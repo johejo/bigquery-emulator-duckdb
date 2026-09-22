@@ -15,6 +15,12 @@ refresh_compile_commands(
     },
 )
 
+filegroup(
+    name = "clang_tidy_config",
+    srcs = [".clang-tidy"],
+    visibility = ["//visibility:public"],
+)
+
 MACOS_ONLY = select({
     "@platforms//os:macos": [],
     "//conditions:default": ["@platforms//:incompatible"],

@@ -7,11 +7,20 @@ bazel_dep(name = "cpp-httplib", version = "0.46.0")
 bazel_dep(name = "googlesql", version = "2026.9.2")
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
 
+bazel_dep(name = "bazel_clang_tidy", dev_dependency = True)
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.19")
+
+git_override(
+    module_name = "bazel_clang_tidy",
+    commit = "c4d35e0d0b838309358e57a2efed831780f85cd0",
+    patch_strip = 1,
+    patches = ["//third_party/bazel_clang_tidy:cxx_include_order.patch"],
+    remote = "https://github.com/erenon/bazel_clang_tidy.git",
+)
 
 git_override(
     module_name = "hedron_compile_commands",

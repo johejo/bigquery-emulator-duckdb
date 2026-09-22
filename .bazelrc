@@ -9,5 +9,12 @@ build:macos --features=-header_modules
 build:macos --features=-layering_check
 build:macos --features=-parse_headers
 
+# clang-tidy, run as a Bazel aspect so it sees the same toolchain flags as the build.
+build:clang-tidy --aspects=@bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
+build:clang-tidy --output_groups=report
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
+# Report every file's findings in one run instead of stopping at the first failure.
+build:clang-tidy --keep_going
+
 # Optional machine-specific settings (not checked into Git).
 try-import %workspace%/.bazelrc.local
