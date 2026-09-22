@@ -1,0 +1,23 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["discovery.json"])
+
+# Embeds the discovery document into a C++ translation unit as a raw string literal.
+genrule(
+    name = "discovery_document_cc",
+    srcs = ["discovery.json"],
+    outs = ["discovery_document.cc"],
+    cmd = """
+        {
+          echo '#include "src/discovery_document.h"'
+          echo 'namespace bigquery_emulator_duckdb {'
+          echo 'namespace {'
+          echo 'constexpr char kDiscoveryDocument[] = R"__bq_discovery__('
+          cat $(location discovery.json)
+          echo ')__bq_discovery__";'
+          echo '}  // namespace'
+          echo 'std::string_view DiscoveryDocument() { return kDiscoveryDocument; }'
+          echo '}  // namespace bigquery_emulator_duckdb'
+        } > $@
+    """,
+)

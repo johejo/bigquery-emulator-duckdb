@@ -1,0 +1,29 @@
+desc: bq query returns BigQuery-compatible results for scalar expressions
+steps:
+  select_one:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT 1 AS x'
+    test: |
+      current.exit_code == 0 && trim(current.stdout) == '[{"x":"1"}]'
+  scalar_types:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT 1.5 AS f, 'a' AS s, true AS b, DATE '2024-01-02' AS d,
+         TIMESTAMP '2024-01-02 03:04:05' AS ts, SAFE_CAST('x' AS INT64) AS n"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"b":"true","d":"2024-01-02","f":"1.5","n":null,"s":"a","ts":"2024-01-02 03:04:05"}]'
+  arrays_and_structs:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT [1, 2] AS arr, STRUCT(1 AS a, 'x' AS b) AS s"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"arr":["1","2"],"s":{"a":"1","b":"x"}}]'
+  invalid_query:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT * FROM missing_table'
+    test: |
+      current.exit_code != 0 && current.stdout contains "missing_table"

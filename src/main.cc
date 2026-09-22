@@ -1,18 +1,49 @@
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <string>
+#include <string_view>
 
-#include "src/backend.h"
-#include "src/frontend.h"
-#include "src/translator.h"
+#include "src/emulator.h"
+#include "src/server.h"
 
-int main() {
-  const std::string google_sql = "SELECT 1";
+namespace {
+
+void PrintUsage() {
+  std::cerr << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT]\n"
+               "  --host HOST  Address to listen on (default: 0.0.0.0)\n"
+               "  --port PORT  Port to listen on (default: 9050)\n";
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  bigquery_emulator_duckdb::ServerOptions options;
+  for (int i = 1; i < argc; ++i) {
+    const std::string_view arg = argv[i];
+    const bool has_value = i + 1 < argc;
+    if (arg == "--host" && has_value) {
+      options.host = argv[++i];
+    } else if (arg == "--port" && has_value) {
+      options.port = std::atoi(argv[++i]);
+    } else if (arg == "--help" || arg == "-h") {
+      PrintUsage();
+      return 0;
+    } else {
+      PrintUsage();
+      return 2;
+    }
+  }
+
   try {
-    const auto frontend_result = bigquery_emulator_duckdb::ParseGoogleSql(google_sql);
-    const auto duckdb_sql = bigquery_emulator_duckdb::TranslateToDuckDbSql(frontend_result);
-    std::cout << bigquery_emulator_duckdb::ExecuteScalarString(duckdb_sql) << '\n';
-    return 0;
+    bigquery_emulator_duckdb::Emulator emulator;
+    bigquery_emulator_duckdb::Server server(emulator, options);
+    if (!server.Bind()) {
+      std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';
+      return 1;
+    }
+    std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
+    return server.Serve() ? 0 : 1;
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

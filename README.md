@@ -6,6 +6,17 @@ A BigQuery Emulator using DuckDB as the backend.
 
 For BigQuery compatibility, an HTTP server is implemented to handle BigQuery's REST API requests. The server receives SQL queries, passes them through the frontend, translator, and backend, and returns the results in a format compatible with BigQuery.
 
+The server is built on [cpp-httplib](https://github.com/yhirose/cpp-httplib) with [nlohmann/json](https://github.com/nlohmann/json). It serves the BigQuery v2 discovery document (which `bq` fetches from any non-Google endpoint) and the following resources:
+
+| Resource | Methods |
+| --- | --- |
+| `jobs` | `query`, `insert` (query jobs only), `get`, `getQueryResults` |
+| `datasets` | `list`, `get`, `insert`, `delete` |
+| `tables` | `list`, `get`, `insert`, `delete` |
+| `tabledata` | `list` |
+
+Jobs always complete synchronously. Projects map to DuckDB catalogs (attached in-memory databases), datasets to schemas and tables to tables, so `project.dataset.table` references work unchanged.
+
 ## Frontend
 
 [GoogleSQL](https://github.com/google/googlesql) is used as the frontend parser and analyzer. It parses and analyzes the SQL query and produces a GoogleSQL AST or resolved AST. The frontend should stay focused on BigQuery SQL semantics and should not depend on DuckDB-specific execution details.
@@ -16,9 +27,22 @@ The translator converts the GoogleSQL AST or resolved AST into a DuckDB-compatib
 
 Keeping this layer separate prevents the frontend from growing into both a parser/analyzer and a DuckDB query generator, while also keeping the backend focused on execution.
 
+The current translator is token based rather than AST based: after the frontend validates the syntax, it rewrites
+
+- backtick identifiers (`` `project.dataset.table` `` → `"project"."dataset"."table"`),
+- string literals (double quotes, triple quotes, `r`/`b` prefixes, backslash escapes),
+- float literals (`1.5` → `1.5::DOUBLE`, since DuckDB would infer `DECIMAL`),
+- type names (`INT64`, `STRING`, `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, ...),
+- `STRUCT(...)` constructors and `ARRAY<T>`/`STRUCT<...>` type parameters,
+- a few functions (`SAFE_CAST`, `CURRENT_TIMESTAMP()`, ...),
+
+and passes everything else through. Replacing this with a resolved AST based translation is the next step.
+
 ## Backend
 
 [DuckDB](https://duckdb.org/) is used as the backend database engine. It executes the translated DuckDB query and returns the results. Powered by libduckdb's C++ API.
+
+The backend also encodes results in BigQuery's wire format: a `TableSchema` derived from the DuckDB column types (`TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`) and rows as `{"f": [{"v": ...}]}` with BigQuery's value encoding (timestamps as epoch seconds, bytes as base64, ...).
 
 ## Usage
 
@@ -27,22 +51,31 @@ Keeping this layer separate prevents the frontend from growing into both a parse
 Get bigquery-emulator-duckdb binary:
 
 ```bash
-# TBD
+bazelisk build //:bigquery-emulator-duckdb
+# -> bazel-bin/bigquery-emulator-duckdb
 ```
 
 ### Run the server
 
 ```bash
-# TBD
+bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050
 ```
 
 ### Connect from BigQuery client
 
-An example using the `bq` command-line tool to connect to the emulator:
+An example using the `bq` command-line tool to connect to the emulator. `bq` normally obtains credentials from `gcloud`; a dummy `--oauth_access_token` together with `--nouse_google_auth` skips that.
 
 ```bash
-# TBD
+alias bqe='bq --api http://127.0.0.1:9050 --project_id test --oauth_access_token=dummy --nouse_google_auth'
+
+bqe mk --dataset ds
+bqe mk --table ds.users id:INTEGER,name:STRING,created:TIMESTAMP
+bqe query --nouse_legacy_sql "INSERT INTO ds.users VALUES (1, 'alice', CURRENT_TIMESTAMP())"
+bqe query --nouse_legacy_sql --format=json 'SELECT * FROM `test.ds.users`'
+bqe head ds.users
 ```
+
+`tests/e2e/bq.sh` wraps the same invocation for the end-to-end tests.
 
 ## Development
 
@@ -54,8 +87,14 @@ Nix optionally provides a development shell with tools such as Bazel, compilers,
 
 End-to-end tests using the `bq` command-line tool are the primary compatibility tests, because the emulator should behave correctly from the BigQuery client's point of view. These scenarios should be described with [runn](https://github.com/k1LoW/runn), using it to execute `bq` commands against the emulator and verify the observable BigQuery-compatible behavior.
 
-Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB.
+```bash
+just e2e            # builds the emulator, starts it on a free port and runs tests/e2e/*.yml
+just e2e --verbose  # extra arguments are passed to `runn run`
+```
+
+Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB. The backend and the HTTP server have unit tests too (`just test`).
 
 #### Internal structure memo
 
-- Use Crow as the HTTP server framework.
+- HTTP server: cpp-httplib (header-only, in the Bazel Central Registry) + nlohmann/json. Crow was considered but it is not in the BCR and depends on asio.
+- `third_party/bigquery/discovery.json` is the discovery document bundled with `bq`, embedded into the binary by a genrule.

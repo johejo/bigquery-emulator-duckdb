@@ -10,8 +10,20 @@ refresh_compile_commands(
     targets = {
         "//:backend_test": "",
         "//:bigquery-emulator-duckdb": "",
+        "//:server_test": "",
         "//:translator_test": "",
     },
+)
+
+MACOS_ONLY = select({
+    "@platforms//os:macos": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+cc_library(
+    name = "api_error",
+    hdrs = ["src/api_error.h"],
+    copts = ["-std=c++20"],
 )
 
 cc_library(
@@ -41,12 +53,47 @@ cc_library(
         "@platforms//os:macos": ["-Wl,-rpath,@loader_path"],
         "//conditions:default": [],
     }),
-    target_compatible_with = select({
-        "@platforms//os:macos": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
+    target_compatible_with = MACOS_ONLY,
     deps = [
         "@duckdb_prebuilt_macos_universal//:duckdb",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "emulator",
+    srcs = ["src/emulator.cc"],
+    hdrs = ["src/emulator.h"],
+    copts = ["-std=c++20"],
+    target_compatible_with = MACOS_ONLY,
+    deps = [
+        ":api_error",
+        ":backend",
+        ":frontend",
+        ":translator",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "discovery_document",
+    srcs = ["//third_party/bigquery:discovery_document.cc"],
+    hdrs = ["src/discovery_document.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
+    name = "server",
+    srcs = ["src/server.cc"],
+    hdrs = ["src/server.h"],
+    copts = ["-std=c++20"],
+    target_compatible_with = MACOS_ONLY,
+    deps = [
+        ":api_error",
+        ":discovery_document",
+        ":emulator",
+        "@cpp-httplib//:httplib",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -55,9 +102,8 @@ cc_binary(
     srcs = ["src/main.cc"],
     copts = ["-std=c++20"],
     deps = [
-        ":backend",
-        ":frontend",
-        ":translator",
+        ":emulator",
+        ":server",
     ],
 )
 
@@ -79,5 +125,19 @@ cc_test(
     deps = [
         ":backend",
         "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_test(
+    name = "server_test",
+    srcs = ["tests/server_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":emulator",
+        ":server",
+        "@com_google_googletest//:gtest_main",
+        "@cpp-httplib//:httplib",
+        "@nlohmann_json//:json",
     ],
 )

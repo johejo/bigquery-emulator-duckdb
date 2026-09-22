@@ -23,4 +23,11 @@ lint: fmt-check tidy
 test:
     bazelisk test //...
 
-check: lint test
+# End-to-end tests: start the emulator and drive it with the bq command-line tool via runn.
+e2e *args:
+    tests/e2e/run.sh {{args}}
+
+run *args:
+    bazelisk run //:bigquery-emulator-duckdb -- {{args}}
+
+check: lint test e2e
