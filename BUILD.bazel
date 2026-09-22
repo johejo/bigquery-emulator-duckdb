@@ -1,0 +1,83 @@
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+    exclude_external_sources = True,
+    exclude_headers = "external",
+    targets = {
+        "//:backend_test": "",
+        "//:bigquery-emulator-duckdb": "",
+        "//:translator_test": "",
+    },
+)
+
+cc_library(
+    name = "frontend",
+    srcs = ["src/frontend.cc"],
+    hdrs = ["src/frontend.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "@googlesql//googlesql/public:parse_helpers",
+    ],
+)
+
+cc_library(
+    name = "translator",
+    srcs = ["src/translator.cc"],
+    hdrs = ["src/translator.h"],
+    copts = ["-std=c++20"],
+    deps = [":frontend"],
+)
+
+cc_library(
+    name = "backend",
+    srcs = ["src/backend.cc"],
+    hdrs = ["src/backend.h"],
+    copts = ["-std=c++20"],
+    linkopts = select({
+        "@platforms//os:macos": ["-Wl,-rpath,@loader_path"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "@duckdb_prebuilt_macos_universal//:duckdb",
+    ],
+)
+
+cc_binary(
+    name = "bigquery-emulator-duckdb",
+    srcs = ["src/main.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":backend",
+        ":frontend",
+        ":translator",
+    ],
+)
+
+cc_test(
+    name = "translator_test",
+    srcs = ["tests/translator_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":frontend",
+        ":translator",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "backend_test",
+    srcs = ["tests/backend_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":backend",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

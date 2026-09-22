@@ -1,0 +1,13 @@
+common --enable_platform_specific_config
+
+# GoogleSQL requires C++20 for dependencies and build tools as well.
+build --cxxopt=-std=c++20
+build --host_cxxopt=-std=c++20
+
+# macOS build compatibility.
+build:macos --features=-header_modules
+build:macos --features=-layering_check
+build:macos --features=-parse_headers
+
+# Optional machine-specific settings (not checked into Git).
+try-import %workspace%/.bazelrc.local

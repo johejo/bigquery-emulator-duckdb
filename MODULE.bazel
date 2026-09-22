@@ -1,0 +1,34 @@
+module(
+    name = "bigquery_emulator_duckdb",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "googlesql", version = "2026.9.2")
+bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+
+bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_cc", version = "0.2.19")
+
+git_override(
+    module_name = "hedron_compile_commands",
+    commit = "abb61a688167623088f8768cc9264798df6a9d10",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+)
+
+archive_override(
+    module_name = "googlesql",
+    integrity = "sha256-Bi6Z2jQDKs31HB2VR5ds72HKT4PaQqSHYDqi4/JJJX4=",
+    strip_prefix = "googlesql-2026.9.2",
+    urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.9.2.tar.gz"],
+)
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "duckdb_prebuilt_macos_universal",
+    build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
+    sha256 = "7b5b8915cc382d0708636fe6385c0cdad5a61c9ff8ba2638b3e2141640783155",
+    urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/libduckdb-osx-universal.zip"],
+)

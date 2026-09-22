@@ -1,0 +1,44 @@
+{
+  description = "Development shell for bigquery-emulator-duckdb";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  };
+
+  outputs =
+    { nixpkgs, ... }:
+    let
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-linux"
+      ];
+
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+    in
+    {
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = pkgs.mkShellNoCC {
+            packages = with pkgs; [
+              bazelisk
+              buildifier
+              clang-tools
+              google-cloud-sdk
+              just
+              runn
+            ];
+
+            shellHook = pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
+              export CC=/usr/bin/clang
+              export CXX=/usr/bin/clang++
+            '';
+          };
+        }
+      );
+    };
+}

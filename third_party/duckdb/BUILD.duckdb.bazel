@@ -1,0 +1,18 @@
+load("@rules_cc//cc:cc_import.bzl", "cc_import")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_import(
+    name = "libduckdb",
+    shared_library = "libduckdb.dylib",
+)
+
+cc_library(
+    name = "duckdb",
+    hdrs = [
+        "duckdb.h",
+        "duckdb.hpp",
+    ],
+    deps = [":libduckdb"],
+)

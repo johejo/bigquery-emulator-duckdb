@@ -1,0 +1,17 @@
+# Bazel output and generated dependency symlinks
+/bazel-*
+/external
+
+# clang tooling
+/compile_commands.json
+/.cache/
+
+# Local Nix / direnv environment
+/.envrc
+/.direnv/
+
+# macOS metadata
+.DS_Store
+
+# Machine-specific Bazel settings
+/.bazelrc.local
