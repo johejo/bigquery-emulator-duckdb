@@ -63,6 +63,7 @@ std::string JobKey(const std::string& project_id, const std::string& job_id) {
 
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
+  values.reserve(result.rows.size());
   for (const json& row : result.rows) {
     values.push_back(row["f"][0]["v"].get<std::string>());
   }

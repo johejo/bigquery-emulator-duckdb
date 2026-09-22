@@ -160,8 +160,14 @@ json JobResource(const Job& job) {
               {"statistics", JobStatistics(job)}};
 }
 
+// The slice of a job's rows that one response carries.
+struct ResultPage {
+  int64_t start_index = 0;
+  int64_t max_results = 0;
+};
+
 // Fills the result fields shared by jobs.query and jobs.getQueryResults responses.
-void AddQueryResults(const Job& job, int64_t start_index, int64_t max_results, json& response) {
+void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   response["jobReference"] = JobReference(job);
   response["jobComplete"] = true;
   response["totalBytesProcessed"] = "0";
@@ -169,6 +175,10 @@ void AddQueryResults(const Job& job, int64_t start_index, int64_t max_results, j
   if (job.error.has_value()) {
     response["errors"] = json::array({ErrorProto(*job.error)});
     return;
+  }
+  // Job sets exactly one of `result` and `error`, but nothing in the type system says so.
+  if (!job.result.has_value()) {
+    throw ApiError::Internal("Job has neither a result nor an error");
   }
   const QueryResult& result = *job.result;
   if (result.affected_rows >= 0) {
@@ -181,8 +191,8 @@ void AddQueryResults(const Job& job, int64_t start_index, int64_t max_results, j
   response["schema"] = result.SchemaToJson();
   response["totalRows"] = std::to_string(result.rows.size());
   const int64_t total = static_cast<int64_t>(result.rows.size());
-  const int64_t begin = std::clamp<int64_t>(start_index, 0, total);
-  const int64_t end = std::min(total, begin + std::max<int64_t>(max_results, 0));
+  const int64_t begin = std::clamp<int64_t>(page.start_index, 0, total);
+  const int64_t end = std::min(total, begin + std::max<int64_t>(page.max_results, 0));
   response["rows"] = json::array();
   for (int64_t i = begin; i < end; ++i) {
     response["rows"].push_back(result.rows[i]);
@@ -241,16 +251,16 @@ class Server::Impl {
     });
     http_.set_exception_handler(
         [](const httplib::Request&, httplib::Response& response, std::exception_ptr exception) {
-          std::string message = "Internal error";
+          std::string message;
           try {
             std::rethrow_exception(std::move(exception));
           } catch (const std::exception& error) {
             message = error.what();
           } catch (...) {
+            message = "Internal error";
           }
           response.status = 500;
-          response.set_content(ErrorBody(ApiError(500, "internalError", message)).dump(),
-                               "application/json");
+          response.set_content(ErrorBody(ApiError::Internal(message)).dump(), "application/json");
         });
     RegisterRoutes();
   }
@@ -297,15 +307,19 @@ class Server::Impl {
                      emulator_.RunQuery(Param(request, "project"), body["query"].get<std::string>(),
                                         ParseDefaultDataset(body), "");
                  json response = {{"kind", "bigquery#queryResponse"}};
-                 AddQueryResults(*job, 0, body.value("maxResults", kDefaultMaxResults), response);
+                 AddQueryResults(
+                     *job, {.max_results = body.value("maxResults", kDefaultMaxResults)}, response);
                  return response;
                }));
     http_.Get("/bigquery/v2/projects/:project/queries/:job",
               Json([this](const httplib::Request& request, httplib::Response&) {
                 const auto job = emulator_.GetJob(Param(request, "project"), Param(request, "job"));
                 json response = {{"kind", "bigquery#getQueryResultsResponse"}, {"etag", ""}};
-                AddQueryResults(*job, StartIndex(request),
-                                QueryParamInt(request, "maxResults", kDefaultMaxResults), response);
+                AddQueryResults(
+                    *job,
+                    {.start_index = StartIndex(request),
+                     .max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults)},
+                    response);
                 return response;
               }));
     http_.Post("/bigquery/v2/projects/:project/jobs",
