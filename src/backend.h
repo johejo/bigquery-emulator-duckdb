@@ -33,6 +33,15 @@ struct QueryResult {
   nlohmann::json SchemaToJson() const;
 };
 
+// Whether `schema` has a TIMESTAMP field anywhere, including inside a RECORD.
+bool HasTimestampField(const std::vector<FieldSchema>& schema);
+
+// Rewrites the TIMESTAMP cells of `row` from the epoch microseconds that results carry
+// internally to BigQuery's default decimal-seconds spelling. Clients that ask for
+// formatOptions.useInt64Timestamp are served the row as it is.
+nlohmann::json TimestampsAsSeconds(const std::vector<FieldSchema>& schema,
+                                   const nlohmann::json& row);
+
 class BackendError : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -50,6 +59,10 @@ class Backend {
   // Runs a single statement and materializes its result. `setup` statements run first on the
   // same connection and are used to select the default catalog and schema.
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
+
+  // Validates `sql` and returns the schema of its result without running it. The result never
+  // has rows; `has_rows` says whether the statement produces a result set at all.
+  QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
  private:
   std::unique_ptr<duckdb::DuckDB> db_;

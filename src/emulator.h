@@ -12,6 +12,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -37,6 +38,9 @@ struct Job {
   std::string job_id;
   std::string location = "US";
   std::string query;
+  // A dry run job is validated but never executed, and it is not kept: BigQuery does not
+  // create a job for it, so `GetJob` will not find it afterwards.
+  bool dry_run = false;
   int64_t creation_time_ms = 0;
   int64_t end_time_ms = 0;
   // Exactly one of `result` and `error` is set once the job is done. Jobs always complete
@@ -45,16 +49,25 @@ struct Job {
   std::optional<ApiError> error;
 };
 
+// A query to run as a job.
+struct QueryRequest {
+  std::string project_id;
+  std::string query;
+  std::optional<DatasetReference> default_dataset;
+  std::string job_id;  // Generated when empty.
+  QueryParameters parameters;
+  bool dry_run = false;
+};
+
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
  public:
   Emulator();
 
-  // Runs `query` as a job and returns it. `job_id` is generated when empty.
-  std::shared_ptr<const Job> RunQuery(const std::string& project_id, const std::string& query,
-                                      const std::optional<DatasetReference>& default_dataset,
-                                      const std::string& job_id);
+  // Runs `request` as a job and returns it. A failed query is reported through the job's
+  // error rather than thrown, which is how BigQuery reports it too.
+  std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
   std::shared_ptr<const Job> GetJob(const std::string& project_id, const std::string& job_id);
 
   std::vector<std::string> ListDatasets(const std::string& project_id);
@@ -71,6 +84,7 @@ class Emulator {
  private:
   void EnsureProject(const std::string& project_id);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
+  QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
   Backend backend_;
   std::mutex mutex_;

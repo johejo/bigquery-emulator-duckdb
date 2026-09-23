@@ -95,8 +95,8 @@ FieldSchema ToFieldSchema(const std::string& name, const duckdb::LogicalType& ty
   return field;
 }
 
+// BigQuery's default TIMESTAMP encoding: a decimal string of seconds since the Unix epoch.
 std::string EpochSecondsString(int64_t micros) {
-  // BigQuery encodes TIMESTAMP as a decimal string of seconds since the Unix epoch.
   const bool negative = micros < 0;
   const uint64_t magnitude =
       negative ? static_cast<uint64_t>(-(micros + 1)) + 1 : static_cast<uint64_t>(micros);
@@ -127,7 +127,10 @@ json ScalarToCellValue(const duckdb::Value& value) {
     case duckdb::LogicalTypeId::BLOB:
       return duckdb::Blob::ToBase64(duckdb::string_t(duckdb::StringValue::Get(value)));
     case duckdb::LogicalTypeId::TIMESTAMP_TZ:
-      return EpochSecondsString(value.GetValueUnsafe<duckdb::timestamp_t>().value);
+      // Kept as epoch microseconds, which is what clients asking for
+      // formatOptions.useInt64Timestamp want; `TimestampsAsSeconds` produces the other
+      // spelling for everyone else.
+      return std::to_string(value.GetValueUnsafe<duckdb::timestamp_t>().value);
     case duckdb::LogicalTypeId::TIMESTAMP:
     case duckdb::LogicalTypeId::TIMESTAMP_SEC:
     case duckdb::LogicalTypeId::TIMESTAMP_MS:
@@ -193,6 +196,40 @@ bool IsDml(duckdb::StatementType type) {
          type == duckdb::StatementType::MERGE_INTO_STATEMENT;
 }
 
+json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells);
+
+// One value of a cell: the element of a REPEATED field, or the whole value of a scalar one.
+json ValueAsSeconds(const FieldSchema& field, const json& value) {
+  if (value.is_null()) {
+    return value;
+  }
+  if (field.type == "TIMESTAMP") {
+    return EpochSecondsString(std::stoll(value.get<std::string>()));
+  }
+  if (field.type == "RECORD") {
+    return json{{"f", CellsAsSeconds(field.fields, value.at("f"))}};
+  }
+  return value;
+}
+
+json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
+  json result = json::array();
+  for (size_t i = 0; i < schema.size() && i < cells.size(); ++i) {
+    const FieldSchema& field = schema[i];
+    const json& value = cells[i].at("v");
+    if (field.mode != "REPEATED" || value.is_null()) {
+      result.push_back(json{{"v", ValueAsSeconds(field, value)}});
+      continue;
+    }
+    json elements = json::array();
+    for (const json& element : value) {
+      elements.push_back(json{{"v", ValueAsSeconds(field, element.at("v"))}});
+    }
+    result.push_back(json{{"v", std::move(elements)}});
+  }
+  return result;
+}
+
 void ThrowIfFailed(const std::unique_ptr<duckdb::MaterializedQueryResult>& result) {
   if (!result || result->HasError()) {
     throw BackendError(result ? result->GetError() : "DuckDB query failed");
@@ -218,6 +255,19 @@ json QueryResult::SchemaToJson() const {
     fields.push_back(field.ToJson());
   }
   return json{{"fields", std::move(fields)}};
+}
+
+bool HasTimestampField(const std::vector<FieldSchema>& schema) {
+  for (const FieldSchema& field : schema) {
+    if (field.type == "TIMESTAMP" || HasTimestampField(field.fields)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row) {
+  return json{{"f", CellsAsSeconds(schema, row.at("f"))}};
 }
 
 Backend::Backend() : db_(std::make_unique<duckdb::DuckDB>(nullptr)) {}
@@ -250,6 +300,33 @@ QueryResult Backend::Execute(const std::string& sql, const std::vector<std::stri
       cells.push_back(ToCell(result->GetValue(column, row)));
     }
     query_result.rows.push_back(json{{"f", std::move(cells)}});
+  }
+  return query_result;
+}
+
+QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
+  duckdb::Connection connection(*db_);
+  ThrowIfFailed(connection.Query("SET TimeZone = 'UTC'"));
+  for (const std::string& statement : setup) {
+    ThrowIfFailed(connection.Query(statement));
+  }
+  // Preparing binds names and types without running the statement, which is what a dry run
+  // needs: the query is validated and its result schema is known, but nothing is read or
+  // written.
+  std::unique_ptr<duckdb::PreparedStatement> prepared = connection.Prepare(sql);
+  if (!prepared || prepared->HasError()) {
+    throw BackendError(prepared ? prepared->GetError() : "DuckDB failed to prepare the query");
+  }
+
+  QueryResult query_result;
+  if (!ProducesResultSet(prepared->GetStatementType())) {
+    return query_result;
+  }
+  query_result.has_rows = true;
+  const std::vector<std::string>& names = prepared->GetNames();
+  const std::vector<duckdb::LogicalType>& types = prepared->GetTypes();
+  for (size_t i = 0; i < names.size(); ++i) {
+    query_result.schema.push_back(ToFieldSchema(names[i], types[i]));
   }
   return query_result;
 }

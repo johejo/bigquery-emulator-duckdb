@@ -4,18 +4,23 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
+#include "src/api_error.h"
 #include "src/frontend.h"
+#include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
 
-std::string Translate(const std::string& sql) { return TranslateToDuckDbSql(ParseGoogleSql(sql)); }
+std::string Translate(const std::string& sql, const QueryParameters& parameters = {}) {
+  return TranslateToDuckDbSql(ParseGoogleSql(sql), parameters);
+}
 
 // The translator unparses the AST, so line breaks and indentation are the unparser's rather
 // than the input's. Collapsing runs of whitespace keeps the expectations readable; the cases
 // that depend on whitespace inside a literal use Translate() and search the output instead.
-std::string TranslateOneLine(const std::string& sql) {
-  const std::string translated = Translate(sql);
+std::string TranslateOneLine(const std::string& sql, const QueryParameters& parameters = {}) {
+  const std::string translated = Translate(sql, parameters);
   std::string result;
   bool in_space = false;
   for (const char c : translated) {
@@ -145,6 +150,27 @@ TEST(TranslatorTest, DropsComments) {
 
 TEST(TranslatorTest, RejectsInvalidSyntax) {
   EXPECT_THROW(Translate("SELECT FROM WHERE"), std::runtime_error);
+}
+
+TEST(TranslatorTest, ReplacesNamedQueryParameters) {
+  const QueryParameters parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
+      {"name": "id", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "42"}},
+      {"name": "name", "parameterType": {"type": "STRING"},
+       "parameterValue": {"value": "a'b"}}])"));
+  EXPECT_EQ(TranslateOneLine("SELECT @name FROM t WHERE id = @id", parameters),
+            "SELECT CAST('a''b' AS VARCHAR) FROM t WHERE id = CAST('42' AS BIGINT)");
+}
+
+TEST(TranslatorTest, ReplacesPositionalQueryParameters) {
+  const QueryParameters parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
+      {"parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}},
+      {"parameterType": {"type": "STRING"}, "parameterValue": {"value": "x"}}])"));
+  EXPECT_EQ(TranslateOneLine("SELECT * FROM t WHERE a = ? AND b = ?", parameters),
+            "SELECT * FROM t WHERE a = CAST('1' AS BIGINT) AND b = CAST('x' AS VARCHAR)");
+}
+
+TEST(TranslatorTest, RejectsUndeclaredQueryParameters) {
+  EXPECT_THROW(Translate("SELECT @missing"), ApiError);
 }
 
 }  // namespace

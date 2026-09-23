@@ -59,6 +59,16 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","point":{"x":"2","y":"3"},"tags":["a","b"]}]'
+  dry_run_does_not_create_a_table:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --dry_run
+        "CREATE TABLE e2e.dry_run (id INT64)"
+    test: current.exit_code == 0 && current.stdout contains "successfully validated"
+  show_table_from_dry_run:
+    exec:
+      command: tests/e2e/bq.sh show e2e.dry_run
+    test: current.exit_code != 0
   rm_nested_table:
     exec:
       command: tests/e2e/bq.sh rm -f -t e2e.nested

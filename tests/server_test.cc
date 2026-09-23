@@ -102,6 +102,86 @@ TEST_F(ServerTest, PaginatesQueryResults) {
   EXPECT_FALSE(page.contains("pageToken"));
 }
 
+TEST_F(ServerTest, RunsQueryWithNamedParameters) {
+  const json response =
+      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT @n AS n, @s AS s, @a AS a"},
+                                               {"parameterMode", "NAMED"},
+                                               {"queryParameters", json::parse(R"([
+                {"name": "n", "parameterType": {"type": "INT64"},
+                 "parameterValue": {"value": "7"}},
+                {"name": "s", "parameterType": {"type": "STRING"},
+                 "parameterValue": {"value": "x"}},
+                {"name": "a", "parameterType": {"type": "ARRAY",
+                                                "arrayType": {"type": "INT64"}},
+                 "parameterValue": {"arrayValues": [{"value": "1"}, {"value": "2"}]}}])")}});
+  EXPECT_EQ(response["schema"]["fields"][2]["mode"], "REPEATED");
+  EXPECT_EQ(response["rows"][0]["f"],
+            json::parse(R"([{"v": "7"}, {"v": "x"}, {"v": [{"v": "1"}, {"v": "2"}]}])"));
+}
+
+TEST_F(ServerTest, RunsQueryWithPositionalParameters) {
+  const json response =
+      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT ? AS a, ? AS b"},
+                                               {"parameterMode", "POSITIONAL"},
+                                               {"queryParameters", json::parse(R"([
+                {"parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}},
+                {"parameterType": {"type": "STRING"}, "parameterValue": {"value": "b"}}])")}});
+  EXPECT_EQ(response["rows"][0]["f"], json::parse(R"([{"v": "1"}, {"v": "b"}])"));
+}
+
+TEST_F(ServerTest, ReportsUndeclaredParameters) {
+  const json response = Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT @missing"}});
+  ASSERT_TRUE(response.contains("errors"));
+  EXPECT_EQ(response["errors"][0]["reason"], "invalidQuery");
+}
+
+TEST_F(ServerTest, ValidatesQueriesWithoutRunningThem) {
+  Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  Post("/bigquery/v2/projects/p/queries", {{"query", "CREATE TABLE ds.t (id INT64)"}});
+
+  const json response = Post("/bigquery/v2/projects/p/queries",
+                             {{"query", "SELECT id FROM `p.ds.t`"}, {"dryRun", true}});
+  EXPECT_EQ(response["jobComplete"], true);
+  EXPECT_EQ(response["schema"]["fields"][0]["name"], "id");
+  EXPECT_FALSE(response.contains("jobReference"));
+  EXPECT_FALSE(response.contains("rows"));
+
+  // The statement is validated but never runs, and no job is created for it.
+  const json job = Post("/bigquery/v2/projects/p/jobs", {{"jobReference", {{"jobId", "dry1"}}},
+                                                         {"configuration",
+                                                          {{"dryRun", true},
+                                                           {"query",
+                                                            {{"query",
+                                                              "INSERT INTO ds.t VALUES "
+                                                              "(1)"}}}}}});
+  EXPECT_EQ(job["status"]["state"], "DONE");
+  EXPECT_EQ(job["configuration"]["dryRun"], true);
+  EXPECT_FALSE(job["status"].contains("errorResult"));
+  Get("/bigquery/v2/projects/p/jobs/dry1", 404);
+  EXPECT_EQ(Post("/bigquery/v2/projects/p/queries",
+                 {{"query", "SELECT count(*) AS c FROM `p.ds.t`"}})["rows"][0]["f"][0]["v"],
+            "0");
+
+  Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT * FROM missing"}, {"dryRun", true}},
+       400);
+}
+
+TEST_F(ServerTest, EncodesTimestampsAsMicrosecondsOnRequest) {
+  const json body = {{"query", "SELECT TIMESTAMP '2020-01-02 03:04:05+00' AS ts"}};
+  EXPECT_EQ(Post("/bigquery/v2/projects/p/queries", body)["rows"][0]["f"][0]["v"], "1577934245");
+
+  json with_option = body;
+  with_option["formatOptions"] = {{"useInt64Timestamp", true}};
+  EXPECT_EQ(Post("/bigquery/v2/projects/p/queries", with_option)["rows"][0]["f"][0]["v"],
+            "1577934245000000");
+
+  Post("/bigquery/v2/projects/p/jobs",
+       {{"jobReference", {{"jobId", "ts1"}}}, {"configuration", {{"query", body}}}});
+  EXPECT_EQ(Get("/bigquery/v2/projects/p/queries/ts1"
+                "?formatOptions.useInt64Timestamp=true")["rows"][0]["f"][0]["v"],
+            "1577934245000000");
+}
+
 TEST_F(ServerTest, ManagesDatasetsAndTables) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}}, 409);

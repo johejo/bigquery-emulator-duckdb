@@ -12,6 +12,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/duckdb_sql.h"
 #include "src/frontend.h"
 #include "src/translator.h"
 
@@ -24,28 +25,6 @@ int64_t NowMillis() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
-}
-
-std::string QuoteIdentifier(const std::string& identifier) {
-  std::string quoted = "\"";
-  for (const char c : identifier) {
-    quoted += c;
-    if (c == '"') {
-      quoted += '"';
-    }
-  }
-  return quoted + "\"";
-}
-
-std::string QuoteLiteral(const std::string& text) {
-  std::string quoted = "'";
-  for (const char c : text) {
-    quoted += c;
-    if (c == '\'') {
-      quoted += '\'';
-    }
-  }
-  return quoted + "'";
 }
 
 std::string QualifiedName(const DatasetReference& dataset) {
@@ -137,34 +116,43 @@ QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::str
   }
 }
 
-std::shared_ptr<const Job> Emulator::RunQuery(
-    const std::string& project_id, const std::string& query,
-    const std::optional<DatasetReference>& default_dataset, const std::string& job_id) {
-  EnsureProject(project_id);
+QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
+  try {
+    return backend_.Prepare(sql, setup);
+  } catch (const BackendError& error) {
+    throw ApiError::InvalidQuery(error.what());
+  }
+}
+
+std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
+  EnsureProject(request.project_id);
   auto job = std::make_shared<Job>();
-  job->project_id = project_id;
-  job->query = query;
+  job->project_id = request.project_id;
+  job->query = request.query;
+  job->dry_run = request.dry_run;
   job->creation_time_ms = NowMillis();
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    job->job_id = job_id.empty() ? "job_" + std::to_string(next_job_number_++) : job_id;
+    job->job_id =
+        request.job_id.empty() ? "job_" + std::to_string(next_job_number_++) : request.job_id;
   }
 
   std::vector<std::string> setup;
-  if (default_dataset.has_value()) {
-    const std::string dataset_project =
-        default_dataset->project_id.empty() ? project_id : default_dataset->project_id;
+  if (request.default_dataset.has_value()) {
+    const std::string dataset_project = request.default_dataset->project_id.empty()
+                                            ? request.project_id
+                                            : request.default_dataset->project_id;
     EnsureProject(dataset_project);
-    setup.push_back("USE " +
-                    QualifiedName(DatasetReference{dataset_project, default_dataset->dataset_id}));
+    setup.push_back("USE " + QualifiedName(DatasetReference{dataset_project,
+                                                            request.default_dataset->dataset_id}));
   } else {
-    setup.push_back("USE " + QuoteIdentifier(project_id));
+    setup.push_back("USE " + QuoteIdentifier(request.project_id));
   }
 
   try {
-    const FrontendResult frontend_result = ParseGoogleSql(query);
-    const std::string duckdb_sql = TranslateToDuckDbSql(frontend_result);
-    job->result = Execute(duckdb_sql, setup);
+    const FrontendResult frontend_result = ParseGoogleSql(request.query);
+    const std::string duckdb_sql = TranslateToDuckDbSql(frontend_result, request.parameters);
+    job->result = request.dry_run ? Prepare(duckdb_sql, setup) : Execute(duckdb_sql, setup);
   } catch (const ApiError& error) {
     job->error = error;
   } catch (const std::exception& error) {
@@ -172,8 +160,11 @@ std::shared_ptr<const Job> Emulator::RunQuery(
   }
   job->end_time_ms = NowMillis();
 
+  if (request.dry_run) {
+    return job;
+  }
   std::lock_guard<std::mutex> lock(mutex_);
-  jobs_[JobKey(project_id, job->job_id)] = job;
+  jobs_[JobKey(request.project_id, job->job_id)] = job;
   return job;
 }
 

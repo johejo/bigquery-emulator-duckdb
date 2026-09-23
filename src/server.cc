@@ -16,6 +16,7 @@
 #include "src/api_error.h"
 #include "src/discovery_document.h"
 #include "src/emulator.h"
+#include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -23,6 +24,9 @@ namespace {
 using nlohmann::json;
 
 constexpr int64_t kDefaultMaxResults = 100000;
+
+// The path prefix of the BigQuery REST API, below the API root.
+const std::string kApiPrefix = "/bigquery/v2";  // NOLINT(cert-err58-cpp)
 
 json ErrorBody(const ApiError& error) {
   const char* status = "INVALID_ARGUMENT";
@@ -80,6 +84,20 @@ std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
   }
   const json& dataset = config["defaultDataset"];
   return DatasetReference{dataset.value("projectId", ""), dataset.value("datasetId", "")};
+}
+
+// jobs.query takes the query configuration as the request body and jobs.insert takes it as
+// configuration.query, but the fields this emulator reads are spelled the same in both.
+QueryRequest ToQueryRequest(const std::string& project_id, const json& config) {
+  if (!config.contains("query") || !config["query"].is_string()) {
+    throw ApiError::Invalid("Required parameter is missing: query");
+  }
+  QueryRequest request;
+  request.project_id = project_id;
+  request.query = config["query"].get<std::string>();
+  request.default_dataset = ParseDefaultDataset(config);
+  request.parameters = QueryParameters::Parse(config.value("queryParameters", json::array()));
+  return request;
 }
 
 // Derives JobStatistics2.statementType from the leading keywords of the query.
@@ -141,6 +159,10 @@ json JobStatistics(const Job& job) {
   if (job.result.has_value() && job.result->affected_rows >= 0) {
     query_statistics["numDmlAffectedRows"] = std::to_string(job.result->affected_rows);
   }
+  // A dry run reports what the query would return; that schema is all it produces.
+  if (job.dry_run && job.result.has_value() && job.result->has_rows) {
+    query_statistics["schema"] = job.result->SchemaToJson();
+  }
   return json{{"creationTime", std::to_string(job.creation_time_ms)},
               {"startTime", std::to_string(job.creation_time_ms)},
               {"endTime", std::to_string(job.end_time_ms)},
@@ -155,7 +177,9 @@ json JobResource(const Job& job) {
               {"selfLink", ""},
               {"jobReference", JobReference(job)},
               {"configuration",
-               {{"jobType", "QUERY"}, {"query", {{"query", job.query}, {"useLegacySql", false}}}}},
+               {{"jobType", "QUERY"},
+                {"dryRun", job.dry_run},
+                {"query", {{"query", job.query}, {"useLegacySql", false}}}}},
               {"status", JobStatus(job)},
               {"statistics", JobStatistics(job)}};
 }
@@ -164,7 +188,22 @@ json JobResource(const Job& job) {
 struct ResultPage {
   int64_t start_index = 0;
   int64_t max_results = 0;
+  // Clients that ask for formatOptions.useInt64Timestamp get TIMESTAMP values as epoch
+  // microseconds instead of the default decimal seconds.
+  bool int64_timestamps = false;
 };
+
+// Copies the rows of `result` in [begin, end) into a response, in the timestamp encoding the
+// request asked for.
+json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool int64_timestamps) {
+  const bool as_seconds = !int64_timestamps && HasTimestampField(result.schema);
+  json rows = json::array();
+  for (int64_t i = begin; i < end; ++i) {
+    rows.push_back(as_seconds ? TimestampsAsSeconds(result.schema, result.rows[i])
+                              : result.rows[i]);
+  }
+  return rows;
+}
 
 // Fills the result fields shared by jobs.query and jobs.getQueryResults responses.
 void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
@@ -193,13 +232,29 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   const int64_t total = static_cast<int64_t>(result.rows.size());
   const int64_t begin = std::clamp<int64_t>(page.start_index, 0, total);
   const int64_t end = std::min(total, begin + std::max<int64_t>(page.max_results, 0));
-  response["rows"] = json::array();
-  for (int64_t i = begin; i < end; ++i) {
-    response["rows"].push_back(result.rows[i]);
-  }
+  response["rows"] = RowsForResponse(result, begin, end, page.int64_timestamps);
   if (end < total) {
     response["pageToken"] = std::to_string(end);
   }
+}
+
+json DryRunQueryResponse(const Job& job) {
+  json response = {{"kind", "bigquery#queryResponse"},
+                   {"jobComplete", true},
+                   {"totalBytesProcessed", "0"},
+                   {"cacheHit", false}};
+  if (job.error.has_value()) {
+    throw *job.error;
+  }
+  if (job.result.has_value() && job.result->has_rows) {
+    response["schema"] = job.result->SchemaToJson();
+  }
+  response["totalRows"] = "0";
+  return response;
+}
+
+bool Int64Timestamps(const httplib::Request& request) {
+  return QueryParamBool(request, "formatOptions.useInt64Timestamp");
 }
 
 int64_t StartIndex(const httplib::Request& request) {
@@ -270,6 +325,23 @@ class Server::Impl {
  private:
   using Handler = std::function<json(const httplib::Request&, httplib::Response&)>;
 
+  // Every resource is served twice: under the /bigquery/v2 prefix that the REST API uses, and
+  // directly under the root. A client pointed at the emulator with an endpoint override
+  // replaces the whole API base path, prefix included, and then asks for /projects/... —
+  // option.WithEndpoint in the Go client works that way.
+  void Get(const std::string& path, httplib::Server::Handler handler) {
+    http_.Get(kApiPrefix + path, handler);
+    http_.Get(path, std::move(handler));
+  }
+  void Post(const std::string& path, httplib::Server::Handler handler) {
+    http_.Post(kApiPrefix + path, handler);
+    http_.Post(path, std::move(handler));
+  }
+  void Delete(const std::string& path, httplib::Server::Handler handler) {
+    http_.Delete(kApiPrefix + path, handler);
+    http_.Delete(path, std::move(handler));
+  }
+
   // Wraps a handler so that it returns JSON and maps ApiError to BigQuery's error format.
   httplib::Server::Handler Json(Handler handler) {
     return [handler = std::move(handler)](const httplib::Request& request,
@@ -297,157 +369,154 @@ class Server::Impl {
     });
 
     // jobs
-    http_.Post("/bigquery/v2/projects/:project/queries",
-               Json([this](const httplib::Request& request, httplib::Response&) {
-                 const json body = ParseBody(request);
-                 if (!body.contains("query")) {
-                   throw ApiError::Invalid("Required parameter is missing: query");
-                 }
-                 const auto job =
-                     emulator_.RunQuery(Param(request, "project"), body["query"].get<std::string>(),
-                                        ParseDefaultDataset(body), "");
-                 json response = {{"kind", "bigquery#queryResponse"}};
-                 AddQueryResults(
-                     *job, {.max_results = body.value("maxResults", kDefaultMaxResults)}, response);
-                 return response;
-               }));
-    http_.Get("/bigquery/v2/projects/:project/queries/:job",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                const auto job = emulator_.GetJob(Param(request, "project"), Param(request, "job"));
-                json response = {{"kind", "bigquery#getQueryResultsResponse"}, {"etag", ""}};
-                AddQueryResults(
-                    *job,
-                    {.start_index = StartIndex(request),
-                     .max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults)},
-                    response);
-                return response;
-              }));
-    http_.Post("/bigquery/v2/projects/:project/jobs",
-               Json([this](const httplib::Request& request, httplib::Response&) {
-                 const json body = ParseBody(request);
-                 const json config = body.value("configuration", json::object());
-                 if (!config.contains("query") || !config["query"].contains("query")) {
-                   throw ApiError::Invalid("Only query jobs are supported");
-                 }
-                 const json& query = config["query"];
-                 const std::string job_id =
-                     body.value("jobReference", json::object()).value("jobId", "");
-                 const auto job = emulator_.RunQuery(Param(request, "project"),
-                                                     query["query"].get<std::string>(),
-                                                     ParseDefaultDataset(query), job_id);
-                 return JobResource(*job);
-               }));
-    http_.Get(
-        "/bigquery/v2/projects/:project/jobs/:job",
+    Post("/projects/:project/queries",
+         Json([this](const httplib::Request& request, httplib::Response&) {
+           const json body = ParseBody(request);
+           QueryRequest query_request = ToQueryRequest(Param(request, "project"), body);
+           query_request.dry_run = body.value("dryRun", false);
+           const auto job = emulator_.RunQuery(query_request);
+           if (job->dry_run) {
+             // A dry run creates no job, so its response has no job reference either.
+             return DryRunQueryResponse(*job);
+           }
+           json response = {{"kind", "bigquery#queryResponse"}};
+           AddQueryResults(
+               *job,
+               {.max_results = body.value("maxResults", kDefaultMaxResults),
+                .int64_timestamps =
+                    body.value("formatOptions", json::object()).value("useInt64Timestamp", false)},
+               response);
+           return response;
+         }));
+    Get("/projects/:project/queries/:job",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const auto job = emulator_.GetJob(Param(request, "project"), Param(request, "job"));
+          json response = {{"kind", "bigquery#getQueryResultsResponse"}, {"etag", ""}};
+          AddQueryResults(*job,
+                          {.start_index = StartIndex(request),
+                           .max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults),
+                           .int64_timestamps = Int64Timestamps(request)},
+                          response);
+          return response;
+        }));
+    Post("/projects/:project/jobs",
+         Json([this](const httplib::Request& request, httplib::Response&) {
+           const json body = ParseBody(request);
+           const json config = body.value("configuration", json::object());
+           if (!config.contains("query")) {
+             throw ApiError::Invalid("Only query jobs are supported");
+           }
+           QueryRequest query_request = ToQueryRequest(Param(request, "project"), config["query"]);
+           query_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
+           query_request.dry_run = config.value("dryRun", false);
+           return JobResource(*emulator_.RunQuery(query_request));
+         }));
+    Get("/projects/:project/jobs/:job",
         Json([this](const httplib::Request& request, httplib::Response&) {
           return JobResource(*emulator_.GetJob(Param(request, "project"), Param(request, "job")));
         }));
 
     // datasets
-    http_.Get("/bigquery/v2/projects/:project/datasets",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                const std::string project = Param(request, "project");
-                json datasets = json::array();
-                for (const std::string& dataset_id : emulator_.ListDatasets(project)) {
-                  datasets.push_back(DatasetResource(DatasetReference{project, dataset_id}));
-                }
-                return json{{"kind", "bigquery#datasetList"},
-                            {"etag", ""},
-                            {"datasets", std::move(datasets)}};
-              }));
-    http_.Post("/bigquery/v2/projects/:project/datasets",
-               Json([this](const httplib::Request& request, httplib::Response&) {
-                 const json body = ParseBody(request);
-                 const json reference = body.value("datasetReference", json::object());
-                 if (!reference.contains("datasetId")) {
-                   throw ApiError::Invalid("Required parameter is missing: datasetId");
-                 }
-                 const DatasetReference dataset{Param(request, "project"),
-                                                reference["datasetId"].get<std::string>()};
-                 emulator_.CreateDataset(dataset);
-                 return DatasetResource(dataset);
-               }));
-    http_.Get("/bigquery/v2/projects/:project/datasets/:dataset",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                const DatasetReference dataset{Param(request, "project"),
-                                               Param(request, "dataset")};
-                emulator_.GetDataset(dataset);
-                return DatasetResource(dataset);
-              }));
-    http_.Delete("/bigquery/v2/projects/:project/datasets/:dataset",
-                 Json([this](const httplib::Request& request, httplib::Response& response) {
-                   emulator_.DeleteDataset(
-                       DatasetReference{Param(request, "project"), Param(request, "dataset")},
-                       QueryParamBool(request, "deleteContents"));
-                   response.status = 204;
-                   return json::object();
-                 }));
+    Get("/projects/:project/datasets",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const std::string project = Param(request, "project");
+          json datasets = json::array();
+          for (const std::string& dataset_id : emulator_.ListDatasets(project)) {
+            datasets.push_back(DatasetResource(DatasetReference{project, dataset_id}));
+          }
+          return json{
+              {"kind", "bigquery#datasetList"}, {"etag", ""}, {"datasets", std::move(datasets)}};
+        }));
+    Post("/projects/:project/datasets",
+         Json([this](const httplib::Request& request, httplib::Response&) {
+           const json body = ParseBody(request);
+           const json reference = body.value("datasetReference", json::object());
+           if (!reference.contains("datasetId")) {
+             throw ApiError::Invalid("Required parameter is missing: datasetId");
+           }
+           const DatasetReference dataset{Param(request, "project"),
+                                          reference["datasetId"].get<std::string>()};
+           emulator_.CreateDataset(dataset);
+           return DatasetResource(dataset);
+         }));
+    Get("/projects/:project/datasets/:dataset",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const DatasetReference dataset{Param(request, "project"), Param(request, "dataset")};
+          emulator_.GetDataset(dataset);
+          return DatasetResource(dataset);
+        }));
+    Delete("/projects/:project/datasets/:dataset",
+           Json([this](const httplib::Request& request, httplib::Response& response) {
+             emulator_.DeleteDataset(
+                 DatasetReference{Param(request, "project"), Param(request, "dataset")},
+                 QueryParamBool(request, "deleteContents"));
+             response.status = 204;
+             return json::object();
+           }));
 
     // tables
-    http_.Get("/bigquery/v2/projects/:project/datasets/:dataset/tables",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                const DatasetReference dataset{Param(request, "project"),
-                                               Param(request, "dataset")};
-                json tables = json::array();
-                for (const std::string& table_id : emulator_.ListTables(dataset)) {
-                  const TableReference table{dataset.project_id, dataset.dataset_id, table_id};
-                  tables.push_back(
-                      json{{"kind", "bigquery#table"},
-                           {"id", table.project_id + ":" + table.dataset_id + "." + table.table_id},
-                           {"tableReference", TableReferenceJson(table)},
-                           {"type", "TABLE"}});
-                }
-                return json{{"kind", "bigquery#tableList"},
-                            {"etag", ""},
-                            {"totalItems", tables.size()},
-                            {"tables", std::move(tables)}};
-              }));
-    http_.Post("/bigquery/v2/projects/:project/datasets/:dataset/tables",
-               Json([this](const httplib::Request& request, httplib::Response&) {
-                 const json body = ParseBody(request);
-                 const json reference = body.value("tableReference", json::object());
-                 if (!reference.contains("tableId")) {
-                   throw ApiError::Invalid("Required parameter is missing: tableId");
-                 }
-                 const TableReference table{Param(request, "project"), Param(request, "dataset"),
-                                            reference["tableId"].get<std::string>()};
-                 emulator_.CreateTable(
-                     table, body.value("schema", json::object()).value("fields", json::array()));
-                 return TableResource(emulator_.GetTable(table));
-               }));
-    http_.Get(
-        "/bigquery/v2/projects/:project/datasets/:dataset/tables/:table",
+    Get("/projects/:project/datasets/:dataset/tables",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const DatasetReference dataset{Param(request, "project"), Param(request, "dataset")};
+          json tables = json::array();
+          for (const std::string& table_id : emulator_.ListTables(dataset)) {
+            const TableReference table{dataset.project_id, dataset.dataset_id, table_id};
+            tables.push_back(
+                json{{"kind", "bigquery#table"},
+                     {"id", table.project_id + ":" + table.dataset_id + "." + table.table_id},
+                     {"tableReference", TableReferenceJson(table)},
+                     {"type", "TABLE"}});
+          }
+          return json{{"kind", "bigquery#tableList"},
+                      {"etag", ""},
+                      {"totalItems", tables.size()},
+                      {"tables", std::move(tables)}};
+        }));
+    Post("/projects/:project/datasets/:dataset/tables",
+         Json([this](const httplib::Request& request, httplib::Response&) {
+           const json body = ParseBody(request);
+           const json reference = body.value("tableReference", json::object());
+           if (!reference.contains("tableId")) {
+             throw ApiError::Invalid("Required parameter is missing: tableId");
+           }
+           const TableReference table{Param(request, "project"), Param(request, "dataset"),
+                                      reference["tableId"].get<std::string>()};
+           emulator_.CreateTable(
+               table, body.value("schema", json::object()).value("fields", json::array()));
+           return TableResource(emulator_.GetTable(table));
+         }));
+    Get("/projects/:project/datasets/:dataset/tables/:table",
         Json([this](const httplib::Request& request, httplib::Response&) {
           return TableResource(emulator_.GetTable(TableReference{
               Param(request, "project"), Param(request, "dataset"), Param(request, "table")}));
         }));
-    http_.Delete(
-        "/bigquery/v2/projects/:project/datasets/:dataset/tables/:table",
-        Json([this](const httplib::Request& request, httplib::Response& response) {
-          emulator_.DeleteTable(TableReference{Param(request, "project"), Param(request, "dataset"),
-                                               Param(request, "table")});
-          response.status = 204;
-          return json::object();
+    Delete("/projects/:project/datasets/:dataset/tables/:table",
+           Json([this](const httplib::Request& request, httplib::Response& response) {
+             emulator_.DeleteTable(TableReference{
+                 Param(request, "project"), Param(request, "dataset"), Param(request, "table")});
+             response.status = 204;
+             return json::object();
+           }));
+    Get("/projects/:project/datasets/:dataset/tables/:table/data",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const TableReference table{Param(request, "project"), Param(request, "dataset"),
+                                     Param(request, "table")};
+          const int64_t start_index = StartIndex(request);
+          const int64_t max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults);
+          const QueryResult result = emulator_.ListTableData(table, start_index, max_results);
+          const int64_t total = emulator_.GetTable(table).num_rows;
+          json response = {
+              {"kind", "bigquery#tableDataList"},
+              {"etag", ""},
+              {"totalRows", std::to_string(total)},
+              {"rows", RowsForResponse(result, 0, static_cast<int64_t>(result.rows.size()),
+                                       Int64Timestamps(request))}};
+          if (start_index + static_cast<int64_t>(result.rows.size()) < total) {
+            response["pageToken"] =
+                std::to_string(start_index + static_cast<int64_t>(result.rows.size()));
+          }
+          return response;
         }));
-    http_.Get("/bigquery/v2/projects/:project/datasets/:dataset/tables/:table/data",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                const TableReference table{Param(request, "project"), Param(request, "dataset"),
-                                           Param(request, "table")};
-                const int64_t start_index = StartIndex(request);
-                const int64_t max_results =
-                    QueryParamInt(request, "maxResults", kDefaultMaxResults);
-                const QueryResult result = emulator_.ListTableData(table, start_index, max_results);
-                const int64_t total = emulator_.GetTable(table).num_rows;
-                json response = {{"kind", "bigquery#tableDataList"},
-                                 {"etag", ""},
-                                 {"totalRows", std::to_string(total)},
-                                 {"rows", result.rows}};
-                if (start_index + static_cast<int64_t>(result.rows.size()) < total) {
-                  response["pageToken"] =
-                      std::to_string(start_index + static_cast<int64_t>(result.rows.size()));
-                }
-                return response;
-              }));
   }
 
   Emulator& emulator_;

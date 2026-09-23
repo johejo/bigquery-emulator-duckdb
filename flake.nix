@@ -28,6 +28,7 @@
               bazelisk
               buildifier
               clang-tools
+              go
               google-cloud-sdk
               just
               runn

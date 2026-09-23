@@ -9,6 +9,7 @@ refresh_compile_commands(
     exclude_headers = "external",
     targets = {
         "//:backend_test": "",
+        "//:query_parameters_test": "",
         "//:bigquery-emulator-duckdb": "",
         "//:server_test": "",
         "//:translator_test": "",
@@ -33,6 +34,25 @@ cc_library(
 )
 
 cc_library(
+    name = "duckdb_sql",
+    srcs = ["src/duckdb_sql.cc"],
+    hdrs = ["src/duckdb_sql.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
+    name = "query_parameters",
+    srcs = ["src/query_parameters.cc"],
+    hdrs = ["src/query_parameters.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":duckdb_sql",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "frontend",
     srcs = ["src/frontend.cc"],
     hdrs = ["src/frontend.h"],
@@ -50,7 +70,9 @@ cc_library(
     hdrs = ["src/translator.h"],
     copts = ["-std=c++20"],
     deps = [
+        ":duckdb_sql",
         ":frontend",
+        ":query_parameters",
         # The parser AST and the unparser live in //googlesql/parser, which is visible only
         # inside googlesql; they come in transitively through these public targets.
         "@googlesql//googlesql/public:parse_helpers",
@@ -83,7 +105,9 @@ cc_library(
     deps = [
         ":api_error",
         ":backend",
+        ":duckdb_sql",
         ":frontend",
+        ":query_parameters",
         ":translator",
         "@nlohmann_json//:json",
     ],
@@ -106,6 +130,7 @@ cc_library(
         ":api_error",
         ":discovery_document",
         ":emulator",
+        ":query_parameters",
         "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
@@ -127,8 +152,22 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":frontend",
+        ":query_parameters",
         ":translator",
         "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_test(
+    name = "query_parameters_test",
+    srcs = ["tests/query_parameters_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":query_parameters",
+        "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
     ],
 )
 

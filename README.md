@@ -15,7 +15,11 @@ The server is built on [cpp-httplib](https://github.com/yhirose/cpp-httplib) wit
 | `tables` | `list`, `get`, `insert`, `delete` |
 | `tabledata` | `list` |
 
-Jobs always complete synchronously. Projects map to DuckDB catalogs (attached in-memory databases), datasets to schemas and tables to tables, so `project.dataset.table` references work unchanged.
+Jobs always complete synchronously. Query jobs take named (`@name`) and positional (`?`) query parameters, and a `dryRun` job validates the query and reports the schema it would return without running it. Clients that ask for `formatOptions.useInt64Timestamp` get TIMESTAMP values as epoch microseconds rather than the default decimal seconds.
+
+Every resource is served both below `/bigquery/v2` and directly below the root, because a client that is given an endpoint override replaces the whole API base path, prefix included; `option.WithEndpoint` in the Go client works that way, so the emulator's URL is all it needs.
+
+Projects map to DuckDB catalogs (attached in-memory databases), datasets to schemas and tables to tables, so `project.dataset.table` references work unchanged.
 
 ## Frontend
 
@@ -39,7 +43,10 @@ extending GoogleSQL's own unparser and overriding only the constructs whose spel
   `STRUCT<a INT64>` → `STRUCT(a BIGINT)`, ...),
 - `STRUCT(...)` constructors (→ `struct_pack(a := ...)`) and `ARRAY<T>[...]` constructors,
 - `SAFE_CAST` (→ `TRY_CAST`) and the `CURRENT_TIMESTAMP()` family, which DuckDB spells without
-  parentheses.
+  parentheses,
+- query parameters (`@name` and `?`), which are replaced by a typed literal of the value the
+  request declared (`CAST('42' AS BIGINT)`), so that ARRAY and STRUCT parameters follow the same
+  spelling rules as the rest of the statement.
 
 Everything else is printed by the base unparser, so joins, CTEs, subqueries and window functions
 need no rules of their own. Because the output is generated from the AST it is normalised SQL
@@ -87,6 +94,19 @@ bqe head ds.users
 
 `tests/e2e/bq.sh` wraps the same invocation for the end-to-end tests.
 
+### Connect from the Go client library
+
+The endpoint override replaces the whole API base path, so the emulator's URL is enough:
+
+```go
+client, err := bigquery.NewClient(ctx, "test",
+	option.WithEndpoint("http://127.0.0.1:9050"), option.WithoutAuthentication())
+
+query := client.Query("SELECT @name AS name")
+query.Parameters = []bigquery.QueryParameter{{Name: "name", Value: "alice"}}
+rows, err := query.Read(ctx)
+```
+
 ## Development
 
 The project uses C++20 and Bazel. Prefer the standard library for project code.
@@ -101,6 +121,8 @@ End-to-end tests using the `bq` command-line tool are the primary compatibility 
 just e2e            # builds the emulator, starts it on a free port and runs tests/e2e/*.yml
 just e2e --verbose  # extra arguments are passed to `runn run`
 ```
+
+`tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
 
 Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB. The backend and the HTTP server have unit tests too (`just test`).
 

@@ -22,6 +22,32 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"arr":["1","2"],"s":{"a":"1","b":"x"}}]'
+  named_parameters:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        --parameter='id:INT64:42' --parameter='name:STRING:alice'
+        --parameter='tags:ARRAY<STRING>:["a","b"]'
+        'SELECT @id AS id, @name AS name, @tags AS tags'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"42","name":"alice","tags":["a","b"]}]'
+  positional_parameters:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        --parameter=:INT64:7 --parameter=:STRING:x 'SELECT ? AS a, ? AS b'
+    test: |
+      current.exit_code == 0 && trim(current.stdout) == '[{"a":"7","b":"x"}]'
+  dry_run:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'SELECT 1 AS x'
+    test: |
+      current.exit_code == 0 && current.stdout contains "successfully validated"
+  dry_run_of_an_invalid_query:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'SELECT * FROM missing_table'
+    test: current.exit_code != 0 && current.stdout contains "missing_table"
   invalid_query:
     exec:
       command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT * FROM missing_table'

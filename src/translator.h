@@ -3,6 +3,7 @@
 #include <string>
 
 #include "src/frontend.h"
+#include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -12,6 +13,10 @@ namespace bigquery_emulator_duckdb {
 // whose spelling differs in DuckDB (identifiers, literals, type names, STRUCT constructors and
 // a few functions). The output is normalised SQL rather than the original text, and comments
 // are dropped, because they are not part of the AST.
-std::string TranslateToDuckDbSql(const FrontendResult& frontend_result);
+//
+// Query parameters are replaced by the literal `parameters` declares for them, so the result is
+// a complete statement that needs no further binding.
+std::string TranslateToDuckDbSql(const FrontendResult& frontend_result,
+                                 const QueryParameters& parameters = {});
 
 }  // namespace bigquery_emulator_duckdb
