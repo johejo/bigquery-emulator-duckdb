@@ -28,6 +28,10 @@
               bazelisk
               buildifier
               clang-tools
+              # For trying a query against the engine the emulator embeds without building
+              # anything. Worth keeping at the version MODULE.bazel pins, which nixpkgs
+              # happens to carry today; nothing enforces that they stay in step.
+              duckdb
               go
               google-cloud-sdk
               just
