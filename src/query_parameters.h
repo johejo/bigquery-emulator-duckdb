@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
+#include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -28,9 +29,17 @@ class QueryParameters {
   const std::string& ByName(const std::string& name) const;
   const std::string& ByPosition(int position) const;
 
+  // The declared types, in TableFieldSchema form: the named parameters with their names, in
+  // request order, and the positional ones in position order. An ARRAY parameter is its
+  // element type with mode REPEATED.
+  const std::vector<FieldSchema>& named_types() const { return named_types_; }
+  const std::vector<FieldSchema>& positional_types() const { return positional_types_; }
+
  private:
   std::unordered_map<std::string, std::string> by_name_;  // Keyed by the lower-cased name.
   std::vector<std::string> by_position_;
+  std::vector<FieldSchema> named_types_;
+  std::vector<FieldSchema> positional_types_;
 };
 
 }  // namespace bigquery_emulator_duckdb

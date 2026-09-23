@@ -19,7 +19,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |
 | Query parameters | Supported | Named (`@name`) and positional (`?`) parameters, including ARRAY and STRUCT values. |
 | Dry runs | Supported | Validates queries and returns their result schema without executing them. |
-| Result schema | Supported | Derives `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
+| Result schema | Supported | Queries take column names and types from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
 | Result rows | Supported | BigQuery `{"f": [{"v": ...}]}` encoding, including nested values and base64 bytes. |
 | Timestamp encoding | Supported | Epoch seconds by default; epoch microseconds with `formatOptions.useInt64Timestamp`. |
 | Projects, datasets, and tables | Partial | Map to DuckDB in-memory catalogs, schemas, and tables; `project.dataset.table` references work, but data is not persisted across server restarts. |
@@ -28,7 +28,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. A catalog and an analyzer entry point resolve names and types against table schemas, but queries are still translated from the parser AST without them. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries are still translated from the parser AST. |
 | Joins, CTEs, subqueries, window functions, and `QUALIFY` | Partial | Passed through by the base unparser; execution depends on DuckDB compatibility. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
@@ -64,8 +64,12 @@ The GoogleSQL analyzer can also resolve a parsed statement into a resolved AST, 
 bound and every expression typed. [src/catalog.cc](src/catalog.cc) looks tables up lazily
 through a `TableSource`, completes `table` and `dataset.table` paths from the default project
 and dataset, and maps BigQuery field types to GoogleSQL types; functions and types come from
-GoogleSQL's built-ins. [src/analyzer.cc](src/analyzer.cc) runs the analyzer with the same
-language options as the parser. This path is not yet wired into query execution.
+GoogleSQL's built-ins, plus BigQuery functions GoogleSQL lacks such as `CONTAINS_SUBSTR`.
+[src/analyzer.cc](src/analyzer.cc) runs the analyzer with the same language options as the
+parser. The emulator analyzes every query and DML statement before translating it, with the
+tables looked up in DuckDB, and a statement that fails analysis is reported as `invalidQuery`.
+For a query, the resolved output columns supply the result schema's names, and its types where
+they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 

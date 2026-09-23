@@ -1,10 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "src/field_schema.h"
 #include "src/frontend.h"
 
 namespace googlesql {
@@ -39,6 +41,11 @@ class AnalyzerResult {
   ~AnalyzerResult();
 
   const googlesql::ResolvedStatement& statement() const;
+
+  // The schema of the rows a query returns, named and typed the way BigQuery reports them:
+  // a column without a name is f0_, f1_, ... in the order of the unnamed columns. Empty for a
+  // statement that is not a query and for a query with a column BigQuery cannot describe.
+  std::optional<std::vector<FieldSchema>> result_schema() const;
 
  private:
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output_;

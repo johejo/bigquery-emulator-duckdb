@@ -91,6 +91,32 @@ TEST(QueryParametersTest, NumbersParametersWithoutANameByPosition) {
   EXPECT_THROW(parameters.ByPosition(3), ApiError);
 }
 
+TEST(QueryParametersTest, KeepsTheDeclaredTypes) {
+  const QueryParameters named = Parse(R"([
+      {"name": "i", "parameterType": {"type": "INTEGER"}, "parameterValue": {"value": "1"}},
+      {"name": "a", "parameterType": {"type": "ARRAY", "arrayType": {"type": "STRING"}},
+       "parameterValue": {"arrayValues": []}},
+      {"name": "s", "parameterType": {"type": "STRUCT", "structTypes": [
+           {"name": "x", "type": {"type": "INT64"}}]},
+       "parameterValue": {"structValues": {"x": {"value": "1"}}}}])");
+  ASSERT_EQ(named.named_types().size(), 3);
+  EXPECT_TRUE(named.positional_types().empty());
+  EXPECT_EQ(named.named_types()[0].name, "i");
+  EXPECT_EQ(named.named_types()[0].type, "INT64");
+  EXPECT_EQ(named.named_types()[0].mode, "NULLABLE");
+  EXPECT_EQ(named.named_types()[1].type, "STRING");
+  EXPECT_EQ(named.named_types()[1].mode, "REPEATED");
+  EXPECT_EQ(named.named_types()[2].type, "STRUCT");
+  ASSERT_EQ(named.named_types()[2].fields.size(), 1);
+  EXPECT_EQ(named.named_types()[2].fields[0].name, "x");
+  EXPECT_EQ(named.named_types()[2].fields[0].type, "INT64");
+
+  const QueryParameters positional = Parse(R"([
+      {"parameterType": {"type": "BOOL"}, "parameterValue": {"value": "true"}}])");
+  ASSERT_EQ(positional.positional_types().size(), 1);
+  EXPECT_EQ(positional.positional_types()[0].type, "BOOL");
+}
+
 TEST(QueryParametersTest, ReportsUndeclaredParameters) {
   const QueryParameters parameters;
   EXPECT_TRUE(parameters.empty());
@@ -102,6 +128,9 @@ TEST(QueryParametersTest, RejectsMalformedParameters) {
   EXPECT_THROW(Parse(R"({})"), ApiError);
   EXPECT_THROW(Parse(R"([{"name": "a"}])"), ApiError);
   EXPECT_THROW(Parse(R"([{"name": "a", "parameterType": {}}])"), ApiError);
+  EXPECT_THROW(Parse(R"([{"name": "a", "parameterType": {"type": "ARRAY", "arrayType":
+                 {"type": "ARRAY", "arrayType": {"type": "INT64"}}}}])"),
+               ApiError);
 }
 
 }  // namespace

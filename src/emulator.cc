@@ -5,14 +5,20 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
+#include "googlesql/public/type.h"
 #include "nlohmann/json.hpp"
+#include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/frontend.h"
 #include "src/translator.h"
 
@@ -94,6 +100,82 @@ std::string ToDuckDbType(const json& field) {
   return duckdb_type;
 }
 
+// Serves the analyzer the tables the emulator keeps in DuckDB.
+class DuckDbTableSource : public TableSource {
+ public:
+  explicit DuckDbTableSource(Backend& backend) : backend_(backend) {}
+
+  std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
+                                                    const std::string& dataset,
+                                                    const std::string& table) override {
+    try {
+      return backend_
+          .Prepare("SELECT * FROM " + QualifiedName(TableReference{project, dataset, table}))
+          .schema;
+    } catch (const BackendError&) {
+      return std::nullopt;
+    }
+  }
+
+ private:
+  Backend& backend_;
+};
+
+std::vector<const googlesql::Type*> ParameterTypes(const std::vector<FieldSchema>& fields,
+                                                   googlesql::TypeFactory& type_factory) {
+  std::vector<const googlesql::Type*> types;
+  for (const FieldSchema& field : fields) {
+    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+    if (!type.ok()) {
+      throw ApiError::InvalidQuery(std::string(type.status().message()));
+    }
+    types.push_back(*type);
+  }
+  return types;
+}
+
+// Types whose values the backend writes the same way on the wire, so that a column DuckDB
+// computed as one of them can be reported as another: all numbers are decimal strings, and
+// these textual types are plain strings.
+bool SameWireEncoding(const std::string& a, const std::string& b) {
+  static const auto* const kGroups = new std::vector<std::set<std::string>>{
+      {"INTEGER", "FLOAT", "NUMERIC", "BIGNUMERIC"}, {"STRING", "JSON", "GEOGRAPHY"}};
+  if (a == b) {
+    return true;
+  }
+  for (const std::set<std::string>& group : *kGroups) {
+    if (group.contains(a) && group.contains(b)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Takes the column names, and the types where it can, from the schema the analyzer resolved,
+// which follows BigQuery's typing rules (SUM of INT64 is INT64, an unnamed column is f0_), over
+// the one DuckDB reports. The rows are still encoded after DuckDB's types, so a type that
+// would change their encoding (DATETIME for a TIMESTAMP, say) is left as DuckDB has it.
+std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
+                                         const std::vector<FieldSchema>& resolved_schema) {
+  if (duckdb_schema.size() != resolved_schema.size()) {
+    return duckdb_schema;
+  }
+  for (size_t i = 0; i < duckdb_schema.size(); ++i) {
+    FieldSchema& field = duckdb_schema[i];
+    const FieldSchema& resolved = resolved_schema[i];
+    field.name = resolved.name;
+    if (field.mode != resolved.mode) {
+      continue;
+    }
+    if (field.type == "RECORD" && resolved.type == "RECORD") {
+      field.fields = ReconcileSchema(std::move(field.fields), resolved.fields);
+    } else if (SameWireEncoding(field.type, resolved.type)) {
+      field.type = resolved.type;
+    }
+  }
+  return duckdb_schema;
+}
+
 }  // namespace
 
 Emulator::Emulator() = default;
@@ -124,6 +206,21 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
+std::optional<std::vector<FieldSchema>> Emulator::Analyze(const FrontendResult& frontend_result,
+                                                          const QueryParameters& parameters,
+                                                          AnalyzerSettings settings) {
+  googlesql::TypeFactory type_factory;
+  for (const FieldSchema& field : parameters.named_types()) {
+    settings.named_parameters.emplace_back(field.name,
+                                           ParameterTypes({field}, type_factory).front());
+  }
+  settings.positional_parameters = ParameterTypes(parameters.positional_types(), type_factory);
+  DuckDbTableSource source(backend_);
+  BigQueryCatalog catalog(source, &type_factory, settings.default_project,
+                          settings.default_dataset);
+  return AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings).result_schema();
+}
+
 std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   EnsureProject(request.project_id);
   auto job = std::make_shared<Job>();
@@ -138,6 +235,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   }
 
   std::vector<std::string> setup;
+  AnalyzerSettings settings{.default_project = request.project_id};
   if (request.default_dataset.has_value()) {
     const std::string dataset_project = request.default_dataset->project_id.empty()
                                             ? request.project_id
@@ -145,14 +243,24 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     EnsureProject(dataset_project);
     setup.push_back("USE " + QualifiedName(DatasetReference{dataset_project,
                                                             request.default_dataset->dataset_id}));
+    settings.default_project = dataset_project;
+    settings.default_dataset = request.default_dataset->dataset_id;
   } else {
     setup.push_back("USE " + QuoteIdentifier(request.project_id));
   }
 
   try {
     const FrontendResult frontend_result = ParseGoogleSql(request.query);
+    std::optional<std::vector<FieldSchema>> resolved_schema;
+    if (IsQueryOrDml(frontend_result)) {
+      resolved_schema = Analyze(frontend_result, request.parameters, settings);
+    }
     const std::string duckdb_sql = TranslateToDuckDbSql(frontend_result, request.parameters);
-    job->result = request.dry_run ? Prepare(duckdb_sql, setup) : Execute(duckdb_sql, setup);
+    QueryResult result = request.dry_run ? Prepare(duckdb_sql, setup) : Execute(duckdb_sql, setup);
+    if (resolved_schema.has_value()) {
+      result.schema = ReconcileSchema(std::move(result.schema), *resolved_schema);
+    }
+    job->result = std::move(result);
   } catch (const ApiError& error) {
     job->error = error;
   } catch (const std::exception& error) {

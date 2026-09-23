@@ -1,17 +1,24 @@
 #include "src/analyzer.h"
 
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/strings.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/catalog.h"
+#include "src/field_schema.h"
 #include "src/frontend.h"
 
 namespace bigquery_emulator_duckdb {
@@ -25,6 +32,27 @@ AnalyzerResult::~AnalyzerResult() = default;
 
 const googlesql::ResolvedStatement& AnalyzerResult::statement() const {
   return *analyzer_output_->resolved_statement();
+}
+
+std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
+  if (!statement().Is<googlesql::ResolvedQueryStmt>()) {
+    return std::nullopt;
+  }
+  const auto* query = statement().GetAs<googlesql::ResolvedQueryStmt>();
+  std::vector<FieldSchema> schema;
+  int anonymous_columns = 0;
+  for (const auto& output_column : query->output_column_list()) {
+    std::string name = output_column->name();
+    if (googlesql::IsInternalAlias(name)) {
+      name = "f" + std::to_string(anonymous_columns++) + "_";
+    }
+    absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(name, output_column->column().type());
+    if (!field.ok()) {
+      return std::nullopt;
+    }
+    schema.push_back(*std::move(field));
+  }
+  return schema;
 }
 
 AnalyzerResult AnalyzeGoogleSql(const FrontendResult& frontend_result, googlesql::Catalog& catalog,

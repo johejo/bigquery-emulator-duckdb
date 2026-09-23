@@ -1,5 +1,7 @@
 #include "src/catalog.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -15,6 +17,8 @@
 #include "absl/types/span.h"
 #include "googlesql/public/builtin_function_options.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/function.h"
+#include "googlesql/public/function_signature.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "src/field_schema.h"
@@ -30,6 +34,15 @@ std::unique_ptr<googlesql::SimpleCatalog> MakeBuiltinCatalog(googlesql::TypeFact
   if (!status.ok()) {
     throw std::runtime_error(status.ToString());
   }
+  // BigQuery functions that GoogleSQL does not ship, declared with the signatures the
+  // translator supports.
+  catalog->AddOwnedFunction(
+      new googlesql::Function("contains_substr", "bigquery", googlesql::Function::SCALAR,
+                              {googlesql::FunctionSignature(
+                                  googlesql::FunctionArgumentType(googlesql::types::BoolType()),
+                                  {googlesql::FunctionArgumentType(googlesql::types::StringType()),
+                                   googlesql::FunctionArgumentType(googlesql::types::StringType())},
+                                  /*context_id=*/static_cast<int64_t>(0))}));
   return catalog;
 }
 
@@ -77,6 +90,44 @@ absl::StatusOr<const googlesql::Type*> ScalarType(const std::string& type) {
     return googlesql::types::GeographyType();
   }
   return absl::InvalidArgumentError("Unsupported field type: " + type);
+}
+
+absl::StatusOr<std::string> BigQueryTypeName(const googlesql::Type* type) {
+  switch (type->kind()) {
+    case googlesql::TYPE_INT64:
+      return "INTEGER";
+    case googlesql::TYPE_DOUBLE:
+      return "FLOAT";
+    case googlesql::TYPE_BOOL:
+      return "BOOLEAN";
+    case googlesql::TYPE_STRING:
+      return "STRING";
+    case googlesql::TYPE_BYTES:
+      return "BYTES";
+    case googlesql::TYPE_DATE:
+      return "DATE";
+    case googlesql::TYPE_TIME:
+      return "TIME";
+    case googlesql::TYPE_DATETIME:
+      return "DATETIME";
+    case googlesql::TYPE_TIMESTAMP:
+      return "TIMESTAMP";
+    case googlesql::TYPE_NUMERIC:
+      return "NUMERIC";
+    case googlesql::TYPE_BIGNUMERIC:
+      return "BIGNUMERIC";
+    case googlesql::TYPE_JSON:
+      return "JSON";
+    case googlesql::TYPE_INTERVAL:
+      return "INTERVAL";
+    case googlesql::TYPE_GEOGRAPHY:
+      return "GEOGRAPHY";
+    case googlesql::TYPE_STRUCT:
+      return "RECORD";
+    default:
+      return absl::InvalidArgumentError("Unsupported result type: " +
+                                        type->ShortTypeName(googlesql::PRODUCT_EXTERNAL));
+  }
 }
 
 }  // namespace
@@ -139,6 +190,39 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
     type = *array_type;
   }
   return type;
+}
+
+absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
+                                                const googlesql::Type* type) {
+  FieldSchema field;
+  field.name = name;
+  field.mode = "NULLABLE";
+  if (type->IsArray()) {
+    field.mode = "REPEATED";
+    type = type->AsArray()->element_type();
+    if (type->IsArray()) {
+      return absl::InvalidArgumentError("Unsupported result type: an array of arrays");
+    }
+  }
+  absl::StatusOr<std::string> type_name = BigQueryTypeName(type);
+  if (!type_name.ok()) {
+    return type_name.status();
+  }
+  field.type = *std::move(type_name);
+  if (type->IsStruct()) {
+    const std::vector<googlesql::StructField>& struct_fields = type->AsStruct()->fields();
+    for (size_t i = 0; i < struct_fields.size(); ++i) {
+      const std::string& child_name = struct_fields[i].name;
+      absl::StatusOr<FieldSchema> child =
+          BigQueryFieldSchema(child_name.empty() ? "_field_" + std::to_string(i + 1) : child_name,
+                              struct_fields[i].type);
+      if (!child.ok()) {
+        return child.status();
+      }
+      field.fields.push_back(*std::move(child));
+    }
+  }
+  return field;
 }
 
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,

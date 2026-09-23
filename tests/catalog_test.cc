@@ -7,6 +7,7 @@
 #include <tuple>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "gtest/gtest.h"
@@ -50,6 +51,24 @@ std::string TypeName(const FieldSchema& field) {
     return type.status().ToString();
   }
   return (*type)->ShortTypeName(googlesql::PRODUCT_EXTERNAL);
+}
+
+// A field as "name TYPE MODE", followed by its child fields in parentheses for a RECORD.
+std::string Describe(const FieldSchema& field) {
+  std::string description = field.name + " " + field.type + " " + field.mode;
+  if (!field.fields.empty()) {
+    description += " (";
+    for (size_t i = 0; i < field.fields.size(); ++i) {
+      description += (i == 0 ? "" : ", ") + Describe(field.fields[i]);
+    }
+    description += ")";
+  }
+  return description;
+}
+
+std::string BigQueryTypeOf(const googlesql::Type* type) {
+  absl::StatusOr<FieldSchema> field = BigQueryFieldSchema("c", type);
+  return field.ok() ? Describe(*field) : field.status().ToString();
 }
 
 TEST(NormalizeTablePathTest, CompletesMissingProjectAndDataset) {
@@ -109,6 +128,31 @@ TEST(GoogleSqlTypeTest, MapsRepeatedAndRecordFields) {
 TEST(GoogleSqlTypeTest, RejectsUnknownTypes) {
   googlesql::TypeFactory type_factory;
   EXPECT_FALSE(GoogleSqlType({.name = "c", .type = "NOPE"}, &type_factory).ok());
+}
+
+TEST(BigQueryFieldSchemaTest, MapsScalarTypes) {
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::Int64Type()), "c INTEGER NULLABLE");
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::DoubleType()), "c FLOAT NULLABLE");
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::BoolType()), "c BOOLEAN NULLABLE");
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::StringType()), "c STRING NULLABLE");
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::TimestampType()), "c TIMESTAMP NULLABLE");
+  EXPECT_EQ(BigQueryTypeOf(googlesql::types::BigNumericType()), "c BIGNUMERIC NULLABLE");
+}
+
+TEST(BigQueryFieldSchemaTest, RoundTripsGoogleSqlType) {
+  googlesql::TypeFactory type_factory;
+  const FieldSchema field = {.name = "c",
+                             .type = "RECORD",
+                             .mode = "REPEATED",
+                             .fields = {{.name = "x", .type = "DATE", .mode = "NULLABLE"},
+                                        {.name = "y", .type = "STRING", .mode = "REPEATED"}}};
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+  ASSERT_TRUE(type.ok()) << type.status();
+  EXPECT_EQ(BigQueryTypeOf(*type), Describe(field));
+}
+
+TEST(BigQueryFieldSchemaTest, RejectsTypesBigQueryCannotDescribe) {
+  EXPECT_THAT(BigQueryTypeOf(googlesql::types::Int32Type()), ::testing::HasSubstr("INT32"));
 }
 
 class BigQueryCatalogTest : public ::testing::Test {
@@ -211,6 +255,31 @@ TEST_F(BigQueryCatalogTest, RejectsUnknownColumns) {
   } catch (const std::runtime_error& e) {
     EXPECT_NE(std::string(e.what()).find("Unrecognized name: nope"), std::string::npos) << e.what();
   }
+}
+
+TEST_F(BigQueryCatalogTest, ResolvesBigQueryOnlyFunctions) {
+  EXPECT_EQ(OutputColumns("SELECT CONTAINS_SUBSTR('abc', 'b') AS c"),
+            (std::vector<std::string>{"c BOOL"}));
+}
+
+TEST_F(BigQueryCatalogTest, DescribesTheResultSchema) {
+  const std::optional<std::vector<FieldSchema>> result_schema =
+      Analyze("SELECT a, a + 1, b, STRUCT(1 AS x, 'y'), 1.5 FROM ds.t").result_schema();
+  if (!result_schema.has_value()) {
+    FAIL() << "the query has no result schema";
+  }
+  const std::vector<FieldSchema>& schema = *result_schema;
+  ASSERT_EQ(schema.size(), 5);
+  EXPECT_EQ(Describe(schema[0]), "a INTEGER NULLABLE");
+  EXPECT_EQ(Describe(schema[1]), "f0_ INTEGER NULLABLE");
+  EXPECT_EQ(Describe(schema[2]), "b STRING REPEATED");
+  EXPECT_EQ(Describe(schema[3]),
+            "f1_ RECORD NULLABLE (x INTEGER NULLABLE, _field_2 STRING NULLABLE)");
+  EXPECT_EQ(Describe(schema[4]), "f2_ FLOAT NULLABLE");
+}
+
+TEST_F(BigQueryCatalogTest, HasNoResultSchemaForDml) {
+  EXPECT_FALSE(Analyze("INSERT INTO ds.t (a) VALUES (1)").result_schema().has_value());
 }
 
 TEST_F(BigQueryCatalogTest, AnalyzesDdlAndDml) {

@@ -3,9 +3,12 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
+#include "src/field_schema.h"
+#include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -20,6 +23,11 @@ class EmulatorTest : public ::testing::Test {
     request.project_id = "test";
     request.query = sql;
     return emulator_.RunQuery(request);
+  }
+
+  // The job's error message, or an empty string when the job succeeded.
+  static std::string ErrorMessage(const Job& job) {
+    return job.error.has_value() ? job.error->what() : "";
   }
 
   // The HTTP status the job's error would be reported with, or 0 when the query succeeded.
@@ -60,7 +68,8 @@ TEST_F(EmulatorTest, RunsRenamedFunctions) {
   EXPECT_EQ(Scalar("SELECT CONTAINS_SUBSTR('abcdef', 'cd')"), "true");
   EXPECT_EQ(Scalar("SELECT DIV(7, 2)"), "3");
   EXPECT_EQ(Scalar("SELECT FORMAT('%s-%d', 'x', 3)"), "x-3");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(GENERATE_ARRAY(1, 5, 2), ',')"), "1,3,5");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(['a', 'b', 'c'], ',')"), "a,b,c");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_ARRAY(1, 5, 2))"), "3");
   // DuckDB's uuid() is typed UUID rather than a string, which the cast makes explicit.
   EXPECT_EQ(Scalar("SELECT LENGTH(CAST(GENERATE_UUID() AS STRING))"), "36");
   EXPECT_EQ(Scalar("SELECT RAND() >= 0 AND RAND() < 1"), "true");
@@ -176,6 +185,88 @@ TEST_F(EmulatorTest, RunsCallsWithDifferentSemantics) {
 TEST_F(EmulatorTest, RunsCallsWithTheSafePrefix) {
   EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, 3)"), "bcd");
   EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS('abc', 'b')"), "true");
+}
+
+// The result schema follows BigQuery's typing and naming rather than DuckDB's.
+TEST_F(EmulatorTest, ReportsTheResolvedResultSchema) {
+  const std::shared_ptr<const Job> job =
+      Run("SELECT SUM(x) AS s, ANY_VALUE('a'), 2.5, CURRENT_DATE() FROM (SELECT 1 AS x UNION ALL "
+          "SELECT 2)");
+  if (!job->result.has_value()) {
+    FAIL() << ErrorMessage(*job);
+  }
+  const std::vector<FieldSchema>& schema = job->result->schema;
+  ASSERT_EQ(schema.size(), 4);
+  // DuckDB sums integers into a HUGEINT, which alone would be reported as BIGNUMERIC.
+  EXPECT_EQ(schema[0].name, "s");
+  EXPECT_EQ(schema[0].type, "INTEGER");
+  EXPECT_EQ(schema[1].name, "f0_");
+  EXPECT_EQ(schema[1].type, "STRING");
+  EXPECT_EQ(schema[2].name, "f1_");
+  EXPECT_EQ(schema[2].type, "FLOAT");
+  EXPECT_EQ(schema[3].name, "f2_");
+  EXPECT_EQ(schema[3].type, "DATE");
+}
+
+// FIXME: The translator keeps `UNNEST(...) AS x` as a table alias, so DuckDB binds `x` to the
+// whole row, a STRUCT, instead of the element. This asserts the current failure so the bug is
+// not forgotten; once the translator aliases the column, replace it with
+// EXPECT_EQ(Scalar("SELECT SUM(x) FROM UNNEST([1, 2]) AS x"), "3");
+TEST_F(EmulatorTest, FailsToAliasUnnestedElements) {
+  EXPECT_EQ(ErrorStatus("SELECT SUM(x) FROM UNNEST([1, 2]) AS x"), 400);
+}
+
+TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {
+  emulator_.CreateDataset({"test", "ds"});
+  emulator_.CreateTable({"test", "ds", "t"}, nlohmann::json::parse(R"([
+      {"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING"}])"));
+  QueryRequest request;
+  request.project_id = "test";
+  request.default_dataset = DatasetReference{"test", "ds"};
+  request.query = "INSERT INTO t (a, b) VALUES (1, 'x'), (2, 'y')";
+  ASSERT_FALSE(emulator_.RunQuery(request)->error.has_value());
+  request.query = "SELECT SUM(a) FROM t";
+  const std::shared_ptr<const Job> job = emulator_.RunQuery(request);
+  if (!job->result.has_value()) {
+    FAIL() << ErrorMessage(*job);
+  }
+  EXPECT_EQ(job->result->schema.at(0).name, "f0_");
+  EXPECT_EQ(job->result->schema.at(0).type, "INTEGER");
+  EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "3");
+
+  request.query = "SELECT nope FROM t";
+  const std::shared_ptr<const Job> failed = emulator_.RunQuery(request);
+  ASSERT_TRUE(failed->error.has_value());
+  EXPECT_NE(ErrorMessage(*failed).find("Unrecognized name: nope"), std::string::npos)
+      << ErrorMessage(*failed);
+}
+
+TEST_F(EmulatorTest, TypesQueryParameters) {
+  QueryRequest request;
+  request.project_id = "test";
+  request.parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
+      {"name": "n", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "2"}},
+      {"name": "s", "parameterType": {"type": "STRING"}, "parameterValue": {"value": "2"}}])"));
+  request.query = "SELECT @n * 2 AS x";
+  const std::shared_ptr<const Job> job = emulator_.RunQuery(request);
+  if (!job->result.has_value()) {
+    FAIL() << ErrorMessage(*job);
+  }
+  EXPECT_EQ(job->result->schema.at(0).type, "INTEGER");
+  EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "4");
+
+  // BigQuery does not coerce a STRING to a number, however DuckDB would.
+  request.query = "SELECT @s * 2";
+  EXPECT_TRUE(emulator_.RunQuery(request)->error.has_value());
+  request.query = "SELECT @missing";
+  EXPECT_TRUE(emulator_.RunQuery(request)->error.has_value());
+}
+
+// DDL is not analyzed, so a table the statement itself creates need not exist yet.
+TEST_F(EmulatorTest, RunsDdlWithoutAnalysis) {
+  emulator_.CreateDataset({"test", "ddl"});
+  EXPECT_EQ(ErrorStatus("CREATE TABLE ddl.t (a INT64)"), 0);
+  EXPECT_EQ(ErrorStatus("DROP TABLE ddl.t"), 0);
 }
 
 // A query that fails is reported through the job rather than thrown, which is how BigQuery

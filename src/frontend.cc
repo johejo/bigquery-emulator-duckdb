@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 
+#include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/language_options.h"
@@ -55,6 +56,15 @@ FrontendResult ParseGoogleSql(const std::string& sql) {
         googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status).ToString());
   }
   return {sql, std::move(parser_output)};
+}
+
+bool IsQueryOrDml(const FrontendResult& frontend_result) {
+  const googlesql::ASTStatement& statement = frontend_result.statement();
+  return statement.Is<googlesql::ASTQueryStatement>() ||
+         statement.Is<googlesql::ASTInsertStatement>() ||
+         statement.Is<googlesql::ASTUpdateStatement>() ||
+         statement.Is<googlesql::ASTDeleteStatement>() ||
+         statement.Is<googlesql::ASTMergeStatement>();
 }
 
 }  // namespace bigquery_emulator_duckdb

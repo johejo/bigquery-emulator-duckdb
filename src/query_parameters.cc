@@ -7,6 +7,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -61,6 +62,27 @@ std::string ToDuckDbType(const json& type) {
     return "VARCHAR";
   }
   return DuckDbTypeName(name);
+}
+
+FieldSchema ToFieldSchema(const std::string& name, const json& type) {
+  FieldSchema field{.name = name, .type = CanonicalTypeName(type), .mode = "NULLABLE"};
+  if (field.type == "ARRAY") {
+    if (!type.contains("arrayType")) {
+      throw ApiError::Invalid("ARRAY query parameter is missing arrayType");
+    }
+    field = ToFieldSchema(name, type["arrayType"]);
+    if (field.mode == "REPEATED") {
+      throw ApiError::Invalid("ARRAY query parameter cannot contain an ARRAY");
+    }
+    field.mode = "REPEATED";
+    return field;
+  }
+  if (field.type == "STRUCT") {
+    for (const json& child : type.value("structTypes", json::array())) {
+      field.fields.push_back(ToFieldSchema(child.value("name", ""), child.at("type")));
+    }
+  }
+  return field;
 }
 
 // The scalar text of a ParameterValue. BigQuery sends every scalar as a string; a client that
@@ -137,10 +159,13 @@ QueryParameters QueryParameters::Parse(const json& parameters) {
     std::string literal = ToDuckDbLiteral({.type = parameter["parameterType"],
                                            .value = value == parameter.end() ? NoValue() : *value});
     const std::string name = parameter.value("name", "");
+    FieldSchema type = ToFieldSchema(name, parameter["parameterType"]);
     if (name.empty()) {
       result.by_position_.push_back(std::move(literal));
+      result.positional_types_.push_back(std::move(type));
     } else {
       result.by_name_[ToUpperAscii(name)] = std::move(literal);
+      result.named_types_.push_back(std::move(type));
     }
   }
   return result;
