@@ -5,6 +5,7 @@
 
 namespace googlesql {
 class ASTStatement;
+class LanguageOptions;
 class ParserOutput;
 }  // namespace googlesql
 
@@ -28,6 +29,10 @@ class FrontendResult {
   std::string sql_;
   std::unique_ptr<googlesql::ParserOutput> parser_output_;
 };
+
+// The language settings shared by the parser and the analyzer, so that a statement the parser
+// accepts is not then rejected by the analyzer for a feature it was not told about.
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
 
 // Parses `sql` as a single GoogleSQL statement. Throws std::runtime_error on a syntax error.
 FrontendResult ParseGoogleSql(const std::string& sql);

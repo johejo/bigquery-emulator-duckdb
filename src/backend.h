@@ -5,22 +5,13 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
+#include "src/field_schema.h"
 
 namespace duckdb {
 class DuckDB;
 }  // namespace duckdb
 
 namespace bigquery_emulator_duckdb {
-
-// A column of a query result described with BigQuery's TableFieldSchema vocabulary.
-struct FieldSchema {
-  std::string name;
-  std::string type;                 // INTEGER, FLOAT, STRING, BOOLEAN, TIMESTAMP, RECORD, ...
-  std::string mode;                 // NULLABLE or REPEATED
-  std::vector<FieldSchema> fields;  // Populated for RECORD.
-
-  nlohmann::json ToJson() const;
-};
 
 // A materialized query result. Rows are already encoded in BigQuery's wire format
 // ({"f": [{"v": ...}, ...]}) so that they can be returned to clients as is.

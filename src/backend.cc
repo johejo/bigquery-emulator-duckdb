@@ -238,17 +238,6 @@ void ThrowIfFailed(const std::unique_ptr<duckdb::MaterializedQueryResult>& resul
 
 }  // namespace
 
-json FieldSchema::ToJson() const {
-  json field = {{"name", name}, {"type", type}, {"mode", mode}};
-  if (!fields.empty()) {
-    field["fields"] = json::array();
-    for (const FieldSchema& child : fields) {
-      field["fields"].push_back(child.ToJson());
-    }
-  }
-  return field;
-}
-
 json QueryResult::SchemaToJson() const {
   json fields = json::array();
   for (const FieldSchema& field : schema) {

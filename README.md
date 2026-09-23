@@ -28,7 +28,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`; analyzer-based name and type resolution is still planned. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. A catalog and an analyzer entry point resolve names and types against table schemas, but queries are still translated from the parser AST without them. |
 | Joins, CTEs, subqueries, window functions, and `QUALIFY` | Partial | Passed through by the base unparser; execution depends on DuckDB compatibility. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
@@ -59,6 +59,13 @@ translator, and backend, and returns BigQuery-compatible responses. It is built 
 
 [GoogleSQL](https://github.com/google/googlesql) parses each query into a parser AST.
 The frontend owns GoogleSQL syntax handling and stays independent of DuckDB execution details.
+
+The GoogleSQL analyzer can also resolve a parsed statement into a resolved AST, with every name
+bound and every expression typed. [src/catalog.cc](src/catalog.cc) looks tables up lazily
+through a `TableSource`, completes `table` and `dataset.table` paths from the default project
+and dataset, and maps BigQuery field types to GoogleSQL types; functions and types come from
+GoogleSQL's built-ins. [src/analyzer.cc](src/analyzer.cc) runs the analyzer with the same
+language options as the parser. This path is not yet wired into query execution.
 
 ## Translator
 

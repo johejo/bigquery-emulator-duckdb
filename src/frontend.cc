@@ -24,17 +24,27 @@ const googlesql::ASTStatement& FrontendResult::statement() const {
   return *parser_output_->statement();
 }
 
-FrontendResult ParseGoogleSql(const std::string& sql) {
-  // Some syntax BigQuery accepts is gated behind a language feature that the default options
-  // leave off, QUALIFY among it, so every released feature is turned on. Accepting a little
-  // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
-  // cannot run at all.
-  googlesql::LanguageOptions language_options;
-  language_options.EnableMaximumLanguageFeatures();
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
+  static const googlesql::LanguageOptions* const kLanguageOptions = [] {
+    auto* options = new googlesql::LanguageOptions();
+    // Some syntax BigQuery accepts is gated behind a language feature that the default options
+    // leave off, QUALIFY among it, so every released feature is turned on. Accepting a little
+    // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
+    // cannot run at all.
+    options->EnableMaximumLanguageFeatures();
+    // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.
+    options->set_product_mode(googlesql::PRODUCT_EXTERNAL);
+    // The analyzer accepts only queries by default, but the emulator also runs DDL and DML.
+    options->SetSupportsAllStatementKinds();
+    return options;
+  }();
+  return *kLanguageOptions;
+}
 
+FrontendResult ParseGoogleSql(const std::string& sql) {
   std::unique_ptr<googlesql::ParserOutput> parser_output;
-  const absl::Status status =
-      googlesql::ParseStatement(sql, googlesql::ParserOptions(language_options), &parser_output);
+  const absl::Status status = googlesql::ParseStatement(
+      sql, googlesql::ParserOptions(GoogleSqlLanguageOptions()), &parser_output);
   if (!status.ok()) {
     // The parser reports the error location as a payload; turn it into a readable message.
     const googlesql::ErrorMessageOptions error_message_options = {

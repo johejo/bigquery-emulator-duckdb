@@ -9,6 +9,7 @@ refresh_compile_commands(
     exclude_headers = "external",
     targets = {
         "//:backend_test": "",
+        "//:catalog_test": "",
         "//:emulator_test": "",
         "//:query_parameters_test": "",
         "//:bigquery-emulator-duckdb": "",
@@ -73,6 +74,45 @@ cc_library(
 )
 
 cc_library(
+    name = "field_schema",
+    srcs = ["src/field_schema.cc"],
+    hdrs = ["src/field_schema.h"],
+    copts = ["-std=c++20"],
+    deps = ["@nlohmann_json//:json"],
+)
+
+cc_library(
+    name = "catalog",
+    srcs = ["src/catalog.cc"],
+    hdrs = ["src/catalog.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":field_schema",
+        ":frontend",
+        "@googlesql//googlesql/public:builtin_function_options",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:catalog_wrapper",
+        "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:type",
+    ],
+)
+
+cc_library(
+    name = "analyzer",
+    srcs = ["src/analyzer.cc"],
+    hdrs = ["src/analyzer.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":frontend",
+        "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:analyzer_output",
+        "@googlesql//googlesql/public:error_helpers",
+        "@googlesql//googlesql/public:language_options",
+    ],
+)
+
+cc_library(
     name = "translator",
     srcs = ["src/translator.cc"],
     hdrs = ["src/translator.h"],
@@ -100,6 +140,7 @@ cc_library(
     }),
     target_compatible_with = MACOS_ONLY,
     deps = [
+        ":field_schema",
         "@duckdb_prebuilt_macos_universal//:duckdb",
         "@nlohmann_json//:json",
     ],
@@ -165,6 +206,21 @@ cc_test(
         ":translator",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
+    ],
+)
+
+cc_test(
+    name = "catalog_test",
+    srcs = ["tests/catalog_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":analyzer",
+        ":catalog",
+        ":field_schema",
+        ":frontend",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
     ],
 )
 
