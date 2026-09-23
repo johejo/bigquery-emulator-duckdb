@@ -2,95 +2,82 @@
 
 A BigQuery Emulator using DuckDB as the backend.
 
+## Compatibility and feature support
+
+Supported means implemented within the scope described below; partial means there are known
+differences or only a subset is implemented. SQL execution ultimately uses DuckDB semantics,
+so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
+
+| Feature | Status | Scope and limitations |
+| --- | --- | --- |
+| `bq` CLI and Go BigQuery client | Supported | Covered by [end-to-end tests](tests/e2e); use the emulator URL as the endpoint override. |
+| REST discovery and endpoint paths | Supported | Serves the v2 discovery document; resource routes accept both `/bigquery/v2` and root paths. |
+| Query jobs | Partial | `jobs.query`, `jobs.insert`, `jobs.get`, and `jobs.getQueryResults`; jobs complete synchronously. |
+| Load, extract, and copy jobs | Unsupported | `jobs.insert` accepts query jobs only. |
+| Datasets and tables | Partial | `list`, `get`, `insert`, and `delete`; update and patch methods are not implemented. |
+| Table data | Partial | `tabledata.list` is implemented; streaming inserts (`tabledata.insertAll`) are not. |
+| Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |
+| Query parameters | Supported | Named (`@name`) and positional (`?`) parameters, including ARRAY and STRUCT values. |
+| Dry runs | Supported | Validates queries and returns their result schema without executing them. |
+| Result schema | Supported | Derives `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
+| Result rows | Supported | BigQuery `{"f": [{"v": ...}]}` encoding, including nested values and base64 bytes. |
+| Timestamp encoding | Supported | Epoch seconds by default; epoch microseconds with `formatOptions.useInt64Timestamp`. |
+| Projects, datasets, and tables | Partial | Map to DuckDB in-memory catalogs, schemas, and tables; `project.dataset.table` references work, but data is not persisted across server restarts. |
+
+## SQL compatibility
+
+| Feature | Status | Scope and limitations |
+| --- | --- | --- |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`; analyzer-based name and type resolution is still planned. |
+| Joins, CTEs, subqueries, window functions, and `QUALIFY` | Partial | Passed through by the base unparser; execution depends on DuckDB compatibility. |
+| Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
+| String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
+| Float literals | Supported | `1.5` becomes `1.5::DOUBLE` to avoid DuckDB inferring `DECIMAL`. |
+| Type names and typed literals | Partial | Maps types in expressions, DDL, and typed literals: `INT64` → `BIGINT`, `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, `ARRAY<T>` → `T[]`, `STRUCT<a INT64>` → `STRUCT(a BIGINT)`. |
+| ARRAY and STRUCT constructors | Supported | Converts `ARRAY<T>[...]` and `STRUCT(...)` constructors to DuckDB syntax, including `struct_pack(a := ...)`. |
+| Star modifiers | Supported | `SELECT * EXCEPT` becomes `EXCLUDE`; `REPLACE` keeps its spelling. |
+| Parameter substitution | Supported | Uses typed literals such as `CAST('42' AS BIGINT)`, applying the same type and constructor conversions to ARRAY and STRUCT parameters. |
+| `SAFE_CAST` | Supported | Translated to DuckDB's `TRY_CAST`. |
+| Current time functions | Supported | The `CURRENT_TIMESTAMP()` family is emitted without parentheses where DuckDB requires it. |
+| Function renames | Partial | Examples: `REGEXP_CONTAINS` → `regexp_matches`, `LOGICAL_AND` → `bool_and`, `FORMAT` → `printf`; preserves `DISTINCT`, `IGNORE NULLS`, `ORDER BY`, and `OVER`. |
+| Function templates | Partial | Selected calls are rewritten using rules in [src/functions.cc](src/functions.cc); unmatched argument counts pass through, including unsupported time zone overloads. |
+| `SAFE_DIVIDE` and `LOG` | Supported | Division uses `NULLIF` to return NULL for a zero divisor; `LOG(x)` becomes `ln(x)` and `LOG(x, base)` becomes `log(base, x)`. |
+| Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. |
+| `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
+| Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
+| Type-dependent function mappings | Unsupported | For example, `BYTE_LENGTH` needs `strlen` for STRING and `octet_length` for BYTES; argument types are not resolved yet. |
+| `SAFE.` function prefix | Unsupported | The prefix is dropped, so function errors reach the client instead of returning NULL. |
+
 ## Server
 
-For BigQuery compatibility, an HTTP server is implemented to handle BigQuery's REST API requests. The server receives SQL queries, passes them through the frontend, translator, and backend, and returns the results in a format compatible with BigQuery.
-
-The server is built on [cpp-httplib](https://github.com/yhirose/cpp-httplib) with [nlohmann/json](https://github.com/nlohmann/json). It serves the BigQuery v2 discovery document (which `bq` fetches from any non-Google endpoint) and the following resources:
-
-| Resource | Methods |
-| --- | --- |
-| `jobs` | `query`, `insert` (query jobs only), `get`, `getQueryResults` |
-| `datasets` | `list`, `get`, `insert`, `delete` |
-| `tables` | `list`, `get`, `insert`, `delete` |
-| `tabledata` | `list` |
-
-Jobs always complete synchronously. Query jobs take named (`@name`) and positional (`?`) query parameters, and a `dryRun` job validates the query and reports the schema it would return without running it. Clients that ask for `formatOptions.useInt64Timestamp` get TIMESTAMP values as epoch microseconds rather than the default decimal seconds.
-
-Every resource is served both below `/bigquery/v2` and directly below the root, because a client that is given an endpoint override replaces the whole API base path, prefix included; `option.WithEndpoint` in the Go client works that way, so the emulator's URL is all it needs.
-
-Projects map to DuckDB catalogs (attached in-memory databases), datasets to schemas and tables to tables, so `project.dataset.table` references work unchanged.
+The HTTP server handles BigQuery REST requests, passes queries through the frontend,
+translator, and backend, and returns BigQuery-compatible responses. It is built on
+[cpp-httplib](https://github.com/yhirose/cpp-httplib) with
+[nlohmann/json](https://github.com/nlohmann/json).
 
 ## Frontend
 
-[GoogleSQL](https://github.com/google/googlesql) is used as the frontend parser and analyzer. It parses and analyzes the SQL query and produces a GoogleSQL AST or resolved AST. The frontend should stay focused on BigQuery SQL semantics and should not depend on DuckDB-specific execution details.
-
-Every released language feature is enabled, because some syntax BigQuery accepts is gated behind one and the default options leave it off: `QUALIFY` is rejected outright without `FEATURE_QUALIFY`. Accepting a little more than BigQuery does is the lesser problem for an emulator, since a query the parser rejects cannot run at all.
+[GoogleSQL](https://github.com/google/googlesql) parses each query into a parser AST.
+The frontend owns GoogleSQL syntax handling and stays independent of DuckDB execution details.
 
 ## Translator
 
-The translator converts the GoogleSQL AST or resolved AST into a DuckDB-compatible query. This layer owns the compatibility gap between BigQuery SQL and DuckDB SQL, such as function names, type mappings, identifier handling, and BigQuery-specific syntax.
-
-Keeping this layer separate prevents the frontend from growing into both a parser/analyzer and a DuckDB query generator, while also keeping the backend focused on execution.
-
-The translator walks the parser AST produced by the frontend and unparses it as DuckDB SQL,
-extending GoogleSQL's own unparser and overriding only the constructs whose spelling differs:
-
-- identifiers (`` `project.dataset.table` `` → `"project"."dataset"."table"`),
-- string literals (the parser hands over the unescaped value, which is then quoted the DuckDB way)
-  and bytes literals (`b'abc'` → `from_hex('616263')`, so quotes, NUL and non-UTF-8 survive),
-- float literals (`1.5` → `1.5::DOUBLE`, since DuckDB would infer `DECIMAL`),
-- type names in expressions, in DDL column definitions and in typed literals (`INT64` → `BIGINT`,
-  `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, `ARRAY<T>` → `T[]`,
-  `STRUCT<a INT64>` → `STRUCT(a BIGINT)`, ...),
-- `STRUCT(...)` constructors (→ `struct_pack(a := ...)`) and `ARRAY<T>[...]` constructors,
-- `SAFE_CAST` (→ `TRY_CAST`) and the `CURRENT_TIMESTAMP()` family, which DuckDB spells without
-  parentheses,
-- function calls (see below),
-- `SELECT * EXCEPT (a)` (→ `SELECT * EXCLUDE (a)`; `REPLACE` is spelled the same in DuckDB),
-- query parameters (`@name` and `?`), which are replaced by a typed literal of the value the
-  request declared (`CAST('42' AS BIGINT)`), so that ARRAY and STRUCT parameters follow the same
-  spelling rules as the rest of the statement.
-
-Everything else is printed by the base unparser, so joins, CTEs, subqueries, window functions
-and `QUALIFY` need no rules of their own. Because the output is generated from the AST it is
-normalised SQL rather than the original text, and comments are dropped: they are not part of
-the AST.
+The translator walks the parser AST and extends GoogleSQL's unparser, overriding constructs
+that need DuckDB-specific spelling. Keeping conversion in this layer leaves the frontend
+focused on parsing and the backend on execution. The generated SQL is normalized, and comments
+are dropped because they are not part of the AST.
 
 ### Functions
 
-`src/functions.cc` holds the two tables that cover the functions whose spelling differs, both
-keyed by the BigQuery name:
-
-- a **rename**, when DuckDB has the same function under another name (`REGEXP_CONTAINS` →
-  `regexp_matches`, `LOGICAL_AND` → `bool_and`, `FORMAT` → `printf`). Only the name is replaced,
-  so `DISTINCT`, `IGNORE NULLS`, `ORDER BY` and `OVER` keep working.
-- a **template** over the arguments, when the call itself has to change shape. `$n` is the n-th
-  argument and `#n` the n-th argument as the lower case string literal DuckDB expects a date part
-  to be, so `DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`. A rule matches one argument
-  count, and a call the rules do not cover is left alone.
-
-Some of these are not just spelling. A division by zero is an error in BigQuery and `+Inf` in
-DuckDB, so `SAFE_DIVIDE(a, b)` becomes `(a / NULLIF(b, 0))`; `LOG()` is the natural logarithm in
-BigQuery and the base 10 one in DuckDB; `REGEXP_REPLACE` replaces every occurrence and needs
-DuckDB's global flag; `DATE_ADD` stays a `DATE` where the DuckDB operator would widen it to a
-`TIMESTAMP`; and the epoch functions return a civil timestamp that has to be read as UTC.
-
-A template turns the call into an ordinary expression, which an `OVER` clause could no longer
-attach to, so a call carrying one keeps its BigQuery spelling. `SAFE.f(x)` returns NULL where
-`f(x)` would fail; DuckDB has no such call, so the prefix is dropped and the error reaches the
-client instead of becoming a NULL.
-
-Resolving names and types with GoogleSQL's analyzer, which would turn this into a resolved AST
-based translation, is the next step. It would also give the translator the argument types that
-the remaining gaps need: `BYTE_LENGTH` is `strlen` for a STRING and `octet_length` for BYTES,
-and there is no way to tell which is meant without them.
+[src/functions.cc](src/functions.cc) defines two rule tables keyed by BigQuery function name.
+A **rename** replaces only the function name. A **template** rewrites the call using `$n` for
+the n-th argument and `#n` for that argument as a lowercase string literal, as required for
+DuckDB date parts. For example, `DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`.
 
 ## Backend
 
-[DuckDB](https://duckdb.org/) is used as the backend database engine. It executes the translated DuckDB query and returns the results. Powered by libduckdb's C++ API.
-
-The backend also encodes results in BigQuery's wire format: a `TableSchema` derived from the DuckDB column types (`TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`) and rows as `{"f": [{"v": ...}]}` with BigQuery's value encoding (timestamps as epoch seconds, bytes as base64, ...).
+[DuckDB](https://duckdb.org/) executes translated queries through libduckdb's C++ API.
+The backend derives result schemas and encodes rows in the BigQuery wire format described above.
 
 ## Usage
 
