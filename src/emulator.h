@@ -86,11 +86,13 @@ class Emulator {
 
  private:
   void EnsureProject(const std::string& project_id);
-  // Resolves a query or DML statement against the tables in DuckDB and returns the schema of
-  // the rows a query returns. Throws when the statement does not analyze.
-  std::optional<std::vector<FieldSchema>> Analyze(const FrontendResult& frontend_result,
-                                                  const QueryParameters& parameters,
-                                                  AnalyzerSettings settings);
+  struct Translation {
+    std::string sql;
+    std::optional<std::vector<FieldSchema>> schema;
+  };
+  // Keeps the catalog, types and resolved AST alive until translation finishes.
+  Translation Translate(const FrontendResult& frontend_result, const QueryParameters& parameters,
+                        AnalyzerSettings settings);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 

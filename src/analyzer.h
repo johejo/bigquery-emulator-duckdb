@@ -31,6 +31,8 @@ struct AnalyzerSettings {
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so
 // the statement stays valid for as long as the result does. Types in the AST come from the
 // TypeFactory passed to AnalyzeGoogleSql and are valid only as long as that factory is.
+// References to catalog objects (such as tables and functions) likewise require the catalog
+// to outlive the result.
 class AnalyzerResult {
  public:
   explicit AnalyzerResult(std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output);

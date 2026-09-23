@@ -182,6 +182,49 @@ TEST_F(EmulatorTest, RunsCallsWithDifferentSemantics) {
   EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(SPLIT('a,b'), '|')"), "a|b");
 }
 
+TEST_F(EmulatorTest, RunsResolvedByteLengthOverloads) {
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH('あ')"), "3");
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(b'abc')"), "3");
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(b'\\x00\\xff')"), "2");
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH('')"), "0");
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(CAST(NULL AS STRING))"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(CAST(NULL AS BYTES))"), std::nullopt);
+}
+
+TEST_F(EmulatorTest, RunsAndPreparesResolvedParameters) {
+  QueryRequest request;
+  request.project_id = "test";
+  request.parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
+    {"name":"s","parameterType":{"type":"STRING"},"parameterValue":{"value":"あ"}},
+    {"name":"b","parameterType":{"type":"BYTES"},"parameterValue":{"value":"AP8="}}
+  ])"));
+  request.query = "SELECT BYTE_LENGTH(@s), BYTE_LENGTH(@b) AS bytes, SAFE_CAST(@s AS INT64)";
+  for (const bool dry_run : {false, true}) {
+    request.dry_run = dry_run;
+    const auto job = emulator_.RunQuery(request);
+    if (!job->result.has_value()) {
+      FAIL() << ErrorMessage(*job);
+    }
+    const auto& result = job->result.value();
+    ASSERT_EQ(result.schema.size(), 3);
+    EXPECT_EQ(result.schema[0].name, "f0_");
+    EXPECT_EQ(result.schema[1].name, "bytes");
+    EXPECT_EQ(result.schema[2].name, "f1_");
+    for (const auto& field : result.schema) {
+      EXPECT_EQ(field.type, "INTEGER");
+    }
+    if (!dry_run) {
+      ASSERT_EQ(result.rows.size(), 1);
+      EXPECT_EQ(result.rows[0]["f"][0]["v"], "3");
+      EXPECT_EQ(result.rows[0]["f"][1]["v"], "2");
+      EXPECT_TRUE(result.rows[0]["f"][2]["v"].is_null());
+    }
+  }
+  request.dry_run = false;
+  request.query = "SELECT CAST(@s AS INT64)";
+  EXPECT_TRUE(emulator_.RunQuery(request)->error.has_value());
+}
+
 TEST_F(EmulatorTest, RunsCallsWithTheSafePrefix) {
   EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, 3)"), "bcd");
   EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS('abc', 'b')"), "true");

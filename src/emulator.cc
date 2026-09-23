@@ -20,6 +20,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/frontend.h"
+#include "src/resolved_translator.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -206,9 +207,12 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-std::optional<std::vector<FieldSchema>> Emulator::Analyze(const FrontendResult& frontend_result,
-                                                          const QueryParameters& parameters,
-                                                          AnalyzerSettings settings) {
+Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
+                                          const QueryParameters& parameters,
+                                          AnalyzerSettings settings) {
+  if (!IsQueryOrDml(frontend_result)) {
+    return {TranslateToDuckDbSql(frontend_result, parameters), std::nullopt};
+  }
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
     settings.named_parameters.emplace_back(field.name,
@@ -218,7 +222,13 @@ std::optional<std::vector<FieldSchema>> Emulator::Analyze(const FrontendResult& 
   DuckDbTableSource source(backend_);
   BigQueryCatalog catalog(source, &type_factory, settings.default_project,
                           settings.default_dataset);
-  return AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings).result_schema();
+  const AnalyzerResult analyzed =
+      AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings);
+  std::optional<std::string> sql = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters);
+  if (!sql.has_value()) {
+    sql = TranslateToDuckDbSql(frontend_result, parameters);
+  }
+  return {*std::move(sql), analyzed.result_schema()};
 }
 
 std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
@@ -251,14 +261,11 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
 
   try {
     const FrontendResult frontend_result = ParseGoogleSql(request.query);
-    std::optional<std::vector<FieldSchema>> resolved_schema;
-    if (IsQueryOrDml(frontend_result)) {
-      resolved_schema = Analyze(frontend_result, request.parameters, settings);
-    }
-    const std::string duckdb_sql = TranslateToDuckDbSql(frontend_result, request.parameters);
-    QueryResult result = request.dry_run ? Prepare(duckdb_sql, setup) : Execute(duckdb_sql, setup);
-    if (resolved_schema.has_value()) {
-      result.schema = ReconcileSchema(std::move(result.schema), *resolved_schema);
+    const Translation translation = Translate(frontend_result, request.parameters, settings);
+    QueryResult result =
+        request.dry_run ? Prepare(translation.sql, setup) : Execute(translation.sql, setup);
+    if (translation.schema.has_value()) {
+      result.schema = ReconcileSchema(std::move(result.schema), *translation.schema);
     }
     job->result = std::move(result);
   } catch (const ApiError& error) {

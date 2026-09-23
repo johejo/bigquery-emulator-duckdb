@@ -12,6 +12,7 @@ refresh_compile_commands(
         "//:catalog_test": "",
         "//:emulator_test": "",
         "//:query_parameters_test": "",
+        "//:resolved_translator_test": "",
         "//:bigquery-emulator-duckdb": "",
         "//:server_test": "",
         "//:translator_test": "",
@@ -136,6 +137,21 @@ cc_library(
 )
 
 cc_library(
+    name = "resolved_translator",
+    srcs = ["src/resolved_translator.cc"],
+    hdrs = ["src/resolved_translator.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":duckdb_sql",
+        ":query_parameters",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+)
+
+cc_library(
     name = "backend",
     srcs = ["src/backend.cc"],
     hdrs = ["src/backend.h"],
@@ -167,6 +183,7 @@ cc_library(
         ":field_schema",
         ":frontend",
         ":query_parameters",
+        ":resolved_translator",
         ":translator",
         "@googlesql//googlesql/public:type",
         "@nlohmann_json//:json",
@@ -280,6 +297,22 @@ cc_test(
         ":server",
         "@com_google_googletest//:gtest_main",
         "@cpp-httplib//:httplib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_test(
+    name = "resolved_translator_test",
+    srcs = ["tests/resolved_translator_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":analyzer",
+        ":catalog",
+        ":frontend",
+        ":query_parameters",
+        ":resolved_translator",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public:type",
         "@nlohmann_json//:json",
     ],
 )

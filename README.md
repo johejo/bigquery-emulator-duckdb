@@ -28,7 +28,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries are still translated from the parser AST. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Simple SELECTs without FROM use resolved AST translation; other queries use the parser AST. |
 | Joins, CTEs, subqueries, window functions, and `QUALIFY` | Partial | Passed through by the base unparser; execution depends on DuckDB compatibility. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
@@ -45,7 +45,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. |
 | `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
 | Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
-| Type-dependent function mappings | Unsupported | For example, `BYTE_LENGTH` needs `strlen` for STRING and `octet_length` for BYTES; argument types are not resolved yet. |
+| Type-dependent function mappings | Partial | In supported SELECTs without FROM, resolved argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. Queries outside the resolved translator subset still use parser AST translation. |
 | `SAFE.` function prefix | Unsupported | The prefix is dropped, so function errors reach the client instead of returning NULL. |
 
 ## Server
@@ -73,9 +73,17 @@ they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 
-The translator walks the parser AST and extends GoogleSQL's unparser, overriding constructs
-that need DuckDB-specific spelling. Keeping conversion in this layer leaves the frontend
-focused on parsing and the backend on execution. The generated SQL is normalized, and comments
+[src/resolved_translator.cc](src/resolved_translator.cc) translates a first subset directly from
+resolved AST: a projection over a single row (SELECT without FROM), with INT64, FLOAT64, BOOL,
+STRING and BYTES literals and parameters, basic casts including SAFE_CAST, and BYTE_LENGTH.
+The catalog, TypeFactory and analyzer output remain alive through translation. Output columns
+are matched by resolved column ID, and BYTE_LENGTH selects its DuckDB function from the resolved
+argument type. Unsupported nodes, functions or modifiers return to parser AST translation for
+the entire statement; translation and execution errors do not trigger fallback.
+
+For other statements, the translator walks the parser AST and extends GoogleSQL's unparser,
+overriding constructs that need DuckDB-specific spelling. Keeping conversion in this layer leaves
+the frontend focused on parsing and the backend on execution. The generated SQL is normalized, and comments
 are dropped because they are not part of the AST.
 
 ### Functions
