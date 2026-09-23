@@ -143,8 +143,11 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":duckdb_sql",
+        ":functions",
         ":query_parameters",
+        "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
@@ -307,6 +310,7 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
+        ":backend",
         ":catalog",
         ":frontend",
         ":query_parameters",

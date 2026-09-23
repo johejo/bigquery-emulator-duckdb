@@ -28,8 +28,9 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Simple SELECTs without FROM use resolved AST translation; other queries use the parser AST. |
-| Joins, CTEs, subqueries, window functions, and `QUALIFY` | Partial | Passed through by the base unparser; execution depends on DuckDB compatibility. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. SELECTs built from projections, table reads, filters, ordering and limits use resolved AST translation when their expressions are supported; other statements use the parser AST. |
+| Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
+| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Still use the parser AST; execution depends on DuckDB compatibility. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
 | Float literals | Supported | `1.5` becomes `1.5::DOUBLE` to avoid DuckDB inferring `DECIMAL`. |
@@ -45,7 +46,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. |
 | `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
 | Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
-| Type-dependent function mappings | Partial | In supported SELECTs without FROM, resolved argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. Queries outside the resolved translator subset still use parser AST translation. |
+| Type-dependent function mappings | Partial | In supported resolved SELECTs, argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. Queries outside the resolved translator subset still use parser AST translation. |
 | `SAFE.` function prefix | Unsupported | The prefix is dropped, so function errors reach the client instead of returning NULL. |
 
 ## Server
@@ -73,13 +74,26 @@ they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 
-[src/resolved_translator.cc](src/resolved_translator.cc) translates a first subset directly from
-resolved AST: a projection over a single row (SELECT without FROM), with INT64, FLOAT64, BOOL,
-STRING and BYTES literals and parameters, basic casts including SAFE_CAST, and BYTE_LENGTH.
-The catalog, TypeFactory and analyzer output remain alive through translation. Output columns
-are matched by resolved column ID, and BYTE_LENGTH selects its DuckDB function from the resolved
-argument type. Unsupported nodes, functions or modifiers return to parser AST translation for
-the entire statement; translation and execution errors do not trigger fallback.
+[src/resolved_translator.cc](src/resolved_translator.cc) translates SELECTs composed of
+SingleRow, Table, Project, Filter, OrderBy and LimitOffset scans. Column references use resolved
+column IDs and internal aliases, with user-facing names applied only at the output boundary.
+Derived tables composed of these scans work too. Sort keys survive projections even when they
+are absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
+
+Expressions include scalar literals and parameters, casts, arithmetic, comparisons, boolean
+operators, CASE/IF/COALESCE and selected scalar functions. The existing function renames and
+templates are reused, adapting resolved enum date parts, interval arguments and default arguments.
+BYTE_LENGTH and LENGTH distinguish STRING from BYTES. Temporal, NUMERIC and JSON values, plus
+scalar ARRAY literals/parameters and array-returning scalar functions, are supported; general
+ARRAY/STRUCT expressions and UNNEST remain outside this migration stage. Existing documented
+function compatibility limitations still apply.
+
+The catalog, TypeFactory and analyzer output remain alive through translation. Unsupported nodes,
+functions, types or modifiers return to parser AST translation for the entire statement;
+translation and execution errors do not trigger fallback. Joins, CTEs, aggregation, set operations,
+analytic scans, scalar/correlated subqueries and DML/DDL still use the parser translator.
+`tests/resolved_translator_test.cc` executes supported queries directly against DuckDB without a
+parser fallback, covering results, types, aliases, ordering and parameterized preparation.
 
 For other statements, the translator walks the parser AST and extends GoogleSQL's unparser,
 overriding constructs that need DuckDB-specific spelling. Keeping conversion in this layer leaves
