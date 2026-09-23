@@ -25,6 +25,8 @@ Projects map to DuckDB catalogs (attached in-memory databases), datasets to sche
 
 [GoogleSQL](https://github.com/google/googlesql) is used as the frontend parser and analyzer. It parses and analyzes the SQL query and produces a GoogleSQL AST or resolved AST. The frontend should stay focused on BigQuery SQL semantics and should not depend on DuckDB-specific execution details.
 
+Every released language feature is enabled, because some syntax BigQuery accepts is gated behind one and the default options leave it off: `QUALIFY` is rejected outright without `FEATURE_QUALIFY`. Accepting a little more than BigQuery does is the lesser problem for an emulator, since a query the parser rejects cannot run at all.
+
 ## Translator
 
 The translator converts the GoogleSQL AST or resolved AST into a DuckDB-compatible query. This layer owns the compatibility gap between BigQuery SQL and DuckDB SQL, such as function names, type mappings, identifier handling, and BigQuery-specific syntax.
@@ -44,16 +46,45 @@ extending GoogleSQL's own unparser and overriding only the constructs whose spel
 - `STRUCT(...)` constructors (→ `struct_pack(a := ...)`) and `ARRAY<T>[...]` constructors,
 - `SAFE_CAST` (→ `TRY_CAST`) and the `CURRENT_TIMESTAMP()` family, which DuckDB spells without
   parentheses,
+- function calls (see below),
+- `SELECT * EXCEPT (a)` (→ `SELECT * EXCLUDE (a)`; `REPLACE` is spelled the same in DuckDB),
 - query parameters (`@name` and `?`), which are replaced by a typed literal of the value the
   request declared (`CAST('42' AS BIGINT)`), so that ARRAY and STRUCT parameters follow the same
   spelling rules as the rest of the statement.
 
-Everything else is printed by the base unparser, so joins, CTEs, subqueries and window functions
-need no rules of their own. Because the output is generated from the AST it is normalised SQL
-rather than the original text, and comments are dropped: they are not part of the AST.
+Everything else is printed by the base unparser, so joins, CTEs, subqueries, window functions
+and `QUALIFY` need no rules of their own. Because the output is generated from the AST it is
+normalised SQL rather than the original text, and comments are dropped: they are not part of
+the AST.
+
+### Functions
+
+`src/functions.cc` holds the two tables that cover the functions whose spelling differs, both
+keyed by the BigQuery name:
+
+- a **rename**, when DuckDB has the same function under another name (`REGEXP_CONTAINS` →
+  `regexp_matches`, `LOGICAL_AND` → `bool_and`, `FORMAT` → `printf`). Only the name is replaced,
+  so `DISTINCT`, `IGNORE NULLS`, `ORDER BY` and `OVER` keep working.
+- a **template** over the arguments, when the call itself has to change shape. `$n` is the n-th
+  argument and `#n` the n-th argument as the lower case string literal DuckDB expects a date part
+  to be, so `DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`. A rule matches one argument
+  count, and a call the rules do not cover is left alone.
+
+Some of these are not just spelling. A division by zero is an error in BigQuery and `+Inf` in
+DuckDB, so `SAFE_DIVIDE(a, b)` becomes `(a / NULLIF(b, 0))`; `LOG()` is the natural logarithm in
+BigQuery and the base 10 one in DuckDB; `REGEXP_REPLACE` replaces every occurrence and needs
+DuckDB's global flag; `DATE_ADD` stays a `DATE` where the DuckDB operator would widen it to a
+`TIMESTAMP`; and the epoch functions return a civil timestamp that has to be read as UTC.
+
+A template turns the call into an ordinary expression, which an `OVER` clause could no longer
+attach to, so a call carrying one keeps its BigQuery spelling. `SAFE.f(x)` returns NULL where
+`f(x)` would fail; DuckDB has no such call, so the prefix is dropped and the error reaches the
+client instead of becoming a NULL.
 
 Resolving names and types with GoogleSQL's analyzer, which would turn this into a resolved AST
-based translation, is the next step.
+based translation, is the next step. It would also give the translator the argument types that
+the remaining gaps need: `BYTE_LENGTH` is `strlen` for a STRING and `octet_length` for BYTES,
+and there is no way to tell which is meant without them.
 
 ## Backend
 
@@ -125,6 +156,8 @@ just e2e --verbose  # extra arguments are passed to `runn run`
 `tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
 
 Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB. The backend and the HTTP server have unit tests too (`just test`).
+
+Those tests check what a query is translated *into*. `tests/emulator_test.cc` checks that the translation then runs: it drives `Emulator::RunQuery`, so each case goes through the parser, the translator and DuckDB, and asserts the value BigQuery would return. Every function in `src/functions.cc` is exercised there, which is what tells a correct translation apart from a plausible looking one — `LOG()` means a different logarithm in each dialect and a division by zero a different thing, so a case like that fails on the value rather than on an error. Being linked against the same libduckdb as the emulator, it needs no DuckDB installation of its own, and the whole file runs in a few seconds.
 
 #### Internal structure memo
 

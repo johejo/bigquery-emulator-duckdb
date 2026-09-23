@@ -35,6 +35,14 @@ std::string ToUpperAscii(std::string_view text) {
   return result;
 }
 
+std::string ToLowerAscii(std::string_view text) {
+  std::string result(text);
+  for (char& c : result) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return result;
+}
+
 std::string QuoteLiteral(std::string_view value) {
   std::string result = "'";
   for (const char c : value) {

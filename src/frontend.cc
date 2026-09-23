@@ -25,9 +25,16 @@ const googlesql::ASTStatement& FrontendResult::statement() const {
 }
 
 FrontendResult ParseGoogleSql(const std::string& sql) {
+  // Some syntax BigQuery accepts is gated behind a language feature that the default options
+  // leave off, QUALIFY among it, so every released feature is turned on. Accepting a little
+  // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
+  // cannot run at all.
+  googlesql::LanguageOptions language_options;
+  language_options.EnableMaximumLanguageFeatures();
+
   std::unique_ptr<googlesql::ParserOutput> parser_output;
-  const absl::Status status = googlesql::ParseStatement(
-      sql, googlesql::ParserOptions(googlesql::LanguageOptions()), &parser_output);
+  const absl::Status status =
+      googlesql::ParseStatement(sql, googlesql::ParserOptions(language_options), &parser_output);
   if (!status.ok()) {
     // The parser reports the error location as a payload; turn it into a readable message.
     const googlesql::ErrorMessageOptions error_message_options = {

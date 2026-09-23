@@ -1,0 +1,90 @@
+desc: BigQuery functions and select modifiers produce BigQuery results through the translator
+steps:
+  date_and_time:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT DATE_ADD(DATE '2024-01-31', INTERVAL 1 MONTH) AS d,
+         DATE_DIFF(DATE '2024-03-01', DATE '2024-01-01', DAY) AS diff,
+         DATE_TRUNC(DATE '2024-05-17', MONTH) AS m,
+         FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', TIMESTAMP '2024-01-02 03:04:05') AS f"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"d":"2024-02-29","diff":"60","f":"2024-01-02T03:04:05Z","m":"2024-05-01"}]'
+  epoch_conversions:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT UNIX_SECONDS(TIMESTAMP '2020-01-01 00:00:00') AS s,
+         TIMESTAMP_MILLIS(1577836800000) AS ts,
+         TIMESTAMP_ADD(TIMESTAMP '2020-01-01 00:00:00', INTERVAL 90 MINUTE) AS a"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"a":"2020-01-01 01:30:00","s":"1577836800","ts":"2020-01-01 00:00:00"}]'
+  strings_and_regular_expressions:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT REGEXP_CONTAINS('abc', 'b') AS c, REGEXP_REPLACE('aaa', 'a', 'b') AS r,
+         SPLIT('a,b') AS s, FORMAT('%s-%d', 'x', 3) AS t, SAFE.SUBSTR('abcdef', 2, 3) AS sub"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"c":"true","r":"bbb","s":["a","b"],"sub":"bcd","t":"x-3"}]'
+  # A division by zero is an error in DuckDB terms and NULL in BigQuery terms, and LOG() means
+  # a different logarithm in each dialect.
+  numbers:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT SAFE_DIVIDE(1, 0) AS d, CAST(LOG(8, 2) AS INT64) AS l, DIV(7, 2) AS q,
+         PARSE_DATE('%Y-%m-%d', '2024-02-29') AS p"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"d":null,"l":"3","p":"2024-02-29","q":"3"}]'
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset fn
+    test: current.exit_code == 0
+  create_table:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE TABLE fn.scores (id INT64, name STRING, score INT64)"
+    test: current.exit_code == 0
+  insert:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "INSERT INTO fn.scores VALUES (1, 'a', 10), (2, 'b', 30), (3, 'a', 20)"
+    test: current.exit_code == 0
+  select_except:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT * EXCEPT (score) FROM `test.fn.scores` ORDER BY id'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"a"},{"id":"2","name":"b"},{"id":"3","name":"a"}]'
+  select_replace:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT * REPLACE (score * 2 AS score) FROM `test.fn.scores` ORDER BY id LIMIT 1'
+    test: |
+      current.exit_code == 0 && trim(current.stdout) == '[{"id":"1","name":"a","score":"20"}]'
+  qualify:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT name, score FROM `test.fn.scores`
+         QUALIFY ROW_NUMBER() OVER (PARTITION BY name ORDER BY score DESC) = 1 ORDER BY name'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"name":"a","score":"20"},{"name":"b","score":"30"}]'
+  aggregates:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT LOGICAL_OR(score > 25) AS any_high, COUNTIF(score > 15) AS n FROM `test.fn.scores`'
+    test: |
+      current.exit_code == 0 && trim(current.stdout) == '[{"any_high":"true","n":"2"}]'
