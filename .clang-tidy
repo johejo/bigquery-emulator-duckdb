@@ -1,5 +1,9 @@
 # Headers are linted as their own translation unit by the clang-tidy Bazel aspect,
 # which makes every '#pragma once' look like it sits in a main file.
+#
+# googlesql deprecated ParseTreeVisitor in favour of a status based visitor, but its own
+# Unparser (which the translator extends) still derives from the deprecated one, so every
+# ASTNode::Accept call would be an error here. Ordinary builds still print them as warnings.
 Checks: >
   clang-analyzer-*,
   bugprone-*,
@@ -7,7 +11,8 @@ Checks: >
   readability-identifier-naming,
   modernize-use-nullptr,
   modernize-use-override,
-  -clang-diagnostic-pragma-once-outside-header
+  -clang-diagnostic-pragma-once-outside-header,
+  -clang-diagnostic-deprecated-declarations
 HeaderFilterRegex: '^(src|tests)/'
 # The aspect runner only prints clang-tidy's log when it exits non-zero, so findings
 # have to be errors to be visible at all.

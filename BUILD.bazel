@@ -38,6 +38,8 @@ cc_library(
     hdrs = ["src/frontend.h"],
     copts = ["-std=c++20"],
     deps = [
+        "@googlesql//googlesql/public:error_helpers",
+        "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:parse_helpers",
     ],
 )
@@ -47,7 +49,13 @@ cc_library(
     srcs = ["src/translator.cc"],
     hdrs = ["src/translator.h"],
     copts = ["-std=c++20"],
-    deps = [":frontend"],
+    deps = [
+        ":frontend",
+        # The parser AST and the unparser live in //googlesql/parser, which is visible only
+        # inside googlesql; they come in transitively through these public targets.
+        "@googlesql//googlesql/public:parse_helpers",
+        "@googlesql//googlesql/public:type",
+    ],
 )
 
 cc_library(

@@ -39,6 +39,30 @@ steps:
       command: tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
     test: |
       current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
+  create_table_with_nested_types:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE TABLE e2e.nested (id INT64, tags ARRAY<STRING>, point STRUCT<x INT64, y INT64>)"
+    test: current.exit_code == 0
+  insert_nested:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "INSERT INTO e2e.nested VALUES (1, ['a', 'b'], STRUCT(2 AS x, 3 AS y))"
+    test: current.exit_code == 0
+  select_nested:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT * FROM `test.e2e.nested`'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","point":{"x":"2","y":"3"},"tags":["a","b"]}]'
+  rm_nested_table:
+    exec:
+      command: tests/e2e/bq.sh rm -f -t e2e.nested
+    test: current.exit_code == 0
   rm_table:
     exec:
       command: tests/e2e/bq.sh rm -f -t e2e.users

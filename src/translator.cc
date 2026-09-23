@@ -1,10 +1,15 @@
 #include "src/translator.h"
 
 #include <cctype>
-#include <optional>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+
+#include "googlesql/parser/parse_tree.h"
+#include "googlesql/parser/unparser.h"
+#include "googlesql/public/options.pb.h"
+#include "googlesql/public/type.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -17,16 +22,7 @@ std::string ToUpper(std::string_view text) {
   return result;
 }
 
-bool IsIdentifierStart(char c) {
-  return std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_';
-}
-
-bool IsIdentifierChar(char c) {
-  return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
-}
-
-// Type names that differ between GoogleSQL and DuckDB. Only applied when the word is used as a
-// type (i.e. not immediately followed by "(", where it would be a function call).
+// Type names that differ between GoogleSQL and DuckDB.
 const std::unordered_map<std::string, std::string>& TypeNames() {
   static const auto* const kNames = new std::unordered_map<std::string, std::string>{
       {"INT64", "BIGINT"},
@@ -43,332 +39,224 @@ const std::unordered_map<std::string, std::string>& TypeNames() {
   return *kNames;
 }
 
-// Function names that differ between GoogleSQL and DuckDB. Only applied when the word is
-// immediately followed by "(".
-const std::unordered_map<std::string, std::string>& FunctionNames() {
-  static const auto* const kNames = new std::unordered_map<std::string, std::string>{
-      {"SAFE_CAST", "TRY_CAST"},
-  };
-  return *kNames;
+// Maps a GoogleSQL type name onto its DuckDB spelling, keeping the original name when the two
+// agree. `has_type_parameters` drops the default parameters of the mapped name, because an
+// explicit parameter list follows and replaces them.
+std::string MapTypeName(std::string_view name, bool has_type_parameters) {
+  const auto it = TypeNames().find(ToUpper(name));
+  if (it == TypeNames().end()) {
+    return std::string(name);
+  }
+  return has_type_parameters ? it->second.substr(0, it->second.find('(')) : it->second;
 }
 
-class Translator {
+// Functions that GoogleSQL spells with empty parentheses and DuckDB spells as a bare keyword.
+bool IsBareKeywordFunction(std::string_view upper_name) {
+  return upper_name == "CURRENT_TIMESTAMP" || upper_name == "CURRENT_DATE" ||
+         upper_name == "CURRENT_TIME";
+}
+
+// '...' with the DuckDB escaping rules: a single quote is doubled and nothing else is special.
+std::string QuoteString(std::string_view value) {
+  std::string result = "'";
+  for (const char c : value) {
+    result += c;
+    if (c == '\'') {
+      result += c;
+    }
+  }
+  result += '\'';
+  return result;
+}
+
+std::string ToHex(std::string_view value) {
+  static constexpr std::string_view kDigits = "0123456789abcdef";
+  std::string result;
+  result.reserve(value.size() * 2);
+  for (const char c : value) {
+    const auto byte = static_cast<unsigned char>(c);
+    result += kDigits[byte >> 4U];
+    result += kDigits[byte & 0x0FU];
+  }
+  return result;
+}
+
+// A backtick quoted GoogleSQL identifier holds a whole path in BigQuery: `project.dataset.table`
+// is one identifier that names three objects, so it becomes "project"."dataset"."table".
+std::string QuotePath(std::string_view name) {
+  std::string result;
+  result += '"';
+  for (const char c : name) {
+    if (c == '.') {
+      result += "\".\"";
+    } else {
+      result += c;
+      if (c == '"') {
+        result += c;
+      }
+    }
+  }
+  result += '"';
+  return result;
+}
+
+// Unparses a GoogleSQL AST as DuckDB SQL: the base class knows how to print GoogleSQL, and the
+// overrides below replace the constructs whose spelling differs in DuckDB.
+class DuckDbUnparser : public googlesql::parser::Unparser {
  public:
-  explicit Translator(std::string_view input) : input_(input) {}
+  explicit DuckDbUnparser(std::string* unparsed) : Unparser(unparsed) {}
 
-  std::string Run() {
-    Translate(/*stop_at_delimiter=*/false);
-    return output_;
-  }
-
- private:
-  // Position of the top-level "AS" alias found while translating a STRUCT argument.
-  struct AliasPosition {
-    size_t output_before_as = 0;  // Output length just before the AS keyword.
-    size_t output_after_as = 0;   // Output length just after the AS keyword.
-  };
-
-  // Translates until the end of input or, when `stop_at_delimiter` is set, until a "," or ")"
-  // at parenthesis depth zero (which is left unconsumed).
-  void Translate(bool stop_at_delimiter) {
-    int depth = 0;
-    while (pos_ < input_.size()) {
-      const char c = input_[pos_];
-      if (stop_at_delimiter && depth == 0 && (c == ',' || c == ')')) {
-        return;
-      }
-      if (c == '(' || c == '[') {
-        ++depth;
-      } else if (c == ')' || c == ']') {
-        --depth;
-      }
-      if (c == '`') {
-        QuotedIdentifier();
-      } else if (c == '\'' || c == '"') {
-        StringLiteral(/*raw=*/false, /*bytes=*/false);
-      } else if (c == '-' && Peek(1) == '-') {
-        LineComment(2);
-      } else if (c == '#') {
-        LineComment(1);
-      } else if (c == '/' && Peek(1) == '*') {
-        BlockComment();
-      } else if (IsIdentifierStart(c)) {
-        Word(stop_at_delimiter && depth == 0);
-      } else if (std::isdigit(static_cast<unsigned char>(c)) != 0 ||
-                 (c == '.' && std::isdigit(static_cast<unsigned char>(Peek(1))) != 0)) {
-        Number();
-      } else {
-        output_ += c;
-        ++pos_;
-      }
+  void visitASTIdentifier(const googlesql::ASTIdentifier* node, void* data) override {
+    if (node->is_quoted()) {
+      print(QuotePath(node->GetAsStringView()));
+    } else {
+      print(node->GetAsStringView());
     }
   }
 
-  char Peek(size_t offset) const {
-    return pos_ + offset < input_.size() ? input_[pos_ + offset] : '\0';
+  // GoogleSQL literals are already unescaped by the parser, so the value only has to be quoted
+  // the way DuckDB expects. This covers "...", '''...''' and the r prefix in one place.
+  void visitASTStringLiteral(const googlesql::ASTStringLiteral* node, void* data) override {
+    print(QuoteString(node->string_value()));
   }
 
-  bool NextNonSpaceIs(char expected) const {
-    size_t i = pos_;
-    while (i < input_.size() && std::isspace(static_cast<unsigned char>(input_[i])) != 0) {
-      ++i;
-    }
-    return i < input_.size() && input_[i] == expected;
-  }
-
-  // `project.dataset.table` -> "project"."dataset"."table"
-  void QuotedIdentifier() {
-    ++pos_;  // Opening backtick.
-    std::string part;
-    auto flush = [&] {
-      output_ += '"';
-      for (const char c : part) {
-        output_ += c;
-        if (c == '"') {
-          output_ += '"';
-        }
-      }
-      output_ += '"';
-      part.clear();
-    };
-    while (pos_ < input_.size() && input_[pos_] != '`') {
-      const char c = input_[pos_++];
-      if (c == '\\' && pos_ < input_.size()) {
-        part += input_[pos_++];
-      } else if (c == '.') {
-        flush();
-        output_ += '.';
-      } else {
-        part += c;
-      }
-    }
-    ++pos_;  // Closing backtick.
-    flush();
-  }
-
-  // Handles '...', "...", '''...''', """...""" and the r/b prefixes. GoogleSQL processes
-  // backslash escapes in regular strings, DuckDB only in E'...' strings; raw strings map to
-  // plain DuckDB strings, where a backslash is already literal.
-  void StringLiteral(bool raw, bool bytes) {
-    const char quote = input_[pos_];
-    const bool triple = Peek(1) == quote && Peek(2) == quote;
-    pos_ += triple ? 3 : 1;
-    std::string body;
-    bool has_escape = false;
-    while (pos_ < input_.size()) {
-      const char c = input_[pos_];
-      if (c == quote && (!triple || (Peek(1) == quote && Peek(2) == quote))) {
-        pos_ += triple ? 3 : 1;
-        break;
-      }
-      if (c == '\\' && !raw && pos_ + 1 < input_.size()) {
-        has_escape = true;
-        body += c;
-        body += input_[pos_ + 1];
-        pos_ += 2;
-        continue;
-      }
-      if (c == '\'') {
-        body += "''";
-      } else {
-        body += c;
-      }
-      ++pos_;
-    }
-    output_ += has_escape ? "E'" : "'";
-    output_ += body;
-    output_ += '\'';
-    if (bytes) {
-      output_ += "::BLOB";
-    }
+  // Bytes may contain quotes, NUL and non-UTF-8 sequences, none of which survive a string
+  // literal, so they go through their hex encoding.
+  void visitASTBytesLiteral(const googlesql::ASTBytesLiteral* node, void* data) override {
+    print("from_hex(" + QuoteString(ToHex(node->bytes_value())) + ")");
   }
 
   // GoogleSQL treats every literal with a decimal point as FLOAT64, whereas DuckDB infers a
-  // DECIMAL, so "1.5" becomes "1.5::DOUBLE". Literals with an exponent are already DOUBLE.
-  void Number() {
-    const size_t start = pos_;
-    bool has_point = false;
-    bool has_exponent = false;
-    while (pos_ < input_.size()) {
-      const char c = input_[pos_];
-      if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
-        ++pos_;
-      } else if (c == '.' && !has_point && !has_exponent) {
-        has_point = true;
-        ++pos_;
-      } else if ((c == 'e' || c == 'E') && !has_exponent &&
-                 (std::isdigit(static_cast<unsigned char>(Peek(1))) != 0 ||
-                  ((Peek(1) == '+' || Peek(1) == '-') &&
-                   std::isdigit(static_cast<unsigned char>(Peek(2))) != 0))) {
-        has_exponent = true;
-        pos_ += Peek(1) == '+' || Peek(1) == '-' ? 2 : 1;
-      } else {
-        break;
-      }
+  // DECIMAL, so the type is pinned down explicitly.
+  void visitASTFloatLiteral(const googlesql::ASTFloatLiteral* node, void* data) override {
+    print(std::string(node->image()) + "::DOUBLE");
+  }
+
+  void visitASTSimpleType(const googlesql::ASTSimpleType* node, void* data) override {
+    print(MapTypeName(node->type_name()->ToIdentifierPathString(),
+                      node->type_parameters() != nullptr));
+    if (node->type_parameters() != nullptr) {
+      node->type_parameters()->Accept(this, data);
     }
-    output_ += input_.substr(start, pos_ - start);
-    if (has_point && !has_exponent) {
-      output_ += "::DOUBLE";
+    if (node->collate() != nullptr) {
+      node->collate()->Accept(this, data);
     }
   }
 
-  void LineComment(size_t marker_length) {
-    output_ += "--";
-    pos_ += marker_length;
-    while (pos_ < input_.size() && input_[pos_] != '\n') {
-      output_ += input_[pos_++];
-    }
+  void visitASTArrayType(const googlesql::ASTArrayType* node, void* data) override {
+    node->element_type()->Accept(this, data);
+    print("[]");
   }
 
-  void BlockComment() {
-    while (pos_ < input_.size()) {
-      if (input_[pos_] == '*' && Peek(1) == '/') {
-        output_ += "*/";
-        pos_ += 2;
-        return;
-      }
-      output_ += input_[pos_++];
-    }
+  void visitASTStructType(const googlesql::ASTStructType* node, void* data) override {
+    print("STRUCT(");
+    UnparseVectorWithSeparator(node->struct_fields(), data, ",");
+    print(")");
   }
 
-  void Word(bool record_alias) {
-    const size_t start = pos_;
-    while (pos_ < input_.size() && IsIdentifierChar(input_[pos_])) {
-      ++pos_;
-    }
-    const std::string_view word = input_.substr(start, pos_ - start);
-    const std::string upper = ToUpper(word);
-
-    if (record_alias && upper == "AS") {
-      alias_ = AliasPosition{output_.size(), output_.size() + word.size()};
-    }
-    if (upper == "STRUCT" && NextNonSpaceIs('(')) {
-      StructConstructor();
-      return;
-    }
-    if ((upper == "ARRAY" || upper == "STRUCT") && NextNonSpaceIs('<')) {
-      // Typed constructors such as ARRAY<INT64>[1, 2]: DuckDB infers the type, so the type
-      // parameter is dropped.
-      SkipTypeParameter();
-      if (upper == "STRUCT") {
-        StructConstructor();
-      }
-      return;
-    }
-    // CURRENT_TIMESTAMP() and friends are functions in GoogleSQL but keywords in DuckDB.
-    if ((upper == "CURRENT_TIMESTAMP" || upper == "CURRENT_DATE" || upper == "CURRENT_TIME") &&
-        SkipEmptyParens()) {
-      output_ += word;
-      return;
-    }
-
-    // r'...', b'...', rb'...' string prefixes.
-    if (upper.size() <= 2 && (Peek(0) == '\'' || Peek(0) == '"') &&
-        upper.find_first_not_of("RB") == std::string::npos) {
-      StringLiteral(/*raw=*/upper.find('R') != std::string::npos,
-                    /*bytes=*/upper.find('B') != std::string::npos);
-      return;
-    }
-
-    if (NextNonSpaceIs('(')) {
-      if (const auto it = FunctionNames().find(upper); it != FunctionNames().end()) {
-        output_ += it->second;
-        return;
-      }
-    } else if (const auto it = TypeNames().find(upper); it != TypeNames().end()) {
-      output_ += it->second;
-      return;
-    }
-    output_ += word;
+  // A column type in DDL is an ASTColumnSchema rather than an ASTType, and the base class
+  // prints the rest of the column (parameters, collation, default, options) through a private
+  // helper. Rather than reimplementing that tail, the type name node is remembered here and
+  // rewritten when the base class walks into it.
+  void visitASTSimpleColumnSchema(const googlesql::ASTSimpleColumnSchema* node,
+                                  void* data) override {
+    column_type_name_ = node->type_name();
+    column_type_has_parameters_ = node->type_parameters() != nullptr;
+    Unparser::visitASTSimpleColumnSchema(node, data);
+    column_type_name_ = nullptr;
   }
 
-  // Consumes "()" when the next non-space characters are exactly that. Returns false otherwise,
-  // leaving the input untouched.
-  bool SkipEmptyParens() {
-    size_t i = pos_;
-    while (i < input_.size() && std::isspace(static_cast<unsigned char>(input_[i])) != 0) {
-      ++i;
+  void visitASTPathExpression(const googlesql::ASTPathExpression* node, void* data) override {
+    if (node == column_type_name_) {
+      print(MapTypeName(node->ToIdentifierPathString(), column_type_has_parameters_));
+      return;
     }
-    if (i + 1 < input_.size() && input_[i] == '(' && input_[i + 1] == ')') {
-      pos_ = i + 2;
-      return true;
-    }
-    return false;
+    Unparser::visitASTPathExpression(node, data);
   }
 
-  // Skips a "<...>" type parameter list, including nested ones.
-  void SkipTypeParameter() {
-    while (pos_ < input_.size() && input_[pos_] != '<') {
-      ++pos_;
-    }
-    int depth = 0;
-    while (pos_ < input_.size()) {
-      const char c = input_[pos_++];
-      if (c == '<') {
-        ++depth;
-      } else if (c == '>' && --depth == 0) {
-        break;
-      }
-    }
+  // ARRAY<T> / STRUCT<...> column types. The column tail that the base class would print after
+  // them is dropped along the way; defaults and options on a nested column type are not
+  // supported yet.
+  void visitASTArrayColumnSchema(const googlesql::ASTArrayColumnSchema* node, void* data) override {
+    node->element_schema()->Accept(this, data);
+    print("[]");
+  }
+
+  void visitASTStructColumnSchema(const googlesql::ASTStructColumnSchema* node,
+                                  void* data) override {
+    print("STRUCT(");
+    UnparseVectorWithSeparator(node->struct_fields(), data, ",");
+    print(")");
+  }
+
+  // TIMESTAMP '2024-01-01 00:00:00' and friends name their type as a keyword, not as a type
+  // node, so the same mapping is applied here.
+  void visitASTDateOrTimeLiteral(const googlesql::ASTDateOrTimeLiteral* node, void* data) override {
+    print(MapTypeName(
+        googlesql::Type::TypeKindToString(node->type_kind(), googlesql::PRODUCT_INTERNAL),
+        /*has_type_parameters=*/false));
+    node->string_literal()->Accept(this, data);
+  }
+
+  void visitASTArrayConstructor(const googlesql::ASTArrayConstructor* node, void* data) override {
+    // DuckDB infers the element type of a list literal and has no ARRAY<T>[...] spelling.
+    print("[");
+    UnparseVectorWithSeparator(node->elements(), data, ",");
+    print("]");
   }
 
   // STRUCT(1 AS a, 'x' AS b) -> struct_pack(a := 1, b := 'x')
-  void StructConstructor() {
-    while (pos_ < input_.size() && input_[pos_] != '(') {
-      ++pos_;
-    }
-    ++pos_;  // Opening parenthesis.
-    output_ += "struct_pack(";
-    int index = 0;
-    while (pos_ < input_.size()) {
-      const size_t argument_start = output_.size();
-      const std::optional<AliasPosition> outer_alias = alias_;
-      alias_.reset();
-      Translate(/*stop_at_delimiter=*/true);
-      std::string argument = output_.substr(argument_start);
-      output_.resize(argument_start);
-      std::string name;
-      std::string expression;
-      if (alias_.has_value()) {
-        expression = argument.substr(0, alias_->output_before_as - argument_start);
-        name = argument.substr(alias_->output_after_as - argument_start);
-      } else {
-        expression = argument;
-        name = "_field_" + std::to_string(index + 1);
+  void visitASTStructConstructorWithKeyword(const googlesql::ASTStructConstructorWithKeyword* node,
+                                            void* data) override {
+    print("struct_pack(");
+    const auto fields = node->fields();
+    for (size_t i = 0; i < fields.size(); ++i) {
+      if (i > 0) {
+        print(",");
       }
-      alias_ = outer_alias;
-      output_ += Trim(name) + " := " + Trim(expression);
-      ++index;
-      if (pos_ < input_.size() && input_[pos_] == ',') {
-        output_ += ", ";
-        ++pos_;
-        continue;
-      }
-      ++pos_;  // Closing parenthesis.
-      break;
+      const googlesql::ASTStructConstructorArg* field = fields[i];
+      const std::string name = field->alias() == nullptr
+                                   ? "_field_" + std::to_string(i + 1)
+                                   : std::string(field->alias()->identifier()->GetAsStringView());
+      print(name + " := ");
+      field->expression()->Accept(this, data);
     }
-    output_ += ')';
+    print(")");
   }
 
-  static std::string Trim(const std::string& text) {
-    const size_t begin = text.find_first_not_of(" \t\r\n");
-    if (begin == std::string::npos) {
-      return "";
-    }
-    const size_t end = text.find_last_not_of(" \t\r\n");
-    return text.substr(begin, end - begin + 1);
+  void visitASTCastExpression(const googlesql::ASTCastExpression* node, void* data) override {
+    print(node->is_safe_cast() ? "TRY_CAST(" : "CAST(");
+    node->expr()->Accept(this, data);
+    print("AS");
+    node->type()->Accept(this, data);
+    print(")");
   }
 
-  std::string_view input_;
-  size_t pos_ = 0;
-  std::string output_;
-  std::optional<AliasPosition> alias_;
+  void visitASTFunctionCall(const googlesql::ASTFunctionCall* node, void* data) override {
+    const googlesql::ASTPathExpression* function = node->function();
+    if (node->arguments().empty() && function->num_names() == 1 &&
+        IsBareKeywordFunction(ToUpper(function->first_name()->GetAsStringView()))) {
+      print(function->first_name()->GetAsStringView());
+      return;
+    }
+    Unparser::visitASTFunctionCall(node, data);
+  }
+
+ private:
+  // The type name of the column schema currently being unparsed, if any.
+  const googlesql::ASTPathExpression* column_type_name_ = nullptr;
+  bool column_type_has_parameters_ = false;
 };
 
 }  // namespace
 
 std::string TranslateToDuckDbSql(const FrontendResult& frontend_result) {
-  return Translator(frontend_result.sql()).Run();
+  std::string unparsed;
+  DuckDbUnparser unparser(&unparsed);
+  frontend_result.statement().Accept(&unparser, /*data=*/nullptr);
+  unparser.FlushLine();
+  const size_t end = unparsed.find_last_not_of(" \t\r\n");
+  return end == std::string::npos ? std::string() : unparsed.substr(0, end + 1);
 }
 
 }  // namespace bigquery_emulator_duckdb

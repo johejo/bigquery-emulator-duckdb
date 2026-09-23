@@ -27,16 +27,26 @@ The translator converts the GoogleSQL AST or resolved AST into a DuckDB-compatib
 
 Keeping this layer separate prevents the frontend from growing into both a parser/analyzer and a DuckDB query generator, while also keeping the backend focused on execution.
 
-The current translator is token based rather than AST based: after the frontend validates the syntax, it rewrites
+The translator walks the parser AST produced by the frontend and unparses it as DuckDB SQL,
+extending GoogleSQL's own unparser and overriding only the constructs whose spelling differs:
 
-- backtick identifiers (`` `project.dataset.table` `` → `"project"."dataset"."table"`),
-- string literals (double quotes, triple quotes, `r`/`b` prefixes, backslash escapes),
+- identifiers (`` `project.dataset.table` `` → `"project"."dataset"."table"`),
+- string literals (the parser hands over the unescaped value, which is then quoted the DuckDB way)
+  and bytes literals (`b'abc'` → `from_hex('616263')`, so quotes, NUL and non-UTF-8 survive),
 - float literals (`1.5` → `1.5::DOUBLE`, since DuckDB would infer `DECIMAL`),
-- type names (`INT64`, `STRING`, `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, ...),
-- `STRUCT(...)` constructors and `ARRAY<T>`/`STRUCT<...>` type parameters,
-- a few functions (`SAFE_CAST`, `CURRENT_TIMESTAMP()`, ...),
+- type names in expressions, in DDL column definitions and in typed literals (`INT64` → `BIGINT`,
+  `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, `ARRAY<T>` → `T[]`,
+  `STRUCT<a INT64>` → `STRUCT(a BIGINT)`, ...),
+- `STRUCT(...)` constructors (→ `struct_pack(a := ...)`) and `ARRAY<T>[...]` constructors,
+- `SAFE_CAST` (→ `TRY_CAST`) and the `CURRENT_TIMESTAMP()` family, which DuckDB spells without
+  parentheses.
 
-and passes everything else through. Replacing this with a resolved AST based translation is the next step.
+Everything else is printed by the base unparser, so joins, CTEs, subqueries and window functions
+need no rules of their own. Because the output is generated from the AST it is normalised SQL
+rather than the original text, and comments are dropped: they are not part of the AST.
+
+Resolving names and types with GoogleSQL's analyzer, which would turn this into a resolved AST
+based translation, is the next step.
 
 ## Backend
 
