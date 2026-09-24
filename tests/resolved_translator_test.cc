@@ -507,6 +507,49 @@ TEST_F(ResolvedTranslatorTest, RunsUnnestStructsAndArrays) {
   EXPECT_THROW(Execute("SELECT [10, 20, 30][OFFSET(3)]"), BackendError);
 }
 
+TEST_F(ResolvedTranslatorTest, InsertsValuesAndQueryResults) {
+  Execute("INSERT INTO t VALUES (10, 'v', b'\\x01'), (11, CONCAT('w', 'x'), NULL)");
+  Execute("INSERT INTO p.ds.t (b, a, raw) VALUES ('reordered', 12, DEFAULT)");
+  Execute("INSERT t (a) SELECT a + 100 FROM t WHERE a IN (1, 2) ORDER BY a");
+
+  const auto parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
+    {"name":"a","parameterType":{"type":"INT64"},"parameterValue":{"value":"13"}}
+  ])"));
+  AnalyzerSettings settings;
+  settings.named_parameters.emplace_back("a", googlesql::types::Int64Type());
+  Execute("INSERT INTO t (a, b) VALUES (@a, 'param')", parameters, settings);
+
+  const auto result =
+      backend_.Execute("SELECT a, b, hex(raw) FROM p.ds.t WHERE a >= 10 ORDER BY a");
+  ASSERT_EQ(result.rows.size(), 6);
+  const std::vector<std::vector<std::optional<std::string>>> expected = {
+      {"10", "v", "01"},
+      {"11", "wx", std::nullopt},
+      {"12", "reordered", std::nullopt},
+      {"13", "param", std::nullopt},
+      {"101", std::nullopt, std::nullopt},
+      {"102", std::nullopt, std::nullopt}};
+  for (size_t row = 0; row < expected.size(); ++row) {
+    for (size_t i = 0; i < 3; ++i) {
+      const auto& cell = result.rows[row]["f"][i]["v"];
+      const auto& want = expected[row][i];
+      if (want.has_value()) {
+        EXPECT_EQ(cell, *want) << row << "," << i;
+      } else {
+        EXPECT_TRUE(cell.is_null()) << row << "," << i;
+      }
+    }
+  }
+}
+
+TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedInsertModifiers) {
+  for (const std::string& sql : {std::string("INSERT OR IGNORE INTO t (a) VALUES (1)"),
+                                 std::string("INSERT INTO t (a) VALUES (1) ASSERT_ROWS_MODIFIED 1"),
+                                 std::string("INSERT INTO t (a) VALUES (1) THEN RETURN a")}) {
+    EXPECT_FALSE(Translate(sql).has_value()) << sql;
+  }
+}
+
 TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {
   AnalyzerSettings settings;
   settings.named_parameters.emplace_back("s", googlesql::types::StringType());

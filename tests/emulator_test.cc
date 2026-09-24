@@ -319,8 +319,9 @@ TEST(EmulatorParserFallbackTest, DenyFailsOnlyStatementsTheResolvedTranslatorMis
   };
   emulator.CreateDataset({"test", "fallback"});
   EXPECT_FALSE(run("CREATE TABLE fallback.t (x INT64)")->error.has_value());
+  EXPECT_FALSE(run("INSERT INTO fallback.t (x) VALUES (1)")->error.has_value());
   EXPECT_FALSE(run("SELECT x FROM fallback.t")->error.has_value());
-  const std::shared_ptr<const Job> job = run("INSERT INTO fallback.t (x) VALUES (1)");
+  const std::shared_ptr<const Job> job = run("UPDATE fallback.t SET x = 2 WHERE TRUE");
   EXPECT_EQ(job->error.has_value() ? job->error->http_status() : 0, 400);
   EXPECT_NE(std::string(job->error.has_value() ? job->error->what() : "")
                 .find("parser AST fallback is disabled"),

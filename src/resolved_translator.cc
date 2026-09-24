@@ -1131,19 +1131,93 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
   return result;
 }
 
+std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, const Scope& scope) {
+  const auto* table = insert.table_scan();
+  if (insert.insert_mode() != googlesql::ResolvedInsertStmt::OR_ERROR ||
+      insert.assert_rows_modified() != nullptr || insert.returning() != nullptr ||
+      insert.on_conflict_clause() != nullptr || insert.query_parameter_list_size() != 0 ||
+      insert.generated_column_expr_list_size() != 0 ||
+      insert.timestamp_version_column() != nullptr || insert.temporal_at() != nullptr ||
+      !table->hint_list().empty() || table->for_system_time_expr() != nullptr ||
+      table->table()->IsValueTable() ||
+      table->column_list_size() != table->column_index_list_size()) {
+    return std::nullopt;
+  }
+  // The inserted columns are the table scan's columns; name them by the table's own columns.
+  std::map<int, std::string> table_columns;
+  for (int i = 0; i < table->column_list_size(); ++i) {
+    table_columns.emplace(
+        table->column_list(i).column_id(),
+        QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()));
+  }
+  std::vector<std::string> names;
+  for (const auto& column : insert.insert_column_list()) {
+    const auto name = table_columns.find(column.column_id());
+    if (name == table_columns.end() || !SqlType(column.type()) ||
+        column.type_annotation_map() != nullptr) {
+      return std::nullopt;
+    }
+    names.push_back(name->second);
+  }
+  std::string sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
+                    Join(names, ", ") + ") ";
+  if (insert.query() != nullptr) {
+    const auto relation = Scan(*insert.query(), scope);
+    if (!relation) {
+      return std::nullopt;
+    }
+    std::vector<std::string> projections;
+    for (const auto& output : insert.query_output_column_list()) {
+      const auto column = relation->columns.find(output.column_id());
+      if (column == relation->columns.end()) {
+        return std::nullopt;
+      }
+      projections.push_back(column->second);
+    }
+    return sql + "SELECT " + Join(projections, ", ") + relation->From();
+  }
+  if (insert.row_list_size() == 0) {
+    return std::nullopt;
+  }
+  std::vector<std::string> rows;
+  for (const auto& row : insert.row_list()) {
+    std::vector<std::string> values;
+    for (const auto& dml_value : row->value_list()) {
+      const auto* value = dml_value->value();
+      if (value->Is<googlesql::ResolvedDMLDefault>()) {
+        values.emplace_back("DEFAULT");
+        continue;
+      }
+      const auto sql_value = Expression(*value, scope, {});
+      if (!sql_value) {
+        return std::nullopt;
+      }
+      values.push_back(*sql_value);
+    }
+    rows.push_back("(" + Join(values, ", ") + ")");
+  }
+  return sql + "VALUES " + Join(rows, ", ");
+}
+
 }  // namespace
 
 std::optional<std::string> TranslateResolvedToDuckDbSql(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters) {
-  if (!statement.Is<googlesql::ResolvedQueryStmt>() || !statement.hint_list().empty()) {
+  if (!statement.hint_list().empty()) {
+    return std::nullopt;
+  }
+  int next_name = 0;
+  const Scope scope{parameters, next_name, {}, {}};
+  if (statement.Is<googlesql::ResolvedInsertStmt>()) {
+    return Insert(*statement.GetAs<googlesql::ResolvedInsertStmt>(), scope);
+  }
+  if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return std::nullopt;
   }
   const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
   if (query->is_value_table()) {
     return std::nullopt;
   }
-  int next_name = 0;
-  const Scope scope{parameters, next_name, {}, {}};
   const auto relation = Scan(*query->query(), scope);
   if (!relation) {
     return std::nullopt;
