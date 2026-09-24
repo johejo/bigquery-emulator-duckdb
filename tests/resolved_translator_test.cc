@@ -578,6 +578,17 @@ TEST_F(ResolvedTranslatorTest, RunsUnnestStructsAndArrays) {
   EXPECT_EQ(Column(Execute("SELECT a, x FROM t LEFT JOIN UNNEST(GENERATE_ARRAY(1, a - 1)) AS x "
                            "WHERE a IS NOT NULL ORDER BY a, x")),
             (V{"1", "2", "3", "3"}));
+  EXPECT_EQ(Rows(Execute("SELECT x, y, o FROM UNNEST([1, 2, 3] AS x, ['a'] AS y) WITH OFFSET AS o "
+                         "ORDER BY o")),
+            (V{"1|a|0", "2|NULL|1", "3|NULL|2"}));
+  EXPECT_EQ(Rows(Execute("SELECT x, y FROM UNNEST([1, 2, 3] AS x, ['a', 'b'] AS y, "
+                         "mode => 'TRUNCATE') ORDER BY x")),
+            (V{"1|a", "2|b"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, x, y FROM t, UNNEST([a] AS x, CAST(NULL AS ARRAY<STRING>) "
+                         "AS y) WHERE a IS NOT NULL ORDER BY a")),
+            (V{"1|1|NULL", "2|2|NULL", "3|3|NULL"}));
+  EXPECT_THROW(Execute("SELECT x FROM UNNEST([1, 2] AS x, [3] AS y, mode => 'STRICT')"),
+               BackendError);
   EXPECT_EQ(Scalar("SELECT s.y FROM (SELECT STRUCT(1 AS x, 'z' AS y) AS s)"), "z");
   EXPECT_EQ(Scalar("SELECT [10, 20, 30][OFFSET(1)]"), "20");
   EXPECT_EQ(Scalar("SELECT [10, 20, 30][ORDINAL(1)]"), "10");

@@ -1206,33 +1206,23 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   return result;
 }
 
-std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, const Scope& scope) {
-  if (array.array_expr_list_size() != 1 || array.element_column_list_size() != 1 ||
-      array.array_zip_mode() != nullptr) {
-    return Unsupported(scope, "UNNEST of multiple arrays");
-  }
-  auto result = array.input_scan() == nullptr
-                    ? std::optional<Relation>(Relation{"SELECT 1 AS _unit", {}, {}})
-                    : Scan(*array.input_scan(), scope);
-  if (!result) {
-    return std::nullopt;
-  }
-  const auto elements = Expression(*array.array_expr_list(0), scope, result->columns);
-  if (!elements) {
-    return std::nullopt;
-  }
-  // UNNEST is joined laterally so the array can refer to the input row. Ordinals are 1-based.
-  Columns visible = result->columns;
+// The joined tail of an array scan: the lateral UNNEST `unnest` with its element and offset
+// columns `visible` to the join condition.
+std::optional<Relation> JoinArrays(const googlesql::ResolvedArrayScan& array, Relation input,
+                                   const std::string& unnest, Columns visible,
+                                   const std::vector<std::string>& elements, const Scope& scope) {
   std::vector<std::string> projections = {"q.*"};
-  const int element = array.element_column_list(0).column_id();
-  projections.push_back("u.e AS " + ColumnName(element));
-  visible.emplace(element, "u.e");
-  result->columns.emplace(element, "q." + ColumnName(element));
+  for (int i = 0; i < array.element_column_list_size(); ++i) {
+    const int element = array.element_column_list(i).column_id();
+    projections.push_back(elements.at(i) + " AS " + ColumnName(element));
+    visible.emplace(element, elements.at(i));
+    input.columns.emplace(element, "q." + ColumnName(element));
+  }
   if (array.array_offset_column() != nullptr) {
     const int offset = array.array_offset_column()->column().column_id();
     projections.push_back("CAST(u.o - 1 AS BIGINT) AS " + ColumnName(offset));
     visible.emplace(offset, "(u.o - 1)");
-    result->columns.emplace(offset, "q." + ColumnName(offset));
+    input.columns.emplace(offset, "q." + ColumnName(offset));
   }
   std::string condition = "TRUE";
   if (array.join_expr() != nullptr) {
@@ -1242,10 +1232,76 @@ std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, con
     }
     condition = *on;
   }
-  result->sql = "SELECT " + Join(projections, ", ") + result->From() +
-                (array.is_outer() ? " LEFT" : " INNER") + " JOIN LATERAL unnest(" + *elements +
-                ") WITH ORDINALITY AS u(e, o) ON " + condition;
-  return result;
+  input.sql = "SELECT " + Join(projections, ", ") + input.From() +
+              (array.is_outer() ? " LEFT" : " INNER") + " JOIN LATERAL " + unnest + " ON " +
+              condition;
+  return input;
+}
+
+// UNNEST(a, b, mode => ...) walks the arrays in step by position. The row count is the longest
+// array's for PAD, which pads the others with NULL, and the shortest's for TRUNCATE; STRICT
+// fails when the lengths differ. A NULL array counts as empty.
+std::optional<Relation> ZippedArrayScan(const googlesql::ResolvedArrayScan& array,
+                                        const Relation& input, const Scope& scope) {
+  std::string mode = "PAD";
+  if (const auto* zip = array.array_zip_mode(); zip != nullptr) {
+    if (!zip->Is<googlesql::ResolvedLiteral>() ||
+        zip->GetAs<googlesql::ResolvedLiteral>()->value().is_null() || !zip->type()->IsEnum()) {
+      return Unsupported(scope, "UNNEST mode that is not a literal");
+    }
+    mode = zip->GetAs<googlesql::ResolvedLiteral>()->value().EnumDisplayName();
+  }
+  std::vector<std::string> arrays;
+  std::vector<std::string> lengths;
+  std::vector<std::string> elements;
+  std::vector<std::string> picks;
+  for (int i = 0; i < array.array_expr_list_size(); ++i) {
+    const auto sql = Expression(*array.array_expr_list(i), scope, input.columns);
+    if (!sql) {
+      return std::nullopt;
+    }
+    const std::string name = "a" + std::to_string(i);
+    arrays.push_back(*sql + " AS " + name);
+    lengths.push_back("coalesce(len(z." + name + "), 0)");
+    elements.push_back("u.e" + std::to_string(i));
+    picks.push_back("z." + name + "[u.o] AS e" + std::to_string(i));
+  }
+  std::string count;
+  if (mode == "PAD") {
+    count = "greatest(" + Join(lengths, ", ") + ")";
+  } else if (mode == "TRUNCATE") {
+    count = "least(" + Join(lengths, ", ") + ")";
+  } else if (mode == "STRICT") {
+    count = "CASE WHEN least(" + Join(lengths, ", ") + ") = greatest(" + Join(lengths, ", ") +
+            ") THEN greatest(" + Join(lengths, ", ") +
+            ") ELSE error('Unnested arrays under STRICT mode must have equal lengths') END";
+  } else {
+    return Unsupported(scope, "UNNEST mode " + mode);
+  }
+  picks.emplace_back("u.o");
+  const std::string unnest = "(SELECT " + Join(picks, ", ") + " FROM (SELECT " +
+                             Join(arrays, ", ") + ") AS z, range(1, " + count +
+                             " + 1) AS u(o)) AS u";
+  return JoinArrays(array, input, unnest, input.columns, elements, scope);
+}
+
+std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, const Scope& scope) {
+  auto result = array.input_scan() == nullptr
+                    ? std::optional<Relation>(Relation{"SELECT 1 AS _unit", {}, {}})
+                    : Scan(*array.input_scan(), scope);
+  if (!result) {
+    return std::nullopt;
+  }
+  if (array.array_expr_list_size() != 1) {
+    return ZippedArrayScan(array, *result, scope);
+  }
+  const auto elements = Expression(*array.array_expr_list(0), scope, result->columns);
+  if (!elements) {
+    return std::nullopt;
+  }
+  // UNNEST is joined laterally so the array can refer to the input row. Ordinals are 1-based.
+  return JoinArrays(array, *result, "unnest(" + *elements + ") WITH ORDINALITY AS u(e, o)",
+                    result->columns, {"u.e"}, scope);
 }
 
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
