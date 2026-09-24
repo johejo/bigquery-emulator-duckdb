@@ -589,6 +589,24 @@ TEST_F(ResolvedTranslatorTest, RunsSetOperations) {
             (V{"1"}));
 }
 
+TEST_F(ResolvedTranslatorTest, RunsLateralJoins) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Rows(Execute("SELECT t.a, s.m FROM t, LATERAL (SELECT MAX(u.a) AS m FROM t AS u "
+                         "WHERE u.a < t.a) AS s ORDER BY t.a")),
+            (V{"NULL|NULL", "1|NULL", "2|1", "3|2"}));
+  EXPECT_EQ(Rows(Execute("SELECT t.a, s.b FROM t LEFT JOIN LATERAL (SELECT u.b FROM t AS u "
+                         "WHERE u.a = t.a + 1) AS s ON s.b != 'yy' ORDER BY t.a")),
+            (V{"NULL|NULL", "1|NULL", "2|あ", "3|NULL"}));
+  EXPECT_EQ(Column(Execute("SELECT t.a, s.n FROM t JOIN LATERAL (SELECT COUNT(*) AS n FROM t AS u "
+                           "WHERE u.a <= t.a) AS s ON s.n > 1 ORDER BY t.a"),
+                   1),
+            (V{"2", "3"}));
+  // The lateral side also sees columns of the query enclosing the join.
+  EXPECT_EQ(Column(Execute("SELECT (SELECT SUM(s.x) FROM UNNEST([10, 20]) AS o, "
+                           "LATERAL (SELECT o + t.a AS x) AS s) FROM t ORDER BY t.a")),
+            (V{"NULL", "32", "34", "36"}));
+}
+
 TEST_F(ResolvedTranslatorTest, RunsAnalyticFunctionsAndQualify) {
   using V = std::vector<std::string>;
   const auto result = Execute(

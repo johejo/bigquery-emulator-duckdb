@@ -33,7 +33,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. `SET s.field = ...` rebuilds the struct with its other fields, and fails on a NULL struct as BigQuery does. Updates of array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
 | `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
-| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Recursive CTEs `WITH DEPTH` and lateral joins fall back to the parser AST. |
+| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Lateral joins are translated too; recursive CTEs `WITH DEPTH` fall back to the parser AST. |
 | Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for `UNION` / `INTERSECT` / `EXCEPT`, including `CORRESPONDING [BY]` with `FULL` / `LEFT` / `INNER` propagation, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
@@ -92,7 +92,8 @@ recursive CTE, whose UNION [ALL] iterates the same way. Grouping sets compute th
 derived table below the aggregation and group by those column names, so ROLLUP, CUBE, nested
 GROUPING SETS and GROUP BY a, ROLLUP(b) keep their DuckDB spelling. A set operation matching
 columns by name is already aligned by position in the resolved AST, with missing columns padded
-with NULLs, so it becomes a positional DuckDB set operation. UNNEST becomes a lateral `unnest` with
+with NULLs, so it becomes a positional DuckDB set operation. A lateral join becomes DuckDB's `JOIN LATERAL`, and its right
+side refers to the left's columns the way a correlated subquery does. UNNEST becomes a lateral `unnest` with
 ordinality; several arrays are instead indexed in step over a `range` sized by the zip mode, and correlated subquery references resolve through the enclosing scan's column names.
 
 Expressions include scalar literals and parameters, casts, arithmetic, comparisons, boolean

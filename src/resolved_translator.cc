@@ -833,12 +833,15 @@ std::optional<std::vector<std::string>> Renamed(
 }
 
 std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const Scope& scope) {
-  if (join.is_lateral() || !join.parameter_list().empty()) {
-    return Unsupported(scope, "lateral join");
-  }
   const auto left = Scan(*join.left_scan(), scope);
-  const auto right = Scan(*join.right_scan(), scope);
-  if (!left || !right) {
+  if (!left) {
+    return std::nullopt;
+  }
+  // A lateral right side sees the left's columns the way a correlated subquery sees its
+  // enclosing query's.
+  const auto right =
+      Scan(*join.right_scan(), join.is_lateral() ? Nested(scope, left->columns) : scope);
+  if (!right) {
     return std::nullopt;
   }
   Relation result;
@@ -880,8 +883,8 @@ std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const 
     condition.clear();
   }
   result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-               " FROM (" + left->sql + ") AS l " + kind + " JOIN (" + right->sql + ") AS r" +
-               condition;
+               " FROM (" + left->sql + ") AS l " + kind + " JOIN " +
+               (join.is_lateral() ? "LATERAL " : "") + "(" + right->sql + ") AS r" + condition;
   return result;
 }
 
