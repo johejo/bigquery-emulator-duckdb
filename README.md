@@ -33,7 +33,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. Updates of struct fields or array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
 | `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
-| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE` and `GROUPING()`. Recursive CTEs `WITH DEPTH`, lateral joins and aggregate `HAVING MAX` / `LIMIT` modifiers fall back to the parser AST. |
+| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Recursive CTEs `WITH DEPTH` and lateral joins fall back to the parser AST. |
 | Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for positional `UNION` / `INTERSECT` / `EXCEPT`, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts; `CORRESPONDING` falls back. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
@@ -97,7 +97,9 @@ Expressions include scalar literals and parameters, casts, arithmetic, compariso
 operators, CASE/IF/COALESCE, selected scalar functions, STRUCT construction and field access,
 array literals and subscripts, and scalar, ARRAY, EXISTS and IN subqueries. Aggregate and
 analytic calls cover the common numeric, string, array and navigation functions, with DISTINCT,
-ORDER BY and IGNORE NULLS where DuckDB can express them, and window frames. The existing function
+ORDER BY and IGNORE NULLS where DuckDB can express them, and window frames. An aggregate `LIMIT`
+slices the aggregated list, and `HAVING MAX` / `MIN` filters the aggregate's rows against a
+window maximum or minimum over the group. The existing function
 renames and templates are reused, adapting resolved enum date parts, interval arguments and
 default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. Function and aggregate
 results are cast to their resolved types. Existing documented function compatibility limitations

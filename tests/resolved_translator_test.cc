@@ -475,6 +475,20 @@ TEST_F(ResolvedTranslatorTest, RunsAggregatesAndDistinct) {
   EXPECT_EQ(Scalar("SELECT COUNT(*) FROM t WHERE FALSE"), "0");
 }
 
+TEST_F(ResolvedTranslatorTest, RunsAggregateLimitAndHavingModifiers) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_AGG(b ORDER BY a LIMIT 2), ',') FROM t "
+                   "WHERE a IS NOT NULL"),
+            "x,yy");
+  EXPECT_EQ(Scalar("SELECT STRING_AGG(b, '|' ORDER BY a DESC LIMIT 2) FROM t"), "あ|yy");
+  EXPECT_EQ(Scalar("SELECT STRING_AGG(b LIMIT 1) FROM t WHERE FALSE"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_AGG(b HAVING MAX a), ',') FROM t"), "あ");
+  EXPECT_EQ(Column(Execute("SELECT MOD(a, 2) AS k, ANY_VALUE(b HAVING MIN a), COUNT(*) FROM t "
+                           "WHERE a IS NOT NULL GROUP BY k ORDER BY k"),
+                   1),
+            (V{"yy", "x"}));
+}
+
 TEST_F(ResolvedTranslatorTest, RunsValueTables) {
   using V = std::vector<std::string>;
   const auto structs =

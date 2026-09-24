@@ -626,11 +626,12 @@ std::optional<std::string> OrderItems(
   return Join(sql, ", ");
 }
 
-// Aggregate calls (with `aggregate` set) and analytic calls (with a non-empty `over`).
+// Aggregate calls (with `aggregate` set) and analytic calls (with a non-empty `over`). An
+// aggregate's HAVING MAX/MIN modifier is the caller's to compute, as the rows `having` selects.
 std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunctionCallBase& call,
                                          const googlesql::ResolvedAggregateFunctionCall* aggregate,
                                          const std::string& over, const Scope& scope,
-                                         const Columns& columns) {
+                                         const Columns& columns, const std::string& having = "") {
   const std::string name = ToUpperAscii(call.function()->Name());
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
@@ -639,10 +640,10 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
   }
   if (aggregate != nullptr &&
-      (aggregate->having_modifier() != nullptr || aggregate->limit() != nullptr ||
+      ((aggregate->having_modifier() != nullptr && having.empty()) ||
        !aggregate->group_by_list().empty() || !aggregate->group_by_aggregate_list().empty() ||
        aggregate->having_expr() != nullptr)) {
-    return Unsupported(scope, "aggregate " + name + " with HAVING, LIMIT or GROUP BY");
+    return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
   }
   static const std::map<std::string, std::string> aggregates = {{"COUNT", "count"},
                                                                 {"$COUNT_STAR", "count"},
@@ -701,24 +702,52 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (call.distinct()) {
     inner = "DISTINCT " + inner;
   }
-  std::string filter;
+  std::vector<std::string> conditions;
+  if (!having.empty()) {
+    conditions.push_back(having);
+  }
   if (call.null_handling_modifier() == googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
     if (name == "ARRAY_AGG") {
-      filter = " FILTER (WHERE " + args.at(0) + " IS NOT NULL)";
+      conditions.push_back(args.at(0) + " IS NOT NULL");
     } else if (name == "FIRST_VALUE" || name == "LAST_VALUE" || name == "NTH_VALUE") {
       inner += " IGNORE NULLS";
     } else {
       return Unsupported(scope, name + " IGNORE NULLS");
     }
   }
+  std::string order;
   if (aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
-    const auto order = OrderItems(aggregate->order_by_item_list(), scope, columns);
-    if (!order) {
+    const auto items = OrderItems(aggregate->order_by_item_list(), scope, columns);
+    if (!items) {
       return std::nullopt;
     }
-    inner += " ORDER BY " + *order;
+    order = " ORDER BY " + *items;
   }
-  return function->second + "(" + inner + ")" + filter + over;
+  // LIMIT keeps the first elements of the list the aggregate would build; STRING_AGG builds it
+  // from its non-NULL values and joins them afterwards.
+  std::string limit;
+  if (aggregate != nullptr && aggregate->limit() != nullptr) {
+    const auto sql = Expression(*aggregate->limit(), scope, columns);
+    if (!sql) {
+      return std::nullopt;
+    }
+    limit = *sql;
+    if (name == "STRING_AGG") {
+      conditions.push_back(args.at(0) + " IS NOT NULL");
+      const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
+                               args.at(0) + order + ") FILTER (WHERE " + Join(conditions, " AND ") +
+                               ")";
+      return "array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
+             (args.size() > 1 ? args.at(1) : "','") + ")";
+    }
+    if (name != "ARRAY_AGG") {
+      return Unsupported(scope, "aggregate " + name + " with LIMIT");
+    }
+  }
+  const std::string sql =
+      function->second + "(" + inner + order + ")" +
+      (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
+  return limit.empty() ? sql : "list_slice(" + sql + ", 1, " + limit + ")";
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,
@@ -942,6 +971,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   Relation result;
   std::vector<std::string> projections;
   std::vector<std::string> keys;
+  // The rows each HAVING MAX/MIN modifier keeps, keyed by the aggregate call it modifies.
+  std::map<const googlesql::ResolvedAggregateFunctionCall*, std::string> havings;
   // GROUPING() without grouping sets still needs them: it is 0 over the one plain grouping.
   if (!aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty()) {
     // Grouping sets name their keys, so compute the keys once below the aggregation and group
@@ -996,6 +1027,45 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         .sql = "SELECT " + (inner.empty() ? "1 AS _unit" : Join(inner, ", ")) + input->From(),
         .columns = columns};
   } else {
+    // HAVING MAX/MIN keeps the rows whose expression reaches the group's maximum or minimum,
+    // which a window over the group computes alongside the input.
+    std::vector<std::string> partition;
+    for (const auto& key : aggregate.group_by_list()) {
+      const auto sql = Expression(*key->expr(), scope, input->columns);
+      if (!sql) {
+        return std::nullopt;
+      }
+      partition.push_back(*sql);
+    }
+    std::vector<std::string> inner;
+    Columns columns;
+    for (const auto& [id, sql] : input->columns) {
+      inner.push_back(sql + " AS " + ColumnName(id));
+      columns.emplace(id, "q." + ColumnName(id));
+    }
+    for (const auto& computed : aggregate.aggregate_list()) {
+      const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
+      if (!computed->expr()->Is<googlesql::ResolvedAggregateFunctionCall>() ||
+          call->having_modifier() == nullptr) {
+        continue;
+      }
+      const auto& modifier = *call->having_modifier();
+      const auto window = Expression(*modifier.having_expr(), scope, input->columns);
+      const auto row = Expression(*modifier.having_expr(), scope, columns);
+      if (!window || !row) {
+        return std::nullopt;
+      }
+      const std::string name = "_h" + std::to_string(havings.size());
+      inner.push_back(
+          std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "max("
+                                                                                         : "min(") +
+          *window + ") OVER (" +
+          (partition.empty() ? "" : "PARTITION BY " + Join(partition, ", ")) + ") AS " + name);
+      havings.emplace(call, *row + " = q." + name);
+    }
+    if (!havings.empty()) {
+      input = Relation{.sql = "SELECT " + Join(inner, ", ") + input->From(), .columns = columns};
+    }
     for (const auto& key : aggregate.group_by_list()) {
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
@@ -1013,7 +1083,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     if (!computed->expr()->Is<googlesql::ResolvedAggregateFunctionCall>() || !type) {
       return std::nullopt;
     }
-    const auto sql = NonScalarCall(*call, call, "", scope, input->columns);
+    const auto having = havings.find(call);
+    const auto sql = NonScalarCall(*call, call, "", scope, input->columns,
+                                   having == havings.end() ? "" : having->second);
     if (!sql) {
       return std::nullopt;
     }
