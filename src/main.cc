@@ -10,13 +10,19 @@
 namespace {
 
 void PrintUsage() {
-  std::cerr << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT]\n"
-               "  --host HOST  Address to listen on (default: 0.0.0.0)\n"
-               "  --port PORT  Port to listen on (default: 9050)\n";
+  std::cerr
+      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--parser-fallback MODE]\n"
+         "  --host HOST              Address to listen on (default: 0.0.0.0)\n"
+         "  --port PORT              Port to listen on (default: 9050)\n"
+         "  --parser-fallback MODE   What to do with a query or DML statement the resolved\n"
+         "                           AST translator does not support: allow (default)\n"
+         "                           translates it from the parser AST, warn also logs it,\n"
+         "                           deny fails the query\n";
 }
 
 int Run(int argc, char** argv) {
   bigquery_emulator_duckdb::ServerOptions options;
+  bigquery_emulator_duckdb::EmulatorOptions emulator_options;
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
     const bool has_value = i + 1 < argc;
@@ -24,6 +30,18 @@ int Run(int argc, char** argv) {
       options.host = argv[++i];
     } else if (arg == "--port" && has_value) {
       options.port = std::atoi(argv[++i]);
+    } else if (arg == "--parser-fallback" && has_value) {
+      const std::string_view mode = argv[++i];
+      if (mode == "allow") {
+        emulator_options.parser_fallback = bigquery_emulator_duckdb::ParserFallback::kAllow;
+      } else if (mode == "warn") {
+        emulator_options.parser_fallback = bigquery_emulator_duckdb::ParserFallback::kWarn;
+      } else if (mode == "deny") {
+        emulator_options.parser_fallback = bigquery_emulator_duckdb::ParserFallback::kDeny;
+      } else {
+        PrintUsage();
+        return 2;
+      }
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return 0;
@@ -33,7 +51,7 @@ int Run(int argc, char** argv) {
     }
   }
 
-  bigquery_emulator_duckdb::Emulator emulator;
+  bigquery_emulator_duckdb::Emulator emulator(emulator_options);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Bind()) {
     std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';

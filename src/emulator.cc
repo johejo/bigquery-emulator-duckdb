@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -32,6 +33,23 @@ int64_t NowMillis() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
+}
+
+// Collapses whitespace runs so a multi-line statement logs as one line.
+std::string OneLine(const std::string& sql) {
+  std::string line;
+  for (const char c : sql) {
+    const bool space = c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    if (!space) {
+      line += c;
+    } else if (!line.empty() && line.back() != ' ') {
+      line += ' ';
+    }
+  }
+  if (!line.empty() && line.back() == ' ') {
+    line.pop_back();
+  }
+  return line;
 }
 
 std::string QualifiedName(const DatasetReference& dataset) {
@@ -179,7 +197,7 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
 
 }  // namespace
 
-Emulator::Emulator() = default;
+Emulator::Emulator(EmulatorOptions options) : options_(options) {}
 
 void Emulator::EnsureProject(const std::string& project_id) {
   if (project_id.empty()) {
@@ -226,6 +244,17 @@ Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
       AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings);
   std::optional<std::string> sql = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters);
   if (!sql.has_value()) {
+    switch (options_.parser_fallback) {
+      case ParserFallback::kDeny:
+        throw ApiError::InvalidQuery(
+            "The resolved AST translator does not support this statement, and parser AST "
+            "fallback is disabled");
+      case ParserFallback::kWarn:
+        std::cerr << "parser AST fallback: " << OneLine(frontend_result.sql()) << '\n';
+        break;
+      case ParserFallback::kAllow:
+        break;
+    }
     sql = TranslateToDuckDbSql(frontend_result, parameters);
   }
   return {*std::move(sql), analyzed.result_schema()};

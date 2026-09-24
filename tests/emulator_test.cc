@@ -308,6 +308,25 @@ TEST_F(EmulatorTest, RunsDdlWithoutAnalysis) {
   EXPECT_EQ(ErrorStatus("DROP TABLE ddl.t"), 0);
 }
 
+// DDL never goes through the resolved translator, so denying the fallback leaves it alone.
+TEST(EmulatorParserFallbackTest, DenyFailsOnlyStatementsTheResolvedTranslatorMisses) {
+  Emulator emulator(EmulatorOptions{.parser_fallback = ParserFallback::kDeny});
+  const auto run = [&](const std::string& sql) {
+    QueryRequest request;
+    request.project_id = "test";
+    request.query = sql;
+    return emulator.RunQuery(request);
+  };
+  emulator.CreateDataset({"test", "fallback"});
+  EXPECT_FALSE(run("CREATE TABLE fallback.t (x INT64)")->error.has_value());
+  EXPECT_FALSE(run("SELECT x FROM fallback.t")->error.has_value());
+  const std::shared_ptr<const Job> job = run("INSERT INTO fallback.t (x) VALUES (1)");
+  EXPECT_EQ(job->error.has_value() ? job->error->http_status() : 0, 400);
+  EXPECT_NE(std::string(job->error.has_value() ? job->error->what() : "")
+                .find("parser AST fallback is disabled"),
+            std::string::npos);
+}
+
 // A query that fails is reported through the job rather than thrown, which is how BigQuery
 // reports it too.
 TEST_F(EmulatorTest, ReportsAFailedQueryAsAJobError) {

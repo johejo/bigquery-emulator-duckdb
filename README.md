@@ -97,7 +97,9 @@ still apply.
 The catalog, TypeFactory and analyzer output remain alive through translation. Unsupported nodes,
 functions, types or modifiers return to parser AST translation for the entire statement;
 translation and execution errors do not trigger fallback. Recursive CTEs, grouping sets and DML/DDL
-still use the parser translator. `tests/resolved_translator_test.cc` executes supported queries
+still use the parser translator. `--parser-fallback warn` logs each query or DML statement that
+falls back, and `--parser-fallback deny` fails it instead, to measure what the resolved translator
+still misses; DDL is unaffected. `tests/resolved_translator_test.cc` executes supported queries
 directly against DuckDB without a parser fallback, covering results, types, aliases, ordering and
 parameterized preparation.
 
@@ -177,6 +179,7 @@ End-to-end tests using the `bq` command-line tool are the primary compatibility 
 ```bash
 just e2e            # builds the emulator, starts it on a free port and runs tests/e2e/*.yml
 just e2e --verbose  # extra arguments are passed to `runn run`
+BQ_EMULATOR_PARSER_FALLBACK=warn just e2e  # logs the statements the resolved translator misses
 ```
 
 `tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.

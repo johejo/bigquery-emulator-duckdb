@@ -62,11 +62,23 @@ struct QueryRequest {
   bool dry_run = false;
 };
 
+// What to do with a query or DML statement the resolved AST translator does not support. DDL is
+// always translated from the parser AST and is unaffected.
+enum class ParserFallback : uint8_t {
+  kAllow,  // Translate it from the parser AST.
+  kWarn,   // Same, but log the statement to stderr first.
+  kDeny,   // Fail the job, to find out what the resolved translator is still missing.
+};
+
+struct EmulatorOptions {
+  ParserFallback parser_fallback = ParserFallback::kAllow;
+};
+
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
  public:
-  Emulator();
+  explicit Emulator(EmulatorOptions options = {});
 
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
@@ -96,6 +108,7 @@ class Emulator {
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
+  EmulatorOptions options_;
   Backend backend_;
   std::mutex mutex_;
   std::unordered_set<std::string> projects_;
