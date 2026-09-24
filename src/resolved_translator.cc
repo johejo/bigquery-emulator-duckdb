@@ -256,6 +256,25 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "(" + args[0] + " " + op->second + " " + args[1] + ")";
   }
+  if ((name == "$IS_DISTINCT_FROM" || name == "$IS_NOT_DISTINCT_FROM") && n == 2) {
+    return "(" + args[0] +
+           (name == "$IS_DISTINCT_FROM" ? " IS DISTINCT FROM " : " IS NOT DISTINCT FROM ") +
+           args[1] + ")";
+  }
+  if ((name == "$BITWISE_LEFT_SHIFT" || name == "$BITWISE_RIGHT_SHIFT") && n == 2 &&
+      call.argument_list(0)->type()->IsInt64()) {
+    // DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits
+    // shifted out and fill with zeros, which is what shifting a 64-bit BIT string does.
+    return "list_transform([struct_pack(x := " + args[0] + ", s := " + args[1] +
+           ")], _sh -> CASE WHEN _sh.s < 0 THEN error('Bit shift by a negative value') "
+           "WHEN _sh.s >= 64 THEN 0 ELSE CAST(CAST(_sh.x AS BIT) " +
+           (name == "$BITWISE_LEFT_SHIFT" ? "<<" : ">>") +
+           " CAST(_sh.s AS INTEGER) AS BIGINT) END)[1]";
+  }
+  if (name == "$IN_ARRAY" && n == 2) {
+    // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
+    return "(" + args[0] + " IN (SELECT unnest(" + args[1] + ")))";
+  }
   if ((name == "$AND" || name == "$OR") && n >= 2) {
     return "(" + Join(args, name == "$AND" ? " AND " : " OR ") + ")";
   }
@@ -454,6 +473,47 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "json(" + args[0] + ")";
   }
+  if (name == "ERROR" && n == 1) {
+    return invoke("error");
+  }
+  if (name == "ARRAY_REVERSE" && n == 1) {
+    return invoke("list_reverse");
+  }
+  if (name == "ARRAY_CONCAT" && n >= 1) {
+    if (n == 1) {
+      return args[0];
+    }
+    // BigQuery returns NULL when any array is NULL, where DuckDB skips it.
+    std::vector<std::string> fields;
+    std::vector<std::string> nulls;
+    std::vector<std::string> lists;
+    for (size_t i = 0; i < n; ++i) {
+      const std::string field = "a" + std::to_string(i);
+      fields.push_back(field + " := " + args[i]);
+      nulls.push_back("_cat." + field + " IS NULL");
+      lists.push_back("_cat." + field);
+    }
+    return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _cat -> CASE WHEN " +
+           Join(nulls, " OR ") + " THEN NULL ELSE list_concat(" + Join(lists, ", ") + ") END)[1]";
+  }
+  if (name == "ROUND" && n == 1) {
+    return invoke("round");
+  }
+  if (name == "ROUND" && n == 2) {
+    // DuckDB takes the digits as an INTEGER.
+    return "round(" + args[0] + ", CAST(" + args[1] + " AS INTEGER))";
+  }
+  if ((name == "LPAD" || name == "RPAD") && (n == 2 || n == 3)) {
+    // DuckDB has neither a default pad nor a BYTES overload.
+    if (!call.argument_list(0)->type()->IsString()) {
+      return std::nullopt;
+    }
+    return ToLowerAscii(name) + "(" + args[0] + ", CAST(" + args[1] + " AS INTEGER), " +
+           (n == 3 ? args[2] : "' '") + ")";
+  }
+  if (name == "SPLIT" && n > 0 && !call.argument_list(0)->type()->IsString()) {
+    return std::nullopt;
+  }
   if (name == "LENGTH" && n == 1 && call.argument_list(0)->type()->IsBytes()) {
     return invoke("octet_length");
   }
@@ -509,7 +569,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
   // and overloads with different semantics. Extend this list with execution coverage.
   static const std::set<std::string> plain = {"ABS",
                                               "SIGN",
-                                              "ROUND",
                                               "TRUNC",
                                               "CEIL",
                                               "CEILING",
@@ -541,8 +600,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
                                               "REPLACE",
                                               "REVERSE",
                                               "REPEAT",
-                                              "LPAD",
-                                              "RPAD",
                                               "STARTS_WITH",
                                               "ENDS_WITH",
                                               "STRPOS",

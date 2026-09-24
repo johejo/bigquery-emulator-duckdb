@@ -865,6 +865,39 @@ TEST_F(ResolvedTranslatorTest, MergesRows) {
   EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IS NOT NULL ORDER BY a")), (V{"1", "3", "7"}));
 }
 
+TEST_F(ResolvedTranslatorTest, RunsOperatorsAndArrayFunctions) {
+  // BigQuery's shifts drop the bits shifted out and fill with zeros, even for negative values.
+  EXPECT_EQ(Scalar("SELECT 1 << 63"), "-9223372036854775808");
+  EXPECT_EQ(Scalar("SELECT 3 << 62"), "-4611686018427387904");
+  EXPECT_EQ(Scalar("SELECT -8 >> 1"), "9223372036854775804");
+  EXPECT_EQ(Scalar("SELECT 1 << 64"), "0");
+  EXPECT_EQ(Scalar("SELECT 8 >> 2"), "2");
+  EXPECT_EQ(Scalar("SELECT CAST(NULL AS INT64) << 1"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT 1 << -1"), std::exception);
+  EXPECT_EQ(Scalar("SELECT 1 IS DISTINCT FROM NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT NULL IS NOT DISTINCT FROM NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT 2 IN UNNEST([1, 2])"), "true");
+  EXPECT_EQ(Scalar("SELECT 3 IN UNNEST([1, NULL])"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT NULL IN UNNEST([1])"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT 1 IN UNNEST(CAST([] AS ARRAY<INT64>))"), "false");
+  EXPECT_EQ(Scalar("SELECT 1 IN UNNEST(CAST(NULL AS ARRAY<INT64>))"), "false");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_CONCAT(['a'], ['b'], ['c']), ',')"), "a,b,c");
+  EXPECT_EQ(Scalar("SELECT ARRAY_CONCAT(['a'], CAST(NULL AS ARRAY<STRING>)) IS NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_REVERSE(['a', 'b']), ',')"), "b,a");
+  EXPECT_EQ(Scalar("SELECT ARRAY_FIRST([4, 5])"), "4");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LAST([4, 5])"), "5");
+  EXPECT_THROW(Execute("SELECT ARRAY_FIRST(CAST([] AS ARRAY<INT64>))"), std::exception);
+  EXPECT_THROW(Execute("SELECT ERROR('boom')"), std::exception);
+  EXPECT_EQ(Scalar("SELECT IF(TRUE, 1, ERROR('boom'))"), "1");
+  EXPECT_EQ(Scalar("SELECT ROUND(1.25, 1)"), "1.3");
+  EXPECT_EQ(Scalar("SELECT ROUND(-2.5)"), "-3.0");
+  EXPECT_EQ(Scalar("SELECT LPAD('a', 3)"), "  a");
+  EXPECT_EQ(Scalar("SELECT RPAD('a', 3, 'xy')"), "axy");
+  EXPECT_EQ(Scalar("SELECT LPAD('abc', 2)"), "ab");
+  EXPECT_EQ(Unsupported("SELECT LPAD(b'a', 3)"), "function LPAD");
+  EXPECT_EQ(Unsupported("SELECT SPLIT(b'a,b', b',')"), "function SPLIT");
+}
+
 TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {
   AnalyzerSettings settings;
   settings.named_parameters.emplace_back("s", googlesql::types::StringType());
