@@ -150,8 +150,7 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
 
 TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
   for (const std::string& sql :
-       {std::string("SELECT AS VALUE 1"), std::string("SELECT SAFE.RAND()"),
-        std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
+       {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
         std::string("CREATE TABLE ds.new_t (x INT64)"),
         std::string("SELECT COUNT(DISTINCT a) OVER () FROM t"),
         std::string("SELECT STRUCT(1, 2)")}) {
@@ -164,7 +163,6 @@ TEST_F(ResolvedTranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("SELECT a FROM t WHERE a IN (SELECT SAFE.RAND() FROM t)"), "SAFE.RAND");
   EXPECT_EQ(Unsupported("SELECT COUNT(DISTINCT a) OVER () FROM t"),
             "DISTINCT window aggregate COUNT");
-  EXPECT_EQ(Unsupported("SELECT AS VALUE a FROM t"), "SELECT AS STRUCT or AS VALUE");
   EXPECT_EQ(Unsupported("UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1"),
             "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
 }
@@ -479,6 +477,19 @@ TEST_F(ResolvedTranslatorTest, RunsAggregatesAndDistinct) {
   EXPECT_EQ(Column(Execute("SELECT DISTINCT a > 1 AS big FROM t ORDER BY big")),
             (V{"NULL", "false", "true"}));
   EXPECT_EQ(Scalar("SELECT COUNT(*) FROM t WHERE FALSE"), "0");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsValueTables) {
+  using V = std::vector<std::string>;
+  const auto structs =
+      Execute("SELECT AS STRUCT a, b AS name FROM t WHERE a IS NOT NULL ORDER BY a DESC");
+  ASSERT_EQ(structs.schema.size(), 2);
+  EXPECT_EQ(structs.schema[0].name, "a");
+  EXPECT_EQ(structs.schema[1].name, "name");
+  EXPECT_EQ(Rows(structs), (V{"3|あ", "2|yy", "1|x"}));
+  EXPECT_EQ(Rows(Execute("SELECT AS VALUE a FROM t WHERE a > 1 ORDER BY a")), (V{"2", "3"}));
+  EXPECT_EQ(Rows(Execute("SELECT AS VALUE STRUCT(a AS x) FROM t WHERE a = 1")), (V{"1"}));
+  EXPECT_EQ(Scalar("SELECT COUNT(*) FROM (SELECT AS VALUE a FROM t)"), "4");
 }
 
 TEST_F(ResolvedTranslatorTest, RunsGroupingSets) {

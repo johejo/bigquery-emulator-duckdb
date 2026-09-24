@@ -16,6 +16,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/analyzer.h"
 #include "src/duckdb_sql.h"
 #include "src/functions.h"
 
@@ -1747,14 +1748,27 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     return Unsupported(scope, "statement " + statement.node_kind_string());
   }
   const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
-  if (query->is_value_table()) {
-    return Unsupported(scope, "SELECT AS STRUCT or AS VALUE");
-  }
   const auto relation = Scan(*query->query(), scope);
   if (!relation) {
     return std::nullopt;
   }
   std::vector<std::string> projections;
+  // A value table of structs is returned as the structs' fields, like BigQuery does.
+  if (query->is_value_table() && query->output_column_list_size() == 1 &&
+      query->output_column_list(0)->column().type()->IsStruct()) {
+    const auto& output = query->output_column_list(0)->column();
+    const auto column = relation->columns.find(output.column_id());
+    const auto& fields = output.type()->AsStruct()->fields();
+    if (column == relation->columns.end() || fields.empty()) {
+      return Unsupported(scope, "SELECT AS STRUCT without fields");
+    }
+    for (size_t i = 0; i < fields.size(); ++i) {
+      projections.push_back(
+          "struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ") AS " +
+          QuoteIdentifier(ValueTableFieldName(fields[i].name, static_cast<int>(i))));
+    }
+    return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
+  }
   for (const auto& output : query->output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
     if (column == relation->columns.end()) {

@@ -30,6 +30,10 @@ AnalyzerResult::AnalyzerResult(AnalyzerResult&&) noexcept = default;
 AnalyzerResult& AnalyzerResult::operator=(AnalyzerResult&&) noexcept = default;
 AnalyzerResult::~AnalyzerResult() = default;
 
+std::string ValueTableFieldName(const std::string& name, int index) {
+  return name.empty() ? "_field_" + std::to_string(index + 1) : name;
+}
+
 const googlesql::ResolvedStatement& AnalyzerResult::statement() const {
   return *analyzer_output_->resolved_statement();
 }
@@ -40,6 +44,19 @@ std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
   }
   const auto* query = statement().GetAs<googlesql::ResolvedQueryStmt>();
   std::vector<FieldSchema> schema;
+  if (query->is_value_table() && query->output_column_list_size() == 1 &&
+      query->output_column_list(0)->column().type()->IsStruct()) {
+    const auto& fields = query->output_column_list(0)->column().type()->AsStruct()->fields();
+    for (size_t i = 0; i < fields.size(); ++i) {
+      absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(
+          ValueTableFieldName(fields[i].name, static_cast<int>(i)), fields[i].type);
+      if (!field.ok()) {
+        return std::nullopt;
+      }
+      schema.push_back(*std::move(field));
+    }
+    return schema;
+  }
   int anonymous_columns = 0;
   for (const auto& output_column : query->output_column_list()) {
     std::string name = output_column->name();

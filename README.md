@@ -32,6 +32,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | `INSERT` | Partial | `INSERT ... VALUES` (including `DEFAULT`) and `INSERT ... SELECT` with or without a column list are translated from the resolved AST. `INSERT OR IGNORE/REPLACE/UPDATE`, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. |
 | `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. Updates of struct fields or array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
+| `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
 | Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE` and `GROUPING()`. Recursive CTEs `WITH DEPTH`, lateral joins, `DISTINCT` window aggregates, and aggregate `HAVING MAX` / `LIMIT` modifiers fall back to the parser AST. |
 | Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for positional `UNION` / `INTERSECT` / `EXCEPT`, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts; `CORRESPONDING` falls back. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
@@ -84,7 +85,7 @@ queries. INSERT names its target columns after the table's columns bound to the 
 UPDATE, DELETE and MERGE alias the target table `_t`, so its columns resolve by ID like any other
 scan's; an UPDATE's FROM clause and a MERGE's source become the derived table `q`. Each scan becomes a derived table whose columns are named
 after resolved column IDs, with user-facing names applied only at the output boundary, so
-duplicate or shadowed aliases never collide. Sort keys survive projections even when they are
+duplicate or shadowed aliases never collide. A query returning a value table of STRUCTs selects each field with `struct_extract_at`. Sort keys survive projections even when they are
 absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
 CTEs become DuckDB CTEs with positional column names; a recursive entry becomes a DuckDB
 recursive CTE, whose UNION [ALL] iterates the same way. Grouping sets compute their keys in a
