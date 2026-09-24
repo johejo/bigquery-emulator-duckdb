@@ -569,6 +569,24 @@ TEST_F(ResolvedTranslatorTest, RunsSetOperations) {
   EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IS NOT NULL EXCEPT DISTINCT "
                            "SELECT 2 ORDER BY 1")),
             (V{"1", "3"}));
+  EXPECT_EQ(Rows(Execute("SELECT 1 AS a, 2 AS b UNION ALL CORRESPONDING SELECT 3 AS b, 4 AS a "
+                         "ORDER BY a")),
+            (V{"1|2", "4|3"}));
+  EXPECT_EQ(Rows(Execute("SELECT 1 AS a, 2 AS b FULL UNION ALL CORRESPONDING SELECT 3 AS c, "
+                         "4 AS a ORDER BY a")),
+            (V{"1|2|NULL", "4|NULL|3"}));
+  EXPECT_EQ(Rows(Execute("SELECT 1 AS a, 2 AS b LEFT UNION ALL CORRESPONDING SELECT 3 AS c, "
+                         "4 AS a ORDER BY a")),
+            (V{"1|2", "4|NULL"}));
+  EXPECT_EQ(Rows(Execute("SELECT 1 AS a, 2 AS b INNER UNION ALL CORRESPONDING SELECT 3 AS c, "
+                         "4 AS a ORDER BY a")),
+            (V{"1", "4"}));
+  EXPECT_EQ(Rows(Execute("SELECT 1 AS a, 2 AS b, 5 AS c UNION ALL CORRESPONDING BY (c, a) "
+                         "SELECT 3 AS c, 4 AS a ORDER BY a")),
+            (V{"5|1", "3|4"}));
+  EXPECT_EQ(Column(Execute("SELECT a, b FROM t INTERSECT DISTINCT CORRESPONDING "
+                           "SELECT 'x' AS b, 1 AS a")),
+            (V{"1"}));
 }
 
 TEST_F(ResolvedTranslatorTest, RunsAnalyticFunctionsAndQualify) {

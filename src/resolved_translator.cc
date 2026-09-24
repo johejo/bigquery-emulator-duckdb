@@ -1238,10 +1238,8 @@ std::optional<Relation> RecursiveRefScan(const googlesql::ResolvedRecursiveRefSc
 
 std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationScan& set,
                                          const Scope& scope) {
-  if (set.column_match_mode() != googlesql::ResolvedSetOperationScan::BY_POSITION ||
-      set.column_propagation_mode() != googlesql::ResolvedSetOperationScan::STRICT) {
-    return Unsupported(scope, "set operation by name or CORRESPONDING");
-  }
+  // CORRESPONDING is resolved into each input item's output_column_list, which is positional
+  // and pads missing columns with NULLs, so the match and propagation modes need no handling.
   static const std::map<googlesql::ResolvedSetOperationScan::SetOperationType, std::string>
       operators = {{googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
                    {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},

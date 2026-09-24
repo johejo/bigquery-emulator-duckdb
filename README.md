@@ -34,7 +34,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
 | `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
 | Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Recursive CTEs `WITH DEPTH` and lateral joins fall back to the parser AST. |
-| Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for positional `UNION` / `INTERSECT` / `EXCEPT`, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts; `CORRESPONDING` falls back. |
+| Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for `UNION` / `INTERSECT` / `EXCEPT`, including `CORRESPONDING [BY]` with `FULL` / `LEFT` / `INNER` propagation, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
 | Float literals | Supported | `1.5` becomes `1.5::DOUBLE` to avoid DuckDB inferring `DECIMAL`. |
@@ -90,7 +90,9 @@ absent from the result, and ORDER BY explicitly implements BigQuery's default NU
 CTEs become DuckDB CTEs with positional column names; a recursive entry becomes a DuckDB
 recursive CTE, whose UNION [ALL] iterates the same way. Grouping sets compute their keys in a
 derived table below the aggregation and group by those column names, so ROLLUP, CUBE, nested
-GROUPING SETS and GROUP BY a, ROLLUP(b) keep their DuckDB spelling. UNNEST becomes a lateral `unnest` with
+GROUPING SETS and GROUP BY a, ROLLUP(b) keep their DuckDB spelling. A set operation matching
+columns by name is already aligned by position in the resolved AST, with missing columns padded
+with NULLs, so it becomes a positional DuckDB set operation. UNNEST becomes a lateral `unnest` with
 ordinality; several arrays are instead indexed in step over a `range` sized by the zip mode, and correlated subquery references resolve through the enclosing scan's column names.
 
 Expressions include scalar literals and parameters, casts, arithmetic, comparisons, boolean
