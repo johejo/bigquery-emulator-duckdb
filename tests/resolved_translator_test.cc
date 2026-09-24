@@ -149,14 +149,11 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
 }
 
 TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
-  const std::string recursive =
-      "WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM c WHERE n < 3) "
-      "SELECT n FROM c";
   for (const std::string& sql :
        {std::string("SELECT AS VALUE 1"), std::string("SELECT SAFE.RAND()"),
         std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
-        std::string("CREATE TABLE ds.new_t (x INT64)"), recursive,
-        std::string("SELECT a, COUNT(*) FROM t GROUP BY ROLLUP(a)"),
+        std::string("CREATE TABLE ds.new_t (x INT64)"),
+        std::string("SELECT COUNT(DISTINCT a) OVER () FROM t"),
         std::string("SELECT STRUCT(1, 2)")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
@@ -165,8 +162,8 @@ TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
 TEST_F(ResolvedTranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("SELECT BYTE_LENGTH('abc'), SESSION_USER()"), "function SESSION_USER");
   EXPECT_EQ(Unsupported("SELECT a FROM t WHERE a IN (SELECT SAFE.RAND() FROM t)"), "SAFE.RAND");
-  EXPECT_EQ(Unsupported("SELECT a, COUNT(*) FROM t GROUP BY ROLLUP(a)"),
-            "GROUPING SETS, ROLLUP, CUBE or GROUPING");
+  EXPECT_EQ(Unsupported("SELECT COUNT(DISTINCT a) OVER () FROM t"),
+            "DISTINCT window aggregate COUNT");
   EXPECT_EQ(Unsupported("SELECT AS VALUE a FROM t"), "SELECT AS STRUCT or AS VALUE");
   EXPECT_EQ(Unsupported("UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1"),
             "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
@@ -427,6 +424,18 @@ std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {
   return values;
 }
 
+// Each row's cells joined with '|', so a test can compare whole rows.
+std::vector<std::string> Rows(const QueryResult& result) {
+  std::vector<std::string> rows(result.rows.size());
+  for (size_t i = 0; i < result.schema.size(); ++i) {
+    const auto column = Column(result, i);
+    for (size_t j = 0; j < rows.size(); ++j) {
+      rows[j] += (i == 0 ? "" : "|") + column[j];
+    }
+  }
+  return rows;
+}
+
 TEST_F(ResolvedTranslatorTest, RunsJoinsAndCtes) {
   using V = std::vector<std::string>;
   EXPECT_EQ(Column(Execute("SELECT l.a + r.a FROM t AS l JOIN t AS r ON l.a = r.a ORDER BY 1")),
@@ -470,6 +479,45 @@ TEST_F(ResolvedTranslatorTest, RunsAggregatesAndDistinct) {
   EXPECT_EQ(Column(Execute("SELECT DISTINCT a > 1 AS big FROM t ORDER BY big")),
             (V{"NULL", "false", "true"}));
   EXPECT_EQ(Scalar("SELECT COUNT(*) FROM t WHERE FALSE"), "0");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsGroupingSets) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Rows(Execute("SELECT a > 1 AS big, COUNT(*) AS n, GROUPING(a > 1) AS g FROM t "
+                         "WHERE a IS NOT NULL GROUP BY ROLLUP(big) ORDER BY g, big")),
+            (V{"false|1|0", "true|2|0", "NULL|3|1"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, b, COUNT(*) FROM t WHERE a < 3 "
+                         "GROUP BY CUBE(a, b) ORDER BY a NULLS LAST, b NULLS LAST")),
+            (V{"1|x|1", "1|NULL|1", "2|yy|1", "2|NULL|1", "NULL|x|1", "NULL|yy|1", "NULL|NULL|2"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, b, SUM(a) FROM t WHERE a < 3 "
+                         "GROUP BY GROUPING SETS ((a, b), a, ()) ORDER BY 3, 1, 2")),
+            (V{"1|NULL|1", "1|x|1", "2|NULL|2", "2|yy|2", "NULL|NULL|3"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, b, COUNT(*) FROM t WHERE a < 3 "
+                         "GROUP BY a, ROLLUP(b) ORDER BY a, b NULLS LAST")),
+            (V{"1|x|1", "1|NULL|1", "2|yy|1", "2|NULL|1"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, GROUPING(a) FROM t WHERE a = 1 GROUP BY a")), (V{"1|0"}));
+}
+
+TEST_F(ResolvedTranslatorTest, RunsRecursiveCtes) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Column(Execute("WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL "
+                           "SELECT n + 1 FROM c WHERE n < 3) SELECT n FROM c ORDER BY n")),
+            (V{"1", "2", "3"}));
+  // UNION DISTINCT stops once an iteration adds no new row.
+  EXPECT_EQ(Column(Execute("WITH RECURSIVE c AS (SELECT 0 AS n UNION DISTINCT "
+                           "SELECT MOD(n + 1, 3) FROM c) SELECT n FROM c ORDER BY n")),
+            (V{"0", "1", "2"}));
+  // A plain entry next to a recursive one, and a recursive term that joins a table and
+  // filters through a subquery.
+  EXPECT_EQ(Rows(Execute("WITH RECURSIVE base AS (SELECT a FROM t WHERE a IS NOT NULL), "
+                         "c AS (SELECT MIN(a) AS n, 1 AS depth FROM base UNION ALL "
+                         "SELECT base.a, depth + 1 FROM c JOIN base ON base.a = c.n + 1 "
+                         "WHERE EXISTS (SELECT 1 FROM base WHERE a > c.n)) "
+                         "SELECT n, depth FROM c ORDER BY depth")),
+            (V{"1|1", "2|2", "3|3"}));
+  EXPECT_EQ(Unsupported("WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL "
+                        "SELECT n + 1 FROM c WHERE n < 3) WITH DEPTH SELECT n FROM c"),
+            "WITH RECURSIVE depth modifier");
 }
 
 TEST_F(ResolvedTranslatorTest, RunsSetOperations) {

@@ -53,6 +53,8 @@ struct Scope {
   std::string& unsupported;
   Columns outer;
   std::map<std::string, WithQuery> with;
+  // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
+  std::optional<WithQuery> recursive;
 };
 
 // Records why the statement falls back. The innermost failure is recorded first, and the
@@ -857,28 +859,156 @@ std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const 
   return result;
 }
 
+// Spells one element of a grouping set list over the group by keys in `keys`.
+std::optional<std::string> GroupingSet(const googlesql::ResolvedGroupingSetBase& set,
+                                       const Columns& keys) {
+  const auto references =
+      [&](const std::vector<std::unique_ptr<const googlesql::ResolvedColumnRef>>& refs)
+      -> std::optional<std::string> {
+    std::vector<std::string> sql;
+    for (const auto& ref : refs) {
+      const auto key = keys.find(ref->column().column_id());
+      if (key == keys.end()) {
+        return std::nullopt;
+      }
+      sql.push_back(key->second);
+    }
+    return "(" + Join(sql, ", ") + ")";
+  };
+  const auto multi_columns =
+      [&](const std::vector<std::unique_ptr<const googlesql::ResolvedGroupingSetMultiColumn>>& list)
+      -> std::optional<std::string> {
+    std::vector<std::string> sql;
+    for (const auto& columns : list) {
+      const auto item = references(columns->column_list());
+      if (!item) {
+        return std::nullopt;
+      }
+      sql.push_back(*item);
+    }
+    return Join(sql, ", ");
+  };
+  const auto elements =
+      [&](const std::vector<std::unique_ptr<const googlesql::ResolvedGroupingSetBase>>& list)
+      -> std::optional<std::string> {
+    std::vector<std::string> sql;
+    for (const auto& element : list) {
+      const auto item = GroupingSet(*element, keys);
+      if (!item) {
+        return std::nullopt;
+      }
+      sql.push_back(*item);
+    }
+    return Join(sql, ", ");
+  };
+  if (set.Is<googlesql::ResolvedGroupingSet>()) {
+    return references(set.GetAs<googlesql::ResolvedGroupingSet>()->group_by_column_list());
+  }
+  std::optional<std::string> inner;
+  if (set.Is<googlesql::ResolvedRollup>()) {
+    inner = multi_columns(set.GetAs<googlesql::ResolvedRollup>()->rollup_column_list());
+    return inner ? std::optional<std::string>("ROLLUP(" + *inner + ")") : std::nullopt;
+  }
+  if (set.Is<googlesql::ResolvedCube>()) {
+    inner = multi_columns(set.GetAs<googlesql::ResolvedCube>()->cube_column_list());
+    return inner ? std::optional<std::string>("CUBE(" + *inner + ")") : std::nullopt;
+  }
+  if (set.Is<googlesql::ResolvedGroupingSetList>()) {
+    inner = elements(set.GetAs<googlesql::ResolvedGroupingSetList>()->elem_list());
+    return inner ? std::optional<std::string>("GROUPING SETS (" + *inner + ")") : std::nullopt;
+  }
+  if (set.Is<googlesql::ResolvedGroupingSetProduct>()) {
+    // DuckDB reads a parenthesized list in GROUP BY a, (b, c) as a row, so each factor of the
+    // product is spelled as a grouping set list of its own.
+    std::vector<std::string> factors;
+    for (const auto& factor : set.GetAs<googlesql::ResolvedGroupingSetProduct>()->input_list()) {
+      const auto item = GroupingSet(*factor, keys);
+      if (!item) {
+        return std::nullopt;
+      }
+      factors.push_back("GROUPING SETS (" + *item + ")");
+    }
+    return Join(factors, ", ");
+  }
+  return std::nullopt;
+}
+
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
-  if (!aggregate.grouping_set_list().empty() || !aggregate.rollup_column_list().empty() ||
-      !aggregate.grouping_call_list().empty() || !aggregate.collation_list().empty()) {
-    return Unsupported(scope, "GROUPING SETS, ROLLUP, CUBE or GROUPING");
+  if (!aggregate.collation_list().empty()) {
+    return Unsupported(scope, "GROUP BY with collation");
   }
-  const auto input = Scan(*aggregate.input_scan(), scope);
+  auto input = Scan(*aggregate.input_scan(), scope);
   if (!input) {
     return std::nullopt;
   }
   Relation result;
   std::vector<std::string> projections;
   std::vector<std::string> keys;
-  for (const auto& key : aggregate.group_by_list()) {
-    const auto sql = Expression(*key->expr(), scope, input->columns);
-    if (!sql) {
-      return std::nullopt;
+  // GROUPING() without grouping sets still needs them: it is 0 over the one plain grouping.
+  if (!aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty()) {
+    // Grouping sets name their keys, so compute the keys once below the aggregation and group
+    // by the column names rather than by position.
+    std::vector<std::string> inner;
+    Columns columns;
+    for (const auto& [id, sql] : input->columns) {
+      inner.push_back(sql + " AS " + ColumnName(id));
+      columns.emplace(id, "q." + ColumnName(id));
     }
-    const int id = key->column().column_id();
-    projections.push_back(*sql + " AS " + ColumnName(id));
-    keys.push_back(std::to_string(projections.size()));
-    result.columns.emplace(id, "q." + ColumnName(id));
+    Columns key_columns;
+    for (const auto& key : aggregate.group_by_list()) {
+      const auto sql = Expression(*key->expr(), scope, input->columns);
+      if (!sql) {
+        return std::nullopt;
+      }
+      const int id = key->column().column_id();
+      inner.push_back(*sql + " AS " + ColumnName(id));
+      key_columns.emplace(id, "q." + ColumnName(id));
+      projections.push_back("q." + ColumnName(id) + " AS " + ColumnName(id));
+      result.columns.emplace(id, "q." + ColumnName(id));
+    }
+    std::vector<std::string> all_keys;
+    for (const auto& [id, sql] : key_columns) {
+      all_keys.push_back(sql);
+    }
+    for (const auto& set : aggregate.grouping_set_list()) {
+      const auto sql = GroupingSet(*set, key_columns);
+      if (!sql) {
+        return Unsupported(scope, "grouping set");
+      }
+      keys.push_back(*sql);
+    }
+    if (keys.empty()) {
+      keys.push_back("(" + Join(all_keys, ", ") + ")");
+    }
+    // A product stands for GROUP BY a, ROLLUP(b), which is its own spelling.
+    if (keys.size() > 1 || aggregate.grouping_set_list().empty() ||
+        !aggregate.grouping_set_list(0)->Is<googlesql::ResolvedGroupingSetProduct>()) {
+      keys = {"GROUPING SETS (" + Join(keys, ", ") + ")"};
+    }
+    for (const auto& call : aggregate.grouping_call_list()) {
+      const auto key = key_columns.find(call->group_by_column()->column().column_id());
+      if (key == key_columns.end()) {
+        return std::nullopt;
+      }
+      const int id = call->output_column().column_id();
+      projections.push_back("CAST(GROUPING(" + key->second + ") AS BIGINT) AS " + ColumnName(id));
+      result.columns.emplace(id, "q." + ColumnName(id));
+    }
+    input = Relation{
+        .sql = "SELECT " + (inner.empty() ? "1 AS _unit" : Join(inner, ", ")) + input->From(),
+        .columns = columns};
+  } else {
+    for (const auto& key : aggregate.group_by_list()) {
+      const auto sql = Expression(*key->expr(), scope, input->columns);
+      if (!sql) {
+        return std::nullopt;
+      }
+      const int id = key->column().column_id();
+      projections.push_back(*sql + " AS " + ColumnName(id));
+      keys.push_back(std::to_string(projections.size()));
+      result.columns.emplace(id, "q." + ColumnName(id));
+    }
   }
   for (const auto& computed : aggregate.aggregate_list()) {
     const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
@@ -934,38 +1064,89 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
   return result;
 }
 
-std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const Scope& scope) {
-  // DuckDB's recursive CTEs differ in how they terminate and deduplicate.
-  if (with.recursive()) {
-    return Unsupported(scope, "WITH RECURSIVE");
+// The body of a recursive WITH entry: DuckDB evaluates UNION [ALL] in WITH RECURSIVE by the
+// same iteration, deduplicating against every earlier row for UNION.
+std::optional<std::string> RecursiveQuery(const googlesql::ResolvedRecursiveScan& recursive,
+                                          const std::vector<std::string>& names,
+                                          const WithQuery& self, const Scope& scope) {
+  if (recursive.recursion_depth_modifier() != nullptr) {
+    return Unsupported(scope, "WITH RECURSIVE depth modifier");
   }
+  std::vector<std::string> terms;
+  for (const auto* item : {recursive.non_recursive_term(), recursive.recursive_term()}) {
+    Scope inner = scope;
+    if (item == recursive.recursive_term()) {
+      inner.recursive = self;
+    }
+    const auto relation = Scan(*item->scan(), inner);
+    if (!relation) {
+      return std::nullopt;
+    }
+    const auto projections = Renamed(*relation, item->output_column_list(), names);
+    if (!projections || projections->empty()) {
+      return std::nullopt;
+    }
+    terms.push_back("SELECT " + Join(*projections, ", ") + relation->From());
+  }
+  return Join(terms, recursive.op_type() == googlesql::ResolvedRecursiveScan::UNION_ALL
+                         ? " UNION ALL "
+                         : " UNION ");
+}
+
+std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const Scope& scope) {
   Scope inner = scope;
   std::vector<std::string> definitions;
   for (const auto& entry : with.with_entry_list()) {
     const auto* subquery = entry->with_subquery();
-    const auto relation = Scan(*subquery, inner);
-    if (!relation) {
-      return std::nullopt;
-    }
     std::vector<std::string> names;
     names.reserve(subquery->column_list_size());
     for (int i = 0; i < subquery->column_list_size(); ++i) {
       names.push_back(QuoteIdentifier("_p" + std::to_string(i)));
     }
-    const auto projections = Renamed(*relation, subquery->column_list(), names);
-    if (!projections || projections->empty()) {
+    const WithQuery query{"_w" + std::to_string(scope.next_name++), names.size()};
+    std::optional<std::string> body;
+    if (subquery->Is<googlesql::ResolvedRecursiveScan>()) {
+      body =
+          RecursiveQuery(*subquery->GetAs<googlesql::ResolvedRecursiveScan>(), names, query, inner);
+    } else {
+      const auto relation = Scan(*subquery, inner);
+      if (!relation) {
+        return std::nullopt;
+      }
+      const auto projections = Renamed(*relation, subquery->column_list(), names);
+      if (!projections || projections->empty()) {
+        return std::nullopt;
+      }
+      body = "SELECT " + Join(*projections, ", ") + relation->From();
+    }
+    if (!body) {
       return std::nullopt;
     }
-    const std::string name = "_w" + std::to_string(scope.next_name++);
-    definitions.push_back(QuoteIdentifier(name) + " AS (SELECT " + Join(*projections, ", ") +
-                          relation->From() + ")");
-    inner.with[entry->with_query_name()] = WithQuery{name, names.size()};
+    definitions.push_back(QuoteIdentifier(query.name) + "(" + Join(names, ", ") + ") AS (" + *body +
+                          ")");
+    inner.with[entry->with_query_name()] = query;
   }
   auto result = Scan(*with.query(), inner);
   if (!result) {
     return std::nullopt;
   }
-  result->sql = "WITH " + Join(definitions, ", ") + " SELECT q.*" + result->From();
+  result->sql = std::string(with.recursive() ? "WITH RECURSIVE " : "WITH ") +
+                Join(definitions, ", ") + " SELECT q.*" + result->From();
+  return result;
+}
+
+// Reads `query` into fresh columns.
+Relation WithRead(const WithQuery& query, const std::vector<googlesql::ResolvedColumn>& columns) {
+  Relation result;
+  std::vector<std::string> projections;
+  for (size_t i = 0; i < columns.size(); ++i) {
+    const int id = columns[i].column_id();
+    projections.push_back("q." + QuoteIdentifier("_p" + std::to_string(i)) + " AS " +
+                          ColumnName(id));
+    result.columns.emplace(id, "q." + ColumnName(id));
+  }
+  result.sql =
+      "SELECT " + Join(projections, ", ") + " FROM " + QuoteIdentifier(query.name) + " AS q";
   return result;
 }
 
@@ -975,17 +1156,15 @@ std::optional<Relation> WithRefScan(const googlesql::ResolvedWithRefScan& ref, c
       with->second.width != static_cast<size_t>(ref.column_list_size())) {
     return std::nullopt;
   }
-  Relation result;
-  std::vector<std::string> projections;
-  for (int i = 0; i < ref.column_list_size(); ++i) {
-    const int id = ref.column_list(i).column_id();
-    projections.push_back("q." + QuoteIdentifier("_p" + std::to_string(i)) + " AS " +
-                          ColumnName(id));
-    result.columns.emplace(id, "q." + ColumnName(id));
+  return WithRead(with->second, ref.column_list());
+}
+
+std::optional<Relation> RecursiveRefScan(const googlesql::ResolvedRecursiveRefScan& ref,
+                                         const Scope& scope) {
+  if (!scope.recursive || scope.recursive->width != static_cast<size_t>(ref.column_list_size())) {
+    return std::nullopt;
   }
-  result.sql =
-      "SELECT " + Join(projections, ", ") + " FROM " + QuoteIdentifier(with->second.name) + " AS q";
-  return result;
+  return WithRead(*scope.recursive, ref.column_list());
 }
 
 std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationScan& set,
@@ -1108,6 +1287,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedWithScan>()) {
     return WithScan(*scan.GetAs<googlesql::ResolvedWithScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedRecursiveRefScan>()) {
+    return RecursiveRefScan(*scan.GetAs<googlesql::ResolvedRecursiveRefScan>(), scope);
   }
   if (scan.Is<googlesql::ResolvedWithRefScan>()) {
     return WithRefScan(*scan.GetAs<googlesql::ResolvedWithRefScan>(), scope);
