@@ -79,7 +79,7 @@ they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 
-[src/resolved_translator.cc](src/resolved_translator.cc) translates queries composed of
+[src/translator.cc](src/translator.cc) translates queries composed of
 SingleRow, Table, Project, Filter, OrderBy, LimitOffset, Join, Aggregate, Analytic, With,
 WithRef, Recursive, RecursiveRef, SetOperation and Array scans, INSERT, UPDATE, DELETE and MERGE statements over such
 queries, and CREATE TABLE [AS SELECT], CREATE SCHEMA and DROP TABLE / SCHEMA. DDL has no catalog
@@ -115,7 +115,7 @@ still apply.
 The catalog, TypeFactory and analyzer output remain alive through translation. A statement containing
 an unsupported node, function, type or modifier fails as `invalidQuery`, naming the construct.
 Keeping conversion in this layer leaves the frontend focused on parsing and the backend on
-execution. `tests/resolved_translator_test.cc` executes supported queries directly against
+execution. `tests/translator_test.cc` executes supported queries directly against
 DuckDB, covering results, types, aliases, ordering and parameterized preparation.
 
 ### Functions

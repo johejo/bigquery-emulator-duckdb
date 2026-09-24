@@ -1,4 +1,4 @@
-#include "src/resolved_translator.h"
+#include "src/translator.h"
 
 #include <cmath>
 #include <map>
