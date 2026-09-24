@@ -427,6 +427,34 @@ TEST_F(ResolvedTranslatorTest, RunsCallsWithDifferentSemantics) {
   EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(SPLIT('a,b'), '|')"), "a|b");
 }
 
+// Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
+TEST_F(ResolvedTranslatorTest, RunsStringBytesAndMathFunctions) {
+  EXPECT_EQ(Scalar("SELECT CHR(0)"), "");
+  EXPECT_EQ(Scalar("SELECT CHR(12354)"), "あ");
+  EXPECT_EQ(Scalar("SELECT UNICODE('')"), "0");
+  EXPECT_EQ(Scalar("SELECT UNICODE('あ')"), "12354");
+  EXPECT_EQ(Scalar("SELECT ASCII('A')"), "65");
+  EXPECT_EQ(Scalar("SELECT INSTR('abcb', 'b')"), "2");
+  EXPECT_EQ(Scalar("SELECT LEFT('abc', 2) || RIGHT('abc', 1)"), "abc");
+  EXPECT_THROW(Execute("SELECT LEFT('abc', -1)"), BackendError);
+  EXPECT_EQ(Scalar("SELECT TRANSLATE('abc', 'ab', 'x')"), "xc");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(b'\\x00\\xff')"), "00ff");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(FROM_HEX('A'))"), "0a");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(MD5('a'))"), "0cc175b9c0f1b6a831c399e269772661");
+  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(SHA256('a'))"), "32");
+  EXPECT_EQ(Scalar("SELECT TO_BASE64(FROM_BASE64('AP8='))"), "AP8=");
+  EXPECT_EQ(Scalar("SELECT CAST(IEEE_DIVIDE(1, 0) AS STRING)"), "inf");
+  EXPECT_EQ(Scalar("SELECT BIT_COUNT(-1)"), "64");
+  EXPECT_EQ(Scalar("SELECT CAST(CBRT(8) AS INT64)"), "2");
+  EXPECT_EQ(Scalar("SELECT CAST(ATAN2(1, 1) * 4 * 1000 AS INT64)"), "3142");
+  EXPECT_EQ(Scalar("SELECT SAFE_ADD(9223372036854775807, 1)"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3"), "6");
+  EXPECT_EQ(Scalar("SELECT SAFE_NEGATE(1)"), "-1");
+  EXPECT_EQ(Scalar("SELECT SAFE_SUBTRACT(1, 2)"), "-1");
+  // DuckDB's left() has no BYTES overload.
+  EXPECT_EQ(Unsupported("SELECT LEFT(b'abc', 1)"), "function LEFT");
+}
+
 std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {
   std::vector<std::string> values;
   for (const auto& row : result.rows) {

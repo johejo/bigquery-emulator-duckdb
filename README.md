@@ -50,7 +50,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. |
 | `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
 | Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
-| Type-dependent function mappings | Partial | In supported resolved SELECTs, argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. Queries outside the resolved translator subset still use parser AST translation. |
+| Type-dependent function mappings | Partial | In supported resolved SELECTs, argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. STRING-only mappings cover `INSTR`, `LEFT` / `RIGHT` (erroring on a negative length), `TRANSLATE`, `ASCII`, `UNICODE`, `NORMALIZE`, `FROM_HEX` and `FROM_BASE64`, with `CHR(0)` and `UNICODE('')` following BigQuery; `MD5` / `SHA1` / `SHA256` return BYTES, `TO_HEX` is lowercase and `BIT_COUNT` takes INT64; their BYTES overloads fall back. Queries outside the resolved translator subset still use parser AST translation. |
 | `SAFE.` function prefix | Partial | In resolved statements, the call runs inside DuckDB's `TRY` with its arguments evaluated outside it, so the function's own errors return NULL while argument errors still propagate. Volatile functions and calls translated to an explicit `error()` fall back; in parser AST translation the prefix is dropped. |
 
 ## Server
@@ -104,7 +104,9 @@ ORDER BY and IGNORE NULLS where DuckDB can express them, and window frames. An a
 slices the aggregated list, and `HAVING MAX` / `MIN` filters the aggregate's rows against a
 window maximum or minimum over the group. The existing function
 renames and templates are reused, adapting resolved enum date parts, interval arguments and
-default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. Function and aggregate
+default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. String, hash and
+trigonometric functions, `IEEE_DIVIDE` and `SAFE_ADD` / `SAFE_SUBTRACT` / `SAFE_MULTIPLY` /
+`SAFE_NEGATE` (the arithmetic operators under `SAFE.`) are translated as well. Function and aggregate
 results are cast to their resolved types. Existing documented function compatibility limitations
 still apply.
 

@@ -344,6 +344,48 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
   if (name == "LENGTH" && n == 1 && call.argument_list(0)->type()->IsBytes()) {
     return invoke("octet_length");
   }
+  const bool strings = n > 0 && call.argument_list(0)->type()->IsString();
+  // Functions whose DuckDB counterparts differ only at the edges BigQuery defines differently.
+  // They are resolved-only so the argument types can select the STRING overloads.
+  static const std::map<std::string, std::pair<size_t, std::string>> string_templates = {
+      {"INSTR", {2, "strpos($1, $2)"}},
+      {"LEFT",
+       {2,
+        "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE left($1, $2) "
+        "END"}},
+      {"RIGHT",
+       {2,
+        "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE right($1, $2) "
+        "END"}},
+      {"TRANSLATE", {3, "translate($1, $2, $3)"}},
+      {"ASCII", {1, "ascii($1)"}},
+      {"UNICODE", {1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END"}},
+      {"NORMALIZE", {1, "nfc_normalize($1)"}},
+      {"FROM_HEX", {1, "unhex($1)"}},
+      {"FROM_BASE64", {1, "from_base64($1)"}}};
+  if (const auto spelling = string_templates.find(name);
+      spelling != string_templates.end() && strings && spelling->second.first == n) {
+    return Expand(spelling->second.second, args);
+  }
+  // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
+  if ((name == "MD5" || name == "SHA1" || name == "SHA256") && n == 1) {
+    return "unhex(" + invoke(ToLowerAscii(name)) + ")";
+  }
+  if (name == "TO_HEX" && n == 1) {
+    return "lower(hex(" + args[0] + "))";
+  }
+  if (name == "TO_BASE64" && n == 1) {
+    return invoke("to_base64");
+  }
+  if (name == "CHR" && n == 1) {
+    return "CASE WHEN " + args[0] + " = 0 THEN '' ELSE chr(CAST(" + args[0] + " AS INTEGER)) END";
+  }
+  if (name == "IEEE_DIVIDE" && n == 2) {
+    return "(CAST(" + args[0] + " AS DOUBLE) / CAST(" + args[1] + " AS DOUBLE))";
+  }
+  if (name == "BIT_COUNT" && n == 1 && call.argument_list(0)->type()->IsInt64()) {
+    return invoke("bit_count");
+  }
   if (const auto spelling = DuckDbFunctionTemplate(name, n)) {
     return Expand(*spelling, args);
   }
@@ -393,7 +435,17 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
                                               "STRPOS",
                                               "SPLIT",
                                               "ARRAY_LENGTH",
-                                              "ARRAY_TO_STRING"};
+                                              "ARRAY_TO_STRING",
+                                              "SIN",
+                                              "COS",
+                                              "TAN",
+                                              "ASIN",
+                                              "ACOS",
+                                              "ATAN",
+                                              "ATAN2",
+                                              "TANH",
+                                              "ASINH",
+                                              "CBRT"};
   return plain.contains(name) ? std::optional<std::string>(invoke(name)) : std::nullopt;
 }
 
@@ -408,7 +460,16 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
     return Unsupported(scope, "function " + name);
   }
-  const bool safe = call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE;
+  // SAFE_ADD and its siblings are the arithmetic operators with the SAFE. prefix.
+  static const std::map<std::string, std::string> safe_operators = {
+      {"SAFE_ADD", "$ADD"},
+      {"SAFE_SUBTRACT", "$SUBTRACT"},
+      {"SAFE_MULTIPLY", "$MULTIPLY"},
+      {"SAFE_NEGATE", "$UNARY_MINUS"}};
+  const auto safe_operator = safe_operators.find(name);
+  const std::string function = safe_operator == safe_operators.end() ? name : safe_operator->second;
+  const bool safe = call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE ||
+                    safe_operator != safe_operators.end();
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
     return Unsupported(scope, "function " + name + " error mode");
   }
@@ -429,7 +490,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     args.push_back(*sql);
   }
   if (!safe) {
-    auto sql = Call(call, name, args);
+    auto sql = Call(call, function, args);
     if (!sql) {
       return Unsupported(scope, "function " + name);
     }
@@ -458,7 +519,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql = Call(call, name, placeholders);
+  const auto sql = Call(call, function, placeholders);
   if (!sql || sql->find("error(") != std::string::npos) {
     return Unsupported(scope, "SAFE." + name);
   }
