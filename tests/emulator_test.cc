@@ -251,12 +251,8 @@ TEST_F(EmulatorTest, ReportsTheResolvedResultSchema) {
   EXPECT_EQ(schema[3].type, "DATE");
 }
 
-// FIXME: The translator keeps `UNNEST(...) AS x` as a table alias, so DuckDB binds `x` to the
-// whole row, a STRUCT, instead of the element. This asserts the current failure so the bug is
-// not forgotten; once the translator aliases the column, replace it with
-// EXPECT_EQ(Scalar("SELECT SUM(x) FROM UNNEST([1, 2]) AS x"), "3");
-TEST_F(EmulatorTest, FailsToAliasUnnestedElements) {
-  EXPECT_EQ(ErrorStatus("SELECT SUM(x) FROM UNNEST([1, 2]) AS x"), 400);
+TEST_F(EmulatorTest, AliasesUnnestedElements) {
+  EXPECT_EQ(Scalar("SELECT SUM(x) FROM UNNEST([1, 2]) AS x"), "3");
 }
 
 TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {

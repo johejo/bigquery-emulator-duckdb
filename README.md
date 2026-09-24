@@ -28,9 +28,10 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. SELECTs built from projections, table reads, filters, ordering and limits use resolved AST translation when their expressions are supported; other statements use the parser AST. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries use resolved AST translation when every scan and expression in them is supported; DML, DDL and other queries use the parser AST. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
-| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Still use the parser AST; execution depends on DuckDB compatibility. |
+| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans. Recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, lateral joins, `DISTINCT` window aggregates, and aggregate `HAVING MAX` / `LIMIT` modifiers fall back to the parser AST. |
+| Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for positional `UNION` / `INTERSECT` / `EXCEPT`, single-array `UNNEST` with `WITH OFFSET`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts; `CORRESPONDING` and multi-array `UNNEST` fall back. |
 | Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
 | String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
 | Float literals | Supported | `1.5` becomes `1.5::DOUBLE` to avoid DuckDB inferring `DECIMAL`. |
@@ -74,26 +75,31 @@ they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 
-[src/resolved_translator.cc](src/resolved_translator.cc) translates SELECTs composed of
-SingleRow, Table, Project, Filter, OrderBy and LimitOffset scans. Column references use resolved
-column IDs and internal aliases, with user-facing names applied only at the output boundary.
-Derived tables composed of these scans work too. Sort keys survive projections even when they
-are absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
+[src/resolved_translator.cc](src/resolved_translator.cc) translates queries composed of
+SingleRow, Table, Project, Filter, OrderBy, LimitOffset, Join, Aggregate, Analytic, With,
+WithRef, SetOperation and Array scans. Each scan becomes a derived table whose columns are named
+after resolved column IDs, with user-facing names applied only at the output boundary, so
+duplicate or shadowed aliases never collide. Sort keys survive projections even when they are
+absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
+CTEs become DuckDB CTEs with positional column names, UNNEST becomes a lateral `unnest` with
+ordinality, and correlated subquery references resolve through the enclosing scan's column names.
 
 Expressions include scalar literals and parameters, casts, arithmetic, comparisons, boolean
-operators, CASE/IF/COALESCE and selected scalar functions. The existing function renames and
-templates are reused, adapting resolved enum date parts, interval arguments and default arguments.
-BYTE_LENGTH and LENGTH distinguish STRING from BYTES. Temporal, NUMERIC and JSON values, plus
-scalar ARRAY literals/parameters and array-returning scalar functions, are supported; general
-ARRAY/STRUCT expressions and UNNEST remain outside this migration stage. Existing documented
-function compatibility limitations still apply.
+operators, CASE/IF/COALESCE, selected scalar functions, STRUCT construction and field access,
+array literals and subscripts, and scalar, ARRAY, EXISTS and IN subqueries. Aggregate and
+analytic calls cover the common numeric, string, array and navigation functions, with DISTINCT,
+ORDER BY and IGNORE NULLS where DuckDB can express them, and window frames. The existing function
+renames and templates are reused, adapting resolved enum date parts, interval arguments and
+default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. Function and aggregate
+results are cast to their resolved types. Existing documented function compatibility limitations
+still apply.
 
 The catalog, TypeFactory and analyzer output remain alive through translation. Unsupported nodes,
 functions, types or modifiers return to parser AST translation for the entire statement;
-translation and execution errors do not trigger fallback. Joins, CTEs, aggregation, set operations,
-analytic scans, scalar/correlated subqueries and DML/DDL still use the parser translator.
-`tests/resolved_translator_test.cc` executes supported queries directly against DuckDB without a
-parser fallback, covering results, types, aliases, ordering and parameterized preparation.
+translation and execution errors do not trigger fallback. Recursive CTEs, grouping sets and DML/DDL
+still use the parser translator. `tests/resolved_translator_test.cc` executes supported queries
+directly against DuckDB without a parser fallback, covering results, types, aliases, ordering and
+parameterized preparation.
 
 For other statements, the translator walks the parser AST and extends GoogleSQL's unparser,
 overriding constructs that need DuckDB-specific spelling. Keeping conversion in this layer leaves

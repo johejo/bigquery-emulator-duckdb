@@ -11,8 +11,9 @@ class ResolvedStatement;
 
 namespace bigquery_emulator_duckdb {
 
-// Translates projections, table reads, filters, ordering and limits with supported
-// scalar expressions. Columns are bound by resolved ID across scan scopes. nullopt means
+// Translates queries: projections, table reads, filters, ordering, limits, joins, CTEs,
+// aggregation, analytic functions, set operations, UNNEST and subqueries, with supported
+// expressions. Columns are bound by resolved ID across scan scopes. nullopt means
 // an unsupported construct, allowing the caller to translate the whole statement through
 // the parser AST.
 // Errors are not caught: a failed translation or execution must not trigger fallback.

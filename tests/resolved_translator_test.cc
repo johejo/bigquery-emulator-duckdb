@@ -140,13 +140,15 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
 }
 
 TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
-  for (const auto* sql :
-       {"SELECT STRUCT(1 AS x)", "SELECT x FROM UNNEST([1, 2]) AS x", "SELECT SUM(a) FROM t",
-        "SELECT DISTINCT a FROM t", "SELECT l.a FROM t AS l JOIN t AS r ON l.a = r.a",
-        "WITH c AS (SELECT 1 AS x) SELECT x FROM c", "SELECT 1 UNION ALL SELECT 2",
-        "SELECT a FROM t QUALIFY ROW_NUMBER() OVER (ORDER BY a) = 1", "SELECT AS VALUE 1",
-        "SELECT SAFE.BYTE_LENGTH('abc')", "SELECT BYTE_LENGTH('abc'), SESSION_USER()",
-        "CREATE TABLE ds.new_t (x INT64)"}) {
+  const std::string recursive =
+      "WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM c WHERE n < 3) "
+      "SELECT n FROM c";
+  for (const std::string& sql :
+       {std::string("SELECT AS VALUE 1"), std::string("SELECT SAFE.BYTE_LENGTH('abc')"),
+        std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
+        std::string("CREATE TABLE ds.new_t (x INT64)"), recursive,
+        std::string("SELECT a, COUNT(*) FROM t GROUP BY ROLLUP(a)"),
+        std::string("SELECT STRUCT(1, 2)")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }
@@ -384,6 +386,125 @@ TEST_F(ResolvedTranslatorTest, RunsCallsWithDifferentSemantics) {
   // DuckDB replaces only the first occurrence without the global flag.
   EXPECT_EQ(Scalar("SELECT REGEXP_REPLACE('aaa', 'a', 'b')"), "bbb");
   EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(SPLIT('a,b'), '|')"), "a|b");
+}
+
+std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {
+  std::vector<std::string> values;
+  for (const auto& row : result.rows) {
+    const auto& cell = row["f"][index]["v"];
+    values.push_back(cell.is_null() ? "NULL" : cell.get<std::string>());
+  }
+  return values;
+}
+
+TEST_F(ResolvedTranslatorTest, RunsJoinsAndCtes) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Column(Execute("SELECT l.a + r.a FROM t AS l JOIN t AS r ON l.a = r.a ORDER BY 1")),
+            (V{"2", "4", "6"}));
+  EXPECT_EQ(Column(Execute("SELECT r.b FROM t AS l LEFT JOIN t AS r ON l.a = r.a + 1 "
+                           "ORDER BY l.a NULLS LAST")),
+            (V{"NULL", "x", "yy", "NULL"}));
+  EXPECT_EQ(Execute("SELECT 1 FROM t AS l CROSS JOIN t AS r").rows.size(), 16);
+  EXPECT_EQ(Execute("SELECT 1 FROM t AS l FULL JOIN t AS r ON l.a = r.a").rows.size(), 5);
+  EXPECT_EQ(Column(Execute("SELECT a FROM t JOIN (SELECT 2 AS a) USING (a)")), (V{"2"}));
+  EXPECT_EQ(Column(Execute("WITH c AS (SELECT a * 10 AS x FROM t), d AS (SELECT x FROM c "
+                           "WHERE x > 10) SELECT x FROM d ORDER BY x DESC")),
+            (V{"30", "20"}));
+  EXPECT_EQ(Column(Execute("WITH c AS (SELECT 1 AS x) SELECT l.x + r.x FROM c AS l, c AS r")),
+            (V{"2"}));
+}
+
+TEST_F(ResolvedTranslatorTest, RunsAggregatesAndDistinct) {
+  using V = std::vector<std::string>;
+  const auto result = Execute(
+      "SELECT SUM(a), COUNT(*), COUNT(a), COUNT(DISTINCT a), AVG(a), MIN(b), MAX(b), "
+      "STRING_AGG(b, ',' ORDER BY a DESC), ARRAY_LENGTH(ARRAY_AGG(a IGNORE NULLS)), "
+      "COUNTIF(a > 1), LOGICAL_AND(a > 0) FROM t");
+  ASSERT_EQ(result.rows.size(), 1);
+  EXPECT_EQ(result.schema[0].type, "INTEGER");
+  const auto& row = result.rows[0]["f"];
+  EXPECT_EQ(row[0]["v"], "6");
+  EXPECT_EQ(row[1]["v"], "4");
+  EXPECT_EQ(row[2]["v"], "3");
+  EXPECT_EQ(row[3]["v"], "3");
+  EXPECT_EQ(row[4]["v"], "2.0");
+  EXPECT_EQ(row[5]["v"], "x");
+  EXPECT_EQ(row[6]["v"], "あ");
+  EXPECT_EQ(row[7]["v"], "あ,yy,x");
+  EXPECT_EQ(row[8]["v"], "3");
+  EXPECT_EQ(row[9]["v"], "2");
+  EXPECT_EQ(row[10]["v"], "true");
+  EXPECT_EQ(Column(Execute("SELECT MOD(a, 2) AS k, COUNT(*) AS n FROM t WHERE a IS NOT NULL "
+                           "GROUP BY k HAVING COUNT(*) > 1")),
+            (V{"1"}));
+  EXPECT_EQ(Column(Execute("SELECT DISTINCT a > 1 AS big FROM t ORDER BY big")),
+            (V{"NULL", "false", "true"}));
+  EXPECT_EQ(Scalar("SELECT COUNT(*) FROM t WHERE FALSE"), "0");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsSetOperations) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Column(Execute("SELECT 1 AS x UNION ALL SELECT 1 UNION ALL SELECT 2 ORDER BY x")),
+            (V{"1", "1", "2"}));
+  EXPECT_EQ(Column(Execute("SELECT a FROM t UNION DISTINCT SELECT a FROM t ORDER BY a")),
+            (V{"NULL", "1", "2", "3"}));
+  EXPECT_EQ(Column(Execute("SELECT a FROM t INTERSECT DISTINCT SELECT 2")), (V{"2"}));
+  EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IS NOT NULL EXCEPT DISTINCT "
+                           "SELECT 2 ORDER BY 1")),
+            (V{"1", "3"}));
+}
+
+TEST_F(ResolvedTranslatorTest, RunsAnalyticFunctionsAndQualify) {
+  using V = std::vector<std::string>;
+  const auto result = Execute(
+      "SELECT a, ROW_NUMBER() OVER (ORDER BY a), "
+      "SUM(a) OVER (ORDER BY a ROWS BETWEEN 1 PRECEDING AND CURRENT ROW), "
+      "LAG(a) OVER (ORDER BY a), FIRST_VALUE(a IGNORE NULLS) OVER (ORDER BY a "
+      "ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) "
+      "FROM t ORDER BY a");
+  EXPECT_EQ(Column(result, 1), (V{"1", "2", "3", "4"}));
+  EXPECT_EQ(Column(result, 2), (V{"NULL", "1", "3", "5"}));
+  EXPECT_EQ(Column(result, 3), (V{"NULL", "NULL", "1", "2"}));
+  EXPECT_EQ(Column(result, 4), (V{"1", "1", "1", "1"}));
+  EXPECT_EQ(Column(Execute("SELECT b FROM t WHERE a IS NOT NULL "
+                           "QUALIFY ROW_NUMBER() OVER (ORDER BY a DESC) = 1")),
+            (V{"あ"}));
+}
+
+TEST_F(ResolvedTranslatorTest, RunsSubqueries) {
+  using V = std::vector<std::string>;
+  EXPECT_EQ(Scalar("SELECT (SELECT MAX(a) FROM t)"), "3");
+  EXPECT_EQ(Scalar("SELECT EXISTS(SELECT 1 FROM t WHERE a = 2)"), "true");
+  EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IN (SELECT a + 1 FROM t) ORDER BY a")),
+            (V{"2", "3"}));
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT b FROM t WHERE b IS NOT NULL "
+                   "ORDER BY a DESC), ',')"),
+            "あ,yy,x");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t WHERE FALSE))"), "0");
+  EXPECT_EQ(Column(Execute("SELECT (SELECT COUNT(*) FROM t AS i WHERE i.a < o.a) FROM t AS o "
+                           "WHERE o.a IS NOT NULL ORDER BY o.a")),
+            (V{"0", "1", "2"}));
+  EXPECT_EQ(Column(Execute("SELECT a FROM t AS o WHERE EXISTS (SELECT 1 FROM (SELECT a FROM t "
+                           "WHERE a > o.a)) ORDER BY a")),
+            (V{"1", "2"}));
+}
+
+TEST_F(ResolvedTranslatorTest, RunsUnnestStructsAndArrays) {
+  using V = std::vector<std::string>;
+  const auto unnested = Execute(
+      "SELECT x, o FROM UNNEST(['a', 'b']) AS x WITH OFFSET AS o "
+      "ORDER BY o DESC");
+  EXPECT_EQ(Column(unnested, 0), (V{"b", "a"}));
+  EXPECT_EQ(Column(unnested, 1), (V{"1", "0"}));
+  EXPECT_EQ(Scalar("SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x"), "6");
+  EXPECT_EQ(Column(Execute("SELECT a, x FROM t LEFT JOIN UNNEST(GENERATE_ARRAY(1, a - 1)) AS x "
+                           "WHERE a IS NOT NULL ORDER BY a, x")),
+            (V{"1", "2", "3", "3"}));
+  EXPECT_EQ(Scalar("SELECT s.y FROM (SELECT STRUCT(1 AS x, 'z' AS y) AS s)"), "z");
+  EXPECT_EQ(Scalar("SELECT [10, 20, 30][OFFSET(1)]"), "20");
+  EXPECT_EQ(Scalar("SELECT [10, 20, 30][ORDINAL(1)]"), "10");
+  EXPECT_EQ(Scalar("SELECT [10, 20, 30][SAFE_OFFSET(3)]"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT [10, 20, 30][OFFSET(3)]"), BackendError);
 }
 
 TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {
