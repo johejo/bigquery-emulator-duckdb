@@ -455,6 +455,80 @@ TEST_F(ResolvedTranslatorTest, RunsStringBytesAndMathFunctions) {
   EXPECT_EQ(Unsupported("SELECT LEFT(b'abc', 1)"), "function LEFT");
 }
 
+// Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
+// differently from BigQuery's.
+TEST_F(ResolvedTranslatorTest, RunsDateTimeConstructorsAndExtract) {
+  EXPECT_EQ(Scalar("SELECT EXTRACT(DAYOFWEEK FROM DATE '2024-01-07')"), "1");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(DAYOFYEAR FROM DATE '2024-02-01')"), "32");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(WEEK FROM DATE '2024-01-07')"), "1");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(ISOWEEK FROM DATE '2024-01-07')"), "1");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(YEAR FROM DATETIME '2024-05-06 07:08:09')"), "2024");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(MILLISECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')"),
+            "345");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(MICROSECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')"),
+            "345678");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(HOUR FROM TIMESTAMP '2024-01-01 00:00:00' AT TIME ZONE "
+                   "'Asia/Tokyo')"),
+            "9");
+  EXPECT_EQ(Scalar("SELECT EXTRACT(DATE FROM TIMESTAMP '2024-01-01 20:00:00' AT TIME ZONE "
+                   "'Asia/Tokyo')"),
+            "2024-01-02");
+  EXPECT_EQ(Scalar("SELECT CAST(EXTRACT(TIME FROM DATETIME '2024-01-01 01:02:03') AS STRING)"),
+            "01:02:03");
+  EXPECT_EQ(Scalar("SELECT DATE_TRUNC(DATE '2024-01-10', WEEK)"), "2024-01-07");
+  EXPECT_EQ(Scalar("SELECT DATE_TRUNC(DATE '2024-01-10', ISOWEEK)"), "2024-01-08");
+  EXPECT_EQ(
+      Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d', DATETIME_TRUNC(DATETIME '2024-01-07 10:00:00', "
+             "WEEK))"),
+      "2024-01-07");
+  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-07', DATE '2024-01-06', WEEK)"), "1");
+  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-08', DATE '2024-01-07', ISOWEEK)"), "1");
+  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-06', DATE '2024-01-01', WEEK)"), "0");
+  EXPECT_EQ(Scalar("SELECT TIMESTAMP_DIFF(TIMESTAMP '2001-02-01 01:00:00', "
+                   "TIMESTAMP '2001-02-01 00:00:01', HOUR)"),
+            "0");
+  EXPECT_EQ(Scalar("SELECT TIMESTAMP_DIFF(TIMESTAMP '2024-01-02 01:00:00', "
+                   "TIMESTAMP '2024-01-01 23:00:00', DAY)"),
+            "0");
+  EXPECT_EQ(Scalar("SELECT TIME_DIFF(TIME '09:59:00', TIME '10:00:30', MINUTE)"), "-1");
+  EXPECT_EQ(Scalar("SELECT DATETIME_DIFF(DATETIME '2024-01-02 00:00:00', "
+                   "DATETIME '2024-01-01 23:59:59', DAY)"),
+            "1");
+  EXPECT_EQ(Scalar("SELECT DATE(2024, 1, 2)"), "2024-01-02");
+  EXPECT_EQ(Scalar("SELECT DATE(TIMESTAMP '2024-01-01 20:00:00', 'Asia/Tokyo')"), "2024-01-02");
+  EXPECT_EQ(Scalar("SELECT DATE(DATETIME '2024-01-01 20:00:00')"), "2024-01-01");
+  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(2024, 1, 2, 3, 4, 5))"),
+            "2024-01-02 03:04:05");
+  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(DATE '2024-01-02', TIME "
+                   "'03:04:05'))"),
+            "2024-01-02 03:04:05");
+  EXPECT_EQ(
+      Scalar(
+          "SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(TIMESTAMP '2024-01-01 00:00:00', "
+          "'Asia/Tokyo'))"),
+      "2024-01-01 09:00:00");
+  EXPECT_EQ(Scalar("SELECT CAST(TIME(1, 2, 3) AS STRING)"), "01:02:03");
+  EXPECT_EQ(Scalar("SELECT CAST(TIME(DATETIME '2024-01-01 04:05:06') AS STRING)"), "04:05:06");
+  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP(DATETIME '2024-01-01 09:00:00', "
+                   "'Asia/Tokyo'))"),
+            "1704067200");
+  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP(DATE '2024-01-01'))"), "1704067200");
+  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP('2024-01-01 09:00:00+09'))"), "1704067200");
+  EXPECT_EQ(Scalar("SELECT LAST_DAY(DATE '2024-02-10')"), "2024-02-29");
+  EXPECT_EQ(Scalar("SELECT LAST_DAY(DATE '2024-02-10', MONTH)"), "2024-02-29");
+  EXPECT_EQ(Scalar("SELECT UNIX_DATE(DATE '2020-01-01')"), "18262");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_DATE('%d', d) FROM "
+                   "UNNEST(GENERATE_DATE_ARRAY(DATE '2024-01-01', DATE '2024-01-15', "
+                   "INTERVAL 1 WEEK)) AS d), ',')"),
+            "01,08,15");
+  EXPECT_EQ(
+      Scalar("SELECT ARRAY_LENGTH(GENERATE_DATE_ARRAY(DATE '2024-01-01', DATE '2024-01-03'))"),
+      "3");
+  EXPECT_EQ(Unsupported("SELECT GENERATE_DATE_ARRAY(DATE '2024-01-31', DATE '2024-05-01', "
+                        "INTERVAL 1 MONTH)"),
+            "function GENERATE_DATE_ARRAY");
+}
+
 std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {
   std::vector<std::string> values;
   for (const auto& row : result.rows) {

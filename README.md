@@ -47,7 +47,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Function renames | Partial | Examples: `REGEXP_CONTAINS` → `regexp_matches`, `LOGICAL_AND` → `bool_and`, `FORMAT` → `printf`; preserves `DISTINCT`, `IGNORE NULLS`, `ORDER BY`, and `OVER`. |
 | Function templates | Partial | Selected calls are rewritten using rules in [src/functions.cc](src/functions.cc); unmatched argument counts pass through, including unsupported time zone overloads. |
 | `SAFE_DIVIDE` and `LOG` | Supported | Division uses `NULLIF` to return NULL for a zero divisor; `LOG(x)` becomes `ln(x)` and `LOG(x, base)` becomes `log(base, x)`. |
-| Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. |
+| Date/time functions | Partial | Selected arithmetic, difference, truncation, formatting, parsing, and epoch conversions are rewritten; `DATE_ADD` retains its DATE type and civil timestamps from epoch conversions are interpreted as UTC. In resolved statements, `EXTRACT`, the date/time constructors, `WEEK` / `ISOWEEK` truncation and differences, and whole-unit `TIMESTAMP_DIFF` / `TIME_DIFF` follow BigQuery; `GENERATE_DATE_ARRAY` with a MONTH or longer step falls back. |
 | `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
 | Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
 | Type-dependent function mappings | Partial | In supported resolved SELECTs, argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. STRING-only mappings cover `INSTR`, `LEFT` / `RIGHT` (erroring on a negative length), `TRANSLATE`, `ASCII`, `UNICODE`, `NORMALIZE`, `FROM_HEX` and `FROM_BASE64`, with `CHR(0)` and `UNICODE('')` following BigQuery; `MD5` / `SHA1` / `SHA256` return BYTES, `TO_HEX` is lowercase and `BIT_COUNT` takes INT64; their BYTES overloads fall back. Queries outside the resolved translator subset still use parser AST translation. |
@@ -106,7 +106,7 @@ window maximum or minimum over the group. The existing function
 renames and templates are reused, adapting resolved enum date parts, interval arguments and
 default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. String, hash and
 trigonometric functions, `IEEE_DIVIDE` and `SAFE_ADD` / `SAFE_SUBTRACT` / `SAFE_MULTIPLY` /
-`SAFE_NEGATE` (the arithmetic operators under `SAFE.`) are translated as well. Function and aggregate
+`SAFE_NEGATE` (the arithmetic operators under `SAFE.`) are translated as well. `EXTRACT` (including `DAYOFWEEK`, Sunday-based `WEEK`, `ISOWEEK`, sub-second parts, `AT TIME ZONE` and `EXTRACT(DATE/TIME/DATETIME FROM ...)`), the `DATE` / `DATETIME` / `TIME` / `TIMESTAMP` constructors, `LAST_DAY`, `UNIX_DATE` and `GENERATE_DATE_ARRAY` with a DAY or WEEK step follow BigQuery; `WEEK` and `ISOWEEK` truncation and differences start weeks on Sunday and Monday, and `TIMESTAMP_DIFF`, `TIME_DIFF` and differences below a day count whole units rather than boundaries. Function and aggregate
 results are cast to their resolved types. Existing documented function compatibility limitations
 still apply.
 

@@ -191,8 +191,8 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   }
   const std::string part = ToLowerAscii(value.EnumDisplayName());
   static const std::set<std::string> supported = {
-      "year",   "quarter", "month",       "week",        "day",     "hour",
-      "minute", "second",  "millisecond", "microsecond", "isoyear", "isoweek"};
+      "year",   "quarter",     "month",       "week",    "day",     "hour",      "minute",
+      "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear"};
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
 }
 
@@ -314,6 +314,119 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
   }
   if (name == "CURRENT_DATETIME" && n == 0) {
     return "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)";
+  }
+  // BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
+  const auto week_start = [](const std::string& value, bool iso) {
+    return iso ? "date_trunc('week', " + value + ")"
+               : "(date_trunc('week', " + value + " + INTERVAL 1 DAY) - INTERVAL 1 DAY)";
+  };
+  if ((name == "DATE_TRUNC" || name == "DATETIME_TRUNC" || name == "TIMESTAMP_TRUNC") && n == 2) {
+    const auto part = DatePart(*call.argument_list(1));
+    if (part == "week" || part == "isoweek") {
+      const std::string start = week_start(args[0], *part == "isoweek");
+      return name == "DATE_TRUNC" ? "CAST(" + start + " AS DATE)" : start;
+    }
+  }
+  if ((name == "DATE_DIFF" || name == "DATETIME_DIFF" || name == "TIMESTAMP_DIFF" ||
+       name == "TIME_DIFF") &&
+      n == 3) {
+    const auto part = DatePart(*call.argument_list(2));
+    if (!part) {
+      return std::nullopt;
+    }
+    // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
+    if (*part == "week" || *part == "isoweek") {
+      const bool iso = *part == "isoweek";
+      return "(date_diff('day', " + week_start(args[1], iso) + ", " + week_start(args[0], iso) +
+             ") // 7)";
+    }
+    // Below a day, and for any TIMESTAMP or TIME, BigQuery counts whole units rather than the
+    // boundaries crossed, which is DuckDB's date_sub rather than date_diff.
+    static const std::set<std::string> sub_day = {"hour", "minute", "second", "millisecond",
+                                                  "microsecond"};
+    if (name == "TIMESTAMP_DIFF" || name == "TIME_DIFF" || sub_day.contains(*part)) {
+      return "date_sub(" + args[2] + ", " + args[1] + ", " + args[0] + ")";
+    }
+  }
+  // A time zone argument moves a TIMESTAMP to the civil time there.
+  const auto civil = [&](size_t zone) {
+    return n > zone ? "timezone(" + args[zone] + ", " + args[0] + ")" : args[0];
+  };
+  const auto type = [&](size_t i) { return call.argument_list(static_cast<int>(i))->type(); };
+  if (name == "$EXTRACT" && (n == 2 || n == 3)) {
+    const auto part = DatePart(*call.argument_list(1));
+    if (!part) {
+      return std::nullopt;
+    }
+    const std::string value = civil(2);
+    if (*part == "dayofweek") {
+      return "(date_part('dayofweek', " + value + ") + 1)";
+    }
+    if (*part == "week") {
+      return "CAST(strftime(" + value + ", '%U') AS BIGINT)";
+    }
+    if (*part == "isoweek") {
+      return "date_part('week', " + value + ")";
+    }
+    // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
+    if (*part == "millisecond" || *part == "microsecond") {
+      return "(date_part(" + args[1] + ", " + value + ") % " +
+             (*part == "millisecond" ? "1000" : "1000000") + ")";
+    }
+    return "date_part(" + args[1] + ", " + value + ")";
+  }
+  if ((name == "$EXTRACT_DATE" || name == "$EXTRACT_TIME" || name == "$EXTRACT_DATETIME") &&
+      (n == 1 || n == 2)) {
+    const std::string target = name == "$EXTRACT_DATE"   ? "DATE"
+                               : name == "$EXTRACT_TIME" ? "TIME"
+                                                         : "TIMESTAMP";
+    return "CAST(" + civil(1) + " AS " + target + ")";
+  }
+  if (name == "DATE" && n == 3) {
+    return invoke("make_date");
+  }
+  if (name == "DATETIME" && n == 6) {
+    return invoke("make_timestamp");
+  }
+  if (name == "TIME" && n == 3) {
+    return invoke("make_time");
+  }
+  if (name == "DATETIME" && n == 2 && type(0)->IsDate() && type(1)->IsTime()) {
+    return "(" + args[0] + " + " + args[1] + ")";
+  }
+  if ((name == "DATE" || name == "DATETIME" || name == "TIME") && (n == 1 || n == 2)) {
+    if (n == 2 && !type(0)->IsTimestamp()) {
+      return std::nullopt;
+    }
+    const std::string target = name == "DATETIME" ? "TIMESTAMP" : name;
+    return "CAST(" + civil(1) + " AS " + target + ")";
+  }
+  if (name == "TIMESTAMP" && n == 1) {
+    return "CAST(" + args[0] + " AS TIMESTAMPTZ)";
+  }
+  // A civil time in the given zone; a string with its own offset keeps the offset.
+  if (name == "TIMESTAMP" && n == 2 && (type(0)->IsDate() || type(0)->IsDatetime())) {
+    return "timezone(" + args[1] + ", CAST(" + args[0] + " AS TIMESTAMP))";
+  }
+  if (name == "LAST_DAY" && (n == 1 || (n == 2 && DatePart(*call.argument_list(1)) == "month"))) {
+    return "last_day(" + args[0] + ")";
+  }
+  if (name == "UNIX_DATE" && n == 1) {
+    return "date_diff('day', DATE '1970-01-01', " + args[0] + ")";
+  }
+  // DuckDB's generate_series steps from the previous element, which only agrees with BigQuery
+  // stepping from the start for parts of a fixed length.
+  if (name == "GENERATE_DATE_ARRAY" && (n == 2 || n == 4)) {
+    std::string step = "INTERVAL 1 DAY";
+    if (n == 4) {
+      const auto part = DatePart(*call.argument_list(3));
+      if (part != "day" && part != "week") {
+        return std::nullopt;
+      }
+      step = "(" + args[2] + " * INTERVAL '1 " + *part + "')";
+    }
+    return "list_transform(generate_series(CAST(" + args[0] + " AS TIMESTAMP), CAST(" + args[1] +
+           " AS TIMESTAMP), " + step + "), _d -> CAST(_d AS DATE))";
   }
   // INTERVAL n PART becomes two arguments (INT64, enum) in the resolved AST.
   if (n == 3 && (name == "DATE_ADD" || name == "DATE_SUB" || name == "DATETIME_ADD" ||
