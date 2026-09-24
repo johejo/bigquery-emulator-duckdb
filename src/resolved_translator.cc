@@ -1584,6 +1584,7 @@ struct Target {
   std::map<int, std::string> names;
   // The same columns qualified by the alias, for expressions.
   Columns columns;
+  std::map<int, const googlesql::Type*> column_types;
 };
 
 std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope) {
@@ -1592,7 +1593,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
       table.column_list_size() != table.column_index_list_size()) {
     return Unsupported(scope, "DML target with hints, FOR SYSTEM_TIME or a value table");
   }
-  Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}};
+  Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}, {}};
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
     if (!SqlType(column.type()) || column.type_annotation_map() != nullptr) {
@@ -1602,6 +1603,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
         QuoteIdentifier(table.table()->GetColumn(table.column_index_list(i))->Name());
     target.names.emplace(column.column_id(), name);
     target.columns.emplace(column.column_id(), "_t." + name);
+    target.column_types.emplace(column.column_id(), column.type());
   }
   return target;
 }
@@ -1621,28 +1623,90 @@ std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value, co
   return Expression(*value.value(), scope, columns);
 }
 
-// SET assignments of whole columns. Struct fields, array elements and nested DML are not.
+// The assignments below one column or struct field: either its new value, or the fields of it
+// that are assigned, by field index.
+struct UpdateNode {
+  std::optional<std::string> value;
+  std::map<int, UpdateNode> fields;
+};
+
+// The new value of a struct `original` of `type` whose fields `node` assigns: the struct rebuilt
+// from its assigned and original fields. Setting a field of a NULL struct is an error.
+std::optional<std::string> UpdatedStruct(const std::string& original, const googlesql::Type* type,
+                                         const UpdateNode& node) {
+  if (node.value) {
+    return node.value;
+  }
+  const auto sql_type = SqlType(type);
+  if (!sql_type) {
+    return std::nullopt;
+  }
+  std::vector<std::string> fields;
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    const auto& field = type->AsStruct()->field(i);
+    std::string value = "struct_extract_at(" + original + ", " + std::to_string(i + 1) + ")";
+    if (const auto child = node.fields.find(i); child != node.fields.end()) {
+      const auto sql = UpdatedStruct(value, field.type, child->second);
+      if (!sql) {
+        return std::nullopt;
+      }
+      value = *sql;
+    }
+    fields.push_back(QuoteIdentifier(field.name) + " := " + value);
+  }
+  return "CASE WHEN " + original + " IS NULL THEN error(" +
+         QuoteLiteral("Cannot set field of NULL " + type->TypeName(googlesql::PRODUCT_EXTERNAL)) +
+         ") ELSE CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *sql_type + ") END";
+}
+
+// SET assignments of whole columns and struct fields. Array elements and nested DML are not.
 std::optional<std::string> UpdateItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedUpdateItem>>& items,
     const Target& target, const Scope& scope, const Columns& columns) {
-  std::vector<std::string> assignments;
+  // Assignments by column ID, in the order the columns are first assigned.
+  std::vector<int> order;
+  std::map<int, UpdateNode> nodes;
   for (const auto& item : items) {
-    if (!item->target()->Is<googlesql::ResolvedColumnRef>() || item->set_value() == nullptr ||
-        item->element_column() != nullptr || !item->update_item_element_list().empty() ||
-        !item->delete_list().empty() || !item->update_list().empty() ||
-        !item->insert_list().empty()) {
-      return Unsupported(scope, "UPDATE of struct fields, array elements or nested DML");
+    if (item->set_value() == nullptr || item->element_column() != nullptr ||
+        !item->update_item_element_list().empty() || !item->delete_list().empty() ||
+        !item->update_list().empty() || !item->insert_list().empty()) {
+      return Unsupported(scope, "UPDATE of array elements or nested DML");
     }
-    const auto name = target.names.find(
-        item->target()->GetAs<googlesql::ResolvedColumnRef>()->column().column_id());
-    if (name == target.names.end()) {
+    std::vector<int> path;
+    const googlesql::ResolvedExpr* target_expr = item->target();
+    while (target_expr->Is<googlesql::ResolvedGetStructField>()) {
+      const auto* get = target_expr->GetAs<googlesql::ResolvedGetStructField>();
+      path.insert(path.begin(), get->field_idx());
+      target_expr = get->expr();
+    }
+    if (!target_expr->Is<googlesql::ResolvedColumnRef>()) {
+      return Unsupported(scope, "UPDATE target");
+    }
+    const int id = target_expr->GetAs<googlesql::ResolvedColumnRef>()->column().column_id();
+    if (!target.names.contains(id) || !target.columns.contains(id)) {
       return Unsupported(scope, "UPDATE target");
     }
     const auto value = DmlValue(*item->set_value(), scope, columns);
     if (!value) {
       return std::nullopt;
     }
-    assignments.push_back(name->second + " = " + *value);
+    if (!nodes.contains(id)) {
+      order.push_back(id);
+    }
+    UpdateNode* node = &nodes[id];
+    for (const int field : path) {
+      node = &node->fields[field];
+    }
+    node->value = *value;
+  }
+  std::vector<std::string> assignments;
+  for (const int id : order) {
+    const auto value =
+        UpdatedStruct(target.columns.at(id), target.column_types.at(id), nodes.at(id));
+    if (!value) {
+      return std::nullopt;
+    }
+    assignments.push_back(target.names.at(id) + " = " + *value);
   }
   if (assignments.empty()) {
     return Unsupported(scope, "UPDATE without assignments");

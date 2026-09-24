@@ -22,7 +22,20 @@ class TestTableSource : public TableSource {
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
                                                     const std::string& table) override {
-    if (project != "p" || dataset != "ds" || table != "t") {
+    if (project != "p" || dataset != "ds") {
+      return std::nullopt;
+    }
+    if (table == "st") {
+      return std::vector<FieldSchema>{{.name = "id", .type = "INTEGER"},
+                                      {.name = "s",
+                                       .type = "RECORD",
+                                       .fields = {{.name = "x", .type = "INTEGER"},
+                                                  {.name = "y",
+                                                   .type = "RECORD",
+                                                   .fields = {{.name = "z", .type = "STRING"},
+                                                              {.name = "w", .type = "INTEGER"}}}}}};
+    }
+    if (table != "t") {
       return std::nullopt;
     }
     return std::vector<FieldSchema>{{.name = "a", .type = "INTEGER"},
@@ -74,6 +87,11 @@ class ResolvedTranslatorTest : public ::testing::Test {
     backend_.Execute(
         "INSERT INTO p.ds.t VALUES (3, 'あ', from_hex('00ff')), "
         "(1, 'x', from_hex('61')), (2, 'yy', NULL), (NULL, NULL, NULL)");
+    backend_.Execute(
+        "CREATE TABLE p.ds.st (id BIGINT, s STRUCT(x BIGINT, y STRUCT(z VARCHAR, w BIGINT)))");
+    backend_.Execute(
+        "INSERT INTO p.ds.st VALUES (1, {'x': 1, 'y': {'z': 'a', 'w': 10}}), "
+        "(2, {'x': 2, 'y': NULL}), (3, NULL)");
   }
 
   Backend backend_;
@@ -677,6 +695,17 @@ TEST_F(ResolvedTranslatorTest, UpdatesAndDeletesRows) {
       Column(Execute("SELECT CONCAT(CAST(a AS STRING), ':', b, ':', CAST(raw IS NULL AS STRING)) "
                      "FROM t ORDER BY a")),
       (V{"1:x!:true", "30:from:false"}));
+}
+
+// A struct field assignment rebuilds the struct around it, keeping the fields it leaves alone.
+TEST_F(ResolvedTranslatorTest, UpdatesStructFields) {
+  using V = std::vector<std::string>;
+  Execute("UPDATE st SET s.x = s.x + 100, s.y.z = 'b' WHERE id = 1");
+  Execute("UPDATE st SET s.y = STRUCT('c', 20) WHERE id = 2");
+  EXPECT_EQ(Column(Execute("SELECT FORMAT('%d:%s:%d', s.x, s.y.z, s.y.w) FROM st "
+                           "WHERE id < 3 ORDER BY id")),
+            (V{"101:b:10", "2:c:20"}));
+  EXPECT_THROW(Execute("UPDATE st SET s.x = 1 WHERE id = 3"), BackendError);
 }
 
 TEST_F(ResolvedTranslatorTest, MergesRows) {
