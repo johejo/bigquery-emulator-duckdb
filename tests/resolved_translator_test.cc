@@ -50,13 +50,15 @@ class ResolvedTranslatorTest : public ::testing::Test {
                                        const QueryParameters& parameters = {},
                                        const AnalyzerSettings& settings = {}) {
     const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, settings);
-    return TranslateResolvedToDuckDbSql(analyzed.statement(), parameters);
+    return TranslateResolvedToDuckDbSql(analyzed.statement(), parameters,
+                                        DefaultDataset{"p", "ds"});
   }
 
   std::string Unsupported(const std::string& sql) {
     const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, {});
     std::string reason;
-    if (TranslateResolvedToDuckDbSql(analyzed.statement(), {}, &reason).has_value()) {
+    if (TranslateResolvedToDuckDbSql(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
+            .has_value()) {
       throw std::runtime_error("Unexpected resolved translation: " + sql);
     }
     return reason;
@@ -64,9 +66,12 @@ class ResolvedTranslatorTest : public ::testing::Test {
 
   QueryResult Execute(const std::string& sql, const QueryParameters& parameters = {},
                       const AnalyzerSettings& settings = {}) {
-    const auto translated = Translate(sql, parameters, settings);
+    const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, settings);
+    std::string reason;
+    const auto translated = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters,
+                                                         DefaultDataset{"p", "ds"}, &reason);
     if (!translated) {
-      throw std::runtime_error("Unexpected parser fallback: " + sql);
+      throw std::runtime_error("Unexpected parser fallback (" + reason + "): " + sql);
     }
     return backend_.Execute(*translated);
   }
@@ -169,7 +174,7 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
 TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
   for (const std::string& sql :
        {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
-        std::string("CREATE TABLE ds.new_t (x INT64)"), std::string("SELECT STRUCT(1, 2)")}) {
+        std::string("SELECT STRUCT(1, 2)")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }
@@ -179,6 +184,66 @@ TEST_F(ResolvedTranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("SELECT a FROM t WHERE a IN (SELECT SAFE.RAND() FROM t)"), "SAFE.RAND");
   EXPECT_EQ(Unsupported("UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1"),
             "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
+  EXPECT_EQ(Unsupported("CREATE TEMP TABLE tmp (x INT64)"), "temporary tables");
+  EXPECT_EQ(Unsupported("CREATE TABLE ds.g (x INT64, y INT64 AS (x + 1))"), "generated columns");
+  EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(76, 38))"), "column type BIGNUMERIC");
+  EXPECT_EQ(Unsupported("CREATE TABLE ds.c (x INT64 NOT NULL) AS SELECT 1 AS x"),
+            "NOT NULL in CREATE TABLE AS SELECT");
+  EXPECT_EQ(Unsupported("CREATE OR REPLACE SCHEMA other"), "CREATE OR REPLACE SCHEMA");
+  EXPECT_EQ(Unsupported("DROP VIEW ds.v"), "DROP VIEW");
+}
+
+TEST_F(ResolvedTranslatorTest, TranslatesDdlPaths) {
+  EXPECT_EQ(Translate("CREATE TABLE new_t (x INT64)"),
+            "CREATE TABLE \"p\".\"ds\".\"new_t\" (\"x\" BIGINT)");
+  EXPECT_EQ(Translate("CREATE TABLE IF NOT EXISTS `q.other.new_t` (x INT64)"),
+            "CREATE TABLE IF NOT EXISTS \"q\".\"other\".\"new_t\" (\"x\" BIGINT)");
+  EXPECT_EQ(Translate("CREATE SCHEMA IF NOT EXISTS `q.other`"),
+            "CREATE SCHEMA IF NOT EXISTS \"q\".\"other\"");
+  EXPECT_EQ(Translate("DROP SCHEMA other CASCADE"), "DROP SCHEMA \"p\".\"other\" CASCADE");
+  EXPECT_EQ(Translate("DROP TABLE IF EXISTS ds.new_t"),
+            "DROP TABLE IF EXISTS \"p\".\"ds\".\"new_t\"");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsDdl) {
+  Execute("CREATE SCHEMA other");
+  Execute(
+      "CREATE TABLE other.typed (id INT64 NOT NULL, price NUMERIC(10, 2), label STRING(8) "
+      "DEFAULT 'none', tags ARRAY<STRING>, s STRUCT<x INT64, y ARRAY<BIGNUMERIC>>, "
+      "PRIMARY KEY (id) NOT ENFORCED) PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10)) "
+      "OPTIONS (description = 'd')");
+  backend_.Execute("INSERT INTO p.other.typed (id, price) VALUES (1, 1.235)");
+  EXPECT_THROW(backend_.Execute("INSERT INTO p.other.typed (price) VALUES (1)"), BackendError);
+  auto result = backend_.Execute("SELECT * FROM p.other.typed");
+  ASSERT_EQ(result.rows.size(), 1);
+  EXPECT_EQ(result.rows[0]["f"][1]["v"], "1.24");
+  EXPECT_EQ(result.rows[0]["f"][2]["v"], "none");
+  EXPECT_EQ(result.schema[3].mode, "REPEATED");
+  EXPECT_EQ(result.schema[4].type, "RECORD");
+
+  EXPECT_THROW(Execute("CREATE TABLE other.typed (x INT64)"), BackendError);
+  Execute("CREATE TABLE IF NOT EXISTS other.typed (x INT64)");
+  Execute("CREATE OR REPLACE TABLE other.typed (x INT64)");
+  EXPECT_EQ(backend_.Execute("SELECT * FROM p.other.typed").schema.size(), 1);
+
+  Execute(
+      "CREATE TABLE ds.copied (n INT64, label STRING) CLUSTER BY n AS "
+      "SELECT a * 10, b FROM t WHERE a IS NOT NULL ORDER BY a");
+  result = backend_.Execute("SELECT * FROM p.ds.copied");
+  ASSERT_EQ(result.rows.size(), 3);
+  EXPECT_EQ(result.schema[0].name, "n");
+  EXPECT_EQ(result.schema[1].name, "label");
+  EXPECT_EQ(result.rows[0]["f"][0]["v"], "10");
+
+  Execute("CREATE OR REPLACE TABLE ds.copied AS SELECT COUNT(*) AS c FROM t");
+  EXPECT_EQ(backend_.Execute("SELECT c FROM p.ds.copied").rows[0]["f"][0]["v"], "4");
+
+  Execute("DROP TABLE ds.copied");
+  Execute("DROP TABLE IF EXISTS ds.copied");
+  EXPECT_THROW(Execute("DROP TABLE ds.copied"), BackendError);
+  EXPECT_THROW(Execute("DROP SCHEMA other"), BackendError);
+  Execute("DROP SCHEMA other CASCADE");
+  Execute("DROP SCHEMA IF EXISTS other");
 }
 
 TEST_F(ResolvedTranslatorTest, RunsSafeCalls) {

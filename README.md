@@ -28,9 +28,10 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries and `INSERT` / `UPDATE` / `DELETE` / `MERGE` statements use resolved AST translation when every scan and expression in them is supported; DDL and the remaining statements use the parser AST. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Every statement is analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would. Queries, `INSERT` / `UPDATE` / `DELETE` / `MERGE` and the DDL below use resolved AST translation when every scan and expression in them is supported; the remaining statements use the parser AST. |
 | `INSERT` | Partial | `INSERT ... VALUES` (including `DEFAULT`) and `INSERT ... SELECT` with or without a column list are translated from the resolved AST. `INSERT OR IGNORE/REPLACE/UPDATE`, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. |
 | `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. `SET s.field = ...` rebuilds the struct with its other fields, and fails on a NULL struct as BigQuery does. Updates of array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
+| `CREATE TABLE`, `CREATE SCHEMA`, `DROP TABLE` / `SCHEMA` | Partial | Translated from the resolved AST, with `table`, `dataset.table` and `dataset` completed from the default project and dataset. `CREATE [OR REPLACE] TABLE [IF NOT EXISTS]` keeps column types, `NOT NULL` and `DEFAULT`, and `NUMERIC(P, S)` becomes `DECIMAL(P, S)`; `STRING(L)` / `BYTES(L)` lose their length, and `BIGNUMERIC` is `DECIMAL(38, 19)`. `CREATE TABLE AS SELECT` casts the query's columns to the declared types. Partitioning, clustering, options and unenforced keys are accepted and dropped. Temporary tables, `LIKE`, `CLONE` / `COPY`, generated columns, collation, `NOT NULL` in `CREATE TABLE AS SELECT`, `CREATE OR REPLACE SCHEMA` and other object types fall back to the parser AST. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
 | `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
 | Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Lateral joins are translated too; recursive CTEs `WITH DEPTH` fall back to the parser AST. |
@@ -71,7 +72,7 @@ through a `TableSource`, completes `table` and `dataset.table` paths from the de
 and dataset, and maps BigQuery field types to GoogleSQL types; functions and types come from
 GoogleSQL's built-ins, plus BigQuery functions GoogleSQL lacks such as `CONTAINS_SUBSTR`.
 [src/analyzer.cc](src/analyzer.cc) runs the analyzer with the same language options as the
-parser. The emulator analyzes every query and DML statement before translating it, with the
+parser. The emulator analyzes every statement before translating it, with the
 tables looked up in DuckDB, and a statement that fails analysis is reported as `invalidQuery`.
 For a query, the resolved output columns supply the result schema's names, and its types where
 they share a wire encoding with the column DuckDB returns.
@@ -80,8 +81,9 @@ they share a wire encoding with the column DuckDB returns.
 
 [src/resolved_translator.cc](src/resolved_translator.cc) translates queries composed of
 SingleRow, Table, Project, Filter, OrderBy, LimitOffset, Join, Aggregate, Analytic, With,
-WithRef, Recursive, RecursiveRef, SetOperation and Array scans, and INSERT, UPDATE, DELETE and MERGE statements over such
-queries. INSERT names its target columns after the table's columns bound to the insert column list.
+WithRef, Recursive, RecursiveRef, SetOperation and Array scans, INSERT, UPDATE, DELETE and MERGE statements over such
+queries, and CREATE TABLE [AS SELECT], CREATE SCHEMA and DROP TABLE / SCHEMA. DDL has no catalog
+lookup, so the translator completes its table and dataset paths from the default project and dataset itself. INSERT names its target columns after the table's columns bound to the insert column list.
 UPDATE, DELETE and MERGE alias the target table `_t`, so its columns resolve by ID like any other
 scan's; an UPDATE's FROM clause and a MERGE's source become the derived table `q`. Each scan becomes a derived table whose columns are named
 after resolved column IDs, with user-facing names applied only at the output boundary, so
@@ -112,9 +114,9 @@ still apply.
 
 The catalog, TypeFactory and analyzer output remain alive through translation. Unsupported nodes,
 functions, types or modifiers return to parser AST translation for the entire statement;
-translation and execution errors do not trigger fallback. DDL still uses the parser translator. `--parser-fallback warn` logs each query or DML statement that falls back,
+translation and execution errors do not trigger fallback. `--parser-fallback warn` logs each statement that falls back,
 with the construct that caused it, and `--parser-fallback deny` fails it instead, naming the construct, to measure what the resolved translator
-still misses; DDL is unaffected. `tests/resolved_translator_test.cc` executes supported queries
+still misses. `tests/resolved_translator_test.cc` executes supported queries
 directly against DuckDB without a parser fallback, covering results, types, aliases, ordering and
 parameterized preparation.
 

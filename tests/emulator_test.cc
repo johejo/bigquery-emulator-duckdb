@@ -318,14 +318,31 @@ TEST_F(EmulatorTest, TypesQueryParameters) {
   EXPECT_TRUE(emulator_.RunQuery(request)->error.has_value());
 }
 
-// DDL is not analyzed, so a table the statement itself creates need not exist yet.
-TEST_F(EmulatorTest, RunsDdlWithoutAnalysis) {
+// A table the statement itself creates need not exist yet, and unqualified names in DDL go to
+// the default dataset the way they do in queries.
+TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
   emulator_.CreateDataset({"test", "ddl"});
   EXPECT_EQ(ErrorStatus("CREATE TABLE ddl.t (a INT64)"), 0);
+  QueryRequest request;
+  request.project_id = "test";
+  request.default_dataset = DatasetReference{"test", "ddl"};
+  request.query = "CREATE TABLE u AS SELECT 'x' AS b";
+  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
+  request.query = "SELECT b FROM u";
+  const std::shared_ptr<const Job> job = emulator_.RunQuery(request);
+  if (!job->result.has_value()) {
+    FAIL() << ErrorMessage(*job);
+  }
+  EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "x");
+  EXPECT_EQ(emulator_.ListTables({"test", "ddl"}), (std::vector<std::string>{"t", "u"}));
+  request.query = "DROP TABLE u";
+  ASSERT_FALSE(emulator_.RunQuery(request)->error.has_value());
   EXPECT_EQ(ErrorStatus("DROP TABLE ddl.t"), 0);
+  EXPECT_EQ(ErrorStatus("CREATE SCHEMA made"), 0);
+  EXPECT_EQ(emulator_.ListDatasets("test"), (std::vector<std::string>{"ddl", "made"}));
+  EXPECT_EQ(ErrorStatus("DROP SCHEMA made"), 0);
 }
 
-// DDL never goes through the resolved translator, so denying the fallback leaves it alone.
 TEST(EmulatorParserFallbackTest, DenyFailsOnlyStatementsTheResolvedTranslatorMisses) {
   Emulator emulator(EmulatorOptions{.parser_fallback = ParserFallback::kDeny});
   const auto run = [&](const std::string& sql) {

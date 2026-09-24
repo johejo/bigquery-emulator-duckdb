@@ -58,13 +58,4 @@ FrontendResult ParseGoogleSql(const std::string& sql) {
   return {sql, std::move(parser_output)};
 }
 
-bool IsQueryOrDml(const FrontendResult& frontend_result) {
-  const googlesql::ASTStatement& statement = frontend_result.statement();
-  return statement.Is<googlesql::ASTQueryStatement>() ||
-         statement.Is<googlesql::ASTInsertStatement>() ||
-         statement.Is<googlesql::ASTUpdateStatement>() ||
-         statement.Is<googlesql::ASTDeleteStatement>() ||
-         statement.Is<googlesql::ASTMergeStatement>();
-}
-
 }  // namespace bigquery_emulator_duckdb

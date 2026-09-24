@@ -228,9 +228,6 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
 Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
                                           const QueryParameters& parameters,
                                           AnalyzerSettings settings) {
-  if (!IsQueryOrDml(frontend_result)) {
-    return {TranslateToDuckDbSql(frontend_result, parameters), std::nullopt};
-  }
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
     settings.named_parameters.emplace_back(field.name,
@@ -243,8 +240,9 @@ Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
   const AnalyzerResult analyzed =
       AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings);
   std::string unsupported;
-  std::optional<std::string> sql =
-      TranslateResolvedToDuckDbSql(analyzed.statement(), parameters, &unsupported);
+  std::optional<std::string> sql = TranslateResolvedToDuckDbSql(
+      analyzed.statement(), parameters,
+      DefaultDataset{settings.default_project, settings.default_dataset}, &unsupported);
   if (!sql.has_value()) {
     switch (options_.parser_fallback) {
       case ParserFallback::kDeny:

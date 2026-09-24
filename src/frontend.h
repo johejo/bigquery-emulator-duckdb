@@ -37,8 +37,4 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
 // Parses `sql` as a single GoogleSQL statement. Throws std::runtime_error on a syntax error.
 FrontendResult ParseGoogleSql(const std::string& sql);
 
-// Whether the statement is a query or a DML statement (INSERT, UPDATE, DELETE or MERGE), the
-// statements the emulator resolves with the analyzer before running them.
-bool IsQueryOrDml(const FrontendResult& frontend_result);
-
 }  // namespace bigquery_emulator_duckdb

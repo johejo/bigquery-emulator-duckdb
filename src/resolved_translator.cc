@@ -17,6 +17,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer.h"
+#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/functions.h"
 
@@ -89,6 +90,9 @@ std::optional<std::string> SqlType(const googlesql::Type* type) {
       return "TIME";
     case googlesql::TYPE_NUMERIC:
       return "DECIMAL(38,9)";
+    case googlesql::TYPE_BIGNUMERIC:
+      // Narrower than BIGNUMERIC, but the widest DuckDB decimal; out of range values fail.
+      return "DECIMAL(38,19)";
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_ARRAY: {
@@ -2312,8 +2316,265 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
          *condition + " " + Join(clauses, " ");
 }
 
+// DDL names tables and datasets by path rather than through the catalog, so the defaults the
+// catalog resolves queries with are applied here.
+std::optional<std::string> TablePath(const std::vector<std::string>& path,
+                                     const DefaultDataset& defaults, const Scope& scope) {
+  const auto parts = NormalizeTablePath(path, defaults.project, defaults.dataset);
+  if (parts.empty()) {
+    return Unsupported(scope, "table name " + Join(path, "."));
+  }
+  std::vector<std::string> quoted;
+  quoted.reserve(parts.size());
+  for (const auto& part : parts) {
+    quoted.push_back(QuoteIdentifier(part));
+  }
+  return Join(quoted, ".");
+}
+
+std::optional<std::string> DatasetPath(const std::vector<std::string>& path,
+                                       const DefaultDataset& defaults, const Scope& scope) {
+  std::vector<std::string> parts;
+  for (const auto& element : path) {
+    for (size_t begin = 0;;) {
+      const size_t end = element.find('.', begin);
+      parts.push_back(element.substr(begin, end - begin));
+      if (end == std::string::npos) {
+        break;
+      }
+      begin = end + 1;
+    }
+  }
+  if (parts.size() == 1) {
+    parts.insert(parts.begin(), defaults.project);
+  }
+  if (parts.size() != 2 || parts[0].empty() || parts[1].empty()) {
+    return Unsupported(scope, "dataset name " + Join(path, "."));
+  }
+  return QuoteIdentifier(parts[0]) + "." + QuoteIdentifier(parts[1]);
+}
+
+// A column type with its type parameters. DuckDB ignores lengths, so STRING(L) and BYTES(L)
+// lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S).
+std::optional<std::string> ColumnType(const googlesql::Type* type,
+                                      const googlesql::TypeParameters& parameters) {
+  if (parameters.IsEmpty() || parameters.IsStringTypeParameters()) {
+    return SqlType(type);
+  }
+  if (parameters.IsNumericTypeParameters()) {
+    const auto& numeric = parameters.numeric_type_parameters();
+    if (numeric.is_max_precision() || numeric.precision() > 38) {
+      return std::nullopt;
+    }
+    return "DECIMAL(" + std::to_string(numeric.precision()) + "," +
+           std::to_string(numeric.scale()) + ")";
+  }
+  if (!parameters.IsTopLevelEmpty()) {
+    return std::nullopt;
+  }
+  if (type->IsArray() && parameters.num_children() == 1) {
+    const auto element = ColumnType(type->AsArray()->element_type(), parameters.child(0));
+    return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
+  }
+  if (!type->IsStruct() || parameters.num_children() != type->AsStruct()->num_fields()) {
+    return std::nullopt;
+  }
+  std::set<std::string> names;
+  std::vector<std::string> fields;
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    const auto& field = type->AsStruct()->field(i);
+    const auto field_type = ColumnType(field.type, parameters.child(i));
+    if (!field_type || field.name.empty() || !names.insert(ToLowerAscii(field.name)).second) {
+      return std::nullopt;
+    }
+    fields.push_back(QuoteIdentifier(field.name) + " " + *field_type);
+  }
+  return "STRUCT(" + Join(fields, ", ") + ")";
+}
+
+bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
+  if (annotations == nullptr) {
+    return false;
+  }
+  if (annotations->collation_name() != nullptr) {
+    return true;
+  }
+  for (const auto& child : annotations->child_list()) {
+    if (HasCollation(child.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
+                                                const Scope& scope) {
+  if (HasCollation(column.annotations())) {
+    return Unsupported(scope, "column collation");
+  }
+  auto type = ColumnType(column.type(), column.annotations() == nullptr
+                                            ? googlesql::TypeParameters()
+                                            : column.annotations()->type_parameters());
+  if (!type) {
+    return Unsupported(scope, "column type " + column.type()->DebugString());
+  }
+  return type;
+}
+
+// CREATE [OR REPLACE] TABLE [IF NOT EXISTS] path, shared with CREATE TABLE AS SELECT.
+// Partitioning, clustering and options only shape BigQuery storage, and BigQuery's primary and
+// foreign keys are never enforced, so they are all dropped.
+std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
+                                           const DefaultDataset& defaults, const Scope& scope) {
+  if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
+    return Unsupported(scope, "temporary tables");
+  }
+  if (create.like_table() != nullptr) {
+    return Unsupported(scope, "CREATE TABLE LIKE");
+  }
+  if (create.is_value_table() || !create.pseudo_column_list().empty() ||
+      create.collation_name() != nullptr || create.connection() != nullptr ||
+      !create.check_constraint_list().empty()) {
+    return Unsupported(scope, "CREATE TABLE option");
+  }
+  const auto path = TablePath(create.name_path(), defaults, scope);
+  if (!path) {
+    return std::nullopt;
+  }
+  switch (create.create_mode()) {
+    case googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE:
+      return "CREATE OR REPLACE TABLE " + *path;
+    case googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS:
+      return "CREATE TABLE IF NOT EXISTS " + *path;
+    default:
+      return "CREATE TABLE " + *path;
+  }
+}
+
+std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
+                                       const DefaultDataset& defaults, const Scope& scope) {
+  if (create.clone_from() != nullptr || create.copy_from() != nullptr) {
+    return Unsupported(scope, "CREATE TABLE CLONE or COPY");
+  }
+  const auto head = CreateTableHead(create, defaults, scope);
+  if (!head) {
+    return std::nullopt;
+  }
+  std::vector<std::string> columns;
+  for (const auto& column : create.column_definition_list()) {
+    if (column->is_hidden() || column->generated_column_info() != nullptr) {
+      return Unsupported(scope, "generated columns");
+    }
+    const auto type = ColumnDefinitionType(*column, scope);
+    if (!type) {
+      return std::nullopt;
+    }
+    std::string sql = QuoteIdentifier(column->name()) + " " + *type;
+    if (column->annotations() != nullptr && column->annotations()->not_null()) {
+      sql += " NOT NULL";
+    }
+    if (column->default_value() != nullptr) {
+      // A parameterized column's default is cast to its type with the parameters, which the
+      // column itself applies when the default is stored.
+      const googlesql::ResolvedExpr* expression = column->default_value()->expression();
+      if (expression->Is<googlesql::ResolvedCast>()) {
+        const auto* cast = expression->GetAs<googlesql::ResolvedCast>();
+        if (cast->format() == nullptr && cast->time_zone() == nullptr &&
+            cast->extended_cast() == nullptr && !cast->return_null_on_error()) {
+          expression = cast->expr();
+        }
+      }
+      const auto value = Expression(*expression, scope, {});
+      if (!value) {
+        return std::nullopt;
+      }
+      sql += " DEFAULT " + *value;
+    }
+    columns.push_back(sql);
+  }
+  if (columns.empty()) {
+    return Unsupported(scope, "CREATE TABLE without columns");
+  }
+  return *head + " (" + Join(columns, ", ") + ")";
+}
+
+// The query's columns are cast to the declared types, which DuckDB would otherwise infer.
+std::optional<std::string> CreateTableAsSelect(
+    const googlesql::ResolvedCreateTableAsSelectStmt& create, const DefaultDataset& defaults,
+    const Scope& scope) {
+  if (create.output_column_list_size() != create.column_definition_list_size()) {
+    return Unsupported(scope, "CREATE TABLE AS SELECT columns");
+  }
+  const auto head = CreateTableHead(create, defaults, scope);
+  if (!head) {
+    return std::nullopt;
+  }
+  const auto relation = Scan(*create.query(), scope);
+  if (!relation) {
+    return std::nullopt;
+  }
+  std::vector<std::string> projections;
+  for (int i = 0; i < create.output_column_list_size(); ++i) {
+    const auto& definition = *create.column_definition_list(i);
+    // DuckDB cannot declare constraints on a table created from a query.
+    if (definition.annotations() != nullptr && definition.annotations()->not_null()) {
+      return Unsupported(scope, "NOT NULL in CREATE TABLE AS SELECT");
+    }
+    const auto column = relation->columns.find(create.output_column_list(i)->column().column_id());
+    const auto type = ColumnDefinitionType(definition, scope);
+    if (column == relation->columns.end() || !type) {
+      return std::nullopt;
+    }
+    projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
+                          QuoteIdentifier(definition.name()));
+  }
+  return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
+}
+
+std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
+                                        const DefaultDataset& defaults, const Scope& scope) {
+  if (create.collation_name() != nullptr) {
+    return Unsupported(scope, "dataset collation");
+  }
+  const auto path = DatasetPath(create.name_path(), defaults, scope);
+  if (!path) {
+    return std::nullopt;
+  }
+  switch (create.create_mode()) {
+    case googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE:
+      return Unsupported(scope, "CREATE OR REPLACE SCHEMA");
+    case googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS:
+      return "CREATE SCHEMA IF NOT EXISTS " + *path;
+    default:
+      return "CREATE SCHEMA " + *path;
+  }
+}
+
+std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop,
+                                const DefaultDataset& defaults, const Scope& scope) {
+  const std::string object_type = ToUpperAscii(drop.object_type());
+  const bool is_schema = object_type == "SCHEMA";
+  if (object_type != "TABLE" && !is_schema) {
+    return Unsupported(scope, "DROP " + object_type);
+  }
+  const auto path = is_schema ? DatasetPath(drop.name_path(), defaults, scope)
+                              : TablePath(drop.name_path(), defaults, scope);
+  if (!path) {
+    return std::nullopt;
+  }
+  std::string sql = "DROP " + object_type + (drop.is_if_exists() ? " IF EXISTS " : " ") + *path;
+  switch (drop.drop_mode()) {
+    case googlesql::ResolvedDropStmt::CASCADE:
+      return sql + " CASCADE";
+    case googlesql::ResolvedDropStmt::RESTRICT:
+      return sql + " RESTRICT";
+    default:
+      return sql;
+  }
+}
+
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
-                                     const Scope& scope) {
+                                     const DefaultDataset& defaults, const Scope& scope) {
   if (!statement.hint_list().empty()) {
     return Unsupported(scope, "statement hints");
   }
@@ -2328,6 +2589,19 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedMergeStmt>()) {
     return Merge(*statement.GetAs<googlesql::ResolvedMergeStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
+    return CreateTable(*statement.GetAs<googlesql::ResolvedCreateTableStmt>(), defaults, scope);
+  }
+  if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
+    return CreateTableAsSelect(*statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>(),
+                               defaults, scope);
+  }
+  if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
+    return CreateSchema(*statement.GetAs<googlesql::ResolvedCreateSchemaStmt>(), defaults, scope);
+  }
+  if (statement.Is<googlesql::ResolvedDropStmt>()) {
+    return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), defaults, scope);
   }
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return Unsupported(scope, "statement " + statement.node_kind_string());
@@ -2371,11 +2645,11 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
 
 std::optional<std::string> TranslateResolvedToDuckDbSql(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
-    std::string* unsupported) {
+    const DefaultDataset& defaults, std::string* unsupported) {
   int next_name = 0;
   std::string reason;
   const Scope scope{parameters, next_name, reason, {}, {}};
-  auto sql = Statement(statement, scope);
+  auto sql = Statement(statement, defaults, scope);
   if (!sql && unsupported != nullptr) {
     *unsupported = reason.empty() ? "unsupported construct" : reason;
   }
