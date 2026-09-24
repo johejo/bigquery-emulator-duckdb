@@ -209,6 +209,120 @@ std::string Expand(std::string_view spelling, const std::vector<std::string>& ar
   return sql;
 }
 
+std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->IsString()) {
+    return std::nullopt;
+  }
+  return value.string_value();
+}
+
+// A JSONPath key as DuckDB spells it. Quoting every key keeps DuckDB's wildcards and other
+// extensions from applying. DuckDB rejects the empty key.
+std::optional<std::string> JsonPathKey(std::string_view key) {
+  if (key.empty()) {
+    return std::nullopt;
+  }
+  std::string quoted = ".\"";
+  for (const char c : key) {
+    if (c == '"' || c == '\\') {
+      quoted += '\\';
+    }
+    quoted += c;
+  }
+  return quoted + "\"";
+}
+
+// A literal JSONPath as a DuckDB path literal. The legacy JSON_EXTRACT functions escape keys as
+// ['a.b'], the standard ones as ."a.b". Paths outside this subset fall back.
+std::optional<std::string> JsonPath(const googlesql::ResolvedExpr& expr, bool legacy) {
+  const auto path = StringLiteral(expr);
+  if (!path || !path->starts_with("$")) {
+    return std::nullopt;
+  }
+  std::string sql = "$";
+  for (size_t i = 1; i < path->size();) {
+    const char c = (*path)[i++];
+    std::optional<std::string> element;
+    if (c == '.' && !legacy && i < path->size() && (*path)[i] == '"') {
+      const size_t end = path->find('"', i + 1);
+      if (end == std::string::npos ||
+          path->substr(i + 1, end - i - 1).find('\\') != std::string::npos) {
+        return std::nullopt;
+      }
+      element = JsonPathKey(path->substr(i + 1, end - i - 1));
+      i = end + 1;
+    } else if (c == '.') {
+      const size_t end = std::min(path->find_first_of(".[", i), path->size());
+      const std::string key = path->substr(i, end - i);
+      if (key.find_first_of("\"'] \t\n\r") != std::string::npos) {
+        return std::nullopt;
+      }
+      element = JsonPathKey(key);
+      i = end;
+    } else if (c == '[' && legacy && i < path->size() && (*path)[i] == '\'') {
+      const size_t end = path->find('\'', i + 1);
+      if (end == std::string::npos || end + 1 >= path->size() || (*path)[end + 1] != ']') {
+        return std::nullopt;
+      }
+      element = JsonPathKey(path->substr(i + 1, end - i - 1));
+      i = end + 2;
+    } else if (c == '[') {
+      const size_t end = path->find(']', i);
+      const std::string index = end == std::string::npos ? "" : path->substr(i, end - i);
+      if (index.empty() || index.size() > 18 ||
+          index.find_first_not_of("0123456789") != std::string::npos) {
+        return std::nullopt;
+      }
+      element = "[" + index + "]";
+      i = end + 1;
+    }
+    if (!element) {
+      return std::nullopt;
+    }
+    sql += *element;
+  }
+  return QuoteLiteral(sql);
+}
+
+// The number of capturing groups in an RE2 pattern, or nullopt if it cannot tell.
+std::optional<size_t> CapturingGroups(std::string_view pattern) {
+  size_t groups = 0;
+  for (size_t i = 0; i < pattern.size(); ++i) {
+    if (pattern[i] == '\\') {
+      if (i + 1 < pattern.size() && pattern[i + 1] == 'Q') {
+        return std::nullopt;
+      }
+      ++i;
+    } else if (pattern[i] == '[') {
+      // A ] right after [ or [^ is literal.
+      size_t j = i + 1;
+      if (j < pattern.size() && pattern[j] == '^') {
+        ++j;
+      }
+      if (j < pattern.size() && pattern[j] == ']') {
+        ++j;
+      }
+      for (; j < pattern.size() && pattern[j] != ']'; ++j) {
+        if (pattern[j] == '\\') {
+          ++j;
+        }
+      }
+      i = j;
+    } else if (pattern[i] == '(') {
+      const std::string_view rest = pattern.substr(i + 1);
+      if (!rest.starts_with("?") || rest.starts_with("?P<") ||
+          (rest.starts_with("?<") && !rest.starts_with("?<=") && !rest.starts_with("?<!"))) {
+        ++groups;
+      }
+    }
+  }
+  return groups;
+}
+
 // The DuckDB spelling of a scalar call over already translated arguments.
 std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
                                 const std::string& name, const std::vector<std::string>& args) {
@@ -463,15 +577,113 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     return Expand(*spelling, {args[0], interval});
   }
   if (name == "PARSE_JSON" && n == 2) {
-    const auto* mode = call.argument_list(1);
-    if (!mode->Is<googlesql::ResolvedLiteral>()) {
-      return std::nullopt;
-    }
-    const auto& value = mode->GetAs<googlesql::ResolvedLiteral>()->value();
-    if (value.is_null() || !value.type()->IsString() || value.string_value() != "exact") {
+    if (StringLiteral(*call.argument_list(1)) != "exact") {
       return std::nullopt;
     }
     return "json(" + args[0] + ")";
+  }
+  if ((name == "REGEXP_EXTRACT" || name == "REGEXP_EXTRACT_ALL") && n == 2 && type(0)->IsString()) {
+    const auto pattern = StringLiteral(*call.argument_list(1));
+    const auto groups = pattern ? CapturingGroups(*pattern) : std::nullopt;
+    if (!groups) {
+      return std::nullopt;
+    }
+    if (*groups > 1) {
+      return "error('Regular expressions passed into extraction functions must not have more "
+             "than 1 capturing group')";
+    }
+    const std::string group = std::to_string(*groups);
+    if (name == "REGEXP_EXTRACT_ALL") {
+      return "regexp_extract_all(" + args[0] + ", " + args[1] + ", " + group + ")";
+    }
+    // DuckDB returns an empty string rather than NULL when nothing matches.
+    return "list_transform([" + args[0] + "], _rx -> CASE WHEN regexp_matches(_rx, " + args[1] +
+           ") THEN regexp_extract(_rx, " + args[1] + ", " + group + ") END)[1]";
+  }
+  static const std::map<std::string, bool> json_extractors = {
+      {"JSON_QUERY", false},       {"JSON_EXTRACT", true},
+      {"JSON_VALUE", false},       {"JSON_EXTRACT_SCALAR", true},
+      {"JSON_QUERY_ARRAY", false}, {"JSON_EXTRACT_ARRAY", true},
+      {"JSON_VALUE_ARRAY", false}, {"JSON_EXTRACT_STRING_ARRAY", true}};
+  if (const auto legacy = json_extractors.find(name); legacy != json_extractors.end() &&
+                                                      (n == 1 || n == 2) &&
+                                                      (type(0)->IsString() || type(0)->IsJson())) {
+    const auto path = n == 1 ? std::optional<std::string>("'$'")
+                             : JsonPath(*call.argument_list(1), legacy->second);
+    if (!path) {
+      return std::nullopt;
+    }
+    const bool strings = type(0)->IsString();
+    const std::string value = "json_extract(_j, " + *path + ")";
+    const std::string elements = "CAST(" + value + " AS JSON[])";
+    std::string sql;
+    if (name == "JSON_QUERY" || name == "JSON_EXTRACT") {
+      // A JSON null in a STRING is SQL NULL, and in JSON the JSON null.
+      if (!strings) {
+        return "json_extract(" + args[0] + ", " + *path + ")";
+      }
+      sql = "CASE WHEN json_type(" + value + ") <> 'NULL' THEN " + value + " END";
+    } else if (name == "JSON_VALUE" || name == "JSON_EXTRACT_SCALAR") {
+      sql = "CASE WHEN json_type(" + value +
+            ") NOT IN ('OBJECT', 'ARRAY') THEN json_extract_string(" + value + ", '$') END";
+    } else if (name == "JSON_QUERY_ARRAY" || name == "JSON_EXTRACT_ARRAY") {
+      // Indexing keeps JSON nulls, which a cast to JSON[] turns into SQL NULLs.
+      sql = "CASE WHEN json_type(" + value + ") = 'ARRAY' THEN list_transform(range(CAST(" +
+            "json_array_length(" + value + ") AS BIGINT)), _i -> json_extract(" + value +
+            ", _i)) END";
+    } else {
+      // NULL unless every element is a scalar; JSON nulls become SQL NULLs.
+      sql = "CASE WHEN json_type(" + value + ") = 'ARRAY' AND len(list_filter(" + elements +
+            ", _e -> json_type(_e) IN ('OBJECT', 'ARRAY'))) = 0 THEN list_transform(" + elements +
+            ", _e -> json_extract_string(_e, '$')) END";
+    }
+    // A malformed JSON string gives NULL rather than an error.
+    if (strings) {
+      sql = "CASE WHEN json_valid(_j) THEN " + sql + " END";
+    }
+    return "list_transform([" + args[0] + "], _j -> " + sql + ")[1]";
+  }
+  if (name == "JSON_TYPE" && n == 1) {
+    return "CASE json_type(" + args[0] +
+           ") WHEN 'OBJECT' THEN 'object' WHEN 'ARRAY' THEN 'array' WHEN 'VARCHAR' THEN 'string' "
+           "WHEN 'BOOLEAN' THEN 'boolean' WHEN 'NULL' THEN 'null' WHEN 'BIGINT' THEN 'number' "
+           "WHEN 'UBIGINT' THEN 'number' WHEN 'DOUBLE' THEN 'number' END";
+  }
+  if (name == "$SUBSCRIPT" && n == 2 && type(0)->IsJson()) {
+    if (type(1)->IsInt64()) {
+      // DuckDB counts negative indexes from the end.
+      return "list_transform([struct_pack(j := " + args[0] + ", i := " + args[1] +
+             ")], _js -> CASE WHEN _js.i >= 0 THEN json_extract(_js.j, _js.i) END)[1]";
+    }
+    const auto key = StringLiteral(*call.argument_list(1));
+    const auto path = key ? JsonPathKey(*key) : std::nullopt;
+    if (!path) {
+      return std::nullopt;
+    }
+    return "json_extract(" + args[0] + ", " + QuoteLiteral("$" + *path) + ")";
+  }
+  // Conversions from JSON fail unless the value has the requested type; SQL NULL stays NULL.
+  static const std::map<std::string, std::pair<std::string, std::string>> json_conversions = {
+      {"BOOL", {"json_type(_j) = 'BOOLEAN' THEN CAST(_j AS BOOLEAN)", "a boolean"}},
+      {"STRING", {"json_type(_j) = 'VARCHAR' THEN json_extract_string(_j, '$')", "a string"}},
+      {"INT64",
+       {"json_type(_j) IN ('BIGINT', 'UBIGINT') THEN CAST(_j AS BIGINT) WHEN json_type(_j) = "
+        "'DOUBLE' AND CAST(_j AS DOUBLE) = trunc(CAST(_j AS DOUBLE)) THEN CAST(CAST(_j AS DOUBLE) "
+        "AS BIGINT)",
+        "an integer"}},
+      {"FLOAT64",
+       {"json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)", "a number"}},
+      {"DOUBLE",
+       {"json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)", "a number"}}};
+  if (const auto conversion = json_conversions.find(name);
+      conversion != json_conversions.end() && n >= 1 && type(0)->IsJson()) {
+    // FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which falls back.
+    if (n > 2 || (n == 2 && StringLiteral(*call.argument_list(1)) != "round")) {
+      return std::nullopt;
+    }
+    return "list_transform([" + args[0] + "], _j -> CASE WHEN _j IS NULL THEN NULL WHEN " +
+           conversion->second.first + " ELSE error('The provided JSON input is not " +
+           conversion->second.second + "') END)[1]";
   }
   if (name == "ERROR" && n == 1) {
     return invoke("error");
@@ -818,6 +1030,15 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return std::nullopt;
     }
     return "struct_extract_at(" + *input + ", " + std::to_string(get->field_idx() + 1) + ")";
+  }
+  if (expr.Is<googlesql::ResolvedGetJsonField>()) {
+    const auto* get = expr.GetAs<googlesql::ResolvedGetJsonField>();
+    const auto input = Expression(*get->expr(), scope, columns);
+    const auto path = JsonPathKey(get->field_name());
+    if (!input || !path) {
+      return input ? Unsupported(scope, "empty JSON field name") : std::nullopt;
+    }
+    return "json_extract(" + *input + ", " + QuoteLiteral("$" + *path) + ")";
   }
   if (expr.Is<googlesql::ResolvedSubqueryExpr>()) {
     return Subquery(*expr.GetAs<googlesql::ResolvedSubqueryExpr>(), *type, scope, columns);

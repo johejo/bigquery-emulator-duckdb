@@ -898,6 +898,75 @@ TEST_F(ResolvedTranslatorTest, RunsOperatorsAndArrayFunctions) {
   EXPECT_EQ(Unsupported("SELECT SPLIT(b'a,b', b',')"), "function SPLIT");
 }
 
+TEST_F(ResolvedTranslatorTest, RunsRegularExpressionFunctions) {
+  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo123bar', r'\\d+')"), "123");
+  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo123bar', r'o(\\d)')"), "1");
+  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo', r'\\d')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo', r'(x)?f')"), "");
+  EXPECT_EQ(Scalar("SELECT REGEXP_SUBSTR('a1b2', r'[(]?\\d')"), "1");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b22', r'\\d+'), ',')"), "1,22");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b2', r'(?:[a-z])(\\d)'), ',')"),
+            "1,2");
+  EXPECT_THROW(Execute("SELECT REGEXP_EXTRACT('ab', r'(a)(b)')"), std::exception);
+  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT(b, b) FROM p.ds.t"), "function REGEXP_EXTRACT");
+  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT('a', 'a', 2)"), "function REGEXP_EXTRACT");
+  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT(b'a', b'a')"), "function REGEXP_EXTRACT");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsJsonFunctions) {
+  const std::string doc = R"('{"a": {"b": [1, null, {"c": "x"}, "s"]}, "k.l": 2, "n": null}')";
+  EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.a.b[2]')"), R"({"c":"x"})");
+  EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.\"k.l\"')"), "2");
+  EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.n')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.missing')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT(" + doc + ", \"$['k.l']\")"), "2");
+  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT('{x', '$')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a.b[3]')"), "s");
+  EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a.b[0]')"), "1");
+  EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT_SCALAR('\"s\"')"), "s");
+  EXPECT_EQ(Scalar("SELECT JSON_VALUE(JSON '{\"a\": true}', '$.a')"), "true");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_QUERY(JSON '{\"a\": null}', '$.a'))"), "null");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_QUERY_ARRAY(" + doc + ", '$.a.b'))"),
+            R"(["1","null","{\"c\":\"x\"}","\"s\""])");
+  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT_ARRAY(" + doc + ", '$.a') IS NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(JSON_QUERY_ARRAY('[]'))"), "0");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_VALUE_ARRAY('[1, null, \"s\"]'))"),
+            R"(["1",null,"s"])");
+  EXPECT_EQ(Scalar("SELECT JSON_VALUE_ARRAY(" + doc + ", '$.a.b') IS NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_EXTRACT_STRING_ARRAY(JSON '[true]'), ',')"),
+            "true");
+  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON '[1]')"), "array");
+  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON '1.5')"), "number");
+  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON 'null')"), "null");
+  EXPECT_EQ(Scalar("SELECT JSON_TYPE(CAST(NULL AS JSON))"), std::nullopt);
+  EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$[a]')"), "function JSON_QUERY");
+  EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$.a[*]')"), "function JSON_QUERY");
+}
+
+TEST_F(ResolvedTranslatorTest, AccessesAndConvertsJson) {
+  const std::string doc = R"(JSON '{"a": {"b": [10, 20]}, "c d": "x", "f": 2.0, "g": 2.5}')";
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING((" + doc + ").a.b)"), "[10,20]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING((" + doc + ").a.b[1])"), "20");
+  EXPECT_EQ(Scalar("SELECT (" + doc + ").a.b[5] IS NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT (" + doc + ").a.b[-1] IS NULL"), "true");
+  EXPECT_EQ(Scalar("SELECT STRING((" + doc + ")['c d'])"), "x");
+  EXPECT_EQ(Scalar("SELECT INT64((" + doc + ").a.b[0])"), "10");
+  EXPECT_EQ(Scalar("SELECT INT64((" + doc + ").f)"), "2");
+  EXPECT_THROW(Execute("SELECT INT64((" + doc + ").g)"), std::exception);
+  EXPECT_THROW(Execute("SELECT INT64((" + doc + ").a)"), std::exception);
+  EXPECT_EQ(Scalar("SELECT FLOAT64((" + doc + ").g)"), "2.5");
+  EXPECT_EQ(Scalar("SELECT FLOAT64(JSON '1', wide_number_mode => 'round')"), "1.0");
+  EXPECT_EQ(Scalar("SELECT BOOL(JSON 'true')"), "true");
+  EXPECT_THROW(Execute("SELECT BOOL(JSON '1')"), std::exception);
+  EXPECT_THROW(Execute("SELECT STRING(JSON '1')"), std::exception);
+  EXPECT_EQ(Scalar("SELECT INT64(CAST(NULL AS JSON))"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT STRING((" + doc + ").missing)"), std::nullopt);
+  EXPECT_EQ(Unsupported("SELECT FLOAT64(JSON '1', wide_number_mode => 'exact')"),
+            "function FLOAT64");
+  EXPECT_EQ(Unsupported("SELECT LAX_INT64(JSON '1')"), "function LAX_INT64");
+}
+
 TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {
   AnalyzerSettings settings;
   settings.named_parameters.emplace_back("s", googlesql::types::StringType());
