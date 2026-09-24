@@ -22,9 +22,8 @@ struct DefaultDataset {
 // aggregation, analytic functions, set operations, UNNEST and subqueries, with supported
 // expressions, INSERT, UPDATE, DELETE and MERGE, and CREATE TABLE [AS SELECT], CREATE SCHEMA
 // and DROP TABLE/SCHEMA. Columns are bound by resolved ID across scan scopes. nullopt means an
-// unsupported construct, allowing the caller to translate the whole statement through the
-// parser AST; `unsupported`, when given, then names it.
-// Errors are not caught: a failed translation or execution must not trigger fallback.
+// unsupported construct, which `unsupported`, when given, then names.
+// Errors are not caught, so that a failed translation is not reported as an unsupported one.
 // The statement's catalog and TypeFactory must remain alive for this call.
 std::optional<std::string> TranslateResolvedToDuckDbSql(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},

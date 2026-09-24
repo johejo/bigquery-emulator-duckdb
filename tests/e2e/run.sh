@@ -9,9 +9,7 @@ bazelisk build //:bigquery-emulator-duckdb
 port="${BQ_EMULATOR_PORT:-$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
 export BQ_EMULATOR_API="http://127.0.0.1:${port}"
 
-# BQ_EMULATOR_PARSER_FALLBACK=warn|deny reports queries the resolved AST translator misses.
-./bazel-bin/bigquery-emulator-duckdb --host 127.0.0.1 --port "${port}" \
-  --parser-fallback "${BQ_EMULATOR_PARSER_FALLBACK:-allow}" &
+./bazel-bin/bigquery-emulator-duckdb --host 127.0.0.1 --port "${port}" &
 emulator_pid=$!
 trap 'kill "${emulator_pid}" 2>/dev/null || true' EXIT
 

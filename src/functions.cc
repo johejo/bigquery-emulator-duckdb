@@ -40,7 +40,7 @@ struct TemplateRule {
 
 // BigQuery functions that DuckDB spells with the arguments in another order, with an extra
 // argument, or as an operator. Each rule matches one argument count, so a call that carries an
-// argument the rule does not cover - a time zone, say - is left to the base unparser.
+// argument the rule does not cover - a time zone, say - is left to the other translations.
 const std::unordered_map<std::string_view, std::vector<TemplateRule>>& FunctionTemplates() {
   static const auto* const kTemplates =
       new std::unordered_map<std::string_view, std::vector<TemplateRule>>{

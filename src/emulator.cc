@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -22,7 +21,6 @@
 #include "src/field_schema.h"
 #include "src/frontend.h"
 #include "src/resolved_translator.h"
-#include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -33,23 +31,6 @@ int64_t NowMillis() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
-}
-
-// Collapses whitespace runs so a multi-line statement logs as one line.
-std::string OneLine(const std::string& sql) {
-  std::string line;
-  for (const char c : sql) {
-    const bool space = c == ' ' || c == '\t' || c == '\n' || c == '\r';
-    if (!space) {
-      line += c;
-    } else if (!line.empty() && line.back() != ' ') {
-      line += ' ';
-    }
-  }
-  if (!line.empty() && line.back() == ' ') {
-    line.pop_back();
-  }
-  return line;
 }
 
 std::string QualifiedName(const DatasetReference& dataset) {
@@ -197,7 +178,7 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
 
 }  // namespace
 
-Emulator::Emulator(EmulatorOptions options) : options_(options) {}
+Emulator::Emulator() = default;
 
 void Emulator::EnsureProject(const std::string& project_id) {
   if (project_id.empty()) {
@@ -244,19 +225,7 @@ Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
       analyzed.statement(), parameters,
       DefaultDataset{settings.default_project, settings.default_dataset}, &unsupported);
   if (!sql.has_value()) {
-    switch (options_.parser_fallback) {
-      case ParserFallback::kDeny:
-        throw ApiError::InvalidQuery(
-            "The resolved AST translator does not support this statement (" + unsupported +
-            "), and parser AST fallback is disabled");
-      case ParserFallback::kWarn:
-        std::cerr << "parser AST fallback (" << unsupported
-                  << "): " << OneLine(frontend_result.sql()) << '\n';
-        break;
-      case ParserFallback::kAllow:
-        break;
-    }
-    sql = TranslateToDuckDbSql(frontend_result, parameters);
+    throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
   }
   return {*std::move(sql), analyzed.result_schema()};
 }

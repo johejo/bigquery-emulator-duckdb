@@ -343,24 +343,11 @@ TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
   EXPECT_EQ(ErrorStatus("DROP SCHEMA made"), 0);
 }
 
-TEST(EmulatorParserFallbackTest, DenyFailsOnlyStatementsTheResolvedTranslatorMisses) {
-  Emulator emulator(EmulatorOptions{.parser_fallback = ParserFallback::kDeny});
-  const auto run = [&](const std::string& sql) {
-    QueryRequest request;
-    request.project_id = "test";
-    request.query = sql;
-    return emulator.RunQuery(request);
-  };
-  emulator.CreateDataset({"test", "fallback"});
-  EXPECT_FALSE(run("CREATE TABLE fallback.t (x INT64)")->error.has_value());
-  EXPECT_FALSE(run("INSERT INTO fallback.t (x) VALUES (1)")->error.has_value());
-  EXPECT_FALSE(run("SELECT x FROM fallback.t")->error.has_value());
-  EXPECT_FALSE(run("UPDATE fallback.t SET x = 2 WHERE TRUE")->error.has_value());
-  const std::shared_ptr<const Job> job = run("SELECT SESSION_USER() FROM fallback.t");
-  EXPECT_EQ(job->error.has_value() ? job->error->http_status() : 0, 400);
-  EXPECT_NE(std::string(job->error.has_value() ? job->error->what() : "")
-                .find("(function SESSION_USER), and parser AST fallback is disabled"),
-            std::string::npos);
+TEST_F(EmulatorTest, ReportsUnsupportedConstructsAsInvalidQuery) {
+  EXPECT_EQ(ErrorStatus("SELECT SESSION_USER()"), 400);
+  EXPECT_NE(
+      ErrorMessage(*Run("SELECT SESSION_USER()")).find("does not support function SESSION_USER"),
+      std::string::npos);
 }
 
 // A query that fails is reported through the job rather than thrown, which is how BigQuery

@@ -71,7 +71,7 @@ class ResolvedTranslatorTest : public ::testing::Test {
     const auto translated = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters,
                                                          DefaultDataset{"p", "ds"}, &reason);
     if (!translated) {
-      throw std::runtime_error("Unexpected parser fallback (" + reason + "): " + sql);
+      throw std::runtime_error("Unexpected unsupported construct (" + reason + "): " + sql);
     }
     return backend_.Execute(*translated);
   }
@@ -171,7 +171,7 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
   }
 }
 
-TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
+TEST_F(ResolvedTranslatorTest, RejectsUnsupportedConstructs) {
   for (const std::string& sql :
        {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
         std::string("SELECT STRUCT(1, 2)")}) {
@@ -323,7 +323,7 @@ TEST_F(ResolvedTranslatorTest, SortsNullsAndAppliesLimitsAtTheCorrectScope) {
   EXPECT_EQ(ordinal.rows.at(0)["f"][0]["v"], "-3");
 }
 
-TEST_F(ResolvedTranslatorTest, RunsOperatorsAndConditionsWithoutFallback) {
+TEST_F(ResolvedTranslatorTest, RunsOperatorsAndConditions) {
   const auto result = Execute(
       "SELECT (1 + 2) * 3 - 4, 3 / 2, NOT (1 > 2 OR 2 <> 2), "
       "2 BETWEEN 1 AND 3, 2 IN (1, 2, NULL), 'abc' LIKE 'a%', "
@@ -362,7 +362,7 @@ TEST_F(ResolvedTranslatorTest, RunsOperatorsAndConditionsWithoutFallback) {
   EXPECT_EQ(Execute("SELECT IF(FALSE, 1 / 0, 42)").rows.at(0)["f"][0]["v"], "42.0");
 }
 
-TEST_F(ResolvedTranslatorTest, PreparesParameterizedTableQueriesWithoutFallback) {
+TEST_F(ResolvedTranslatorTest, PreparesParameterizedTableQueries) {
   const auto parameters = QueryParameters::Parse(nlohmann::json::parse(R"([
     {"name":"min", "parameterType":{"type":"INT64"}, "parameterValue":{"value":"1"}},
     {"name":"n", "parameterType":{"type":"INT64"}, "parameterValue":{"value":"1"}},
@@ -877,7 +877,7 @@ TEST_F(ResolvedTranslatorTest, InsertsValuesAndQueryResults) {
   }
 }
 
-TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedInsertModifiers) {
+TEST_F(ResolvedTranslatorTest, RejectsUnsupportedInsertModifiers) {
   for (const std::string& sql : {std::string("INSERT OR IGNORE INTO t (a) VALUES (1)"),
                                  std::string("INSERT INTO t (a) VALUES (1) ASSERT_ROWS_MODIFIED 1"),
                                  std::string("INSERT INTO t (a) VALUES (1) THEN RETURN a")}) {
@@ -1032,7 +1032,7 @@ TEST_F(ResolvedTranslatorTest, AccessesAndConvertsJson) {
   EXPECT_EQ(Unsupported("SELECT LAX_INT64(JSON '1')"), "function LAX_INT64");
 }
 
-TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {
+TEST_F(ResolvedTranslatorTest, DoesNotReportParameterErrorsAsUnsupported) {
   AnalyzerSettings settings;
   settings.named_parameters.emplace_back("s", googlesql::types::StringType());
   EXPECT_THROW(Translate("SELECT BYTE_LENGTH(@s)", {}, settings), std::exception);

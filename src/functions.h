@@ -16,7 +16,7 @@ std::optional<std::string_view> DuckDbFunctionName(std::string_view upper_name);
 // The DuckDB spelling of a BigQuery function whose call has to be restructured, as a template
 // over the arguments, or nullopt when no rule applies to this name and argument count:
 //
-//   $n  the n-th argument, unparsed as DuckDB SQL,
+//   $n  the n-th argument, translated to DuckDB SQL,
 //   #n  the n-th argument, a BigQuery date part such as DAY, as the lower case string literal
 //       that DuckDB expects ('day').
 //

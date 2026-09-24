@@ -51,7 +51,7 @@ struct WithQuery {
 struct Scope {
   const QueryParameters& parameters;
   int& next_name;
-  // The first construct found unsupported, reported with the parser AST fallback.
+  // The first construct found unsupported, reported in the error the statement fails with.
   std::string& unsupported;
   Columns outer;
   std::map<std::string, WithQuery> with;
@@ -59,7 +59,7 @@ struct Scope {
   std::optional<WithQuery> recursive;
 };
 
-// Records why the statement falls back. The innermost failure is recorded first, and the
+// Records why the statement is unsupported. The innermost failure is recorded first, and the
 // callers above it only propagate nullopt.
 std::nullopt_t Unsupported(const Scope& scope, std::string_view what) {
   if (scope.unsupported.empty()) {
@@ -241,7 +241,7 @@ std::optional<std::string> JsonPathKey(std::string_view key) {
 }
 
 // A literal JSONPath as a DuckDB path literal. The legacy JSON_EXTRACT functions escape keys as
-// ['a.b'], the standard ones as ."a.b". Paths outside this subset fall back.
+// ['a.b'], the standard ones as ."a.b". Paths outside this subset are unsupported.
 std::optional<std::string> JsonPath(const googlesql::ResolvedExpr& expr, bool legacy) {
   const auto path = StringLiteral(expr);
   if (!path || !path->starts_with("$")) {
@@ -681,7 +681,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
        {"json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)", "a number"}}};
   if (const auto conversion = json_conversions.find(name);
       conversion != json_conversions.end() && n >= 1 && type(0)->IsJson()) {
-    // FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which falls back.
+    // FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which is unsupported.
     if (n > 2 || (n == 2 && StringLiteral(*call.argument_list(1)) != "round")) {
       return std::nullopt;
     }
