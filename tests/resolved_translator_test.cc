@@ -151,9 +151,7 @@ TEST_F(ResolvedTranslatorTest, MatchesDuplicateAliasesByColumnId) {
 TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
   for (const std::string& sql :
        {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
-        std::string("CREATE TABLE ds.new_t (x INT64)"),
-        std::string("SELECT COUNT(DISTINCT a) OVER () FROM t"),
-        std::string("SELECT STRUCT(1, 2)")}) {
+        std::string("CREATE TABLE ds.new_t (x INT64)"), std::string("SELECT STRUCT(1, 2)")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }
@@ -161,8 +159,6 @@ TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
 TEST_F(ResolvedTranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("SELECT BYTE_LENGTH('abc'), SESSION_USER()"), "function SESSION_USER");
   EXPECT_EQ(Unsupported("SELECT a FROM t WHERE a IN (SELECT SAFE.RAND() FROM t)"), "SAFE.RAND");
-  EXPECT_EQ(Unsupported("SELECT COUNT(DISTINCT a) OVER () FROM t"),
-            "DISTINCT window aggregate COUNT");
   EXPECT_EQ(Unsupported("UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1"),
             "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
 }
@@ -558,6 +554,10 @@ TEST_F(ResolvedTranslatorTest, RunsAnalyticFunctionsAndQualify) {
   EXPECT_EQ(Column(Execute("SELECT b FROM t WHERE a IS NOT NULL "
                            "QUALIFY ROW_NUMBER() OVER (ORDER BY a DESC) = 1")),
             (V{"あ"}));
+  EXPECT_EQ(Rows(Execute("SELECT a, COUNT(DISTINCT MOD(a, 2)) OVER (PARTITION BY a > 1), "
+                         "SUM(DISTINCT a) OVER () FROM (SELECT a FROM t UNION ALL SELECT a FROM t) "
+                         "WHERE a IS NOT NULL ORDER BY a")),
+            (V{"1|1|6", "1|1|6", "2|2|6", "2|2|6", "3|2|6", "3|2|6"}));
 }
 
 TEST_F(ResolvedTranslatorTest, RunsSubqueries) {

@@ -686,10 +686,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return Unsupported(scope, "aggregate or analytic function " + name);
     }
   }
-  // DuckDB has no DISTINCT window aggregates.
-  if (call.distinct() && !over.empty()) {
-    return Unsupported(scope, "DISTINCT window aggregate " + name);
-  }
   if (name == "STRING_AGG" && !call.argument_list(0)->type()->IsString()) {
     return Unsupported(scope, "STRING_AGG over BYTES");
   }
