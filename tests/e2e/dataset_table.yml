@@ -39,6 +39,35 @@ steps:
       command: tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
     test: |
       current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
+  update:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "UPDATE e2e.users SET name = UPPER(name) WHERE id = 1"
+    test: current.exit_code == 0
+  delete:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "DELETE FROM e2e.users WHERE id = 2"
+    test: current.exit_code == 0
+  merge:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "MERGE e2e.users AS u USING (SELECT 1 AS id, 'ann' AS name UNION ALL SELECT 3, 'carol') AS s
+        ON u.id = s.id
+        WHEN MATCHED THEN UPDATE SET name = CONCAT(u.name, '/', s.name)
+        WHEN NOT MATCHED THEN INSERT (id, name) VALUES (s.id, s.name)"
+    test: current.exit_code == 0
+  select_after_dml:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT id, name FROM `test.e2e.users` ORDER BY id'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"ALICE/ann"},{"id":"3","name":"carol"}]'
   create_table_with_nested_types:
     exec:
       command: >-

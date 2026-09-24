@@ -49,9 +49,20 @@ struct WithQuery {
 struct Scope {
   const QueryParameters& parameters;
   int& next_name;
+  // The first construct found unsupported, reported with the parser AST fallback.
+  std::string& unsupported;
   Columns outer;
   std::map<std::string, WithQuery> with;
 };
+
+// Records why the statement falls back. The innermost failure is recorded first, and the
+// callers above it only propagate nullopt.
+std::nullopt_t Unsupported(const Scope& scope, std::string_view what) {
+  if (scope.unsupported.empty()) {
+    scope.unsupported = what;
+  }
+  return std::nullopt;
+}
 
 std::optional<std::string> SqlType(const googlesql::Type* type) {
   switch (type->kind()) {
@@ -195,27 +206,9 @@ std::string Expand(std::string_view spelling, const std::vector<std::string>& ar
   return sql;
 }
 
-std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
-                                    const Columns& columns) {
-  if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
-      !call.collation_list().empty() ||
-      call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
-    return std::nullopt;
-  }
-  std::string name = ToUpperAscii(call.function()->Name());
-  // CONTAINS_SUBSTR is supplied by our catalog because GoogleSQL lacks this BigQuery builtin.
-  if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
-    return std::nullopt;
-  }
-  std::vector<std::string> args;
-  for (const auto& argument : call.argument_list()) {
-    auto sql =
-        argument->type()->IsEnum() ? DatePart(*argument) : Expression(*argument, scope, columns);
-    if (!sql) {
-      return std::nullopt;
-    }
-    args.push_back(argument->type()->IsEnum() ? QuoteLiteral(*sql) : *sql);
-  }
+// The DuckDB spelling of a scalar call over already translated arguments.
+std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
+                                const std::string& name, const std::vector<std::string>& args) {
   const size_t n = args.size();
   const auto invoke = [&](std::string_view function) {
     return std::string(function) + "(" + Join(args, ", ") + ")";
@@ -401,6 +394,78 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   return plain.contains(name) ? std::optional<std::string>(invoke(name)) : std::nullopt;
 }
 
+std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
+                                    const Columns& columns) {
+  const std::string name = ToUpperAscii(call.function()->Name());
+  if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
+      !call.collation_list().empty()) {
+    return Unsupported(scope, "function " + name + " with generic arguments, hints or collation");
+  }
+  // CONTAINS_SUBSTR is supplied by our catalog because GoogleSQL lacks this BigQuery builtin.
+  if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
+    return Unsupported(scope, "function " + name);
+  }
+  const bool safe = call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE;
+  if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
+    return Unsupported(scope, "function " + name + " error mode");
+  }
+  std::vector<std::string> args;
+  for (const auto& argument : call.argument_list()) {
+    if (argument->type()->IsEnum()) {
+      const auto part = DatePart(*argument);
+      if (!part) {
+        return Unsupported(scope, "function " + name + " date part");
+      }
+      args.push_back(QuoteLiteral(*part));
+      continue;
+    }
+    const auto sql = Expression(*argument, scope, columns);
+    if (!sql) {
+      return std::nullopt;
+    }
+    args.push_back(*sql);
+  }
+  if (!safe) {
+    auto sql = Call(call, name, args);
+    if (!sql) {
+      return Unsupported(scope, "function " + name);
+    }
+    return sql;
+  }
+  // SAFE. turns errors of the function itself into NULL, while errors evaluating its
+  // arguments still propagate. The arguments are bound outside the lambda so TRY only covers
+  // the call; binding them also keeps DuckDB from raising constant errors at bind time.
+  // DuckDB's TRY rejects volatile functions, and error() is how translations raise errors.
+  static const std::set<std::string> volatile_functions = {
+      "RAND",         "GENERATE_UUID",    "CURRENT_TIMESTAMP",
+      "CURRENT_DATE", "CURRENT_DATETIME", "CURRENT_TIME"};
+  if (volatile_functions.contains(name)) {
+    return Unsupported(scope, "SAFE." + name);
+  }
+  const std::string lambda = "_s" + std::to_string(scope.next_name++);
+  std::vector<std::string> bound;
+  std::vector<std::string> placeholders;
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (call.argument_list(static_cast<int>(i))->type()->IsEnum()) {
+      placeholders.push_back(args[i]);
+      continue;
+    }
+    const std::string field = "a" + std::to_string(i + 1);
+    bound.push_back(field + " := " + args[i]);
+    placeholders.push_back(lambda);
+    placeholders.back() += "." + field;
+  }
+  const auto sql = Call(call, name, placeholders);
+  if (!sql || sql->find("error(") != std::string::npos) {
+    return Unsupported(scope, "SAFE." + name);
+  }
+  if (bound.empty()) {
+    return "TRY(" + *sql + ")";
+  }
+  return "list_transform([struct_pack(" + Join(bound, ", ") + ")], " + lambda + " -> TRY(" + *sql +
+         "))[1]";
+}
+
 // Correlated references in a subquery name the enclosing columns without the q qualifier, which
 // the subquery's own scopes shadow. Column IDs are unique per statement, so nothing collides.
 Scope Nested(const Scope& scope, const Columns& columns) {
@@ -459,10 +524,14 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
                                       const Columns& columns) {
   const auto type = SqlType(expr.type());
   if (!type || expr.type_annotation_map() != nullptr) {
-    return std::nullopt;
+    return Unsupported(scope, "type " + expr.type()->DebugString());
   }
   if (expr.Is<googlesql::ResolvedLiteral>()) {
-    return Literal(expr.GetAs<googlesql::ResolvedLiteral>()->value());
+    auto literal = Literal(expr.GetAs<googlesql::ResolvedLiteral>()->value());
+    if (!literal) {
+      return Unsupported(scope, "literal of type " + expr.type()->DebugString());
+    }
+    return literal;
   }
   if (expr.Is<googlesql::ResolvedColumnRef>()) {
     const auto* ref = expr.GetAs<googlesql::ResolvedColumnRef>();
@@ -482,7 +551,7 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     const auto* cast = expr.GetAs<googlesql::ResolvedCast>();
     if (cast->format() != nullptr || cast->time_zone() != nullptr ||
         cast->extended_cast() != nullptr || !cast->type_modifiers().IsEmpty()) {
-      return std::nullopt;
+      return Unsupported(scope, "CAST with FORMAT, time zone or type parameters");
     }
     const auto argument = Expression(*cast->expr(), scope, columns);
     if (!argument) {
@@ -519,7 +588,7 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   if (expr.Is<googlesql::ResolvedSubqueryExpr>()) {
     return Subquery(*expr.GetAs<googlesql::ResolvedSubqueryExpr>(), *type, scope, columns);
   }
-  return std::nullopt;
+  return Unsupported(scope, "expression " + expr.node_kind_string());
 }
 
 std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item, const Scope& scope,
@@ -559,17 +628,18 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const googlesql::ResolvedAggregateFunctionCall* aggregate,
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns) {
+  const std::string name = ToUpperAscii(call.function()->Name());
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
       !call.function()->IsGoogleSQLBuiltin() || call.where_expr() != nullptr) {
-    return std::nullopt;
+    return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
   }
   if (aggregate != nullptr &&
       (aggregate->having_modifier() != nullptr || aggregate->limit() != nullptr ||
        !aggregate->group_by_list().empty() || !aggregate->group_by_aggregate_list().empty() ||
        aggregate->having_expr() != nullptr)) {
-    return std::nullopt;
+    return Unsupported(scope, "aggregate " + name + " with HAVING, LIMIT or GROUP BY");
   }
   static const std::map<std::string, std::string> aggregates = {{"COUNT", "count"},
                                                                 {"$COUNT_STAR", "count"},
@@ -606,20 +676,19 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                                                {"FIRST_VALUE", "first_value"},
                                                                {"LAST_VALUE", "last_value"},
                                                                {"NTH_VALUE", "nth_value"}};
-  const std::string name = ToUpperAscii(call.function()->Name());
   auto function = aggregates.find(name);
   if (function == aggregates.end()) {
     function = analytics.find(name);
     if (function == analytics.end() || over.empty()) {
-      return std::nullopt;
+      return Unsupported(scope, "aggregate or analytic function " + name);
     }
   }
   // DuckDB has no DISTINCT window aggregates.
   if (call.distinct() && !over.empty()) {
-    return std::nullopt;
+    return Unsupported(scope, "DISTINCT window aggregate " + name);
   }
   if (name == "STRING_AGG" && !call.argument_list(0)->type()->IsString()) {
-    return std::nullopt;
+    return Unsupported(scope, "STRING_AGG over BYTES");
   }
   std::vector<std::string> args;
   for (const auto& argument : call.argument_list()) {
@@ -640,7 +709,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     } else if (name == "FIRST_VALUE" || name == "LAST_VALUE" || name == "NTH_VALUE") {
       inner += " IGNORE NULLS";
     } else {
-      return std::nullopt;
+      return Unsupported(scope, name + " IGNORE NULLS");
     }
   }
   if (aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
@@ -737,7 +806,7 @@ std::optional<std::vector<std::string>> Renamed(
 
 std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const Scope& scope) {
   if (join.is_lateral() || !join.parameter_list().empty()) {
-    return std::nullopt;
+    return Unsupported(scope, "lateral join");
   }
   const auto left = Scan(*join.left_scan(), scope);
   const auto right = Scan(*join.right_scan(), scope);
@@ -769,7 +838,7 @@ std::optional<Relation> JoinScan(const googlesql::ResolvedJoinScan& join, const 
       kind = "FULL";
       break;
     default:
-      return std::nullopt;
+      return Unsupported(scope, "join type");
   }
   std::string condition = " ON TRUE";
   if (join.join_expr() != nullptr) {
@@ -792,7 +861,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
                                       const Scope& scope) {
   if (!aggregate.grouping_set_list().empty() || !aggregate.rollup_column_list().empty() ||
       !aggregate.grouping_call_list().empty() || !aggregate.collation_list().empty()) {
-    return std::nullopt;
+    return Unsupported(scope, "GROUPING SETS, ROLLUP, CUBE or GROUPING");
   }
   const auto input = Scan(*aggregate.input_scan(), scope);
   if (!input) {
@@ -868,7 +937,7 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
 std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const Scope& scope) {
   // DuckDB's recursive CTEs differ in how they terminate and deduplicate.
   if (with.recursive()) {
-    return std::nullopt;
+    return Unsupported(scope, "WITH RECURSIVE");
   }
   Scope inner = scope;
   std::vector<std::string> definitions;
@@ -923,7 +992,7 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
                                          const Scope& scope) {
   if (set.column_match_mode() != googlesql::ResolvedSetOperationScan::BY_POSITION ||
       set.column_propagation_mode() != googlesql::ResolvedSetOperationScan::STRICT) {
-    return std::nullopt;
+    return Unsupported(scope, "set operation by name or CORRESPONDING");
   }
   static const std::map<googlesql::ResolvedSetOperationScan::SetOperationType, std::string>
       operators = {{googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
@@ -961,7 +1030,7 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
 std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, const Scope& scope) {
   if (array.array_expr_list_size() != 1 || array.element_column_list_size() != 1 ||
       array.array_zip_mode() != nullptr) {
-    return std::nullopt;
+    return Unsupported(scope, "UNNEST of multiple arrays");
   }
   auto result = array.input_scan() == nullptr
                     ? std::optional<Relation>(Relation{"SELECT 1 AS _unit", {}, {}})
@@ -1009,14 +1078,14 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     if (table->for_system_time_expr() != nullptr || table->lock_mode() != nullptr ||
         table->read_as_row_type() || table->table()->IsValueTable() ||
         table->column_list_size() != table->column_index_list_size()) {
-      return std::nullopt;
+      return Unsupported(scope, "table read with FOR SYSTEM_TIME, a lock mode or a value table");
     }
     Relation result;
     std::vector<std::string> projections;
     for (int i = 0; i < table->column_list_size(); ++i) {
       const auto& column = table->column_list(i);
       if (!SqlType(column.type()) || column.type_annotation_map() != nullptr) {
-        return std::nullopt;
+        return Unsupported(scope, "column type " + column.type()->DebugString());
       }
       const std::string alias = ColumnName(column.column_id());
       projections.push_back(
@@ -1063,7 +1132,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     input = scan.GetAs<googlesql::ResolvedLimitOffsetScan>()->input_scan();
   }
   if (input == nullptr) {
-    return std::nullopt;
+    return Unsupported(scope, "scan " + scan.node_kind_string());
   }
   auto result = Scan(*input, scope);
   if (!result) {
@@ -1121,7 +1190,7 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
 
 std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (!scan.hint_list().empty()) {
-    return std::nullopt;
+    return Unsupported(scope, "hints");
   }
   auto result = ScanBody(scan, scope);
   // Ordering from a subquery is not a promise of ordering for its parent scan.
@@ -1141,7 +1210,9 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
       !table->hint_list().empty() || table->for_system_time_expr() != nullptr ||
       table->table()->IsValueTable() ||
       table->column_list_size() != table->column_index_list_size()) {
-    return std::nullopt;
+    return Unsupported(scope,
+                       "INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, "
+                       "ON CONFLICT or generated columns");
   }
   // The inserted columns are the table scan's columns; name them by the table's own columns.
   std::map<int, std::string> table_columns;
@@ -1199,24 +1270,247 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   return sql + "VALUES " + Join(rows, ", ");
 }
 
-}  // namespace
+// The table modified by a DML statement, aliased as _t.
+struct Target {
+  std::string table;
+  // Resolved column ID to the table's own column name.
+  std::map<int, std::string> names;
+  // The same columns qualified by the alias, for expressions.
+  Columns columns;
+};
 
-std::optional<std::string> TranslateResolvedToDuckDbSql(
-    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters) {
-  if (!statement.hint_list().empty()) {
+std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope) {
+  if (!table.hint_list().empty() || table.for_system_time_expr() != nullptr ||
+      table.lock_mode() != nullptr || table.table()->IsValueTable() ||
+      table.column_list_size() != table.column_index_list_size()) {
+    return Unsupported(scope, "DML target with hints, FOR SYSTEM_TIME or a value table");
+  }
+  Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}};
+  for (int i = 0; i < table.column_list_size(); ++i) {
+    const auto& column = table.column_list(i);
+    if (!SqlType(column.type()) || column.type_annotation_map() != nullptr) {
+      return Unsupported(scope, "column type " + column.type()->DebugString());
+    }
+    const std::string name =
+        QuoteIdentifier(table.table()->GetColumn(table.column_index_list(i))->Name());
+    target.names.emplace(column.column_id(), name);
+    target.columns.emplace(column.column_id(), "_t." + name);
+  }
+  return target;
+}
+
+// Correlated subqueries see the target row through the outer columns.
+Scope DmlScope(const Scope& scope, const Target& target) {
+  Scope dml = scope;
+  dml.outer.insert(target.columns.begin(), target.columns.end());
+  return dml;
+}
+
+std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value, const Scope& scope,
+                                    const Columns& columns) {
+  if (value.value()->Is<googlesql::ResolvedDMLDefault>()) {
+    return "DEFAULT";
+  }
+  return Expression(*value.value(), scope, columns);
+}
+
+// SET assignments of whole columns. Struct fields, array elements and nested DML are not.
+std::optional<std::string> UpdateItems(
+    const std::vector<std::unique_ptr<const googlesql::ResolvedUpdateItem>>& items,
+    const Target& target, const Scope& scope, const Columns& columns) {
+  std::vector<std::string> assignments;
+  for (const auto& item : items) {
+    if (!item->target()->Is<googlesql::ResolvedColumnRef>() || item->set_value() == nullptr ||
+        item->element_column() != nullptr || !item->update_item_element_list().empty() ||
+        !item->delete_list().empty() || !item->update_list().empty() ||
+        !item->insert_list().empty()) {
+      return Unsupported(scope, "UPDATE of struct fields, array elements or nested DML");
+    }
+    const auto name = target.names.find(
+        item->target()->GetAs<googlesql::ResolvedColumnRef>()->column().column_id());
+    if (name == target.names.end()) {
+      return Unsupported(scope, "UPDATE target");
+    }
+    const auto value = DmlValue(*item->set_value(), scope, columns);
+    if (!value) {
+      return std::nullopt;
+    }
+    assignments.push_back(name->second + " = " + *value);
+  }
+  if (assignments.empty()) {
+    return Unsupported(scope, "UPDATE without assignments");
+  }
+  return Join(assignments, ", ");
+}
+
+std::optional<std::string> Update(const googlesql::ResolvedUpdateStmt& update, const Scope& scope) {
+  if (update.assert_rows_modified() != nullptr || update.returning() != nullptr ||
+      update.array_offset_column() != nullptr || update.generated_column_expr_list_size() != 0 ||
+      update.timestamp_version_column() != nullptr || update.temporal_at() != nullptr) {
+    return Unsupported(scope, "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
+  }
+  const auto target = DmlTarget(*update.table_scan(), scope);
+  if (!target) {
     return std::nullopt;
   }
-  int next_name = 0;
-  const Scope scope{parameters, next_name, {}, {}};
+  const Scope dml = DmlScope(scope, *target);
+  Columns columns = target->columns;
+  std::string from;
+  if (update.from_scan() != nullptr) {
+    const auto relation = Scan(*update.from_scan(), dml);
+    if (!relation) {
+      return std::nullopt;
+    }
+    columns.insert(relation->columns.begin(), relation->columns.end());
+    from = relation->From();
+  }
+  const auto assignments = UpdateItems(update.update_item_list(), *target, dml, columns);
+  if (!assignments) {
+    return std::nullopt;
+  }
+  std::string sql = "UPDATE " + target->table + " AS _t SET " + *assignments + from;
+  if (update.where_expr() != nullptr) {
+    const auto where = Expression(*update.where_expr(), dml, columns);
+    if (!where) {
+      return std::nullopt;
+    }
+    sql += " WHERE " + *where;
+  }
+  return sql;
+}
+
+std::optional<std::string> Delete(const googlesql::ResolvedDeleteStmt& del, const Scope& scope) {
+  if (del.assert_rows_modified() != nullptr || del.returning() != nullptr ||
+      del.array_offset_column() != nullptr || del.timestamp_version_column() != nullptr ||
+      del.using_scan() != nullptr) {
+    return Unsupported(scope, "DELETE with ASSERT_ROWS_MODIFIED, THEN RETURN or USING");
+  }
+  const auto target = DmlTarget(*del.table_scan(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  std::string sql = "DELETE FROM " + target->table + " AS _t";
+  if (del.where_expr() != nullptr) {
+    const auto where = Expression(*del.where_expr(), DmlScope(scope, *target), target->columns);
+    if (!where) {
+      return std::nullopt;
+    }
+    sql += " WHERE " + *where;
+  }
+  return sql;
+}
+
+std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
+                                       const Target& target, const Scope& scope,
+                                       const Columns& columns) {
+  std::string sql;
+  switch (when.match_type()) {
+    case googlesql::ResolvedMergeWhen::MATCHED:
+      sql = "WHEN MATCHED";
+      break;
+    case googlesql::ResolvedMergeWhen::NOT_MATCHED_BY_TARGET:
+      sql = "WHEN NOT MATCHED BY TARGET";
+      break;
+    case googlesql::ResolvedMergeWhen::NOT_MATCHED_BY_SOURCE:
+      sql = "WHEN NOT MATCHED BY SOURCE";
+      break;
+    default:
+      return Unsupported(scope, "MERGE match type");
+  }
+  if (when.match_expr() != nullptr) {
+    const auto condition = Expression(*when.match_expr(), scope, columns);
+    if (!condition) {
+      return std::nullopt;
+    }
+    sql += " AND " + *condition;
+  }
+  switch (when.action_type()) {
+    case googlesql::ResolvedMergeWhen::DELETE:
+      return sql + " THEN DELETE";
+    case googlesql::ResolvedMergeWhen::UPDATE: {
+      const auto assignments = UpdateItems(when.update_item_list(), target, scope, columns);
+      if (!assignments) {
+        return std::nullopt;
+      }
+      return sql + " THEN UPDATE SET " + *assignments;
+    }
+    case googlesql::ResolvedMergeWhen::INSERT: {
+      if (when.insert_row() == nullptr ||
+          when.insert_row()->value_list_size() != when.insert_column_list_size()) {
+        return Unsupported(scope, "MERGE INSERT");
+      }
+      std::vector<std::string> names;
+      std::vector<std::string> values;
+      for (int i = 0; i < when.insert_column_list_size(); ++i) {
+        const auto name = target.names.find(when.insert_column_list(i).column_id());
+        if (name == target.names.end()) {
+          return Unsupported(scope, "MERGE INSERT column");
+        }
+        const auto value = DmlValue(*when.insert_row()->value_list(i), scope, columns);
+        if (!value) {
+          return std::nullopt;
+        }
+        names.push_back(name->second);
+        values.push_back(*value);
+      }
+      return sql + " THEN INSERT (" + Join(names, ", ") + ") VALUES (" + Join(values, ", ") + ")";
+    }
+    default:
+      return Unsupported(scope, "MERGE action");
+  }
+}
+
+std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, const Scope& scope) {
+  const auto target = DmlTarget(*merge.table_scan(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  const Scope dml = DmlScope(scope, *target);
+  const auto source = Scan(*merge.from_scan(), dml);
+  if (!source) {
+    return std::nullopt;
+  }
+  Columns columns = target->columns;
+  columns.insert(source->columns.begin(), source->columns.end());
+  const auto condition = Expression(*merge.merge_expr(), dml, columns);
+  if (!condition) {
+    return std::nullopt;
+  }
+  std::vector<std::string> clauses;
+  for (const auto& when : merge.when_clause_list()) {
+    const auto clause = MergeClause(*when, *target, dml, columns);
+    if (!clause) {
+      return std::nullopt;
+    }
+    clauses.push_back(*clause);
+  }
+  return "MERGE INTO " + target->table + " AS _t USING (" + source->sql + ") AS q ON " +
+         *condition + " " + Join(clauses, " ");
+}
+
+std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
+                                     const Scope& scope) {
+  if (!statement.hint_list().empty()) {
+    return Unsupported(scope, "statement hints");
+  }
   if (statement.Is<googlesql::ResolvedInsertStmt>()) {
     return Insert(*statement.GetAs<googlesql::ResolvedInsertStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedUpdateStmt>()) {
+    return Update(*statement.GetAs<googlesql::ResolvedUpdateStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedDeleteStmt>()) {
+    return Delete(*statement.GetAs<googlesql::ResolvedDeleteStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedMergeStmt>()) {
+    return Merge(*statement.GetAs<googlesql::ResolvedMergeStmt>(), scope);
+  }
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
-    return std::nullopt;
+    return Unsupported(scope, "statement " + statement.node_kind_string());
   }
   const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
   if (query->is_value_table()) {
-    return std::nullopt;
+    return Unsupported(scope, "SELECT AS STRUCT or AS VALUE");
   }
   const auto relation = Scan(*query->query(), scope);
   if (!relation) {
@@ -1234,6 +1528,21 @@ std::optional<std::string> TranslateResolvedToDuckDbSql(
     return std::nullopt;
   }
   return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
+}
+
+}  // namespace
+
+std::optional<std::string> TranslateResolvedToDuckDbSql(
+    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
+    std::string* unsupported) {
+  int next_name = 0;
+  std::string reason;
+  const Scope scope{parameters, next_name, reason, {}, {}};
+  auto sql = Statement(statement, scope);
+  if (!sql && unsupported != nullptr) {
+    *unsupported = reason.empty() ? "unsupported construct" : reason;
+  }
+  return sql;
 }
 
 }  // namespace bigquery_emulator_duckdb

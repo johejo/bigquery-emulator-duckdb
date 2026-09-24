@@ -28,9 +28,9 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries and plain `INSERT` statements use resolved AST translation when every scan and expression in them is supported; other DML, DDL and other queries use the parser AST. |
+| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Queries and DML are analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would; DDL skips analysis. Queries and `INSERT` / `UPDATE` / `DELETE` / `MERGE` statements use resolved AST translation when every scan and expression in them is supported; DDL and the remaining statements use the parser AST. |
 | `INSERT` | Partial | `INSERT ... VALUES` (including `DEFAULT`) and `INSERT ... SELECT` with or without a column list are translated from the resolved AST. `INSERT OR IGNORE/REPLACE/UPDATE`, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. |
-| `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the parser AST. |
+| `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. Updates of struct fields or array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` fall back to the parser AST. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
 | Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
 | Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans. Recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, lateral joins, `DISTINCT` window aggregates, and aggregate `HAVING MAX` / `LIMIT` modifiers fall back to the parser AST. |
 | Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for positional `UNION` / `INTERSECT` / `EXCEPT`, single-array `UNNEST` with `WITH OFFSET`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts; `CORRESPONDING` and multi-array `UNNEST` fall back. |
@@ -50,7 +50,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | `REGEXP_REPLACE` | Supported | Adds DuckDB's global flag to replace every occurrence. |
 | Templates with `OVER` | Unsupported | Calls keep their BigQuery spelling because a template may produce an expression that cannot take `OVER`. |
 | Type-dependent function mappings | Partial | In supported resolved SELECTs, argument types map `BYTE_LENGTH` to `strlen` for STRING and `octet_length` for BYTES. Queries outside the resolved translator subset still use parser AST translation. |
-| `SAFE.` function prefix | Unsupported | The prefix is dropped, so function errors reach the client instead of returning NULL. |
+| `SAFE.` function prefix | Partial | In resolved statements, the call runs inside DuckDB's `TRY` with its arguments evaluated outside it, so the function's own errors return NULL while argument errors still propagate. Volatile functions and calls translated to an explicit `error()` fall back; in parser AST translation the prefix is dropped. |
 
 ## Server
 
@@ -79,8 +79,10 @@ they share a wire encoding with the column DuckDB returns.
 
 [src/resolved_translator.cc](src/resolved_translator.cc) translates queries composed of
 SingleRow, Table, Project, Filter, OrderBy, LimitOffset, Join, Aggregate, Analytic, With,
-WithRef, SetOperation and Array scans, and INSERT statements whose rows are VALUES lists or such
-a query. INSERT names its target columns after the table's columns bound to the insert column list. Each scan becomes a derived table whose columns are named
+WithRef, SetOperation and Array scans, and INSERT, UPDATE, DELETE and MERGE statements over such
+queries. INSERT names its target columns after the table's columns bound to the insert column list.
+UPDATE, DELETE and MERGE alias the target table `_t`, so its columns resolve by ID like any other
+scan's; an UPDATE's FROM clause and a MERGE's source become the derived table `q`. Each scan becomes a derived table whose columns are named
 after resolved column IDs, with user-facing names applied only at the output boundary, so
 duplicate or shadowed aliases never collide. Sort keys survive projections even when they are
 absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
@@ -99,9 +101,9 @@ still apply.
 
 The catalog, TypeFactory and analyzer output remain alive through translation. Unsupported nodes,
 functions, types or modifiers return to parser AST translation for the entire statement;
-translation and execution errors do not trigger fallback. Recursive CTEs, grouping sets, UPDATE,
-DELETE, MERGE and DDL still use the parser translator. `--parser-fallback warn` logs each query or DML statement that
-falls back, and `--parser-fallback deny` fails it instead, to measure what the resolved translator
+translation and execution errors do not trigger fallback. Recursive CTEs, grouping sets and DDL still use
+the parser translator. `--parser-fallback warn` logs each query or DML statement that falls back,
+with the construct that caused it, and `--parser-fallback deny` fails it instead, naming the construct, to measure what the resolved translator
 still misses; DDL is unaffected. `tests/resolved_translator_test.cc` executes supported queries
 directly against DuckDB without a parser fallback, covering results, types, aliases, ordering and
 parameterized preparation.

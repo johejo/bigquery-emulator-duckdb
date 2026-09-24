@@ -40,6 +40,15 @@ class ResolvedTranslatorTest : public ::testing::Test {
     return TranslateResolvedToDuckDbSql(analyzed.statement(), parameters);
   }
 
+  std::string Unsupported(const std::string& sql) {
+    const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, {});
+    std::string reason;
+    if (TranslateResolvedToDuckDbSql(analyzed.statement(), {}, &reason).has_value()) {
+      throw std::runtime_error("Unexpected resolved translation: " + sql);
+    }
+    return reason;
+  }
+
   QueryResult Execute(const std::string& sql, const QueryParameters& parameters = {},
                       const AnalyzerSettings& settings = {}) {
     const auto translated = Translate(sql, parameters, settings);
@@ -144,13 +153,34 @@ TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedConstructs) {
       "WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM c WHERE n < 3) "
       "SELECT n FROM c";
   for (const std::string& sql :
-       {std::string("SELECT AS VALUE 1"), std::string("SELECT SAFE.BYTE_LENGTH('abc')"),
+       {std::string("SELECT AS VALUE 1"), std::string("SELECT SAFE.RAND()"),
         std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
         std::string("CREATE TABLE ds.new_t (x INT64)"), recursive,
         std::string("SELECT a, COUNT(*) FROM t GROUP BY ROLLUP(a)"),
         std::string("SELECT STRUCT(1, 2)")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
+}
+
+TEST_F(ResolvedTranslatorTest, NamesTheUnsupportedConstruct) {
+  EXPECT_EQ(Unsupported("SELECT BYTE_LENGTH('abc'), SESSION_USER()"), "function SESSION_USER");
+  EXPECT_EQ(Unsupported("SELECT a FROM t WHERE a IN (SELECT SAFE.RAND() FROM t)"), "SAFE.RAND");
+  EXPECT_EQ(Unsupported("SELECT a, COUNT(*) FROM t GROUP BY ROLLUP(a)"),
+            "GROUPING SETS, ROLLUP, CUBE or GROUPING");
+  EXPECT_EQ(Unsupported("SELECT AS VALUE a FROM t"), "SELECT AS STRUCT or AS VALUE");
+  EXPECT_EQ(Unsupported("UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1"),
+            "UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns");
+}
+
+TEST_F(ResolvedTranslatorTest, RunsSafeCalls) {
+  EXPECT_EQ(Scalar("SELECT SAFE.LENGTH('abc')"), "3");
+  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS('abc', '(')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, '(') FROM t WHERE a = 1"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1"), "true");
+  EXPECT_EQ(Scalar("SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1"), "Xz");
+  EXPECT_EQ(Scalar("SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)"), "2024-05-01");
+  // Only the function's own errors become NULL, not those of its arguments.
+  EXPECT_THROW(Execute("SELECT SAFE.ABS(1 / 0)"), BackendError);
 }
 
 TEST_F(ResolvedTranslatorTest, ReadsTablesAndKeepsHiddenSortColumns) {
@@ -548,6 +578,40 @@ TEST_F(ResolvedTranslatorTest, FallsBackForUnsupportedInsertModifiers) {
                                  std::string("INSERT INTO t (a) VALUES (1) THEN RETURN a")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
+}
+
+TEST_F(ResolvedTranslatorTest, UpdatesAndDeletesRows) {
+  using V = std::vector<std::string>;
+  Execute("UPDATE t SET b = CONCAT(b, '!'), raw = DEFAULT WHERE a = 1");
+  Execute("UPDATE p.ds.t AS x SET a = x.a * 10 WHERE x.a > 1");
+  Execute(
+      "UPDATE t SET b = s.b FROM (SELECT 30 AS a, 'from' AS b) AS s "
+      "WHERE t.a = s.a");
+  Execute("DELETE t WHERE a IS NULL");
+  Execute("DELETE FROM t WHERE EXISTS (SELECT 1 FROM UNNEST([20]) AS v WHERE v = t.a)");
+  EXPECT_EQ(
+      Column(Execute("SELECT CONCAT(CAST(a AS STRING), ':', b, ':', CAST(raw IS NULL AS STRING)) "
+                     "FROM t ORDER BY a")),
+      (V{"1:x!:true", "30:from:false"}));
+}
+
+TEST_F(ResolvedTranslatorTest, MergesRows) {
+  using V = std::vector<std::string>;
+  Execute(
+      "MERGE t USING (SELECT 1 AS a, 'one' AS b UNION ALL SELECT 5, 'five') AS s ON t.a = s.a "
+      "WHEN MATCHED THEN UPDATE SET b = s.b "
+      "WHEN NOT MATCHED BY TARGET THEN INSERT (a, b) VALUES (s.a, s.b) "
+      "WHEN NOT MATCHED BY SOURCE AND t.a = 2 THEN DELETE "
+      "WHEN NOT MATCHED BY SOURCE THEN UPDATE SET b = 'gone'");
+  EXPECT_EQ(
+      Column(Execute("SELECT CONCAT(IFNULL(CAST(a AS STRING), 'NULL'), ':', b) FROM t ORDER BY a")),
+      (V{"NULL:gone", "1:one", "3:gone", "5:five"}));
+  Execute(
+      "MERGE INTO p.ds.t AS d USING (SELECT 5 AS a, 'new' AS b, CAST(NULL AS BYTES) AS raw "
+      "UNION ALL SELECT 7, 'new', b'z') AS s ON d.a = s.a "
+      "WHEN MATCHED AND d.b = 'five' THEN DELETE "
+      "WHEN NOT MATCHED THEN INSERT ROW");
+  EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IS NOT NULL ORDER BY a")), (V{"1", "3", "7"}));
 }
 
 TEST_F(ResolvedTranslatorTest, DoesNotConvertParameterErrorsToFallback) {

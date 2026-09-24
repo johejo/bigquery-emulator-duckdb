@@ -321,10 +321,11 @@ TEST(EmulatorParserFallbackTest, DenyFailsOnlyStatementsTheResolvedTranslatorMis
   EXPECT_FALSE(run("CREATE TABLE fallback.t (x INT64)")->error.has_value());
   EXPECT_FALSE(run("INSERT INTO fallback.t (x) VALUES (1)")->error.has_value());
   EXPECT_FALSE(run("SELECT x FROM fallback.t")->error.has_value());
-  const std::shared_ptr<const Job> job = run("UPDATE fallback.t SET x = 2 WHERE TRUE");
+  EXPECT_FALSE(run("UPDATE fallback.t SET x = 2 WHERE TRUE")->error.has_value());
+  const std::shared_ptr<const Job> job = run("SELECT AS VALUE x FROM fallback.t");
   EXPECT_EQ(job->error.has_value() ? job->error->http_status() : 0, 400);
   EXPECT_NE(std::string(job->error.has_value() ? job->error->what() : "")
-                .find("parser AST fallback is disabled"),
+                .find("(SELECT AS STRUCT or AS VALUE), and parser AST fallback is disabled"),
             std::string::npos);
 }
 

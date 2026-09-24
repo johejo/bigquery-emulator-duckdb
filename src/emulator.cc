@@ -242,15 +242,18 @@ Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
                           settings.default_dataset);
   const AnalyzerResult analyzed =
       AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings);
-  std::optional<std::string> sql = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters);
+  std::string unsupported;
+  std::optional<std::string> sql =
+      TranslateResolvedToDuckDbSql(analyzed.statement(), parameters, &unsupported);
   if (!sql.has_value()) {
     switch (options_.parser_fallback) {
       case ParserFallback::kDeny:
         throw ApiError::InvalidQuery(
-            "The resolved AST translator does not support this statement, and parser AST "
-            "fallback is disabled");
+            "The resolved AST translator does not support this statement (" + unsupported +
+            "), and parser AST fallback is disabled");
       case ParserFallback::kWarn:
-        std::cerr << "parser AST fallback: " << OneLine(frontend_result.sql()) << '\n';
+        std::cerr << "parser AST fallback (" << unsupported
+                  << "): " << OneLine(frontend_result.sql()) << '\n';
         break;
       case ParserFallback::kAllow:
         break;
