@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -32,6 +33,11 @@ struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
   int64_t num_rows = 0;
+};
+
+struct InsertError {
+  size_t index;
+  std::string message;
 };
 
 struct Job {
@@ -81,6 +87,8 @@ class Emulator {
   void CreateTable(const TableReference& table, const nlohmann::json& fields);
   void DeleteTable(const TableReference& table);
   QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);
+  std::vector<InsertError> InsertTableData(const TableReference& table, const nlohmann::json& rows,
+                                           bool skip_invalid_rows, bool ignore_unknown_values);
 
  private:
   void EnsureProject(const std::string& project_id);

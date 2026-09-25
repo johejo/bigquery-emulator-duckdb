@@ -15,7 +15,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Query jobs | Partial | `jobs.query`, `jobs.insert`, `jobs.get`, and `jobs.getQueryResults`; jobs complete synchronously. |
 | Load, extract, and copy jobs | Unsupported | `jobs.insert` accepts query jobs only. |
 | Datasets and tables | Partial | `list`, `get`, `insert`, and `delete`; update and patch methods are not implemented. |
-| Table data | Partial | `tabledata.list` is implemented; streaming inserts (`tabledata.insertAll`) are not. |
+| Table data | Partial | `tabledata.list` and `tabledata.insertAll` are implemented. Streaming inserts accept scalar, repeated, and record fields, report row errors, and support `skipInvalidRows` and `ignoreUnknownValues`. Insert ID deduplication and template suffixes are unsupported. |
 | Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |
 | Query parameters | Supported | Named (`@name`) and positional (`?`) parameters, including ARRAY and STRUCT values. |
 | Dry runs | Supported | Validates queries and returns their result schema without executing them. |
@@ -187,7 +187,7 @@ just e2e            # builds the emulator, starts it on a free port and runs tes
 just e2e --verbose  # extra arguments are passed to `runn run`
 ```
 
-`tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
+`tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs, streams rows with `Inserter.Put`, and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
 
 Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB. The backend and the HTTP server have unit tests too (`just test`).
 

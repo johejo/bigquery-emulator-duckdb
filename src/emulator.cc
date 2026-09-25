@@ -1,5 +1,6 @@
 #include "src/emulator.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -97,6 +98,68 @@ std::string ToDuckDbType(const json& field) {
     duckdb_type += "[]";
   }
   return duckdb_type;
+}
+
+std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values);
+
+std::string InsertRecord(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
+  if (!value.is_object()) {
+    throw ApiError::Invalid("Expected an object for field " + field.name);
+  }
+  for (auto it = value.begin(); it != value.end(); ++it) {
+    const bool known =
+        std::any_of(field.fields.begin(), field.fields.end(),
+                    [&](const FieldSchema& child) { return child.name == it.key(); });
+    if (!known && !ignore_unknown_values) {
+      throw ApiError::Invalid("Unknown field: " + it.key());
+    }
+  }
+  std::string fields;
+  for (const FieldSchema& child : field.fields) {
+    if (!fields.empty()) {
+      fields += ", ";
+    }
+    const auto it = value.find(child.name);
+    fields += QuoteIdentifier(child.name) + " := " +
+              InsertValue(it == value.end() ? json(nullptr) : *it, child, ignore_unknown_values);
+  }
+  return "struct_pack(" + fields + ")";
+}
+
+std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
+  const std::string type = ToDuckDbType(field.ToJson());
+  if (value.is_null()) {
+    return "CAST(NULL AS " + type + ")";
+  }
+  if (field.mode == "REPEATED") {
+    if (!value.is_array()) {
+      throw ApiError::Invalid("Expected an array for field " + field.name);
+    }
+    FieldSchema element = field;
+    element.mode = "NULLABLE";
+    std::string values;
+    for (const json& item : value) {
+      if (!values.empty()) {
+        values += ", ";
+      }
+      values += InsertValue(item, element, ignore_unknown_values);
+    }
+    return "CAST([" + values + "] AS " + type + ")";
+  }
+  if (field.type == "RECORD") {
+    return InsertRecord(value, field, ignore_unknown_values);
+  }
+  if (!value.is_primitive()) {
+    throw ApiError::Invalid("Expected a scalar for field " + field.name);
+  }
+  const std::string scalar = value.is_string() ? value.get<std::string>() : value.dump();
+  if (field.type == "BYTES") {
+    return "from_base64(" + QuoteLiteral(scalar) + ")";
+  }
+  if (field.type == "TIMESTAMP" && value.is_number()) {
+    return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";
+  }
+  return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
 // Serves the analyzer the tables the emulator keeps in DuckDB.
@@ -384,6 +447,64 @@ QueryResult Emulator::ListTableData(const TableReference& table, int64_t start_i
   GetTable(table);
   return Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT " + std::to_string(max_results) +
                  " OFFSET " + std::to_string(start_index));
+}
+
+std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, const json& rows,
+                                                   bool skip_invalid_rows,
+                                                   bool ignore_unknown_values) {
+  if (!rows.is_array()) {
+    throw ApiError::Invalid("rows must be an array");
+  }
+  const std::vector<FieldSchema> schema = GetTable(table).schema;
+  std::vector<InsertError> errors;
+  std::vector<std::string> statements;
+  std::vector<size_t> indexes;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    try {
+      if (!rows[i].is_object() || !rows[i].contains("json") || !rows[i]["json"].is_object()) {
+        throw ApiError::Invalid("Row must contain a json object");
+      }
+      const json& values = rows[i]["json"];
+      for (auto it = values.begin(); it != values.end(); ++it) {
+        const bool known = std::any_of(schema.begin(), schema.end(), [&](const FieldSchema& field) {
+          return field.name == it.key();
+        });
+        if (!known && !ignore_unknown_values) {
+          throw ApiError::Invalid("Unknown field: " + it.key());
+        }
+      }
+      std::string columns;
+      std::string literals;
+      for (const FieldSchema& field : schema) {
+        if (!columns.empty()) {
+          columns += ", ";
+          literals += ", ";
+        }
+        columns += QuoteIdentifier(field.name);
+        const auto it = values.find(field.name);
+        literals +=
+            InsertValue(it == values.end() ? json(nullptr) : *it, field, ignore_unknown_values);
+      }
+      statements.push_back("INSERT INTO " + QualifiedName(table) + " (" + columns + ") VALUES (" +
+                           literals + ")");
+      indexes.push_back(i);
+    } catch (const ApiError& error) {
+      errors.push_back({i, error.what()});
+    }
+  }
+  if (!skip_invalid_rows && !errors.empty()) {
+    return errors;
+  }
+  try {
+    for (const auto& [index, message] : backend_.InsertRows(statements, skip_invalid_rows)) {
+      errors.push_back({indexes[index], message});
+    }
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
+  }
+  std::sort(errors.begin(), errors.end(),
+            [](const InsertError& a, const InsertError& b) { return a.index < b.index; });
+  return errors;
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -309,6 +309,30 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
   return query_result;
 }
 
+std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
+    const std::vector<std::string>& statements, bool skip_invalid_rows) {
+  duckdb::Connection connection(*db_);
+  RunSetup(connection, {});
+  std::vector<std::pair<size_t, std::string>> errors;
+  if (!skip_invalid_rows) {
+    ThrowIfFailed(connection.Query("BEGIN TRANSACTION"));
+  }
+  for (size_t i = 0; i < statements.size(); ++i) {
+    std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(statements[i]);
+    if (!result || result->HasError()) {
+      errors.emplace_back(i, result ? result->GetError() : "DuckDB insert failed");
+      if (!skip_invalid_rows) {
+        ThrowIfFailed(connection.Query("ROLLBACK"));
+        return errors;
+      }
+    }
+  }
+  if (!skip_invalid_rows) {
+    ThrowIfFailed(connection.Query("COMMIT"));
+  }
+  return errors;
+}
+
 std::string ExecuteScalarString(const std::string& sql) {
   duckdb::DuckDB db(nullptr);
   duckdb::Connection connection(db);

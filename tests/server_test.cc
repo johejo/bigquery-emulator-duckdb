@@ -217,5 +217,47 @@ TEST_F(ServerTest, ManagesDatasetsAndTables) {
   Get("/bigquery/v2/projects/p/datasets/ds", 404);
 }
 
+TEST_F(ServerTest, StreamsRowsAndReportsRowErrors) {
+  const std::string base = "/projects/p/datasets/ds/tables/t";
+  Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  Post("/projects/p/datasets/ds/tables",
+       {{"tableReference", {{"tableId", "t"}}}, {"schema", {{"fields", json::parse(R"([
+          {"name":"id","type":"INTEGER","mode":"REQUIRED"},
+          {"name":"tags","type":"STRING","mode":"REPEATED"},
+          {"name":"profile","type":"RECORD","fields":[
+            {"name":"name","type":"STRING"},{"name":"score","type":"INTEGER"}]},
+          {"name":"ts","type":"TIMESTAMP"},{"name":"data","type":"BYTES"}])")}}}});
+
+  const json good = {{"insertId", "row-1"},
+                     {"json",
+                      {{"id", "1"},
+                       {"tags", json::array({"a", "b"})},
+                       {"profile", {{"name", "alice"}, {"score", "3"}}},
+                       {"ts", "2024-01-02T03:04:05Z"},
+                       {"data", "AP8="}}}};
+  const json bad = {{"json", {{"id", "nope"}}}};
+  json response = Post(base + "/insertAll", {{"rows", json::array({good, bad})}});
+  ASSERT_EQ(response["insertErrors"].size(), 1);
+  EXPECT_EQ(response["insertErrors"][0]["index"], 1);
+  EXPECT_EQ(Get(base + "/data")["totalRows"], "0");
+
+  response =
+      Post(base + "/insertAll", {{"rows", json::array({good, bad})}, {"skipInvalidRows", true}});
+  ASSERT_EQ(response["insertErrors"].size(), 1);
+  EXPECT_EQ(response["insertErrors"][0]["index"], 1);
+  const json data = Get(base + "/data");
+  EXPECT_EQ(data["totalRows"], "1");
+  EXPECT_EQ(data["rows"][0]["f"][1]["v"], json::parse(R"([{"v":"a"},{"v":"b"}])"));
+  EXPECT_EQ(data["rows"][0]["f"][2]["v"]["f"][0]["v"], "alice");
+  EXPECT_EQ(data["rows"][0]["f"][3]["v"], "1704164645");
+  EXPECT_EQ(data["rows"][0]["f"][4]["v"], "AP8=");
+
+  response = Post(base + "/insertAll",
+                  {{"rows", json::array({{{"json", {{"id", 2}, {"extra", "ignored"}}}}})},
+                   {"ignoreUnknownValues", true}});
+  EXPECT_FALSE(response.contains("insertErrors"));
+  EXPECT_EQ(Get(base + "/data")["totalRows"], "2");
+}
+
 }  // namespace
 }  // namespace bigquery_emulator_duckdb

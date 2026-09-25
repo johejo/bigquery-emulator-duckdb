@@ -515,6 +515,33 @@ class Server::Impl {
           }
           return response;
         }));
+    Post(
+        "/projects/:project/datasets/:dataset/tables/:table/insertAll",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const json body = ParseBody(request);
+          const TableReference table{Param(request, "project"), Param(request, "dataset"),
+                                     Param(request, "table")};
+          if (!body.contains("rows")) {
+            throw ApiError::Invalid("Required parameter is missing: rows");
+          }
+          if (body.contains("templateSuffix") && !body["templateSuffix"].is_null() &&
+              body["templateSuffix"] != "") {
+            throw ApiError::Invalid("templateSuffix is not supported");
+          }
+          json response = {{"kind", "bigquery#tableDataInsertAllResponse"}};
+          const auto errors =
+              emulator_.InsertTableData(table, body["rows"], body.value("skipInvalidRows", false),
+                                        body.value("ignoreUnknownValues", false));
+          if (!errors.empty()) {
+            response["insertErrors"] = json::array();
+            for (const InsertError& error : errors) {
+              response["insertErrors"].push_back(
+                  {{"index", error.index},
+                   {"errors", json::array({{{"reason", "invalid"}, {"message", error.message}}})}});
+            }
+          }
+          return response;
+        }));
   }
 
   Emulator& emulator_;

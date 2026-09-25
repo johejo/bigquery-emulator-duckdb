@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -54,6 +56,11 @@ class Backend {
   // Validates `sql` and returns the schema of its result without running it. The result never
   // has rows; `has_rows` says whether the statement produces a result set at all.
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
+
+  // Inserts each row on one connection. Unless skip_invalid_rows is set, a failed row rolls
+  // back the entire request. Returns the failed row indexes and their DuckDB errors.
+  std::vector<std::pair<size_t, std::string>> InsertRows(const std::vector<std::string>& statements,
+                                                         bool skip_invalid_rows);
 
  private:
   std::unique_ptr<duckdb::DuckDB> db_;
