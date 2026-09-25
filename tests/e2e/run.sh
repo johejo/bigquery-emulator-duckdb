@@ -9,9 +9,25 @@ bazelisk build //:bigquery-emulator-duckdb
 port="${BQ_EMULATOR_PORT:-$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
 export BQ_EMULATOR_API="http://127.0.0.1:${port}"
 
+gcs_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+export STORAGE_EMULATOR_HOST="http://127.0.0.1:${gcs_port}"
+fake-gcs-server --scheme http --host 127.0.0.1 --port "${gcs_port}" --backend memory --log-level error &
+gcs_pid=$!
+
 ./bazel-bin/bigquery-emulator-duckdb --host 127.0.0.1 --port "${port}" &
 emulator_pid=$!
-trap 'kill "${emulator_pid}" 2>/dev/null || true' EXIT
+trap 'kill "${emulator_pid}" "${gcs_pid}" 2>/dev/null || true' EXIT
+
+for _ in $(seq 1 50); do
+  if curl -fs -o /dev/null "${STORAGE_EMULATOR_HOST}/storage/v1/b"; then
+    break
+  fi
+  sleep 0.1
+done
+curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test" \
+  -H 'Content-Type: application/json' -d '{"name":"load-fixtures"}' >/dev/null
+curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=people.jsonl" \
+  -H 'Content-Type: application/json' --data-binary @tests/e2e/data/people.jsonl >/dev/null
 
 for _ in $(seq 1 50); do
   if curl -fs -o /dev/null "${BQ_EMULATOR_API}/\$discovery/rest?version=v2"; then

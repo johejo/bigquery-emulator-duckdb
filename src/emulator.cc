@@ -3,15 +3,20 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "absl/status/statusor.h"
 #include "googlesql/public/type.h"
@@ -65,6 +70,76 @@ std::string QualifiedName(const TableReference& table) {
 
 std::string JobKey(const std::string& project_id, const std::string& job_id) {
   return project_id + ":" + job_id;
+}
+
+std::string UrlEncode(const std::string& value) {
+  static constexpr char kHex[] = "0123456789ABCDEF";
+  std::string encoded;
+  for (unsigned char c : value) {
+    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/') {
+      encoded += static_cast<char>(c);
+    } else {
+      encoded += '%';
+      encoded += kHex[c >> 4];
+      encoded += kHex[c & 15];
+    }
+  }
+  return encoded;
+}
+
+// curl handles HTTPS and the standard STORAGE_EMULATOR_HOST HTTP endpoint. Arguments are passed
+// directly to exec, so object names and credentials never pass through a shell.
+void DownloadGcs(const std::string& uri, const std::string& output) {
+  const size_t slash = uri.find('/', 5);
+  if (slash == std::string::npos || slash == 5 || slash + 1 == uri.size()) {
+    throw ApiError::Invalid("Invalid GCS URI: " + uri);
+  }
+  const std::string bucket = uri.substr(5, slash - 5);
+  const std::string object = uri.substr(slash + 1);
+  const char* emulator_host = std::getenv("STORAGE_EMULATOR_HOST");
+  std::string base = emulator_host && *emulator_host ? emulator_host : "https://storage.googleapis.com";
+  while (!base.empty() && base.back() == '/') base.pop_back();
+  const std::string url = base + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" +
+                          UrlEncode(object) + "?alt=media";
+  const char* token = std::getenv("GOOGLE_OAUTH_ACCESS_TOKEN");
+  std::string authorization = token && *token ? std::string("Authorization: Bearer ") + token : "";
+  std::vector<const char*> argv = {"curl", "--fail", "--silent", "--show-error", "--location",
+                                   "--output", output.c_str()};
+  if (!authorization.empty()) {
+    argv.push_back("--header");
+    argv.push_back(authorization.c_str());
+  }
+  argv.push_back(url.c_str());
+  argv.push_back(nullptr);
+  const pid_t pid = fork();
+  if (pid < 0) throw ApiError::Internal("Could not start GCS download");
+  if (pid == 0) {
+    execvp("curl", const_cast<char* const*>(argv.data()));
+    _exit(127);
+  }
+  int status = 0;
+  if (waitpid(pid, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    throw ApiError::Invalid("Could not read GCS object: " + uri);
+  }
+}
+
+struct DownloadedFiles {
+  std::vector<std::string> paths;
+  ~DownloadedFiles() {
+    for (const std::string& path : paths) {
+      std::error_code ignored;
+      std::filesystem::remove(path, ignored);
+    }
+  }
+};
+
+FieldSchema ParseField(const json& value) {
+  FieldSchema field{value.at("name").get<std::string>(), value.value("type", "STRING"),
+                    value.value("mode", "NULLABLE"), {}};
+  for (const json& child : value.value("fields", json::array())) {
+    field.fields.push_back(ParseField(child));
+  }
+  return field;
 }
 
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
@@ -431,10 +506,138 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   return job;
 }
 
+std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
+  EnsureProject(request.project_id);
+  auto job = std::make_shared<Job>();
+  job->project_id = request.project_id;
+  job->job_id = request.job_id;
+  job->is_load = true;
+  job->load_configuration = request.configuration;
+  job->destination_table = request.destination_table;
+  job->create_disposition = request.configuration.value("createDisposition", "");
+  job->write_disposition = request.configuration.value("writeDisposition", "");
+  if (job->write_disposition.empty()) job->write_disposition = "WRITE_APPEND";
+  job->creation_time_ms = NowMillis();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (job->job_id.empty()) {
+      do {
+        job->job_id = "job_" + std::to_string(next_job_number_++);
+      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
+               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
+    }
+    const std::string key = JobKey(request.project_id, job->job_id);
+    if (jobs_.contains(key) || running_jobs_.contains(key)) {
+      throw ApiError::Duplicate("Already Exists: Job " + key);
+    }
+    running_jobs_.insert(key);
+  }
+
+  try {
+    const json& config = request.configuration;
+    const std::string format = config.value("sourceFormat", "CSV");
+    if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
+      throw ApiError::Invalid("Unsupported source format: " + format);
+    }
+    const json uris = config.value("sourceUris", json::array());
+    if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("sourceUris is required");
+    DownloadedFiles downloads;
+    std::string paths;
+    for (const json& item : uris) {
+      if (!item.is_string()) throw ApiError::Invalid("Invalid source URI");
+      const std::string uri = item.get<std::string>();
+      std::string path;
+      if (uri.starts_with("gs://")) {
+        char pattern[] = "/tmp/bigquery-load-XXXXXX";
+        const int fd = mkstemp(pattern);
+        if (fd < 0) throw ApiError::Internal("Could not create load temporary file");
+        close(fd);
+        path = pattern;
+        downloads.paths.push_back(path);
+        DownloadGcs(uri, path);
+      } else if (uri.starts_with("file://")) {
+        path = uri.substr(7);
+      } else if (uri.find("://") == std::string::npos) {
+        path = uri;
+      } else {
+        throw ApiError::Invalid("Unsupported source URI: " + uri);
+      }
+      if (path.empty() || !std::filesystem::is_regular_file(path)) {
+        throw ApiError::Invalid("Source file does not exist: " + uri);
+      }
+      paths += (paths.empty() ? "" : ", ") + QuoteLiteral(path);
+    }
+    const std::string files = "[" + paths + "]";
+    std::vector<FieldSchema> requested_schema;
+    if (config.contains("schema")) {
+      for (const json& field : config.at("schema").at("fields")) {
+        requested_schema.push_back(ParseField(field));
+      }
+    }
+    if (requested_schema.empty()) {
+      TableReference destination = request.destination_table;
+      if (destination.project_id.empty()) destination.project_id = request.project_id;
+      try {
+        requested_schema = GetTable(destination).schema;
+      } catch (const ApiError& error) {
+        if (error.http_status() != 404) throw;
+      }
+    }
+    std::string sql;
+    if (format == "CSV") {
+      sql = "SELECT * FROM read_csv(" + files + ", header=false, skip=" +
+            std::to_string(config.value("skipLeadingRows", 0)) + ", delim=" +
+            QuoteLiteral(config.value("fieldDelimiter", ","));
+      if (!requested_schema.empty()) {
+        sql += ", auto_detect=false";
+        std::string columns;
+        for (const FieldSchema& field : requested_schema) {
+          columns += (columns.empty() ? "" : ", ") + QuoteLiteral(field.name) + ": " +
+                     QuoteLiteral(ToDuckDbType(field.ToJson()));
+        }
+        sql += ", columns={" + columns + "}";
+      }
+      sql += ")";
+    } else if (format == "NEWLINE_DELIMITED_JSON") {
+      sql = "SELECT * FROM read_json(" + files + ", format='newline_delimited')";
+    } else {
+      sql = "SELECT * FROM read_parquet(" + files + ")";
+    }
+    if (!requested_schema.empty() && format != "CSV") {
+      std::string columns;
+      for (const FieldSchema& field : requested_schema) {
+        if (!columns.empty()) columns += ", ";
+        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " +
+                   ToDuckDbType(field.ToJson()) + ") AS " + QuoteIdentifier(field.name);
+      }
+      sql = "SELECT " + columns + " FROM (" + sql + ") AS source";
+    }
+    const QueryResult prepared = Prepare(sql);
+    QueryRequest destination_request;
+    destination_request.project_id = request.project_id;
+    destination_request.create_disposition = job->create_disposition;
+    destination_request.write_disposition = job->write_disposition;
+    QueryResult result = WriteDestination(destination_request, request.destination_table, sql,
+                                          requested_schema.empty() ? prepared.schema : requested_schema,
+                                          {}, true);
+    job->output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job->result = QueryResult{};
+  } catch (const ApiError& error) {
+    job->error = error;
+  } catch (const std::exception& error) {
+    job->error = ApiError::Invalid(error.what());
+  }
+  job->end_time_ms = NowMillis();
+  std::lock_guard<std::mutex> lock(mutex_);
+  running_jobs_.erase(JobKey(request.project_id, job->job_id));
+  jobs_[JobKey(request.project_id, job->job_id)] = job;
+  return job;
+}
+
 QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReference destination,
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
-                                       const std::vector<std::string>& setup) {
+                                       const std::vector<std::string>& setup, bool count_only) {
   const std::string create =
       request.create_disposition.empty() ? "CREATE_IF_NEEDED" : request.create_disposition;
   const std::string write =
@@ -514,7 +717,8 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
     statements.push_back("INSERT INTO " + target + " BY NAME SELECT * FROM " + result_table);
   }
   statements.emplace_back("COMMIT");
-  statements.push_back("SELECT * FROM " + result_table);
+  statements.push_back("SELECT " + std::string(count_only ? "count(*)" : "*") + " FROM " +
+                       result_table);
   try {
     return backend_.ExecuteAll(statements, setup);
   } catch (const BackendError& error) {

@@ -13,7 +13,8 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | `bq` CLI and Go BigQuery client | Supported | Covered by [end-to-end tests](tests/e2e); use the emulator URL as the endpoint override. |
 | REST discovery and endpoint paths | Supported | Serves the v2 discovery document; resource routes accept both `/bigquery/v2` and root paths. |
 | Query jobs | Partial | Jobs complete synchronously, so cancellation cannot interrupt them. Legacy SQL is unsupported, and results are not stored in anonymous tables. |
-| Load, extract, and copy jobs | Unsupported | `jobs.insert` accepts query jobs only. |
+| Load jobs | Partial | `bq load` accepts local files and `gs://` objects; direct `jobs.insert` also accepts local paths and `file://` paths. CSV, newline-delimited JSON, and Parquet are supported. Jobs complete synchronously. GCS uses `STORAGE_EMULATOR_HOST` for fake-gcs-server or the public Storage API; set `GOOGLE_OAUTH_ACCESS_TOKEN` for private objects. Wildcard URIs and compressed inputs are unsupported. |
+| Extract and copy jobs | Unsupported | `jobs.insert` does not implement these job types. |
 | Datasets and tables | Partial | `list`, `get`, `insert`, and `delete`; update and patch methods are not implemented. |
 | Table data | Partial | `tabledata.list` and `tabledata.insertAll` are implemented. Streaming inserts accept scalar, repeated, and record fields, report row errors, and support `skipInvalidRows` and `ignoreUnknownValues`. Insert ID deduplication and template suffixes are unsupported. |
 | Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |
@@ -173,6 +174,8 @@ just e2e --verbose  # extra arguments are passed to `runn run`
 ```
 
 `tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs, streams rows with `Inserter.Put`, and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
+
+The load scenario starts fake-gcs-server, uploads a fixture object, and checks both GCS and local file load jobs through runn. `curl` is required for GCS downloads.
 
 The end-to-end scenarios own client-visible results, including representative function semantics, query parameters, and table operations. Add new behavior checks there first. Keep C++ tests for focused internal boundaries: translation choices and edge cases in `tests/translator_test.cc`, result encoding in `tests/backend_test.cc`, and raw HTTP response details in `tests/server_test.cc` (`just test`). `tests/emulator_test.cc` covers direct `Emulator::RunQuery` behavior that the client scenarios do not exercise. Avoid copying the same SQL and expected result between these layers.
 

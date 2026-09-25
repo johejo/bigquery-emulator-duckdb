@@ -1,0 +1,34 @@
+desc: load jobs read local CSV files and GCS JSON objects from fake-gcs-server
+steps:
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset e2e_load
+    test: current.exit_code == 0
+  load_local:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
+        e2e_load.people tests/e2e/data/people.csv id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  local_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.people
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
+  load_gcs:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.people gs://load-fixtures/people.jsonl
+    test: current.exit_code == 0
+  rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.people
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"},{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
+  cleanup:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d e2e_load
+    test: current.exit_code == 0
