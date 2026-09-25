@@ -196,6 +196,23 @@ cc_binary(
     ],
 )
 
+# Prints a Markdown report of which GoogleSQL built-in functions the emulator translates and runs.
+cc_binary(
+    name = "function_probe",
+    srcs = ["tools/function_probe.cc"],
+    copts = ["-std=c++20"],
+    target_compatible_with = MACOS_ONLY,
+    deps = [
+        ":analyzer",
+        ":catalog",
+        ":emulator",
+        "@googlesql//googlesql/public:builtin_function_options",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:type",
+    ],
+)
+
 cc_test(
     name = "catalog_test",
     srcs = ["tests/catalog_test.cc"],
