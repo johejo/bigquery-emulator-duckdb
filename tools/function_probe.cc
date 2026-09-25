@@ -2,7 +2,8 @@
 // prints a Markdown report of which ones translate and run. Each signature the analyzer knows for a
 // function is called with sample arguments of its types, unless the hints file gives the calls; a
 // signature the probe cannot build a valid call for is reported as untested. A probe checks only
-// that a call translates and runs on DuckDB, not that it returns what BigQuery would.
+// that a call translates and runs on DuckDB, not that it returns what BigQuery would. The hints file
+// can also give a function a note on its behavior, which the report shows before the probe's notes.
 
 #include <algorithm>
 #include <cstdint>
@@ -47,7 +48,9 @@ and whether the emulator runs it. The list comes from `tools/bigquery_functions.
 `//:function_probe` calls each function once for every signature the analyzer knows, with sample
 arguments of the signature's types. A function whose valid arguments the types do not describe
 is called with the queries in `tools/function_probe_hints.txt` instead. A probe checks only that
-a call translates and runs on DuckDB, not that it returns what BigQuery would.
+a call translates and runs on DuckDB, not that it returns what BigQuery would. The notes the
+hints file gives describe how the emulator follows BigQuery where DuckDB would differ, and the
+probe's own notes name what it rejected.
 
 - **Supported**: every call runs.
 - **Partial**: some calls run, and the emulator rejects the others as unsupported.
@@ -340,10 +343,13 @@ int Main(int argc, char** argv) {
     functions[name].push_back(doc);
   }
   std::map<std::string, std::vector<std::string>> hints;
+  // Behavior a probe cannot observe, such as where results differ from DuckDB's defaults.
+  std::map<std::string, std::string> documented;
   for (const auto& [directive, hint] : ReadLines(args[1])) {
     const std::string name = hint.substr(0, hint.find(' '));
-    const std::string sql = hint.substr(std::min(hint.size(), name.size() + 1));
-    if (directive != "query" || sql.empty()) {
+    const std::string text = hint.substr(std::min(hint.size(), name.size() + 1));
+    if ((directive != "query" && directive != "note") || text.empty() ||
+        (directive == "note" && documented.contains(name))) {
       std::cerr << "cannot parse hint: " << directive << " " << hint << "\n";
       return 1;
     }
@@ -352,7 +358,11 @@ int Main(int argc, char** argv) {
       std::cerr << "hint names a function not in " << args[0] << ": " << name << "\n";
       return 1;
     }
-    hints[name].push_back(sql);
+    if (directive == "note") {
+      documented[name] = text;
+    } else {
+      hints[name].push_back(text);
+    }
   }
 
   googlesql::TypeFactory type_factory;
@@ -404,6 +414,9 @@ int Main(int argc, char** argv) {
     const std::string status = Status(counts);
     ++totals[status];
     std::string note;
+    if (const auto it = documented.find(name); it != documented.end()) {
+      note = it->second;
+    }
     for (const std::string& n : notes) {
       note += (note.empty() ? "" : "; ") + n;
     }

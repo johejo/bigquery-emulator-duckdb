@@ -71,44 +71,21 @@ they share a wire encoding with the column DuckDB returns.
 
 ## Translator
 
-[src/translator.cc](src/translator.cc) translates queries composed of
-SingleRow, Table, Project, Filter, OrderBy, LimitOffset, Join, Aggregate, Analytic, With,
-WithRef, Recursive, RecursiveRef, SetOperation and Array scans, INSERT, UPDATE, DELETE and MERGE statements over such
-queries, and CREATE TABLE [AS SELECT], CREATE SCHEMA and DROP TABLE / SCHEMA. DDL has no catalog
-lookup, so the translator completes its table and dataset paths from the default project and dataset itself. INSERT names its target columns after the table's columns bound to the insert column list.
-UPDATE, DELETE and MERGE alias the target table `_t`, so its columns resolve by ID like any other
-scan's; an UPDATE's FROM clause and a MERGE's source become the derived table `q`. Each scan becomes a derived table whose columns are named
-after resolved column IDs, with user-facing names applied only at the output boundary, so
-duplicate or shadowed aliases never collide. A query returning a value table of STRUCTs selects each field with `struct_extract_at`. Sort keys survive projections even when they are
-absent from the result, and ORDER BY explicitly implements BigQuery's default NULL ordering.
-CTEs become DuckDB CTEs with positional column names; a recursive entry becomes a DuckDB
-recursive CTE, whose UNION [ALL] iterates the same way. Grouping sets compute their keys in a
-derived table below the aggregation and group by those column names, so ROLLUP, CUBE, nested
-GROUPING SETS and GROUP BY a, ROLLUP(b) keep their DuckDB spelling. A set operation matching
-columns by name is already aligned by position in the resolved AST, with missing columns padded
-with NULLs, so it becomes a positional DuckDB set operation. A lateral join becomes DuckDB's `JOIN LATERAL`, and its right
-side refers to the left's columns the way a correlated subquery does. UNNEST becomes a lateral `unnest` with
-ordinality; several arrays are instead indexed in step over a `range` sized by the zip mode, and correlated subquery references resolve through the enclosing scan's column names.
+[src/translator.cc](src/translator.cc) translates the resolved AST of queries, INSERT, UPDATE,
+DELETE and MERGE, and CREATE TABLE [AS SELECT], CREATE SCHEMA and DROP TABLE / SCHEMA into DuckDB
+SQL. A statement containing an unsupported node, function, type or modifier fails as
+`invalidQuery`, naming the construct.
 
-Expressions include scalar literals and parameters, casts, arithmetic, comparisons, boolean
-operators, CASE/IF/COALESCE, selected scalar functions, STRUCT construction and field access,
-array literals and subscripts, and scalar, ARRAY, EXISTS and IN subqueries. Aggregate and
-analytic calls cover the common numeric, string, array and navigation functions, with DISTINCT,
-ORDER BY and IGNORE NULLS where DuckDB can express them, and window frames. An aggregate `LIMIT`
-slices the aggregated list, and `HAVING MAX` / `MIN` filters the aggregate's rows against a
-window maximum or minimum over the group. The existing function
-renames and templates are reused, adapting resolved enum date parts, interval arguments and
-default arguments. BYTE_LENGTH and LENGTH distinguish STRING from BYTES. String, hash and
-trigonometric functions, `IEEE_DIVIDE` and `SAFE_ADD` / `SAFE_SUBTRACT` / `SAFE_MULTIPLY` /
-`SAFE_NEGATE` (the arithmetic operators under `SAFE.`) are translated as well. `<<` and `>>` shift a 64-bit BIT string, so they drop the bits shifted out and fill with zeros as BigQuery does instead of failing on overflow or extending the sign; `IS [NOT] DISTINCT FROM`, `IN UNNEST`, `ERROR`, `ARRAY_CONCAT` (NULL when any array is NULL), `ARRAY_REVERSE`, `ROUND` with digits and `LPAD` / `RPAD` with the default pad are translated too, while their BYTES overloads and `SPLIT` on BYTES are unsupported. `EXTRACT` (including `DAYOFWEEK`, Sunday-based `WEEK`, `ISOWEEK`, sub-second parts, `AT TIME ZONE` and `EXTRACT(DATE/TIME/DATETIME FROM ...)`), the `DATE` / `DATETIME` / `TIME` / `TIMESTAMP` constructors, `LAST_DAY`, `UNIX_DATE` and `GENERATE_DATE_ARRAY` with a DAY or WEEK step follow BigQuery; `WEEK` and `ISOWEEK` truncation and differences start weeks on Sunday and Monday, and `TIMESTAMP_DIFF`, `TIME_DIFF` and differences below a day count whole units rather than boundaries. `REGEXP_EXTRACT` / `REGEXP_SUBSTR` and `REGEXP_EXTRACT_ALL` with a literal STRING pattern return the capturing group, NULL when nothing matches, and fail on more than one group. `JSON_QUERY` / `JSON_VALUE` and their `_ARRAY` variants, the legacy `JSON_EXTRACT` family, `JSON_TYPE`, `json.field` and `json[...]` access, and the `INT64` / `FLOAT64` / `BOOL` / `STRING` conversions from JSON follow BigQuery for literal JSONPaths built from keys and indexes: malformed JSON strings and JSON nulls give NULL where BigQuery returns NULL, and a conversion fails when the value has another JSON type. Wildcards, `REGEXP_INSTR`, the `LAX_` conversions and the other JSON functions are unsupported. Function and aggregate
-results are cast to their resolved types. Existing documented function compatibility limitations
-still apply.
+Each scan becomes a derived table whose columns are named after resolved column IDs, and
+user-facing names are applied only at the output boundary, so duplicate or shadowed aliases never
+collide. Where DuckDB differs from BigQuery, the translator spells out BigQuery's semantics: ORDER
+BY states the default NULL ordering, sort keys survive projections, set operations matching
+columns by name become positional ones, and function and aggregate results are cast to their
+resolved types. Operators follow BigQuery too, such as `<<` and `>>` on 64-bit values,
+`IS [NOT] DISTINCT FROM`, `IN UNNEST` and the `SAFE.` prefix on arithmetic.
 
-The catalog, TypeFactory and analyzer output remain alive through translation. A statement containing
-an unsupported node, function, type or modifier fails as `invalidQuery`, naming the construct.
-Keeping conversion in this layer leaves the frontend focused on parsing and the backend on
-execution. `tests/translator_test.cc` executes supported queries directly against
-DuckDB, covering results, types, aliases, ordering and parameterized preparation.
+`tests/translator_test.cc` runs supported queries directly against DuckDB, covering results,
+types, aliases, ordering and parameterized preparation.
 
 ### Functions
 
@@ -117,8 +94,9 @@ A **rename** replaces only the function name. A **template** rewrites the call u
 the n-th argument and `#n` for that argument as a lowercase string literal, as required for
 DuckDB date parts. For example, `DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`.
 
-[docs/functions.md](docs/functions.md) lists which BigQuery functions the emulator runs. It is
-generated by `//:function_probe`, and `//:functions_md_test` fails when it is stale; run
+[docs/functions.md](docs/functions.md) lists which BigQuery functions the emulator runs, with
+notes on where their behavior needs care. It is generated by `//:function_probe` from
+`tools/function_probe_hints.txt`, and `//:functions_md_test` fails when it is stale; run
 `just docs` to regenerate it.
 
 ## Backend

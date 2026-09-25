@@ -2,6 +2,8 @@
 #
 #   query NAME SQL   probes SQL instead of the calls generated from the function's signatures;
 #                    repeat it to cover each signature BigQuery documents
+#   note NAME TEXT   shows TEXT in the Notes column, for behavior a probe cannot observe;
+#                    at most one per function
 #
 # NAME must be in tools/bigquery_functions.txt. Run
 # `bazel run //:function_probe -- --signatures $PWD/tools/bigquery_functions.txt $PWD/tools/function_probe_hints.txt`
@@ -40,6 +42,11 @@ query STRING SELECT STRING(JSON '"abc"')
 query FROM_BASE64 SELECT FROM_BASE64('YWJj')
 query PARSE_JSON SELECT PARSE_JSON('{"a": 1}')
 query PARSE_JSON SELECT PARSE_JSON('1.5', wide_number_mode => 'round')
+# JSONPaths must be literals the translator can parse.
+query JSON_QUERY SELECT JSON_QUERY('{"a": [1, 2]}', '$.a')
+query JSON_QUERY SELECT JSON_QUERY(JSON '{"a": [1, 2]}', '$.a')
+query JSON_EXTRACT SELECT JSON_EXTRACT('{"a": [1, 2]}', '$.a')
+query JSON_EXTRACT SELECT JSON_EXTRACT(JSON '{"a": [1, 2]}', '$.a')
 query ERROR SELECT IF(FALSE, ERROR('abc'), 1)
 query FORMAT SELECT FORMAT('%d-%s', 2, 'abc')
 query GROUPING SELECT x, GROUPING(x) FROM UNNEST([1, 2]) AS x GROUP BY ROLLUP(x)
@@ -70,3 +77,35 @@ query KLL_QUANTILES.EXTRACT_POINT_FLOAT64 SELECT KLL_QUANTILES.EXTRACT_POINT_FLO
 query KLL_QUANTILES.EXTRACT_POINT_INT64 SELECT KLL_QUANTILES.EXTRACT_POINT_INT64(KLL_QUANTILES.INIT_INT64(x), 0.5) FROM UNNEST([1, 2]) AS x
 query KLL_QUANTILES.MERGE_POINT_FLOAT64 SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST([1.5, 2.5]) AS x)
 query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 0.5) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1, 2]) AS x)
+
+# Behavior that follows BigQuery where DuckDB would differ.
+note BYTE_LENGTH counts the bytes of a STRING's UTF-8 encoding
+note LENGTH counts characters of a STRING and bytes of a BYTES
+note ARRAY_CONCAT returns NULL when any array is NULL
+note LPAD pads with spaces by default; the BYTES overload is unsupported
+note RPAD pads with spaces by default; the BYTES overload is unsupported
+note SPLIT the BYTES overload is unsupported
+note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
+note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
+note DATE_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
+note DATETIME_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
+note TIMESTAMP_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
+note DATE_DIFF WEEK starts on Sunday and ISOWEEK on Monday
+note DATETIME_DIFF WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries
+note TIMESTAMP_DIFF counts whole units rather than boundaries
+note TIME_DIFF counts whole units rather than boundaries
+note REGEXP_EXTRACT needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group
+note REGEXP_SUBSTR needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group
+note REGEXP_EXTRACT_ALL needs a literal STRING pattern; returns the capturing group and fails on more than one group
+note JSON_QUERY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note JSON_VALUE needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL
+note JSON_QUERY_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note JSON_VALUE_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note JSON_EXTRACT needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note JSON_EXTRACT_SCALAR needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL
+note JSON_EXTRACT_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note JSON_EXTRACT_STRING_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
+note INT64 from JSON, fails when the value has another JSON type
+note FLOAT64 from JSON, fails when the value has another JSON type
+note BOOL from JSON, fails when the value has another JSON type
+note STRING from JSON, fails when the value has another JSON type
