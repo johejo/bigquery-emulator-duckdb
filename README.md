@@ -14,7 +14,8 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | REST discovery and endpoint paths | Supported | Serves the v2 discovery document; resource routes accept both `/bigquery/v2` and root paths. |
 | Query jobs | Partial | Jobs complete synchronously, so cancellation cannot interrupt them. Legacy SQL is unsupported, and results are not stored in anonymous tables. |
 | Load jobs | Partial | `bq load` accepts local files and `gs://` objects; direct `jobs.insert` also accepts local paths and `file://` paths. CSV, newline-delimited JSON, and Parquet are supported. Jobs complete synchronously. GCS uses `STORAGE_EMULATOR_HOST` for fake-gcs-server or the public Storage API; set `GOOGLE_OAUTH_ACCESS_TOKEN` for private objects. Wildcard URIs and compressed inputs are unsupported. |
-| Extract and copy jobs | Unsupported | `jobs.insert` does not implement these job types. |
+| Copy jobs | Partial | `bq cp` and `jobs.insert` copy one or multiple tables, with create and write dispositions. Jobs complete synchronously. Table snapshots, clones, and cross-region behavior are unsupported. |
+| Extract jobs | Unsupported | `jobs.insert` does not implement extract jobs. |
 | Datasets and tables | Partial | `list`, `get`, `insert`, and `delete`; update and patch methods are not implemented. |
 | Table data | Partial | `tabledata.list` and `tabledata.insertAll` are implemented. Streaming inserts accept scalar, repeated, and record fields, report row errors, and support `skipInvalidRows` and `ignoreUnknownValues`. Insert ID deduplication and template suffixes are unsupported. |
 | Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |

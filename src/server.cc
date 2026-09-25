@@ -1,5 +1,7 @@
 #include "src/server.h"
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -11,10 +13,9 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 #include <vector>
-#include <unistd.h>
 
 #include "httplib.h"
 #include "nlohmann/json.hpp"
@@ -206,6 +207,12 @@ json JobStatus(const Job& job) {
 }
 
 json JobStatistics(const Job& job) {
+  if (job.is_copy) {
+    return json{{"creationTime", std::to_string(job.creation_time_ms)},
+                {"startTime", std::to_string(job.creation_time_ms)},
+                {"endTime", std::to_string(job.end_time_ms)},
+                {"copy", {{"copiedRows", std::to_string(job.output_rows)}}}};
+  }
   if (job.is_load) {
     return json{{"creationTime", std::to_string(job.creation_time_ms)},
                 {"startTime", std::to_string(job.creation_time_ms)},
@@ -237,6 +244,29 @@ json TableReferenceJson(const TableReference& table) {
 }
 
 json JobResource(const Job& job) {
+  if (job.is_copy) {
+    json copy = job.copy_configuration;
+    auto complete = [&job](json& table) {
+      if (table.value("projectId", "").empty()) table["projectId"] = job.project_id;
+    };
+    complete(copy["destinationTable"]);
+    if (copy.contains("sourceTable")) complete(copy["sourceTable"]);
+    if (copy.contains("sourceTables")) {
+      for (json& table : copy["sourceTables"]) complete(table);
+    }
+    copy["createDisposition"] =
+        job.create_disposition.empty() ? "CREATE_IF_NEEDED" : job.create_disposition;
+    copy["writeDisposition"] =
+        job.write_disposition.empty() ? "WRITE_EMPTY" : job.write_disposition;
+    return json{{"kind", "bigquery#job"},
+                {"etag", ""},
+                {"id", job.project_id + ":" + job.location + "." + job.job_id},
+                {"selfLink", ""},
+                {"jobReference", JobReference(job)},
+                {"configuration", {{"jobType", "COPY"}, {"copy", std::move(copy)}}},
+                {"status", JobStatus(job)},
+                {"statistics", JobStatistics(job)}};
+  }
   if (job.is_load) {
     json load = job.load_configuration;
     TableReference destination = *job.destination_table;
@@ -496,84 +526,116 @@ class Server::Impl {
                           response);
           return response;
         }));
-    const auto insert_job = Json([this](const httplib::Request& request, httplib::Response& response) {
-           if ((request.has_param("uploadType") &&
-                request.get_param_value("uploadType") == "resumable") ||
-               (request.has_param("upload_protocol") &&
-                request.get_param_value("upload_protocol") == "resumable")) {
-             const json metadata = ParseBody(request);
-             std::string id;
-             {
-               std::lock_guard<std::mutex> lock(uploads_mutex_);
-               id = std::to_string(next_upload_id_++);
-               uploads_[id] = metadata;
-             }
-             response.set_header("Location", server_.root_url() +
-                 "/resumable/upload/bigquery/v2/projects/" + Param(request, "project") +
-                 "/jobs/" + id);
-             return json::object();
-           }
-           TemporaryUpload upload;
-           json body;
-           if (request.get_header_value("Content-Type").find("multipart/related") !=
-               std::string::npos) {
-             auto [metadata, content] = ParseMultipartUpload(request);
-             body = std::move(metadata);
-             char pattern[] = "/tmp/bigquery-upload-XXXXXX";
-             const int fd = mkstemp(pattern);
-             if (fd < 0) throw ApiError::Internal("Could not create upload temporary file");
-             close(fd);
-             upload.path = pattern;
-             std::ofstream stream(upload.path, std::ios::binary);
-             stream.write(content.data(), static_cast<std::streamsize>(content.size()));
-             if (!stream) throw ApiError::Internal("Could not write upload temporary file");
-             stream.close();
-             body["configuration"]["load"]["sourceUris"] = json::array({upload.path});
-           } else {
-             body = ParseBody(request);
-           }
-           const json config = body.value("configuration", json::object());
-           if (config.contains("load")) {
-             const json& load = config.at("load");
-             if (!load.is_object() || !load.contains("destinationTable") ||
-                 !load.at("destinationTable").is_object()) {
-               throw ApiError::Invalid("Invalid destination table");
-             }
-             const json& table = load.at("destinationTable");
-             LoadRequest load_request;
-             load_request.project_id = Param(request, "project");
-             load_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
-             load_request.destination_table =
-                 TableReference{table.value("projectId", ""), table.value("datasetId", ""),
+    const auto insert_job = Json([this](const httplib::Request& request,
+                                        httplib::Response& response) {
+      if ((request.has_param("uploadType") &&
+           request.get_param_value("uploadType") == "resumable") ||
+          (request.has_param("upload_protocol") &&
+           request.get_param_value("upload_protocol") == "resumable")) {
+        const json metadata = ParseBody(request);
+        std::string id;
+        {
+          std::lock_guard<std::mutex> lock(uploads_mutex_);
+          id = std::to_string(next_upload_id_++);
+          uploads_[id] = metadata;
+        }
+        response.set_header("Location", server_.root_url() +
+                                            "/resumable/upload/bigquery/v2/projects/" +
+                                            Param(request, "project") + "/jobs/" + id);
+        return json::object();
+      }
+      TemporaryUpload upload;
+      json body;
+      if (request.get_header_value("Content-Type").find("multipart/related") != std::string::npos) {
+        auto [metadata, content] = ParseMultipartUpload(request);
+        body = std::move(metadata);
+        char pattern[] = "/tmp/bigquery-upload-XXXXXX";
+        const int fd = mkstemp(pattern);
+        if (fd < 0) throw ApiError::Internal("Could not create upload temporary file");
+        close(fd);
+        upload.path = pattern;
+        std::ofstream stream(upload.path, std::ios::binary);
+        stream.write(content.data(), static_cast<std::streamsize>(content.size()));
+        if (!stream) throw ApiError::Internal("Could not write upload temporary file");
+        stream.close();
+        body["configuration"]["load"]["sourceUris"] = json::array({upload.path});
+      } else {
+        body = ParseBody(request);
+      }
+      const json config = body.value("configuration", json::object());
+      if (config.contains("load")) {
+        const json& load = config.at("load");
+        if (!load.is_object() || !load.contains("destinationTable") ||
+            !load.at("destinationTable").is_object()) {
+          throw ApiError::Invalid("Invalid destination table");
+        }
+        const json& table = load.at("destinationTable");
+        LoadRequest load_request;
+        load_request.project_id = Param(request, "project");
+        load_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
+        load_request.destination_table = TableReference{
+            table.value("projectId", ""), table.value("datasetId", ""), table.value("tableId", "")};
+        if (load_request.destination_table.dataset_id.empty() ||
+            load_request.destination_table.table_id.empty()) {
+          throw ApiError::Invalid("Invalid destination table");
+        }
+        load_request.configuration = load;
+        return JobResource(*emulator_.RunLoad(load_request));
+      }
+      if (config.contains("copy")) {
+        const json& copy = config.at("copy");
+        auto parse_table = [](const json& table) {
+          if (!table.is_object()) throw ApiError::Invalid("Invalid table reference");
+          TableReference result{table.value("projectId", ""), table.value("datasetId", ""),
                                 table.value("tableId", "")};
-             if (load_request.destination_table.dataset_id.empty() ||
-                 load_request.destination_table.table_id.empty()) {
-               throw ApiError::Invalid("Invalid destination table");
-             }
-             load_request.configuration = load;
-             return JobResource(*emulator_.RunLoad(load_request));
-           }
-           if (!config.contains("query")) {
-             throw ApiError::Invalid("Only query and load jobs are supported");
-           }
-           QueryRequest query_request = ToQueryRequest(Param(request, "project"), config["query"]);
-           query_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
-           query_request.dry_run = config.value("dryRun", false);
-           const json& query_config = config["query"];
-           if (query_config.contains("destinationTable")) {
-             const json& table = query_config["destinationTable"];
-             query_request.destination_table =
-                 TableReference{table.value("projectId", ""), table.value("datasetId", ""),
-                                table.value("tableId", "")};
-             if (query_request.destination_table->dataset_id.empty() ||
-                 query_request.destination_table->table_id.empty()) {
-               throw ApiError::Invalid("Invalid destination table");
-             }
-           }
-           query_request.create_disposition = query_config.value("createDisposition", "");
-           query_request.write_disposition = query_config.value("writeDisposition", "");
-           return JobResource(*emulator_.RunQuery(query_request));
-         });
+          if (result.dataset_id.empty() || result.table_id.empty()) {
+            throw ApiError::Invalid("Invalid table reference");
+          }
+          return result;
+        };
+        if (!copy.is_object() || !copy.contains("destinationTable")) {
+          throw ApiError::Invalid("Invalid destination table");
+        }
+        CopyRequest copy_request;
+        copy_request.project_id = Param(request, "project");
+        copy_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
+        copy_request.destination_table = parse_table(copy.at("destinationTable"));
+        if (copy.contains("sourceTable") == copy.contains("sourceTables")) {
+          throw ApiError::Invalid("Specify sourceTable or sourceTables");
+        }
+        if (copy.contains("sourceTable")) {
+          copy_request.source_tables.push_back(parse_table(copy.at("sourceTable")));
+        } else {
+          if (!copy.at("sourceTables").is_array() || copy.at("sourceTables").empty()) {
+            throw ApiError::Invalid("sourceTables is required");
+          }
+          for (const json& table : copy.at("sourceTables")) {
+            copy_request.source_tables.push_back(parse_table(table));
+          }
+        }
+        copy_request.configuration = copy;
+        return JobResource(*emulator_.RunCopy(copy_request));
+      }
+      if (!config.contains("query")) {
+        throw ApiError::Invalid("Only query, load, and copy jobs are supported");
+      }
+      QueryRequest query_request = ToQueryRequest(Param(request, "project"), config["query"]);
+      query_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
+      query_request.dry_run = config.value("dryRun", false);
+      const json& query_config = config["query"];
+      if (query_config.contains("destinationTable")) {
+        const json& table = query_config["destinationTable"];
+        query_request.destination_table = TableReference{
+            table.value("projectId", ""), table.value("datasetId", ""), table.value("tableId", "")};
+        if (query_request.destination_table->dataset_id.empty() ||
+            query_request.destination_table->table_id.empty()) {
+          throw ApiError::Invalid("Invalid destination table");
+        }
+      }
+      query_request.create_disposition = query_config.value("createDisposition", "");
+      query_request.write_disposition = query_config.value("writeDisposition", "");
+      return JobResource(*emulator_.RunQuery(query_request));
+    });
     Post("/projects/:project/jobs", insert_job);
     http_.Post("/upload/bigquery/v2/projects/:project/jobs", insert_job);
     http_.Post("/resumable/upload/bigquery/v2/projects/:project/jobs",
@@ -589,8 +651,8 @@ class Server::Impl {
                    uploads_[id] = body;
                  }
                  response.set_header("Location", server_.root_url() +
-                     "/resumable/upload/bigquery/v2/projects/" + Param(request, "project") +
-                     "/jobs/" + id);
+                                                     "/resumable/upload/bigquery/v2/projects/" +
+                                                     Param(request, "project") + "/jobs/" + id);
                  return json::object();
                }));
     http_.Put("/resumable/upload/bigquery/v2/projects/:project/jobs/:upload",
@@ -610,7 +672,8 @@ class Server::Impl {
                 close(fd);
                 upload.path = pattern;
                 std::ofstream stream(upload.path, std::ios::binary);
-                stream.write(request.body.data(), static_cast<std::streamsize>(request.body.size()));
+                stream.write(request.body.data(),
+                             static_cast<std::streamsize>(request.body.size()));
                 if (!stream) throw ApiError::Internal("Could not write upload temporary file");
                 stream.close();
                 json& config = body["configuration"]["load"];

@@ -1,0 +1,38 @@
+desc: bq cp copies tables and applies append and replace dispositions
+steps:
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset copy_e2e
+    test: current.exit_code == 0
+  source:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE TABLE copy_e2e.source AS SELECT 1 AS id'
+    test: current.exit_code == 0
+  copy:
+    exec:
+      command: tests/e2e/bq.sh cp copy_e2e.source copy_e2e.target
+    test: current.exit_code == 0
+  copied_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json copy_e2e.target
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1"}]'
+  append:
+    exec:
+      command: tests/e2e/bq.sh cp --append_table copy_e2e.source copy_e2e.target
+    test: current.exit_code == 0
+  appended_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json copy_e2e.target
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1"},{"id":"1"}]'
+  replace:
+    exec:
+      command: tests/e2e/bq.sh cp --force copy_e2e.source copy_e2e.target
+    test: current.exit_code == 0
+  replaced_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json copy_e2e.target
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1"}]'
+  rm_dataset:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d copy_e2e
+    test: current.exit_code == 0

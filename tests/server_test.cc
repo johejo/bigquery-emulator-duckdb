@@ -202,6 +202,42 @@ TEST_F(ServerTest, WritesJobResultsToADestinationTable) {
   EXPECT_EQ(again["status"]["errorResult"]["reason"], "duplicate");
 }
 
+TEST_F(ServerTest, CopiesTablesWithDispositionsAndReportsFailures) {
+  const std::string jobs = "/projects/p/jobs";
+  Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  Post("/projects/p/queries", {{"query", "CREATE TABLE ds.source AS SELECT 1 AS id"}});
+  const json source = {{"datasetId", "ds"}, {"tableId", "source"}};
+  const json destination = {{"datasetId", "ds"}, {"tableId", "target"}};
+  const json copied =
+      Post(jobs, {{"jobReference", {{"jobId", "copy1"}}},
+                  {"configuration",
+                   {{"copy", {{"sourceTable", source}, {"destinationTable", destination}}}}}});
+  EXPECT_EQ(copied["configuration"]["jobType"], "COPY");
+  EXPECT_EQ(copied["configuration"]["copy"]["sourceTable"]["projectId"], "p");
+  EXPECT_EQ(copied["statistics"]["copy"]["copiedRows"], "1");
+  EXPECT_EQ(Get(jobs + "/copy1"), copied);
+  EXPECT_EQ(Get("/projects/p/datasets/ds/tables/target/data")["totalRows"], "1");
+
+  const json failed =
+      Post(jobs, {{"configuration",
+                   {{"copy", {{"sourceTable", source}, {"destinationTable", destination}}}}}});
+  EXPECT_EQ(failed["status"]["errorResult"]["reason"], "duplicate");
+  const json appended = Post(jobs, {{"configuration",
+                                     {{"copy",
+                                       {{"sourceTables", json::array({source, source})},
+                                        {"destinationTable", destination},
+                                        {"writeDisposition", "WRITE_APPEND"}}}}}});
+  EXPECT_EQ(appended["statistics"]["copy"]["copiedRows"], "2");
+  EXPECT_EQ(Get("/projects/p/datasets/ds/tables/target/data")["totalRows"], "3");
+  const json missing =
+      Post(jobs, {{"configuration",
+                   {{"copy",
+                     {{"sourceTable", source},
+                      {"destinationTable", {{"datasetId", "ds"}, {"tableId", "absent"}}},
+                      {"createDisposition", "CREATE_NEVER"}}}}}});
+  EXPECT_EQ(missing["status"]["errorResult"]["reason"], "notFound");
+}
+
 TEST_F(ServerTest, PaginatesQueryResults) {
   Post("/bigquery/v2/projects/p/jobs",
        {{"jobReference", {{"jobId", "job1"}}},

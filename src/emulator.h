@@ -46,7 +46,9 @@ struct Job {
   std::string location = "US";
   std::string query;
   bool is_load = false;
+  bool is_copy = false;
   nlohmann::json load_configuration;
+  nlohmann::json copy_configuration;
   int64_t output_rows = 0;
   // A dry run job is validated but never executed, and it is not kept: BigQuery does not
   // create a job for it, so `GetJob` will not find it afterwards.
@@ -84,6 +86,14 @@ struct LoadRequest {
   nlohmann::json configuration;
 };
 
+struct CopyRequest {
+  std::string project_id;
+  std::string job_id;
+  std::vector<TableReference> source_tables;
+  TableReference destination_table;
+  nlohmann::json configuration;
+};
+
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
@@ -97,6 +107,7 @@ class Emulator {
   // error rather than thrown, which is how BigQuery reports it too.
   std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
   std::shared_ptr<const Job> RunLoad(const LoadRequest& request);
+  std::shared_ptr<const Job> RunCopy(const CopyRequest& request);
   std::shared_ptr<const Job> GetJob(const std::string& project_id, const std::string& job_id);
   std::vector<std::shared_ptr<const Job>> ListJobs(const std::string& project_id);
   void DeleteJob(const std::string& project_id, const std::string& job_id);

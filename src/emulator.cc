@@ -1,10 +1,13 @@
 #include "src/emulator.h"
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -15,8 +18,6 @@
 #include <system_error>
 #include <utility>
 #include <vector>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #include "absl/status/statusor.h"
 #include "googlesql/public/type.h"
@@ -97,14 +98,15 @@ void DownloadGcs(const std::string& uri, const std::string& output) {
   const std::string bucket = uri.substr(5, slash - 5);
   const std::string object = uri.substr(slash + 1);
   const char* emulator_host = std::getenv("STORAGE_EMULATOR_HOST");
-  std::string base = emulator_host && *emulator_host ? emulator_host : "https://storage.googleapis.com";
+  std::string base =
+      emulator_host && *emulator_host ? emulator_host : "https://storage.googleapis.com";
   while (!base.empty() && base.back() == '/') base.pop_back();
-  const std::string url = base + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" +
-                          UrlEncode(object) + "?alt=media";
+  const std::string url =
+      base + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" + UrlEncode(object) + "?alt=media";
   const char* token = std::getenv("GOOGLE_OAUTH_ACCESS_TOKEN");
   std::string authorization = token && *token ? std::string("Authorization: Bearer ") + token : "";
-  std::vector<const char*> argv = {"curl", "--fail", "--silent", "--show-error", "--location",
-                                   "--output", output.c_str()};
+  std::vector<const char*> argv = {"curl",       "--fail",   "--silent",    "--show-error",
+                                   "--location", "--output", output.c_str()};
   if (!authorization.empty()) {
     argv.push_back("--header");
     argv.push_back(authorization.c_str());
@@ -134,8 +136,10 @@ struct DownloadedFiles {
 };
 
 FieldSchema ParseField(const json& value) {
-  FieldSchema field{value.at("name").get<std::string>(), value.value("type", "STRING"),
-                    value.value("mode", "NULLABLE"), {}};
+  FieldSchema field{value.at("name").get<std::string>(),
+                    value.value("type", "STRING"),
+                    value.value("mode", "NULLABLE"),
+                    {}};
   for (const json& child : value.value("fields", json::array())) {
     field.fields.push_back(ParseField(child));
   }
@@ -585,9 +589,9 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     }
     std::string sql;
     if (format == "CSV") {
-      sql = "SELECT * FROM read_csv(" + files + ", header=false, skip=" +
-            std::to_string(config.value("skipLeadingRows", 0)) + ", delim=" +
-            QuoteLiteral(config.value("fieldDelimiter", ","));
+      sql = "SELECT * FROM read_csv(" + files +
+            ", header=false, skip=" + std::to_string(config.value("skipLeadingRows", 0)) +
+            ", delim=" + QuoteLiteral(config.value("fieldDelimiter", ","));
       if (!requested_schema.empty()) {
         sql += ", auto_detect=false";
         std::string columns;
@@ -607,8 +611,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       std::string columns;
       for (const FieldSchema& field : requested_schema) {
         if (!columns.empty()) columns += ", ";
-        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " +
-                   ToDuckDbType(field.ToJson()) + ") AS " + QuoteIdentifier(field.name);
+        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " + ToDuckDbType(field.ToJson()) +
+                   ") AS " + QuoteIdentifier(field.name);
       }
       sql = "SELECT " + columns + " FROM (" + sql + ") AS source";
     }
@@ -617,9 +621,71 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     destination_request.project_id = request.project_id;
     destination_request.create_disposition = job->create_disposition;
     destination_request.write_disposition = job->write_disposition;
-    QueryResult result = WriteDestination(destination_request, request.destination_table, sql,
-                                          requested_schema.empty() ? prepared.schema : requested_schema,
-                                          {}, true);
+    QueryResult result =
+        WriteDestination(destination_request, request.destination_table, sql,
+                         requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
+    job->output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job->result = QueryResult{};
+  } catch (const ApiError& error) {
+    job->error = error;
+  } catch (const std::exception& error) {
+    job->error = ApiError::Invalid(error.what());
+  }
+  job->end_time_ms = NowMillis();
+  std::lock_guard<std::mutex> lock(mutex_);
+  running_jobs_.erase(JobKey(request.project_id, job->job_id));
+  jobs_[JobKey(request.project_id, job->job_id)] = job;
+  return job;
+}
+
+std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
+  EnsureProject(request.project_id);
+  auto job = std::make_shared<Job>();
+  job->project_id = request.project_id;
+  job->job_id = request.job_id;
+  job->is_copy = true;
+  job->copy_configuration = request.configuration;
+  job->destination_table = request.destination_table;
+  job->create_disposition = request.configuration.value("createDisposition", "");
+  job->write_disposition = request.configuration.value("writeDisposition", "");
+  job->creation_time_ms = NowMillis();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (job->job_id.empty()) {
+      do {
+        job->job_id = "job_" + std::to_string(next_job_number_++);
+      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
+               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
+    }
+    const std::string key = JobKey(request.project_id, job->job_id);
+    if (jobs_.contains(key) || running_jobs_.contains(key)) {
+      throw ApiError::Duplicate("Already Exists: Job " + key);
+    }
+    running_jobs_.insert(key);
+  }
+
+  try {
+    if (request.source_tables.empty()) throw ApiError::Invalid("Source table is required");
+    std::vector<FieldSchema> schema;
+    std::string sql;
+    for (TableReference source : request.source_tables) {
+      if (source.project_id.empty()) source.project_id = request.project_id;
+      EnsureProject(source.project_id);
+      const TableInfo table = GetTable(source);
+      if (sql.empty()) {
+        schema = table.schema;
+      } else if (SchemaToJson(table.schema) != SchemaToJson(schema)) {
+        throw ApiError::Invalid("Source tables have different schemas");
+      }
+      sql += (sql.empty() ? "" : " UNION ALL ") + std::string("SELECT * FROM ") +
+             QualifiedName(source);
+    }
+    QueryRequest destination_request;
+    destination_request.project_id = request.project_id;
+    destination_request.create_disposition = job->create_disposition;
+    destination_request.write_disposition = job->write_disposition;
+    const QueryResult result =
+        WriteDestination(destination_request, request.destination_table, sql, schema, {}, true);
     job->output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job->result = QueryResult{};
   } catch (const ApiError& error) {
