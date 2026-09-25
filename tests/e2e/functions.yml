@@ -41,6 +41,22 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"d":null,"l":"3","p":"2024-02-29","q":"3"}]'
+  more_function_semantics:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT CONTAINS_SUBSTR('abcdef', 'cd') AS c,
+         ARRAY_TO_STRING(['a', 'b', 'c'], ',') AS joined,
+         ARRAY_LENGTH(GENERATE_ARRAY(1, 5, 2)) AS len,
+         SAFE_DIVIDE(3, 2) AS divide,
+         CAST(ROUND(LOG(EXP(1))) AS INT64) AS log,
+         ARRAY_TO_STRING(SPLIT('a,b'), '|') AS split,
+         DATE_DIFF(DATE '2024-01-01', DATE '2024-03-01', MONTH) AS diff,
+         UNIX_MILLIS(TIMESTAMP '2020-01-01 00:00:00') AS unix,
+         DATE_FROM_UNIX_DATE(18262) AS date"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"c":"true","date":"2020-01-01","diff":"-2","divide":"1.5","joined":"a,b,c","len":"3","log":"1","split":"a|b","unix":"1577836800000"}]'
   mk_dataset:
     exec:
       command: tests/e2e/bq.sh mk --dataset fn

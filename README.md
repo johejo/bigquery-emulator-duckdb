@@ -174,9 +174,7 @@ just e2e --verbose  # extra arguments are passed to `runn run`
 
 `tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs, streams rows with `Inserter.Put`, and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
 
-Translator tests use [GoogleTest](https://github.com/google/googletest). The translator has a small and well-defined boundary, so C++ unit tests should cover query conversion cases such as functions, types, identifiers, literals, and BigQuery-specific syntax before the translated query reaches DuckDB. The backend and the HTTP server have unit tests too (`just test`).
-
-Those tests check what a query is translated *into*. `tests/emulator_test.cc` checks that the translation then runs: it drives `Emulator::RunQuery`, so each case goes through the parser, the translator and DuckDB, and asserts the value BigQuery would return. Every function in `src/functions.cc` is exercised there, which is what tells a correct translation apart from a plausible looking one — `LOG()` means a different logarithm in each dialect and a division by zero a different thing, so a case like that fails on the value rather than on an error. Being linked against the same libduckdb as the emulator, it needs no DuckDB installation of its own, and the whole file runs in a few seconds.
+The end-to-end scenarios own client-visible results, including representative function semantics, query parameters, and table operations. Add new behavior checks there first. Keep C++ tests for focused internal boundaries: translation choices and edge cases in `tests/translator_test.cc`, result encoding in `tests/backend_test.cc`, and raw HTTP response details in `tests/server_test.cc` (`just test`). `tests/emulator_test.cc` covers direct `Emulator::RunQuery` behavior that the client scenarios do not exercise. Avoid copying the same SQL and expected result between these layers.
 
 #### Internal structure memo
 
