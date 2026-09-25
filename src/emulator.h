@@ -125,6 +125,7 @@ class Emulator {
   std::mutex mutex_;
   std::unordered_set<std::string> projects_;
   std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;
+  std::unordered_set<std::string> running_jobs_;
   int64_t next_job_number_ = 1;
 };
 

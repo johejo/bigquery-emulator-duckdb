@@ -361,11 +361,6 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   job->create_disposition = request.create_disposition;
   job->write_disposition = request.write_disposition;
   job->creation_time_ms = NowMillis();
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    job->job_id =
-        request.job_id.empty() ? "job_" + std::to_string(next_job_number_++) : request.job_id;
-  }
 
   std::vector<std::string> setup;
   AnalyzerSettings settings{.default_project = request.project_id};
@@ -380,6 +375,25 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     settings.default_dataset = request.default_dataset->dataset_id;
   } else {
     setup.push_back("USE " + QuoteIdentifier(request.project_id));
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (request.job_id.empty()) {
+      do {
+        job->job_id = "job_" + std::to_string(next_job_number_++);
+      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
+               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
+    } else {
+      job->job_id = request.job_id;
+    }
+    if (!request.dry_run) {
+      const std::string key = JobKey(request.project_id, job->job_id);
+      if (jobs_.contains(key) || running_jobs_.contains(key)) {
+        throw ApiError::Duplicate("Already Exists: Job " + key);
+      }
+      running_jobs_.insert(key);
+    }
   }
 
   try {
@@ -412,6 +426,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     return job;
   }
   std::lock_guard<std::mutex> lock(mutex_);
+  running_jobs_.erase(JobKey(request.project_id, job->job_id));
   jobs_[JobKey(request.project_id, job->job_id)] = job;
   return job;
 }

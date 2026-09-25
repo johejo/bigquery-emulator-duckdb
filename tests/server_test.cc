@@ -100,6 +100,20 @@ TEST_F(ServerTest, RunsJobAndFetchesResults) {
   Get("/bigquery/v2/projects/p/queries/missing", 404);
 }
 
+TEST_F(ServerTest, RejectsDuplicateJobIdWithoutRunningQuery) {
+  const std::string path = "/bigquery/v2/projects/p/jobs";
+  const json first = {{"jobReference", {{"jobId", "same"}}},
+                      {"configuration", {{"query", {{"query", "SELECT 1 AS x"}}}}}};
+  Post(path, first);
+
+  const json duplicate = {{"jobReference", {{"jobId", "same"}}},
+                          {"configuration", {{"query", {{"query", "SELECT 2 AS x"}}}}}};
+  const json error = Post(path, duplicate, 409);
+  EXPECT_EQ(error["error"]["errors"][0]["reason"], "duplicate");
+  EXPECT_EQ(error["error"]["status"], "ALREADY_EXISTS");
+  EXPECT_EQ(Get("/bigquery/v2/projects/p/queries/same")["rows"][0]["f"][0]["v"], "1");
+}
+
 TEST_F(ServerTest, WritesJobResultsToADestinationTable) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   const json destination = {{"datasetId", "ds"}, {"tableId", "t"}};
