@@ -525,8 +525,14 @@ std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, 
         literals +=
             InsertValue(it == values.end() ? json(nullptr) : *it, field, ignore_unknown_values);
       }
-      statements.push_back("INSERT INTO " + QualifiedName(table) + " (" + columns + ") VALUES (" +
-                           literals + ")");
+      std::string statement = "INSERT INTO ";
+      statement += QualifiedName(table);
+      statement += " (";
+      statement += columns;
+      statement += ") VALUES (";
+      statement += literals;
+      statement += ")";
+      statements.push_back(std::move(statement));
       indexes.push_back(i);
     } catch (const ApiError& error) {
       errors.push_back({i, error.what()});

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -169,8 +170,10 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
   for (size_t i = 0; i < parts.size(); ++i) {
     if (parts[i].find(':') != std::string::npos) {
       if (i > 0) {
-        const std::string project = absl::StrJoin(parts.begin(), parts.begin() + i + 1, ".");
-        parts.erase(parts.begin(), parts.begin() + i + 1);
+        const auto project_end =
+            std::next(parts.begin(), static_cast<std::vector<std::string>::difference_type>(i + 1));
+        const std::string project = absl::StrJoin(parts.begin(), project_end, ".");
+        parts.erase(parts.begin(), project_end);
         parts.insert(parts.begin(), project);
       }
       break;

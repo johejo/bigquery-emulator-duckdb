@@ -358,14 +358,18 @@ TEST_F(EmulatorTest, QueriesDomainScopedProjects) {
   for (const std::string& table : {"t", "ds.t", "`example.com:proj.ds.t`"}) {
     request.query = "SELECT a FROM " + table;
     const auto job = emulator_.RunQuery(request);
-    ASSERT_TRUE(job->result.has_value()) << table << ": " << ErrorMessage(*job);
+    if (!job->result.has_value()) {
+      FAIL() << table << ": " << ErrorMessage(*job);
+    }
     EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "7");
   }
 
   request.default_dataset.reset();
   request.query = "SELECT a FROM `example.com:proj.ds.t`";
   const auto qualified = emulator_.RunQuery(request);
-  ASSERT_TRUE(qualified->result.has_value()) << ErrorMessage(*qualified);
+  if (!qualified->result.has_value()) {
+    FAIL() << ErrorMessage(*qualified);
+  }
   EXPECT_EQ(qualified->result->rows.at(0)["f"][0]["v"], "7");
   request.default_dataset = DatasetReference{project, "ds"};
 
@@ -373,7 +377,9 @@ TEST_F(EmulatorTest, QueriesDomainScopedProjects) {
   EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
   request.query = "SELECT a FROM t";
   const auto updated = emulator_.RunQuery(request);
-  ASSERT_TRUE(updated->result.has_value()) << ErrorMessage(*updated);
+  if (!updated->result.has_value()) {
+    FAIL() << ErrorMessage(*updated);
+  }
   EXPECT_EQ(updated->result->rows.at(0)["f"][0]["v"], "8");
 
   request.query = "CREATE TABLE u AS SELECT a FROM t";
