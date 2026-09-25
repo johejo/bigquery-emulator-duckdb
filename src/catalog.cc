@@ -256,6 +256,8 @@ BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* ty
       default_project_(std::move(default_project)),
       default_dataset_(std::move(default_dataset)) {}
 
+BigQueryCatalog::~BigQueryCatalog() = default;
+
 absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& path,
                                         const googlesql::Table** table,
                                         const FindOptions& /*options*/) {

@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
-#include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/field_schema.h"
@@ -91,7 +90,7 @@ class Emulator {
   };
   // Keeps the catalog, types and resolved AST alive until translation finishes.
   Translation Translate(const std::string& query, const QueryParameters& parameters,
-                        AnalyzerSettings settings);
+                        const std::string& default_project, const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 

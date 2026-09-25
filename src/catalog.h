@@ -11,13 +11,14 @@
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
-#include "googlesql/public/simple_catalog.h"
-#include "googlesql/public/type.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
 class LanguageOptions;
-}
+class SimpleTable;
+class Type;
+class TypeFactory;
+}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 
@@ -64,6 +65,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // `source` and `type_factory` must outlive the catalog.
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                   std::string default_project, std::string default_dataset);
+  ~BigQueryCatalog() override;
 
   std::string FullName() const override { return "bigquery"; }
 

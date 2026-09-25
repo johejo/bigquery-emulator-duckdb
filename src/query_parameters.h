@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "nlohmann/json.hpp"
+#include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {

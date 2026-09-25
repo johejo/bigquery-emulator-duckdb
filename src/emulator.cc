@@ -203,7 +203,9 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
 
 Emulator::Translation Emulator::Translate(const std::string& query,
                                           const QueryParameters& parameters,
-                                          AnalyzerSettings settings) {
+                                          const std::string& default_project,
+                                          const std::string& default_dataset) {
+  AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
     settings.named_parameters.emplace_back(field.name, ParameterType(field, type_factory));
@@ -254,7 +256,8 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   }
 
   try {
-    const Translation translation = Translate(request.query, request.parameters, settings);
+    const Translation translation = Translate(request.query, request.parameters,
+                                               settings.default_project, settings.default_dataset);
     QueryResult result =
         request.dry_run ? Prepare(translation.sql, setup) : Execute(translation.sql, setup);
     if (translation.schema.has_value()) {
