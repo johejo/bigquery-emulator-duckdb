@@ -53,3 +53,8 @@ steps:
       command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT * FROM missing_table'
     test: |
       current.exit_code != 0 && current.stdout contains "missing_table"
+  legacy_sql:
+    exec:
+      command: tests/e2e/bq.sh query --use_legacy_sql 'SELECT 1 AS x'
+    test: |
+      current.exit_code != 0 && current.stdout contains "legacy SQL"

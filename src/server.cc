@@ -93,6 +93,11 @@ QueryRequest ToQueryRequest(const std::string& project_id, const json& config) {
   if (!config.contains("query") || !config["query"].is_string()) {
     throw ApiError::Invalid("Required parameter is missing: query");
   }
+  // Only GoogleSQL is emulated. An omitted useLegacySql runs as GoogleSQL, although BigQuery
+  // defaults it to true.
+  if (config.contains("useLegacySql") && config["useLegacySql"] == true) {
+    throw ApiError::Invalid("The emulator does not support legacy SQL; set useLegacySql to false");
+  }
   QueryRequest request;
   request.project_id = project_id;
   request.query = config["query"].get<std::string>();

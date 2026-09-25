@@ -74,6 +74,17 @@ TEST_F(ServerTest, ReportsQueryErrors) {
   EXPECT_EQ(response["errors"][0]["reason"], "invalidQuery");
 }
 
+TEST_F(ServerTest, RejectsLegacySql) {
+  const json query =
+      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT 1"}, {"useLegacySql", true}}, 400);
+  EXPECT_EQ(query["error"]["errors"][0]["reason"], "invalid");
+  const json job =
+      Post("/bigquery/v2/projects/p/jobs",
+           {{"configuration", {{"query", {{"query", "SELECT 1"}, {"useLegacySql", true}}}}}}, 400);
+  EXPECT_EQ(job["error"]["errors"][0]["reason"], "invalid");
+  Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT 1"}, {"useLegacySql", false}});
+}
+
 TEST_F(ServerTest, RunsJobAndFetchesResults) {
   const json job = Post("/bigquery/v2/projects/p/jobs",
                         {{"jobReference", {{"projectId", "p"}, {"jobId", "job1"}}},
