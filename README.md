@@ -19,32 +19,25 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Result pagination | Supported | Query results and table data accept `maxResults`, `startIndex`, and `pageToken`. |
 | Query parameters | Supported | Named (`@name`) and positional (`?`) parameters, including ARRAY and STRUCT values. |
 | Dry runs | Supported | Validates queries and returns their result schema without executing them. |
-| Result schema | Supported | Queries take column names and types from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
+| Result schema | Supported | Queries take column names and types from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`, … and `SUM` over integers reports `INTEGER`. A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …. Other statements derive `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
 | Result rows | Supported | BigQuery `{"f": [{"v": ...}]}` encoding, including nested values and base64 bytes. |
 | Timestamp encoding | Supported | Epoch seconds by default; epoch microseconds with `formatOptions.useInt64Timestamp`. |
 | Projects, datasets, and tables | Partial | Map to DuckDB catalogs, schemas, and tables; `project.dataset.table` references work. Catalogs are in memory unless `--data-dir` is given, in which case each project persists to its own DuckDB file. |
 
 ## SQL compatibility
 
+Rows list only what is unsupported or differs from BigQuery; everything else in a statement kind
+is expected to run.
+
 | Feature | Status | Scope and limitations |
 | --- | --- | --- |
-| GoogleSQL parsing | Partial | Released language features are enabled, including `QUALIFY`. Every statement is analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors are rejected as BigQuery would. Queries, `INSERT` / `UPDATE` / `DELETE` / `MERGE` and the DDL below are translated from the resolved AST; statements, scans and expressions outside that subset are rejected as `invalidQuery`. |
-| `INSERT` | Partial | `INSERT ... VALUES` (including `DEFAULT`) and `INSERT ... SELECT` with or without a column list are translated from the resolved AST. `INSERT OR IGNORE/REPLACE/UPDATE`, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` are unsupported. |
-| `UPDATE`, `DELETE`, `MERGE` | Partial | Translated from the resolved AST, including `UPDATE ... FROM`, `SET col = DEFAULT`, correlated subqueries, and `MERGE` clauses `WHEN MATCHED` / `NOT MATCHED [BY TARGET]` / `NOT MATCHED BY SOURCE` with `UPDATE`, `DELETE`, `INSERT (cols) VALUES` and `INSERT ROW`. `SET s.field = ...` rebuilds the struct with its other fields, and fails on a NULL struct as BigQuery does. Updates of array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` are unsupported. Unlike BigQuery, DuckDB does not reject an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows. |
-| `CREATE TABLE`, `CREATE SCHEMA`, `DROP TABLE` / `SCHEMA` | Partial | Translated from the resolved AST, with `table`, `dataset.table` and `dataset` completed from the default project and dataset. `CREATE [OR REPLACE] TABLE [IF NOT EXISTS]` keeps column types, `NOT NULL` and `DEFAULT`, and `NUMERIC(P, S)` becomes `DECIMAL(P, S)`; `STRING(L)` / `BYTES(L)` lose their length, and `BIGNUMERIC` is `DECIMAL(38, 19)`. `CREATE TABLE AS SELECT` casts the query's columns to the declared types. Partitioning, clustering, options and unenforced keys are accepted and dropped. Temporary tables, `LIKE`, `CLONE` / `COPY`, generated columns, collation, `NOT NULL` in `CREATE TABLE AS SELECT`, `CREATE OR REPLACE SCHEMA` and other object types are unsupported. |
-| Table reads, `WHERE`, `ORDER BY`, `LIMIT` / `OFFSET` | Supported | Translated from resolved scans, including derived tables built from these scans, hidden sort columns, and BigQuery NULL ordering. |
-| `SELECT AS STRUCT` / `AS VALUE` | Supported | A query returning STRUCT values returns their fields as columns, with anonymous fields named `_field_1`, `_field_2`, …; any other value table returns one `f0_` column. |
-| Joins, CTEs, scalar/correlated subqueries, aggregates, window functions, and `QUALIFY` | Partial | Translated from resolved scans, including `DISTINCT` window aggregates, recursive CTEs, `GROUPING SETS` / `ROLLUP` / `CUBE`, `GROUPING()`, and `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` modifiers outside grouping sets. Lateral joins are translated too; recursive CTEs `WITH DEPTH` are unsupported. |
-| Set operations, `UNNEST`, `STRUCT` and array subscripts | Partial | Translated from resolved scans for `UNION` / `INTERSECT` / `EXCEPT`, including `CORRESPONDING [BY]` with `FULL` / `LEFT` / `INNER` propagation, `UNNEST` with `WITH OFFSET`, including multi-array `UNNEST` in each `mode`, named `STRUCT` fields and `OFFSET` / `ORDINAL` / `SAFE_` subscripts. |
-| Identifiers | Supported | Backtick paths such as `` `project.dataset.table` `` become `"project"."dataset"."table"`. |
-| String and bytes literals | Supported | Strings are re-quoted from their parsed values; `b'abc'` becomes `from_hex('616263')`, preserving quotes, NUL, and non-UTF-8 bytes. |
-| Float literals | Supported | `1.5` becomes `1.5::DOUBLE` to avoid DuckDB inferring `DECIMAL`. |
-| Type names and typed literals | Partial | Maps types in expressions, DDL, and typed literals: `INT64` → `BIGINT`, `TIMESTAMP` → `TIMESTAMPTZ`, `DATETIME` → `TIMESTAMP`, `ARRAY<T>` → `T[]`, `STRUCT<a INT64>` → `STRUCT(a BIGINT)`. |
-| ARRAY and STRUCT constructors | Supported | Converts `ARRAY<T>[...]` and `STRUCT(...)` constructors to DuckDB syntax, including `struct_pack(a := ...)`. |
-| Star modifiers | Supported | `SELECT * EXCEPT` becomes `EXCLUDE`; `REPLACE` keeps its spelling. |
-| Parameter substitution | Supported | Uses typed literals such as `CAST('42' AS BIGINT)`, applying the same type and constructor conversions to ARRAY and STRUCT parameters. |
-| Built-in functions | Partial | Each BigQuery function's support is listed in [docs/functions.md](docs/functions.md), which a probe of the emulator generates. Calls are renamed or rewritten using rules in [src/functions.cc](src/functions.cc) and the translator; templates cannot take `OVER`, so such calls keep their BigQuery spelling. |
-| `SAFE.` function prefix | Partial | In resolved statements, the call runs inside DuckDB's `TRY` with its arguments evaluated outside it, so the function's own errors return NULL while argument errors still propagate. Volatile functions and calls translated to an explicit `error()` are unsupported. |
+| Analysis | Partial | Released GoogleSQL language features are enabled. Every statement is analyzed against the tables in DuckDB and the declared parameter types, so unknown names and type errors fail as in BigQuery. Statements, scans and expressions the translator does not handle fail as `invalidQuery`, naming the construct. |
+| Queries | Partial | Joins, CTEs, subqueries, aggregates, window functions, `QUALIFY`, set operations, `UNNEST` and `SELECT AS STRUCT` / `AS VALUE` run. Recursive CTEs `WITH DEPTH` are unsupported, as are `ARRAY_AGG` / `STRING_AGG` `LIMIT` and aggregate `HAVING MAX` / `MIN` inside grouping sets. |
+| `INSERT` | Partial | `INSERT OR IGNORE/REPLACE/UPDATE`, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` are unsupported. |
+| `UPDATE`, `DELETE`, `MERGE` | Partial | Updates of array elements, nested DML, `ASSERT_ROWS_MODIFIED` and `THEN RETURN` are unsupported. Unlike BigQuery, an `UPDATE ... FROM` or `MERGE` in which one target row matches several source rows is not rejected. |
+| DDL | Partial | `CREATE [OR REPLACE] TABLE [IF NOT EXISTS] [AS SELECT]`, `CREATE SCHEMA` and `DROP TABLE` / `SCHEMA`. Partitioning, clustering, options and unenforced keys are accepted and dropped; `STRING(L)` / `BYTES(L)` lose their length, and `BIGNUMERIC` is `DECIMAL(38, 19)`. Temporary tables, `LIKE`, `CLONE` / `COPY`, generated columns, collation, `NOT NULL` in `CREATE TABLE AS SELECT`, `CREATE OR REPLACE SCHEMA` and other object types are unsupported. |
+| Built-in functions | Partial | Listed per function in [docs/functions.md](docs/functions.md). |
+| `SAFE.` function prefix | Partial | The function's own errors return NULL while argument errors still propagate. Volatile functions and calls translated to an explicit `error()` are unsupported. |
 
 ## Server
 
@@ -83,6 +76,9 @@ BY states the default NULL ordering, sort keys survive projections, set operatio
 columns by name become positional ones, and function and aggregate results are cast to their
 resolved types. Operators follow BigQuery too, such as `<<` and `>>` on 64-bit values,
 `IS [NOT] DISTINCT FROM`, `IN UNNEST` and the `SAFE.` prefix on arithmetic.
+Literals, types, constructors and star modifiers are respelled for DuckDB, such as `1.5` as
+`1.5::DOUBLE`, `b'abc'` as `from_hex('616263')` and `* EXCEPT` as `* EXCLUDE`, and query
+parameters are substituted as typed literals.
 
 `tests/translator_test.cc` runs supported queries directly against DuckDB, covering results,
 types, aliases, ordering and parameterized preparation.
