@@ -186,7 +186,8 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   } else {
     literal = value.GetSQLLiteral();
     if (value.type()->IsDate() || value.type()->IsTimestamp() || value.type()->IsDatetime() ||
-        value.type()->IsTime() || value.type()->IsNumericType() || value.type()->IsJson()) {
+        value.type()->IsTime() || value.type()->IsNumericType() || value.type()->IsBigNumericType() ||
+        value.type()->IsJson()) {
       std::string contents;
       if (!googlesql::ParseStringLiteral(literal.substr(literal.find(' ') + 1), &contents).ok()) {
         return std::nullopt;

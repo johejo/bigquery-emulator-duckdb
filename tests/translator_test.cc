@@ -398,6 +398,7 @@ TEST_F(TranslatorTest, RunsRenamedFunctions) {
   EXPECT_EQ(Scalar("SELECT RAND() >= 0 AND RAND() < 1"), "true");
   EXPECT_EQ(Scalar("SELECT IS_INF(CAST('inf' AS FLOAT64))"), "true");
   EXPECT_EQ(Scalar("SELECT IS_NAN(CAST('nan' AS FLOAT64))"), "true");
+  EXPECT_EQ(Scalar("SELECT ABS(BIGNUMERIC '-1.5') = 1.5"), "true");
   EXPECT_EQ(Scalar(R"(SELECT JSON_EXTRACT_SCALAR('{"a": 1}', '$.a'))"), "1");
   EXPECT_EQ(Scalar(R"(SELECT JSON_QUERY('{"a": {"b": 1}}', '$.a'))"), R"({"b":1})");
   EXPECT_EQ(Scalar(R"(SELECT TO_JSON_STRING(PARSE_JSON('{"a":1}')))"), R"({"a":1})");
