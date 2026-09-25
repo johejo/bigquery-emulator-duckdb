@@ -21,8 +21,7 @@ std::string QuoteIdentifierPath(std::string_view path);
 std::string ToHex(std::string_view value);
 
 // Maps a GoogleSQL type name onto its DuckDB spelling, keeping the original name when the two
-// agree. `has_type_parameters` drops the default parameters of the mapped name, because an
-// explicit parameter list follows and replaces them (NUMERIC(10) -> DECIMAL(10)).
-std::string DuckDbTypeName(std::string_view googlesql_name, bool has_type_parameters = false);
+// agree.
+std::string DuckDbTypeName(std::string_view googlesql_name);
 
 }  // namespace bigquery_emulator_duckdb

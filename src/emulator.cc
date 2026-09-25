@@ -19,7 +19,6 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/frontend.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -121,17 +120,13 @@ class DuckDbTableSource : public TableSource {
   Backend& backend_;
 };
 
-std::vector<const googlesql::Type*> ParameterTypes(const std::vector<FieldSchema>& fields,
-                                                   googlesql::TypeFactory& type_factory) {
-  std::vector<const googlesql::Type*> types;
-  for (const FieldSchema& field : fields) {
-    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
-    if (!type.ok()) {
-      throw ApiError::InvalidQuery(std::string(type.status().message()));
-    }
-    types.push_back(*type);
+const googlesql::Type* ParameterType(const FieldSchema& field,
+                                     googlesql::TypeFactory& type_factory) {
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+  if (!type.ok()) {
+    throw ApiError::InvalidQuery(std::string(type.status().message()));
   }
-  return types;
+  return *type;
 }
 
 // Types whose values the backend writes the same way on the wire, so that a column DuckDB
@@ -206,22 +201,22 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-Emulator::Translation Emulator::Translate(const FrontendResult& frontend_result,
+Emulator::Translation Emulator::Translate(const std::string& query,
                                           const QueryParameters& parameters,
                                           AnalyzerSettings settings) {
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
-    settings.named_parameters.emplace_back(field.name,
-                                           ParameterTypes({field}, type_factory).front());
+    settings.named_parameters.emplace_back(field.name, ParameterType(field, type_factory));
   }
-  settings.positional_parameters = ParameterTypes(parameters.positional_types(), type_factory);
+  for (const FieldSchema& field : parameters.positional_types()) {
+    settings.positional_parameters.push_back(ParameterType(field, type_factory));
+  }
   DuckDbTableSource source(backend_);
   BigQueryCatalog catalog(source, &type_factory, settings.default_project,
                           settings.default_dataset);
-  const AnalyzerResult analyzed =
-      AnalyzeGoogleSql(frontend_result, catalog, type_factory, settings);
+  const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
-  std::optional<std::string> sql = TranslateResolvedToDuckDbSql(
+  std::optional<std::string> sql = TranslateToDuckDbSql(
       analyzed.statement(), parameters,
       DefaultDataset{settings.default_project, settings.default_dataset}, &unsupported);
   if (!sql.has_value()) {
@@ -259,8 +254,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   }
 
   try {
-    const FrontendResult frontend_result = ParseGoogleSql(request.query);
-    const Translation translation = Translate(frontend_result, request.parameters, settings);
+    const Translation translation = Translate(request.query, request.parameters, settings);
     QueryResult result =
         request.dry_run ? Prepare(translation.sql, setup) : Execute(translation.sql, setup);
     if (translation.schema.has_value()) {

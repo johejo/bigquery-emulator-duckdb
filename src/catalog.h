@@ -15,7 +15,15 @@
 #include "googlesql/public/type.h"
 #include "src/field_schema.h"
 
+namespace googlesql {
+class LanguageOptions;
+}
+
 namespace bigquery_emulator_duckdb {
+
+// The language settings shared by the catalog's built-in functions and the analyzer, so that a
+// statement is not rejected for a feature one of them was not told about.
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
 
 // Resolves a BigQuery table reference to its schema. The emulator implements it on top of the
 // metadata it keeps in DuckDB.

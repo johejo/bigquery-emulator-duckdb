@@ -13,7 +13,6 @@
 #include "gtest/gtest.h"
 #include "src/analyzer.h"
 #include "src/field_schema.h"
-#include "src/frontend.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -164,7 +163,7 @@ class BigQueryCatalogTest : public ::testing::Test {
   }
 
   AnalyzerResult Analyze(const std::string& sql, const AnalyzerSettings& settings = {}) {
-    return AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, type_factory_, settings);
+    return AnalyzeGoogleSql(sql, catalog_, type_factory_, settings);
   }
 
   // The names and types of the output columns of a query.

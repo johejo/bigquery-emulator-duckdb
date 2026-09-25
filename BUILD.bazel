@@ -63,18 +63,6 @@ cc_library(
 )
 
 cc_library(
-    name = "frontend",
-    srcs = ["src/frontend.cc"],
-    hdrs = ["src/frontend.h"],
-    copts = ["-std=c++20"],
-    deps = [
-        "@googlesql//googlesql/public:error_helpers",
-        "@googlesql//googlesql/public:language_options",
-        "@googlesql//googlesql/public:parse_helpers",
-    ],
-)
-
-cc_library(
     name = "field_schema",
     srcs = ["src/field_schema.cc"],
     hdrs = ["src/field_schema.h"],
@@ -89,11 +77,11 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":field_schema",
-        ":frontend",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:catalog_wrapper",
         "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:type",
     ],
@@ -107,7 +95,6 @@ cc_library(
     deps = [
         ":catalog",
         ":field_schema",
-        ":frontend",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:analyzer_output",
@@ -168,7 +155,6 @@ cc_library(
         ":catalog",
         ":duckdb_sql",
         ":field_schema",
-        ":frontend",
         ":query_parameters",
         ":translator",
         "@googlesql//googlesql/public:type",
@@ -193,6 +179,7 @@ cc_library(
         ":api_error",
         ":discovery_document",
         ":emulator",
+        ":field_schema",
         ":query_parameters",
         "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
@@ -217,7 +204,6 @@ cc_test(
         ":analyzer",
         ":catalog",
         ":field_schema",
-        ":frontend",
         "@com_google_googletest//:gtest_main",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
@@ -282,7 +268,6 @@ cc_test(
         ":analyzer",
         ":backend",
         ":catalog",
-        ":frontend",
         ":query_parameters",
         ":translator",
         "@com_google_googletest//:gtest_main",

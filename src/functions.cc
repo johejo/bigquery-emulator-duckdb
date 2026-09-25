@@ -21,8 +21,6 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
       {"IS_NAN", "isnan"},
       {"JSON_EXTRACT_SCALAR", "json_extract_string"},
       {"JSON_QUERY", "json_extract"},
-      {"LOGICAL_AND", "bool_and"},
-      {"LOGICAL_OR", "bool_or"},
       {"PARSE_JSON", "json"},
       {"RAND", "random"},
       {"REGEXP_CONTAINS", "regexp_matches"},

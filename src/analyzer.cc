@@ -19,7 +19,6 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/field_schema.h"
-#include "src/frontend.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -72,7 +71,7 @@ std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
   return schema;
 }
 
-AnalyzerResult AnalyzeGoogleSql(const FrontendResult& frontend_result, googlesql::Catalog& catalog,
+AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
                                 const AnalyzerSettings& settings) {
   if (!settings.named_parameters.empty() && !settings.positional_parameters.empty()) {
@@ -105,9 +104,7 @@ AnalyzerResult AnalyzeGoogleSql(const FrontendResult& frontend_result, googlesql
   }
 
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
-  status = googlesql::AnalyzeStatementFromParserAST(frontend_result.statement(), options,
-                                                    frontend_result.sql(), &catalog, &type_factory,
-                                                    &analyzer_output);
+  status = googlesql::AnalyzeStatement(sql, options, &catalog, &type_factory, &analyzer_output);
   if (!status.ok()) {
     // In the caret mode the analyzer has already folded the location into the message; this
     // only matters for the few errors that still carry it as a payload.
@@ -116,8 +113,7 @@ AnalyzerResult AnalyzeGoogleSql(const FrontendResult& frontend_result, googlesql
         .attach_error_location_payload = false,
     };
     throw std::runtime_error(
-        googlesql::MaybeUpdateErrorFromPayload(error_message_options, frontend_result.sql(), status)
-            .ToString());
+        googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status).ToString());
   }
   return AnalyzerResult(std::move(analyzer_output));
 }

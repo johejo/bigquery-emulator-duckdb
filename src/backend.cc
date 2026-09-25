@@ -115,6 +115,8 @@ std::string EpochSecondsString(int64_t micros) {
   return result;
 }
 
+json ToCell(const duckdb::Value& value);
+
 // Encodes a scalar (non-list) DuckDB value as the "v" member of a BigQuery cell.
 json ScalarToCellValue(const duckdb::Value& value) {
   if (value.IsNull()) {
@@ -144,18 +146,8 @@ json ScalarToCellValue(const duckdb::Value& value) {
     }
     case duckdb::LogicalTypeId::STRUCT: {
       json fields = json::array();
-      const auto& children = duckdb::StructValue::GetChildren(value);
-      const auto& child_types = duckdb::StructType::GetChildTypes(type);
-      for (size_t i = 0; i < children.size(); ++i) {
-        json cell;
-        cell["v"] = IsListLike(child_types[i].second) ? json::array()  // Replaced below.
-                                                      : ScalarToCellValue(children[i]);
-        if (IsListLike(child_types[i].second)) {
-          for (const auto& element : duckdb::ListValue::GetChildren(children[i])) {
-            cell["v"].push_back(json{{"v", ScalarToCellValue(element)}});
-          }
-        }
-        fields.push_back(std::move(cell));
+      for (const duckdb::Value& child : duckdb::StructValue::GetChildren(value)) {
+        fields.push_back(ToCell(child));
       }
       return json{{"f", std::move(fields)}};
     }
@@ -236,15 +228,18 @@ void ThrowIfFailed(const std::unique_ptr<duckdb::MaterializedQueryResult>& resul
   }
 }
 
+// Prepares a fresh connection: BigQuery evaluates timestamps in UTC, and `setup` (such as
+// temporary functions) must precede the statement on the same connection.
+void RunSetup(duckdb::Connection& connection, const std::vector<std::string>& setup) {
+  ThrowIfFailed(connection.Query("SET TimeZone = 'UTC'"));
+  for (const std::string& statement : setup) {
+    ThrowIfFailed(connection.Query(statement));
+  }
+}
+
 }  // namespace
 
-json QueryResult::SchemaToJson() const {
-  json fields = json::array();
-  for (const FieldSchema& field : schema) {
-    fields.push_back(field.ToJson());
-  }
-  return json{{"fields", std::move(fields)}};
-}
+json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::SchemaToJson(schema); }
 
 bool HasTimestampField(const std::vector<FieldSchema>& schema) {
   for (const FieldSchema& field : schema) {
@@ -265,10 +260,7 @@ Backend::~Backend() = default;
 
 QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup) {
   duckdb::Connection connection(*db_);
-  ThrowIfFailed(connection.Query("SET TimeZone = 'UTC'"));
-  for (const std::string& statement : setup) {
-    ThrowIfFailed(connection.Query(statement));
-  }
+  RunSetup(connection, setup);
   std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(sql);
   ThrowIfFailed(result);
 
@@ -295,10 +287,7 @@ QueryResult Backend::Execute(const std::string& sql, const std::vector<std::stri
 
 QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
   duckdb::Connection connection(*db_);
-  ThrowIfFailed(connection.Query("SET TimeZone = 'UTC'"));
-  for (const std::string& statement : setup) {
-    ThrowIfFailed(connection.Query(statement));
-  }
+  RunSetup(connection, setup);
   // Preparing binds names and types without running the statement, which is what a dry run
   // needs: the query is validated and its result schema is known, but nothing is read or
   // written.

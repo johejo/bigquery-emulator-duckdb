@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/strings.h"
@@ -68,7 +70,33 @@ std::nullopt_t Unsupported(const Scope& scope, std::string_view what) {
   return std::nullopt;
 }
 
-std::optional<std::string> SqlType(const googlesql::Type* type) {
+// The DuckDB type of `type`, narrowed by `parameters` when a column definition gives some.
+// DuckDB ignores lengths, so STRING(L) and BYTES(L) lose them; NUMERIC(P, S) keeps its rounding
+// as DECIMAL(P, S).
+std::optional<std::string> SqlType(const googlesql::Type* type,
+                                   const googlesql::TypeParameters* parameters = nullptr) {
+  if (parameters != nullptr && (parameters->IsEmpty() || parameters->IsStringTypeParameters())) {
+    parameters = nullptr;
+  }
+  if (parameters != nullptr) {
+    if (parameters->IsNumericTypeParameters()) {
+      const auto& numeric = parameters->numeric_type_parameters();
+      if (numeric.is_max_precision() || numeric.precision() > 38) {
+        return std::nullopt;
+      }
+      return "DECIMAL(" + std::to_string(numeric.precision()) + "," +
+             std::to_string(numeric.scale()) + ")";
+    }
+    const int children = type->IsArray()    ? 1
+                         : type->IsStruct() ? type->AsStruct()->num_fields()
+                                            : -1;
+    if (!parameters->IsTopLevelEmpty() || parameters->num_children() != children) {
+      return std::nullopt;
+    }
+  }
+  const auto child = [parameters](int i) {
+    return parameters == nullptr ? nullptr : &parameters->child(i);
+  };
   switch (type->kind()) {
     case googlesql::TYPE_INT64:
       return "BIGINT";
@@ -96,15 +124,16 @@ std::optional<std::string> SqlType(const googlesql::Type* type) {
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_ARRAY: {
-      const auto element = SqlType(type->AsArray()->element_type());
+      const auto element = SqlType(type->AsArray()->element_type(), child(0));
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
     }
     case googlesql::TYPE_STRUCT: {
       // DuckDB structs need distinct field names, which anonymous BigQuery fields lack.
       std::set<std::string> names;
       std::vector<std::string> fields;
-      for (const auto& field : type->AsStruct()->fields()) {
-        const auto field_type = SqlType(field.type);
+      for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+        const auto& field = type->AsStruct()->field(i);
+        const auto field_type = SqlType(field.type, child(i));
         if (!field_type || field.name.empty() || !names.insert(ToLowerAscii(field.name)).second) {
           return std::nullopt;
         }
@@ -352,17 +381,17 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
            " ELSE " + (ordinal ? "_at.a[_at.i]" : "_at.a[_at.i + 1]") + " END)[1]";
   }
   static const std::map<std::string, std::string> binary = {
-      {"$ADD", "+"},        {"$SUBTRACT", "-"},
-      {"$MULTIPLY", "*"},   {"$DIVIDE", "/"},
-      {"$EQUAL", "="},      {"$NOT_EQUAL", "<>"},
-      {"$LESS", "<"},       {"$LESS_OR_EQUAL", "<="},
-      {"$GREATER", ">"},    {"$GREATER_OR_EQUAL", ">="},
-      {"$LIKE", "LIKE"},    {"$BITWISE_AND", "&"},
-      {"$BITWISE_OR", "|"}, {"$BITWISE_XOR", "^"}};
+      {"$ADD", "+"},       {"$SUBTRACT", "-"},
+      {"$MULTIPLY", "*"},  {"$DIVIDE", "/"},
+      {"$EQUAL", "="},     {"$NOT_EQUAL", "<>"},
+      {"$LESS", "<"},      {"$LESS_OR_EQUAL", "<="},
+      {"$GREATER", ">"},   {"$GREATER_OR_EQUAL", ">="},
+      {"$LIKE", "LIKE"},   {"$BITWISE_AND", "&"},
+      {"$BITWISE_OR", "|"}};
+  if (name == "$BITWISE_XOR" && n == 2) {
+    return invoke("xor");
+  }
   if (const auto op = binary.find(name); op != binary.end() && n == 2) {
-    if (name == "$BITWISE_XOR") {
-      return invoke("xor");
-    }
     if (name == "$DIVIDE") {
       // Bind both operands once, including volatile expressions, while keeping this an
       // expression that CASE/IF can short-circuit. DuckDB otherwise returns infinity on
@@ -2336,13 +2365,8 @@ std::optional<std::string> DatasetPath(const std::vector<std::string>& path,
                                        const DefaultDataset& defaults, const Scope& scope) {
   std::vector<std::string> parts;
   for (const auto& element : path) {
-    for (size_t begin = 0;;) {
-      const size_t end = element.find('.', begin);
-      parts.push_back(element.substr(begin, end - begin));
-      if (end == std::string::npos) {
-        break;
-      }
-      begin = end + 1;
+    for (const absl::string_view part : absl::StrSplit(element, '.')) {
+      parts.emplace_back(part);
     }
   }
   if (parts.size() == 1) {
@@ -2352,44 +2376,6 @@ std::optional<std::string> DatasetPath(const std::vector<std::string>& path,
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
   return QuoteIdentifier(parts[0]) + "." + QuoteIdentifier(parts[1]);
-}
-
-// A column type with its type parameters. DuckDB ignores lengths, so STRING(L) and BYTES(L)
-// lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S).
-std::optional<std::string> ColumnType(const googlesql::Type* type,
-                                      const googlesql::TypeParameters& parameters) {
-  if (parameters.IsEmpty() || parameters.IsStringTypeParameters()) {
-    return SqlType(type);
-  }
-  if (parameters.IsNumericTypeParameters()) {
-    const auto& numeric = parameters.numeric_type_parameters();
-    if (numeric.is_max_precision() || numeric.precision() > 38) {
-      return std::nullopt;
-    }
-    return "DECIMAL(" + std::to_string(numeric.precision()) + "," +
-           std::to_string(numeric.scale()) + ")";
-  }
-  if (!parameters.IsTopLevelEmpty()) {
-    return std::nullopt;
-  }
-  if (type->IsArray() && parameters.num_children() == 1) {
-    const auto element = ColumnType(type->AsArray()->element_type(), parameters.child(0));
-    return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
-  }
-  if (!type->IsStruct() || parameters.num_children() != type->AsStruct()->num_fields()) {
-    return std::nullopt;
-  }
-  std::set<std::string> names;
-  std::vector<std::string> fields;
-  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
-    const auto& field = type->AsStruct()->field(i);
-    const auto field_type = ColumnType(field.type, parameters.child(i));
-    if (!field_type || field.name.empty() || !names.insert(ToLowerAscii(field.name)).second) {
-      return std::nullopt;
-    }
-    fields.push_back(QuoteIdentifier(field.name) + " " + *field_type);
-  }
-  return "STRUCT(" + Join(fields, ", ") + ")";
 }
 
 bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
@@ -2412,9 +2398,9 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   if (HasCollation(column.annotations())) {
     return Unsupported(scope, "column collation");
   }
-  auto type = ColumnType(column.type(), column.annotations() == nullptr
-                                            ? googlesql::TypeParameters()
-                                            : column.annotations()->type_parameters());
+  auto type =
+      SqlType(column.type(),
+              column.annotations() == nullptr ? nullptr : &column.annotations()->type_parameters());
   if (!type) {
     return Unsupported(scope, "column type " + column.type()->DebugString());
   }
@@ -2643,9 +2629,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
 
 }  // namespace
 
-std::optional<std::string> TranslateResolvedToDuckDbSql(
-    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
-    const DefaultDataset& defaults, std::string* unsupported) {
+std::optional<std::string> TranslateToDuckDbSql(const googlesql::ResolvedStatement& statement,
+                                                const QueryParameters& parameters,
+                                                const DefaultDataset& defaults,
+                                                std::string* unsupported) {
   int next_name = 0;
   std::string reason;
   const Scope scope{parameters, next_name, reason, {}, {}};

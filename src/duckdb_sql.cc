@@ -95,12 +95,9 @@ std::string ToHex(std::string_view value) {
   return result;
 }
 
-std::string DuckDbTypeName(std::string_view googlesql_name, bool has_type_parameters) {
+std::string DuckDbTypeName(std::string_view googlesql_name) {
   const auto it = TypeNames().find(ToUpperAscii(googlesql_name));
-  if (it == TypeNames().end()) {
-    return std::string(googlesql_name);
-  }
-  return has_type_parameters ? it->second.substr(0, it->second.find('(')) : it->second;
+  return it == TypeNames().end() ? std::string(googlesql_name) : it->second;
 }
 
 }  // namespace bigquery_emulator_duckdb

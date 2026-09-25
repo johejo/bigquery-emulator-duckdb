@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "src/field_schema.h"
-#include "src/frontend.h"
 
 namespace googlesql {
 class AnalyzerOutput;
@@ -57,10 +56,10 @@ class AnalyzerResult {
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output_;
 };
 
-// Resolves the names and types of a parsed statement against `catalog`. Throws
-// std::runtime_error with a caret-annotated message when the statement does not analyze, the
-// same way ParseGoogleSql reports a syntax error.
-AnalyzerResult AnalyzeGoogleSql(const FrontendResult& frontend_result, googlesql::Catalog& catalog,
+// Parses `sql` as a single GoogleSQL statement and resolves its names and types against
+// `catalog`. Throws std::runtime_error with a caret-annotated message when the statement does
+// not parse or analyze.
+AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
                                 const AnalyzerSettings& settings = {});
 

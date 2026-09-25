@@ -17,4 +17,12 @@ json FieldSchema::ToJson() const {
   return field;
 }
 
+json SchemaToJson(const std::vector<FieldSchema>& schema) {
+  json fields = json::array();
+  for (const FieldSchema& field : schema) {
+    fields.push_back(field.ToJson());
+  }
+  return json{{"fields", std::move(fields)}};
+}
+
 }  // namespace bigquery_emulator_duckdb

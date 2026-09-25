@@ -19,31 +19,37 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/language_options.h"
+#include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "src/field_schema.h"
-#include "src/frontend.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
 
-std::unique_ptr<googlesql::SimpleCatalog> MakeBuiltinCatalog(googlesql::TypeFactory* type_factory) {
-  auto catalog = std::make_unique<googlesql::SimpleCatalog>("builtin", type_factory);
-  const absl::Status status = catalog->AddBuiltinFunctionsAndTypes(
-      googlesql::BuiltinFunctionOptions(GoogleSqlLanguageOptions()));
-  if (!status.ok()) {
-    throw std::runtime_error(status.ToString());
-  }
-  // BigQuery functions that GoogleSQL does not ship, declared with the signatures the
-  // translator supports.
-  catalog->AddOwnedFunction(
-      new googlesql::Function("contains_substr", "bigquery", googlesql::Function::SCALAR,
-                              {googlesql::FunctionSignature(
-                                  googlesql::FunctionArgumentType(googlesql::types::BoolType()),
-                                  {googlesql::FunctionArgumentType(googlesql::types::StringType()),
-                                   googlesql::FunctionArgumentType(googlesql::types::StringType())},
-                                  /*context_id=*/static_cast<int64_t>(0))}));
-  return catalog;
+// Built once per process: registering every built-in function is expensive, and SimpleCatalog
+// lookups are thread-safe.
+googlesql::SimpleCatalog* BuiltinCatalog() {
+  static googlesql::SimpleCatalog* const kCatalog = [] {
+    auto* catalog = new googlesql::SimpleCatalog("builtin", new googlesql::TypeFactory());
+    const absl::Status status = catalog->AddBuiltinFunctionsAndTypes(
+        googlesql::BuiltinFunctionOptions(GoogleSqlLanguageOptions()));
+    if (!status.ok()) {
+      throw std::runtime_error(status.ToString());
+    }
+    // BigQuery functions that GoogleSQL does not ship, declared with the signatures the
+    // translator supports.
+    catalog->AddOwnedFunction(new googlesql::Function(
+        "contains_substr", "bigquery", googlesql::Function::SCALAR,
+        {googlesql::FunctionSignature(
+            googlesql::FunctionArgumentType(googlesql::types::BoolType()),
+            {googlesql::FunctionArgumentType(googlesql::types::StringType()),
+             googlesql::FunctionArgumentType(googlesql::types::StringType())},
+            /*context_id=*/static_cast<int64_t>(0))}));
+    return catalog;
+  }();
+  return kCatalog;
 }
 
 absl::StatusOr<const googlesql::Type*> ScalarType(const std::string& type) {
@@ -131,6 +137,23 @@ absl::StatusOr<std::string> BigQueryTypeName(const googlesql::Type* type) {
 }
 
 }  // namespace
+
+const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
+  static const googlesql::LanguageOptions* const kLanguageOptions = [] {
+    auto* options = new googlesql::LanguageOptions();
+    // Some syntax BigQuery accepts is gated behind a language feature that the default options
+    // leave off, QUALIFY among it, so every released feature is turned on. Accepting a little
+    // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
+    // cannot run at all.
+    options->EnableMaximumLanguageFeatures();
+    // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.
+    options->set_product_mode(googlesql::PRODUCT_EXTERNAL);
+    // The analyzer accepts only queries by default, but the emulator also runs DDL and DML.
+    options->SetSupportsAllStatementKinds();
+    return options;
+  }();
+  return *kLanguageOptions;
+}
 
 std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
@@ -227,7 +250,7 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
 
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                  std::string default_project, std::string default_dataset)
-    : googlesql::CatalogWrapper(MakeBuiltinCatalog(type_factory)),
+    : googlesql::CatalogWrapper(BuiltinCatalog()),
       source_(source),
       type_factory_(type_factory),
       default_project_(std::move(default_project)),

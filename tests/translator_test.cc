@@ -12,7 +12,6 @@
 #include "src/analyzer.h"
 #include "src/backend.h"
 #include "src/catalog.h"
-#include "src/frontend.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -49,15 +48,14 @@ class TranslatorTest : public ::testing::Test {
   std::optional<std::string> Translate(const std::string& sql,
                                        const QueryParameters& parameters = {},
                                        const AnalyzerSettings& settings = {}) {
-    const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, settings);
-    return TranslateResolvedToDuckDbSql(analyzed.statement(), parameters,
-                                        DefaultDataset{"p", "ds"});
+    const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
+    return TranslateToDuckDbSql(analyzed.statement(), parameters, DefaultDataset{"p", "ds"});
   }
 
   std::string Unsupported(const std::string& sql) {
-    const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, {});
+    const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, {});
     std::string reason;
-    if (TranslateResolvedToDuckDbSql(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
+    if (TranslateToDuckDbSql(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
             .has_value()) {
       throw std::runtime_error("Unexpected translation: " + sql);
     }
@@ -66,10 +64,10 @@ class TranslatorTest : public ::testing::Test {
 
   QueryResult Execute(const std::string& sql, const QueryParameters& parameters = {},
                       const AnalyzerSettings& settings = {}) {
-    const auto analyzed = AnalyzeGoogleSql(ParseGoogleSql(sql), catalog_, types_, settings);
+    const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
     std::string reason;
-    const auto translated = TranslateResolvedToDuckDbSql(analyzed.statement(), parameters,
-                                                         DefaultDataset{"p", "ds"}, &reason);
+    const auto translated =
+        TranslateToDuckDbSql(analyzed.statement(), parameters, DefaultDataset{"p", "ds"}, &reason);
     if (!translated) {
       throw std::runtime_error("Unexpected unsupported construct (" + reason + "): " + sql);
     }

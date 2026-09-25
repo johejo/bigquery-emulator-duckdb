@@ -25,8 +25,9 @@ struct DefaultDataset {
 // unsupported construct, which `unsupported`, when given, then names.
 // Errors are not caught, so that a failed translation is not reported as an unsupported one.
 // The statement's catalog and TypeFactory must remain alive for this call.
-std::optional<std::string> TranslateResolvedToDuckDbSql(
-    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},
-    const DefaultDataset& defaults = {}, std::string* unsupported = nullptr);
+std::optional<std::string> TranslateToDuckDbSql(const googlesql::ResolvedStatement& statement,
+                                                const QueryParameters& parameters = {},
+                                                const DefaultDataset& defaults = {},
+                                                std::string* unsupported = nullptr);
 
 }  // namespace bigquery_emulator_duckdb

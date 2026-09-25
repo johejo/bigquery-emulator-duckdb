@@ -17,4 +17,7 @@ struct FieldSchema {
   nlohmann::json ToJson() const;
 };
 
+// A TableSchema object: {"fields": [...]}.
+nlohmann::json SchemaToJson(const std::vector<FieldSchema>& schema);
+
 }  // namespace bigquery_emulator_duckdb

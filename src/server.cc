@@ -16,6 +16,7 @@
 #include "src/api_error.h"
 #include "src/discovery_document.h"
 #include "src/emulator.h"
+#include "src/field_schema.h"
 #include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
@@ -280,16 +281,12 @@ json TableReferenceJson(const TableReference& table) {
 }
 
 json TableResource(const TableInfo& info) {
-  json fields = json::array();
-  for (const FieldSchema& field : info.schema) {
-    fields.push_back(field.ToJson());
-  }
   return json{{"kind", "bigquery#table"},
               {"etag", ""},
               {"id", info.reference.project_id + ":" + info.reference.dataset_id + "." +
                          info.reference.table_id},
               {"tableReference", TableReferenceJson(info.reference)},
-              {"schema", {{"fields", std::move(fields)}}},
+              {"schema", SchemaToJson(info.schema)},
               {"type", "TABLE"},
               {"numRows", std::to_string(info.num_rows)},
               {"numBytes", "0"},
@@ -360,7 +357,8 @@ class Server::Impl {
     // Patterns without path parameters are regular expressions in cpp-httplib, so "$" needs
     // escaping.
     http_.Get(R"(/\$discovery/rest)", [this](const httplib::Request&, httplib::Response& response) {
-      json document = json::parse(DiscoveryDocument());
+      static const json* const kDocument = new json(json::parse(DiscoveryDocument()));
+      json document = *kDocument;
       const std::string root = server_.root_url() + "/";
       document["rootUrl"] = root;
       document["mtlsRootUrl"] = root;
