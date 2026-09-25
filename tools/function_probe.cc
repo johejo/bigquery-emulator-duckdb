@@ -1,8 +1,8 @@
-// Probes every GoogleSQL built-in function signature against the emulator and prints a Markdown
-// report of which ones translate and run. Each signature is called with sample arguments of its
-// types, unless the hints file gives the calls for the function; a signature the probe cannot
-// build a valid call for is reported as untested. A probe checks only that a call translates and
-// runs on DuckDB, not that it returns what BigQuery would.
+// Probes the BigQuery functions listed in tools/bigquery_functions.txt against the emulator and
+// prints a Markdown report of which ones translate and run. Each signature the analyzer knows for a
+// function is called with sample arguments of its types, unless the hints file gives the calls; a
+// signature the probe cannot build a valid call for is reported as untested. A probe checks only
+// that a call translates and runs on DuckDB, not that it returns what BigQuery would.
 
 #include <algorithm>
 #include <fstream>
@@ -14,14 +14,16 @@
 #include <stdexcept>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
-#include "googlesql/public/builtin_function_options.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
-#include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "src/analyzer.h"
@@ -30,6 +32,9 @@
 
 namespace bigquery_emulator_duckdb {
 namespace {
+
+constexpr std::string_view kDocs =
+    "https://cloud.google.com/bigquery/docs/reference/standard-sql";
 
 class NoTables : public TableSource {
  public:
@@ -58,9 +63,14 @@ std::optional<std::string> Sample(const googlesql::Type* type) {
     return "STRUCT(" + fields + ")";
   }
   if (type->IsEnum()) {
-    // Date parts are the only enum arguments BigQuery spells as keywords.
-    return type->DebugString().find("DateTimestampPart") != std::string::npos
-               ? std::optional<std::string>("DAY")
+    // Date parts are the only enum arguments BigQuery spells as keywords; it spells rounding
+    // modes as strings.
+    const std::string name = type->DebugString();
+    if (name.find("DateTimestampPart") != std::string::npos) {
+      return "DAY";
+    }
+    return name.find("ROUNDING_MODE") != std::string::npos
+               ? std::optional<std::string>("'ROUND_HALF_EVEN'")
                : std::nullopt;
   }
   if (type->IsRange()) {
@@ -136,45 +146,53 @@ struct Probe {
   std::string detail;
 };
 
-// Calls for the functions whose generated samples do not make a valid call, and the functions
-// that are left out of the report. See tools/function_probe_hints.txt for the format.
-struct Hints {
-  std::set<std::string> skip;
-  std::map<std::string, std::vector<std::string>> queries;
-};
-
-Hints ReadHints(const std::string& path) {
+// The lines of `path` that are neither blank nor comments, split into the first word and the rest.
+std::vector<std::pair<std::string, std::string>> ReadLines(const std::string& path) {
   std::ifstream in(path);
   if (!in) {
     throw std::runtime_error("cannot read " + path);
   }
-  Hints hints;
+  std::vector<std::pair<std::string, std::string>> lines;
   std::string line;
   for (int number = 1; std::getline(in, line); ++number) {
     if (line.empty() || line.starts_with("#")) {
       continue;
     }
     std::istringstream words(line);
-    std::string directive;
-    std::string name;
-    words >> directive >> name;
+    std::string first;
     std::string rest;
+    words >> first;
     std::getline(words >> std::ws, rest);
-    if (directive == "skip" && !name.empty()) {
-      hints.skip.insert(name);
-    } else if (directive == "query" && !rest.empty()) {
-      hints.queries[name].push_back(rest);
-    } else {
+    if (rest.empty()) {
       throw std::runtime_error(path + ":" + std::to_string(number) + ": cannot parse " + line);
     }
+    lines.emplace_back(first, rest);
   }
-  return hints;
+  return lines;
 }
 
 std::string FirstLine(const std::string& text) { return text.substr(0, text.find('\n')); }
 
+// Whether BigQuery has the signature: GoogleSQL has signatures over types BigQuery lacks, such as
+// FLOAT for CEILING.
+bool IsBigQuerySignature(const googlesql::FunctionSignature& signature) {
+  const googlesql::LanguageOptions& options = GoogleSqlLanguageOptions();
+  if (signature.HideInSupportedSignatureList(options)) {
+    return false;
+  }
+  const auto supported = [&](const googlesql::FunctionArgumentType& argument) {
+    const googlesql::Type* type = argument.type();
+    if (type != nullptr && type->IsArray()) {
+      type = type->AsArray()->element_type();
+    }
+    return type == nullptr || (type->IsSupportedType(options) && !type->IsFloat());
+  };
+  return supported(signature.result_type()) && std::ranges::all_of(signature.arguments(), supported);
+}
+
 // The generated query for a signature, or why there is none.
-std::variant<std::string, Probe> GeneratedQuery(const googlesql::Function& function,
+std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
+                                                const googlesql::Function& function,
                                                 const googlesql::FunctionSignature& signature) {
   std::vector<std::string> arguments;
   for (const googlesql::FunctionArgumentType& argument : signature.arguments()) {
@@ -190,7 +208,7 @@ std::variant<std::string, Probe> GeneratedQuery(const googlesql::Function& funct
     }
     arguments.push_back(*sample);
   }
-  std::string call = function.SQLName() + "(";
+  std::string call = name + "(";
   for (size_t i = 0; i < arguments.size(); ++i) {
     call += (i == 0 ? "" : ", ") + arguments[i];
   }
@@ -246,6 +264,28 @@ std::string Escape(const std::string& text) {
   return out;
 }
 
+// The page that documents the function itself rather than a variant of it, such as AVG over
+// aggregate-dp-functions#dp_avg: the one whose anchor is the function's name.
+std::string MainDoc(const std::string& name, const std::vector<std::string>& docs) {
+  std::string anchor = absl::AsciiStrToLower(name);
+  std::erase(anchor, '.');
+  for (const std::string& doc : docs) {
+    if (doc.ends_with("#" + anchor)) {
+      return doc;
+    }
+  }
+  return docs.front();
+}
+
+// The pages that document the function, which name the categories it belongs to.
+std::string Categories(const std::vector<std::string>& docs) {
+  std::set<std::string> pages;
+  for (const std::string& doc : docs) {
+    pages.insert(doc.substr(0, doc.find('#')));
+  }
+  return absl::StrJoin(pages, ", ");
+}
+
 std::string Status(std::map<Outcome, int> counts) {
   const int tested = counts[Outcome::kRuns] + counts[Outcome::kUnsupported] +
                      counts[Outcome::kFailsOnDuckDb];
@@ -262,74 +302,57 @@ std::string Status(std::map<Outcome, int> counts) {
 }
 
 int Main(int argc, char** argv) {
-  const std::vector<std::string> args(argv + 1, argv + argc);
-  const bool list_signatures = std::ranges::find(args, "--signatures") != args.end();
-  const auto hints_path = std::ranges::find_if(
-      args, [](const std::string& arg) { return !arg.starts_with("--"); });
-  if (hints_path == args.end()) {
-    std::cerr << "usage: function_probe [--signatures] HINTS_FILE\n";
+  std::vector<std::string> args(argv + 1, argv + argc);
+  const bool list_signatures = std::erase(args, "--signatures") > 0;
+  if (args.size() != 2) {
+    std::cerr << "usage: function_probe [--signatures] FUNCTIONS_FILE HINTS_FILE\n";
     return 2;
   }
-  const Hints hints = ReadHints(*hints_path);
+  // The pages and anchors that document each function. A name can be documented on several
+  // pages, such as EXTRACT for each type it takes, and the probe covers them in one row.
+  std::map<std::string, std::vector<std::string>> functions;
+  for (const auto& [name, doc] : ReadLines(args[0])) {
+    functions[name].push_back(doc);
+  }
+  std::map<std::string, std::vector<std::string>> hints;
+  for (const auto& [directive, hint] : ReadLines(args[1])) {
+    const std::string name = hint.substr(0, hint.find(' '));
+    const std::string sql = hint.substr(std::min(hint.size(), name.size() + 1));
+    if (directive != "query" || sql.empty()) {
+      std::cerr << "cannot parse hint: " << directive << " " << hint << "\n";
+      return 1;
+    }
+    // A hint for a function BigQuery does not have is a typo or a function BigQuery dropped.
+    if (!functions.contains(name)) {
+      std::cerr << "hint names a function not in " << args[0] << ": " << name << "\n";
+      return 1;
+    }
+    hints[name].push_back(sql);
+  }
 
   googlesql::TypeFactory type_factory;
-  googlesql::SimpleCatalog catalog("builtins", &type_factory);
-  if (const absl::Status status = catalog.AddBuiltinFunctionsAndTypes(
-          googlesql::BuiltinFunctionOptions(GoogleSqlLanguageOptions()));
-      !status.ok()) {
-    std::cerr << status << "\n";
-    return 1;
-  }
-  absl::flat_hash_set<const googlesql::Function*> set;
-  if (const absl::Status status = catalog.GetFunctions(&set); !status.ok()) {
-    std::cerr << status << "\n";
-    return 1;
-  }
-  std::vector<const googlesql::Function*> functions;
-  std::set<std::string> names;
-  for (const googlesql::Function* function : set) {
-    // Operators and internal functions start with $; they are covered by the SQL tests.
-    if (!function->Name().starts_with("$")) {
-      functions.push_back(function);
-      names.insert(function->SQLName());
-    }
-  }
-  std::ranges::sort(functions, {}, [](const googlesql::Function* f) { return f->SQLName(); });
-  // A hint for a function that does not exist is a typo or a function GoogleSQL dropped.
-  for (const auto& name : hints.skip) {
-    if (!names.contains(name)) {
-      std::cerr << "hint names an unknown function: " << name << "\n";
-      return 1;
-    }
-  }
-  for (const auto& [name, queries] : hints.queries) {
-    if (!names.contains(name)) {
-      std::cerr << "hint names an unknown function: " << name << "\n";
-      return 1;
-    }
-  }
-
+  NoTables tables;
+  BigQueryCatalog catalog(tables, &type_factory, "test", "");
   Prober prober;
   std::map<std::string, int> totals;
   if (!list_signatures) {
-    std::cout << "| Function | Kind | Status | Notes |\n| --- | --- | --- | --- |\n";
+    std::cout << "| Function | Category | Status | Notes |\n| --- | --- | --- | --- |\n";
   }
-  for (const googlesql::Function* function : functions) {
-    const std::string name = function->SQLName();
-    if (hints.skip.contains(name)) {
-      continue;
-    }
+  for (const auto& [name, docs] : functions) {
     std::vector<Probe> probes;
-    if (const auto hinted = hints.queries.find(name); hinted != hints.queries.end()) {
+    const googlesql::Function* function = nullptr;
+    // Aliases such as CEILING resolve to the function they stand for.
+    const std::vector<std::string> path = absl::StrSplit(name, '.');
+    if (const auto hinted = hints.find(name); hinted != hints.end()) {
       for (const std::string& sql : hinted->second) {
         probes.push_back(prober.Run(sql));
       }
-    } else {
+    } else if (catalog.FindFunction(path, &function).ok()) {
       for (const googlesql::FunctionSignature& signature : function->signatures()) {
-        if (signature.HideInSupportedSignatureList(GoogleSqlLanguageOptions())) {
+        if (!IsBigQuerySignature(signature)) {
           continue;
         }
-        const auto query = GeneratedQuery(*function, signature);
+        const auto query = GeneratedQuery(name, *function, signature);
         if (list_signatures) {
           std::cout << signature.DebugString(name) << "\n  "
                     << (std::holds_alternative<std::string>(query)
@@ -342,6 +365,8 @@ int Main(int argc, char** argv) {
                              ? prober.Run(std::get<std::string>(query))
                              : std::get<Probe>(query));
       }
+    } else {
+      probes.push_back({Outcome::kUnsupported, "the analyzer does not know this function"});
     }
     if (list_signatures || probes.empty()) {
       continue;
@@ -360,11 +385,8 @@ int Main(int argc, char** argv) {
     for (const std::string& n : notes) {
       note += (note.empty() ? "" : "; ") + n;
     }
-    std::cout << "| `" << name << "` | "
-              << (function->IsAnalytic()    ? "analytic"
-                  : function->IsAggregate() ? "aggregate"
-                                            : "scalar")
-              << " | " << status << " | " << Escape(note) << " |\n";
+    std::cout << "| [`" << name << "`](" << kDocs << "/" << MainDoc(name, docs) << ") | "
+              << Categories(docs) << " | " << status << " | " << Escape(note) << " |\n";
   }
   for (const auto& [status, count] : totals) {
     std::cerr << status << "=" << count << " ";

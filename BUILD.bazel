@@ -206,9 +206,7 @@ cc_binary(
         ":analyzer",
         ":catalog",
         ":emulator",
-        "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:type",
     ],
 )
