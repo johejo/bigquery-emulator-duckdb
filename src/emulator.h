@@ -87,6 +87,8 @@ class Emulator {
   // error rather than thrown, which is how BigQuery reports it too.
   std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
   std::shared_ptr<const Job> GetJob(const std::string& project_id, const std::string& job_id);
+  std::vector<std::shared_ptr<const Job>> ListJobs(const std::string& project_id);
+  void DeleteJob(const std::string& project_id, const std::string& job_id);
 
   std::vector<std::string> ListDatasets(const std::string& project_id);
   void GetDataset(const DatasetReference& dataset);  // Throws when the dataset is missing.

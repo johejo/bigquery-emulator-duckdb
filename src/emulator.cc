@@ -532,6 +532,31 @@ std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,
   return it->second;
 }
 
+std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& project_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::shared_ptr<const Job>> result;
+  for (const auto& entry : jobs_) {
+    const auto& job = entry.second;
+    if (job->project_id == project_id) {
+      result.push_back(job);
+    }
+  }
+  std::sort(result.begin(), result.end(), [](const auto& left, const auto& right) {
+    if (left->creation_time_ms != right->creation_time_ms) {
+      return left->creation_time_ms > right->creation_time_ms;
+    }
+    return left->job_id > right->job_id;
+  });
+  return result;
+}
+
+void Emulator::DeleteJob(const std::string& project_id, const std::string& job_id) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (jobs_.erase(JobKey(project_id, job_id)) == 0) {
+    throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
+  }
+}
+
 std::vector<std::string> Emulator::ListDatasets(const std::string& project_id) {
   EnsureProject(project_id);
   return FirstColumnStrings(

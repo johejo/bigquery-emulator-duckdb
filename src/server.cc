@@ -206,6 +206,22 @@ json JobResource(const Job& job) {
               {"statistics", JobStatistics(job)}};
 }
 
+json JobListEntry(const Job& job, bool full) {
+  json entry = {{"kind", "bigquery#job"},
+                {"id", job.project_id + ":" + job.location + "." + job.job_id},
+                {"jobReference", JobReference(job)},
+                {"state", "DONE"},
+                {"configuration", JobResource(job)["configuration"]},
+                {"statistics", JobStatistics(job)}};
+  if (job.error.has_value()) {
+    entry["errorResult"] = ErrorProto(*job.error);
+  }
+  if (full) {
+    entry["status"] = JobStatus(job);
+  }
+  return entry;
+}
+
 // The slice of a job's rows that one response carries.
 struct ResultPage {
   int64_t start_index = 0;
@@ -437,10 +453,64 @@ class Server::Impl {
            query_request.write_disposition = query_config.value("writeDisposition", "");
            return JobResource(*emulator_.RunQuery(query_request));
          }));
+    Get("/projects/:project/jobs",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          const std::string projection =
+              request.has_param("projection") ? request.get_param_value("projection") : "full";
+          if (projection != "full" && projection != "minimal") {
+            throw ApiError::Invalid("Invalid value for projection");
+          }
+          const std::string state =
+              request.has_param("stateFilter") ? request.get_param_value("stateFilter") : "";
+          if (!state.empty() && state != "done" && state != "pending" && state != "running") {
+            throw ApiError::Invalid("Invalid value for stateFilter");
+          }
+          const int64_t max_results = QueryParamInt(request, "maxResults", 50);
+          const int64_t offset = QueryParamInt(request, "pageToken", 0);
+          const int64_t min_time = QueryParamInt(request, "minCreationTime", 0);
+          const int64_t max_time = QueryParamInt(request, "maxCreationTime", INT64_MAX);
+          if (max_results <= 0 || offset < 0 || min_time < 0 || max_time < 0) {
+            throw ApiError::Invalid("Invalid jobs.list parameter");
+          }
+          json response = {{"kind", "bigquery#jobList"}, {"etag", ""}};
+          json jobs = json::array();
+          int64_t index = 0;
+          const bool parent_filter = request.has_param("parentJobId");
+          for (const auto& job : emulator_.ListJobs(Param(request, "project"))) {
+            if (parent_filter || (state != "" && state != "done") ||
+                job->creation_time_ms < min_time || job->creation_time_ms > max_time) {
+              continue;
+            }
+            if (index++ < offset) {
+              continue;
+            }
+            if (static_cast<int64_t>(jobs.size()) == max_results) {
+              response["nextPageToken"] = std::to_string(index - 1);
+              break;
+            }
+            jobs.push_back(JobListEntry(*job, projection == "full"));
+          }
+          if (!jobs.empty()) {
+            response["jobs"] = std::move(jobs);
+          }
+          return response;
+        }));
     Get("/projects/:project/jobs/:job",
         Json([this](const httplib::Request& request, httplib::Response&) {
           return JobResource(*emulator_.GetJob(Param(request, "project"), Param(request, "job")));
         }));
+    Post("/projects/:project/jobs/:job/cancel",
+         Json([this](const httplib::Request& request, httplib::Response&) {
+           return json{{"kind", "bigquery#jobCancelResponse"},
+                       {"job", JobResource(*emulator_.GetJob(Param(request, "project"),
+                                                             Param(request, "job")))}};
+         }));
+    Delete("/projects/:project/jobs/:job/delete",
+           Json([this](const httplib::Request& request, httplib::Response& response) {
+             emulator_.DeleteJob(Param(request, "project"), Param(request, "job"));
+             response.status = 204;
+             return json::object();
+           }));
 
     // datasets
     Get("/projects/:project/datasets",

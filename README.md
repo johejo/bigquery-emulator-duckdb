@@ -12,7 +12,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | --- | --- | --- |
 | `bq` CLI and Go BigQuery client | Supported | Covered by [end-to-end tests](tests/e2e); use the emulator URL as the endpoint override. |
 | REST discovery and endpoint paths | Supported | Serves the v2 discovery document; resource routes accept both `/bigquery/v2` and root paths. |
-| Query jobs | Partial | `jobs.query`, `jobs.insert`, `jobs.get`, and `jobs.getQueryResults`; jobs complete synchronously. `jobs.insert` writes to `destinationTable` with every `createDisposition` and `writeDisposition`; without one, results are not stored in an anonymous table. Legacy SQL is unsupported: `useLegacySql: true` is rejected, and an omitted `useLegacySql` runs as GoogleSQL. |
+| Query jobs | Partial | Jobs complete synchronously, so cancellation cannot interrupt them. Legacy SQL is unsupported, and results are not stored in anonymous tables. |
 | Load, extract, and copy jobs | Unsupported | `jobs.insert` accepts query jobs only. |
 | Datasets and tables | Partial | `list`, `get`, `insert`, and `delete`; update and patch methods are not implemented. |
 | Table data | Partial | `tabledata.list` and `tabledata.insertAll` are implemented. Streaming inserts accept scalar, repeated, and record fields, report row errors, and support `skipInvalidRows` and `ignoreUnknownValues`. Insert ID deduplication and template suffixes are unsupported. |

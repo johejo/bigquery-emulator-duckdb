@@ -100,6 +100,70 @@ TEST_F(ServerTest, RunsJobAndFetchesResults) {
   Get("/bigquery/v2/projects/p/queries/missing", 404);
 }
 
+TEST_F(ServerTest, ListsJobsWithFiltersAndPages) {
+  const std::string path = "/bigquery/v2/projects/p/jobs";
+  Post(path, {{"jobReference", {{"jobId", "a"}}},
+              {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
+  Post(path, {{"jobReference", {{"jobId", "b"}}},
+              {"configuration", {{"query", {{"query", "SELECT * FROM missing"}}}}}});
+  Post("/projects/other/jobs", {{"jobReference", {{"jobId", "c"}}},
+                                {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
+  const json first = Get(path + "?maxResults=1&projection=minimal");
+  EXPECT_EQ(first["kind"], "bigquery#jobList");
+  ASSERT_EQ(first["jobs"].size(), 1);
+  EXPECT_FALSE(first["jobs"][0].contains("status"));
+  ASSERT_TRUE(first.contains("nextPageToken"));
+  const json second =
+      Get(path + "?maxResults=1&pageToken=" + first["nextPageToken"].get<std::string>());
+  ASSERT_EQ(second["jobs"].size(), 1);
+  EXPECT_TRUE(second["jobs"][0].contains("status"));
+  EXPECT_FALSE(second.contains("nextPageToken"));
+  EXPECT_NE(first["jobs"][0]["jobReference"]["jobId"], second["jobs"][0]["jobReference"]["jobId"]);
+  EXPECT_FALSE(Get(path + "?stateFilter=running").contains("jobs"));
+  EXPECT_FALSE(Get(path + "?parentJobId=parent").contains("jobs"));
+  EXPECT_EQ(Get(path + "?stateFilter=done")["jobs"].size(), 2);
+  Get(path + "?maxResults=-1", 400);
+  Get(path + "?projection=unknown", 400);
+}
+
+TEST_F(ServerTest, CancelsCompletedJobWithoutChangingIt) {
+  const std::string path = "/projects/p/jobs";
+  const json job = Post(path, {{"jobReference", {{"jobId", "done"}}},
+                               {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
+  const json cancelled = Post(path + "/done/cancel", json::object());
+  EXPECT_EQ(cancelled["kind"], "bigquery#jobCancelResponse");
+  EXPECT_EQ(cancelled["job"], job);
+  EXPECT_EQ(Get(path + "/done"), job);
+  EXPECT_EQ(Get("/projects/p/queries/done")["rows"][0]["f"][0]["v"], "1");
+  Post(path + "/missing/cancel", json::object(), 404);
+}
+
+TEST_F(ServerTest, DeletesJobMetadataAndAllowsJobIdReuse) {
+  const std::string path = "/bigquery/v2/projects/p/jobs";
+  Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  const json request = {{"jobReference", {{"jobId", "old"}}},
+                        {"configuration",
+                         {{"query",
+                           {{"query", "SELECT 1 AS x"},
+                            {"destinationTable", {{"datasetId", "ds"}, {"tableId", "result"}}}}}}}};
+  Post(path, request);
+  EXPECT_EQ(Get(path + "?stateFilter=done")["jobs"].size(), 1);
+
+  const httplib::Result deleted = client_->Delete(path + "/old/delete?location=US");
+  ASSERT_TRUE(deleted);
+  EXPECT_EQ(deleted->status, 204) << deleted->body;
+  Get(path + "/old", 404);
+  Get("/projects/p/queries/old", 404);
+  EXPECT_FALSE(Get(path).contains("jobs"));
+  EXPECT_EQ(Get("/projects/p/datasets/ds/tables/result/data")["rows"][0]["f"][0]["v"], "1");
+  EXPECT_EQ(client_->Delete(path + "/old/delete")->status, 404);
+
+  const json reused = Post(path, {{"jobReference", {{"jobId", "old"}}},
+                                  {"configuration", {{"query", {{"query", "SELECT 2 AS x"}}}}}});
+  EXPECT_EQ(reused["status"]["state"], "DONE");
+  EXPECT_EQ(Get("/projects/p/queries/old")["rows"][0]["f"][0]["v"], "2");
+}
+
 TEST_F(ServerTest, RejectsDuplicateJobIdWithoutRunningQuery) {
   const std::string path = "/bigquery/v2/projects/p/jobs";
   const json first = {{"jobReference", {{"jobId", "same"}}},
