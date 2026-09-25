@@ -19,17 +19,16 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 
 | Status | Functions |
 | --- | --- |
-| Broken | 18 |
-| Partial | 24 |
-| Supported | 147 |
-| Unsupported | 204 |
+| Partial | 40 |
+| Supported | 163 |
+| Unsupported | 190 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
 | --- | --- | --- | --- |
 | [`ABS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#abs) | mathematical_functions | Supported |  |
 | [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported |  |
-| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Unsupported | function ACOSH |
+| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported |  |
 | [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Unsupported | function DECRYPT_BYTES |
 | [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Unsupported | function DECRYPT_STRING |
 | [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Unsupported | function ENCRYPT |
@@ -49,13 +48,13 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | array_functions | Supported |  |
 | [`ARRAY_REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_reverse) | array_functions | Supported |  |
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | array_functions | Supported |  |
-| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Broken | `SELECT ARRAY_TO_STRING([b'abc'], b'abc')`: Binder Error: No matching aggregate function |
+| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Partial | function ARRAY_TO_STRING |
 | [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Partial | function ASCII |
 | [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported |  |
 | [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported |  |
 | [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported |  |
 | [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported |  |
-| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Unsupported | function ATANH |
+| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported |  |
 | [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | unsupported construct |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported | the analyzer does not know this function |
 | [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | type ENUM<BITWISE_AGG_MODE> |
@@ -81,16 +80,16 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported |  |
 | [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Supported |  |
 | [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported |  |
-| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Unsupported | function COSH |
+| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported |  |
 | [`COSINE_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosine_distance) | mathematical_functions | Unsupported | function COSINE_DISTANCE |
-| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Unsupported | function COT |
-| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Unsupported | function COTH |
+| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Supported |  |
+| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported |  |
 | [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | aggregate-dp-functions, aggregate_functions | Supported |  |
 | [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | aggregate_functions | Supported |  |
 | [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Supported |  |
 | [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Supported |  |
-| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Unsupported | function CSC |
-| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Unsupported | function CSCH |
+| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported |  |
+| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported |  |
 | [`CUME_DIST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#cume_dist) | numbering_functions | Supported |  |
 | [`CURRENT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#current_date) | date_functions | Supported |  |
 | [`CURRENT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#current_datetime) | datetime_functions | Supported |  |
@@ -121,7 +120,7 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | graph-sql-functions | Untested | no sample for <graph_path> |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | string_functions | Unsupported | function EDIT_DISTANCE |
 | [`ELEMENT_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#element_id) | graph-sql-functions | Untested | no sample for <graph_element> |
-| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Broken | `SELECT ENDS_WITH(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'ends_with(BLOB, BLOB)' |
+| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Partial | function ENDS_WITH |
 | [`ERROR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions#error) | debugging_functions | Supported |  |
 | [`EUCLIDEAN_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#euclidean_distance) | mathematical_functions | Unsupported | function EUCLIDEAN_DISTANCE |
 | [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported |  |
@@ -135,13 +134,13 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Supported |  |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported |  |
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported |  |
-| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Unsupported | function FORMAT_TIME |
+| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported |  |
 | [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported |  |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Unsupported | function FROM_BASE32 |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported |  |
 | [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Broken | `SELECT GENERATE_ARRAY(1.5, 1.5)`: Binder Error: No function matches the given name and argument types 'generate_series(DOUBLE, DOUBLE)'; `SELECT GENERATE_ARRAY(BIGNUMERIC '1.5', BIGNUMERIC '1.5')`: Binder Error: No function matches the given name and argument types 'generate_series(DECIMAL(38,19), DECIMAL(38,19))'; `SELECT GENERATE_ARRAY(NUMERIC '1.5', NUMERIC '1.5')`: Binder Error: No function matches the given name and argument types 'generate_series(DECIMAL(38,9), DECIMAL(38,9))' |
+| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | function GENERATE_ARRAY |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported |  |
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Unsupported | function GENERATE_TIMESTAMP_ARRAY |
@@ -163,7 +162,7 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`IS_NAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_nan) | mathematical_functions | Supported |  |
 | [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested | no sample for <graph_path> |
 | [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Unsupported | function JSON_ARRAY |
+| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported |  |
 | [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Unsupported | function JSON_ARRAY_APPEND |
 | [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Unsupported | function JSON_ARRAY_INSERT |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Unsupported | function JSON_EXTRACT |
@@ -222,9 +221,9 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Supported |  |
 | [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | aggregate_functions | Supported |  |
 | [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | aggregate_functions | Supported |  |
-| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Broken | `SELECT LOWER(b'abc')`: Binder Error: No function matches the given name and argument types 'lower(BLOB)' |
+| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Partial | function LOWER |
 | [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Partial | function LPAD |
-| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Broken | `SELECT LTRIM(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'ltrim(BLOB, BLOB)' |
+| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Partial | function LTRIM |
 | [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported | type INTERVAL |
 | [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported |  |
 | [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Unsupported | the analyzer does not know this function |
@@ -258,7 +257,7 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported |  |
 | [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Partial | function PARSE_JSON |
 | [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported | function PARSE_NUMERIC |
-| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Unsupported | function PARSE_TIME |
+| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported |  |
 | [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
 | [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested | no sample for <graph_path> |
 | [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | graph-sql-functions | Untested | no sample for <graph_path> |
@@ -278,20 +277,20 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | range-functions | Unsupported | the analyzer does not know this function |
 | [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Unsupported | type RANGE<DATE> |
 | [`RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#rank) | numbering_functions | Supported |  |
-| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Broken | `SELECT REGEXP_CONTAINS(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'regexp_matches(BLOB, BLOB)' |
+| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Partial | function REGEXP_CONTAINS |
 | [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Partial | function REGEXP_EXTRACT |
 | [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Partial | function REGEXP_EXTRACT_ALL |
 | [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Unsupported | function REGEXP_INSTR |
-| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Broken | `SELECT REGEXP_REPLACE(b'abc', b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'regexp_replace(BLOB, BLOB, BLOB, STRING_LITERAL)' |
+| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | function REGEXP_REPLACE |
 | [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | function REGEXP_EXTRACT |
 | [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported |  |
-| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Broken | `SELECT REPLACE(b'abc', b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'replace(BLOB, BLOB, BLOB)' |
-| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Broken | `SELECT REVERSE(b'abc')`: Binder Error: No function matches the given name and argument types 'reverse(BLOB)' |
+| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Partial | function REPLACE |
+| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Partial | function REVERSE |
 | [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Partial | function RIGHT |
 | [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | mathematical_functions | Partial | function ROUND date part |
 | [`ROW_NUMBER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#row_number) | numbering_functions | Supported |  |
 | [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | string_functions | Partial | function RPAD |
-| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Broken | `SELECT RTRIM(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'rtrim(BLOB, BLOB)' |
+| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Partial | function RTRIM |
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported |  |
@@ -302,26 +301,26 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`SAFE_NEGATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_negate) | mathematical_functions | Supported |  |
 | [`SAFE_SUBTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_subtract) | mathematical_functions | Supported |  |
 | [`SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search) | search_functions | Unsupported | the analyzer does not know this function |
-| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Unsupported | function SEC |
-| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Unsupported | function SECH |
+| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported |  |
+| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported |  |
 | [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported | function SESSION_USER |
 | [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported |  |
 | [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported |  |
 | [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Unsupported | function SHA512 |
 | [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported |  |
 | [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported |  |
-| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Unsupported | function SINH |
+| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported |  |
 | [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported | function SOUNDEX |
 | [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested | no sample for <graph_edge> |
 | [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Partial | function SPLIT |
 | [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported |  |
-| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Broken | `SELECT STARTS_WITH(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'starts_with(BLOB, BLOB)' |
+| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Partial | function STARTS_WITH |
 | [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported |  |
 | [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported |  |
 | [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported |  |
 | [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | function STRING |
 | [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Partial | STRING_AGG over BYTES |
-| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Broken | `SELECT STRPOS(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'strpos(BLOB, BLOB)' |
+| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Partial | function STRPOS |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | geography_functions | Unsupported | type GEOGRAPHY |
@@ -391,14 +390,14 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Broken | `SELECT SUBSTR(b'abc', 2)`: Binder Error: No function matches the given name and argument types 'substr(BLOB, BIGINT)' |
-| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Broken | `SELECT SUBSTRING(b'abc', 2)`: Binder Error: No function matches the given name and argument types 'substr(BLOB, BIGINT)' |
+| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Partial | function SUBSTR |
+| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Partial | function SUBSTR |
 | [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | unsupported construct |
 | [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported |  |
 | [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported |  |
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported | the analyzer does not know this function |
 | [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported | the analyzer does not know this function |
-| [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Broken | `SELECT TIME(TIMESTAMP '2024-01-15 10:20:30+00')`: Conversion Error: Unimplemented type for cast (TIMESTAMP WITH TIME ZONE -> TIME) |
+| [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported |  |
 | [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | function TIMESTAMP |
 | [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported |  |
 | [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Unsupported | type INTERVAL |
@@ -411,7 +410,7 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`TIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add) | time_functions | Supported |  |
 | [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | time_functions | Supported |  |
 | [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | time_functions | Supported |  |
-| [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Unsupported | function TIME_TRUNC |
+| [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Supported |  |
 | [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Unsupported | function TO_BASE32 |
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported |  |
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported | function TO_CODE_POINTS |
@@ -419,15 +418,15 @@ a call translates and runs on DuckDB, not that it returns what BigQuery would.
 | [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Unsupported | function TO_JSON |
 | [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported |  |
 | [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Partial | function TRANSLATE |
-| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Broken | `SELECT TRIM(b'abc', b'abc')`: Binder Error: No function matches the given name and argument types 'trim(BLOB, BLOB)' |
-| [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Broken | `SELECT TRUNC(1.5, 2)`: Binder Error: No function matches the given name and argument types 'trunc(DOUBLE, BIGINT)'; `SELECT TRUNC(BIGNUMERIC '1.5', 2)`: Binder Error: No function matches the given name and argument types 'trunc(DECIMAL(38,19), BIGINT)'; `SELECT TRUNC(NUMERIC '1.5', 2)`: Binder Error: No function matches the given name and argument types 'trunc(DECIMAL(38,9), BIGINT)' |
+| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Partial | function TRIM |
+| [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Supported |  |
 | [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | utility-functions | Supported |  |
 | [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | string_functions | Supported |  |
 | [`UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date) | date_functions | Supported |  |
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | timestamp_functions | Supported |  |
 | [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported |  |
-| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Broken | `SELECT UPPER(b'abc')`: Binder Error: No function matches the given name and argument types 'upper(BLOB)' |
+| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Partial | function UPPER |
 | [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported |  |
 | [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Supported |  |
 | [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Supported |  |

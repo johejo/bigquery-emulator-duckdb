@@ -76,6 +76,12 @@ TEST(FunctionsTest, BindsArgumentsUsedTwice) {
             "0 THEN error('LEFT length must be non-negative') ELSE left(_fn.a1, _fn.a2) END)[1]");
 }
 
+TEST(FunctionsTest, PassesThroughStringsOnly) {
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", ArgumentType::kString)}), "trim(s)");
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", ArgumentType::kString), Sql("c")}), "trim(s, c)");
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("b", ArgumentType::kBytes)}), std::nullopt);
+}
+
 TEST(FunctionsTest, RenamesAndPassesThrough) {
   EXPECT_EQ(TranslateFunction("RAND", {}), "random()");
   EXPECT_EQ(TranslateFunction("GREATEST", {Sql("a"), Sql("b"), Sql("c")}), "GREATEST(a, b, c)");

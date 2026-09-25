@@ -97,8 +97,36 @@ std::vector<Rule> WeekDiff() {
 
 // A cast to a civil type, where a time zone argument moves a TIMESTAMP to the civil time there.
 std::vector<Rule> Civil(const std::string& target) {
-  return {{1, "CAST($1 AS " + target + ")"},
+  // DuckDB cannot cast a TIMESTAMPTZ to TIME, so it goes through the civil time in UTC, the
+  // session's time zone.
+  return {{1, "CAST(CAST($1 AS TIMESTAMP) AS " + target + ")", {Is(1, {kTimestamp})}},
+          {1, "CAST($1 AS " + target + ")"},
           {2, "CAST(timezone($2, $1) AS " + target + ")", {Is(1, {kTimestamp})}}};
+}
+
+// The DuckDB function of the same name, called with each argument count in `arity`, when the
+// conditions hold.
+std::vector<Rule> Same(std::string_view function, Arity arity,
+                       const std::vector<Condition>& conditions) {
+  std::vector<Rule> rules;
+  for (std::size_t count = arity.min; count <= arity.max; ++count) {
+    std::string spelling = std::string(function) + "(";
+    for (std::size_t i = 1; i <= count; ++i) {
+      spelling += (i == 1 ? "$" : ", $") + std::to_string(i);
+    }
+    rules.push_back({count, spelling + ")", conditions});
+  }
+  return rules;
+}
+
+// The reciprocal of a DuckDB function, which BigQuery reports as an error at zero where DuckDB
+// returns infinity.
+std::vector<Rule> Reciprocal(std::string_view function) {
+  const std::string value = std::string(function) + "($1)";
+  return {{1, "CASE WHEN " + value +
+                  " = 0 THEN error('Floating point error: division by zero') "
+                  "ELSE 1 / " +
+                  value + " END"}};
 }
 
 std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
@@ -120,6 +148,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"LOG", {{1, "ln($1)"}, {2, "log($2, $1)"}}},
       // DuckDB takes the digits as an INTEGER.
       {"ROUND", {{1, "round($1)"}, {2, "round($1, CAST($2 AS INTEGER))"}}},
+      {"TRUNC", {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}},
+      {"SEC", Reciprocal("cos")},
+      {"CSC", Reciprocal("sin")},
+      {"SECH", Reciprocal("cosh")},
+      {"CSCH", Reciprocal("sinh")},
+      {"COTH", Reciprocal("tanh")},
       {"BIT_COUNT", {{1, "bit_count($1)", {Is(1, {kInt64})}}}},
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
@@ -147,6 +181,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"DATE_TRUNC", Concat({WeekTrunc("DATE"), {{2, "CAST(date_trunc(#2, $1) AS DATE)"}}})},
       {"DATETIME_TRUNC", Concat({WeekTrunc(), {{2, "date_trunc(#2, $1)"}}})},
       {"TIMESTAMP_TRUNC", Concat({WeekTrunc(), {{2, "date_trunc(#2, $1)"}}})},
+      {"TIME_TRUNC", {{2, "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"}}},
       {"LAST_DAY", {{{1, 2}, "last_day($1)", {Part(2, {"month"})}}}},
 
       // Constructors and conversions between the civil types and TIMESTAMP.
@@ -171,8 +206,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"FORMAT_DATE", {{2, "strftime($2, $1)"}}},
       {"FORMAT_DATETIME", {{2, "strftime($2, $1)"}}},
       {"FORMAT_TIMESTAMP", {{2, "strftime($2, $1)"}}},
+      // DuckDB's strftime() has no TIME overload.
+      {"FORMAT_TIME", {{2, "strftime(DATE '1970-01-01' + $2, $1)"}}},
       {"PARSE_DATE", {{2, "CAST(strptime($2, $1) AS DATE)"}}},
       {"PARSE_DATETIME", {{2, "strptime($2, $1)"}}},
+      {"PARSE_TIME", {{2, "CAST(strptime($2, $1) AS TIME)"}}},
       {"PARSE_TIMESTAMP", {{2, "CAST(strptime($2, $1) AS TIMESTAMPTZ)"}}},
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
@@ -207,7 +245,20 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
       {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {kString})}}}},
       // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
-      {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')"}}},
+      {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {kString})}}}},
+      {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {kString})}}}},
+      {"LOWER", Same("lower", 1, {Is(1, {kString})})},
+      {"UPPER", Same("upper", 1, {Is(1, {kString})})},
+      {"REVERSE", Same("reverse", 1, {Is(1, {kString})})},
+      {"TRIM", Same("trim", {1, 2}, {Is(1, {kString})})},
+      {"LTRIM", Same("ltrim", {1, 2}, {Is(1, {kString})})},
+      {"RTRIM", Same("rtrim", {1, 2}, {Is(1, {kString})})},
+      {"SUBSTR", Same("substr", {2, 3}, {Is(1, {kString})})},
+      {"SUBSTRING", Same("substr", {2, 3}, {Is(1, {kString})})},
+      {"STRPOS", Same("strpos", 2, {Is(1, {kString})})},
+      {"STARTS_WITH", Same("starts_with", 2, {Is(1, {kString})})},
+      {"ENDS_WITH", Same("ends_with", 2, {Is(1, {kString})})},
+      {"REPLACE", Same("replace", 3, {Is(1, {kString})})},
 
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{1, "unhex(md5($1))"}}},
@@ -230,6 +281,15 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
 
       {"ERROR", {{1, "error($1)"}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
+      {"ARRAY_TO_STRING", Same("array_to_string", {2, 3}, {Is(2, {kString})})},
+      // generate_series() has no floating point overload, and returns an empty list for a zero
+      // step, which BigQuery rejects.
+      {"GENERATE_ARRAY",
+       {{{2, 3},
+         "CASE WHEN $3 = 0 THEN error('Sequence step cannot be 0.') ELSE generate_series($1, $2, "
+         "$3) END",
+         {Is(1, {kInt64}), Is(2, {kInt64}), Is(3, {kInt64})},
+         {"1"}}}},
   };
   return *kRules;
 }
@@ -240,14 +300,13 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
       {"CONTAINS_SUBSTR", "contains"},
       {"DIV", "divide"},
       {"FORMAT", "printf"},
-      {"GENERATE_ARRAY", "generate_series"},
       {"GENERATE_UUID", "uuid"},
       {"IS_INF", "isinf"},
       {"IS_NAN", "isnan"},
+      {"JSON_ARRAY", "json_array"},
       {"JSON_EXTRACT_SCALAR", "json_extract_string"},
       {"JSON_QUERY", "json_extract"},
       {"RAND", "random"},
-      {"REGEXP_CONTAINS", "regexp_matches"},
       {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
       {"UNIX_MILLIS", "epoch_ms"},
@@ -259,53 +318,15 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
 // arbitrary builtin names through would accidentally accept internal functions and overloads
 // with different semantics. Extend this list with execution coverage.
 const std::unordered_set<std::string_view>& PlainFunctions() {
-  static const auto* const kPlain = new std::unordered_set<std::string_view>{"ABS",
-                                                                             "SIGN",
-                                                                             "TRUNC",
-                                                                             "CEIL",
-                                                                             "CEILING",
-                                                                             "FLOOR",
-                                                                             "SQRT",
-                                                                             "POW",
-                                                                             "POWER",
-                                                                             "EXP",
-                                                                             "LN",
-                                                                             "LOG10",
-                                                                             "MOD",
-                                                                             "GREATEST",
-                                                                             "LEAST",
-                                                                             "IF",
-                                                                             "IFNULL",
-                                                                             "NULLIF",
-                                                                             "COALESCE",
-                                                                             "CHAR_LENGTH",
-                                                                             "LOWER",
-                                                                             "UPPER",
-                                                                             "CHARACTER_LENGTH",
-                                                                             "CONCAT",
-                                                                             "SUBSTR",
-                                                                             "SUBSTRING",
-                                                                             "TRIM",
-                                                                             "LTRIM",
-                                                                             "RTRIM",
-                                                                             "REPLACE",
-                                                                             "REVERSE",
-                                                                             "REPEAT",
-                                                                             "STARTS_WITH",
-                                                                             "ENDS_WITH",
-                                                                             "STRPOS",
-                                                                             "ARRAY_LENGTH",
-                                                                             "ARRAY_TO_STRING",
-                                                                             "SIN",
-                                                                             "COS",
-                                                                             "TAN",
-                                                                             "ASIN",
-                                                                             "ACOS",
-                                                                             "ATAN",
-                                                                             "ATAN2",
-                                                                             "TANH",
-                                                                             "ASINH",
-                                                                             "CBRT"};
+  static const auto* const kPlain = new std::unordered_set<std::string_view>{
+      "ABS",    "SIGN",   "CEIL",         "CEILING",     "FLOOR",
+      "SQRT",   "POW",    "POWER",        "EXP",         "LN",
+      "LOG10",  "MOD",    "GREATEST",     "LEAST",       "IF",
+      "IFNULL", "NULLIF", "COALESCE",     "CHAR_LENGTH", "CHARACTER_LENGTH",
+      "CONCAT", "REPEAT", "ARRAY_LENGTH", "SIN",         "COS",
+      "TAN",    "ASIN",   "ACOS",         "ATAN",        "ATAN2",
+      "TANH",   "ASINH",  "CBRT",         "ACOSH",       "ATANH",
+      "SINH",   "COSH",   "COT"};
   return *kPlain;
 }
 
