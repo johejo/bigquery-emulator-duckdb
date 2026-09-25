@@ -582,10 +582,67 @@
         ]
       }
     },
+    "@@envoy_api~//bazel:extensions.bzl%non_module_deps": {
+      "general": {
+        "bzlTransitiveDigest": "tTOrU7gQz/vsiEolaP055C897j9FeauPwlSb9pYIHys=",
+        "usagesDigest": "8xvuKkkardbH8fb0/ZYJRCAHk2vC77D/NiT6ZQDwznY=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "prometheus_metrics_model": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/prometheus/client_model/archive/v0.6.2.tar.gz"
+              ],
+              "sha256": "47c5ea7949f68e7f7b344350c59b6bd31eeb921f0eec6c3a566e27cf1951470c",
+              "strip_prefix": "client_model-0.6.2",
+              "build_file_content": "\nload(\"@envoy_api//bazel:api_build_system.bzl\", \"api_cc_py_proto_library\")\nload(\"@io_bazel_rules_go//proto:def.bzl\", \"go_proto_library\")\n\napi_cc_py_proto_library(\n    name = \"client_model\",\n    srcs = [\n        \"io/prometheus/client/metrics.proto\",\n    ],\n    visibility = [\"//visibility:public\"],\n)\n\ngo_proto_library(\n    name = \"client_model_go_proto\",\n    importpath = \"github.com/prometheus/client_model/go\",\n    proto = \":client_model\",\n    visibility = [\"//visibility:public\"],\n)\n"
+            }
+          },
+          "com_github_chrusty_protoc_gen_jsonschema": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/norbjd/protoc-gen-jsonschema/archive/7680e4998426e62b6896995ff73d4d91cc5fb13c.zip"
+              ],
+              "sha256": "ba3e313b10a1b50a6c1232d994c13f6e23d3669be4ae7fea13762f42bb3b2abc",
+              "strip_prefix": "protoc-gen-jsonschema-7680e4998426e62b6896995ff73d4d91cc5fb13c"
+            }
+          },
+          "envoy_toolshed": {
+            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
+            "ruleClassName": "http_archive",
+            "attributes": {
+              "urls": [
+                "https://github.com/envoyproxy/toolshed/archive/bazel-v0.3.10.tar.gz"
+              ],
+              "sha256": "4e3ca405ab7990697f75fe75e17f42b3935389afd6fa407eb79700e73de98a11",
+              "strip_prefix": "toolshed-bazel-v0.3.10/bazel"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "envoy_api~",
+            "bazel_tools",
+            "bazel_tools"
+          ],
+          [
+            "envoy_api~",
+            "envoy_api",
+            "envoy_api~"
+          ]
+        ]
+      }
+    },
     "@@googleapis~//:extensions.bzl%switched_rules": {
       "general": {
         "bzlTransitiveDigest": "1ZTg77R3Ks/ksx8QMNIoTRJetbJPRlzGFlJa9hoUn+Y=",
-        "usagesDigest": "8t3fJzs4CIz4JcLNYq5Qh1mQPPe5ntrHKR06r69Yb4s=",
+        "usagesDigest": "6mmgHAM+IdXiXlyhIRbIDg2EBq5U6Lasu/NziY8EIvs=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -697,6 +754,81 @@
         ]
       }
     },
+    "@@grpc~//bazel:extensions.bzl%exec_properties": {
+      "general": {
+        "bzlTransitiveDigest": "C9g6ijTS6Lje+XG5c5mDmAaZaTlui4lk3BEeg1bUjFA=",
+        "usagesDigest": "NozlD94v+jk4hMYcpfLFDxsA3i35tgHITwDkiK32yN0=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "grpc_custom_exec_properties": {
+            "bzlFile": "@@grpc~~_repo_rules~bazel_toolchains//rules/exec_properties:exec_properties.bzl",
+            "ruleClassName": "_exec_property_sets_repository",
+            "attributes": {
+              "constants_bzl_content": "LARGE_MACHINE = {\"label:os\": \"ubuntu\", \"label:machine_size\": \"large\"}\n"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "grpc~",
+            "bazel_toolchains",
+            "grpc~~_repo_rules~bazel_toolchains"
+          ]
+        ]
+      }
+    },
+    "@@hedron_compile_commands~//:workspace_setup.bzl%hedron_compile_commands_extension": {
+      "general": {
+        "bzlTransitiveDigest": "3h/6zUQnbEGP9byyn34wt0pCl5EMkq5XfvLx4aN++z8=",
+        "usagesDigest": "ZDVGDCmInjpiNhgRA6J4I3Wttz9QywT/gtb9prOy598=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {},
+        "recordedRepoMappingEntries": [
+          [
+            "hedron_compile_commands~",
+            "bazel_tools",
+            "bazel_tools"
+          ]
+        ]
+      }
+    },
+    "@@hedron_compile_commands~//:workspace_setup_transitive.bzl%hedron_compile_commands_extension": {
+      "general": {
+        "bzlTransitiveDigest": "IfDf0vEa2jjQ11RNpUM0u4xftPXIs+pyM8IMVkRqVMk=",
+        "usagesDigest": "QQepffNx1f2xTIC7Qgebko1RCgkU9T5OwNhDa1sNpVw=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {},
+        "recordedRepoMappingEntries": []
+      }
+    },
+    "@@hedron_compile_commands~//:workspace_setup_transitive_transitive.bzl%hedron_compile_commands_extension": {
+      "general": {
+        "bzlTransitiveDigest": "1p58k3o2Jgjt/pBE7cb8WmmkplrSguIKma/h32x7X10=",
+        "usagesDigest": "oSAtVdFq01jLEStKb6PfuaxobaJnGcKsuG82E+6VVS8=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {},
+        "recordedRepoMappingEntries": []
+      }
+    },
+    "@@hedron_compile_commands~//:workspace_setup_transitive_transitive_transitive.bzl%hedron_compile_commands_extension": {
+      "general": {
+        "bzlTransitiveDigest": "arNWX4EleUjJxqkM5nCRTj+ce05Zz1gSdGH1DCKOoLs=",
+        "usagesDigest": "6CbeqZpNc+5lPZBP7Qcm+MQVDTBMHHMCfiCI9qaKPYk=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {},
+        "recordedRepoMappingEntries": []
+      }
+    },
     "@@pybind11_bazel~//:internal_configure.bzl%internal_configure_extension": {
       "general": {
         "bzlTransitiveDigest": "Jsid+Er+k0JcuPNjK83nTid7q9/fJQeD+ntFHFVkKQg=",
@@ -719,148 +851,6 @@
         "recordedRepoMappingEntries": [
           [
             "pybind11_bazel~",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
-      }
-    },
-    "@@rules_apple~//apple:apple.bzl%provisioning_profile_repository_extension": {
-      "general": {
-        "bzlTransitiveDigest": "qPi4GyxlVn7VTpquDWPPuulXrKFjcPbC8aykhkCi5GY=",
-        "usagesDigest": "z3O39ZVxssoz5kUX8+YMSfNS8WcQb9bUg+MxjVA0v6A=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "local_provisioning_profiles": {
-            "bzlFile": "@@rules_apple~//apple/internal:local_provisioning_profiles.bzl",
-            "ruleClassName": "provisioning_profile_repository",
-            "attributes": {}
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "apple_support~",
-            "bazel_skylib",
-            "bazel_skylib~"
-          ],
-          [
-            "bazel_features~",
-            "bazel_features_globals",
-            "bazel_features~~version_extension~bazel_features_globals"
-          ],
-          [
-            "bazel_features~",
-            "bazel_features_version",
-            "bazel_features~~version_extension~bazel_features_version"
-          ],
-          [
-            "protobuf~",
-            "bazel_skylib",
-            "bazel_skylib~"
-          ],
-          [
-            "protobuf~",
-            "proto_bazel_features",
-            "bazel_features~"
-          ],
-          [
-            "rules_apple~",
-            "bazel_skylib",
-            "bazel_skylib~"
-          ],
-          [
-            "rules_apple~",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_apple~",
-            "build_bazel_apple_support",
-            "apple_support~"
-          ],
-          [
-            "rules_apple~",
-            "build_bazel_rules_apple",
-            "rules_apple~"
-          ],
-          [
-            "rules_apple~",
-            "build_bazel_rules_swift",
-            "rules_swift~"
-          ],
-          [
-            "rules_proto~",
-            "com_google_protobuf",
-            "protobuf~"
-          ],
-          [
-            "rules_swift~",
-            "bazel_skylib",
-            "bazel_skylib~"
-          ],
-          [
-            "rules_swift~",
-            "bazel_tools",
-            "bazel_tools"
-          ],
-          [
-            "rules_swift~",
-            "build_bazel_apple_support",
-            "apple_support~"
-          ],
-          [
-            "rules_swift~",
-            "build_bazel_rules_swift",
-            "rules_swift~"
-          ],
-          [
-            "rules_swift~",
-            "build_bazel_rules_swift_local_config",
-            "rules_swift~~non_module_deps~build_bazel_rules_swift_local_config"
-          ],
-          [
-            "rules_swift~",
-            "com_github_apple_swift_protobuf",
-            "rules_swift~~non_module_deps~com_github_apple_swift_protobuf"
-          ],
-          [
-            "rules_swift~",
-            "com_github_grpc_grpc_swift",
-            "rules_swift~~non_module_deps~com_github_grpc_grpc_swift"
-          ],
-          [
-            "rules_swift~",
-            "rules_proto",
-            "rules_proto~"
-          ]
-        ]
-      }
-    },
-    "@@rules_apple~//apple:extensions.bzl%non_module_deps": {
-      "general": {
-        "bzlTransitiveDigest": "5JTvg4Qr6DXjRKV+Eqg4V65+iHTZQV9VQ+3KQ+Oziw4=",
-        "usagesDigest": "9pqqsAjbe7kL2SXEcVAUhrJxq9vOJ39lgszUnsqDdrU=",
-        "recordedFileInputs": {},
-        "recordedDirentsInputs": {},
-        "envVariables": {},
-        "generatedRepoSpecs": {
-          "xctestrunner": {
-            "bzlFile": "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "ruleClassName": "http_archive",
-            "attributes": {
-              "urls": [
-                "https://github.com/google/xctestrunner/archive/b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6.tar.gz"
-              ],
-              "strip_prefix": "xctestrunner-b7698df3d435b6491b4b4c0f9fc7a63fbed5e3a6",
-              "sha256": "ae3a063c985a8633cb7eb566db21656f8db8eb9a0edb8c182312c7f0db53730d"
-            }
-          }
-        },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_apple~",
             "bazel_tools",
             "bazel_tools"
           ]
@@ -1402,6 +1392,85 @@
           "reproducible": false
         },
         "recordedRepoMappingEntries": []
+      }
+    },
+    "@@rules_perl~//perl:extensions.bzl%perl_repositories": {
+      "general": {
+        "bzlTransitiveDigest": "zKzjvlkMYt5ciDqNdVyTtZfAAPO39SuFy2B+xMqgTss=",
+        "usagesDigest": "tuJgAyNZD8Ewzr/MlAnnittbPMDC60XQF8aGrsjU+nY=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "perl_darwin_arm64": {
+            "bzlFile": "@@rules_perl~//perl:repo.bzl",
+            "ruleClassName": "perl_download",
+            "attributes": {
+              "strip_prefix": "perl-darwin-arm64",
+              "sha256": "285769f3c50c339fb59a3987b216ae3c5c573b95babe6875a1ef56fb178433da",
+              "urls": [
+                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-darwin-arm64.tar.xz"
+              ]
+            }
+          },
+          "perl_darwin_amd64": {
+            "bzlFile": "@@rules_perl~//perl:repo.bzl",
+            "ruleClassName": "perl_download",
+            "attributes": {
+              "strip_prefix": "perl-darwin-amd64",
+              "sha256": "63bc5ee36f5394d71c50cca6cafdd333ee58f9eaa40bca63c85f9bd06f2c1fd6",
+              "urls": [
+                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-darwin-amd64.tar.xz"
+              ]
+            }
+          },
+          "perl_linux_amd64": {
+            "bzlFile": "@@rules_perl~//perl:repo.bzl",
+            "ruleClassName": "perl_download",
+            "attributes": {
+              "strip_prefix": "perl-linux-amd64",
+              "sha256": "3bdffa9d7a3f97c0207314637b260ba5115b1d0829f97e3e2e301191a4d4d076",
+              "urls": [
+                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-linux-amd64.tar.xz"
+              ]
+            }
+          },
+          "perl_linux_arm64": {
+            "bzlFile": "@@rules_perl~//perl:repo.bzl",
+            "ruleClassName": "perl_download",
+            "attributes": {
+              "strip_prefix": "perl-linux-arm64",
+              "sha256": "6fa4ece99e790ecbc2861f6ecb7b52694c01c2eeb215b4370f16a3b12d952117",
+              "urls": [
+                "https://github.com/skaji/relocatable-perl/releases/download/5.36.0.1/perl-linux-arm64.tar.xz"
+              ]
+            }
+          },
+          "perl_windows_x86_64": {
+            "bzlFile": "@@rules_perl~//perl:repo.bzl",
+            "ruleClassName": "perl_download",
+            "attributes": {
+              "strip_prefix": "",
+              "sha256": "aeb973da474f14210d3e1a1f942dcf779e2ae7e71e4c535e6c53ebabe632cc98",
+              "urls": [
+                "https://mirror.bazel.build/strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.zip",
+                "https://strawberryperl.com/download/5.32.1.1/strawberry-perl-5.32.1.1-64bit.zip"
+              ]
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "rules_perl~",
+            "bazel_tools",
+            "bazel_tools"
+          ],
+          [
+            "rules_perl~",
+            "rules_perl",
+            "rules_perl~"
+          ]
+        ]
       }
     },
     "@@rules_python~//python/uv:uv.bzl%uv": {

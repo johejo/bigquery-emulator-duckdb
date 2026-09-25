@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
@@ -196,7 +197,7 @@ cc_binary(
     ],
 )
 
-# Prints a Markdown report of which GoogleSQL built-in functions the emulator translates and runs.
+# Prints docs/functions.md, a report of which BigQuery functions the emulator translates and runs.
 cc_binary(
     name = "function_probe",
     srcs = ["tools/function_probe.cc"],
@@ -209,6 +210,26 @@ cc_binary(
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
     ],
+)
+
+genrule(
+    name = "functions_md",
+    srcs = [
+        "tools/bigquery_functions.txt",
+        "tools/function_probe_hints.txt",
+    ],
+    outs = ["functions.md"],
+    cmd = "$(execpath :function_probe) $(execpath tools/bigquery_functions.txt) $(execpath tools/function_probe_hints.txt) > $@",
+    target_compatible_with = MACOS_ONLY,
+    tools = [":function_probe"],
+)
+
+diff_test(
+    name = "functions_md_test",
+    failure_message = "docs/functions.md is stale; run `just docs` to regenerate it.",
+    file1 = ":functions_md",
+    file2 = "docs/functions.md",
+    target_compatible_with = MACOS_ONLY,
 )
 
 cc_test(

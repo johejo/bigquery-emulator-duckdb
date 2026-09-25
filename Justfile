@@ -31,3 +31,8 @@ run *args:
     bazelisk run //:bigquery-emulator-duckdb -- {{args}}
 
 check: lint test e2e
+
+# Regenerates docs/functions.md, the table of which BigQuery functions the emulator runs.
+docs:
+    bazelisk build //:functions_md
+    install -m 644 bazel-bin/functions.md docs/functions.md
