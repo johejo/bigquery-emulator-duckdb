@@ -70,7 +70,10 @@ struct QueryRequest {
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
  public:
-  Emulator();
+  // With an empty `data_dir` every project is an in-memory database and nothing survives the
+  // process. Otherwise each project is stored in its own DuckDB file under `data_dir`, which is
+  // created when missing, and a project's data comes back the next time it is used.
+  explicit Emulator(std::string data_dir = "");
 
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
@@ -92,6 +95,8 @@ class Emulator {
 
  private:
   void EnsureProject(const std::string& project_id);
+  // What EnsureProject attaches for `project_id`: a DuckDB file path, or ":memory:".
+  std::string ProjectDatabase(const std::string& project_id) const;
   struct Translation {
     std::string sql;
     std::optional<std::vector<FieldSchema>> schema;
@@ -103,6 +108,7 @@ class Emulator {
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
   Backend backend_;
+  std::string data_dir_;
   std::mutex mutex_;
   std::unordered_set<std::string> projects_;
   std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;

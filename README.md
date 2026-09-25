@@ -22,7 +22,7 @@ so accepting GoogleSQL syntax does not guarantee full BigQuery compatibility.
 | Result schema | Supported | Queries take column names and types from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive `TableSchema` from DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`. |
 | Result rows | Supported | BigQuery `{"f": [{"v": ...}]}` encoding, including nested values and base64 bytes. |
 | Timestamp encoding | Supported | Epoch seconds by default; epoch microseconds with `formatOptions.useInt64Timestamp`. |
-| Projects, datasets, and tables | Partial | Map to DuckDB in-memory catalogs, schemas, and tables; `project.dataset.table` references work, but data is not persisted across server restarts. |
+| Projects, datasets, and tables | Partial | Map to DuckDB catalogs, schemas, and tables; `project.dataset.table` references work. Catalogs are in memory unless `--data-dir` is given, in which case each project persists to its own DuckDB file. |
 
 ## SQL compatibility
 
@@ -142,6 +142,19 @@ bazelisk build //:bigquery-emulator-duckdb
 ```bash
 bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050
 ```
+
+By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
+each project is stored in `DIR/<project>.duckdb` (characters outside `[A-Za-z0-9_-]` are
+percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its datasets
+and tables come back after a restart. Jobs are still kept in memory only.
+
+```bash
+bazel-bin/bigquery-emulator-duckdb --data-dir ./data
+```
+
+On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project file. A
+project file can be open in only one process at a time, and a file written by a newer DuckDB
+cannot be opened by an older one.
 
 ### Connect from BigQuery client
 

@@ -1,8 +1,13 @@
+#include <pthread.h>
+#include <unistd.h>
+
+#include <csignal>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #include "src/emulator.h"
 #include "src/server.h"
@@ -10,13 +15,36 @@
 namespace {
 
 void PrintUsage() {
-  std::cerr << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT]\n"
-               "  --host HOST  Address to listen on (default: 0.0.0.0)\n"
-               "  --port PORT  Port to listen on (default: 9050)\n";
+  std::cerr
+      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--data-dir DIR]\n"
+         "  --host HOST     Address to listen on (default: 0.0.0.0)\n"
+         "  --port PORT     Port to listen on (default: 9050)\n"
+         "  --data-dir DIR  Store each project in DIR/<project>.duckdb so that data survives\n"
+         "                  restarts (default: keep everything in memory)\n";
+}
+
+// Blocks SIGINT and SIGTERM in the calling thread and every thread it starts afterwards, so that
+// they are only ever received through sigwait() in WaitForShutdown().
+sigset_t BlockShutdownSignals() {
+  sigset_t signals;
+  sigemptyset(&signals);
+  sigaddset(&signals, SIGINT);
+  sigaddset(&signals, SIGTERM);
+  pthread_sigmask(SIG_BLOCK, &signals, nullptr);
+  return signals;
+}
+
+// Stops the server on the first shutdown signal. Serve() then returns and the emulator is
+// destroyed normally, which checkpoints every project file so that no WAL is left behind.
+void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& server) {
+  int signal = 0;
+  sigwait(&signals, &signal);
+  server.Stop();
 }
 
 int Run(int argc, char** argv) {
   bigquery_emulator_duckdb::ServerOptions options;
+  std::string data_dir;
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
     const bool has_value = i + 1 < argc;
@@ -24,6 +52,8 @@ int Run(int argc, char** argv) {
       options.host = argv[++i];
     } else if (arg == "--port" && has_value) {
       options.port = std::atoi(argv[++i]);
+    } else if (arg == "--data-dir" && has_value) {
+      data_dir = argv[++i];
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return 0;
@@ -33,14 +63,20 @@ int Run(int argc, char** argv) {
     }
   }
 
-  bigquery_emulator_duckdb::Emulator emulator;
+  const sigset_t signals = BlockShutdownSignals();
+  bigquery_emulator_duckdb::Emulator emulator(data_dir);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Bind()) {
     std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';
     return 1;
   }
+  std::thread shutdown([&] { WaitForShutdown(signals, server); });
   std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
-  return server.Serve() ? 0 : 1;
+  const bool served = server.Serve();
+  // Wakes the shutdown thread when Serve() returned on its own rather than through a signal.
+  kill(getpid(), SIGTERM);
+  shutdown.join();
+  return served ? 0 : 1;
 }
 
 }  // namespace

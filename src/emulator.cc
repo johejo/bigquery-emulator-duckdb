@@ -1,8 +1,10 @@
 #include "src/emulator.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -31,6 +33,25 @@ int64_t NowMillis() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
+}
+
+// The file a project is stored in. Project ids may carry a domain ("example.com:project"), so
+// every byte outside [A-Za-z0-9_-] is percent-encoded. With '.' and '/' encoded, no id can name a
+// path outside the data directory.
+std::string ProjectFileName(const std::string& project_id) {
+  static constexpr char kHex[] = "0123456789ABCDEF";
+  std::string name;
+  for (const char c : project_id) {
+    const auto byte = static_cast<unsigned char>(c);
+    if (std::isalnum(byte) != 0 || c == '_' || c == '-') {
+      name += c;
+    } else {
+      name += '%';
+      name += kHex[byte >> 4];
+      name += kHex[byte & 0xF];
+    }
+  }
+  return name + ".duckdb";
 }
 
 std::string QualifiedName(const DatasetReference& dataset) {
@@ -236,16 +257,35 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
 
 }  // namespace
 
-Emulator::Emulator() = default;
+Emulator::Emulator(std::string data_dir) : data_dir_(std::move(data_dir)) {
+  if (!data_dir_.empty()) {
+    std::filesystem::create_directories(data_dir_);
+  }
+}
+
+std::string Emulator::ProjectDatabase(const std::string& project_id) const {
+  if (data_dir_.empty()) {
+    return ":memory:";
+  }
+  return (std::filesystem::path(data_dir_) / ProjectFileName(project_id)).string();
+}
 
 void Emulator::EnsureProject(const std::string& project_id) {
   if (project_id.empty()) {
     throw ApiError::Invalid("Project id is required");
   }
   std::lock_guard<std::mutex> lock(mutex_);
-  if (projects_.insert(project_id).second) {
-    backend_.Execute("ATTACH ':memory:' AS " + QuoteIdentifier(project_id));
+  if (projects_.contains(project_id)) {
+    return;
   }
+  const std::string database = ProjectDatabase(project_id);
+  try {
+    backend_.Execute("ATTACH " + QuoteLiteral(database) + " AS " + QuoteIdentifier(project_id));
+  } catch (const BackendError& error) {
+    // Most likely another process holds the file's lock.
+    throw ApiError::Internal("Failed to open " + database + ": " + error.what());
+  }
+  projects_.insert(project_id);
 }
 
 QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup) {
