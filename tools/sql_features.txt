@@ -1,0 +1,160 @@
+# The SQL features //:sql_probe checks, which generate docs/sql.md.
+#
+#   setup SQL             A statement run on every fresh emulator before a query, in project `test`.
+#   section TITLE         Starts a table in the report.
+#   query NAME | SQL      A query for the feature NAME, run with `test.d` as the default dataset.
+#                         Repeat it to probe several forms of one feature.
+#   note NAME | TEXT      How the emulator differs from BigQuery where a probe cannot observe it.
+#
+# Every query must be valid GoogleSQL against the fixture; the probe fails on one that is not.
+
+setup CREATE SCHEMA d
+setup CREATE TABLE d.t (id INT64, name STRING, tags ARRAY<STRING>, s STRUCT<a INT64, b STRING>)
+setup INSERT d.t (id, name, tags, s) VALUES (1, 'a', ['x'], STRUCT(1, 'p')), (2, 'b', [], NULL)
+setup CREATE TABLE d.u (id INT64, v INT64)
+setup INSERT d.u (id, v) VALUES (1, 10), (3, 30)
+
+section Queries
+
+query `SELECT` without `FROM` | SELECT 1 AS x, 'a' AS y
+query Table reads, `WHERE`, `ORDER BY`, `LIMIT` | SELECT id, name FROM t WHERE id > 0 ORDER BY id DESC LIMIT 1 OFFSET 0
+query Fully qualified table names | SELECT id FROM `test.d.t`
+query Fully qualified table names | SELECT id FROM test.d.t
+query `SELECT DISTINCT` | SELECT DISTINCT name FROM t
+query Joins | SELECT t.id, u.v FROM t JOIN u ON t.id = u.id
+query Joins | SELECT t.id, u.v FROM t LEFT JOIN u USING (id)
+query Joins | SELECT t.id, u.v FROM t FULL OUTER JOIN u ON t.id = u.id
+query Joins | SELECT t.id, u.v FROM t CROSS JOIN u
+query Joins | SELECT t.id, u.v FROM t, u WHERE t.id = u.id
+query `UNNEST` | SELECT x FROM UNNEST([1, 2, 3]) AS x
+query `UNNEST` | SELECT id, tag FROM t, UNNEST(tags) AS tag
+query `UNNEST` | SELECT id, tag FROM t LEFT JOIN UNNEST(t.tags) AS tag
+query `UNNEST ... WITH OFFSET` | SELECT x, o FROM UNNEST(['a', 'b']) AS x WITH OFFSET AS o
+query `WITH` | WITH a AS (SELECT id FROM t), b AS (SELECT id FROM a) SELECT id FROM b
+query `WITH RECURSIVE` | WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM r WHERE n < 3) SELECT n FROM r
+query `WITH RECURSIVE ... WITH DEPTH` | WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM r WHERE n < 3) WITH DEPTH SELECT n FROM r
+query Subqueries | SELECT (SELECT MAX(v) FROM u) AS m
+query Subqueries | SELECT id FROM t WHERE id IN (SELECT id FROM u)
+query Subqueries | SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t.id)
+query Subqueries | SELECT ARRAY(SELECT v FROM u ORDER BY v) AS a
+query Subqueries | SELECT id FROM (SELECT id FROM t) AS sub
+query Correlated subqueries | SELECT id, (SELECT COUNT(*) FROM UNNEST(tags)) AS n FROM t
+query Aggregates and `GROUP BY` | SELECT name, COUNT(*), SUM(id) FROM t GROUP BY name
+query Aggregates and `GROUP BY` | SELECT name, COUNT(*) FROM t GROUP BY 1 HAVING COUNT(*) > 0
+query Aggregates and `GROUP BY` | SELECT COUNT(DISTINCT name) FROM t
+query `GROUP BY ALL` | SELECT name, COUNT(*) FROM t GROUP BY ALL
+query `GROUPING SETS`, `ROLLUP`, `CUBE` | SELECT id, name, COUNT(*) FROM t GROUP BY GROUPING SETS ((id), (name), ())
+query `GROUPING SETS`, `ROLLUP`, `CUBE` | SELECT id, name, COUNT(*) FROM t GROUP BY ROLLUP (id, name)
+query `GROUPING SETS`, `ROLLUP`, `CUBE` | SELECT id, name, COUNT(*) FROM t GROUP BY CUBE (id, name)
+query Aggregate `ORDER BY` | SELECT ARRAY_AGG(id ORDER BY id DESC) FROM t
+query Aggregate `ORDER BY` | SELECT STRING_AGG(name, ',' ORDER BY name) FROM t
+query Aggregate `LIMIT` | SELECT ARRAY_AGG(id LIMIT 1) FROM t
+query Aggregate `LIMIT` | SELECT STRING_AGG(name LIMIT 1) FROM t
+query Aggregate `LIMIT` | SELECT name, ARRAY_AGG(id LIMIT 1) FROM t GROUP BY ROLLUP (name)
+query Aggregate `IGNORE NULLS` | SELECT ARRAY_AGG(name IGNORE NULLS) FROM t
+query Aggregate `HAVING MAX` / `MIN` | SELECT ANY_VALUE(name HAVING MAX id) FROM t
+query Aggregate `HAVING MAX` / `MIN` | SELECT name, ANY_VALUE(id HAVING MIN id) FROM t GROUP BY ROLLUP (name)
+query Window functions | SELECT id, ROW_NUMBER() OVER (ORDER BY id) FROM t
+query Window functions | SELECT id, SUM(id) OVER (PARTITION BY name ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM t
+query Window functions | SELECT id, LAG(id) OVER w FROM t WINDOW w AS (ORDER BY id)
+query Window functions | SELECT id, COUNT(DISTINCT name) OVER (PARTITION BY id) FROM t
+query `QUALIFY` | SELECT id FROM t WHERE TRUE QUALIFY ROW_NUMBER() OVER (ORDER BY id) = 1
+query Set operations | SELECT id FROM t UNION ALL SELECT id FROM u
+query Set operations | SELECT id FROM t UNION DISTINCT SELECT id FROM u
+query Set operations | SELECT id FROM t INTERSECT DISTINCT SELECT id FROM u
+query Set operations | SELECT id FROM t EXCEPT DISTINCT SELECT id FROM u
+query Set operations `CORRESPONDING` | SELECT id, name FROM t UNION ALL CORRESPONDING SELECT name, id FROM t
+query Set operations `BY NAME` | SELECT id, name FROM t UNION ALL BY NAME SELECT name, id FROM t
+query `SELECT AS STRUCT`, `SELECT AS VALUE` | SELECT AS STRUCT id, name FROM t
+query `SELECT AS STRUCT`, `SELECT AS VALUE` | SELECT AS VALUE s FROM t
+query `SELECT AS STRUCT`, `SELECT AS VALUE` | SELECT ARRAY(SELECT AS STRUCT id, name FROM t) AS a
+query `* EXCEPT`, `* REPLACE` | SELECT * EXCEPT (tags, s) FROM t
+query `* EXCEPT`, `* REPLACE` | SELECT * REPLACE (id + 1 AS id) FROM u
+query `.*` of a struct | SELECT s.* FROM t
+query Struct field and array element access | SELECT s.a, tags[SAFE_OFFSET(0)], tags[SAFE_ORDINAL(1)] FROM t
+query Struct field and array element access | SELECT [1, 2][OFFSET(0)], [1, 2][ORDINAL(1)], [1, 2][0]
+query `PIVOT` | SELECT * FROM (SELECT id, name FROM t) PIVOT (COUNT(*) FOR name IN ('a', 'b'))
+query `UNPIVOT` | SELECT * FROM u UNPIVOT (x FOR col IN (id, v))
+query `TABLESAMPLE` | SELECT id FROM t TABLESAMPLE SYSTEM (50 PERCENT)
+query Pipe syntax | FROM t |> WHERE id > 0 |> SELECT id, name |> ORDER BY id
+query Pipe syntax | FROM t |> AGGREGATE COUNT(*) GROUP BY name
+
+section DML
+
+query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, 'c')
+query `INSERT ... VALUES` | INSERT INTO t VALUES (3, 'c', ['y'], STRUCT(2, 'q'))
+query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, DEFAULT)
+query `INSERT ... SELECT` | INSERT u (id, v) SELECT id, id * 10 FROM t
+query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR IGNORE u (id, v) VALUES (1, 10)
+query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR REPLACE u (id, v) VALUES (1, 10)
+query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR UPDATE u (id, v) VALUES (1, 10)
+query `UPDATE` | UPDATE t SET name = 'z' WHERE id = 1
+query `UPDATE` | UPDATE t SET name = DEFAULT WHERE TRUE
+query `UPDATE` of a struct field | UPDATE t SET s.a = 5 WHERE id = 1
+query `UPDATE ... FROM` | UPDATE t SET name = CAST(u.v AS STRING) FROM u WHERE t.id = u.id
+note `UPDATE ... FROM` | Unlike BigQuery, an update in which one target row matches several source rows is not rejected
+query `UPDATE` of array elements | UPDATE t SET tags[OFFSET(0)] = 'y' WHERE id = 1
+query Nested DML | UPDATE t SET (INSERT tags VALUES ('y')) WHERE id = 1
+query `DELETE` | DELETE t WHERE id = 1
+query `DELETE` | DELETE FROM t WHERE id IN (SELECT id FROM u)
+query `TRUNCATE TABLE` | TRUNCATE TABLE t
+query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED THEN UPDATE SET name = 'm' WHEN NOT MATCHED THEN INSERT (id, name) VALUES (u.id, 'n')
+query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED AND u.v > 10 THEN DELETE WHEN NOT MATCHED BY SOURCE THEN DELETE
+query `MERGE` | MERGE u USING (SELECT 5 AS id, 50 AS v) AS s ON u.id = s.id WHEN NOT MATCHED THEN INSERT ROW
+query `MERGE` | MERGE t USING u ON FALSE WHEN NOT MATCHED BY TARGET THEN INSERT (id) VALUES (u.id) WHEN NOT MATCHED BY SOURCE AND t.id = 2 THEN UPDATE SET name = 'gone'
+note `MERGE` | Unlike BigQuery, a merge in which one target row matches several source rows is not rejected
+query `ASSERT_ROWS_MODIFIED` | UPDATE t SET name = 'z' WHERE id = 1 ASSERT_ROWS_MODIFIED 1
+query `THEN RETURN` | DELETE t WHERE id = 1 THEN RETURN id
+query `THEN RETURN` | INSERT u (id, v) VALUES (5, 50) THEN RETURN *
+
+section DDL
+
+query `CREATE TABLE` | CREATE TABLE n (a INT64, b STRING NOT NULL, c ARRAY<STRUCT<x INT64>>)
+query `CREATE TABLE` | CREATE TABLE IF NOT EXISTS t (a INT64)
+query `CREATE TABLE` | CREATE OR REPLACE TABLE t (a INT64)
+query `CREATE TABLE` | CREATE TABLE `test.d.n` (a INT64)
+query Column types with parameters | CREATE TABLE n (a STRING(10), b BYTES(5), c NUMERIC(10, 2))
+note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length
+query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC)
+query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC(40, 10))
+note `BIGNUMERIC` columns | `BIGNUMERIC` is `DECIMAL(38, 19)`
+query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
+query `CREATE TABLE AS SELECT` | CREATE TABLE n AS SELECT id, name FROM t
+query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELECT id, name FROM t
+query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (id INT64 NOT NULL) AS SELECT id FROM t
+query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', labels = [('k', 'v')])
+note Table and column options | Accepted and dropped
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
+query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
+query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
+note Partitioning and clustering | Accepted and dropped
+query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
+query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
+note Primary and foreign keys | Accepted and dropped; BigQuery does not enforce them either
+query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
+query Generated columns | CREATE TABLE n (a INT64, b INT64 AS (a + 1))
+query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64)
+query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
+query `CREATE TABLE COPY` | CREATE TABLE n COPY t
+query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t
+query `CREATE SNAPSHOT TABLE` | CREATE SNAPSHOT TABLE n CLONE t
+query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
+query `DROP TABLE` | DROP TABLE t
+query `DROP TABLE` | DROP TABLE IF EXISTS n
+query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64
+query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name
+query `ALTER TABLE` | ALTER TABLE t RENAME TO n
+query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x')
+query `CREATE SCHEMA` | CREATE SCHEMA e
+query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
+query `CREATE OR REPLACE SCHEMA` | CREATE OR REPLACE SCHEMA e
+query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
+query `DROP SCHEMA` | DROP SCHEMA d CASCADE
+query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x')
+query `CREATE VIEW` | CREATE VIEW n AS SELECT id FROM t
+query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
+query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
+query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END

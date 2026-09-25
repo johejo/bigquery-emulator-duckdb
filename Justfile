@@ -32,7 +32,9 @@ run *args:
 
 check: lint test e2e
 
-# Regenerates docs/functions.md, the table of which BigQuery functions the emulator runs.
+# Regenerates docs/functions.md and docs/sql.md, the tables of which BigQuery functions and SQL
+# features the emulator runs.
 docs:
-    bazelisk build //:functions_md
+    bazelisk build //:functions_md //:sql_md
     install -m 644 bazel-bin/functions.md docs/functions.md
+    install -m 644 bazel-bin/sql.md docs/sql.md

@@ -2,19 +2,16 @@
 // prints a Markdown report of which ones translate and run. Each signature the analyzer knows for a
 // function is called with sample arguments of its types, unless the hints file gives the calls; a
 // signature the probe cannot build a valid call for is reported as untested. A probe checks only
-// that a call translates and runs on DuckDB, not that it returns what BigQuery would. The hints file
-// can also give a function a note on its behavior, which the report shows before the probe's notes.
+// that a call translates and runs on DuckDB, not that it returns what BigQuery would. The hints
+// file can also give a function a note on its behavior, which the report shows before the probe's
+// notes.
 
 #include <algorithm>
-#include <cstdint>
-#include <fstream>
 #include <iostream>
 #include <map>
-#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,9 +25,9 @@
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_factory.h"
-#include "src/analyzer.h"
 #include "src/catalog.h"
 #include "src/emulator.h"
+#include "tools/probe.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -164,42 +161,6 @@ std::optional<std::string> Sample(const googlesql::FunctionArgumentType& argumen
   }
 }
 
-enum class Outcome : std::uint8_t { kRuns, kFailsOnDuckDb, kUnsupported, kUntested };
-
-struct Probe {
-  Outcome outcome;
-  std::string detail;
-};
-
-// The lines of `path` that are neither blank nor comments, split into the first word and the rest.
-std::vector<std::pair<std::string, std::string>> ReadLines(const std::string& path) {
-  std::ifstream in(path);
-  if (!in) {
-    throw std::runtime_error("cannot read " + path);
-  }
-  std::vector<std::pair<std::string, std::string>> lines;
-  std::string line;
-  for (int number = 1; std::getline(in, line); ++number) {
-    if (line.empty() || line.starts_with("#")) {
-      continue;
-    }
-    std::istringstream words(line);
-    std::string first;
-    std::string rest;
-    words >> first;
-    std::getline(words >> std::ws, rest);
-    if (rest.empty()) {
-      std::string message = path;
-      message += ":" + std::to_string(number) + ": cannot parse " + line;
-      throw std::runtime_error(message);
-    }
-    lines.emplace_back(first, rest);
-  }
-  return lines;
-}
-
-std::string FirstLine(const std::string& text) { return text.substr(0, text.find('\n')); }
-
 // Whether BigQuery has the signature: GoogleSQL has signatures over types BigQuery lacks, such as
 // FLOAT for CEILING.
 bool IsBigQuerySignature(const googlesql::FunctionSignature& signature) {
@@ -246,52 +207,6 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                   : "SELECT " + call;
 }
 
-class Prober {
- public:
-  Probe Run(const std::string& sql) {
-    // Analyze separately so that a call the probe got wrong is not blamed on the emulator.
-    try {
-      googlesql::TypeFactory type_factory;
-      NoTables tables;
-      BigQueryCatalog catalog(tables, &type_factory, "test", "");
-      AnalyzeGoogleSql(sql, catalog, type_factory);
-    } catch (const std::exception& error) {
-      return {Outcome::kUntested, "`" + sql + "`: " + FirstLine(error.what())};
-    }
-
-    QueryRequest request;
-    request.project_id = "test";
-    request.query = sql;
-    const std::shared_ptr<const Job> job = emulator_.RunQuery(request);
-    if (!job->error.has_value()) {
-      return {Outcome::kRuns, ""};
-    }
-    std::string message = FirstLine(job->error->what());
-    static const std::string kUnsupported = "The emulator does not support ";
-    if (message.starts_with(kUnsupported)) {
-      return {Outcome::kUnsupported, message.substr(kUnsupported.size())};
-    }
-    // DuckDB's hint to add casts is noise in a report.
-    message = message.substr(0, message.find(". You might need"));
-    return {Outcome::kFailsOnDuckDb, "`" + sql + "`: " + message};
-  }
-
- private:
-  Emulator emulator_;
-};
-
-std::string Escape(const std::string& text) {
-  std::string out;
-  for (char c : text) {
-    if (c == '|') {
-      out += "\\|";
-    } else {
-      out += c;
-    }
-  }
-  return out;
-}
-
 // The page that documents the function itself rather than a variant of it, such as AVG over
 // aggregate-dp-functions#dp_avg: the one whose anchor is the function's name.
 std::string MainDoc(const std::string& name, const std::vector<std::string>& docs) {
@@ -312,21 +227,6 @@ std::string Categories(const std::vector<std::string>& docs) {
     pages.insert(doc.substr(0, doc.find('#')));
   }
   return absl::StrJoin(pages, ", ");
-}
-
-std::string Status(std::map<Outcome, int> counts) {
-  const int tested =
-      counts[Outcome::kRuns] + counts[Outcome::kUnsupported] + counts[Outcome::kFailsOnDuckDb];
-  if (counts[Outcome::kFailsOnDuckDb] > 0) {
-    return "Broken";
-  }
-  if (tested == 0) {
-    return "Untested";
-  }
-  if (counts[Outcome::kRuns] == tested) {
-    return "Supported";
-  }
-  return counts[Outcome::kRuns] == 0 ? "Unsupported" : "Partial";
 }
 
 int Main(int argc, char** argv) {
@@ -368,7 +268,7 @@ int Main(int argc, char** argv) {
   googlesql::TypeFactory type_factory;
   NoTables tables;
   BigQueryCatalog catalog(tables, &type_factory, "test", "");
-  Prober prober;
+  Emulator emulator;
   std::map<std::string, int> totals;
   std::ostringstream rows;
   for (const auto& [name, docs] : functions) {
@@ -378,7 +278,7 @@ int Main(int argc, char** argv) {
     const std::vector<std::string> path = absl::StrSplit(name, '.');
     if (const auto hinted = hints.find(name); hinted != hints.end()) {
       for (const std::string& sql : hinted->second) {
-        probes.push_back(prober.Run(sql));
+        probes.push_back(RunProbe(emulator, tables, sql));
       }
     } else if (catalog.FindFunction(path, &function).ok()) {
       for (const googlesql::FunctionSignature& signature : function->signatures()) {
@@ -394,7 +294,7 @@ int Main(int argc, char** argv) {
           continue;
         }
         probes.push_back(std::holds_alternative<std::string>(query)
-                             ? prober.Run(std::get<std::string>(query))
+                             ? RunProbe(emulator, tables, std::get<std::string>(query))
                              : std::get<Probe>(query));
       }
     } else {
