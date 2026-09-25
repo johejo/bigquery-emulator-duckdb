@@ -1,7 +1,7 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 _bazel_files := "find . \\( -path './bazel-*' -o -path './external' \\) -prune -o -type f \\( -name 'BUILD' -o -name 'BUILD.bazel' -o -name '*.bzl' -o -name 'MODULE.bazel' \\) -print0"
-_cpp_files := "find src tests -type f \\( -name '*.cc' -o -name '*.h' \\) -print0"
+_cpp_files := "find src tests tools -type f \\( -name '*.cc' -o -name '*.h' \\) -print0"
 
 fmt:
     {{_bazel_files}} | xargs -0 buildifier

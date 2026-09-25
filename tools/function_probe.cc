@@ -5,14 +5,15 @@
 // that a call translates and runs on DuckDB, not that it returns what BigQuery would.
 
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
 #include <set>
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,8 +34,7 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-constexpr std::string_view kDocs =
-    "https://cloud.google.com/bigquery/docs/reference/standard-sql";
+constexpr std::string_view kDocs = "https://cloud.google.com/bigquery/docs/reference/standard-sql";
 
 constexpr std::string_view kPreamble = R"(# BigQuery function support
 
@@ -97,7 +97,8 @@ std::optional<std::string> Sample(const googlesql::Type* type) {
   if (type->IsRange()) {
     const auto element = type->AsRange()->element_type();
     return "RANGE<" + element->TypeName(googlesql::PRODUCT_EXTERNAL) + "> '[" +
-           (element->IsDate() ? "2024-01-01, 2024-02-01" : "2024-01-01 00:00:00, 2024-02-01 00:00:00") +
+           (element->IsDate() ? "2024-01-01, 2024-02-01"
+                              : "2024-01-01 00:00:00, 2024-02-01 00:00:00") +
            ")'";
   }
   switch (type->kind()) {
@@ -160,7 +161,7 @@ std::optional<std::string> Sample(const googlesql::FunctionArgumentType& argumen
   }
 }
 
-enum class Outcome { kRuns, kFailsOnDuckDb, kUnsupported, kUntested };
+enum class Outcome : std::uint8_t { kRuns, kFailsOnDuckDb, kUnsupported, kUntested };
 
 struct Probe {
   Outcome outcome;
@@ -185,7 +186,9 @@ std::vector<std::pair<std::string, std::string>> ReadLines(const std::string& pa
     words >> first;
     std::getline(words >> std::ws, rest);
     if (rest.empty()) {
-      throw std::runtime_error(path + ":" + std::to_string(number) + ": cannot parse " + line);
+      std::string message = path;
+      message += ":" + std::to_string(number) + ": cannot parse " + line;
+      throw std::runtime_error(message);
     }
     lines.emplace_back(first, rest);
   }
@@ -208,7 +211,8 @@ bool IsBigQuerySignature(const googlesql::FunctionSignature& signature) {
     }
     return type == nullptr || (type->IsSupportedType(options) && !type->IsFloat());
   };
-  return supported(signature.result_type()) && std::ranges::all_of(signature.arguments(), supported);
+  return supported(signature.result_type()) &&
+         std::ranges::all_of(signature.arguments(), supported);
 }
 
 // The generated query for a signature, or why there is none.
@@ -234,7 +238,7 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
     call += (i == 0 ? "" : ", ") + arguments[i];
   }
   call += ")";
-  return function.IsAnalytic()   ? "SELECT " + call + " OVER (ORDER BY x) FROM UNNEST([1, 2]) AS x"
+  return function.IsAnalytic()    ? "SELECT " + call + " OVER (ORDER BY x) FROM UNNEST([1, 2]) AS x"
          : function.IsAggregate() ? "SELECT " + call + " FROM UNNEST([1, 2]) AS x"
                                   : "SELECT " + call;
 }
@@ -308,8 +312,8 @@ std::string Categories(const std::vector<std::string>& docs) {
 }
 
 std::string Status(std::map<Outcome, int> counts) {
-  const int tested = counts[Outcome::kRuns] + counts[Outcome::kUnsupported] +
-                     counts[Outcome::kFailsOnDuckDb];
+  const int tested =
+      counts[Outcome::kRuns] + counts[Outcome::kUnsupported] + counts[Outcome::kFailsOnDuckDb];
   if (counts[Outcome::kFailsOnDuckDb] > 0) {
     return "Broken";
   }
@@ -374,9 +378,8 @@ int Main(int argc, char** argv) {
         const auto query = GeneratedQuery(name, *function, signature);
         if (list_signatures) {
           std::cout << signature.DebugString(name) << "\n  "
-                    << (std::holds_alternative<std::string>(query)
-                            ? std::get<std::string>(query)
-                            : std::get<Probe>(query).detail)
+                    << (std::holds_alternative<std::string>(query) ? std::get<std::string>(query)
+                                                                   : std::get<Probe>(query).detail)
                     << "\n";
           continue;
         }
@@ -422,4 +425,14 @@ int Main(int argc, char** argv) {
 }  // namespace
 }  // namespace bigquery_emulator_duckdb
 
-int main(int argc, char** argv) { return bigquery_emulator_duckdb::Main(argc, argv); }
+int main(int argc, char** argv) {
+  try {
+    return bigquery_emulator_duckdb::Main(argc, argv);
+  } catch (const std::exception& error) {
+    std::cerr << error.what() << '\n';
+    return 1;
+  } catch (...) {
+    std::cerr << "Unknown error\n";
+    return 1;
+  }
+}
