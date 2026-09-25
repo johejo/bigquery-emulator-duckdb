@@ -10,8 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/strings.h"
@@ -2158,16 +2156,12 @@ std::optional<std::string> TablePath(const std::vector<std::string>& path,
 
 std::optional<std::string> DatasetPath(const std::vector<std::string>& path,
                                        const DefaultDataset& defaults, const Scope& scope) {
-  std::vector<std::string> parts;
-  for (const auto& element : path) {
-    for (const absl::string_view part : absl::StrSplit(element, '.')) {
-      parts.emplace_back(part);
-    }
-  }
-  if (parts.size() == 1) {
-    parts.insert(parts.begin(), defaults.project);
-  }
-  if (parts.size() != 2 || parts[0].empty() || parts[1].empty()) {
+  // Reuse table path normalization so dots inside a domain-scoped project are handled
+  // the same way for CREATE/DROP SCHEMA and table references.
+  std::vector<std::string> table_path = path;
+  table_path.push_back("_dataset_path_placeholder");
+  const auto parts = NormalizeTablePath(table_path, defaults.project, defaults.dataset);
+  if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
   return QuoteIdentifier(parts[0]) + "." + QuoteIdentifier(parts[1]);

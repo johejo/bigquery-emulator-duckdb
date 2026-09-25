@@ -82,6 +82,14 @@ TEST(NormalizeTablePathTest, SplitsElementsWithDots) {
   EXPECT_EQ(NormalizeTablePath(Path{"pr.ds", "t"}, "p", "d"), (Path{"pr", "ds", "t"}));
 }
 
+TEST(NormalizeTablePathTest, KeepsDomainScopedProjectTogether) {
+  const Path expected{"example.com:proj", "ds", "t"};
+  EXPECT_EQ(NormalizeTablePath(Path{"example.com:proj.ds.t"}, "p", "d"), expected);
+  EXPECT_EQ(NormalizeTablePath(Path{"example.com:proj", "ds", "t"}, "p", "d"), expected);
+  EXPECT_EQ(NormalizeTablePath(Path{"example", "com:proj", "ds", "t"}, "p", "d"), expected);
+  EXPECT_EQ(NormalizeTablePath(Path{"t"}, "example.com:proj", "ds"), expected);
+}
+
 TEST(NormalizeTablePathTest, RejectsWhatItCannotInterpret) {
   EXPECT_TRUE(NormalizeTablePath(Path{"a", "b", "c", "d"}, "p", "d").empty());
   EXPECT_TRUE(NormalizeTablePath(Path{"a.b.c.d"}, "p", "d").empty());

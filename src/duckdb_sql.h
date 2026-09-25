@@ -14,8 +14,8 @@ std::string QuoteLiteral(std::string_view value);
 // "..." with the DuckDB escaping rules: a double quote is doubled.
 std::string QuoteIdentifier(std::string_view name);
 
-// A backtick quoted GoogleSQL identifier holds a whole path in BigQuery: `project.dataset.table`
-// is one identifier that names three objects, so it becomes "project"."dataset"."table".
+// Quotes a resolved table name as project.dataset.table. Domain-scoped project IDs may
+// contain dots; only the last two dots delimit the dataset and table in that case.
 std::string QuoteIdentifierPath(std::string_view path);
 
 std::string ToHex(std::string_view value);

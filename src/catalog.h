@@ -39,8 +39,9 @@ class TableSource {
 };
 
 // Normalizes a table path to {project, dataset, table}. An element with dots in it, which is how
-// `project.dataset.table` in backquotes arrives, is split first; a missing project and dataset
-// are then taken from the defaults. Returns an empty vector for a path it cannot interpret.
+// `project.dataset.table` in backquotes arrives, is split first; dots before the colon in a
+// domain-scoped project ID are kept in the project. Missing parts come from the defaults.
+// Returns an empty vector for a path it cannot interpret.
 std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
                                             const std::string& default_dataset);

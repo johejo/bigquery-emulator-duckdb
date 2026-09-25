@@ -164,6 +164,18 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
       parts.emplace_back(part);
     }
   }
+  // Domain-scoped project IDs contain dots before the colon. Those dots belong to the
+  // project, even when GoogleSQL passes the entire backtick-quoted path as one element.
+  for (size_t i = 0; i < parts.size(); ++i) {
+    if (parts[i].find(':') != std::string::npos) {
+      if (i > 0) {
+        const std::string project = absl::StrJoin(parts.begin(), parts.begin() + i + 1, ".");
+        parts.erase(parts.begin(), parts.begin() + i + 1);
+        parts.insert(parts.begin(), project);
+      }
+      break;
+    }
+  }
   if (parts.size() == 1) {
     parts.insert(parts.begin(), {default_project, default_dataset});
   } else if (parts.size() == 2) {
