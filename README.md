@@ -184,3 +184,7 @@ The end-to-end scenarios own client-visible results, including representative fu
 
 - HTTP server: cpp-httplib (header-only, in the Bazel Central Registry) + nlohmann/json. Crow was considered but it is not in the BCR and depends on asio.
 - `third_party/bigquery/discovery.json` is the discovery document bundled with `bq`, embedded into the binary by a genrule.
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
