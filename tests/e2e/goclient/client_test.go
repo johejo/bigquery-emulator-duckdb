@@ -220,3 +220,40 @@ func TestInserterPut(t *testing.T) {
 		t.Errorf("query got id %d, want 7", queried.ID)
 	}
 }
+
+func TestQueryToADestinationTable(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+
+	dataset := client.Dataset("go_destination")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+		t.Fatalf("Dataset.Create: %v", err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+
+	table := dataset.Table("results")
+	for _, disposition := range []bigquery.TableWriteDisposition{
+		bigquery.WriteEmpty, bigquery.WriteAppend,
+	} {
+		query := client.Query("SELECT 1 AS n")
+		query.Dst = table
+		query.WriteDisposition = disposition
+		it, err := query.Read(ctx)
+		if err != nil {
+			t.Fatalf("Read with %s: %v", disposition, err)
+		}
+		var row struct{ N int64 }
+		if err := it.Next(&row); err != nil || row.N != 1 {
+			t.Errorf("got row %+v (%v) with %s, want {1}", row, err, disposition)
+		}
+	}
+
+	metadata, err := table.Metadata(ctx)
+	if err != nil {
+		t.Fatalf("Table.Metadata: %v", err)
+	}
+	if metadata.NumRows != 2 {
+		t.Errorf("got %d rows in the destination table, want 2", metadata.NumRows)
+	}
+}

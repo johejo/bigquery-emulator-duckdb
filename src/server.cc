@@ -171,16 +171,32 @@ json JobStatistics(const Job& job) {
               {"query", std::move(query_statistics)}};
 }
 
+json TableReferenceJson(const TableReference& table) {
+  return json{{"projectId", table.project_id},
+              {"datasetId", table.dataset_id},
+              {"tableId", table.table_id}};
+}
+
 json JobResource(const Job& job) {
+  json query{{"query", job.query}, {"useLegacySql", false}};
+  if (job.destination_table.has_value()) {
+    TableReference destination = *job.destination_table;
+    if (destination.project_id.empty()) {
+      destination.project_id = job.project_id;
+    }
+    query["destinationTable"] = TableReferenceJson(destination);
+    query["createDisposition"] =
+        job.create_disposition.empty() ? "CREATE_IF_NEEDED" : job.create_disposition;
+    query["writeDisposition"] =
+        job.write_disposition.empty() ? "WRITE_EMPTY" : job.write_disposition;
+  }
   return json{{"kind", "bigquery#job"},
               {"etag", ""},
               {"id", job.project_id + ":" + job.location + "." + job.job_id},
               {"selfLink", ""},
               {"jobReference", JobReference(job)},
               {"configuration",
-               {{"jobType", "QUERY"},
-                {"dryRun", job.dry_run},
-                {"query", {{"query", job.query}, {"useLegacySql", false}}}}},
+               {{"jobType", "QUERY"}, {"dryRun", job.dry_run}, {"query", std::move(query)}}},
               {"status", JobStatus(job)},
               {"statistics", JobStatistics(job)}};
 }
@@ -272,12 +288,6 @@ json DatasetResource(const DatasetReference& dataset) {
       {"id", dataset.project_id + ":" + dataset.dataset_id},
       {"datasetReference", {{"projectId", dataset.project_id}, {"datasetId", dataset.dataset_id}}},
       {"location", "US"}};
-}
-
-json TableReferenceJson(const TableReference& table) {
-  return json{{"projectId", table.project_id},
-              {"datasetId", table.dataset_id},
-              {"tableId", table.table_id}};
 }
 
 json TableResource(const TableInfo& info) {
@@ -407,6 +417,19 @@ class Server::Impl {
            QueryRequest query_request = ToQueryRequest(Param(request, "project"), config["query"]);
            query_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
            query_request.dry_run = config.value("dryRun", false);
+           const json& query_config = config["query"];
+           if (query_config.contains("destinationTable")) {
+             const json& table = query_config["destinationTable"];
+             query_request.destination_table =
+                 TableReference{table.value("projectId", ""), table.value("datasetId", ""),
+                                table.value("tableId", "")};
+             if (query_request.destination_table->dataset_id.empty() ||
+                 query_request.destination_table->table_id.empty()) {
+               throw ApiError::Invalid("Invalid destination table");
+             }
+           }
+           query_request.create_disposition = query_config.value("createDisposition", "");
+           query_request.write_disposition = query_config.value("writeDisposition", "");
            return JobResource(*emulator_.RunQuery(query_request));
          }));
     Get("/projects/:project/jobs/:job",

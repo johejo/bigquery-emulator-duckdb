@@ -89,6 +89,30 @@ TEST_F(ServerTest, RunsJobAndFetchesResults) {
   Get("/bigquery/v2/projects/p/queries/missing", 404);
 }
 
+TEST_F(ServerTest, WritesJobResultsToADestinationTable) {
+  Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  const json destination = {{"datasetId", "ds"}, {"tableId", "t"}};
+  const json job =
+      Post("/bigquery/v2/projects/p/jobs",
+           {{"jobReference", {{"jobId", "job1"}}},
+            {"configuration",
+             {{"query", {{"query", "SELECT 1 AS x"}, {"destinationTable", destination}}}}}});
+  EXPECT_EQ(job["status"]["state"], "DONE");
+  const json& query = job["configuration"]["query"];
+  EXPECT_EQ(query["destinationTable"]["projectId"], "p");
+  EXPECT_EQ(query["destinationTable"]["tableId"], "t");
+  EXPECT_EQ(query["createDisposition"], "CREATE_IF_NEEDED");
+  EXPECT_EQ(query["writeDisposition"], "WRITE_EMPTY");
+  EXPECT_EQ(Get("/bigquery/v2/projects/p/queries/job1")["rows"][0]["f"][0]["v"], "1");
+  EXPECT_EQ(Get("/bigquery/v2/projects/p/datasets/ds/tables/t/data")["rows"][0]["f"][0]["v"], "1");
+
+  const json again =
+      Post("/bigquery/v2/projects/p/jobs",
+           {{"configuration",
+             {{"query", {{"query", "SELECT 2 AS x"}, {"destinationTable", destination}}}}}});
+  EXPECT_EQ(again["status"]["errorResult"]["reason"], "duplicate");
+}
+
 TEST_F(ServerTest, PaginatesQueryResults) {
   Post("/bigquery/v2/projects/p/jobs",
        {{"jobReference", {{"jobId", "job1"}}},

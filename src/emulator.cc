@@ -255,6 +255,27 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
   return duckdb_schema;
 }
 
+std::string TableName(const TableReference& table) {
+  return table.project_id + ":" + table.dataset_id + "." + table.table_id;
+}
+
+// Column definitions for a table that holds `schema`, or nullopt when a type has no column
+// type of its own in the emulator.
+std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
+  std::string columns;
+  for (const FieldSchema& field : schema) {
+    if (!columns.empty()) {
+      columns += ", ";
+    }
+    try {
+      columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field.ToJson());
+    } catch (const ApiError&) {
+      return std::nullopt;
+    }
+  }
+  return columns;
+}
+
 }  // namespace
 
 Emulator::Emulator(std::string data_dir) : data_dir_(std::move(data_dir)) {
@@ -336,6 +357,9 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   job->project_id = request.project_id;
   job->query = request.query;
   job->dry_run = request.dry_run;
+  job->destination_table = request.destination_table;
+  job->create_disposition = request.create_disposition;
+  job->write_disposition = request.write_disposition;
   job->creation_time_ms = NowMillis();
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -361,8 +385,18 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   try {
     const Translation translation = Translate(request.query, request.parameters,
                                               settings.default_project, settings.default_dataset);
-    QueryResult result =
-        request.dry_run ? Prepare(translation.sql, setup) : Execute(translation.sql, setup);
+    if (request.destination_table.has_value() && !translation.schema.has_value()) {
+      throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
+    }
+    QueryResult result;
+    if (request.dry_run) {
+      result = Prepare(translation.sql, setup);
+    } else if (request.destination_table.has_value()) {
+      result = WriteDestination(request, *request.destination_table, translation.sql,
+                                *translation.schema, setup);
+    } else {
+      result = Execute(translation.sql, setup);
+    }
     if (translation.schema.has_value()) {
       result.schema = ReconcileSchema(std::move(result.schema), *translation.schema);
     }
@@ -380,6 +414,97 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   std::lock_guard<std::mutex> lock(mutex_);
   jobs_[JobKey(request.project_id, job->job_id)] = job;
   return job;
+}
+
+QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReference destination,
+                                       const std::string& sql,
+                                       const std::vector<FieldSchema>& schema,
+                                       const std::vector<std::string>& setup) {
+  const std::string create =
+      request.create_disposition.empty() ? "CREATE_IF_NEEDED" : request.create_disposition;
+  const std::string write =
+      request.write_disposition.empty() ? "WRITE_EMPTY" : request.write_disposition;
+  if (create != "CREATE_IF_NEEDED" && create != "CREATE_NEVER") {
+    throw ApiError::Invalid("Invalid create disposition: " + create);
+  }
+  if (write != "WRITE_EMPTY" && write != "WRITE_APPEND" && write != "WRITE_TRUNCATE" &&
+      write != "WRITE_TRUNCATE_DATA") {
+    throw ApiError::Invalid("Invalid write disposition: " + write);
+  }
+  std::set<std::string> names;
+  std::string duplicates;
+  for (const FieldSchema& field : schema) {
+    std::string name = field.name;
+    std::transform(name.begin(), name.end(), name.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (!names.insert(name).second) {
+      duplicates += (duplicates.empty() ? "" : ", ") + field.name;
+    }
+  }
+  if (!duplicates.empty()) {
+    throw ApiError::InvalidQuery(
+        "Duplicate column names in the result are not supported. Found duplicate(s): " +
+        duplicates);
+  }
+
+  if (destination.project_id.empty()) {
+    destination.project_id = request.project_id;
+  }
+  EnsureProject(destination.project_id);
+  GetDataset(DatasetReference{destination.project_id, destination.dataset_id});
+  std::optional<TableInfo> existing;
+  try {
+    existing = GetTable(destination);
+  } catch (const ApiError& error) {
+    if (error.http_status() != 404) {
+      throw;
+    }
+  }
+  if (!existing.has_value() && create == "CREATE_NEVER") {
+    throw ApiError::NotFound("Not found: Table " + TableName(destination));
+  }
+  if (existing.has_value() && write == "WRITE_EMPTY" && existing->num_rows > 0) {
+    throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
+  }
+
+  // The result is materialized first, which runs the query once even when it reads the
+  // destination itself. DuckDB lets a transaction write to a single database, so the temporary
+  // table is filled before the transaction that writes the destination begins.
+  const std::string result_table = "temp.main._bigquery_emulator_query_result";
+  std::string aliases;
+  for (const FieldSchema& field : schema) {
+    aliases += (aliases.empty() ? "" : ", ") + QuoteIdentifier(field.name);
+  }
+  const std::string target = QualifiedName(destination);
+  std::vector<std::string> statements = {
+      "CREATE TEMP TABLE _bigquery_emulator_query_result AS SELECT * FROM (" + sql +
+          ") AS _bigquery_emulator_query_result(" + aliases + ")",
+      "BEGIN TRANSACTION"};
+  if (!existing.has_value() || write == "WRITE_TRUNCATE") {
+    if (existing.has_value()) {
+      statements.push_back("DROP TABLE " + target);
+    }
+    // The columns take BigQuery's types for the result, so the table reads back as the query's
+    // schema rather than as whatever DuckDB computed.
+    if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
+      statements.push_back("CREATE TABLE " + target + " (" + *columns + ")");
+      statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
+    } else {
+      statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table);
+    }
+  } else {
+    if (write == "WRITE_TRUNCATE_DATA") {
+      statements.push_back("DELETE FROM " + target);
+    }
+    statements.push_back("INSERT INTO " + target + " BY NAME SELECT * FROM " + result_table);
+  }
+  statements.emplace_back("COMMIT");
+  statements.push_back("SELECT * FROM " + result_table);
+  try {
+    return backend_.ExecuteAll(statements, setup);
+  } catch (const BackendError& error) {
+    throw ApiError::InvalidQuery(error.what());
+  }
 }
 
 std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,

@@ -53,6 +53,11 @@ class Backend {
   // same connection and are used to select the default catalog and schema.
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
 
+  // Runs `statements` in order on one connection and materializes the result of the last one.
+  // Statements before the last may open a transaction; it is rolled back if a later one fails.
+  QueryResult ExecuteAll(const std::vector<std::string>& statements,
+                         const std::vector<std::string>& setup = {});
+
   // Validates `sql` and returns the schema of its result without running it. The result never
   // has rows; `has_rows` says whether the statement produces a result set at all.
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});

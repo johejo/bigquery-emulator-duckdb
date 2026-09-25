@@ -48,6 +48,9 @@ struct Job {
   // A dry run job is validated but never executed, and it is not kept: BigQuery does not
   // create a job for it, so `GetJob` will not find it afterwards.
   bool dry_run = false;
+  std::optional<TableReference> destination_table;
+  std::string create_disposition;
+  std::string write_disposition;
   int64_t creation_time_ms = 0;
   int64_t end_time_ms = 0;
   // Exactly one of `result` and `error` is set once the job is done. Jobs always complete
@@ -64,6 +67,11 @@ struct QueryRequest {
   std::string job_id;  // Generated when empty.
   QueryParameters parameters;
   bool dry_run = false;
+  // Where a query's result is written. The dispositions take BigQuery's names; empty means the
+  // default, CREATE_IF_NEEDED and WRITE_EMPTY.
+  std::optional<TableReference> destination_table;
+  std::string create_disposition;
+  std::string write_disposition;
 };
 
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
@@ -106,6 +114,11 @@ class Emulator {
                         const std::string& default_project, const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
+  // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`, the
+  // request's destination table. Returns the query's result.
+  QueryResult WriteDestination(const QueryRequest& request, TableReference destination,
+                               const std::string& sql, const std::vector<FieldSchema>& schema,
+                               const std::vector<std::string>& setup);
 
   Backend backend_;
   std::string data_dir_;

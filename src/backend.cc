@@ -259,9 +259,22 @@ Backend::Backend() : db_(std::make_unique<duckdb::DuckDB>(nullptr)) {}
 Backend::~Backend() = default;
 
 QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup) {
+  return ExecuteAll({sql}, setup);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): setup runs before the statements.
+QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
+                                const std::vector<std::string>& setup) {
+  if (statements.empty()) {
+    throw BackendError("No statement to execute");
+  }
   duckdb::Connection connection(*db_);
   RunSetup(connection, setup);
-  std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(sql);
+  // A transaction left open by a failed statement is rolled back when the connection closes.
+  for (size_t i = 0; i + 1 < statements.size(); ++i) {
+    ThrowIfFailed(connection.Query(statements[i]));
+  }
+  std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(statements.back());
   ThrowIfFailed(result);
 
   QueryResult query_result;

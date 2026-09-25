@@ -391,6 +391,79 @@ TEST_F(EmulatorTest, QueriesDomainScopedProjects) {
   EXPECT_EQ(emulator_.ListDatasets(project), (std::vector<std::string>{"ds", "other"}));
 }
 
+TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
+  emulator_.CreateDataset({"test", "ds"});
+  const TableReference destination{"test", "ds", "dest"};
+  const auto write = [&](const std::string& sql, const std::string& write_disposition,
+                         const std::string& create_disposition = "") {
+    QueryRequest request;
+    request.project_id = "test";
+    request.query = sql;
+    request.destination_table = destination;
+    request.write_disposition = write_disposition;
+    request.create_disposition = create_disposition;
+    return emulator_.RunQuery(request);
+  };
+  const auto values = [&] {
+    std::vector<std::string> cells;
+    for (const nlohmann::json& row : emulator_.ListTableData(destination, 0, 100).rows) {
+      cells.push_back(row["f"][0]["v"].get<std::string>() + "/" +
+                      row["f"][1]["v"].get<std::string>());
+    }
+    return cells;
+  };
+
+  const std::shared_ptr<const Job> never = write("SELECT 1 AS a", "", "CREATE_NEVER");
+  if (!never->error.has_value()) {
+    FAIL() << "expected an error";
+  }
+  EXPECT_EQ(never->error->http_status(), 404);
+
+  // The table takes the query's schema, BigQuery's names and types included.
+  const std::shared_ptr<const Job> created =
+      write("SELECT 1 AS a, SUM(x) FROM UNNEST([2]) AS x", "");
+  if (!created->result.has_value()) {
+    FAIL() << ErrorMessage(*created);
+  }
+  EXPECT_EQ(created->result->rows.size(), 1);
+  const TableInfo table = emulator_.GetTable(destination);
+  ASSERT_EQ(table.schema.size(), 2);
+  EXPECT_EQ(table.schema[1].name, "f0_");
+  EXPECT_EQ(table.schema[1].type, "INTEGER");
+  EXPECT_EQ(values(), (std::vector<std::string>{"1/2"}));
+
+  const std::shared_ptr<const Job> not_empty = write("SELECT 3 AS a, 4 AS f0_", "WRITE_EMPTY");
+  if (!not_empty->error.has_value()) {
+    FAIL() << "expected an error";
+  }
+  EXPECT_EQ(not_empty->error->http_status(), 409);
+
+  // Appending matches columns by name.
+  ASSERT_FALSE(write("SELECT 4 AS f0_, 3 AS a", "WRITE_APPEND")->error.has_value());
+  EXPECT_EQ(values(), (std::vector<std::string>{"1/2", "3/4"}));
+
+  // The query can read the table it replaces.
+  ASSERT_FALSE(
+      write("SELECT a * 10 AS a, f0_ FROM ds.dest", "WRITE_TRUNCATE_DATA")->error.has_value());
+  EXPECT_EQ(values(), (std::vector<std::string>{"10/2", "30/4"}));
+
+  ASSERT_FALSE(write("SELECT 'x' AS b, 5 AS c", "WRITE_TRUNCATE")->error.has_value());
+  const TableInfo replaced = emulator_.GetTable(destination);
+  ASSERT_EQ(replaced.schema.size(), 2);
+  EXPECT_EQ(replaced.schema[0].name, "b");
+  EXPECT_EQ(replaced.schema[0].type, "STRING");
+  EXPECT_EQ(values(), (std::vector<std::string>{"x/5"}));
+
+  // A failed write leaves the table as it was.
+  const std::shared_ptr<const Job> mismatch = write("SELECT 1 AS nope", "WRITE_APPEND");
+  ASSERT_TRUE(mismatch->error.has_value());
+  EXPECT_EQ(values(), (std::vector<std::string>{"x/5"}));
+
+  EXPECT_TRUE(write("SELECT 1 AS a, 2 AS A", "WRITE_TRUNCATE")->error.has_value());
+  EXPECT_TRUE(write("CREATE TABLE ds.other (a INT64)", "")->error.has_value());
+  EXPECT_TRUE(write("SELECT 1 AS a", "WRITE_SOMETIMES")->error.has_value());
+}
+
 TEST_F(EmulatorTest, ReportsUnsupportedConstructsAsInvalidQuery) {
   EXPECT_EQ(ErrorStatus("SELECT SESSION_USER()"), 400);
   EXPECT_NE(

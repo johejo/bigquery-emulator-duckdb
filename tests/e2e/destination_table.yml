@@ -1,0 +1,52 @@
+desc: bq query writes its result to a destination table with the requested dispositions
+steps:
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset dest
+    test: current.exit_code == 0
+  create:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        --destination_table=dest.results 'SELECT 1 AS id, "a" AS name'
+    test: |
+      current.exit_code == 0 && trim(current.stdout) == '[{"id":"1","name":"a"}]'
+  show_created:
+    exec:
+      command: tests/e2e/bq.sh show --format=json dest.results
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"name":"id","type":"INTEGER"' &&
+      current.stdout contains '"name":"name","type":"STRING"'
+  write_empty_fails_on_a_table_with_rows:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        --destination_table=dest.results 'SELECT 2 AS id, "b" AS name'
+    test: current.exit_code != 0 && current.stdout contains "Already Exists"
+  append:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --append_table
+        --destination_table=dest.results 'SELECT "b" AS name, 2 AS id'
+    test: current.exit_code == 0
+  head_after_append:
+    exec:
+      command: tests/e2e/bq.sh head --format=json dest.results
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"a"},{"id":"2","name":"b"}]'
+  replace:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --replace
+        --destination_table=dest.results 'SELECT COUNT(*) AS n FROM dest.results'
+    test: current.exit_code == 0
+  head_after_replace:
+    exec:
+      command: tests/e2e/bq.sh head --format=json dest.results
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"n":"2"}]'
+  rm_dataset:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d dest
+    test: current.exit_code == 0
