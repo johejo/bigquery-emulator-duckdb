@@ -355,6 +355,15 @@ TEST_F(TranslatorTest, RunsOperatorsAndConditions) {
   const auto random = division->find("random()");
   ASSERT_NE(random, std::string::npos);
   EXPECT_EQ(division->find("random()", random + 1), std::string::npos);
+  // An argument that a function translation repeats is still evaluated once.
+  const auto left = Translate("SELECT LEFT('abc', CAST(RAND() * 3 AS INT64))");
+  if (!left) {
+    FAIL() << "Expected translation";
+  }
+  const auto left_random = left->find("random()");
+  ASSERT_NE(left_random, std::string::npos);
+  EXPECT_EQ(left->find("random()", left_random + 1), std::string::npos);
+  EXPECT_EQ(Scalar("SELECT LEFT('abc', CAST(RAND() * 0 AS INT64) + 2)"), "ab");
   EXPECT_EQ(Execute("SELECT IF(a = 1, 42, 1 / (a - 1)) FROM t WHERE a = 1").rows.at(0)["f"][0]["v"],
             "42.0");
   EXPECT_EQ(Execute("SELECT IF(FALSE, 1 / 0, 42)").rows.at(0)["f"][0]["v"], "42.0");

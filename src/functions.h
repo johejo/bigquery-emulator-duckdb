@@ -1,23 +1,41 @@
 #pragma once
 
-#include <cstddef>
+#include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace bigquery_emulator_duckdb {
 
-// The DuckDB name of a BigQuery function that differs from it only in name, or nullopt when the
-// name needs no change. `upper_name` is the BigQuery function name in upper case. Only scalar
-// functions are renamed here; aggregate and analytic functions have their own mapping.
-std::optional<std::string_view> DuckDbFunctionName(std::string_view upper_name);
+// The argument types the translation rules tell apart. Everything else is kOther.
+enum class ArgumentType : std::uint8_t {
+  kOther,
+  kString,
+  kBytes,
+  kInt64,
+  kDate,
+  kDatetime,
+  kTime,
+  kTimestamp,
+  kJson,
+};
 
-// The DuckDB spelling of a BigQuery function whose call has to be restructured, as a template
-// over the arguments, or nullopt when no rule applies to this name and argument count:
-//
-//   $n  the n-th argument, translated to DuckDB SQL,
-//   #n  the n-th argument, a BigQuery date part such as DAY, as the lower case string literal
-//       that DuckDB expects ('day').
-std::optional<std::string_view> DuckDbFunctionTemplate(std::string_view upper_name,
-                                                       std::size_t argument_count);
+// An argument of a BigQuery function call, as far as the translation rules look at it.
+struct FunctionArgument {
+  // The argument translated to DuckDB SQL.
+  std::string sql;
+  ArgumentType type = ArgumentType::kOther;
+  // The date part, such as "day", when the argument is one.
+  std::optional<std::string> date_part;
+  // The value of a STRING literal argument.
+  std::optional<std::string> string_literal;
+};
+
+// The DuckDB spelling of a call to the BigQuery scalar function `upper_name`, or nullopt when
+// the declarative rules do not translate it. `upper_name` is the function name in upper case,
+// and the operators have their internal names such as $EXTRACT_DATE.
+std::optional<std::string> TranslateFunction(std::string_view upper_name,
+                                             const std::vector<FunctionArgument>& arguments);
 
 }  // namespace bigquery_emulator_duckdb

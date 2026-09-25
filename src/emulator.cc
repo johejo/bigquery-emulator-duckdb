@@ -257,7 +257,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
 
   try {
     const Translation translation = Translate(request.query, request.parameters,
-                                               settings.default_project, settings.default_dataset);
+                                              settings.default_project, settings.default_dataset);
     QueryResult result =
         request.dry_run ? Prepare(translation.sql, setup) : Execute(translation.sql, setup);
     if (translation.schema.has_value()) {

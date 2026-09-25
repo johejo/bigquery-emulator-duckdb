@@ -186,8 +186,8 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   } else {
     literal = value.GetSQLLiteral();
     if (value.type()->IsDate() || value.type()->IsTimestamp() || value.type()->IsDatetime() ||
-        value.type()->IsTime() || value.type()->IsNumericType() || value.type()->IsBigNumericType() ||
-        value.type()->IsJson()) {
+        value.type()->IsTime() || value.type()->IsNumericType() ||
+        value.type()->IsBigNumericType() || value.type()->IsJson()) {
       std::string contents;
       if (!googlesql::ParseStringLiteral(literal.substr(literal.find(' ') + 1), &contents).ok()) {
         return std::nullopt;
@@ -230,17 +230,32 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
 }
 
-std::string Expand(std::string_view spelling, const std::vector<std::string>& args) {
-  std::string sql;
-  for (size_t i = 0; i < spelling.size(); ++i) {
-    if ((spelling[i] == '$' || spelling[i] == '#') && i + 1 < spelling.size() &&
-        spelling[i + 1] >= '1' && spelling[i + 1] <= '9') {
-      sql += args.at(static_cast<size_t>(spelling[++i] - '1'));
-    } else {
-      sql += spelling[i];
-    }
+ArgumentType TypeOf(const googlesql::Type& type) {
+  if (type.IsString()) {
+    return ArgumentType::kString;
   }
-  return sql;
+  if (type.IsBytes()) {
+    return ArgumentType::kBytes;
+  }
+  if (type.IsInt64()) {
+    return ArgumentType::kInt64;
+  }
+  if (type.IsDate()) {
+    return ArgumentType::kDate;
+  }
+  if (type.IsDatetime()) {
+    return ArgumentType::kDatetime;
+  }
+  if (type.IsTime()) {
+    return ArgumentType::kTime;
+  }
+  if (type.IsTimestamp()) {
+    return ArgumentType::kTimestamp;
+  }
+  if (type.IsJson()) {
+    return ArgumentType::kJson;
+  }
+  return ArgumentType::kOther;
 }
 
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
@@ -364,6 +379,14 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
   const auto invoke = [&](std::string_view function) {
     return std::string(function) + "(" + Join(args, ", ") + ")";
   };
+  std::vector<FunctionArgument> arguments;
+  for (size_t i = 0; i < n; ++i) {
+    const googlesql::ResolvedExpr& argument = *call.argument_list(static_cast<int>(i));
+    arguments.push_back({.sql = args[i],
+                         .type = TypeOf(*argument.type()),
+                         .date_part = DatePart(argument),
+                         .string_literal = StringLiteral(argument)});
+  }
   if (name == "$MAKE_ARRAY") {
     return "[" + Join(args, ", ") + "]";
   }
@@ -467,54 +490,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "(" + sql + "ELSE " + args.back() + " END)";
   }
-  if (name == "BYTE_LENGTH" && n == 1) {
-    if (call.argument_list(0)->type()->IsString()) {
-      return invoke("strlen");
-    }
-    if (call.argument_list(0)->type()->IsBytes()) {
-      return invoke("octet_length");
-    }
-    return std::nullopt;
-  }
-  if ((name == "CURRENT_TIMESTAMP" || name == "CURRENT_DATE" || name == "CURRENT_TIME") && n == 0) {
-    return name;
-  }
-  if (name == "CURRENT_DATETIME" && n == 0) {
-    return "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)";
-  }
-  // BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
-  const auto week_start = [](const std::string& value, bool iso) {
-    return iso ? "date_trunc('week', " + value + ")"
-               : "(date_trunc('week', " + value + " + INTERVAL 1 DAY) - INTERVAL 1 DAY)";
-  };
-  if ((name == "DATE_TRUNC" || name == "DATETIME_TRUNC" || name == "TIMESTAMP_TRUNC") && n == 2) {
-    const auto part = DatePart(*call.argument_list(1));
-    if (part == "week" || part == "isoweek") {
-      const std::string start = week_start(args[0], *part == "isoweek");
-      return name == "DATE_TRUNC" ? "CAST(" + start + " AS DATE)" : start;
-    }
-  }
-  if ((name == "DATE_DIFF" || name == "DATETIME_DIFF" || name == "TIMESTAMP_DIFF" ||
-       name == "TIME_DIFF") &&
-      n == 3) {
-    const auto part = DatePart(*call.argument_list(2));
-    if (!part) {
-      return std::nullopt;
-    }
-    // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
-    if (*part == "week" || *part == "isoweek") {
-      const bool iso = *part == "isoweek";
-      return "(date_diff('day', " + week_start(args[1], iso) + ", " + week_start(args[0], iso) +
-             ") // 7)";
-    }
-    // Below a day, and for any TIMESTAMP or TIME, BigQuery counts whole units rather than the
-    // boundaries crossed, which is DuckDB's date_sub rather than date_diff.
-    static const std::set<std::string> sub_day = {"hour", "minute", "second", "millisecond",
-                                                  "microsecond"};
-    if (name == "TIMESTAMP_DIFF" || name == "TIME_DIFF" || sub_day.contains(*part)) {
-      return "date_sub(" + args[2] + ", " + args[1] + ", " + args[0] + ")";
-    }
-  }
   // A time zone argument moves a TIMESTAMP to the civil time there.
   const auto civil = [&](size_t zone) {
     return n > zone ? "timezone(" + args[zone] + ", " + args[0] + ")" : args[0];
@@ -542,45 +517,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "date_part(" + args[1] + ", " + value + ")";
   }
-  if ((name == "$EXTRACT_DATE" || name == "$EXTRACT_TIME" || name == "$EXTRACT_DATETIME") &&
-      (n == 1 || n == 2)) {
-    const std::string target = name == "$EXTRACT_DATE"   ? "DATE"
-                               : name == "$EXTRACT_TIME" ? "TIME"
-                                                         : "TIMESTAMP";
-    return "CAST(" + civil(1) + " AS " + target + ")";
-  }
-  if (name == "DATE" && n == 3) {
-    return invoke("make_date");
-  }
-  if (name == "DATETIME" && n == 6) {
-    return invoke("make_timestamp");
-  }
-  if (name == "TIME" && n == 3) {
-    return invoke("make_time");
-  }
-  if (name == "DATETIME" && n == 2 && type(0)->IsDate() && type(1)->IsTime()) {
-    return "(" + args[0] + " + " + args[1] + ")";
-  }
-  if ((name == "DATE" || name == "DATETIME" || name == "TIME") && (n == 1 || n == 2)) {
-    if (n == 2 && !type(0)->IsTimestamp()) {
-      return std::nullopt;
-    }
-    const std::string target = name == "DATETIME" ? "TIMESTAMP" : name;
-    return "CAST(" + civil(1) + " AS " + target + ")";
-  }
-  if (name == "TIMESTAMP" && n == 1) {
-    return "CAST(" + args[0] + " AS TIMESTAMPTZ)";
-  }
-  // A civil time in the given zone; a string with its own offset keeps the offset.
-  if (name == "TIMESTAMP" && n == 2 && (type(0)->IsDate() || type(0)->IsDatetime())) {
-    return "timezone(" + args[1] + ", CAST(" + args[0] + " AS TIMESTAMP))";
-  }
-  if (name == "LAST_DAY" && (n == 1 || (n == 2 && DatePart(*call.argument_list(1)) == "month"))) {
-    return "last_day(" + args[0] + ")";
-  }
-  if (name == "UNIX_DATE" && n == 1) {
-    return "date_diff('day', DATE '1970-01-01', " + args[0] + ")";
-  }
   // DuckDB's generate_series steps from the previous element, which only agrees with BigQuery
   // stepping from the start for parts of a fixed length.
   if (name == "GENERATE_DATE_ARRAY" && (n == 2 || n == 4)) {
@@ -604,17 +540,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
       return std::nullopt;
     }
     const std::string interval = "(" + args[1] + " * INTERVAL '1 " + *part + "')";
-    const auto spelling = DuckDbFunctionTemplate(name, 2);
-    if (!spelling) {
-      return std::nullopt;
-    }
-    return Expand(*spelling, {args[0], interval});
-  }
-  if (name == "PARSE_JSON" && n == 2) {
-    if (StringLiteral(*call.argument_list(1)) != "exact") {
-      return std::nullopt;
-    }
-    return "json(" + args[0] + ")";
+    return TranslateFunction(name, {arguments[0], {.sql = interval}});
   }
   if ((name == "REGEXP_EXTRACT" || name == "REGEXP_EXTRACT_ALL") && n == 2 && type(0)->IsString()) {
     const auto pattern = StringLiteral(*call.argument_list(1));
@@ -677,12 +603,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "list_transform([" + args[0] + "], _j -> " + sql + ")[1]";
   }
-  if (name == "JSON_TYPE" && n == 1) {
-    return "CASE json_type(" + args[0] +
-           ") WHEN 'OBJECT' THEN 'object' WHEN 'ARRAY' THEN 'array' WHEN 'VARCHAR' THEN 'string' "
-           "WHEN 'BOOLEAN' THEN 'boolean' WHEN 'NULL' THEN 'null' WHEN 'BIGINT' THEN 'number' "
-           "WHEN 'UBIGINT' THEN 'number' WHEN 'DOUBLE' THEN 'number' END";
-  }
   if (name == "$SUBSCRIPT" && n == 2 && type(0)->IsJson()) {
     if (type(1)->IsInt64()) {
       // DuckDB counts negative indexes from the end.
@@ -719,12 +639,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
            conversion->second.first + " ELSE error('The provided JSON input is not " +
            conversion->second.second + "') END)[1]";
   }
-  if (name == "ERROR" && n == 1) {
-    return invoke("error");
-  }
-  if (name == "ARRAY_REVERSE" && n == 1) {
-    return invoke("list_reverse");
-  }
   if (name == "ARRAY_CONCAT" && n >= 1) {
     if (n == 1) {
       return args[0];
@@ -742,127 +656,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _cat -> CASE WHEN " +
            Join(nulls, " OR ") + " THEN NULL ELSE list_concat(" + Join(lists, ", ") + ") END)[1]";
   }
-  if (name == "ROUND" && n == 1) {
-    return invoke("round");
-  }
-  if (name == "ROUND" && n == 2) {
-    // DuckDB takes the digits as an INTEGER.
-    return "round(" + args[0] + ", CAST(" + args[1] + " AS INTEGER))";
-  }
-  if ((name == "LPAD" || name == "RPAD") && (n == 2 || n == 3)) {
-    // DuckDB has neither a default pad nor a BYTES overload.
-    if (!call.argument_list(0)->type()->IsString()) {
-      return std::nullopt;
-    }
-    return ToLowerAscii(name) + "(" + args[0] + ", CAST(" + args[1] + " AS INTEGER), " +
-           (n == 3 ? args[2] : "' '") + ")";
-  }
-  if (name == "SPLIT" && n > 0 && !call.argument_list(0)->type()->IsString()) {
-    return std::nullopt;
-  }
-  if (name == "LENGTH" && n == 1 && call.argument_list(0)->type()->IsBytes()) {
-    return invoke("octet_length");
-  }
-  const bool strings = n > 0 && call.argument_list(0)->type()->IsString();
-  // Functions whose DuckDB counterparts differ only at the edges BigQuery defines differently.
-  // They are resolved-only so the argument types can select the STRING overloads.
-  static const std::map<std::string, std::pair<size_t, std::string>> string_templates = {
-      {"INSTR", {2, "strpos($1, $2)"}},
-      {"LEFT",
-       {2,
-        "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE left($1, $2) "
-        "END"}},
-      {"RIGHT",
-       {2,
-        "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE right($1, $2) "
-        "END"}},
-      {"TRANSLATE", {3, "translate($1, $2, $3)"}},
-      {"ASCII", {1, "ascii($1)"}},
-      {"UNICODE", {1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END"}},
-      {"NORMALIZE", {1, "nfc_normalize($1)"}},
-      {"FROM_HEX", {1, "unhex($1)"}},
-      {"FROM_BASE64", {1, "from_base64($1)"}}};
-  if (const auto spelling = string_templates.find(name);
-      spelling != string_templates.end() && strings && spelling->second.first == n) {
-    return Expand(spelling->second.second, args);
-  }
-  // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
-  if ((name == "MD5" || name == "SHA1" || name == "SHA256") && n == 1) {
-    return "unhex(" + invoke(ToLowerAscii(name)) + ")";
-  }
-  if (name == "TO_HEX" && n == 1) {
-    return "lower(hex(" + args[0] + "))";
-  }
-  if (name == "TO_BASE64" && n == 1) {
-    return invoke("to_base64");
-  }
-  if (name == "CHR" && n == 1) {
-    return "CASE WHEN " + args[0] + " = 0 THEN '' ELSE chr(CAST(" + args[0] + " AS INTEGER)) END";
-  }
-  if (name == "IEEE_DIVIDE" && n == 2) {
-    return "(CAST(" + args[0] + " AS DOUBLE) / CAST(" + args[1] + " AS DOUBLE))";
-  }
-  if (name == "BIT_COUNT" && n == 1 && call.argument_list(0)->type()->IsInt64()) {
-    return invoke("bit_count");
-  }
-  if (const auto spelling = DuckDbFunctionTemplate(name, n)) {
-    return Expand(*spelling, args);
-  }
-  if (const auto renamed = DuckDbFunctionName(name)) {
-    return invoke(*renamed);
-  }
-  // Passing arbitrary builtin names through would accidentally accept internal functions
-  // and overloads with different semantics. Extend this list with execution coverage.
-  static const std::set<std::string> plain = {"ABS",
-                                              "SIGN",
-                                              "TRUNC",
-                                              "CEIL",
-                                              "CEILING",
-                                              "FLOOR",
-                                              "SQRT",
-                                              "POW",
-                                              "POWER",
-                                              "EXP",
-                                              "LN",
-                                              "LOG10",
-                                              "MOD",
-                                              "GREATEST",
-                                              "LEAST",
-                                              "IF",
-                                              "IFNULL",
-                                              "NULLIF",
-                                              "COALESCE",
-                                              "LENGTH",
-                                              "CHAR_LENGTH",
-                                              "CHARACTER_LENGTH",
-                                              "LOWER",
-                                              "UPPER",
-                                              "CONCAT",
-                                              "SUBSTR",
-                                              "SUBSTRING",
-                                              "TRIM",
-                                              "LTRIM",
-                                              "RTRIM",
-                                              "REPLACE",
-                                              "REVERSE",
-                                              "REPEAT",
-                                              "STARTS_WITH",
-                                              "ENDS_WITH",
-                                              "STRPOS",
-                                              "SPLIT",
-                                              "ARRAY_LENGTH",
-                                              "ARRAY_TO_STRING",
-                                              "SIN",
-                                              "COS",
-                                              "TAN",
-                                              "ASIN",
-                                              "ACOS",
-                                              "ATAN",
-                                              "ATAN2",
-                                              "TANH",
-                                              "ASINH",
-                                              "CBRT"};
-  return plain.contains(name) ? std::optional<std::string>(invoke(name)) : std::nullopt;
+  return TranslateFunction(name, arguments);
 }
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
