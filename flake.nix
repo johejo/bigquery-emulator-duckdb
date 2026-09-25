@@ -32,6 +32,7 @@
               # anything. Worth keeping at the version MODULE.bazel pins, which nixpkgs
               # happens to carry today; nothing enforces that they stay in step.
               duckdb
+              fake-gcs-server
               go
               google-cloud-sdk
               just
