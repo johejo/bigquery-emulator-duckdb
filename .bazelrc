@@ -4,6 +4,11 @@ common --enable_platform_specific_config
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
+# GoogleSQL loads time zones at runtime. Forward TZDIR, when set, to actions and tests for hosts
+# without /usr/share/zoneinfo, such as NixOS.
+build --action_env=TZDIR
+build --test_env=TZDIR
+
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-layering_check

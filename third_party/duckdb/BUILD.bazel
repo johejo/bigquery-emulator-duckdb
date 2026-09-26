@@ -1,1 +1,34 @@
-exports_files(["BUILD.duckdb.bazel"])
+exports_files([
+    "BUILD.duckdb_linux.bazel",
+    "BUILD.duckdb_macos.bazel",
+])
+
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+# The prebuilt libduckdb for the target platform.
+alias(
+    name = "duckdb",
+    actual = select(
+        {
+            "@platforms//os:macos": "@duckdb_prebuilt_macos_universal//:duckdb",
+            ":linux_x86_64": "@duckdb_prebuilt_linux_amd64//:duckdb",
+            ":linux_aarch64": "@duckdb_prebuilt_linux_arm64//:duckdb",
+        },
+        no_match_error = "No prebuilt libduckdb for this platform; supported are macOS, Linux x86_64 and Linux aarch64.",
+    ),
+    visibility = ["//visibility:public"],
+)

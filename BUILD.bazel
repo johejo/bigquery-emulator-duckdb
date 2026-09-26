@@ -26,11 +26,6 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-MACOS_ONLY = select({
-    "@platforms//os:macos": [],
-    "//conditions:default": ["@platforms//:incompatible"],
-})
-
 cc_library(
     name = "api_error",
     hdrs = ["src/api_error.h"],
@@ -136,10 +131,9 @@ cc_library(
         "@platforms//os:macos": ["-Wl,-rpath,@loader_path"],
         "//conditions:default": [],
     }),
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":field_schema",
-        "@duckdb_prebuilt_macos_universal//:duckdb",
+        "//third_party/duckdb",
         "@nlohmann_json//:json",
     ],
 )
@@ -149,7 +143,6 @@ cc_library(
     srcs = ["src/emulator.cc"],
     hdrs = ["src/emulator.h"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":analyzer",
         ":api_error",
@@ -176,7 +169,6 @@ cc_library(
     srcs = ["src/server.cc"],
     hdrs = ["src/server.h"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":api_error",
         ":discovery_document",
@@ -204,7 +196,6 @@ cc_library(
     srcs = ["tools/probe.cc"],
     hdrs = ["tools/probe.h"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":analyzer",
         ":catalog",
@@ -217,7 +208,6 @@ cc_binary(
     name = "function_probe",
     srcs = ["tools/function_probe.cc"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":catalog",
         ":emulator",
@@ -235,7 +225,6 @@ genrule(
     ],
     outs = ["functions.md"],
     cmd = "$(execpath :function_probe) $(execpath tools/bigquery_functions.txt) $(execpath tools/function_probe_hints.txt) > $@",
-    target_compatible_with = MACOS_ONLY,
     tools = [":function_probe"],
 )
 
@@ -244,14 +233,12 @@ diff_test(
     failure_message = "docs/functions.md is stale; run `just docs` to regenerate it.",
     file1 = ":functions_md",
     file2 = "docs/functions.md",
-    target_compatible_with = MACOS_ONLY,
 )
 
 cc_binary(
     name = "sql_probe",
     srcs = ["tools/sql_probe.cc"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":api_error",
         ":catalog",
@@ -265,7 +252,6 @@ genrule(
     srcs = ["tools/sql_features.txt"],
     outs = ["sql.md"],
     cmd = "$(execpath :sql_probe) $(execpath tools/sql_features.txt) > $@",
-    target_compatible_with = MACOS_ONLY,
     tools = [":sql_probe"],
 )
 
@@ -274,7 +260,6 @@ diff_test(
     failure_message = "docs/sql.md is stale; run `just docs` to regenerate it.",
     file1 = ":sql_md",
     file2 = "docs/sql.md",
-    target_compatible_with = MACOS_ONLY,
 )
 
 cc_test(
@@ -295,7 +280,6 @@ cc_test(
     name = "emulator_test",
     srcs = ["tests/emulator_test.cc"],
     copts = ["-std=c++20"],
-    target_compatible_with = MACOS_ONLY,
     deps = [
         ":emulator",
         ":field_schema",

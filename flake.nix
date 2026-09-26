@@ -39,10 +39,15 @@
               runn
             ];
 
-            shellHook = pkgs.lib.optionalString pkgs.stdenv.isDarwin ''
-              export CC=/usr/bin/clang
-              export CXX=/usr/bin/clang++
-            '';
+            shellHook =
+              pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
+                export CC=/usr/bin/clang
+                export CXX=/usr/bin/clang++
+              ''
+              # Bazel runs genrules with /bin/bash, which NixOS does not have.
+              + pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+                export BAZEL_SH=${pkgs.bash}/bin/bash
+              '';
           };
         }
       );

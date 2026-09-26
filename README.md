@@ -163,6 +163,8 @@ rows, err := query.Read(ctx)
 
 The project uses C++20 and Bazel. Prefer the standard library for project code.
 
+It builds on macOS and on Linux x86_64 and aarch64, linking DuckDB's prebuilt `libduckdb` for the target platform.
+
 Nix optionally provides a development shell with tools such as Bazel, compilers, and the `bq` command-line tool.
 
 ## Testing
