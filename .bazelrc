@@ -21,5 +21,13 @@ build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
 # Report every file's findings in one run instead of stopping at the first failure.
 build:clang-tidy --keep_going
 
+# CI settings. GitHub Actions saves and restores these caches between runs; see
+# .github/workflows/test.yml.
+build:ci --disk_cache=~/.cache/bazel-disk
+build:ci --repository_cache=~/.cache/bazel-repo
+# Keep the host PATH, which differs between runner images, out of action cache keys.
+build:ci --incompatible_strict_action_env
+test:ci --test_output=errors
+
 # Optional machine-specific settings (not checked into Git).
 try-import %workspace%/.bazelrc.local
