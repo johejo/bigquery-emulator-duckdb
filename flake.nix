@@ -37,7 +37,7 @@
               google-cloud-sdk
               just
               runn
-            ];
+            ] ++ lib.optionals stdenv.hostPlatform.isLinux [ gcc14 ];
 
             shellHook =
               pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
@@ -46,6 +46,8 @@
               ''
               # Bazel runs genrules with /bin/bash, which NixOS does not have.
               + pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+                export CC=${pkgs.gcc14}/bin/gcc
+                export CXX=${pkgs.gcc14}/bin/g++
                 export BAZEL_SH=${pkgs.bash}/bin/bash
               '';
           };
