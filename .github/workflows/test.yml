@@ -24,7 +24,56 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      # Caches are saved only from main; pull requests read main's caches, so they do not fill
+      # the repository's cache quota with per-branch copies.
+      - name: Restore Bazel repository cache
+        id: repo-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/bazel-repo
+            ~/.cache/bazelisk
+          key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
+      # The disk cache is content-addressed, so any earlier main run's cache is a useful start.
+      - name: Restore Bazel disk cache
+        id: disk-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+      - name: Mark cache entries as stale
+        # Bazel refreshes the mtime of disk cache entries it reads or writes, so anything this
+        # run does not touch stays older than this marker and is pruned before saving.
+        run: touch "${RUNNER_TEMP}/bazel-disk-cache-start"
+
+      - name: Configure Bazel for CI
+        run: echo 'common --config=ci' > .bazelrc.local
       - name: Bazel tests
         run: nix develop --command just test
       - name: End-to-end tests
         run: nix develop --command just e2e
+
+      - name: Prune unused disk cache entries
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          du -sh ~/.cache/bazel-disk
+          find ~/.cache/bazel-disk -type f ! -newer "${RUNNER_TEMP}/bazel-disk-cache-start" -delete
+          du -sh ~/.cache/bazel-disk
+      - name: Save Bazel disk cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: ${{ steps.disk-cache.outputs.cache-primary-key }}
+      - name: Save Bazel repository cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.repo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/bazel-repo
+            ~/.cache/bazelisk
+          key: ${{ steps.repo-cache.outputs.cache-primary-key }}
