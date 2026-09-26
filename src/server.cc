@@ -13,6 +13,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -118,7 +119,11 @@ int64_t QueryParamInt(const httplib::Request& request, const char* name, int64_t
     return fallback;
   }
   try {
-    return std::stoll(request.get_param_value(name));
+    const std::string value = request.get_param_value(name);
+    if (value.empty() && std::string_view(name) == "pageToken") {
+      return fallback;
+    }
+    return std::stoll(value);
   } catch (const std::exception&) {
     throw ApiError::Invalid(std::string("Invalid value for ") + name);
   }

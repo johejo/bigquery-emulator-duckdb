@@ -34,6 +34,10 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
+  dry_run_dml_does_not_change_rows:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'DELETE FROM e2e.users WHERE id = 1'
+    test: current.exit_code == 0 && current.stdout contains "successfully validated"
   head:
     exec:
       command: tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
