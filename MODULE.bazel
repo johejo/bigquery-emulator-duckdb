@@ -32,6 +32,8 @@ git_override(
 archive_override(
     module_name = "googlesql",
     integrity = "sha256-Bi6Z2jQDKs31HB2VR5ds72HKT4PaQqSHYDqi4/JJJX4=",
+    patch_strip = 1,
+    patches = ["//third_party/googlesql:icu-cxx.patch"],
     strip_prefix = "googlesql-2026.9.2",
     urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.9.2.tar.gz"],
 )
