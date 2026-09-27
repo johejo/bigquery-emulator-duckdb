@@ -10,7 +10,6 @@ build --action_env=TZDIR
 build --test_env=TZDIR
 
 # macOS build compatibility.
-build:macos --macos_sdk_version=26.5
 build:macos --repo_env=DEVELOPER_DIR
 build:macos --action_env=DEVELOPER_DIR
 build:macos --host_action_env=DEVELOPER_DIR

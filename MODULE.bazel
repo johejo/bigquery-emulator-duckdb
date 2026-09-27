@@ -19,15 +19,12 @@ bazel_dep(name = "toolchains_llvm", version = "1.10.0")
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
     name = "llvm_toolchain",
+    # Match the installed SDK's TAPI format; LLVM 21's ld64.lld cannot read macOS 27 stubs.
+    linker = {
+        "darwin-aarch64": "auto",
+        "darwin-x86_64": "auto",
+    },
     llvm_version = "21.1.8",
-)
-llvm.sysroot(
-    name = "llvm_toolchain",
-    path = "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk",
-    targets = [
-        "darwin-aarch64",
-        "darwin-x86_64",
-    ],
 )
 use_repo(llvm, "llvm_toolchain")
 
