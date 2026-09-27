@@ -10,9 +10,6 @@ build --action_env=TZDIR
 build --test_env=TZDIR
 
 # macOS build compatibility.
-build:macos --repo_env=DEVELOPER_DIR
-build:macos --action_env=DEVELOPER_DIR
-build:macos --host_action_env=DEVELOPER_DIR
 build:macos --features=-header_modules
 build:macos --features=-layering_check
 build:macos --features=-parse_headers
