@@ -25,6 +25,10 @@ build:clang-tidy --keep_going
 # .github/workflows/test.yml.
 build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
+# Allow room for the roughly 6G macOS cache used by a full CI run. Bazel
+# collects the disk cache once idle during the end-to-end tests.
+build:ci --experimental_disk_cache_gc_max_size=8G
+build:ci --experimental_disk_cache_gc_idle_delay=5s
 # Keep the host PATH, which differs between runner images, out of action cache keys.
 build:ci --incompatible_strict_action_env
 # Keep CI logs readable while retaining warnings from this repository's C++ sources.
