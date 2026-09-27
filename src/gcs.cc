@@ -11,9 +11,6 @@
 #include "httplib.h"
 #include "src/api_error.h"
 
-// Kept out of emulator.cc: with TLS enabled on macOS, httplib.h includes the Security framework,
-// whose macros (TYPE_EXTENDED among them) collide with GoogleSQL's headers.
-
 namespace bigquery_emulator_duckdb {
 namespace {
 

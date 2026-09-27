@@ -1,4 +1,1 @@
-exports_files([
-    "apple_frameworks.patch",
-    "cxx_include_order.patch",
-])
+exports_files(["cxx_include_order.patch"])

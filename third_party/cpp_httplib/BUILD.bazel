@@ -1,23 +1,16 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 # cpp-httplib with TLS enabled through BoringSSL, so the emulator can download gs:// objects from
-# the public Storage API. The define is exported to every dependent: httplib.h changes its class
-# layouts with it, so all translation units must agree on it.
+# the public Storage API. The defines are exported to every dependent: httplib.h changes its class
+# layouts with them, so all translation units must agree on them.
 cc_library(
     name = "httplib",
-    defines = ["CPPHTTPLIB_OPENSSL_SUPPORT"],
-    # On macOS, httplib loads root certificates from the Keychain.
-    linkopts = select({
-        "@platforms//os:macos": [
-            "-framework",
-            "CoreFoundation",
-            "-framework",
-            "Security",
-            "-framework",
-            "CFNetwork",
-        ],
-        "//conditions:default": [],
-    }),
+    defines = [
+        "CPPHTTPLIB_OPENSSL_SUPPORT",
+        # Read root certificates from BoringSSL's default paths, such as /etc/ssl/cert.pem, on
+        # macOS as on Linux, rather than from the Keychain through the Apple frameworks.
+        "CPPHTTPLIB_DISABLE_MACOSX_AUTOMATIC_ROOT_CERTIFICATES",
+    ],
     visibility = ["//visibility:public"],
     deps = ["@cpp-httplib//:httplib"],
 )
