@@ -42,11 +42,6 @@ jobs:
           path: ~/.cache/bazel-disk
           key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
-      - name: Mark cache entries as stale
-        # Bazel refreshes the mtime of disk cache entries it reads or writes, so anything this
-        # run does not touch stays older than this marker and is pruned before saving.
-        run: touch "${RUNNER_TEMP}/bazel-disk-cache-start"
-
       - name: Configure Bazel for CI
         run: echo 'common --config=ci' > .bazelrc.local
       - name: Bazel tests
@@ -54,12 +49,9 @@ jobs:
       - name: End-to-end tests
         run: nix develop --command just e2e
 
-      - name: Prune unused disk cache entries
+      - name: Report Bazel disk cache size
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          du -sh ~/.cache/bazel-disk
-          find ~/.cache/bazel-disk -type f ! -newer "${RUNNER_TEMP}/bazel-disk-cache-start" -delete
-          du -sh ~/.cache/bazel-disk
+        run: du -sh ~/.cache/bazel-disk
       - name: Save Bazel disk cache
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
