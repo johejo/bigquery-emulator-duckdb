@@ -26,7 +26,7 @@ for _ in $(seq 1 50); do
 done
 curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test" \
   -H 'Content-Type: application/json' -d '{"name":"load-fixtures"}' >/dev/null
-curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=people.jsonl" \
+curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=nested%2Fpeople.jsonl" \
   -H 'Content-Type: application/json' --data-binary @tests/e2e/data/people.jsonl >/dev/null
 
 for _ in $(seq 1 50); do

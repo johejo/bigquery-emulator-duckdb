@@ -150,10 +150,22 @@ cc_library(
         ":catalog",
         ":duckdb_sql",
         ":field_schema",
+        ":gcs",
         ":query_parameters",
         ":translator",
         "@googlesql//googlesql/public:type",
         "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "gcs",
+    srcs = ["src/gcs.cc"],
+    hdrs = ["src/gcs.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        "//third_party/cpp_httplib:httplib",
     ],
 )
 
@@ -175,7 +187,7 @@ cc_library(
         ":emulator",
         ":field_schema",
         ":query_parameters",
-        "@cpp-httplib//:httplib",
+        "//third_party/cpp_httplib:httplib",
         "@nlohmann_json//:json",
     ],
 )
@@ -329,8 +341,8 @@ cc_test(
     deps = [
         ":emulator",
         ":server",
+        "//third_party/cpp_httplib:httplib",
         "@com_google_googletest//:gtest_main",
-        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )

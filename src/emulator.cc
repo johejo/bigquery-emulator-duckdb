@@ -1,6 +1,5 @@
 #include "src/emulator.h"
 
-#include <sys/wait.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -28,6 +27,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/gcs.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -71,59 +71,6 @@ std::string QualifiedName(const TableReference& table) {
 
 std::string JobKey(const std::string& project_id, const std::string& job_id) {
   return project_id + ":" + job_id;
-}
-
-std::string UrlEncode(const std::string& value) {
-  static constexpr char kHex[] = "0123456789ABCDEF";
-  std::string encoded;
-  for (unsigned char c : value) {
-    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/') {
-      encoded += static_cast<char>(c);
-    } else {
-      encoded += '%';
-      encoded += kHex[c >> 4];
-      encoded += kHex[c & 15];
-    }
-  }
-  return encoded;
-}
-
-// curl handles HTTPS and the standard STORAGE_EMULATOR_HOST HTTP endpoint. Arguments are passed
-// directly to exec, so object names and credentials never pass through a shell.
-void DownloadGcs(const std::string& uri, const std::filesystem::path& output) {
-  const size_t slash = uri.find('/', 5);
-  if (slash == std::string::npos || slash == 5 || slash + 1 == uri.size()) {
-    throw ApiError::Invalid("Invalid GCS URI: " + uri);
-  }
-  const std::string bucket = uri.substr(5, slash - 5);
-  const std::string object = uri.substr(slash + 1);
-  const char* emulator_host = std::getenv("STORAGE_EMULATOR_HOST");
-  std::string base =
-      emulator_host && *emulator_host ? emulator_host : "https://storage.googleapis.com";
-  while (!base.empty() && base.back() == '/') base.pop_back();
-  const std::string url =
-      base + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" + UrlEncode(object) + "?alt=media";
-  const char* token = std::getenv("GOOGLE_OAUTH_ACCESS_TOKEN");
-  std::string authorization = token && *token ? std::string("Authorization: Bearer ") + token : "";
-  const std::string output_path = output.string();
-  std::vector<const char*> argv = {"curl",       "--fail",   "--silent",         "--show-error",
-                                   "--location", "--output", output_path.c_str()};
-  if (!authorization.empty()) {
-    argv.push_back("--header");
-    argv.push_back(authorization.c_str());
-  }
-  argv.push_back(url.c_str());
-  argv.push_back(nullptr);
-  const pid_t pid = fork();
-  if (pid < 0) throw ApiError::Internal("Could not start GCS download");
-  if (pid == 0) {
-    execvp("curl", const_cast<char* const*>(argv.data()));
-    _exit(127);
-  }
-  int status = 0;
-  if (waitpid(pid, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-    throw ApiError::Invalid("Could not read GCS object: " + uri);
-  }
 }
 
 struct DownloadedFiles {
@@ -559,7 +506,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
         close(fd);
         path = pattern;
         downloads.paths.push_back(path);
-        DownloadGcs(uri, std::filesystem::path(path));
+        DownloadGcsObject(uri, std::filesystem::path(path));
       } else if (uri.starts_with("file://")) {
         path = uri.substr(7);
       } else if (uri.find("://") == std::string::npos) {

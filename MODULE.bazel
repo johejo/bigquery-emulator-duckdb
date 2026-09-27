@@ -19,7 +19,10 @@ git_override(
     module_name = "bazel_clang_tidy",
     commit = "c4d35e0d0b838309358e57a2efed831780f85cd0",
     patch_strip = 1,
-    patches = ["//third_party/bazel_clang_tidy:cxx_include_order.patch"],
+    patches = [
+        "//third_party/bazel_clang_tidy:cxx_include_order.patch",
+        "//third_party/bazel_clang_tidy:apple_frameworks.patch",
+    ],
     remote = "https://github.com/erenon/bazel_clang_tidy.git",
 )
 

@@ -1,0 +1,16 @@
+diff --git a/clang_tidy/clang_tidy.bzl b/clang_tidy/clang_tidy.bzl
+--- a/clang_tidy/clang_tidy.bzl
++++ b/clang_tidy/clang_tidy.bzl
+@@ -199,6 +199,11 @@ def builtin_include_flags(cc_toolchain):
+ 
+     flags = []
+     for built_in_include_dir in cxx_dirs + other_dirs:
+-        flags.extend(["-isystem", built_in_include_dir])
++        # Framework directories, such as the macOS SDK's System/Library/Frameworks, are
++        # only searched for <Framework/Header.h> includes when given as framework paths.
++        if built_in_include_dir.endswith("Frameworks"):
++            flags.extend(["-iframework", built_in_include_dir])
++        else:
++            flags.extend(["-isystem", built_in_include_dir])
+     return flags
+ 
