@@ -27,6 +27,9 @@ build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
 # Keep the host PATH, which differs between runner images, out of action cache keys.
 build:ci --incompatible_strict_action_env
+# Keep CI logs readable while retaining warnings from this repository's C++ sources.
+build:ci --per_file_copt=external/.*@-w
+build:ci --host_per_file_copt=external/.*@-w
 test:ci --test_output=errors
 
 # Optional machine-specific settings (not checked into Git).
