@@ -9,10 +9,6 @@
 #include "nlohmann/json.hpp"
 #include "src/field_schema.h"
 
-namespace duckdb {
-class DuckDB;
-}  // namespace duckdb
-
 namespace bigquery_emulator_duckdb {
 
 // A materialized query result. Rows are already encoded in BigQuery's wire format
@@ -68,7 +64,8 @@ class Backend {
                                                          bool skip_invalid_rows);
 
  private:
-  std::unique_ptr<duckdb::DuckDB> db_;
+  struct Database;
+  std::unique_ptr<Database> db_;
 };
 
 // Executes `sql` against a throwaway in-memory database and returns the first cell as text.
