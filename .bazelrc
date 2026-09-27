@@ -10,6 +10,10 @@ build --action_env=TZDIR
 build --test_env=TZDIR
 
 # macOS build compatibility.
+build:macos --macos_sdk_version=26.5
+build:macos --repo_env=DEVELOPER_DIR
+build:macos --action_env=DEVELOPER_DIR
+build:macos --host_action_env=DEVELOPER_DIR
 build:macos --features=-header_modules
 build:macos --features=-layering_check
 build:macos --features=-parse_headers
@@ -18,6 +22,7 @@ build:macos --features=-parse_headers
 build:clang-tidy --aspects=@bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
+build:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=@llvm_toolchain//:clang-tidy
 # Report every file's findings in one run instead of stopping at the first failure.
 build:clang-tidy --keep_going
 

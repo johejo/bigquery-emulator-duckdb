@@ -104,6 +104,20 @@ The backend derives result schemas and encodes rows in the BigQuery wire format 
 
 ### Installation
 
+The C++ compiler and clang-tidy are LLVM 21.1.8, selected by Bazel. Nix provides
+development commands such as `bazelisk`, `just`, and `clang-format`; it does not
+supply the build compiler. On macOS, install Xcode Command Line Tools with the
+macOS 26.5 SDK. Its path must be
+`/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`. Select the Command
+Line Tools before running Bazel:
+
+```bash
+export DEVELOPER_DIR=/Library/Developer/CommandLineTools
+```
+
+CI checks that SDK path before building. Bazel uses it as the LLVM toolchain's
+sysroot and sets `--macos_sdk_version=26.5` for Apple build actions.
+
 Get bigquery-emulator-duckdb binary:
 
 ```bash

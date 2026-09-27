@@ -44,6 +44,11 @@ jobs:
           restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
       - name: Configure Bazel for CI
         run: echo 'common --config=ci' > .bazelrc.local
+      - name: Select macOS SDK toolchain
+        if: runner.os == 'macOS'
+        run: |
+          echo 'DEVELOPER_DIR=/Library/Developer/CommandLineTools' >> "$GITHUB_ENV"
+          test -d /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
       - name: Bazel tests
         run: nix develop --command just test
       - name: End-to-end tests
