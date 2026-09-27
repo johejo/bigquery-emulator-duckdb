@@ -5,10 +5,10 @@ module(
 
 bazel_dep(name = "cpp-httplib", version = "0.46.0")
 bazel_dep(name = "googlesql", version = "2026.9.2")
-bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 
 bazel_dep(name = "bazel_clang_tidy", dev_dependency = True)
-bazel_dep(name = "bazel_skylib", version = "1.6.1", dev_dependency = True)
+bazel_dep(name = "bazel_skylib", version = "1.8.2", dev_dependency = True)
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
