@@ -19,31 +19,18 @@ bazel_dep(name = "toolchains_llvm", version = "1.10.0")
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
     name = "llvm_toolchain",
-    # Match the installed SDK's TAPI format; LLVM 21's ld64.lld cannot read macOS 27 stubs.
+    # Use the host linker everywhere. On macOS it matches the installed SDK's TAPI format, which
+    # LLVM 21's ld64.lld cannot read for macOS 27 stubs. On Linux the official LLVM 23.1.0-23.1.2
+    # lld links ICU 70 dynamically and only runs on Ubuntu 22.04 (llvm/llvm-project#215764).
     linker = {
         "darwin-aarch64": "auto",
         "darwin-x86_64": "auto",
+        "linux-aarch64": "auto",
+        "linux-x86_64": "auto",
     },
-    llvm_version = "23.1.2",
-    # LLVM 23 is the first release whose Linux lld links libxml2 statically, so it runs on
-    # hosts without libxml2.so.2. toolchains_llvm picks the .tar.zst archives, but since 23.1.2
-    # (llvm/llvm-project#219587) they use a 1 GiB window (--long=30), and Bazel's zstd decoder
-    # only accepts up to 128 MiB; use the .tar.xz archives from the same release instead.
-    sha256 = {
-        "darwin-aarch64": "d7c26fc6177e42842e2d1ffaad31aec057c56a924392b1a23d830abe2c5d53b1",
-        "linux-aarch64": "075da47cb832273717d4c7bad4b6b4848d7c154262e9ba0dcc0025426d4073f0",
-        "linux-x86_64": "b5ed9675149cc837c282e9b6962c276c9fa62863d5b2f91537b60848552995b7",
-    },
-    strip_prefix = {
-        "darwin-aarch64": "LLVM-23.1.2-macOS-ARM64",
-        "linux-aarch64": "LLVM-23.1.2-Linux-ARM64",
-        "linux-x86_64": "LLVM-23.1.2-Linux-X64",
-    },
-    urls = {
-        "darwin-aarch64": ["https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/LLVM-23.1.2-macOS-ARM64.tar.xz"],
-        "linux-aarch64": ["https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/LLVM-23.1.2-Linux-ARM64.tar.xz"],
-        "linux-x86_64": ["https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/LLVM-23.1.2-Linux-X64.tar.xz"],
-    },
+    # Stay on 23.1.1: from 23.1.2 (llvm/llvm-project#219587) the .tar.zst archives use a 1 GiB
+    # window (--long=30), beyond Bazel's 128 MiB zstd limit.
+    llvm_version = "23.1.1",
 )
 use_repo(llvm, "llvm_toolchain")
 

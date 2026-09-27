@@ -104,7 +104,7 @@ The backend derives result schemas and encodes rows in the BigQuery wire format 
 
 ### Installation
 
-The C++ compiler and clang-tidy are LLVM 23.1.2, selected by Bazel. Nix provides
+The C++ compiler and clang-tidy are LLVM 23.1.1, selected by Bazel. Nix provides
 development commands such as `bazelisk`, `just`, and `clang-format`; it does not
 supply the build compiler. On macOS, install Xcode or Xcode Command Line Tools.
 Bazel uses the SDK and Apple linker selected by `xcrun`, which follows
