@@ -10,9 +10,6 @@ cc_import(
 
 cc_library(
     name = "duckdb",
-    hdrs = [
-        "duckdb.h",
-        "duckdb.hpp",
-    ],
+    hdrs = ["duckdb.h"],
     deps = [":libduckdb"],
 )

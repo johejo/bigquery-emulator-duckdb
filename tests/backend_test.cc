@@ -103,6 +103,98 @@ TEST(BackendTest, PreparesWithoutExecuting) {
   EXPECT_THROW(backend.Prepare("SELECT * FROM missing"), BackendError);
 }
 
+TEST(BackendTest, EncodesFixedArraysAndNullStructs) {
+  Backend backend;
+  const std::string sql = R"(
+      SELECT [{'x': 1}, {'x': NULL}]::STRUCT(x INTEGER)[2] AS a,
+             NULL::STRUCT(x INTEGER) AS s, NULL::INTEGER[2] AS n)";
+  const QueryResult result = backend.Execute(sql);
+  EXPECT_EQ(result.schema[0].type, "RECORD");
+  EXPECT_EQ(result.schema[0].mode, "REPEATED");
+  ASSERT_EQ(result.schema[0].fields.size(), 1);
+  EXPECT_EQ(result.schema[0].fields[0].type, "INTEGER");
+  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([
+      {"v": [{"v": {"f": [{"v": "1"}]}}, {"v": {"f": [{"v": null}]}}]},
+      {"v": null}, {"v": []}])"));
+  EXPECT_EQ(backend.Prepare(sql).SchemaToJson(), result.SchemaToJson());
+}
+
+TEST(BackendTest, PreservesBinaryStringsAndDecimalPrecision) {
+  Backend backend;
+  const QueryResult result = backend.Execute(R"(
+      SELECT chr(0) || 'abc' AS s, from_hex('00ff10') AS b,
+             ''::BLOB AS empty, 'a'::BLOB AS one, 'ab'::BLOB AS two,
+             -1.23::DECIMAL(4,2) AS d16, -12345.67::DECIMAL(9,2) AS d32,
+             -1234567890.123456::DECIMAL(18,6) AS d64,
+             -12345678901234567890.1234567890::DECIMAL(38,10) AS d128,
+             '00112233-4455-6677-8899-aabbccddeeff'::UUID AS uuid)");
+  EXPECT_EQ(result.rows[0]["f"][0]["v"], std::string("\0abc", 4));
+  EXPECT_EQ(result.rows[0]["f"][1]["v"], "AP8Q");
+  EXPECT_EQ(result.rows[0]["f"][2]["v"], "");
+  EXPECT_EQ(result.rows[0]["f"][3]["v"], "YQ==");
+  EXPECT_EQ(result.rows[0]["f"][4]["v"], "YWI=");
+  EXPECT_EQ(result.rows[0]["f"][5]["v"], "-1.23");
+  EXPECT_EQ(result.rows[0]["f"][6]["v"], "-12345.67");
+  EXPECT_EQ(result.rows[0]["f"][7]["v"], "-1234567890.123456");
+  EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.1234567890");
+  EXPECT_EQ(result.rows[0]["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
+  EXPECT_EQ(result.schema[8].type, "BIGNUMERIC");
+}
+
+TEST(BackendTest, FormatsOtherDuckDBScalarTypes) {
+  Backend backend;
+  const QueryResult result = backend.Execute(R"(
+      SELECT 'happy'::ENUM('sad', 'happy') AS e, '101'::BIT AS b,
+             MAP {'x': [1, NULL]} AS m, union_value(s := 'hello') AS u,
+             '18446744073709551615'::UBIGINT AS ui,
+             '-170141183460469231731687303715884105728'::HUGEINT AS hi,
+             TIMESTAMP_NS '2020-01-02 03:04:05.123456789' AS ns,
+             TIMESTAMP_NS 'infinity' AS inf)");
+  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([
+      {"v": "happy"}, {"v": "101"}, {"v": "{x=[1, NULL]}"}, {"v": "hello"},
+      {"v": "18446744073709551615"}, {"v": "-170141183460469231731687303715884105728"},
+      {"v": "2020-01-02T03:04:05.123456"}, {"v": "infinity"}])"));
+}
+
+TEST(BackendTest, ReadsMultipleChunks) {
+  Backend backend;
+  const QueryResult result = backend.Execute("SELECT i, [i, NULL] AS a FROM range(5000) t(i)");
+  ASSERT_EQ(result.rows.size(), 5000);
+  for (size_t i = 0; i < result.rows.size(); ++i) {
+    EXPECT_EQ(result.rows[i]["f"][0]["v"], std::to_string(i));
+    EXPECT_EQ(result.rows[i]["f"][1]["v"][0]["v"], std::to_string(i));
+    EXPECT_TRUE(result.rows[i]["f"][1]["v"][1]["v"].is_null());
+  }
+}
+
+TEST(BackendTest, RollsBackFailedTransactionsAndCanSkipInvalidRows) {
+  Backend backend;
+  backend.Execute("CREATE TABLE t (id INTEGER PRIMARY KEY)");
+  EXPECT_THROW(backend.ExecuteAll({"BEGIN", "INSERT INTO t VALUES (1)", "SELECT * FROM missing"}),
+               BackendError);
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "0");
+  const std::vector<std::string> statements = {
+      "INSERT INTO t VALUES (1)", "INSERT INTO t VALUES (1)", "INSERT INTO t VALUES (2)"};
+  auto errors = backend.InsertRows(statements, false);
+  ASSERT_EQ(errors.size(), 1);
+  EXPECT_EQ(errors[0].first, 1);
+  EXPECT_FALSE(errors[0].second.empty());
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "0");
+  errors = backend.InsertRows(statements, true);
+  ASSERT_EQ(errors.size(), 1);
+  EXPECT_EQ(errors[0].first, 1);
+  EXPECT_EQ(backend.Execute("UPDATE t SET id = id + 10").affected_rows, 2);
+  EXPECT_EQ(backend.Execute("DELETE FROM t WHERE id = 999").affected_rows, 0);
+  EXPECT_EQ(backend.Execute("DELETE FROM t").affected_rows, 2);
+}
+
+TEST(BackendTest, ScalarHelperHandlesNullEmptyAndErrors) {
+  EXPECT_EQ(ExecuteScalarString("SELECT NULL"), "NULL");
+  EXPECT_EQ(ExecuteScalarString("SELECT chr(0) || 'x'"), std::string("\0x", 2));
+  EXPECT_THROW(ExecuteScalarString("SELECT 1 WHERE false"), BackendError);
+  EXPECT_THROW(ExecuteScalarString("SELECT * FROM missing"), BackendError);
+}
+
 TEST(BackendTest, ThrowsOnError) {
   Backend backend;
   EXPECT_THROW(backend.Execute("SELECT * FROM missing"), BackendError);

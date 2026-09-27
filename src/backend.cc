@@ -1,12 +1,13 @@
 #include "src/backend.h"
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "duckdb.hpp"
+#include "duckdb.h"
 #include "nlohmann/json.hpp"
 
 namespace bigquery_emulator_duckdb {
@@ -14,82 +15,119 @@ namespace {
 
 using nlohmann::json;
 
-FieldSchema ToFieldSchema(const std::string& name, const duckdb::LogicalType& type);
+// C API handles must be released even when materialization or a query throws.
+template <typename T, void (*Destroy)(T*)>
+class Handle {
+ public:
+  explicit Handle(T handle = nullptr) : handle_(handle) {}
+  ~Handle() { Destroy(&handle_); }
+  Handle(Handle&& other) noexcept : handle_(other.release()) {}
+  Handle(const Handle&) = delete;
+  Handle& operator=(const Handle&) = delete;
+  T get() const { return handle_; }
+  T* out() { return &handle_; }
+  T release() { return std::exchange(handle_, nullptr); }
+
+ private:
+  T handle_;
+};
+
+using LogicalType = Handle<duckdb_logical_type, duckdb_destroy_logical_type>;
+using Value = Handle<duckdb_value, duckdb_destroy_value>;
+using Connection = Handle<duckdb_connection, duckdb_disconnect>;
+using Prepared = Handle<duckdb_prepared_statement, duckdb_destroy_prepare>;
+using Chunk = Handle<duckdb_data_chunk, duckdb_destroy_data_chunk>;
+struct DuckFree {
+  void operator()(const void* pointer) const { duckdb_free(const_cast<void*>(pointer)); }
+};
+using DuckString = std::unique_ptr<const char, DuckFree>;
+
+struct Result {
+  duckdb_result result{};
+  ~Result() { duckdb_destroy_result(&result); }
+  Result() = default;
+  Result(const Result&) = delete;
+  Result& operator=(const Result&) = delete;
+};
+
+LogicalType ElementType(duckdb_logical_type type) {
+  return LogicalType(duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY
+                         ? duckdb_array_type_child_type(type)
+                         : duckdb_list_type_child_type(type));
+}
+
+FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type);
 
 // Maps a DuckDB type to the BigQuery type name used in TableFieldSchema.type.
-std::string ToBigQueryTypeName(const duckdb::LogicalType& type) {
-  switch (type.id()) {
-    case duckdb::LogicalTypeId::BOOLEAN:
+std::string ToBigQueryTypeName(duckdb_logical_type type) {
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_BOOLEAN:
       return "BOOLEAN";
-    case duckdb::LogicalTypeId::TINYINT:
-    case duckdb::LogicalTypeId::SMALLINT:
-    case duckdb::LogicalTypeId::INTEGER:
-    case duckdb::LogicalTypeId::BIGINT:
-    case duckdb::LogicalTypeId::UTINYINT:
-    case duckdb::LogicalTypeId::USMALLINT:
-    case duckdb::LogicalTypeId::UINTEGER:
-    case duckdb::LogicalTypeId::UBIGINT:
+    case DUCKDB_TYPE_TINYINT:
+    case DUCKDB_TYPE_SMALLINT:
+    case DUCKDB_TYPE_INTEGER:
+    case DUCKDB_TYPE_BIGINT:
+    case DUCKDB_TYPE_UTINYINT:
+    case DUCKDB_TYPE_USMALLINT:
+    case DUCKDB_TYPE_UINTEGER:
+    case DUCKDB_TYPE_UBIGINT:
       return "INTEGER";
-    case duckdb::LogicalTypeId::HUGEINT:
-    case duckdb::LogicalTypeId::UHUGEINT:
+    case DUCKDB_TYPE_HUGEINT:
+    case DUCKDB_TYPE_UHUGEINT:
       return "BIGNUMERIC";
-    case duckdb::LogicalTypeId::FLOAT:
-    case duckdb::LogicalTypeId::DOUBLE:
+    case DUCKDB_TYPE_FLOAT:
+    case DUCKDB_TYPE_DOUBLE:
       return "FLOAT";
-    case duckdb::LogicalTypeId::DECIMAL:
-      return duckdb::DecimalType::GetScale(type) <= 9 ? "NUMERIC" : "BIGNUMERIC";
-    case duckdb::LogicalTypeId::VARCHAR:
-    case duckdb::LogicalTypeId::UUID:
+    case DUCKDB_TYPE_DECIMAL:
+      return duckdb_decimal_scale(type) <= 9 ? "NUMERIC" : "BIGNUMERIC";
+    case DUCKDB_TYPE_VARCHAR:
+    case DUCKDB_TYPE_UUID:
       return "STRING";
-    case duckdb::LogicalTypeId::BLOB:
+    case DUCKDB_TYPE_BLOB:
       return "BYTES";
-    case duckdb::LogicalTypeId::DATE:
+    case DUCKDB_TYPE_DATE:
       return "DATE";
-    case duckdb::LogicalTypeId::TIME:
-    case duckdb::LogicalTypeId::TIME_TZ:
+    case DUCKDB_TYPE_TIME:
+    case DUCKDB_TYPE_TIME_TZ:
       return "TIME";
     // BigQuery TIMESTAMP is an absolute instant, which is DuckDB's TIMESTAMP WITH TIME ZONE.
     // BigQuery DATETIME is a civil time, which is DuckDB's plain TIMESTAMP.
-    case duckdb::LogicalTypeId::TIMESTAMP_TZ:
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
       return "TIMESTAMP";
-    case duckdb::LogicalTypeId::TIMESTAMP:
-    case duckdb::LogicalTypeId::TIMESTAMP_SEC:
-    case duckdb::LogicalTypeId::TIMESTAMP_MS:
-    case duckdb::LogicalTypeId::TIMESTAMP_NS:
+    case DUCKDB_TYPE_TIMESTAMP:
+    case DUCKDB_TYPE_TIMESTAMP_S:
+    case DUCKDB_TYPE_TIMESTAMP_MS:
+    case DUCKDB_TYPE_TIMESTAMP_NS:
       return "DATETIME";
-    case duckdb::LogicalTypeId::INTERVAL:
+    case DUCKDB_TYPE_INTERVAL:
       return "INTERVAL";
-    case duckdb::LogicalTypeId::STRUCT:
+    case DUCKDB_TYPE_STRUCT:
       return "RECORD";
-    case duckdb::LogicalTypeId::LIST:
-    case duckdb::LogicalTypeId::ARRAY:
-      return ToBigQueryTypeName(duckdb::ListType::GetChildType(type));
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY:
+      return ToBigQueryTypeName(ElementType(type).get());
     default:
-      if (type.IsJSONType()) {
-        return "JSON";
-      }
       return "STRING";
   }
 }
 
-bool IsListLike(const duckdb::LogicalType& type) {
-  return type.id() == duckdb::LogicalTypeId::LIST || type.id() == duckdb::LogicalTypeId::ARRAY;
+bool IsListLike(duckdb_logical_type type) {
+  return duckdb_get_type_id(type) == DUCKDB_TYPE_LIST ||
+         duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
 }
 
-const duckdb::LogicalType& ElementType(const duckdb::LogicalType& type) {
-  return type.id() == duckdb::LogicalTypeId::ARRAY ? duckdb::ArrayType::GetChildType(type)
-                                                   : duckdb::ListType::GetChildType(type);
-}
-
-FieldSchema ToFieldSchema(const std::string& name, const duckdb::LogicalType& type) {
+FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   FieldSchema field;
   field.name = name;
   field.type = ToBigQueryTypeName(type);
   field.mode = IsListLike(type) ? "REPEATED" : "NULLABLE";
-  const duckdb::LogicalType& scalar_type = IsListLike(type) ? ElementType(type) : type;
-  if (scalar_type.id() == duckdb::LogicalTypeId::STRUCT) {
-    for (const auto& [child_name, child_type] : duckdb::StructType::GetChildTypes(scalar_type)) {
-      field.fields.push_back(ToFieldSchema(child_name, child_type));
+  LogicalType element(IsListLike(type) ? ElementType(type).release() : nullptr);
+  duckdb_logical_type scalar_type = element.get() ? element.get() : type;
+  if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
+    for (idx_t i = 0; i < duckdb_struct_type_child_count(scalar_type); ++i) {
+      DuckString child_name(duckdb_struct_type_child_name(scalar_type, i));
+      LogicalType child_type(duckdb_struct_type_child_type(scalar_type, i));
+      field.fields.push_back(ToFieldSchema(child_name.get(), child_type.get()));
     }
   }
   return field;
@@ -115,77 +153,291 @@ std::string EpochSecondsString(int64_t micros) {
   return result;
 }
 
-json ToCell(const duckdb::Value& value);
+template <typename T>
+T VectorElement(duckdb_vector vector, idx_t row) {
+  return static_cast<const T*>(duckdb_vector_get_data(vector))[row];
+}
 
-// Encodes a scalar (non-list) DuckDB value as the "v" member of a BigQuery cell.
-json ScalarToCellValue(const duckdb::Value& value) {
-  if (value.IsNull()) {
-    return nullptr;
+std::string VectorString(duckdb_vector vector, idx_t row) {
+  duckdb_string_t value = VectorElement<duckdb_string_t>(vector, row);
+  return {duckdb_string_t_data(&value), duckdb_string_t_length(value)};
+}
+
+std::string ValueString(duckdb_value value) {
+  DuckString text(duckdb_get_varchar(value));
+  if (!text) {
+    throw BackendError("DuckDB failed to format a value");
   }
-  const duckdb::LogicalType& type = value.type();
-  switch (type.id()) {
-    case duckdb::LogicalTypeId::BOOLEAN:
-      return value.GetValue<bool>() ? "true" : "false";
-    case duckdb::LogicalTypeId::BLOB:
-      return duckdb::Blob::ToBase64(duckdb::string_t(duckdb::StringValue::Get(value)));
-    case duckdb::LogicalTypeId::TIMESTAMP_TZ:
-      // Kept as epoch microseconds, which is what clients asking for
-      // formatOptions.useInt64Timestamp want; `TimestampsAsSeconds` produces the other
-      // spelling for everyone else.
-      return std::to_string(value.GetValueUnsafe<duckdb::timestamp_t>().value);
-    case duckdb::LogicalTypeId::TIMESTAMP:
-    case duckdb::LogicalTypeId::TIMESTAMP_SEC:
-    case duckdb::LogicalTypeId::TIMESTAMP_MS:
-    case duckdb::LogicalTypeId::TIMESTAMP_NS: {
-      // DATETIME uses ISO 8601 with a "T" separator and no zone.
-      std::string text = value.DefaultCastAs(duckdb::LogicalType::TIMESTAMP).ToString();
-      if (text.size() > 10 && text[10] == ' ') {
-        text[10] = 'T';
+  return text.get();
+}
+
+std::string Base64(const std::string& bytes) {
+  static constexpr char alphabet[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string result;
+  for (size_t i = 0; i < bytes.size(); i += 3) {
+    const auto a = static_cast<unsigned char>(bytes[i]);
+    const auto b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes[i + 1]) : 0;
+    const auto c = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes[i + 2]) : 0;
+    result += alphabet[a >> 2];
+    result += alphabet[((a & 3) << 4) | (b >> 4)];
+    result += i + 1 < bytes.size() ? alphabet[((b & 15) << 2) | (c >> 6)] : '=';
+    result += i + 2 < bytes.size() ? alphabet[c & 63] : '=';
+  }
+  return result;
+}
+
+// Reconstruct values through the C API so DuckDB formats scalar values itself.
+Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
+  uint64_t* validity = duckdb_vector_get_validity(vector);
+  if (validity && !duckdb_validity_row_is_valid(validity, row)) {
+    return Value(duckdb_create_null_value());
+  }
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_BOOLEAN:
+      return Value(duckdb_create_bool(VectorElement<bool>(vector, row)));
+    case DUCKDB_TYPE_TINYINT:
+      return Value(duckdb_create_int8(VectorElement<int8_t>(vector, row)));
+    case DUCKDB_TYPE_SMALLINT:
+      return Value(duckdb_create_int16(VectorElement<int16_t>(vector, row)));
+    case DUCKDB_TYPE_INTEGER:
+      return Value(duckdb_create_int32(VectorElement<int32_t>(vector, row)));
+    case DUCKDB_TYPE_BIGINT:
+      return Value(duckdb_create_int64(VectorElement<int64_t>(vector, row)));
+    case DUCKDB_TYPE_UTINYINT:
+      return Value(duckdb_create_uint8(VectorElement<uint8_t>(vector, row)));
+    case DUCKDB_TYPE_USMALLINT:
+      return Value(duckdb_create_uint16(VectorElement<uint16_t>(vector, row)));
+    case DUCKDB_TYPE_UINTEGER:
+      return Value(duckdb_create_uint32(VectorElement<uint32_t>(vector, row)));
+    case DUCKDB_TYPE_UBIGINT:
+      return Value(duckdb_create_uint64(VectorElement<uint64_t>(vector, row)));
+    case DUCKDB_TYPE_HUGEINT:
+      return Value(duckdb_create_hugeint(VectorElement<duckdb_hugeint>(vector, row)));
+    case DUCKDB_TYPE_UHUGEINT:
+      return Value(duckdb_create_uhugeint(VectorElement<duckdb_uhugeint>(vector, row)));
+    case DUCKDB_TYPE_FLOAT:
+      return Value(duckdb_create_float(VectorElement<float>(vector, row)));
+    case DUCKDB_TYPE_DOUBLE:
+      return Value(duckdb_create_double(VectorElement<double>(vector, row)));
+    case DUCKDB_TYPE_DATE:
+      return Value(duckdb_create_date(VectorElement<duckdb_date>(vector, row)));
+    case DUCKDB_TYPE_TIME:
+      return Value(duckdb_create_time(VectorElement<duckdb_time>(vector, row)));
+    case DUCKDB_TYPE_TIME_NS:
+      return Value(duckdb_create_time_ns(VectorElement<duckdb_time_ns>(vector, row)));
+    case DUCKDB_TYPE_TIME_TZ:
+      return Value(duckdb_create_time_tz_value(VectorElement<duckdb_time_tz>(vector, row)));
+    case DUCKDB_TYPE_TIMESTAMP:
+      return Value(duckdb_create_timestamp(VectorElement<duckdb_timestamp>(vector, row)));
+    case DUCKDB_TYPE_TIMESTAMP_S:
+      return Value(duckdb_create_timestamp_s(VectorElement<duckdb_timestamp_s>(vector, row)));
+    case DUCKDB_TYPE_TIMESTAMP_MS:
+      return Value(duckdb_create_timestamp_ms(VectorElement<duckdb_timestamp_ms>(vector, row)));
+    case DUCKDB_TYPE_TIMESTAMP_NS:
+      return Value(duckdb_create_timestamp_ns(VectorElement<duckdb_timestamp_ns>(vector, row)));
+    case DUCKDB_TYPE_INTERVAL:
+      return Value(duckdb_create_interval(VectorElement<duckdb_interval>(vector, row)));
+    case DUCKDB_TYPE_DECIMAL: {
+      duckdb_hugeint number{};
+      switch (duckdb_decimal_internal_type(type)) {
+        case DUCKDB_TYPE_SMALLINT: {
+          const int64_t value = VectorElement<int16_t>(vector, row);
+          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          break;
+        }
+        case DUCKDB_TYPE_INTEGER: {
+          const int64_t value = VectorElement<int32_t>(vector, row);
+          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          break;
+        }
+        case DUCKDB_TYPE_BIGINT: {
+          const int64_t value = VectorElement<int64_t>(vector, row);
+          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          break;
+        }
+        default:
+          number = VectorElement<duckdb_hugeint>(vector, row);
       }
-      return text;
+      return Value(
+          duckdb_create_decimal({duckdb_decimal_width(type), duckdb_decimal_scale(type), number}));
     }
-    case duckdb::LogicalTypeId::STRUCT: {
-      json fields = json::array();
-      for (const duckdb::Value& child : duckdb::StructValue::GetChildren(value)) {
-        fields.push_back(ToCell(child));
+    case DUCKDB_TYPE_ENUM: {
+      uint64_t index = 0;
+      switch (duckdb_enum_internal_type(type)) {
+        case DUCKDB_TYPE_UTINYINT:
+          index = VectorElement<uint8_t>(vector, row);
+          break;
+        case DUCKDB_TYPE_USMALLINT:
+          index = VectorElement<uint16_t>(vector, row);
+          break;
+        default:
+          index = VectorElement<uint32_t>(vector, row);
       }
-      return json{{"f", std::move(fields)}};
+      return Value(duckdb_create_enum_value(type, index));
+    }
+    case DUCKDB_TYPE_UUID: {
+      const auto uuid = VectorElement<duckdb_hugeint>(vector, row);
+      return Value(duckdb_create_uuid(
+          {uuid.lower, static_cast<uint64_t>(uuid.upper) ^ (uint64_t{1} << 63)}));
+    }
+    case DUCKDB_TYPE_VARCHAR: {
+      const std::string text = VectorString(vector, row);
+      return Value(duckdb_create_varchar_length(text.data(), text.size()));
+    }
+    case DUCKDB_TYPE_BLOB: {
+      const std::string bytes = VectorString(vector, row);
+      return Value(
+          duckdb_create_blob(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()));
+    }
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+      return Value(duckdb_create_timestamp_tz(VectorElement<duckdb_timestamp>(vector, row)));
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY: {
+      const bool array = duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
+      const idx_t size = array ? duckdb_array_type_array_size(type) : 0;
+      const duckdb_list_entry entry = array ? duckdb_list_entry{row * size, size}
+                                            : VectorElement<duckdb_list_entry>(vector, row);
+      duckdb_vector child =
+          array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
+      LogicalType child_type = ElementType(type);
+      std::vector<Value> values;
+      std::vector<duckdb_value> handles;
+      for (idx_t i = 0; i < entry.length; ++i) {
+        values.push_back(VectorValue(child, child_type.get(), entry.offset + i));
+        handles.push_back(values.back().get());
+      }
+      return Value(
+          array ? duckdb_create_array_value(child_type.get(), handles.data(), handles.size())
+                : duckdb_create_list_value(child_type.get(), handles.data(), handles.size()));
+    }
+    case DUCKDB_TYPE_STRUCT: {
+      std::vector<Value> values;
+      std::vector<duckdb_value> handles;
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType child_type(duckdb_struct_type_child_type(type, i));
+        values.push_back(
+            VectorValue(duckdb_struct_vector_get_child(vector, i), child_type.get(), row));
+        handles.push_back(values.back().get());
+      }
+      return Value(duckdb_create_struct_value(type, handles.data()));
+    }
+    case DUCKDB_TYPE_MAP: {
+      const auto entry = VectorElement<duckdb_list_entry>(vector, row);
+      duckdb_vector entries = duckdb_list_vector_get_child(vector);
+      LogicalType key_type(duckdb_map_type_key_type(type));
+      LogicalType value_type(duckdb_map_type_value_type(type));
+      std::vector<Value> values;
+      std::vector<duckdb_value> keys;
+      std::vector<duckdb_value> mapped;
+      for (idx_t i = 0; i < entry.length; ++i) {
+        values.push_back(VectorValue(duckdb_struct_vector_get_child(entries, 0), key_type.get(),
+                                     entry.offset + i));
+        keys.push_back(values.back().get());
+        values.push_back(VectorValue(duckdb_struct_vector_get_child(entries, 1), value_type.get(),
+                                     entry.offset + i));
+        mapped.push_back(values.back().get());
+      }
+      return Value(duckdb_create_map_value(type, keys.data(), mapped.data(), entry.length));
+    }
+    case DUCKDB_TYPE_UNION: {
+      const auto tag = VectorElement<uint8_t>(duckdb_struct_vector_get_child(vector, 0), row);
+      LogicalType member_type(duckdb_union_type_member_type(type, tag));
+      Value member =
+          VectorValue(duckdb_struct_vector_get_child(vector, tag + 1), member_type.get(), row);
+      return Value(duckdb_create_union_value(type, tag, member.get()));
+    }
+    case DUCKDB_TYPE_BIT: {
+      std::string bytes = VectorString(vector, row);
+      return Value(duckdb_create_bit({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size()}));
     }
     default:
-      return value.ToString();
+      throw BackendError("Unsupported DuckDB result type: " +
+                         std::to_string(duckdb_get_type_id(type)));
   }
 }
 
-json ToCell(const duckdb::Value& value) {
-  json cell;
-  if (IsListLike(value.type())) {
-    cell["v"] = json::array();
-    if (!value.IsNull()) {
-      for (const auto& element : duckdb::ListValue::GetChildren(value)) {
-        cell["v"].push_back(json{{"v", ScalarToCellValue(element)}});
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
+  uint64_t* validity = duckdb_vector_get_validity(vector);
+  const bool is_null = validity && !duckdb_validity_row_is_valid(validity, row);
+  if (IsListLike(type)) {
+    json elements = json::array();
+    if (!is_null) {
+      LogicalType child_type = ElementType(type);
+      const bool array = duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
+      const idx_t size = array ? duckdb_array_type_array_size(type) : 0;
+      const duckdb_list_entry entry = array ? duckdb_list_entry{row * size, size}
+                                            : VectorElement<duckdb_list_entry>(vector, row);
+      duckdb_vector child =
+          array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
+      for (idx_t i = 0; i < entry.length; ++i) {
+        elements.push_back(ToCell(child, child_type.get(), entry.offset + i));
       }
     }
-  } else {
-    cell["v"] = ScalarToCellValue(value);
+    return json{{"v", std::move(elements)}};
   }
-  return cell;
+  if (is_null) {
+    return json{{"v", nullptr}};
+  }
+  json value;
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_STRUCT: {
+      json fields = json::array();
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType child_type(duckdb_struct_type_child_type(type, i));
+        fields.push_back(ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row));
+      }
+      value = json{{"f", std::move(fields)}};
+      break;
+    }
+    case DUCKDB_TYPE_VARCHAR:
+      value = VectorString(vector, row);
+      break;
+    case DUCKDB_TYPE_BLOB:
+      value = Base64(VectorString(vector, row));
+      break;
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+      // Keep epoch microseconds internally for formatOptions.useInt64Timestamp.
+      value = std::to_string(VectorElement<duckdb_timestamp>(vector, row).micros);
+      break;
+    case DUCKDB_TYPE_TIMESTAMP:
+    case DUCKDB_TYPE_TIMESTAMP_S:
+    case DUCKDB_TYPE_TIMESTAMP_MS:
+    case DUCKDB_TYPE_TIMESTAMP_NS: {
+      std::string text;
+      if (duckdb_get_type_id(type) == DUCKDB_TYPE_TIMESTAMP_NS) {
+        // Match a cast to microsecond TIMESTAMP, including truncation before the epoch.
+        const int64_t nanos = VectorElement<duckdb_timestamp_ns>(vector, row).nanos;
+        const bool infinite = nanos == std::numeric_limits<int64_t>::max() ||
+                              nanos == -std::numeric_limits<int64_t>::max();
+        Value timestamp(duckdb_create_timestamp({infinite ? nanos : nanos / 1000}));
+        text = ValueString(timestamp.get());
+      } else {
+        text = ValueString(VectorValue(vector, type, row).get());
+      }
+      if (text.size() > 10 && text[10] == ' ') {
+        text[10] = 'T';
+      }
+      value = std::move(text);
+      break;
+    }
+    default:
+      value = ValueString(VectorValue(vector, type, row).get());
+  }
+  return json{{"v", std::move(value)}};
 }
 
 // Statements that produce a result set. Everything else (DDL, DML, SET, ...) yields a
 // single "Count" or "Success" column that is not part of the BigQuery result.
-bool ProducesResultSet(duckdb::StatementType type) {
-  return type == duckdb::StatementType::SELECT_STATEMENT ||
-         type == duckdb::StatementType::EXPLAIN_STATEMENT ||
-         type == duckdb::StatementType::PRAGMA_STATEMENT ||
-         type == duckdb::StatementType::CALL_STATEMENT ||
-         type == duckdb::StatementType::EXECUTE_STATEMENT;
+bool ProducesResultSet(duckdb_statement_type type) {
+  return type == DUCKDB_STATEMENT_TYPE_SELECT || type == DUCKDB_STATEMENT_TYPE_EXPLAIN ||
+         type == DUCKDB_STATEMENT_TYPE_PRAGMA || type == DUCKDB_STATEMENT_TYPE_CALL ||
+         type == DUCKDB_STATEMENT_TYPE_EXECUTE;
 }
 
-bool IsDml(duckdb::StatementType type) {
-  return type == duckdb::StatementType::INSERT_STATEMENT ||
-         type == duckdb::StatementType::UPDATE_STATEMENT ||
-         type == duckdb::StatementType::DELETE_STATEMENT ||
-         type == duckdb::StatementType::MERGE_INTO_STATEMENT;
+bool IsDml(duckdb_statement_type type) {
+  return type == DUCKDB_STATEMENT_TYPE_INSERT || type == DUCKDB_STATEMENT_TYPE_UPDATE ||
+         type == DUCKDB_STATEMENT_TYPE_DELETE || type == DUCKDB_STATEMENT_TYPE_MERGE_INTO;
 }
 
 json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells);
@@ -222,18 +474,23 @@ json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
   return result;
 }
 
-void ThrowIfFailed(const std::unique_ptr<duckdb::MaterializedQueryResult>& result) {
-  if (!result || result->HasError()) {
-    throw BackendError(result ? result->GetError() : "DuckDB query failed");
+void Query(duckdb_connection connection, const std::string& sql, Result& result) {
+  if (duckdb_query(connection, sql.c_str(), &result.result) == DuckDBError) {
+    const char* error = duckdb_result_error(&result.result);
+    throw BackendError(error ? error : "DuckDB query failed");
   }
 }
 
-// Prepares a fresh connection: BigQuery evaluates timestamps in UTC, and `setup` (such as
-// temporary functions) must precede the statement on the same connection.
-void RunSetup(duckdb::Connection& connection, const std::vector<std::string>& setup) {
-  ThrowIfFailed(connection.Query("SET TimeZone = 'UTC'"));
+void Query(duckdb_connection connection, const std::string& sql) {
+  Result result;
+  Query(connection, sql, result);
+}
+
+// BigQuery evaluates timestamps in UTC; setup must run on the same connection.
+void RunSetup(duckdb_connection connection, const std::vector<std::string>& setup) {
+  Query(connection, "SET TimeZone = 'UTC'");
   for (const std::string& statement : setup) {
-    ThrowIfFailed(connection.Query(statement));
+    Query(connection, statement);
   }
 }
 
@@ -254,7 +511,27 @@ json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row
   return json{{"f", CellsAsSeconds(schema, row.at("f"))}};
 }
 
-Backend::Backend() : db_(std::make_unique<duckdb::DuckDB>(nullptr)) {}
+struct Backend::Database {
+  Handle<duckdb_database, duckdb_close> handle;
+  Database() {
+    char* error = nullptr;
+    const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), nullptr, &error);
+    DuckString message(error);
+    if (state == DuckDBError) {
+      throw BackendError(message ? message.get() : "DuckDB failed to open database");
+    }
+  }
+
+  Connection Connect() const {
+    Connection connection;
+    if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
+      throw BackendError("DuckDB failed to connect");
+    }
+    return Connection(connection.release());
+  }
+};
+
+Backend::Backend() : db_(std::make_unique<Database>()) {}
 
 Backend::~Backend() = default;
 
@@ -268,93 +545,121 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   if (statements.empty()) {
     throw BackendError("No statement to execute");
   }
-  duckdb::Connection connection(*db_);
-  RunSetup(connection, setup);
+  Connection connection = db_->Connect();
+  RunSetup(connection.get(), setup);
   // A transaction left open by a failed statement is rolled back when the connection closes.
   for (size_t i = 0; i + 1 < statements.size(); ++i) {
-    ThrowIfFailed(connection.Query(statements[i]));
+    Query(connection.get(), statements[i]);
   }
-  std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(statements.back());
-  ThrowIfFailed(result);
-
+  Result result;
+  Query(connection.get(), statements.back(), result);
+  const auto statement_type = duckdb_result_statement_type(result.result);
   QueryResult query_result;
-  if (!ProducesResultSet(result->statement_type)) {
-    if (IsDml(result->statement_type) && result->ColumnCount() == 1 && result->RowCount() > 0) {
-      query_result.affected_rows = result->GetValue<int64_t>(0, 0);
+  if (!ProducesResultSet(statement_type)) {
+    if (IsDml(statement_type)) {
+      query_result.affected_rows = static_cast<int64_t>(duckdb_rows_changed(&result.result));
     }
     return query_result;
   }
   query_result.has_rows = true;
-  for (size_t i = 0; i < result->ColumnCount(); ++i) {
-    query_result.schema.push_back(ToFieldSchema(result->names[i], result->types[i]));
+  for (idx_t i = 0; i < duckdb_column_count(&result.result); ++i) {
+    LogicalType type(duckdb_column_logical_type(&result.result, i));
+    query_result.schema.push_back(ToFieldSchema(duckdb_column_name(&result.result, i), type.get()));
   }
-  for (size_t row = 0; row < result->RowCount(); ++row) {
-    json cells = json::array();
-    for (size_t column = 0; column < result->ColumnCount(); ++column) {
-      cells.push_back(ToCell(result->GetValue(column, row)));
+  while (true) {
+    Chunk chunk(duckdb_fetch_chunk(result.result));
+    if (!chunk.get()) {
+      break;
     }
-    query_result.rows.push_back(json{{"f", std::move(cells)}});
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(chunk.get()); ++row) {
+      json cells = json::array();
+      for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(chunk.get()); ++column) {
+        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), column);
+        LogicalType type(duckdb_vector_get_column_type(vector));
+        cells.push_back(ToCell(vector, type.get(), row));
+      }
+      query_result.rows.push_back(json{{"f", std::move(cells)}});
+    }
   }
   return query_result;
 }
 
 QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
-  duckdb::Connection connection(*db_);
-  RunSetup(connection, setup);
+  Connection connection = db_->Connect();
+  RunSetup(connection.get(), setup);
   // Preparing binds names and types without running the statement, which is what a dry run
   // needs: the query is validated and its result schema is known, but nothing is read or
   // written.
-  std::unique_ptr<duckdb::PreparedStatement> prepared = connection.Prepare(sql);
-  if (!prepared || prepared->HasError()) {
-    throw BackendError(prepared ? prepared->GetError() : "DuckDB failed to prepare the query");
+  Prepared prepared;
+  if (duckdb_prepare(connection.get(), sql.c_str(), prepared.out()) == DuckDBError) {
+    const char* error = duckdb_prepare_error(prepared.get());
+    throw BackendError(error ? error : "DuckDB failed to prepare the query");
   }
 
   QueryResult query_result;
-  if (!ProducesResultSet(prepared->GetStatementType())) {
+  if (!ProducesResultSet(duckdb_prepared_statement_type(prepared.get()))) {
     return query_result;
   }
   query_result.has_rows = true;
-  const std::vector<std::string>& names = prepared->GetNames();
-  const std::vector<duckdb::LogicalType>& types = prepared->GetTypes();
-  for (size_t i = 0; i < names.size(); ++i) {
-    query_result.schema.push_back(ToFieldSchema(names[i], types[i]));
+  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
+    DuckString name(duckdb_prepared_statement_column_name(prepared.get(), i));
+    LogicalType type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
+    query_result.schema.push_back(ToFieldSchema(name.get(), type.get()));
   }
   return query_result;
 }
 
 std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     const std::vector<std::string>& statements, bool skip_invalid_rows) {
-  duckdb::Connection connection(*db_);
-  RunSetup(connection, {});
+  Connection connection = db_->Connect();
+  RunSetup(connection.get(), {});
   std::vector<std::pair<size_t, std::string>> errors;
   if (!skip_invalid_rows) {
-    ThrowIfFailed(connection.Query("BEGIN TRANSACTION"));
+    Query(connection.get(), "BEGIN TRANSACTION");
   }
   for (size_t i = 0; i < statements.size(); ++i) {
-    std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(statements[i]);
-    if (!result || result->HasError()) {
-      errors.emplace_back(i, result ? result->GetError() : "DuckDB insert failed");
+    Result result;
+    if (duckdb_query(connection.get(), statements[i].c_str(), &result.result) == DuckDBError) {
+      const char* error = duckdb_result_error(&result.result);
+      errors.emplace_back(i, error ? error : "DuckDB insert failed");
       if (!skip_invalid_rows) {
-        ThrowIfFailed(connection.Query("ROLLBACK"));
+        Query(connection.get(), "ROLLBACK");
         return errors;
       }
     }
   }
   if (!skip_invalid_rows) {
-    ThrowIfFailed(connection.Query("COMMIT"));
+    Query(connection.get(), "COMMIT");
   }
   return errors;
 }
 
 std::string ExecuteScalarString(const std::string& sql) {
-  duckdb::DuckDB db(nullptr);
-  duckdb::Connection connection(db);
-  std::unique_ptr<duckdb::MaterializedQueryResult> result = connection.Query(sql);
-  ThrowIfFailed(result);
-  if (result->RowCount() == 0 || result->ColumnCount() == 0) {
+  Handle<duckdb_database, duckdb_close> database;
+  if (duckdb_open(nullptr, database.out()) == DuckDBError) {
+    throw BackendError("DuckDB failed to open database");
+  }
+  Connection connection;
+  if (duckdb_connect(database.get(), connection.out()) == DuckDBError) {
+    throw BackendError("DuckDB failed to connect");
+  }
+  Result result;
+  Query(connection.get(), sql, result);
+  Chunk chunk(duckdb_fetch_chunk(result.result));
+  if (!chunk.get() || duckdb_data_chunk_get_size(chunk.get()) == 0 ||
+      duckdb_data_chunk_get_column_count(chunk.get()) == 0) {
     throw BackendError("DuckDB query returned no scalar value");
   }
-  return result->GetValue(0, 0).ToString();
+  duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), 0);
+  uint64_t* validity = duckdb_vector_get_validity(vector);
+  if (validity && !duckdb_validity_row_is_valid(validity, 0)) {
+    return "NULL";
+  }
+  LogicalType type(duckdb_vector_get_column_type(vector));
+  if (duckdb_get_type_id(type.get()) == DUCKDB_TYPE_VARCHAR) {
+    return VectorString(vector, 0);
+  }
+  return ValueString(VectorValue(vector, type.get(), 0).get());
 }
 
 }  // namespace bigquery_emulator_duckdb
