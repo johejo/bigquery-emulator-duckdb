@@ -20,7 +20,7 @@ steps:
     exec:
       command: >-
         tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.people gs://load-fixtures/people.jsonl
+        e2e_load.people gs://load-fixtures/nested/people.jsonl
     test: current.exit_code == 0
   rows:
     exec:

@@ -178,7 +178,7 @@ just e2e --verbose  # extra arguments are passed to `runn run`
 
 `tests/e2e/goclient` covers the Go client library (`cloud.google.com/go/bigquery`), which drives the API differently from `bq`: it runs parameterised queries, polls jobs, streams rows with `Inserter.Put`, and asks for timestamps as epoch microseconds. It is a Go module of its own, so the first run downloads its dependencies; `runn` starts it like any other scenario.
 
-The load scenario starts fake-gcs-server, uploads a fixture object, and checks both GCS and local file load jobs through runn. `curl` is required for GCS downloads.
+The load scenario starts fake-gcs-server, uploads a fixture object, and checks both GCS and local file load jobs through runn.
 
 The end-to-end scenarios own client-visible results, including representative function semantics, query parameters, and table operations. Add new behavior checks there first. Keep C++ tests for focused internal boundaries: translation choices and edge cases in `tests/translator_test.cc`, result encoding in `tests/backend_test.cc`, and raw HTTP response details in `tests/server_test.cc` (`just test`). `tests/emulator_test.cc` covers direct `Emulator::RunQuery` behavior that the client scenarios do not exercise. Avoid copying the same SQL and expected result between these layers.
 
