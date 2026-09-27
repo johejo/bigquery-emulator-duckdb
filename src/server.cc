@@ -12,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -273,6 +274,9 @@ json JobResource(const Job& job) {
                 {"statistics", JobStatistics(job)}};
   }
   if (job.is_load) {
+    if (!job.destination_table.has_value()) {
+      throw std::logic_error("Load job is missing its destination table");
+    }
     json load = job.load_configuration;
     TableReference destination = *job.destination_table;
     if (destination.project_id.empty()) destination.project_id = job.project_id;
@@ -435,19 +439,19 @@ class Server::Impl {
     http_.set_logger([](const httplib::Request& request, const httplib::Response& response) {
       std::cerr << request.method << " " << request.path << " -> " << response.status << '\n';
     });
-    http_.set_exception_handler(
-        [](const httplib::Request&, httplib::Response& response, std::exception_ptr exception) {
-          std::string message;
-          try {
-            std::rethrow_exception(std::move(exception));
-          } catch (const std::exception& error) {
-            message = error.what();
-          } catch (...) {
-            message = "Internal error";
-          }
-          response.status = 500;
-          response.set_content(ErrorBody(ApiError::Internal(message)).dump(), "application/json");
-        });
+    http_.set_exception_handler([](const httplib::Request&, httplib::Response& response,
+                                   const std::exception_ptr& exception) {
+      std::string message;
+      try {
+        std::rethrow_exception(exception);
+      } catch (const std::exception& error) {
+        message = error.what();
+      } catch (...) {
+        message = "Internal error";
+      }
+      response.status = 500;
+      response.set_content(ErrorBody(ApiError::Internal(message)).dump(), "application/json");
+    });
     RegisterRoutes();
   }
 

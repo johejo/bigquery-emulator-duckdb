@@ -90,7 +90,7 @@ std::string UrlEncode(const std::string& value) {
 
 // curl handles HTTPS and the standard STORAGE_EMULATOR_HOST HTTP endpoint. Arguments are passed
 // directly to exec, so object names and credentials never pass through a shell.
-void DownloadGcs(const std::string& uri, const std::string& output) {
+void DownloadGcs(const std::string& uri, const std::filesystem::path& output) {
   const size_t slash = uri.find('/', 5);
   if (slash == std::string::npos || slash == 5 || slash + 1 == uri.size()) {
     throw ApiError::Invalid("Invalid GCS URI: " + uri);
@@ -105,8 +105,9 @@ void DownloadGcs(const std::string& uri, const std::string& output) {
       base + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" + UrlEncode(object) + "?alt=media";
   const char* token = std::getenv("GOOGLE_OAUTH_ACCESS_TOKEN");
   std::string authorization = token && *token ? std::string("Authorization: Bearer ") + token : "";
-  std::vector<const char*> argv = {"curl",       "--fail",   "--silent",    "--show-error",
-                                   "--location", "--output", output.c_str()};
+  const std::string output_path = output.string();
+  std::vector<const char*> argv = {"curl",       "--fail",   "--silent",         "--show-error",
+                                   "--location", "--output", output_path.c_str()};
   if (!authorization.empty()) {
     argv.push_back("--header");
     argv.push_back(authorization.c_str());
@@ -558,7 +559,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
         close(fd);
         path = pattern;
         downloads.paths.push_back(path);
-        DownloadGcs(uri, path);
+        DownloadGcs(uri, std::filesystem::path(path));
       } else if (uri.starts_with("file://")) {
         path = uri.substr(7);
       } else if (uri.find("://") == std::string::npos) {
