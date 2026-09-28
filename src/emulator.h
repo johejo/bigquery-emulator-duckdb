@@ -14,6 +14,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/field_schema.h"
+#include "src/gcs.h"
 #include "src/query_parameters.h"
 
 namespace bigquery_emulator_duckdb {
@@ -103,6 +104,9 @@ class Emulator {
   // created when missing, and a project's data comes back the next time it is used.
   explicit Emulator(std::string data_dir = "");
 
+  // The Storage API endpoint that load jobs read gs:// objects from.
+  const std::string& storage_endpoint() const { return gcs_client_.endpoint(); }
+
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
   std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
@@ -145,6 +149,7 @@ class Emulator {
                                const std::vector<std::string>& setup, bool count_only = false);
 
   Backend backend_;
+  GcsClient gcs_client_;
   std::string data_dir_;
   std::mutex mutex_;
   std::unordered_set<std::string> projects_;

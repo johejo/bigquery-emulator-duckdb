@@ -165,7 +165,8 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
-        "//third_party/cpp_httplib:httplib",
+        "@google_cloud_cpp//:common",
+        "@google_cloud_cpp//:storage",
     ],
 )
 
@@ -187,7 +188,7 @@ cc_library(
         ":emulator",
         ":field_schema",
         ":query_parameters",
-        "//third_party/cpp_httplib:httplib",
+        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )
@@ -282,7 +283,7 @@ cc_binary(
         ":emulator",
         ":probe",
         ":server",
-        "//third_party/cpp_httplib:httplib",
+        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )
@@ -366,14 +367,26 @@ cc_test(
 )
 
 cc_test(
+    name = "gcs_test",
+    srcs = ["tests/gcs_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":gcs",
+        "@com_google_googletest//:gtest_main",
+        "@cpp-httplib//:httplib",
+    ],
+)
+
+cc_test(
     name = "server_test",
     srcs = ["tests/server_test.cc"],
     copts = ["-std=c++20"],
     deps = [
         ":emulator",
         ":server",
-        "//third_party/cpp_httplib:httplib",
         "@com_google_googletest//:gtest_main",
+        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )

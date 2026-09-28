@@ -1,83 +1,120 @@
 #include "src/gcs.h"
 
-#include <cctype>
+#include <atomic>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
-#include <ios>
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <string>
+#include <utility>
 
-#include "httplib.h"
+#include "google/cloud/credentials.h"
+#include "google/cloud/options.h"
+#include "google/cloud/status.h"
+#include "google/cloud/storage/client.h"
+#include "google/cloud/storage/options.h"
 #include "src/api_error.h"
 
 namespace bigquery_emulator_duckdb {
+
+namespace cloud = google::cloud;
+namespace storage = cloud::storage;
+
 namespace {
 
-// Encodes a path segment. The Storage JSON API takes an object name as a single segment, so
-// the slashes in it must be encoded too.
-std::string UrlEncode(const std::string& value) {
-  static constexpr char kHex[] = "0123456789ABCDEF";
-  std::string encoded;
-  for (unsigned char c : value) {
-    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      encoded += static_cast<char>(c);
-    } else {
-      encoded += '%';
-      encoded += kHex[c >> 4];
-      encoded += kHex[c & 15];
-    }
+struct Endpoint {
+  std::string url;
+  bool emulator;
+};
+
+Endpoint EndpointFromEnvironment() {
+  // The SDK reads these itself and lets them override any configured endpoint, so they take
+  // precedence here too.
+  for (const char* name : {"CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
+    if (const char* value = std::getenv(name)) return {value, true};
   }
-  return encoded;
+  const char* host = std::getenv("STORAGE_EMULATOR_HOST");
+  if (host == nullptr || *host == '\0') return {"https://storage.googleapis.com", false};
+  std::string url = host;
+  while (!url.empty() && url.back() == '/') url.pop_back();
+  // Like the Google client libraries, accept a bare "host:port" as an HTTP endpoint.
+  if (url.find("://") == std::string::npos) url = "http://" + url;
+  return {url, true};
 }
 
 }  // namespace
 
-void DownloadGcsObject(const std::string& uri, const std::filesystem::path& output) {
+struct GcsClient::Impl {
+  // Emulators are always read anonymously. Otherwise public objects are read anonymously
+  // first and ADC is loaded only when the Storage API rejects the request, so hosts without
+  // ADC can still read public objects.
+  Impl(std::string endpoint, bool emulator)
+      : options(cloud::Options{}
+                    .set<storage::RestEndpointOption>(std::move(endpoint))
+                    .set<cloud::UnifiedCredentialsOption>(cloud::MakeInsecureCredentials())),
+        use_adc(!emulator),
+        client(options) {}
+
+  cloud::Options options;
+  bool use_adc;
+  storage::Client client;
+  std::once_flag initialize_adc;
+  std::optional<storage::Client> adc;
+  // Set once a download has needed ADC, so later downloads skip the anonymous attempt.
+  std::atomic<bool> prefer_adc = false;
+};
+
+GcsClient::GcsClient() {
+  Endpoint endpoint = EndpointFromEnvironment();
+  impl_ = std::make_unique<Impl>(std::move(endpoint.url), endpoint.emulator);
+}
+
+GcsClient::GcsClient(std::string endpoint, bool emulator)
+    : impl_(std::make_unique<Impl>(std::move(endpoint), emulator)) {}
+
+GcsClient::~GcsClient() = default;
+
+const std::string& GcsClient::endpoint() const {
+  return impl_->options.get<storage::RestEndpointOption>();
+}
+
+void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {
   const size_t slash = uri.find('/', 5);
-  if (slash == std::string::npos || slash == 5 || slash + 1 == uri.size()) {
+  if (!uri.starts_with("gs://") || slash == std::string::npos || slash == 5 ||
+      slash + 1 == uri.size()) {
     throw ApiError::Invalid("Invalid GCS URI: " + uri);
   }
   const std::string bucket = uri.substr(5, slash - 5);
   const std::string object = uri.substr(slash + 1);
-  const char* emulator_host = std::getenv("STORAGE_EMULATOR_HOST");
-  std::string base =
-      emulator_host && *emulator_host ? emulator_host : "https://storage.googleapis.com";
-  while (!base.empty() && base.back() == '/') base.pop_back();
-  // Like the Google client libraries, accept a bare "host:port" as an HTTP endpoint.
-  if (base.find("://") == std::string::npos) base = "http://" + base;
-  const size_t path_start = base.find('/', base.find("://") + 3);
-  const std::string origin = base.substr(0, path_start);
-  const std::string path_prefix = path_start == std::string::npos ? "" : base.substr(path_start);
-  httplib::Client client(origin);
-  if (!client.is_valid()) throw ApiError::Internal("Invalid Storage endpoint: " + base);
-  client.set_follow_location(true);
-  const char* token = std::getenv("GOOGLE_OAUTH_ACCESS_TOKEN");
-  if (token && *token) client.set_bearer_token_auth(token);
-  // The body is streamed straight into the file rather than held in memory.
-  std::ofstream file(output, std::ios::binary | std::ios::trunc);
-  if (!file) throw ApiError::Internal("Could not open load temporary file");
-  int status = 0;
-  const httplib::Result result = client.Get(
-      path_prefix + "/storage/v1/b/" + UrlEncode(bucket) + "/o/" + UrlEncode(object) + "?alt=media",
-      [&status](const httplib::Response& response) {
-        status = response.status;
-        return status >= 200 && status < 300;
-      },
-      [&file](const char* data, size_t length) {
-        file.write(data, static_cast<std::streamsize>(length));
-        return file.good();
-      });
-  file.close();
-  if (status != 0 && (status < 200 || status >= 300)) {
-    throw ApiError::Invalid("Could not read GCS object: " + uri + " (HTTP " +
-                            std::to_string(status) + ")");
+  // SDK copies share the connection pool. Concurrent calls on the same Client instance
+  // are not guaranteed to work, so each download uses its own lightweight copy.
+  auto download = [&](storage::Client client) {
+    return client.DownloadToFile(bucket, object, output.string());
+  };
+  auto download_with_adc = [&] {
+    std::call_once(impl_->initialize_adc, [this] {
+      auto options = impl_->options;
+      options.set<cloud::UnifiedCredentialsOption>(cloud::MakeGoogleDefaultCredentials());
+      impl_->adc.emplace(options);
+    });
+    return download(*impl_->adc);
+  };
+  cloud::Status status;
+  if (impl_->prefer_adc) {
+    status = download_with_adc();
+  } else {
+    status = download(impl_->client);
+    if (impl_->use_adc && (status.code() == cloud::StatusCode::kUnauthenticated ||
+                           status.code() == cloud::StatusCode::kPermissionDenied)) {
+      status = download_with_adc();
+      if (status.ok()) impl_->prefer_adc = true;
+    }
   }
-  if (!result) {
-    throw ApiError::Invalid("Could not read GCS object: " + uri + " (" +
-                            httplib::to_string(result.error()) + ")");
+  if (!status.ok()) {
+    throw ApiError::Invalid("Could not read GCS object: " + uri + " (" + status.message() + ")");
   }
-  if (!file) throw ApiError::Internal("Could not write load temporary file");
 }
 
 }  // namespace bigquery_emulator_duckdb
