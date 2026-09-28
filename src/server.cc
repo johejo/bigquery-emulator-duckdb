@@ -625,6 +625,9 @@ class Server::Impl {
         copy_request.configuration = copy;
         return JobResource(*emulator_.RunCopy(copy_request));
       }
+      if (config.contains("extract")) {
+        throw ApiError::Invalid("The emulator does not support extract jobs");
+      }
       if (!config.contains("query")) {
         throw ApiError::Invalid("Only query, load, and copy jobs are supported");
       }
@@ -868,7 +871,7 @@ class Server::Impl {
           }
           if (body.contains("templateSuffix") && !body["templateSuffix"].is_null() &&
               body["templateSuffix"] != "") {
-            throw ApiError::Invalid("templateSuffix is not supported");
+            throw ApiError::Invalid("The emulator does not support templateSuffix");
           }
           json response = {{"kind", "bigquery#tableDataInsertAllResponse"}};
           const auto errors =
