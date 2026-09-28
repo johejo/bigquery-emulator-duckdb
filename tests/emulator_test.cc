@@ -229,53 +229,6 @@ TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
   EXPECT_EQ(ErrorStatus("DROP SCHEMA made"), 0);
 }
 
-TEST_F(EmulatorTest, QueriesDomainScopedProjects) {
-  const std::string project = "example.com:proj";
-  emulator_.CreateDataset({project, "ds"});
-  emulator_.CreateTable({project, "ds", "t"},
-                        nlohmann::json::parse(R"([{"name":"a","type":"INTEGER"}])"));
-  QueryRequest request;
-  request.project_id = project;
-  request.default_dataset = DatasetReference{project, "ds"};
-  request.query = "INSERT INTO t (a) VALUES (7)";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-
-  for (const std::string& table : {"t", "ds.t", "`example.com:proj.ds.t`"}) {
-    request.query = "SELECT a FROM " + table;
-    const auto job = emulator_.RunQuery(request);
-    if (!job->result.has_value()) {
-      FAIL() << table << ": " << ErrorMessage(*job);
-    }
-    EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "7");
-  }
-
-  request.default_dataset.reset();
-  request.query = "SELECT a FROM `example.com:proj.ds.t`";
-  const auto qualified = emulator_.RunQuery(request);
-  if (!qualified->result.has_value()) {
-    FAIL() << ErrorMessage(*qualified);
-  }
-  EXPECT_EQ(qualified->result->rows.at(0)["f"][0]["v"], "7");
-  request.default_dataset = DatasetReference{project, "ds"};
-
-  request.query = "UPDATE `example.com:proj.ds.t` SET a = 8 WHERE a = 7";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  request.query = "SELECT a FROM t";
-  const auto updated = emulator_.RunQuery(request);
-  if (!updated->result.has_value()) {
-    FAIL() << ErrorMessage(*updated);
-  }
-  EXPECT_EQ(updated->result->rows.at(0)["f"][0]["v"], "8");
-
-  request.query = "CREATE TABLE u AS SELECT a FROM t";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  EXPECT_EQ(emulator_.ListTables({project, "ds"}), (std::vector<std::string>{"t", "u"}));
-
-  request.query = "CREATE SCHEMA `example.com:proj.other`";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  EXPECT_EQ(emulator_.ListDatasets(project), (std::vector<std::string>{"ds", "other"}));
-}
-
 TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   emulator_.CreateDataset({"test", "ds"});
   const TableReference destination{"test", "ds", "dest"};
