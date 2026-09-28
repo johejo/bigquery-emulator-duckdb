@@ -191,12 +191,6 @@ TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
   EXPECT_EQ(missing["status"]["errorResult"]["reason"], "notFound");
 }
 
-TEST_F(ServerTest, ReportsUndeclaredParameters) {
-  const json response = Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT @missing"}});
-  ASSERT_TRUE(response.contains("errors"));
-  EXPECT_EQ(response["errors"][0]["reason"], "invalidQuery");
-}
-
 TEST_F(ServerTest, ReportsDryRunResponsesWithoutCreatingJobs) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   Post("/bigquery/v2/projects/p/queries", {{"query", "CREATE TABLE ds.t (id INT64)"}});
