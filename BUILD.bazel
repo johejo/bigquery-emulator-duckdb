@@ -202,7 +202,7 @@ cc_binary(
     ],
 )
 
-# Prints docs/functions.md, a report of which BigQuery functions the emulator translates and runs.
+# Shared by the probes that print docs/functions.md, docs/sql.md and docs/api.md.
 cc_library(
     name = "probe",
     srcs = ["tools/probe.cc"],
@@ -272,6 +272,37 @@ diff_test(
     failure_message = "docs/sql.md is stale; run `just docs` to regenerate it.",
     file1 = ":sql_md",
     file2 = "docs/sql.md",
+)
+
+cc_binary(
+    name = "api_probe",
+    srcs = ["tools/api_probe.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":emulator",
+        ":probe",
+        ":server",
+        "//third_party/cpp_httplib:httplib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+genrule(
+    name = "api_md",
+    srcs = [
+        "//third_party/bigquery:discovery.json",
+        "tools/api_methods.txt",
+    ],
+    outs = ["api.md"],
+    cmd = "$(execpath :api_probe) $(execpath //third_party/bigquery:discovery.json) $(execpath tools/api_methods.txt) > $@",
+    tools = [":api_probe"],
+)
+
+diff_test(
+    name = "api_md_test",
+    failure_message = "docs/api.md is stale; run `just docs` to regenerate it.",
+    file1 = ":api_md",
+    file2 = "docs/api.md",
 )
 
 cc_test(

@@ -1,0 +1,60 @@
+# The REST API requests //:api_probe sends, which generate docs/api.md. The methods themselves come
+# from third_party/bigquery/discovery.json; a method without requests here is probed with one the
+# probe builds from its path.
+#
+#   file NAME | LINE          Writes LINE to the file NAME in the probe's scratch directory, $DIR.
+#   setup METHOD PATH [BODY]  A request sent to every fresh emulator before a probe.
+#   request ID | METHOD PATH [BODY]
+#                             A request for the method ID, such as bigquery.jobs.query. Repeat it
+#                             to probe several forms of one method.
+#   note ID | TEXT            What the emulator ignores or does differently from BigQuery.
+#
+# Paths are below the server root and may carry a query string. Every request here must succeed
+# or be rejected as unsupported; the probe fails on one that fails for another reason.
+
+file people.csv | 1
+
+setup POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "d"}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}]}}
+setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
+
+request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
+request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
+note bigquery.datasets.get | Returns only the dataset's reference and location `US`.
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}}
+note bigquery.datasets.insert | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored.
+request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets
+note bigquery.datasets.list | Ignores `all`, `filter`, `maxResults` and `pageToken`, and returns every dataset in one page.
+
+request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
+note bigquery.jobs.cancel | Jobs finish before `jobs.insert` returns, so cancelling returns the finished job unchanged.
+request bigquery.jobs.delete | DELETE /bigquery/v2/projects/test/jobs/j/delete
+request bigquery.jobs.get | GET /bigquery/v2/projects/test/jobs/j
+request bigquery.jobs.getQueryResults | GET /bigquery/v2/projects/test/queries/j?maxResults=1&startIndex=0
+note bigquery.jobs.getQueryResults | Ignores `timeoutMs`, `location` and `formatOptions.timestampOutputFormat`.
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1", "useLegacySql": false}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "t"}, "writeDisposition": "WRITE_APPEND"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["gs://b/o"]}}}
+note bigquery.jobs.insert | Runs query, load and copy jobs synchronously. Loads read CSV, newline-delimited JSON and Parquet from `gs://` URIs, local paths and media uploads (simple, multipart and resumable).
+request bigquery.jobs.list | GET /bigquery/v2/projects/test/jobs?maxResults=1&projection=full&stateFilter=done
+note bigquery.jobs.list | Ignores `allUsers`. Every job is done, so `stateFilter` of `pending` or `running` and `parentJobId` return no jobs.
+request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT @x AS x", "useLegacySql": false, "parameterMode": "NAMED", "queryParameters": [{"name": "x", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}}]}
+request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "dryRun": true}
+request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": true}
+note bigquery.jobs.query | Runs GoogleSQL only; an omitted `useLegacySql` runs as GoogleSQL, although BigQuery defaults it to true. Ignores `timeoutMs`, `location`, `labels` and `useQueryCache`.
+
+request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
+request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}
+note bigquery.tabledata.insertAll | Ignores `insertId`, so retried rows are not deduplicated.
+request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?maxResults=1&startIndex=0
+note bigquery.tabledata.list | Ignores `selectedFields` and `formatOptions.timestampOutputFormat`.
+
+request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
+request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
+note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference, schema and row count; `numBytes` is always 0.
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
+note bigquery.tables.insert | Keeps only `tableReference` and `schema`; views, partitioning, clustering, labels and descriptions are ignored.
+request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables
+note bigquery.tables.list | Ignores `maxResults` and `pageToken`, and returns every table in one page.
