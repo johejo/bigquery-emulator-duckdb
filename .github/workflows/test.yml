@@ -46,6 +46,8 @@ jobs:
         run: echo 'common --config=ci' > .bazelrc.local
       - name: Bazel tests
         run: nix develop --command just test
+      - name: Clang-tidy
+        run: nix develop --command just tidy
       - name: End-to-end tests
         run: nix develop --command just e2e
 
