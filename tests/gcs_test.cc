@@ -30,8 +30,9 @@ std::string ReadFile(const std::filesystem::path& path) {
 class GcsTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    for (const char* name : {"STORAGE_EMULATOR_HOST", "GOOGLE_APPLICATION_CREDENTIALS",
-                             "CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
+    for (const char* name :
+         {"STORAGE_EMULATOR_HOST", "GOOGLE_APPLICATION_CREDENTIALS",
+          "CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
       const char* value = std::getenv(name);
       environment_[name] = value ? std::optional<std::string>(value) : std::nullopt;
       unsetenv(name);
@@ -183,19 +184,22 @@ TEST_F(GcsTest, NeverUsesAdcWithEmulator) {
   }
 }
 
-TEST_F(GcsTest, ReadsPublicObjectsWithoutAdc) {
+TEST_F(GcsTest, ReadsAnonymouslyWithoutAdc) {
   client_.emplace(endpoint_, false);
   Download();
+  require_adc_ = true;
+  EXPECT_THROW(client().Download(kUri, output_), ApiError);
 }
 
-TEST_F(GcsTest, UsesAdcForPrivateObjects) {
+TEST_F(GcsTest, UsesAdcWhenAvailable) {
   client_.emplace(endpoint_, false);
   WriteAdc();
-  require_adc_ = true;
   authorization_ = "Bearer adc-token";
   Download();
   Download();
-  EXPECT_EQ(token_requests_, 1);
+  // The availability check and the Storage client each exchange a token once.
+  EXPECT_LE(token_requests_, 2);
+  EXPECT_EQ(requests_, 2);
 }
 
 TEST_F(GcsTest, IgnoresEnvironmentChangesAfterConstruction) {
@@ -210,8 +214,7 @@ TEST_F(GcsTest, SupportsConcurrentDownloads) {
   downloads.reserve(4);
   for (int i = 0; i < 4; ++i) {
     downloads.emplace_back([this, &client, i] {
-      EXPECT_NO_THROW(
-          client.Download(kUri, directory_ / std::to_string(i)));
+      EXPECT_NO_THROW(client.Download(kUri, directory_ / std::to_string(i)));
     });
   }
   for (auto& download : downloads) download.join();

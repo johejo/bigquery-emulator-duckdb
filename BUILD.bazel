@@ -166,6 +166,7 @@ cc_library(
     deps = [
         ":api_error",
         "@google_cloud_cpp//:common",
+        "@google_cloud_cpp//:oauth2",
         "@google_cloud_cpp//:storage",
     ],
 )

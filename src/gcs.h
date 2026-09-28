@@ -14,8 +14,8 @@ class GcsClient {
   // CLOUD_STORAGE_TESTBENCH_ENDPOINT, which the SDK itself honors, then STORAGE_EMULATOR_HOST,
   // and otherwise the public Storage API. Any of the variables selects an emulator.
   GcsClient();
-  // Emulators are always read anonymously. Other endpoints read public objects anonymously
-  // and private objects with Application Default Credentials.
+  // Emulators are always read anonymously. Other endpoints use Application Default Credentials
+  // when they are available and anonymous access otherwise.
   GcsClient(std::string endpoint, bool emulator);
   ~GcsClient();
 

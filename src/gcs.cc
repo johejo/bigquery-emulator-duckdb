@@ -1,6 +1,5 @@
 #include "src/gcs.h"
 
-#include <atomic>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
@@ -11,6 +10,7 @@
 #include <utility>
 
 #include "google/cloud/credentials.h"
+#include "google/cloud/oauth2/access_token_generator.h"
 #include "google/cloud/options.h"
 #include "google/cloud/status.h"
 #include "google/cloud/storage/client.h"
@@ -47,23 +47,32 @@ Endpoint EndpointFromEnvironment() {
 }  // namespace
 
 struct GcsClient::Impl {
-  // Emulators are always read anonymously. Otherwise public objects are read anonymously
-  // first and ADC is loaded only when the Storage API rejects the request, so hosts without
-  // ADC can still read public objects.
   Impl(std::string endpoint, bool emulator)
       : options(cloud::Options{}
                     .set<storage::RestEndpointOption>(std::move(endpoint))
                     .set<cloud::UnifiedCredentialsOption>(cloud::MakeInsecureCredentials())),
-        use_adc(!emulator),
-        client(options) {}
+        emulator(emulator),
+        anonymous(options) {}
+
+  // Emulators are always read anonymously. Otherwise ADC is used when it yields a token and
+  // anonymous access otherwise. Without a credentials file ADC falls back to the metadata
+  // server, so the check waits for the first download rather than delaying startup.
+  storage::Client& client() {
+    if (emulator) return anonymous;
+    std::call_once(select_credentials, [this] {
+      auto credentials = cloud::MakeGoogleDefaultCredentials();
+      if (!cloud::oauth2::MakeAccessTokenGenerator(*credentials)->GetToken()) return;
+      adc.emplace(
+          cloud::Options(options).set<cloud::UnifiedCredentialsOption>(std::move(credentials)));
+    });
+    return adc ? *adc : anonymous;
+  }
 
   cloud::Options options;
-  bool use_adc;
-  storage::Client client;
-  std::once_flag initialize_adc;
+  bool emulator;
+  storage::Client anonymous;
+  std::once_flag select_credentials;
   std::optional<storage::Client> adc;
-  // Set once a download has needed ADC, so later downloads skip the anonymous attempt.
-  std::atomic<bool> prefer_adc = false;
 };
 
 GcsClient::GcsClient() {
@@ -90,28 +99,8 @@ void GcsClient::Download(const std::string& uri, const std::filesystem::path& ou
   const std::string object = uri.substr(slash + 1);
   // SDK copies share the connection pool. Concurrent calls on the same Client instance
   // are not guaranteed to work, so each download uses its own lightweight copy.
-  auto download = [&](storage::Client client) {
-    return client.DownloadToFile(bucket, object, output.string());
-  };
-  auto download_with_adc = [&] {
-    std::call_once(impl_->initialize_adc, [this] {
-      auto options = impl_->options;
-      options.set<cloud::UnifiedCredentialsOption>(cloud::MakeGoogleDefaultCredentials());
-      impl_->adc.emplace(options);
-    });
-    return download(*impl_->adc);
-  };
-  cloud::Status status;
-  if (impl_->prefer_adc) {
-    status = download_with_adc();
-  } else {
-    status = download(impl_->client);
-    if (impl_->use_adc && (status.code() == cloud::StatusCode::kUnauthenticated ||
-                           status.code() == cloud::StatusCode::kPermissionDenied)) {
-      status = download_with_adc();
-      if (status.ok()) impl_->prefer_adc = true;
-    }
-  }
+  storage::Client client = impl_->client();
+  const cloud::Status status = client.DownloadToFile(bucket, object, output.string());
   if (!status.ok()) {
     throw ApiError::Invalid("Could not read GCS object: " + uri + " (" + status.message() + ")");
   }
