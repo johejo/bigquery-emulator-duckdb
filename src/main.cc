@@ -72,6 +72,7 @@ int Run(int argc, char** argv) {
   }
   std::thread shutdown([&] { WaitForShutdown(signals, server); });
   std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
+  std::cerr << "Reading gs:// objects from " << emulator.storage_endpoint() << '\n';
   const bool served = server.Serve();
   // Wakes the shutdown thread when Serve() returned on its own rather than through a signal.
   kill(getpid(), SIGTERM);

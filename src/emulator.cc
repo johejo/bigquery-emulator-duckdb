@@ -506,7 +506,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
         close(fd);
         path = pattern;
         downloads.paths.push_back(path);
-        DownloadGcsObject(uri, std::filesystem::path(path));
+        gcs_client_.Download(uri, std::filesystem::path(path));
       } else if (uri.starts_with("file://")) {
         path = uri.substr(7);
       } else if (uri.find("://") == std::string::npos) {
