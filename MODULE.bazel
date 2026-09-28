@@ -5,8 +5,7 @@ module(
 
 bazel_dep(name = "cpp-httplib", version = "0.46.0")
 
-# 3.9+ requires Abseil 20260526, which removes an internal API used by GoogleSQL 2026.9.2.
-bazel_dep(name = "google_cloud_cpp", version = "3.8.0")
+bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
 bazel_dep(name = "googlesql", version = "2026.9.2")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 
@@ -35,6 +34,9 @@ git_override(
 archive_override(
     module_name = "googlesql",
     integrity = "sha256-Bi6Z2jQDKs31HB2VR5ds72HKT4PaQqSHYDqi4/JJJX4=",
+    patch_strip = 1,
+    # Abseil 20260526 (required by google_cloud_cpp 3.9+) removes an internal API GoogleSQL uses.
+    patches = ["//third_party/googlesql:throw_delegate.patch"],
     strip_prefix = "googlesql-2026.9.2",
     urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.9.2.tar.gz"],
 )
