@@ -90,7 +90,7 @@ std::optional<std::pair<std::string, std::string>> SplitNamed(const std::string&
 
 // "METHOD PATH [BODY]", with `$DIR` in the path or body standing for the directory the file
 // directives write to.
-std::optional<Request> ParseRequest(const std::string& text, const std::string& dir) {
+std::optional<Request> ParseRequest(const std::string& text, const std::filesystem::path& dir) {
   std::istringstream words(text);
   Request request;
   words >> request.method >> request.path;
@@ -100,8 +100,8 @@ std::optional<Request> ParseRequest(const std::string& text, const std::string& 
   }
   for (std::string* field : {&request.path, &request.body}) {
     for (size_t at = field->find("$DIR"); at != std::string::npos; at = field->find("$DIR", at)) {
-      field->replace(at, 4, dir);
-      at += dir.size();
+      field->replace(at, 4, dir.string());
+      at += dir.string().size();
     }
   }
   return request;
@@ -271,7 +271,7 @@ int Main(int argc, char** argv) {
   std::vector<Request> setup;
   for (const auto& [directive, text] : ReadLines(argv[2])) {
     if (directive == "setup") {
-      const auto request = ParseRequest(text, dir.string());
+      const auto request = ParseRequest(text, dir);
       if (!request) {
         std::cerr << "cannot parse: setup " << text << "\n";
         return 1;
@@ -303,7 +303,7 @@ int Main(int argc, char** argv) {
       method.note = value;
       continue;
     }
-    const auto request = ParseRequest(value, dir.string());
+    const auto request = ParseRequest(value, dir);
     const std::string path = request ? request->path.substr(0, request->path.find('?')) : "";
     const auto matches = [&](const std::regex& pattern) { return std::regex_match(path, pattern); };
     if (!request || request->method != method.http_method ||
