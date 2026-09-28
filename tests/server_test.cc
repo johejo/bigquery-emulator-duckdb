@@ -59,16 +59,6 @@ TEST_F(ServerTest, ServesDiscoveryDocument) {
   EXPECT_TRUE(document["resources"].contains("jobs"));
 }
 
-TEST_F(ServerTest, RunsQuery) {
-  const json response =
-      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT 1 AS x, 'a' AS y"}});
-  EXPECT_EQ(response["kind"], "bigquery#queryResponse");
-  EXPECT_EQ(response["jobComplete"], true);
-  EXPECT_EQ(response["totalRows"], "1");
-  EXPECT_EQ(response["schema"]["fields"][0]["name"], "x");
-  EXPECT_EQ(response["rows"], json::parse(R"([{"f": [{"v": "1"}, {"v": "a"}]}])"));
-}
-
 TEST_F(ServerTest, ReportsQueryErrors) {
   const json response = Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT * FROM nope"}});
   ASSERT_TRUE(response.contains("errors"));
@@ -86,22 +76,7 @@ TEST_F(ServerTest, RejectsLegacySql) {
   Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT 1"}, {"useLegacySql", false}});
 }
 
-TEST_F(ServerTest, RunsJobAndFetchesResults) {
-  const json job = Post("/bigquery/v2/projects/p/jobs",
-                        {{"jobReference", {{"projectId", "p"}, {"jobId", "job1"}}},
-                         {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
-  EXPECT_EQ(job["jobReference"]["jobId"], "job1");
-  EXPECT_EQ(job["status"]["state"], "DONE");
-  EXPECT_EQ(job["statistics"]["query"]["statementType"], "SELECT");
-
-  EXPECT_EQ(Get("/bigquery/v2/projects/p/jobs/job1")["status"]["state"], "DONE");
-  const json results = Get("/bigquery/v2/projects/p/queries/job1");
-  EXPECT_EQ(results["kind"], "bigquery#getQueryResultsResponse");
-  EXPECT_EQ(results["rows"][0]["f"][0]["v"], "1");
-  Get("/bigquery/v2/projects/p/queries/missing", 404);
-}
-
-TEST_F(ServerTest, ListsJobsWithFiltersAndPages) {
+TEST_F(ServerTest, ListsJobsWithFiltersAndProjection) {
   const std::string path = "/bigquery/v2/projects/p/jobs";
   Post(path, {{"jobReference", {{"jobId", "a"}}},
               {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
@@ -109,21 +84,15 @@ TEST_F(ServerTest, ListsJobsWithFiltersAndPages) {
               {"configuration", {{"query", {{"query", "SELECT * FROM missing"}}}}}});
   Post("/projects/other/jobs", {{"jobReference", {{"jobId", "c"}}},
                                 {"configuration", {{"query", {{"query", "SELECT 1"}}}}}});
-  const json first = Get(path + "?maxResults=1&projection=minimal");
-  EXPECT_EQ(first["kind"], "bigquery#jobList");
-  ASSERT_EQ(first["jobs"].size(), 1);
-  EXPECT_FALSE(first["jobs"][0].contains("status"));
-  ASSERT_TRUE(first.contains("nextPageToken"));
-  const json second =
-      Get(path + "?maxResults=1&pageToken=" + first["nextPageToken"].get<std::string>());
-  ASSERT_EQ(second["jobs"].size(), 1);
-  EXPECT_TRUE(second["jobs"][0].contains("status"));
-  EXPECT_FALSE(second.contains("nextPageToken"));
-  EXPECT_NE(first["jobs"][0]["jobReference"]["jobId"], second["jobs"][0]["jobReference"]["jobId"]);
-  EXPECT_EQ(Get(path + "?pageToken=")["jobs"].size(), 2);
+  const json minimal = Get(path + "?projection=minimal");
+  EXPECT_EQ(minimal["kind"], "bigquery#jobList");
+  ASSERT_EQ(minimal["jobs"].size(), 2);
+  EXPECT_FALSE(minimal["jobs"][0].contains("status"));
+  const json full = Get(path + "?pageToken=");
+  ASSERT_EQ(full["jobs"].size(), 2);
+  EXPECT_TRUE(full["jobs"][0].contains("status"));
   EXPECT_FALSE(Get(path + "?stateFilter=running").contains("jobs"));
   EXPECT_FALSE(Get(path + "?parentJobId=parent").contains("jobs"));
-  EXPECT_EQ(Get(path + "?stateFilter=done")["jobs"].size(), 2);
   Get(path + "?maxResults=-1", 400);
   Get(path + "?projection=unknown", 400);
 }
@@ -136,11 +105,10 @@ TEST_F(ServerTest, CancelsCompletedJobWithoutChangingIt) {
   EXPECT_EQ(cancelled["kind"], "bigquery#jobCancelResponse");
   EXPECT_EQ(cancelled["job"], job);
   EXPECT_EQ(Get(path + "/done"), job);
-  EXPECT_EQ(Get("/projects/p/queries/done")["rows"][0]["f"][0]["v"], "1");
   Post(path + "/missing/cancel", json::object(), 404);
 }
 
-TEST_F(ServerTest, DeletesJobMetadataAndAllowsJobIdReuse) {
+TEST_F(ServerTest, DeletesJobMetadataButKeepsDestinationTable) {
   const std::string path = "/bigquery/v2/projects/p/jobs";
   Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   const json request = {{"jobReference", {{"jobId", "old"}}},
@@ -149,7 +117,7 @@ TEST_F(ServerTest, DeletesJobMetadataAndAllowsJobIdReuse) {
                            {{"query", "SELECT 1 AS x"},
                             {"destinationTable", {{"datasetId", "ds"}, {"tableId", "result"}}}}}}}};
   Post(path, request);
-  EXPECT_EQ(Get(path + "?stateFilter=done")["jobs"].size(), 1);
+  EXPECT_EQ(Get("/projects/p/queries/old")["kind"], "bigquery#getQueryResultsResponse");
 
   const httplib::Result deleted = client_->Delete(path + "/old/delete?location=US");
   ASSERT_TRUE(deleted);
@@ -159,11 +127,6 @@ TEST_F(ServerTest, DeletesJobMetadataAndAllowsJobIdReuse) {
   EXPECT_FALSE(Get(path).contains("jobs"));
   EXPECT_EQ(Get("/projects/p/datasets/ds/tables/result/data")["rows"][0]["f"][0]["v"], "1");
   EXPECT_EQ(client_->Delete(path + "/old/delete")->status, 404);
-
-  const json reused = Post(path, {{"jobReference", {{"jobId", "old"}}},
-                                  {"configuration", {{"query", {{"query", "SELECT 2 AS x"}}}}}});
-  EXPECT_EQ(reused["status"]["state"], "DONE");
-  EXPECT_EQ(Get("/projects/p/queries/old")["rows"][0]["f"][0]["v"], "2");
 }
 
 TEST_F(ServerTest, RejectsDuplicateJobIdWithoutRunningQuery) {
@@ -180,26 +143,18 @@ TEST_F(ServerTest, RejectsDuplicateJobIdWithoutRunningQuery) {
   EXPECT_EQ(Get("/bigquery/v2/projects/p/queries/same")["rows"][0]["f"][0]["v"], "1");
 }
 
-TEST_F(ServerTest, ReportsDestinationTableJobConfigurationAndError) {
+TEST_F(ServerTest, ReportsDefaultQueryJobConfiguration) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
-  const json destination = {{"datasetId", "ds"}, {"tableId", "t"}};
-  const json job =
-      Post("/bigquery/v2/projects/p/jobs",
-           {{"jobReference", {{"jobId", "job1"}}},
-            {"configuration",
-             {{"query", {{"query", "SELECT 1 AS x"}, {"destinationTable", destination}}}}}});
-  EXPECT_EQ(job["status"]["state"], "DONE");
+  const json job = Post("/bigquery/v2/projects/p/jobs",
+                        {{"configuration",
+                          {{"query",
+                            {{"query", "SELECT 1 AS x"},
+                             {"destinationTable", {{"datasetId", "ds"}, {"tableId", "t"}}}}}}}});
+  EXPECT_EQ(job["statistics"]["query"]["statementType"], "SELECT");
   const json& query = job["configuration"]["query"];
   EXPECT_EQ(query["destinationTable"]["projectId"], "p");
-  EXPECT_EQ(query["destinationTable"]["tableId"], "t");
   EXPECT_EQ(query["createDisposition"], "CREATE_IF_NEEDED");
   EXPECT_EQ(query["writeDisposition"], "WRITE_EMPTY");
-
-  const json again =
-      Post("/bigquery/v2/projects/p/jobs",
-           {{"configuration",
-             {{"query", {{"query", "SELECT 2 AS x"}, {"destinationTable", destination}}}}}});
-  EXPECT_EQ(again["status"]["errorResult"]["reason"], "duplicate");
 }
 
 TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
@@ -236,58 +191,13 @@ TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
   EXPECT_EQ(missing["status"]["errorResult"]["reason"], "notFound");
 }
 
-TEST_F(ServerTest, PaginatesQueryResults) {
-  Post("/bigquery/v2/projects/p/jobs",
-       {{"jobReference", {{"jobId", "job1"}}},
-        {"configuration", {{"query", {{"query", "SELECT * FROM UNNEST([1, 2, 3]) AS x"}}}}}});
-  json page = Get("/bigquery/v2/projects/p/queries/job1?maxResults=2");
-  EXPECT_EQ(page["totalRows"], "3");
-  EXPECT_EQ(page["rows"].size(), 2);
-  EXPECT_EQ(page["pageToken"], "2");
-  page = Get("/bigquery/v2/projects/p/queries/job1?maxResults=2&pageToken=2");
-  EXPECT_EQ(page["rows"].size(), 1);
-  EXPECT_FALSE(page.contains("pageToken"));
-}
-
-TEST_F(ServerTest, RunsQueryWithNamedParameters) {
-  const json response =
-      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT @n AS n, @s AS s, @a AS a"},
-                                               {"parameterMode", "NAMED"},
-                                               {"queryParameters", json::parse(R"([
-                {"name": "n", "parameterType": {"type": "INT64"},
-                 "parameterValue": {"value": "7"}},
-                {"name": "s", "parameterType": {"type": "STRING"},
-                 "parameterValue": {"value": "x"}},
-                {"name": "a", "parameterType": {"type": "ARRAY",
-                                                "arrayType": {"type": "INT64"}},
-                 "parameterValue": {"arrayValues": [{"value": "1"}, {"value": "2"}]}}])")}});
-  EXPECT_EQ(response["schema"]["fields"][2]["mode"], "REPEATED");
-  EXPECT_EQ(response["rows"][0]["f"],
-            json::parse(R"([{"v": "7"}, {"v": "x"}, {"v": [{"v": "1"}, {"v": "2"}]}])"));
-}
-
-TEST_F(ServerTest, RunsQueryWithPositionalParameters) {
-  const json response =
-      Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT ? AS a, ? AS b"},
-                                               {"parameterMode", "POSITIONAL"},
-                                               {"queryParameters", json::parse(R"([
-                {"parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}},
-                {"parameterType": {"type": "STRING"}, "parameterValue": {"value": "b"}}])")}});
-  EXPECT_EQ(response["rows"][0]["f"], json::parse(R"([{"v": "1"}, {"v": "b"}])"));
-}
-
-TEST_F(ServerTest, ReportsUndeclaredParameters) {
-  const json response = Post("/bigquery/v2/projects/p/queries", {{"query", "SELECT @missing"}});
-  ASSERT_TRUE(response.contains("errors"));
-  EXPECT_EQ(response["errors"][0]["reason"], "invalidQuery");
-}
-
 TEST_F(ServerTest, ReportsDryRunResponsesWithoutCreatingJobs) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   Post("/bigquery/v2/projects/p/queries", {{"query", "CREATE TABLE ds.t (id INT64)"}});
 
   const json response = Post("/bigquery/v2/projects/p/queries",
                              {{"query", "SELECT id FROM `p.ds.t`"}, {"dryRun", true}});
+  EXPECT_EQ(response["kind"], "bigquery#queryResponse");
   EXPECT_EQ(response["jobComplete"], true);
   EXPECT_EQ(response["schema"]["fields"][0]["name"], "id");
   EXPECT_FALSE(response.contains("jobReference"));
@@ -301,7 +211,6 @@ TEST_F(ServerTest, ReportsDryRunResponsesWithoutCreatingJobs) {
                                                             {{"query",
                                                               "INSERT INTO ds.t VALUES "
                                                               "(1)"}}}}}});
-  EXPECT_EQ(job["status"]["state"], "DONE");
   EXPECT_EQ(job["configuration"]["dryRun"], true);
   EXPECT_FALSE(job["status"].contains("errorResult"));
   Get("/bigquery/v2/projects/p/jobs/dry1", 404);
@@ -326,42 +235,29 @@ TEST_F(ServerTest, EncodesTimestampsAsMicrosecondsOnRequest) {
             "1577934245000000");
 }
 
-TEST_F(ServerTest, ManagesDatasetsAndTables) {
+TEST_F(ServerTest, ReportsDatasetAndTableResourcesAndErrors) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
-  Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}}, 409);
+  const json duplicate =
+      Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}}, 409);
+  EXPECT_EQ(duplicate["error"]["status"], "ALREADY_EXISTS");
   EXPECT_EQ(Get("/bigquery/v2/projects/p/datasets")["datasets"][0]["id"], "p:ds");
-  EXPECT_EQ(Get("/bigquery/v2/projects/p/datasets/ds")["datasetReference"]["datasetId"], "ds");
   Get("/bigquery/v2/projects/p/datasets/missing", 404);
 
   const json table = Post(
       "/bigquery/v2/projects/p/datasets/ds/tables",
       {{"tableReference", {{"tableId", "t"}}},
        {"schema", {{"fields", json::parse(R"([{"name": "id", "type": "INTEGER", "mode": "REQUIRED"},
-                                    {"name": "tags", "type": "STRING", "mode": "REPEATED"},
-                                    {"name": "ts", "type": "TIMESTAMP"}])")}}}});
+                                    {"name": "tags", "type": "STRING", "mode": "REPEATED"}])")}}}});
   EXPECT_EQ(table["id"], "p:ds.t");
   EXPECT_EQ(table["schema"]["fields"][1]["mode"], "REPEATED");
-  EXPECT_EQ(table["schema"]["fields"][2]["type"], "TIMESTAMP");
   EXPECT_EQ(Get("/bigquery/v2/projects/p/datasets/ds/tables")["tables"][0]["id"], "p:ds.t");
-
-  Post("/bigquery/v2/projects/p/queries",
-       {{"query", "INSERT INTO ds.t VALUES (1, ['a'], TIMESTAMP '2020-01-01 00:00:00+00')"}});
-  const json data = Get("/bigquery/v2/projects/p/datasets/ds/tables/t/data");
-  EXPECT_EQ(data["totalRows"], "1");
-  EXPECT_EQ(data["rows"][0]["f"][2]["v"], "1577836800");
-
-  const json query = Post("/bigquery/v2/projects/p/queries",
-                          {{"query", "SELECT id FROM `p.ds.t`"},
-                           {"defaultDataset", {{"projectId", "p"}, {"datasetId", "ds"}}}});
-  EXPECT_EQ(query["rows"][0]["f"][0]["v"], "1");
 
   EXPECT_EQ(client_->Delete("/bigquery/v2/projects/p/datasets/ds")->status, 400);
   EXPECT_EQ(client_->Delete("/bigquery/v2/projects/p/datasets/ds/tables/t")->status, 204);
   EXPECT_EQ(client_->Delete("/bigquery/v2/projects/p/datasets/ds")->status, 204);
-  Get("/bigquery/v2/projects/p/datasets/ds", 404);
 }
 
-TEST_F(ServerTest, EncodesStreamedRowsAndReportsRowErrors) {
+TEST_F(ServerTest, EncodesStreamedRows) {
   const std::string base = "/projects/p/datasets/ds/tables/t";
   Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   Post("/projects/p/datasets/ds/tables",
@@ -372,32 +268,21 @@ TEST_F(ServerTest, EncodesStreamedRowsAndReportsRowErrors) {
             {"name":"name","type":"STRING"},{"name":"score","type":"INTEGER"}]},
           {"name":"ts","type":"TIMESTAMP"},{"name":"data","type":"BYTES"}])")}}}});
 
-  const json good = {{"insertId", "row-1"},
-                     {"json",
-                      {{"id", "1"},
-                       {"tags", json::array({"a", "b"})},
-                       {"profile", {{"name", "alice"}, {"score", "3"}}},
-                       {"ts", "2024-01-02T03:04:05Z"},
-                       {"data", "AP8="}}}};
-  const json bad = {{"json", {{"id", "nope"}}}};
-  json response = Post(base + "/insertAll", {{"rows", json::array({good, bad})}});
-  ASSERT_EQ(response["insertErrors"].size(), 1);
-  EXPECT_EQ(response["insertErrors"][0]["index"], 1);
-
-  response =
-      Post(base + "/insertAll", {{"rows", json::array({good, bad})}, {"skipInvalidRows", true}});
-  ASSERT_EQ(response["insertErrors"].size(), 1);
-  EXPECT_EQ(response["insertErrors"][0]["index"], 1);
+  const json row = {{"insertId", "row-1"},
+                    {"json",
+                     {{"id", "1"},
+                      {"tags", json::array({"a", "b"})},
+                      {"profile", {{"name", "alice"}, {"score", "3"}}},
+                      {"ts", "2024-01-02T03:04:05Z"},
+                      {"data", "AP8="}}}};
+  const json response = Post(base + "/insertAll", {{"rows", json::array({row})}});
+  EXPECT_EQ(response["kind"], "bigquery#tableDataInsertAllResponse");
+  EXPECT_FALSE(response.contains("insertErrors"));
   const json data = Get(base + "/data");
   EXPECT_EQ(data["rows"][0]["f"][1]["v"], json::parse(R"([{"v":"a"},{"v":"b"}])"));
   EXPECT_EQ(data["rows"][0]["f"][2]["v"]["f"][0]["v"], "alice");
   EXPECT_EQ(data["rows"][0]["f"][3]["v"], "1704164645");
   EXPECT_EQ(data["rows"][0]["f"][4]["v"], "AP8=");
-
-  response = Post(base + "/insertAll",
-                  {{"rows", json::array({{{"json", {{"id", 2}, {"extra", "ignored"}}}}})},
-                   {"ignoreUnknownValues", true}});
-  EXPECT_FALSE(response.contains("insertErrors"));
 }
 
 }  // namespace

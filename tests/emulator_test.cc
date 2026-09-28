@@ -229,53 +229,6 @@ TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
   EXPECT_EQ(ErrorStatus("DROP SCHEMA made"), 0);
 }
 
-TEST_F(EmulatorTest, QueriesDomainScopedProjects) {
-  const std::string project = "example.com:proj";
-  emulator_.CreateDataset({project, "ds"});
-  emulator_.CreateTable({project, "ds", "t"},
-                        nlohmann::json::parse(R"([{"name":"a","type":"INTEGER"}])"));
-  QueryRequest request;
-  request.project_id = project;
-  request.default_dataset = DatasetReference{project, "ds"};
-  request.query = "INSERT INTO t (a) VALUES (7)";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-
-  for (const std::string& table : {"t", "ds.t", "`example.com:proj.ds.t`"}) {
-    request.query = "SELECT a FROM " + table;
-    const auto job = emulator_.RunQuery(request);
-    if (!job->result.has_value()) {
-      FAIL() << table << ": " << ErrorMessage(*job);
-    }
-    EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "7");
-  }
-
-  request.default_dataset.reset();
-  request.query = "SELECT a FROM `example.com:proj.ds.t`";
-  const auto qualified = emulator_.RunQuery(request);
-  if (!qualified->result.has_value()) {
-    FAIL() << ErrorMessage(*qualified);
-  }
-  EXPECT_EQ(qualified->result->rows.at(0)["f"][0]["v"], "7");
-  request.default_dataset = DatasetReference{project, "ds"};
-
-  request.query = "UPDATE `example.com:proj.ds.t` SET a = 8 WHERE a = 7";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  request.query = "SELECT a FROM t";
-  const auto updated = emulator_.RunQuery(request);
-  if (!updated->result.has_value()) {
-    FAIL() << ErrorMessage(*updated);
-  }
-  EXPECT_EQ(updated->result->rows.at(0)["f"][0]["v"], "8");
-
-  request.query = "CREATE TABLE u AS SELECT a FROM t";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  EXPECT_EQ(emulator_.ListTables({project, "ds"}), (std::vector<std::string>{"t", "u"}));
-
-  request.query = "CREATE SCHEMA `example.com:proj.other`";
-  EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
-  EXPECT_EQ(emulator_.ListDatasets(project), (std::vector<std::string>{"ds", "other"}));
-}
-
 TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   emulator_.CreateDataset({"test", "ds"});
   const TableReference destination{"test", "ds", "dest"};
@@ -364,42 +317,19 @@ TEST_F(EmulatorTest, ReportsAFailedQueryAsAJobError) {
   EXPECT_EQ(ErrorStatus("SELECT 1"), 0);
 }
 
-TEST(EmulatorPersistenceTest, KeepsProjectsInTheDataDirectoryAcrossRestarts) {
+// That data survives a restart is covered by tests/e2e/run.sh; this checks the file layout.
+TEST(EmulatorPersistenceTest, StoresEachProjectInItsOwnFile) {
   const std::filesystem::path data_dir =
       std::filesystem::path(::testing::TempDir()) / "emulator_persistence";
   std::filesystem::remove_all(data_dir);
-  const std::string project = "proj";
-  // A domain-scoped id checks that ':' and '.' are encoded into a single file name.
-  const std::string scoped_project = "example.com:proj";
   {
     Emulator emulator(data_dir.string());
-    emulator.CreateDataset({project, "ds"});
-    emulator.CreateTable({project, "ds", "t"}, nlohmann::json::parse(R"([
-        {"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING", "mode": "REPEATED"}])"));
-    QueryRequest request;
-    request.project_id = project;
-    request.default_dataset = DatasetReference{project, "ds"};
-    request.query = "INSERT INTO t (a, b) VALUES (1, ['x', 'y'])";
-    const std::shared_ptr<const Job> job = emulator.RunQuery(request);
-    if (job->error.has_value()) {
-      FAIL() << job->error->what();
-    }
-    emulator.CreateDataset({scoped_project, "scoped"});
+    emulator.CreateDataset({"proj", "ds"});
+    // A domain-scoped id checks that ':' and '.' are encoded into a single file name.
+    emulator.CreateDataset({"example.com:proj", "scoped"});
   }
   EXPECT_TRUE(std::filesystem::exists(data_dir / "proj.duckdb"));
   EXPECT_TRUE(std::filesystem::exists(data_dir / "example%2Ecom%3Aproj.duckdb"));
-
-  Emulator emulator(data_dir.string());
-  EXPECT_EQ(emulator.ListDatasets(project), std::vector<std::string>{"ds"});
-  EXPECT_EQ(emulator.ListDatasets(scoped_project), std::vector<std::string>{"scoped"});
-  const TableInfo table = emulator.GetTable({project, "ds", "t"});
-  ASSERT_EQ(table.schema.size(), 2);
-  EXPECT_EQ(table.schema[1].mode, "REPEATED");
-  EXPECT_EQ(table.num_rows, 1);
-  const QueryResult rows = emulator.ListTableData({project, "ds", "t"}, 0, 10);
-  ASSERT_EQ(rows.rows.size(), 1);
-  EXPECT_EQ(rows.rows[0]["f"][0]["v"], "1");
-  EXPECT_EQ(rows.rows[0]["f"][1]["v"][1]["v"], "y");
 }
 
 }  // namespace

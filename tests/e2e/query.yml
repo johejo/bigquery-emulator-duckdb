@@ -53,6 +53,13 @@ steps:
       command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT * FROM missing_table'
     test: |
       current.exit_code != 0 && current.stdout contains "missing_table"
+  undeclared_parameter:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT @missing'
+    # bq prints "Error in query string" only for the invalidQuery reason.
+    test: |
+      current.exit_code != 0 && current.stdout contains "Error in query string" &&
+      current.stdout contains "'missing' not found"
   legacy_sql:
     exec:
       command: tests/e2e/bq.sh query --use_legacy_sql 'SELECT 1 AS x'
