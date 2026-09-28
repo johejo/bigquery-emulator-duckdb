@@ -1,25 +1,17 @@
 diff --git a/clang_tidy/clang_tidy.bzl b/clang_tidy/clang_tidy.bzl
-index 6df71db..78e1874 100644
+index 6df71db..1e13ba1 100644
 --- a/clang_tidy/clang_tidy.bzl
 +++ b/clang_tidy/clang_tidy.bzl
-@@ -186,8 +186,19 @@ def builtin_include_flags(cc_toolchain):
-     Returns:
-         list[str]: Compiler flags for the builtin include directories.
+@@ -188,7 +188,11 @@ def builtin_include_flags(cc_toolchain):
      """
--    flags = []
-+    # libc++ refuses to work when a C standard library include directory is searched
-+    # before its own headers, and toolchains do not necessarily report the directories
-+    # in that order (Apple's does not). Keep the C++ ones in front.
-+    cxx_dirs = []
-+    other_dirs = []
+     flags = []
      for built_in_include_dir in cc_toolchain.built_in_include_directories:
-+        if "/c++/" in built_in_include_dir or built_in_include_dir.endswith("/c++"):
-+            cxx_dirs.append(built_in_include_dir)
-+        else:
-+            other_dirs.append(built_in_include_dir)
-+
-+    flags = []
-+    for built_in_include_dir in cxx_dirs + other_dirs:
-         flags.extend(["-isystem", built_in_include_dir])
+-        flags.extend(["-isystem", built_in_include_dir])
++        # The C++ standard library reaches the C headers through #include_next, so it must be
++        # searched first, but toolchains report the directories in any order. -idirafter keeps
++        # the others behind it, and those clang-tidy already searches at their usual place.
++        is_cxx = "/c++/" in built_in_include_dir or built_in_include_dir.endswith("/c++")
++        flags.extend(["-isystem" if is_cxx else "-idirafter", built_in_include_dir])
      return flags
+ 
  
