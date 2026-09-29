@@ -643,6 +643,63 @@ TEST_F(TranslatorTest, RunsDateTimeConstructorsAndExtract) {
   EXPECT_EQ(Unsupported("SELECT GENERATE_DATE_ARRAY(DATE '2024-01-31', DATE '2024-05-01', "
                         "INTERVAL 1 MONTH)"),
             "function GENERATE_DATE_ARRAY");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%H:%M', t) FROM "
+                   "UNNEST(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01 00:00:00', "
+                   "TIMESTAMP '2024-01-01 01:00:00', INTERVAL 20 MINUTE)) AS t), ',')"),
+            "00:00,00:20,00:40,01:00");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
+                   "TIMESTAMP '2024-01-01', INTERVAL -1 DAY))"),
+            "3");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
+                   "TIMESTAMP '2024-01-01', INTERVAL 1 DAY))"),
+            "0");
+  EXPECT_EQ(Scalar("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', NULL, "
+                   "INTERVAL 1 DAY) IS NULL"),
+            "true");
+  EXPECT_THROW(Execute("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', "
+                       "TIMESTAMP '2024-01-02', INTERVAL 0 DAY)"),
+               BackendError);
+}
+
+TEST_F(TranslatorTest, Buckets) {
+  // The examples of the BigQuery reference.
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 2 DAY) AS "
+                   "STRING) FROM UNNEST([DATE '1949-12-29', DATE '1949-12-30', DATE '1949-12-31', "
+                   "DATE '1950-01-01', DATE '1950-01-02', DATE '1950-01-03']) AS d), ',')"),
+            "1949-12-28,1949-12-30,1949-12-30,1950-01-01,1950-01-01,1950-01-03");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 7 DAY, "
+                   "DATE '2000-12-24') AS STRING) FROM UNNEST([DATE '2000-12-20', "
+                   "DATE '2000-12-21', DATE '2000-12-24', DATE '2000-12-25']) AS d), ',')"),
+            "2000-12-17,2000-12-17,2000-12-24,2000-12-24");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', "
+                   "TIMESTAMP_BUCKET(t, INTERVAL 7 DAY, TIMESTAMP '2000-12-22 12:00:00')) FROM "
+                   "UNNEST([TIMESTAMP '2000-12-21 13:00:00', TIMESTAMP '2000-12-22 12:00:00', "
+                   "TIMESTAMP '2000-12-29 11:59:59']) AS t), ',')"),
+            "2000-12-15 12:00:00,2000-12-22 12:00:00,2000-12-22 12:00:00");
+  EXPECT_EQ(
+      Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '1949-12-31 "
+             "13:00:00', INTERVAL 12 HOUR))"),
+      "1949-12-31 12:00:00");
+  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
+                   "INTERVAL 12 HOUR) AS STRING)"),
+            "1950-01-01 12:00:00");
+  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
+                   "INTERVAL '0:30' HOUR TO MINUTE) AS STRING)"),
+            "1950-01-01 13:00:00");
+  // Months count in the calendar, and last days of the month count as the same day.
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 1 QUARTER, "
+                   "DATE '2000-01-31') AS STRING) FROM UNNEST([DATE '2000-04-29', "
+                   "DATE '2000-04-30', DATE '1999-12-31', DATE '1999-10-30']) AS d), ',')"),
+            "2000-01-31,2000-04-30,1999-10-31,1999-07-31");
+  EXPECT_EQ(Scalar("SELECT CAST(DATE_BUCKET(DATE '2024-05-20', INTERVAL 1 YEAR) AS STRING)"),
+            "2024-01-01");
+  EXPECT_THROW(Execute("SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL -1 DAY)"), BackendError);
+  EXPECT_THROW(Execute("SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 0 HOUR)"),
+               BackendError);
+  EXPECT_EQ(Unsupported("SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 1 MONTH)"),
+            "function TIMESTAMP_BUCKET");
+  EXPECT_EQ(Unsupported("SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL '1 2' DAY TO HOUR)"),
+            "function DATE_BUCKET bucket width");
 }
 
 std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {

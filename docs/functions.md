@@ -22,8 +22,8 @@ probe's own notes name what it rejected.
 | Status | Functions |
 | --- | --- |
 | Partial | 19 |
-| Supported | 197 |
-| Unsupported | 177 |
+| Supported | 201 |
+| Unsupported | 173 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
@@ -100,12 +100,12 @@ probe's own notes name what it rejected.
 | [`DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date) | date_functions | Supported | `SELECT DATE('abc')`: INVALID_ARGUMENT: Could not cast literal "abc" to type TIMESTAMP [at 1:13] |
 | [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | datetime_functions | Supported |  |
 | [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | datetime_functions | Supported |  |
-| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Supported |  |
 | [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries |
 | [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | datetime_functions | Supported |  |
 | [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
 | [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | date_functions | Supported |  |
-| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Supported |  |
 | [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
 | [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | date_functions | Supported |  |
 | [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | date_functions | Supported |  |
@@ -145,7 +145,7 @@ probe's own notes name what it rejected.
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | function GENERATE_ARRAY |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | takes only a DAY or WEEK step |
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
-| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Unsupported | function GENERATE_TIMESTAMP_ARRAY |
+| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported |  |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported |  |
 | [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported |  |
 | [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | aggregate_functions | Supported |  |
@@ -402,7 +402,7 @@ probe's own notes name what it rejected.
 | [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported |  |
 | [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | function TIMESTAMP |
 | [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Supported |  |
 | [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | timestamp_functions | Supported | counts whole units rather than boundaries |
 | [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | timestamp_functions | Supported |  |
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | timestamp_functions | Supported |  |

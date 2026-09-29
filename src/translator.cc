@@ -1,6 +1,7 @@
 #include "src/translator.h"
 
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -226,6 +227,64 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
       "year",   "quarter",     "month",       "week",    "day",     "hour",      "minute",
       "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear"};
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
+}
+
+// A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
+// INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
+struct BucketWidth {
+  std::string unit;
+  // The n of INTERVAL n PART, or null for a literal, whose count is all in `factor`.
+  const googlesql::ResolvedExpr* count = nullptr;
+  int64_t factor = 1;
+};
+
+std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
+  if (expr.Is<googlesql::ResolvedFunctionCall>()) {
+    const auto* call = expr.GetAs<googlesql::ResolvedFunctionCall>();
+    if (call->function()->Name() != "$interval" || call->argument_list_size() != 2) {
+      return std::nullopt;
+    }
+    static const std::map<std::string, std::pair<std::string, int64_t>> units = {
+        {"year", {"months", 12}},
+        {"quarter", {"months", 3}},
+        {"month", {"months", 1}},
+        {"week", {"days", 7}},
+        {"day", {"days", 1}},
+        {"hour", {"micros", 3600000000}},
+        {"minute", {"micros", 60000000}},
+        {"second", {"micros", 1000000}},
+        {"millisecond", {"micros", 1000}},
+        {"microsecond", {"micros", 1}}};
+    const auto part = DatePart(*call->argument_list(1));
+    const auto unit = part ? units.find(*part) : units.end();
+    if (unit == units.end()) {
+      return std::nullopt;
+    }
+    return BucketWidth{
+        .unit = unit->second.first, .count = call->argument_list(0), .factor = unit->second.second};
+  }
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->IsInterval() ||
+      value.interval_value().get_nano_fractions() != 0) {
+    return std::nullopt;
+  }
+  // A zero width counts as days, which raises the error BigQuery raises for every input type.
+  std::vector<BucketWidth> parts;
+  for (const auto& [unit, count] :
+       {std::pair<std::string, int64_t>{"months", value.interval_value().get_months()},
+        {"days", value.interval_value().get_days()},
+        {"micros", value.interval_value().get_micros()}}) {
+    if (count != 0) {
+      parts.push_back({.unit = unit, .factor = count});
+    }
+  }
+  if (parts.size() > 1) {
+    return std::nullopt;
+  }
+  return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts[0];
 }
 
 ArgumentType TypeOf(const googlesql::Type& type) {
@@ -529,6 +588,62 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     return "list_transform(generate_series(CAST(" + args[0] + " AS TIMESTAMP), CAST(" + args[1] +
            " AS TIMESTAMP), " + step + "), _d -> CAST(_d AS DATE))";
   }
+  if (name == "GENERATE_TIMESTAMP_ARRAY" && n == 4) {
+    static const std::map<std::string, std::string> micros = {
+        {"day", "86400000000"}, {"hour", "3600000000"},  {"minute", "60000000"},
+        {"second", "1000000"},  {"millisecond", "1000"}, {"microsecond", "1"}};
+    const auto part = DatePart(*call.argument_list(3));
+    const auto step = part ? micros.find(*part) : micros.end();
+    if (step == micros.end()) {
+      return std::nullopt;
+    }
+    // Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return
+    // an empty array for a zero step.
+    return "list_transform([struct_pack(a := " + args[0] + ", b := " + args[1] +
+           ", s := " + args[2] + " * " + step->second +
+           ")], _g -> CASE WHEN _g.s = 0 THEN error('Sequence step cannot be 0.') ELSE "
+           "generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]";
+  }
+  // The width is already a count of months, days or microseconds, see BucketWidthOf. Months
+  // count from the origin in the calendar, while days and microseconds are fixed lengths;
+  // TIMESTAMP and DATETIME take a day as 24 hours.
+  if ((name == "DATE_BUCKET" || name == "DATETIME_BUCKET" || name == "TIMESTAMP_BUCKET") &&
+      (n == 2 || n == 3)) {
+    const auto width = BucketWidthOf(*call.argument_list(1));
+    const googlesql::Type* input = type(0);
+    if (!width || (input->IsDate() && width->unit == "micros") ||
+        (!input->IsDate() && width->unit == "months")) {
+      return std::nullopt;
+    }
+    std::string bucket;
+    if (input->IsDate() && width->unit == "days") {
+      bucket = "_bk.x - CAST((((_bk.x - _bk.o) % _bk.w) + _bk.w) % _bk.w AS INTEGER)";
+    } else if (input->IsDate()) {
+      // A day past the origin's day of the month starts the next bucket, and last days of the
+      // month count as the same day.
+      bucket =
+          "list_transform([(year(_bk.x) - year(_bk.o)) * 12 + month(_bk.x) - month(_bk.o)], _m -> "
+          "CAST(_bk.o + to_months(CAST(_m - _m % _bk.w - CASE WHEN _m % _bk.w < 0 OR (_m % _bk.w = "
+          "0 AND NOT (_bk.o = last_day(_bk.o) AND _bk.x = last_day(_bk.x)) AND day(_bk.x) < "
+          "day(_bk.o)) THEN _bk.w ELSE 0 END AS INTEGER)) AS DATE))[1]";
+    } else {
+      const std::string w = width->unit == "days" ? "(_bk.w * 86400000000)" : "_bk.w";
+      bucket = "_bk.x - to_microseconds((((epoch_us(_bk.x) - epoch_us(_bk.o)) % " + w + ") + " + w +
+               ") % " + w + ")";
+    }
+    const std::string origin = n == 3                ? args[2]
+                               : input->IsDate()     ? "DATE '1950-01-01'"
+                               : input->IsDatetime() ? "TIMESTAMP '1950-01-01 00:00:00'"
+                                                     : "TIMESTAMPTZ '1950-01-01 00:00:00+00'";
+    const std::string zero = input->IsTimestamp()
+                                 ? "Zero bucket width INTERVAL is not allowed"
+                                 : "Exactly one non-zero INTERVAL part in bucket width is required";
+    return "list_transform([struct_pack(x := " + args[0] + ", w := " + args[1] +
+           ", o := " + origin +
+           ")], _bk -> CASE WHEN _bk.w < 0 THEN error('Negative bucket width INTERVAL is not "
+           "allowed') WHEN _bk.w = 0 THEN error('" +
+           zero + "') ELSE " + bucket + " END)[1]";
+  }
   // INTERVAL n PART becomes two arguments (INT64, enum) in the resolved AST.
   if (n == 3 && (name == "DATE_ADD" || name == "DATE_SUB" || name == "DATETIME_ADD" ||
                  name == "DATETIME_SUB" || name == "TIMESTAMP_ADD" || name == "TIMESTAMP_SUB" ||
@@ -681,8 +796,28 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
     return Unsupported(scope, "function " + name + " error mode");
   }
+  const bool bucket =
+      name == "DATE_BUCKET" || name == "DATETIME_BUCKET" || name == "TIMESTAMP_BUCKET";
   std::vector<std::string> args;
   for (const auto& argument : call.argument_list()) {
+    // The bucket width INTERVAL becomes a plain count, since DuckDB intervals keep no single
+    // part to count in.
+    if (bucket && argument->type()->IsInterval()) {
+      const auto width = BucketWidthOf(*argument);
+      if (!width) {
+        return Unsupported(scope, "function " + name + " bucket width");
+      }
+      if (width->count == nullptr) {
+        args.push_back(std::to_string(width->factor));
+        continue;
+      }
+      const auto count = Expression(*width->count, scope, columns);
+      if (!count) {
+        return std::nullopt;
+      }
+      args.push_back("(" + *count + " * " + std::to_string(width->factor) + ")");
+      continue;
+    }
     if (argument->type()->IsEnum()) {
       const auto part = DatePart(*argument);
       if (!part) {
