@@ -9,14 +9,6 @@ config_setting(
 )
 
 config_setting(
-    name = "macos_x86_64",
-    constraint_values = [
-        "@platforms//os:macos",
-        "@platforms//cpu:x86_64",
-    ],
-)
-
-config_setting(
     name = "linux_x86_64",
     constraint_values = [
         "@platforms//os:linux",
@@ -38,11 +30,10 @@ alias(
     actual = select(
         {
             ":macos_aarch64": "@duckdb_prebuilt_macos_arm64//:duckdb",
-            ":macos_x86_64": "@duckdb_prebuilt_macos_amd64//:duckdb",
             ":linux_x86_64": "@duckdb_prebuilt_linux_amd64//:duckdb",
             ":linux_aarch64": "@duckdb_prebuilt_linux_arm64//:duckdb",
         },
-        no_match_error = "No prebuilt libduckdb for this platform; supported are macOS and Linux on x86_64 and aarch64.",
+        no_match_error = "No prebuilt libduckdb for this platform; supported are macOS on aarch64 and Linux on x86_64 and aarch64.",
     ),
     visibility = ["//visibility:public"],
 )

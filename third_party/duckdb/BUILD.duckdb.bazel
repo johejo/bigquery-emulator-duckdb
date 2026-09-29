@@ -5,16 +5,34 @@ package(default_visibility = ["//visibility:public"])
 # DuckDB's official static libraries: the core, the extensions the release loads statically
 # (core_functions, icu, json, parquet, autocomplete) and the vendored third-party libraries, whose
 # symbols DuckDB keeps in its own namespaces. The unused tpch and tpcds extensions are left out.
+#
+# The core, the generated extension loader and the extensions reference each other in a cycle,
+# which GNU ld cannot resolve in one pass over the archives, so they are linked whole.
 cc_library(
     name = "duckdb",
+    srcs = [
+        "libautocomplete_extension.a",
+        "libcore_functions_extension.a",
+        "libduckdb_generated_extension_loader.a",
+        "libduckdb_static.a",
+        "libicu_extension.a",
+        "libjson_extension.a",
+        "libparquet_extension.a",
+    ],
+    hdrs = ["duckdb.h"],
+    alwayslink = True,
+    deps = [":vendored"],
+)
+
+cc_library(
+    name = "vendored",
     srcs = glob(
-        ["*.a"],
+        ["libduckdb_*.a"],
         exclude = [
-            "libtpcds_extension.a",
-            "libtpch_extension.a",
+            "libduckdb_generated_extension_loader.a",
+            "libduckdb_static.a",
         ],
     ),
-    hdrs = ["duckdb.h"],
     linkopts = select({
         "@platforms//os:linux": [
             "-lpthread",
@@ -22,4 +40,5 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:private"],
 )
