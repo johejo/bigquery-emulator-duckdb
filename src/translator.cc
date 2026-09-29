@@ -965,9 +965,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return Unsupported(scope, "aggregate or analytic function " + name);
     }
   }
-  if (name == "STRING_AGG" && !call.argument_list(0)->type()->IsString()) {
-    return Unsupported(scope, "STRING_AGG over BYTES");
-  }
   std::vector<std::string> args;
   for (const auto& argument : call.argument_list()) {
     const auto sql = Expression(*argument, scope, columns);
@@ -976,6 +973,18 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     args.push_back(*sql);
   }
+  // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their hexadecimal
+  // digits; the default delimiter is b','.
+  const bool bytes = name == "STRING_AGG" && call.argument_list(0)->type()->IsBytes();
+  if (bytes) {
+    args.at(0) = "hex(" + args.at(0) + ")";
+    if (args.size() > 1) {
+      args.at(1) = "hex(" + args.at(1) + ")";
+    } else {
+      args.emplace_back("'2C'");
+    }
+  }
+  const auto unhex = [bytes](const std::string& sql) { return bytes ? "unhex(" + sql + ")" : sql; };
   std::string inner = name == "$COUNT_STAR" ? "*" : Join(args, ", ");
   if (call.distinct()) {
     inner = "DISTINCT " + inner;
@@ -1015,8 +1024,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
                                args.at(0) + order + ") FILTER (WHERE " + Join(conditions, " AND ") +
                                ")";
-      return "array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
-             (args.size() > 1 ? args.at(1) : "','") + ")";
+      return unhex("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
+                   (args.size() > 1 ? args.at(1) : "','") + ")");
     }
     if (name != "ARRAY_AGG") {
       return Unsupported(scope, "aggregate " + name + " with LIMIT");
@@ -1025,7 +1034,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   const std::string sql =
       function->second + "(" + inner + order + ")" +
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
-  return limit.empty() ? sql : "list_slice(" + sql + ", 1, " + limit + ")";
+  return limit.empty() ? unhex(sql) : "list_slice(" + sql + ", 1, " + limit + ")";
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,

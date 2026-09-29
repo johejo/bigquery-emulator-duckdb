@@ -489,8 +489,58 @@ TEST_F(TranslatorTest, RunsStringBytesAndMathFunctions) {
   EXPECT_EQ(Scalar("SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3"), "6");
   EXPECT_EQ(Scalar("SELECT SAFE_NEGATE(1)"), "-1");
   EXPECT_EQ(Scalar("SELECT SAFE_SUBTRACT(1, 2)"), "-1");
-  // DuckDB's left() has no BYTES overload.
-  EXPECT_EQ(Unsupported("SELECT LEFT(b'abc', 1)"), "function LEFT");
+}
+
+TEST_F(TranslatorTest, RunsSubstrAtBigQueryPositions) {
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 0, 2)"), "ab");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -5, 2)"), "ab");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -2)"), "bc");
+  EXPECT_EQ(Scalar("SELECT SUBSTRING('あいう', 2, 1)"), "い");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 4)"), "");
+  EXPECT_THROW(Execute("SELECT SUBSTR('abc', 1, -1)"), BackendError);
+}
+
+// The BYTES overloads work on hexadecimal digits, so a byte that is not valid UTF-8 or looks
+// like part of another byte's digits must stay whole.
+TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
+  const auto hex = [this](const std::string& expression) {
+    return Scalar("SELECT TO_HEX(" + expression + ")");
+  };
+  EXPECT_EQ(hex("LEFT(b'\\xffab', 2)"), "ff61");
+  EXPECT_EQ(hex("RIGHT(b'\\xffab', 1)"), "62");
+  EXPECT_THROW(Execute("SELECT LEFT(b'abc', -1)"), BackendError);
+  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 2)"), "6162");
+  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 0, 2)"), "ff61");
+  EXPECT_EQ(hex("SUBSTRING(b'\\xffab', -2, 1)"), "61");
+  EXPECT_EQ(hex("REVERSE(b'\\x01\\xffa')"), "61ff01");
+  EXPECT_EQ(hex("LOWER(b'\\\\\\xffAz')"), "5cff617a");
+  EXPECT_EQ(hex("UPPER(b'\\\\\\xffAz')"), "5cff415a");
+  EXPECT_EQ(hex("LPAD(b'a', 4, b'\\xff')"), "ffffff61");
+  EXPECT_EQ(hex("RPAD(b'a', 2)"), "6120");
+  EXPECT_EQ(hex("LPAD(b'abc', 2)"), "6162");
+  EXPECT_EQ(hex("TRIM(b'\\xffa\\xffb\\xff', b'\\xff')"), "61ff62");
+  EXPECT_EQ(hex("LTRIM(b'aab', b'a')"), "62");
+  EXPECT_EQ(hex("RTRIM(b'abb', b'ab')"), "");
+  // 0x1f 0xf1 holds the digits of 0xff between its bytes.
+  EXPECT_EQ(hex("REPLACE(b'\\x1f\\xf1\\xff', b'\\xff', b'z')"), "1ff17a");
+  EXPECT_EQ(hex("REPLACE(b'abc', b'', b'z')"), "616263");
+  EXPECT_EQ(Scalar("SELECT STRPOS(b'\\x1f\\xf1\\xff', b'\\xff')"), "3");
+  EXPECT_EQ(Scalar("SELECT INSTR(b'abc', b'z')"), "0");
+  EXPECT_EQ(Scalar("SELECT STARTS_WITH(b'\\xffa', b'\\xff')"), "true");
+  EXPECT_EQ(Scalar("SELECT ENDS_WITH(b'\\xffa', b'\\xff')"), "false");
+  EXPECT_EQ(Scalar("SELECT ASCII(b'\\xffa')"), "255");
+  EXPECT_EQ(Scalar("SELECT ASCII(b'')"), "0");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
+                   "UNNEST(SPLIT(b'a\\x1f\\xf1b', b'\\xf1')) AS x), ',')"),
+            "611f,62");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
+                   "UNNEST(SPLIT(b'a\\xff', b'')) AS x), ',')"),
+            "61,ff");
+  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL, b'\\xff'], b'-')"), "612dff");
+  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL], b'-', b'\\xff')"), "612dff");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(['a', NULL, 'b'], '-', 'N')"), "a-N-b");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw ORDER BY a)) FROM t"), "612c00ff");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t"), "00ff");
 }
 
 // Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
@@ -932,8 +982,6 @@ TEST_F(TranslatorTest, RunsOperatorsAndArrayFunctions) {
   EXPECT_EQ(Scalar("SELECT LPAD('a', 3)"), "  a");
   EXPECT_EQ(Scalar("SELECT RPAD('a', 3, 'xy')"), "axy");
   EXPECT_EQ(Scalar("SELECT LPAD('abc', 2)"), "ab");
-  EXPECT_EQ(Unsupported("SELECT LPAD(b'a', 3)"), "function LPAD");
-  EXPECT_EQ(Unsupported("SELECT SPLIT(b'a,b', b',')"), "function SPLIT");
 }
 
 TEST_F(TranslatorTest, RunsRegularExpressionFunctions) {

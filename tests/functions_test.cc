@@ -29,7 +29,8 @@ TEST(FunctionsTest, MatchesTheArgumentTypes) {
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("b", ArgumentType::kBytes)}), "octet_length(b)");
   // A function with rules is unsupported when none matches, rather than passed through.
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("x")}), std::nullopt);
-  EXPECT_EQ(TranslateFunction("INSTR", {Sql("b", ArgumentType::kBytes), Sql("c")}), std::nullopt);
+  EXPECT_EQ(TranslateFunction("TRANSLATE", {Sql("b", ArgumentType::kBytes), Sql("c"), Sql("d")}),
+            std::nullopt);
 }
 
 TEST(FunctionsTest, FillsInDefaults) {

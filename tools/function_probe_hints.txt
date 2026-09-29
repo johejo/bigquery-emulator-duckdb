@@ -82,9 +82,10 @@ query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 
 note BYTE_LENGTH counts the bytes of a STRING's UTF-8 encoding
 note LENGTH counts characters of a STRING and bytes of a BYTES
 note ARRAY_CONCAT returns NULL when any array is NULL
-note LPAD pads with spaces by default; the BYTES overload is unsupported
-note RPAD pads with spaces by default; the BYTES overload is unsupported
-note SPLIT the BYTES overload is unsupported
+note SUBSTR starts at the first character for a position of 0 or before the start
+note SUBSTRING starts at the first character for a position of 0 or before the start
+note LPAD pads with spaces by default
+note RPAD pads with spaces by default
 note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
 note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
 note DATE_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
