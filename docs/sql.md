@@ -69,12 +69,12 @@ what it rejected.
 | `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | Unsupported | INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, ON CONFLICT or generated columns |
 | `UPDATE` | Supported |  |
 | `UPDATE` of a struct field | Supported |  |
-| `UPDATE ... FROM` | Supported | Unlike BigQuery, an update in which one target row matches several source rows is not rejected |
+| `UPDATE ... FROM` | Supported | Rejects multiple source matches per target row before applying any updates |
 | `UPDATE` of array elements | Unsupported | UPDATE of array elements or nested DML |
 | Nested DML | Unsupported | UPDATE of array elements or nested DML |
 | `DELETE` | Supported |  |
 | `TRUNCATE TABLE` | Unsupported | statement TruncateStmt |
-| `MERGE` | Supported | Unlike BigQuery, a merge in which one target row matches several source rows is not rejected |
+| `MERGE` | Supported | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies |
 | `ASSERT_ROWS_MODIFIED` | Unsupported | UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns |
 | `THEN RETURN` | Unsupported | DELETE with ASSERT_ROWS_MODIFIED, THEN RETURN or USING; INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, ON CONFLICT or generated columns |
 

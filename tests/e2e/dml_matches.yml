@@ -1,0 +1,70 @@
+desc: DML rejects ambiguous source matches atomically while allowing valid duplicates
+steps:
+  dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset matches
+    test: current.exit_code == 0
+  target:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE TABLE matches.t AS SELECT id, 0 AS v FROM UNNEST([1, 2, 2, 3]) AS id'
+    test: current.exit_code == 0
+  update_rejects_multiple_matches:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'UPDATE matches.t AS t SET v = s.v
+        FROM UNNEST([STRUCT(1 AS id, 10 AS v), (1, 20), (3, 30)]) AS s WHERE t.id = s.id'
+    test: current.exit_code != 0 && current.stdout contains 'must match at most one source row'
+  dry_run_does_not_check_data:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'UPDATE matches.t AS t SET v = s.v
+        FROM UNNEST([STRUCT(1 AS id, 10 AS v), (1, 20)]) AS s WHERE t.id = s.id'
+    test: current.exit_code == 0
+  merge_rejects_multiple_matches:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'MERGE matches.t AS t
+        USING UNNEST([STRUCT(1 AS id, 10 AS v), (1, 20), (4, 40)]) AS s ON t.id = s.id
+        WHEN MATCHED THEN UPDATE SET v = s.v WHEN NOT MATCHED THEN INSERT (id, v) VALUES (s.id, s.v)'
+    test: current.exit_code != 0 && current.stdout contains 'must match at most one source row'
+  no_partial_changes:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT id, v FROM matches.t ORDER BY id'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1","v":"0"},{"id":"2","v":"0"},{"id":"2","v":"0"},{"id":"3","v":"0"}]'
+  duplicate_target_rows_are_valid:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'UPDATE matches.t AS t SET v = s.v
+        FROM UNNEST([STRUCT(2 AS id, 22 AS v), (9, 90), (9, 99)]) AS s WHERE t.id = s.id'
+    test: current.exit_code == 0
+  unmatched_duplicates_are_valid:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'MERGE matches.t AS t USING (SELECT id FROM UNNEST([5, 5]) AS id) AS s ON t.id = s.id
+        WHEN MATCHED THEN UPDATE SET v = 50 WHEN NOT MATCHED THEN INSERT (id, v) VALUES (s.id, 50)'
+    test: current.exit_code == 0
+  inactive_matched_actions_are_valid:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'MERGE matches.t AS t USING (SELECT id FROM UNNEST([1, 1]) AS id) AS s ON t.id = s.id
+        WHEN MATCHED AND t.v = 99 THEN UPDATE SET v = 100'
+    test: current.exit_code == 0
+  final_rows:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT id, v FROM matches.t ORDER BY id'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1","v":"0"},{"id":"2","v":"22"},{"id":"2","v":"22"},{"id":"3","v":"0"},{"id":"5","v":"50"},{"id":"5","v":"50"}]'
+  delete_only_allows_multiple_matches:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql 'MERGE matches.t AS t
+        USING (SELECT id FROM UNNEST([1, 1]) AS id) AS s ON t.id = s.id
+        WHEN MATCHED THEN DELETE'
+    test: current.exit_code == 0
+  deleted:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT COUNT(*) AS n FROM matches.t WHERE id = 1'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"n":"0"}]'
+  cleanup:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d matches
+    test: current.exit_code == 0

@@ -86,6 +86,8 @@ Behavior that applies across them:
 - Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
   and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
   cannot read them. Temporary, recursive and value-table views are unsupported.
+- `UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
+  has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
 - Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,
   `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from
   DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`,

@@ -92,7 +92,7 @@ query `UPDATE` | UPDATE t SET name = 'z' WHERE id = 1
 query `UPDATE` | UPDATE t SET name = DEFAULT WHERE TRUE
 query `UPDATE` of a struct field | UPDATE t SET s.a = 5 WHERE id = 1
 query `UPDATE ... FROM` | UPDATE t SET name = CAST(u.v AS STRING) FROM u WHERE t.id = u.id
-note `UPDATE ... FROM` | Unlike BigQuery, an update in which one target row matches several source rows is not rejected
+note `UPDATE ... FROM` | Rejects multiple source matches per target row before applying any updates
 query `UPDATE` of array elements | UPDATE t SET tags[OFFSET(0)] = 'y' WHERE id = 1
 query Nested DML | UPDATE t SET (INSERT tags VALUES ('y')) WHERE id = 1
 query `DELETE` | DELETE t WHERE id = 1
@@ -102,7 +102,7 @@ query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED THEN UPDATE SET name
 query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED AND u.v > 10 THEN DELETE WHEN NOT MATCHED BY SOURCE THEN DELETE
 query `MERGE` | MERGE u USING (SELECT 5 AS id, 50 AS v) AS s ON u.id = s.id WHEN NOT MATCHED THEN INSERT ROW
 query `MERGE` | MERGE t USING u ON FALSE WHEN NOT MATCHED BY TARGET THEN INSERT (id) VALUES (u.id) WHEN NOT MATCHED BY SOURCE AND t.id = 2 THEN UPDATE SET name = 'gone'
-note `MERGE` | Unlike BigQuery, a merge in which one target row matches several source rows is not rejected
+note `MERGE` | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies
 query `ASSERT_ROWS_MODIFIED` | UPDATE t SET name = 'z' WHERE id = 1 ASSERT_ROWS_MODIFIED 1
 query `THEN RETURN` | DELETE t WHERE id = 1 THEN RETURN id
 query `THEN RETURN` | INSERT u (id, v) VALUES (5, 50) THEN RETURN *
