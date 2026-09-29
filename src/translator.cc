@@ -230,7 +230,7 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
                            : value.double_value() < 0       ? "-inf"
                                                             : "inf");
   } else {
-    literal = value.GetSQLLiteral();
+    literal = value.GetSQLLiteral(GoogleSqlLanguageOptions());
     if (value.type()->IsDate() || value.type()->IsTimestamp() || value.type()->IsDatetime() ||
         value.type()->IsTime() || value.type()->IsNumericType() ||
         value.type()->IsBigNumericType() || value.type()->IsJson()) {
