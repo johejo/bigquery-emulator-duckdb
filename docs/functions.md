@@ -22,8 +22,8 @@ probe's own notes name what it rejected.
 | Status | Functions |
 | --- | --- |
 | Partial | 19 |
-| Supported | 201 |
-| Unsupported | 173 |
+| Supported | 211 |
+| Unsupported | 163 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
@@ -172,13 +172,13 @@ probe's own notes name what it rejected.
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
 | [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
 | [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported | function JSON_FLATTEN |
-| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Unsupported | function JSON_KEYS |
-| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Unsupported | function JSON_OBJECT |
+| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported |  |
+| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported |  |
 | [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
 | [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Unsupported | function JSON_REMOVE |
-| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Unsupported | function JSON_SET |
-| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Unsupported | function JSON_STRIP_NULLS |
+| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Supported |  |
+| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Supported |  |
+| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Supported |  |
 | [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported |  |
 | [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
 | [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
@@ -210,10 +210,10 @@ probe's own notes name what it rejected.
 | [`LAG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lag) | navigation_functions | Supported |  |
 | [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported |  |
 | [`LAST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#last_value) | navigation_functions | Supported |  |
-| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Unsupported | function LAX_BOOL |
-| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Unsupported | function LAX_FLOAT64 |
-| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Unsupported | function LAX_INT64 |
-| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Unsupported | function LAX_STRING |
+| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Supported |  |
+| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Supported |  |
+| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Supported |  |
+| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Supported |  |
 | [`LEAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lead) | navigation_functions | Supported |  |
 | [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported |  |
 | [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Supported |  |
@@ -417,7 +417,7 @@ probe's own notes name what it rejected.
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported |  |
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported | function TO_CODE_POINTS |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported |  |
-| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Unsupported | function TO_JSON |
+| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported |  |
 | [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported |  |
 | [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Partial | function TRANSLATE |
 | [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Supported |  |

@@ -1146,6 +1146,63 @@ TEST_F(TranslatorTest, RunsJsonFunctions) {
   EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$.a[*]')"), "function JSON_QUERY");
 }
 
+TEST_F(TranslatorTest, BuildsAndChangesJson) {
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))"),
+            R"({"a":1,"b":[2,3]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(CAST(NULL AS INT64)))"), "null");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON('s', stringify_wide_numbers => FALSE))"),
+            R"("s")");
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'b', NULL, 'c', JSON '[1]'))"),
+            R"({"a":1,"b":null,"c":[1]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT())"), "{}");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'a', 2))"), R"({"a":1})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT(['a', 'b'], [10, 20]))"),
+            R"({"a":10,"b":20})");
+  EXPECT_THROW(Execute("SELECT JSON_OBJECT(['a'], [1, 2])"), BackendError);
+  EXPECT_THROW(Execute("SELECT JSON_OBJECT(CAST(NULL AS STRING), 1)"), BackendError);
+
+  const std::string doc = R"(JSON '{"a": {"b": 1, "c": null}, "d": [1, null, 2]}')";
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_REMOVE(" + doc + ", '$.a.b', '$.d[0]'))"),
+            R"({"a":{"c":null},"d":[null,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_REMOVE(" + doc + ", '$.x', NULL))"),
+            R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_EQ(Scalar("SELECT JSON_REMOVE(CAST(NULL AS JSON), '$.a')"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT JSON_REMOVE(CAST(NULL AS JSON), 'a')"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b', 'x', '$.e.f', [1]))"),
+            R"({"a":{"b":"x","c":null},"d":[1,null,2],"e":{"f":[1]}})");
+  EXPECT_EQ(
+      Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.e', 1, create_if_missing => FALSE))"),
+      R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(JSON '{}', '$.a', CAST(NULL AS INT64)))"),
+            R"({"a":null})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b.c', 1))"),
+            R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_THROW(Execute("SELECT JSON_SET(" + doc + ", 'a', 1)"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_STRIP_NULLS(" + doc + "))"),
+            R"({"a":{"b":1},"d":[1,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_STRIP_NULLS(" + doc +
+                   ", '$.a', include_arrays => FALSE))"),
+            R"({"a":{"b":1},"d":[1,null,2]})");
+
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + "), ',')"), "a,a.b,a.c,d");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + ", 1), ',')"), "a,d");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(JSON_KEYS(JSON '[]'))"), "0");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(JSON '[{\"a\": 1}]', mode => 'lax'), ',')"),
+            "a");
+  EXPECT_THROW(Execute("SELECT JSON_KEYS(" + doc + ", 0)"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT LAX_BOOL(JSON '\"TRUE\"')"), "true");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '\"10\"')"), "10");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '1.5')"), "2");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '[1]')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT LAX_FLOAT64(JSON '\"1.5\"')"), "1.5");
+  EXPECT_EQ(Scalar("SELECT LAX_STRING(JSON '123')"), "123");
+  EXPECT_EQ(Scalar("SELECT LAX_STRING(CAST(NULL AS JSON))"), std::nullopt);
+}
+
 TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   const std::string doc = R"(JSON '{"a": {"b": [10, 20]}, "c d": "x", "f": 2.0, "g": 2.5}')";
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING((" + doc + ").a.b)"), "[10,20]");
@@ -1166,7 +1223,6 @@ TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   EXPECT_EQ(Scalar("SELECT STRING((" + doc + ").missing)"), std::nullopt);
   EXPECT_EQ(Unsupported("SELECT FLOAT64(JSON '1', wide_number_mode => 'exact')"),
             "function FLOAT64");
-  EXPECT_EQ(Unsupported("SELECT LAX_INT64(JSON '1')"), "function LAX_INT64");
 }
 
 TEST_F(TranslatorTest, DoesNotReportParameterErrorsAsUnsupported) {

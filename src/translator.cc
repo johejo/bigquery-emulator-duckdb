@@ -752,6 +752,74 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
            conversion->second.first + " ELSE error('The provided JSON input is not " +
            conversion->second.second + "') END)[1]";
   }
+  // The JSON functions in src/backend.cc take and return JSON as its text.
+  const auto json_text = [&](size_t i) {
+    return type(i)->IsJson() ? "CAST(" + args[i] + " AS VARCHAR)"
+                             : "CAST(to_json(" + args[i] + ") AS VARCHAR)";
+  };
+  // BigQuery's TO_JSON makes JSON null of NULL. Stringifying wide numbers is unsupported.
+  if (name == "TO_JSON" &&
+      (n == 1 || (n == 2 && call.argument_list(1)->Is<googlesql::ResolvedLiteral>() &&
+                  call.argument_list(1)->GetAs<googlesql::ResolvedLiteral>()->value() ==
+                      googlesql::Value::Bool(false)))) {
+    return "coalesce(to_json(" + args[0] + "), JSON 'null')";
+  }
+  static const std::map<std::string, std::string> lax_conversions = {
+      {"LAX_BOOL", "bq_lax_bool"},
+      {"LAX_INT64", "bq_lax_int64"},
+      {"LAX_FLOAT64", "bq_lax_float64"},
+      {"LAX_DOUBLE", "bq_lax_float64"},
+      {"LAX_STRING", "bq_lax_string"}};
+  if (const auto lax = lax_conversions.find(name);
+      lax != lax_conversions.end() && n == 1 && type(0)->IsJson()) {
+    return lax->second + "(" + json_text(0) + ")";
+  }
+  if (name == "JSON_KEYS" && n == 3) {
+    return "CAST(json(bq_json_keys(" + json_text(0) + ", " + args[1] + ", " + args[2] +
+           ")) AS VARCHAR[])";
+  }
+  if (name == "JSON_STRIP_NULLS" && n == 4) {
+    return "json(bq_json_strip_nulls(" + json_text(0) + ", " + args[1] + ", " + args[2] + ", " +
+           args[3] + "))";
+  }
+  // JSON_REMOVE and JSON_SET take the paths one by one, in order.
+  if (name == "JSON_REMOVE" && n >= 2) {
+    std::string result = json_text(0);
+    for (size_t i = 1; i < n; ++i) {
+      result.insert(0, "bq_json_remove(").append(", ").append(args[i]).append(")");
+    }
+    return "json(" + result + ")";
+  }
+  if (name == "JSON_SET" && n >= 4 && n % 2 == 0) {
+    std::string result = json_text(0);
+    for (size_t i = 1; i + 1 < n; i += 2) {
+      result.insert(0, "bq_json_set(")
+          .append(", ")
+          .append(args[i])
+          .append(", ")
+          .append(json_text(i + 1))
+          .append(", ")
+          .append(args[n - 1])
+          .append(")");
+    }
+    return "json(" + result + ")";
+  }
+  if (name == "JSON_OBJECT") {
+    if (n == 2 && type(0)->IsArray()) {
+      return "json(bq_json_object(" + json_text(0) + ", " + json_text(1) + "))";
+    }
+    if (n % 2 != 0) {
+      return std::nullopt;
+    }
+    std::vector<std::string> keys;
+    std::vector<std::string> values;
+    for (size_t i = 0; i < n; i += 2) {
+      keys.push_back(args[i]);
+      values.push_back(args[i + 1]);
+    }
+    return "json(bq_json_object(CAST(json_array(" + Join(keys, ", ") +
+           ") AS VARCHAR), CAST(json_array(" + Join(values, ", ") + ") AS VARCHAR)))";
+  }
   if (name == "ARRAY_CONCAT" && n >= 1) {
     if (n == 1) {
       return args[0];
