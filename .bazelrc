@@ -9,6 +9,20 @@ build --host_cxxopt=-std=c++20
 build --action_env=TZDIR
 build --test_env=TZDIR
 
+# Silence warnings from dependencies, which this repository cannot fix, while keeping warnings
+# from its own C++ sources. -w covers dependency sources. Dependency headers are found through
+# -iquote, so warnings inside them, such as deprecations in inline functions, would still be
+# reported while compiling this repository's sources; treat them as system headers (a clang flag;
+# the Nix and Xcode toolchains are clang). Direct uses of deprecated APIs are still reported.
+build --per_file_copt=external/.*@-w
+build --host_per_file_copt=external/.*@-w
+build --copt=--system-header-prefix=absl/
+build --copt=--system-header-prefix=google/
+build --copt=--system-header-prefix=googlesql/
+build --host_copt=--system-header-prefix=absl/
+build --host_copt=--system-header-prefix=google/
+build --host_copt=--system-header-prefix=googlesql/
+
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-layering_check
@@ -33,9 +47,6 @@ build:ci --experimental_disk_cache_gc_max_size=8G
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 # Keep the host PATH out of action cache keys unless explicitly requested (e.g. clang-tidy).
 build:ci --incompatible_strict_action_env
-# Keep CI logs readable while retaining warnings from this repository's C++ sources.
-build:ci --per_file_copt=external/.*@-w
-build:ci --host_per_file_copt=external/.*@-w
 test:ci --test_output=errors
 
 # Optional machine-specific settings (not checked into Git).

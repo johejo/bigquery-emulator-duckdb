@@ -4,7 +4,6 @@ module(
 )
 
 bazel_dep(name = "cpp-httplib", version = "0.46.0")
-
 bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
 bazel_dep(name = "googlesql", version = "2026.9.2")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
