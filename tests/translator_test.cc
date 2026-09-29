@@ -251,6 +251,10 @@ TEST_F(TranslatorTest, RunsSafeCalls) {
   EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1"), "true");
   EXPECT_EQ(Scalar("SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1"), "Xz");
   EXPECT_EQ(Scalar("SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)"), "2024-05-01");
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, 3)"), "bcd");
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, -1)"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR(b'abc', 2, -1)"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.DIV(1, 0)"), std::nullopt);
   // Only the function's own errors become NULL, not those of its arguments.
   EXPECT_THROW(Execute("SELECT SAFE.ABS(1 / 0)"), BackendError);
 }

@@ -1,5 +1,6 @@
 #include "src/translator.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -38,6 +39,52 @@ std::string Join(const std::vector<std::string>& parts, std::string_view separat
       result += separator;
     }
     result += part;
+  }
+  return result;
+}
+
+// Replaces each error(...) call in `sql` with NULL, skipping over string literals; nullopt when
+// a call is not closed.
+std::optional<std::string> WithoutErrors(const std::string& sql) {
+  static constexpr std::string_view kError = "error(";
+  std::string result;
+  size_t i = 0;
+  while (i < sql.size()) {
+    if (sql[i] == '\'') {
+      const size_t end = sql.find('\'', i + 1);
+      if (end == std::string::npos) {
+        return std::nullopt;
+      }
+      result.append(sql, i, end + 1 - i);
+      i = end + 1;
+      continue;
+    }
+    const bool call = sql.compare(i, kError.size(), kError) == 0 &&
+                      (i == 0 || (std::isalnum(static_cast<unsigned char>(sql[i - 1])) == 0 &&
+                                  sql[i - 1] != '_'));
+    if (!call) {
+      result += sql[i++];
+      continue;
+    }
+    int depth = 0;
+    size_t j = i + kError.size() - 1;
+    for (; j < sql.size(); ++j) {
+      if (sql[j] == '\'') {
+        j = sql.find('\'', j + 1);
+        if (j == std::string::npos) {
+          return std::nullopt;
+        }
+      } else if (sql[j] == '(') {
+        ++depth;
+      } else if (sql[j] == ')' && --depth == 0) {
+        break;
+      }
+    }
+    if (j >= sql.size()) {
+      return std::nullopt;
+    }
+    result += "NULL";
+    i = j + 1;
   }
   return result;
 }
@@ -930,8 +977,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql = Call(call, function, placeholders);
-  if (!sql || sql->find("error(") != std::string::npos) {
+  // The error() calls there are the function's own errors, which become NULL.
+  const auto translated = Call(call, function, placeholders);
+  const auto sql = translated ? WithoutErrors(*translated) : std::nullopt;
+  if (!sql) {
     return Unsupported(scope, "SAFE." + name);
   }
   if (bound.empty()) {
