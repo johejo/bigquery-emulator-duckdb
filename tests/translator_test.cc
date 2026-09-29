@@ -251,6 +251,10 @@ TEST_F(TranslatorTest, RunsSafeCalls) {
   EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1"), "true");
   EXPECT_EQ(Scalar("SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1"), "Xz");
   EXPECT_EQ(Scalar("SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)"), "2024-05-01");
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, 3)"), "bcd");
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, -1)"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR(b'abc', 2, -1)"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT SAFE.DIV(1, 0)"), std::nullopt);
   // Only the function's own errors become NULL, not those of its arguments.
   EXPECT_THROW(Execute("SELECT SAFE.ABS(1 / 0)"), BackendError);
 }
@@ -489,8 +493,86 @@ TEST_F(TranslatorTest, RunsStringBytesAndMathFunctions) {
   EXPECT_EQ(Scalar("SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3"), "6");
   EXPECT_EQ(Scalar("SELECT SAFE_NEGATE(1)"), "-1");
   EXPECT_EQ(Scalar("SELECT SAFE_SUBTRACT(1, 2)"), "-1");
-  // DuckDB's left() has no BYTES overload.
-  EXPECT_EQ(Unsupported("SELECT LEFT(b'abc', 1)"), "function LEFT");
+}
+
+TEST_F(TranslatorTest, RunsSubstrAtBigQueryPositions) {
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 0, 2)"), "ab");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -5, 2)"), "ab");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -2)"), "bc");
+  EXPECT_EQ(Scalar("SELECT SUBSTRING('あいう', 2, 1)"), "い");
+  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 4)"), "");
+  EXPECT_THROW(Execute("SELECT SUBSTR('abc', 1, -1)"), BackendError);
+}
+
+// The BYTES overloads work on hexadecimal digits, so a byte that is not valid UTF-8 or looks
+// like part of another byte's digits must stay whole.
+TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
+  const auto hex = [this](const std::string& expression) {
+    return Scalar("SELECT TO_HEX(" + expression + ")");
+  };
+  EXPECT_EQ(hex("LEFT(b'\\xffab', 2)"), "ff61");
+  EXPECT_EQ(hex("RIGHT(b'\\xffab', 1)"), "62");
+  EXPECT_THROW(Execute("SELECT LEFT(b'abc', -1)"), BackendError);
+  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 2)"), "6162");
+  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 0, 2)"), "ff61");
+  EXPECT_EQ(hex("SUBSTRING(b'\\xffab', -2, 1)"), "61");
+  EXPECT_EQ(hex("REVERSE(b'\\x01\\xffa')"), "61ff01");
+  EXPECT_EQ(hex("LOWER(b'\\\\\\xffAz')"), "5cff617a");
+  EXPECT_EQ(hex("UPPER(b'\\\\\\xffAz')"), "5cff415a");
+  EXPECT_EQ(hex("LPAD(b'a', 4, b'\\xff')"), "ffffff61");
+  EXPECT_EQ(hex("RPAD(b'a', 2)"), "6120");
+  EXPECT_EQ(hex("LPAD(b'abc', 2)"), "6162");
+  EXPECT_EQ(hex("TRIM(b'\\xffa\\xffb\\xff', b'\\xff')"), "61ff62");
+  EXPECT_EQ(hex("LTRIM(b'aab', b'a')"), "62");
+  EXPECT_EQ(hex("RTRIM(b'abb', b'ab')"), "");
+  // 0x1f 0xf1 holds the digits of 0xff between its bytes.
+  EXPECT_EQ(hex("REPLACE(b'\\x1f\\xf1\\xff', b'\\xff', b'z')"), "1ff17a");
+  EXPECT_EQ(hex("REPLACE(b'abc', b'', b'z')"), "616263");
+  EXPECT_EQ(Scalar("SELECT STRPOS(b'\\x1f\\xf1\\xff', b'\\xff')"), "3");
+  EXPECT_EQ(Scalar("SELECT INSTR(b'abc', b'z')"), "0");
+  EXPECT_EQ(Scalar("SELECT STARTS_WITH(b'\\xffa', b'\\xff')"), "true");
+  EXPECT_EQ(Scalar("SELECT ENDS_WITH(b'\\xffa', b'\\xff')"), "false");
+  EXPECT_EQ(Scalar("SELECT ASCII(b'\\xffa')"), "255");
+  EXPECT_EQ(Scalar("SELECT ASCII(b'')"), "0");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
+                   "UNNEST(SPLIT(b'a\\x1f\\xf1b', b'\\xf1')) AS x), ',')"),
+            "611f,62");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
+                   "UNNEST(SPLIT(b'a\\xff', b'')) AS x), ',')"),
+            "61,ff");
+  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL, b'\\xff'], b'-')"), "612dff");
+  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL], b'-', b'\\xff')"), "612dff");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(['a', NULL, 'b'], '-', 'N')"), "a-N-b");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw ORDER BY a)) FROM t"), "612c00ff");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t"), "00ff");
+}
+
+// src/backend.cc registers GoogleSQL's implementations of these.
+TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('')"), "-7286425919675154353");
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('あ') = FARM_FINGERPRINT(b'\\xe3\\x81\\x82')"), "true");
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT(CAST(NULL AS STRING))"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT COUNT(DISTINCT FARM_FINGERPRINT(raw)) FROM t"), "2");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(SHA512('abc'))"),
+            "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+            "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
+  EXPECT_EQ(Scalar("SELECT SHA512(b'\\xff') = SHA512(FROM_HEX('ff'))"), "true");
+  EXPECT_EQ(Scalar("SELECT INITCAP('hello WORLD-everyone!')"), "Hello World-Everyone!");
+  EXPECT_EQ(Scalar("SELECT INITCAP('apples1oranges2pears', '12')"), "Apples1Oranges2Pears");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting')"), "3");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('あい', 'いあ')"), "2");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting', max_distance => 2)"), "2");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE(b'\\xe3\\x81\\x82', b'\\xe3\\x81\\x84')"), "1");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('ab@cd-ef', '@[^-]*')"), "3");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('あいう', 'う')"), "3");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 0)"), "6");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 1)"), "11");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'z')"), "0");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR(b'\\xe3\\x81\\x82b', b'b')"), "4");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'b', NULL)"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 0)"), BackendError);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 1, 1, 2)"), BackendError);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', '(')"), BackendError);
 }
 
 // Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
@@ -565,6 +647,63 @@ TEST_F(TranslatorTest, RunsDateTimeConstructorsAndExtract) {
   EXPECT_EQ(Unsupported("SELECT GENERATE_DATE_ARRAY(DATE '2024-01-31', DATE '2024-05-01', "
                         "INTERVAL 1 MONTH)"),
             "function GENERATE_DATE_ARRAY");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%H:%M', t) FROM "
+                   "UNNEST(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01 00:00:00', "
+                   "TIMESTAMP '2024-01-01 01:00:00', INTERVAL 20 MINUTE)) AS t), ',')"),
+            "00:00,00:20,00:40,01:00");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
+                   "TIMESTAMP '2024-01-01', INTERVAL -1 DAY))"),
+            "3");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
+                   "TIMESTAMP '2024-01-01', INTERVAL 1 DAY))"),
+            "0");
+  EXPECT_EQ(Scalar("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', NULL, "
+                   "INTERVAL 1 DAY) IS NULL"),
+            "true");
+  EXPECT_THROW(Execute("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', "
+                       "TIMESTAMP '2024-01-02', INTERVAL 0 DAY)"),
+               BackendError);
+}
+
+TEST_F(TranslatorTest, Buckets) {
+  // The examples of the BigQuery reference.
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 2 DAY) AS "
+                   "STRING) FROM UNNEST([DATE '1949-12-29', DATE '1949-12-30', DATE '1949-12-31', "
+                   "DATE '1950-01-01', DATE '1950-01-02', DATE '1950-01-03']) AS d), ',')"),
+            "1949-12-28,1949-12-30,1949-12-30,1950-01-01,1950-01-01,1950-01-03");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 7 DAY, "
+                   "DATE '2000-12-24') AS STRING) FROM UNNEST([DATE '2000-12-20', "
+                   "DATE '2000-12-21', DATE '2000-12-24', DATE '2000-12-25']) AS d), ',')"),
+            "2000-12-17,2000-12-17,2000-12-24,2000-12-24");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', "
+                   "TIMESTAMP_BUCKET(t, INTERVAL 7 DAY, TIMESTAMP '2000-12-22 12:00:00')) FROM "
+                   "UNNEST([TIMESTAMP '2000-12-21 13:00:00', TIMESTAMP '2000-12-22 12:00:00', "
+                   "TIMESTAMP '2000-12-29 11:59:59']) AS t), ',')"),
+            "2000-12-15 12:00:00,2000-12-22 12:00:00,2000-12-22 12:00:00");
+  EXPECT_EQ(
+      Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '1949-12-31 "
+             "13:00:00', INTERVAL 12 HOUR))"),
+      "1949-12-31 12:00:00");
+  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
+                   "INTERVAL 12 HOUR) AS STRING)"),
+            "1950-01-01 12:00:00");
+  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
+                   "INTERVAL '0:30' HOUR TO MINUTE) AS STRING)"),
+            "1950-01-01 13:00:00");
+  // Months count in the calendar, and last days of the month count as the same day.
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 1 QUARTER, "
+                   "DATE '2000-01-31') AS STRING) FROM UNNEST([DATE '2000-04-29', "
+                   "DATE '2000-04-30', DATE '1999-12-31', DATE '1999-10-30']) AS d), ',')"),
+            "2000-01-31,2000-04-30,1999-10-31,1999-07-31");
+  EXPECT_EQ(Scalar("SELECT CAST(DATE_BUCKET(DATE '2024-05-20', INTERVAL 1 YEAR) AS STRING)"),
+            "2024-01-01");
+  EXPECT_THROW(Execute("SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL -1 DAY)"), BackendError);
+  EXPECT_THROW(Execute("SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 0 HOUR)"),
+               BackendError);
+  EXPECT_EQ(Unsupported("SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 1 MONTH)"),
+            "function TIMESTAMP_BUCKET");
+  EXPECT_EQ(Unsupported("SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL '1 2' DAY TO HOUR)"),
+            "function DATE_BUCKET bucket width");
 }
 
 std::vector<std::string> Column(const QueryResult& result, size_t index = 0) {
@@ -645,6 +784,37 @@ TEST_F(TranslatorTest, RunsAggregateLimitAndHavingModifiers) {
                            "WHERE a IS NOT NULL GROUP BY k ORDER BY k"),
                    1),
             (V{"yy", "x"}));
+}
+
+TEST_F(TranslatorTest, RunsApproximateAndByAggregates) {
+  EXPECT_EQ(Scalar("SELECT APPROX_COUNT_DISTINCT(a) FROM t"), "3");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t"), "[1,2,3]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(DISTINCT x, 4)) "
+                   "FROM UNNEST([1, 1, 1, 2, 3, 4, 5]) AS x"),
+            "[1,2,3,4,5]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t WHERE FALSE"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 2)) "
+                   "FROM UNNEST(['a', NULL, 'b', 'b', NULL, NULL]) AS x"),
+            R"([{"value":null,"count":3},{"value":"b","count":2}])");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 1)) FROM UNNEST([1, 2, 2]) AS x"),
+            R"([{"value":2,"count":2}])");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(a, 1)) FROM t WHERE FALSE"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT MAX_BY(b, a) FROM t"), "あ");
+  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) FROM t"), "x");
+  EXPECT_EQ(Scalar("SELECT MAX_BY(x, y) FROM UNNEST([STRUCT('a' AS x, 1 AS y), (NULL, 2)])"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) OVER () FROM t LIMIT 1"), "x");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x))) FROM "
+                   "(SELECT [1, 2] AS x UNION ALL SELECT NULL UNION ALL SELECT [3])"),
+            "[3,1,2]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x) DESC "
+                   "LIMIT 1)) FROM (SELECT [1, 2] AS x UNION ALL SELECT [3])"),
+            "[1,2]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x)) FROM "
+                   "(SELECT CAST(NULL AS ARRAY<INT64>) AS x)"),
+            std::nullopt);
 }
 
 TEST_F(TranslatorTest, RunsValueTables) {
@@ -932,8 +1102,6 @@ TEST_F(TranslatorTest, RunsOperatorsAndArrayFunctions) {
   EXPECT_EQ(Scalar("SELECT LPAD('a', 3)"), "  a");
   EXPECT_EQ(Scalar("SELECT RPAD('a', 3, 'xy')"), "axy");
   EXPECT_EQ(Scalar("SELECT LPAD('abc', 2)"), "ab");
-  EXPECT_EQ(Unsupported("SELECT LPAD(b'a', 3)"), "function LPAD");
-  EXPECT_EQ(Unsupported("SELECT SPLIT(b'a,b', b',')"), "function SPLIT");
 }
 
 TEST_F(TranslatorTest, RunsRegularExpressionFunctions) {
@@ -982,6 +1150,63 @@ TEST_F(TranslatorTest, RunsJsonFunctions) {
   EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$.a[*]')"), "function JSON_QUERY");
 }
 
+TEST_F(TranslatorTest, BuildsAndChangesJson) {
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))"),
+            R"({"a":1,"b":[2,3]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(CAST(NULL AS INT64)))"), "null");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON('s', stringify_wide_numbers => FALSE))"),
+            R"("s")");
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'b', NULL, 'c', JSON '[1]'))"),
+            R"({"a":1,"b":null,"c":[1]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT())"), "{}");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'a', 2))"), R"({"a":1})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT(['a', 'b'], [10, 20]))"),
+            R"({"a":10,"b":20})");
+  EXPECT_THROW(Execute("SELECT JSON_OBJECT(['a'], [1, 2])"), BackendError);
+  EXPECT_THROW(Execute("SELECT JSON_OBJECT(CAST(NULL AS STRING), 1)"), BackendError);
+
+  const std::string doc = R"(JSON '{"a": {"b": 1, "c": null}, "d": [1, null, 2]}')";
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_REMOVE(" + doc + ", '$.a.b', '$.d[0]'))"),
+            R"({"a":{"c":null},"d":[null,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_REMOVE(" + doc + ", '$.x', NULL))"),
+            R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_EQ(Scalar("SELECT JSON_REMOVE(CAST(NULL AS JSON), '$.a')"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT JSON_REMOVE(CAST(NULL AS JSON), 'a')"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b', 'x', '$.e.f', [1]))"),
+            R"({"a":{"b":"x","c":null},"d":[1,null,2],"e":{"f":[1]}})");
+  EXPECT_EQ(
+      Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.e', 1, create_if_missing => FALSE))"),
+      R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(JSON '{}', '$.a', CAST(NULL AS INT64)))"),
+            R"({"a":null})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b.c', 1))"),
+            R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
+  EXPECT_THROW(Execute("SELECT JSON_SET(" + doc + ", 'a', 1)"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_STRIP_NULLS(" + doc + "))"),
+            R"({"a":{"b":1},"d":[1,2]})");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_STRIP_NULLS(" + doc +
+                   ", '$.a', include_arrays => FALSE))"),
+            R"({"a":{"b":1},"d":[1,null,2]})");
+
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + "), ',')"), "a,a.b,a.c,d");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + ", 1), ',')"), "a,d");
+  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(JSON_KEYS(JSON '[]'))"), "0");
+  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(JSON '[{\"a\": 1}]', mode => 'lax'), ',')"),
+            "a");
+  EXPECT_THROW(Execute("SELECT JSON_KEYS(" + doc + ", 0)"), BackendError);
+
+  EXPECT_EQ(Scalar("SELECT LAX_BOOL(JSON '\"TRUE\"')"), "true");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '\"10\"')"), "10");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '1.5')"), "2");
+  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '[1]')"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT LAX_FLOAT64(JSON '\"1.5\"')"), "1.5");
+  EXPECT_EQ(Scalar("SELECT LAX_STRING(JSON '123')"), "123");
+  EXPECT_EQ(Scalar("SELECT LAX_STRING(CAST(NULL AS JSON))"), std::nullopt);
+}
+
 TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   const std::string doc = R"(JSON '{"a": {"b": [10, 20]}, "c d": "x", "f": 2.0, "g": 2.5}')";
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING((" + doc + ").a.b)"), "[10,20]");
@@ -1002,7 +1227,6 @@ TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   EXPECT_EQ(Scalar("SELECT STRING((" + doc + ").missing)"), std::nullopt);
   EXPECT_EQ(Unsupported("SELECT FLOAT64(JSON '1', wide_number_mode => 'exact')"),
             "function FLOAT64");
-  EXPECT_EQ(Unsupported("SELECT LAX_INT64(JSON '1')"), "function LAX_INT64");
 }
 
 TEST_F(TranslatorTest, DoesNotReportParameterErrorsAsUnsupported) {

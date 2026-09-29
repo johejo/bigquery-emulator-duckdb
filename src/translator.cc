@@ -1,6 +1,8 @@
 #include "src/translator.h"
 
+#include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -37,6 +39,52 @@ std::string Join(const std::vector<std::string>& parts, std::string_view separat
       result += separator;
     }
     result += part;
+  }
+  return result;
+}
+
+// Replaces each error(...) call in `sql` with NULL, skipping over string literals; nullopt when
+// a call is not closed.
+std::optional<std::string> WithoutErrors(const std::string& sql) {
+  static constexpr std::string_view kError = "error(";
+  std::string result;
+  size_t i = 0;
+  while (i < sql.size()) {
+    if (sql[i] == '\'') {
+      const size_t end = sql.find('\'', i + 1);
+      if (end == std::string::npos) {
+        return std::nullopt;
+      }
+      result.append(sql, i, end + 1 - i);
+      i = end + 1;
+      continue;
+    }
+    const bool call = sql.compare(i, kError.size(), kError) == 0 &&
+                      (i == 0 || (std::isalnum(static_cast<unsigned char>(sql[i - 1])) == 0 &&
+                                  sql[i - 1] != '_'));
+    if (!call) {
+      result += sql[i++];
+      continue;
+    }
+    int depth = 0;
+    size_t j = i + kError.size() - 1;
+    for (; j < sql.size(); ++j) {
+      if (sql[j] == '\'') {
+        j = sql.find('\'', j + 1);
+        if (j == std::string::npos) {
+          return std::nullopt;
+        }
+      } else if (sql[j] == '(') {
+        ++depth;
+      } else if (sql[j] == ')' && --depth == 0) {
+        break;
+      }
+    }
+    if (j >= sql.size()) {
+      return std::nullopt;
+    }
+    result += "NULL";
+    i = j + 1;
   }
   return result;
 }
@@ -226,6 +274,64 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
       "year",   "quarter",     "month",       "week",    "day",     "hour",      "minute",
       "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear"};
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
+}
+
+// A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
+// INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
+struct BucketWidth {
+  std::string unit;
+  // The n of INTERVAL n PART, or null for a literal, whose count is all in `factor`.
+  const googlesql::ResolvedExpr* count = nullptr;
+  int64_t factor = 1;
+};
+
+std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
+  if (expr.Is<googlesql::ResolvedFunctionCall>()) {
+    const auto* call = expr.GetAs<googlesql::ResolvedFunctionCall>();
+    if (call->function()->Name() != "$interval" || call->argument_list_size() != 2) {
+      return std::nullopt;
+    }
+    static const std::map<std::string, std::pair<std::string, int64_t>> units = {
+        {"year", {"months", 12}},
+        {"quarter", {"months", 3}},
+        {"month", {"months", 1}},
+        {"week", {"days", 7}},
+        {"day", {"days", 1}},
+        {"hour", {"micros", 3600000000}},
+        {"minute", {"micros", 60000000}},
+        {"second", {"micros", 1000000}},
+        {"millisecond", {"micros", 1000}},
+        {"microsecond", {"micros", 1}}};
+    const auto part = DatePart(*call->argument_list(1));
+    const auto unit = part ? units.find(*part) : units.end();
+    if (unit == units.end()) {
+      return std::nullopt;
+    }
+    return BucketWidth{
+        .unit = unit->second.first, .count = call->argument_list(0), .factor = unit->second.second};
+  }
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->IsInterval() ||
+      value.interval_value().get_nano_fractions() != 0) {
+    return std::nullopt;
+  }
+  // A zero width counts as days, which raises the error BigQuery raises for every input type.
+  std::vector<BucketWidth> parts;
+  for (const auto& [unit, count] :
+       {std::pair<std::string, int64_t>{"months", value.interval_value().get_months()},
+        {"days", value.interval_value().get_days()},
+        {"micros", value.interval_value().get_micros()}}) {
+    if (count != 0) {
+      parts.push_back({.unit = unit, .factor = count});
+    }
+  }
+  if (parts.size() > 1) {
+    return std::nullopt;
+  }
+  return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts[0];
 }
 
 ArgumentType TypeOf(const googlesql::Type& type) {
@@ -529,6 +635,62 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     return "list_transform(generate_series(CAST(" + args[0] + " AS TIMESTAMP), CAST(" + args[1] +
            " AS TIMESTAMP), " + step + "), _d -> CAST(_d AS DATE))";
   }
+  if (name == "GENERATE_TIMESTAMP_ARRAY" && n == 4) {
+    static const std::map<std::string, std::string> micros = {
+        {"day", "86400000000"}, {"hour", "3600000000"},  {"minute", "60000000"},
+        {"second", "1000000"},  {"millisecond", "1000"}, {"microsecond", "1"}};
+    const auto part = DatePart(*call.argument_list(3));
+    const auto step = part ? micros.find(*part) : micros.end();
+    if (step == micros.end()) {
+      return std::nullopt;
+    }
+    // Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return
+    // an empty array for a zero step.
+    return "list_transform([struct_pack(a := " + args[0] + ", b := " + args[1] +
+           ", s := " + args[2] + " * " + step->second +
+           ")], _g -> CASE WHEN _g.s = 0 THEN error('Sequence step cannot be 0.') ELSE "
+           "generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]";
+  }
+  // The width is already a count of months, days or microseconds, see BucketWidthOf. Months
+  // count from the origin in the calendar, while days and microseconds are fixed lengths;
+  // TIMESTAMP and DATETIME take a day as 24 hours.
+  if ((name == "DATE_BUCKET" || name == "DATETIME_BUCKET" || name == "TIMESTAMP_BUCKET") &&
+      (n == 2 || n == 3)) {
+    const auto width = BucketWidthOf(*call.argument_list(1));
+    const googlesql::Type* input = type(0);
+    if (!width || (input->IsDate() && width->unit == "micros") ||
+        (!input->IsDate() && width->unit == "months")) {
+      return std::nullopt;
+    }
+    std::string bucket;
+    if (input->IsDate() && width->unit == "days") {
+      bucket = "_bk.x - CAST((((_bk.x - _bk.o) % _bk.w) + _bk.w) % _bk.w AS INTEGER)";
+    } else if (input->IsDate()) {
+      // A day past the origin's day of the month starts the next bucket, and last days of the
+      // month count as the same day.
+      bucket =
+          "list_transform([(year(_bk.x) - year(_bk.o)) * 12 + month(_bk.x) - month(_bk.o)], _m -> "
+          "CAST(_bk.o + to_months(CAST(_m - _m % _bk.w - CASE WHEN _m % _bk.w < 0 OR (_m % _bk.w = "
+          "0 AND NOT (_bk.o = last_day(_bk.o) AND _bk.x = last_day(_bk.x)) AND day(_bk.x) < "
+          "day(_bk.o)) THEN _bk.w ELSE 0 END AS INTEGER)) AS DATE))[1]";
+    } else {
+      const std::string w = width->unit == "days" ? "(_bk.w * 86400000000)" : "_bk.w";
+      bucket = "_bk.x - to_microseconds((((epoch_us(_bk.x) - epoch_us(_bk.o)) % " + w + ") + " + w +
+               ") % " + w + ")";
+    }
+    const std::string origin = n == 3                ? args[2]
+                               : input->IsDate()     ? "DATE '1950-01-01'"
+                               : input->IsDatetime() ? "TIMESTAMP '1950-01-01 00:00:00'"
+                                                     : "TIMESTAMPTZ '1950-01-01 00:00:00+00'";
+    const std::string zero = input->IsTimestamp()
+                                 ? "Zero bucket width INTERVAL is not allowed"
+                                 : "Exactly one non-zero INTERVAL part in bucket width is required";
+    return "list_transform([struct_pack(x := " + args[0] + ", w := " + args[1] +
+           ", o := " + origin +
+           ")], _bk -> CASE WHEN _bk.w < 0 THEN error('Negative bucket width INTERVAL is not "
+           "allowed') WHEN _bk.w = 0 THEN error('" +
+           zero + "') ELSE " + bucket + " END)[1]";
+  }
   // INTERVAL n PART becomes two arguments (INT64, enum) in the resolved AST.
   if (n == 3 && (name == "DATE_ADD" || name == "DATE_SUB" || name == "DATETIME_ADD" ||
                  name == "DATETIME_SUB" || name == "TIMESTAMP_ADD" || name == "TIMESTAMP_SUB" ||
@@ -637,6 +799,74 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
            conversion->second.first + " ELSE error('The provided JSON input is not " +
            conversion->second.second + "') END)[1]";
   }
+  // The JSON functions in src/backend.cc take and return JSON as its text.
+  const auto json_text = [&](size_t i) {
+    return type(i)->IsJson() ? "CAST(" + args[i] + " AS VARCHAR)"
+                             : "CAST(to_json(" + args[i] + ") AS VARCHAR)";
+  };
+  // BigQuery's TO_JSON makes JSON null of NULL. Stringifying wide numbers is unsupported.
+  if (name == "TO_JSON" &&
+      (n == 1 || (n == 2 && call.argument_list(1)->Is<googlesql::ResolvedLiteral>() &&
+                  call.argument_list(1)->GetAs<googlesql::ResolvedLiteral>()->value() ==
+                      googlesql::Value::Bool(false)))) {
+    return "coalesce(to_json(" + args[0] + "), JSON 'null')";
+  }
+  static const std::map<std::string, std::string> lax_conversions = {
+      {"LAX_BOOL", "bq_lax_bool"},
+      {"LAX_INT64", "bq_lax_int64"},
+      {"LAX_FLOAT64", "bq_lax_float64"},
+      {"LAX_DOUBLE", "bq_lax_float64"},
+      {"LAX_STRING", "bq_lax_string"}};
+  if (const auto lax = lax_conversions.find(name);
+      lax != lax_conversions.end() && n == 1 && type(0)->IsJson()) {
+    return lax->second + "(" + json_text(0) + ")";
+  }
+  if (name == "JSON_KEYS" && n == 3) {
+    return "CAST(json(bq_json_keys(" + json_text(0) + ", " + args[1] + ", " + args[2] +
+           ")) AS VARCHAR[])";
+  }
+  if (name == "JSON_STRIP_NULLS" && n == 4) {
+    return "json(bq_json_strip_nulls(" + json_text(0) + ", " + args[1] + ", " + args[2] + ", " +
+           args[3] + "))";
+  }
+  // JSON_REMOVE and JSON_SET take the paths one by one, in order.
+  if (name == "JSON_REMOVE" && n >= 2) {
+    std::string result = json_text(0);
+    for (size_t i = 1; i < n; ++i) {
+      result.insert(0, "bq_json_remove(").append(", ").append(args[i]).append(")");
+    }
+    return "json(" + result + ")";
+  }
+  if (name == "JSON_SET" && n >= 4 && n % 2 == 0) {
+    std::string result = json_text(0);
+    for (size_t i = 1; i + 1 < n; i += 2) {
+      result.insert(0, "bq_json_set(")
+          .append(", ")
+          .append(args[i])
+          .append(", ")
+          .append(json_text(i + 1))
+          .append(", ")
+          .append(args[n - 1])
+          .append(")");
+    }
+    return "json(" + result + ")";
+  }
+  if (name == "JSON_OBJECT") {
+    if (n == 2 && type(0)->IsArray()) {
+      return "json(bq_json_object(" + json_text(0) + ", " + json_text(1) + "))";
+    }
+    if (n % 2 != 0) {
+      return std::nullopt;
+    }
+    std::vector<std::string> keys;
+    std::vector<std::string> values;
+    for (size_t i = 0; i < n; i += 2) {
+      keys.push_back(args[i]);
+      values.push_back(args[i + 1]);
+    }
+    return "json(bq_json_object(CAST(json_array(" + Join(keys, ", ") +
+           ") AS VARCHAR), CAST(json_array(" + Join(values, ", ") + ") AS VARCHAR)))";
+  }
   if (name == "ARRAY_CONCAT" && n >= 1) {
     if (n == 1) {
       return args[0];
@@ -681,8 +911,28 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
     return Unsupported(scope, "function " + name + " error mode");
   }
+  const bool bucket =
+      name == "DATE_BUCKET" || name == "DATETIME_BUCKET" || name == "TIMESTAMP_BUCKET";
   std::vector<std::string> args;
   for (const auto& argument : call.argument_list()) {
+    // The bucket width INTERVAL becomes a plain count, since DuckDB intervals keep no single
+    // part to count in.
+    if (bucket && argument->type()->IsInterval()) {
+      const auto width = BucketWidthOf(*argument);
+      if (!width) {
+        return Unsupported(scope, "function " + name + " bucket width");
+      }
+      if (width->count == nullptr) {
+        args.push_back(std::to_string(width->factor));
+        continue;
+      }
+      const auto count = Expression(*width->count, scope, columns);
+      if (!count) {
+        return std::nullopt;
+      }
+      args.push_back("(" + *count + " * " + std::to_string(width->factor) + ")");
+      continue;
+    }
     if (argument->type()->IsEnum()) {
       const auto part = DatePart(*argument);
       if (!part) {
@@ -727,8 +977,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql = Call(call, function, placeholders);
-  if (!sql || sql->find("error(") != std::string::npos) {
+  // The error() calls there are the function's own errors, which become NULL.
+  const auto translated = Call(call, function, placeholders);
+  const auto sql = translated ? WithoutErrors(*translated) : std::nullopt;
+  if (!sql) {
     return Unsupported(scope, "SAFE." + name);
   }
   if (bound.empty()) {
@@ -914,7 +1166,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
-      !call.function()->IsGoogleSQLBuiltin() || call.where_expr() != nullptr) {
+      (!call.function()->IsGoogleSQLBuiltin() && name != "MAX_BY" && name != "MIN_BY") ||
+      call.where_expr() != nullptr) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
   }
   if (aggregate != nullptr &&
@@ -923,30 +1176,39 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        aggregate->having_expr() != nullptr)) {
     return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
   }
-  static const std::map<std::string, std::string> aggregates = {{"COUNT", "count"},
-                                                                {"$COUNT_STAR", "count"},
-                                                                {"SUM", "sum"},
-                                                                {"AVG", "avg"},
-                                                                {"MIN", "min"},
-                                                                {"MAX", "max"},
-                                                                {"ANY_VALUE", "any_value"},
-                                                                {"ARRAY_AGG", "list"},
-                                                                {"STRING_AGG", "string_agg"},
-                                                                {"COUNTIF", "count_if"},
-                                                                {"LOGICAL_AND", "bool_and"},
-                                                                {"LOGICAL_OR", "bool_or"},
-                                                                {"BIT_AND", "bit_and"},
-                                                                {"BIT_OR", "bit_or"},
-                                                                {"BIT_XOR", "bit_xor"},
-                                                                {"STDDEV", "stddev_samp"},
-                                                                {"STDDEV_SAMP", "stddev_samp"},
-                                                                {"STDDEV_POP", "stddev_pop"},
-                                                                {"VARIANCE", "var_samp"},
-                                                                {"VAR_SAMP", "var_samp"},
-                                                                {"VAR_POP", "var_pop"},
-                                                                {"CORR", "corr"},
-                                                                {"COVAR_POP", "covar_pop"},
-                                                                {"COVAR_SAMP", "covar_samp"}};
+  static const std::map<std::string, std::string> aggregates = {
+      {"COUNT", "count"},
+      {"$COUNT_STAR", "count"},
+      {"SUM", "sum"},
+      {"AVG", "avg"},
+      {"MIN", "min"},
+      {"MAX", "max"},
+      {"ANY_VALUE", "any_value"},
+      {"ARRAY_AGG", "list"},
+      {"ARRAY_CONCAT_AGG", "list"},
+      // Exact, which is within any approximation error.
+      {"APPROX_COUNT_DISTINCT", "count"},
+      {"APPROX_QUANTILES", "quantile_disc"},
+      {"APPROX_TOP_COUNT", "histogram"},
+      // The _null variants return a NULL x instead of skipping its row.
+      {"MAX_BY", "arg_max_null"},
+      {"MIN_BY", "arg_min_null"},
+      {"STRING_AGG", "string_agg"},
+      {"COUNTIF", "count_if"},
+      {"LOGICAL_AND", "bool_and"},
+      {"LOGICAL_OR", "bool_or"},
+      {"BIT_AND", "bit_and"},
+      {"BIT_OR", "bit_or"},
+      {"BIT_XOR", "bit_xor"},
+      {"STDDEV", "stddev_samp"},
+      {"STDDEV_SAMP", "stddev_samp"},
+      {"STDDEV_POP", "stddev_pop"},
+      {"VARIANCE", "var_samp"},
+      {"VAR_SAMP", "var_samp"},
+      {"VAR_POP", "var_pop"},
+      {"CORR", "corr"},
+      {"COVAR_POP", "covar_pop"},
+      {"COVAR_SAMP", "covar_samp"}};
   static const std::map<std::string, std::string> analytics = {{"ROW_NUMBER", "row_number"},
                                                                {"RANK", "rank"},
                                                                {"DENSE_RANK", "dense_rank"},
@@ -965,9 +1227,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return Unsupported(scope, "aggregate or analytic function " + name);
     }
   }
-  if (name == "STRING_AGG" && !call.argument_list(0)->type()->IsString()) {
-    return Unsupported(scope, "STRING_AGG over BYTES");
-  }
   std::vector<std::string> args;
   for (const auto& argument : call.argument_list()) {
     const auto sql = Expression(*argument, scope, columns);
@@ -976,8 +1235,32 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
     args.push_back(*sql);
   }
+  // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their hexadecimal
+  // digits; the default delimiter is b','.
+  const bool bytes = name == "STRING_AGG" && call.argument_list(0)->type()->IsBytes();
+  if (bytes) {
+    args.at(0) = "hex(" + args.at(0) + ")";
+    if (args.size() > 1) {
+      args.at(1) = "hex(" + args.at(1) + ")";
+    } else {
+      args.emplace_back("'2C'");
+    }
+  }
+  const auto unhex = [bytes](const std::string& sql) { return bytes ? "unhex(" + sql + ")" : sql; };
+  // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1.
+  if (name == "APPROX_QUANTILES") {
+    args.at(1) = "list_transform(range(" + args.at(1) + " + 1), lambda i: i / " + args.at(1) + ")";
+  }
+  // APPROX_TOP_COUNT's histogram() takes only the values; the count is applied afterwards.
+  const std::string top = name == "APPROX_TOP_COUNT" ? args.at(1) : "";
+  if (!top.empty()) {
+    if (call.distinct()) {
+      return Unsupported(scope, "APPROX_TOP_COUNT(DISTINCT ...)");
+    }
+    args.pop_back();
+  }
   std::string inner = name == "$COUNT_STAR" ? "*" : Join(args, ", ");
-  if (call.distinct()) {
+  if (call.distinct() || name == "APPROX_COUNT_DISTINCT") {
     inner = "DISTINCT " + inner;
   }
   std::vector<std::string> conditions;
@@ -987,11 +1270,22 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (call.null_handling_modifier() == googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
     if (name == "ARRAY_AGG") {
       conditions.push_back(args.at(0) + " IS NOT NULL");
+    } else if (name == "APPROX_QUANTILES") {
+      // quantile_disc() already skips NULLs, as APPROX_QUANTILES does by default.
     } else if (name == "FIRST_VALUE" || name == "LAST_VALUE" || name == "NTH_VALUE") {
       inner += " IGNORE NULLS";
     } else {
       return Unsupported(scope, name + " IGNORE NULLS");
     }
+  }
+  if (call.null_handling_modifier() ==
+          googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS &&
+      name == "APPROX_QUANTILES") {
+    return Unsupported(scope, name + " RESPECT NULLS");
+  }
+  // ARRAY_CONCAT_AGG skips NULL arrays.
+  if (name == "ARRAY_CONCAT_AGG") {
+    conditions.push_back(args.at(0) + " IS NOT NULL");
   }
   std::string order;
   if (aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
@@ -1015,17 +1309,34 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
                                args.at(0) + order + ") FILTER (WHERE " + Join(conditions, " AND ") +
                                ")";
-      return "array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
-             (args.size() > 1 ? args.at(1) : "','") + ")";
+      return unhex("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
+                   (args.size() > 1 ? args.at(1) : "','") + ")");
     }
-    if (name != "ARRAY_AGG") {
+    if (name != "ARRAY_AGG" && name != "ARRAY_CONCAT_AGG") {
       return Unsupported(scope, "aggregate " + name + " with LIMIT");
     }
   }
-  const std::string sql =
-      function->second + "(" + inner + order + ")" +
+  const std::string tail =
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
-  return limit.empty() ? sql : "list_slice(" + sql + ", 1, " + limit + ")";
+  std::string sql = function->second + "(" + inner + order + ")" + tail;
+  if (!limit.empty()) {
+    sql = "list_slice(" + sql + ", 1, " + limit + ")";
+  }
+  if (name == "ARRAY_CONCAT_AGG") {
+    return "flatten(" + sql + ")";
+  }
+  // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting
+  // the (count, value) structs descending puts the most frequent first, and no rows give NULL.
+  if (!top.empty()) {
+    const std::string rows = "count(*)" + tail;
+    const std::string nulls = rows + " - count(" + args.at(0) + ")" + tail;
+    return "CASE WHEN " + rows + " > 0 THEN list_transform(list_slice(list_sort(list_concat(" +
+           "list_transform(map_entries(" + sql +
+           "), lambda e: {'count': e.value::BIGINT, 'value': e.key}), CASE WHEN " + nulls +
+           " > 0 THEN [{'count': " + nulls + ", 'value': NULL}] END), 'DESC'), 1, " + top +
+           "), lambda e: {'value': e.value, 'count': e.count}) END";
+  }
+  return unhex(sql);
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,

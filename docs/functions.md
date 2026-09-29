@@ -21,9 +21,9 @@ probe's own notes name what it rejected.
 
 | Status | Functions |
 | --- | --- |
-| Partial | 40 |
-| Supported | 165 |
-| Unsupported | 188 |
+| Partial | 19 |
+| Supported | 211 |
+| Unsupported | 163 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
@@ -37,21 +37,21 @@ probe's own notes name what it rejected.
 | [`AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#agg) | aggregate_functions | Untested | no sample for <measure<T1>> |
 | [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | aggregate_functions | Supported |  |
 | [`APPENDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#appends) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_COUNT_DISTINCT |
-| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_QUANTILES |
-| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_TOP_COUNT |
+| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Supported |  |
+| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Supported |  |
+| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Supported |  |
 | [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_TOP_SUM |
 | [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | array_functions | Supported |  |
 | [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | aggregate_functions | Supported |  |
 | [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | array_functions | Supported | returns NULL when any array is NULL |
-| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG |
+| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Supported |  |
 | [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | array_functions | Supported |  |
 | [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | array_functions | Supported |  |
 | [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | array_functions | Supported |  |
 | [`ARRAY_REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_reverse) | array_functions | Supported |  |
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | array_functions | Supported |  |
-| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Partial | function ARRAY_TO_STRING |
-| [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Partial | function ASCII |
+| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Supported |  |
+| [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Supported |  |
 | [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported |  |
 | [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported |  |
 | [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported |  |
@@ -100,12 +100,12 @@ probe's own notes name what it rejected.
 | [`DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date) | date_functions | Supported | `SELECT DATE('abc')`: INVALID_ARGUMENT: Could not cast literal "abc" to type TIMESTAMP [at 1:13] |
 | [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | datetime_functions | Supported |  |
 | [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | datetime_functions | Supported |  |
-| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Supported |  |
 | [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries |
 | [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | datetime_functions | Supported |  |
 | [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
 | [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | date_functions | Supported |  |
-| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Supported |  |
 | [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
 | [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | date_functions | Supported |  |
 | [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | date_functions | Supported |  |
@@ -120,16 +120,16 @@ probe's own notes name what it rejected.
 | [`DLP_DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_encrypt) | dlp_functions | Unsupported | the analyzer does not know this function |
 | [`DLP_KEY_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_key_chain) | dlp_functions | Unsupported | the analyzer does not know this function |
 | [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | string_functions | Unsupported | function EDIT_DISTANCE |
+| [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | string_functions | Supported |  |
 | [`ELEMENT_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#element_id) | graph-sql-functions | Untested | no sample for <graph_element> |
-| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Partial | function ENDS_WITH |
+| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Supported |  |
 | [`ERROR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions#error) | debugging_functions | Supported |  |
 | [`EUCLIDEAN_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#euclidean_distance) | mathematical_functions | Unsupported | function EUCLIDEAN_DISTANCE |
 | [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported |  |
 | [`EXTERNAL_OBJECT_TRANSFORM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in#external_object_transform) | table-functions-built-in | Unsupported | the analyzer does not know this function |
 | [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | federated_query_functions | Unsupported | the analyzer does not know this function |
 | [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
-| [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Unsupported | function FARM_FINGERPRINT |
+| [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Supported |  |
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | from JSON, fails when the value has another JSON type |
 | [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported |  |
@@ -145,7 +145,7 @@ probe's own notes name what it rejected.
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | function GENERATE_ARRAY |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | takes only a DAY or WEEK step |
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
-| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Unsupported | function GENERATE_TIMESTAMP_ARRAY |
+| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported |  |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported |  |
 | [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported |  |
 | [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | aggregate_functions | Supported |  |
@@ -156,8 +156,8 @@ probe's own notes name what it rejected.
 | [`IEEE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ieee_divide) | mathematical_functions | Supported |  |
 | [`IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#if) | conditional_expressions | Supported |  |
 | [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | conditional_expressions | Supported |  |
-| [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | string_functions | Unsupported | function INITCAP |
-| [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | string_functions | Partial | function INSTR |
+| [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | string_functions | Supported |  |
+| [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | string_functions | Supported |  |
 | [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | json_functions | Supported | from JSON, fails when the value has another JSON type |
 | [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | graph-sql-functions | Untested | no sample for <graph_path> |
 | [`IS_INF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_inf) | mathematical_functions | Supported |  |
@@ -172,13 +172,13 @@ probe's own notes name what it rejected.
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
 | [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
 | [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported | function JSON_FLATTEN |
-| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Unsupported | function JSON_KEYS |
-| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Unsupported | function JSON_OBJECT |
+| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported |  |
+| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported |  |
 | [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
 | [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Unsupported | function JSON_REMOVE |
-| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Unsupported | function JSON_SET |
-| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Unsupported | function JSON_STRIP_NULLS |
+| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Supported |  |
+| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Supported |  |
+| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Supported |  |
 | [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported |  |
 | [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
 | [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
@@ -210,28 +210,28 @@ probe's own notes name what it rejected.
 | [`LAG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lag) | navigation_functions | Supported |  |
 | [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported |  |
 | [`LAST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#last_value) | navigation_functions | Supported |  |
-| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Unsupported | function LAX_BOOL |
-| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Unsupported | function LAX_FLOAT64 |
-| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Unsupported | function LAX_INT64 |
-| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Unsupported | function LAX_STRING |
+| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Supported |  |
+| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Supported |  |
+| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Supported |  |
+| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Supported |  |
 | [`LEAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lead) | navigation_functions | Supported |  |
 | [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported |  |
-| [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Partial | function LEFT |
+| [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Supported |  |
 | [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | string_functions | Supported | counts characters of a STRING and bytes of a BYTES |
 | [`LN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ln) | mathematical_functions | Supported |  |
 | [`LOG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log) | mathematical_functions | Supported |  |
 | [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Supported |  |
 | [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | aggregate_functions | Supported |  |
 | [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | aggregate_functions | Supported |  |
-| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Partial | function LOWER |
-| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Partial | pads with spaces by default; the BYTES overload is unsupported; function LPAD |
-| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Partial | function LTRIM |
+| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Supported |  |
+| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Supported | pads with spaces by default |
+| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Supported |  |
 | [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported | type INTERVAL |
 | [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported |  |
-| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Unsupported | the analyzer does not know this function |
+| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Supported |  |
 | [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported |  |
 | [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported |  |
-| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Unsupported | the analyzer does not know this function |
+| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported |  |
 | [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported |  |
 | [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported | function HOST |
 | [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Unsupported | function IPV4_FROM_INT64 |
@@ -282,17 +282,17 @@ probe's own notes name what it rejected.
 | [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Partial | function REGEXP_CONTAINS |
 | [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
 | [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group and fails on more than one group; function REGEXP_EXTRACT_ALL |
-| [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Unsupported | function REGEXP_INSTR |
+| [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Supported |  |
 | [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | function REGEXP_REPLACE |
 | [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
 | [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported |  |
-| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Partial | function REPLACE |
-| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Partial | function REVERSE |
-| [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Partial | function RIGHT |
+| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Supported |  |
+| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Supported |  |
+| [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Supported |  |
 | [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | mathematical_functions | Partial | function ROUND date part |
 | [`ROW_NUMBER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#row_number) | numbering_functions | Supported |  |
-| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | string_functions | Partial | pads with spaces by default; the BYTES overload is unsupported; function RPAD |
-| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Partial | function RTRIM |
+| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | string_functions | Supported | pads with spaces by default |
+| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Supported |  |
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported |  |
@@ -308,21 +308,21 @@ probe's own notes name what it rejected.
 | [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported | function SESSION_USER |
 | [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported |  |
 | [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported |  |
-| [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Unsupported | function SHA512 |
+| [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Supported |  |
 | [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported |  |
 | [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported |  |
 | [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported |  |
 | [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported | function SOUNDEX |
 | [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested | no sample for <graph_edge> |
-| [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Partial | the BYTES overload is unsupported; function SPLIT |
+| [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported |  |
 | [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported |  |
-| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Partial | function STARTS_WITH |
+| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Supported |  |
 | [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported |  |
 | [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported |  |
 | [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported |  |
 | [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | from JSON, fails when the value has another JSON type; function STRING |
-| [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Partial | STRING_AGG over BYTES |
-| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Partial | function STRPOS |
+| [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported |  |
+| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported |  |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | geography_functions | Unsupported | type GEOGRAPHY |
@@ -392,8 +392,8 @@ probe's own notes name what it rejected.
 | [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | geography_functions | Unsupported | type GEOGRAPHY |
 | [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Partial | function SUBSTR |
-| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Partial | function SUBSTR |
+| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Supported | starts at the first character for a position of 0 or before the start |
+| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | starts at the first character for a position of 0 or before the start |
 | [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | unsupported construct |
 | [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported |  |
 | [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported |  |
@@ -402,7 +402,7 @@ probe's own notes name what it rejected.
 | [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported |  |
 | [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | function TIMESTAMP |
 | [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Unsupported | type INTERVAL |
+| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Supported |  |
 | [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | timestamp_functions | Supported | counts whole units rather than boundaries |
 | [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | timestamp_functions | Supported |  |
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | timestamp_functions | Supported |  |
@@ -417,10 +417,10 @@ probe's own notes name what it rejected.
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported |  |
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported | function TO_CODE_POINTS |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported |  |
-| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Unsupported | function TO_JSON |
+| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported |  |
 | [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported |  |
 | [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Partial | function TRANSLATE |
-| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Partial | function TRIM |
+| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Supported |  |
 | [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Supported |  |
 | [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | utility-functions | Supported |  |
 | [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | string_functions | Supported |  |
@@ -428,7 +428,7 @@ probe's own notes name what it rejected.
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | timestamp_functions | Supported |  |
 | [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported |  |
-| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Partial | function UPPER |
+| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Supported |  |
 | [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported |  |
 | [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Supported |  |
 | [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Supported |  |

@@ -119,6 +119,63 @@ std::vector<Rule> Same(std::string_view function, Arity arity,
   return rules;
 }
 
+// The hexadecimal digits of the BYTES value `value` with a space after each byte, as in
+// "FF 61 ". A search for one such string in another only matches on byte boundaries.
+std::string Spaced(std::string_view value) {
+  return "regexp_replace(hex(" + std::string(value) + "), '(..)', '\\1 ', 'g')";
+}
+
+// STRPOS and INSTR without a position or occurrence. A match in the spaced digits starts on a
+// byte, three characters each.
+std::vector<Rule> Position() {
+  return {
+      {2, "strpos($1, $2)", {Is(1, {kString})}},
+      {2, "((strpos(" + Spaced("$1") + ", " + Spaced("$2") + ") + 2) // 3)", {Is(1, {kBytes})}}};
+}
+
+// LPAD and RPAD. DuckDB has no default pad; the BYTES one is b' '.
+std::vector<Rule> Pad(const std::string& function) {
+  return {
+      {{2, 3}, function + "($1, CAST($2 AS INTEGER), $3)", {Is(1, {kString})}, {"' '"}},
+      {2, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), '20'))", {Is(1, {kBytes})}},
+      {3, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), hex($3)))", {Is(1, {kBytes})}}};
+}
+
+// TRIM, LTRIM and RTRIM. For BYTES, the regular expression `pattern` removes the bytes to trim
+// from the spaced digits, with @ standing for the alternatives of the bytes of the second
+// argument.
+std::vector<Rule> Trim(const std::string& function, std::string_view pattern) {
+  const std::string bytes = "' || substr(regexp_replace(hex($2), '(..)', '|\\1 ', 'g'), 2) || '";
+  std::string regex;
+  for (const char c : pattern) {
+    regex += c == '@' ? bytes : std::string(1, c);
+  }
+  auto rules = Same(function, {1, 2}, {Is(1, {kString})});
+  rules.push_back(
+      {2,
+       "unhex(replace(regexp_replace(" + Spaced("$1") + ", '" + regex + "', '', 'g'), ' ', ''))",
+       {Is(1, {kBytes})}});
+  return rules;
+}
+
+// SUBSTR and SUBSTRING. BigQuery starts at the first character for a position of 0 or one
+// before the start, where DuckDB takes as many characters fewer.
+std::vector<Rule> Substr() {
+  const auto start = [](const std::string& length) {
+    return "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -" + length + " THEN 1 ELSE " + length +
+           " + $2 + 1 END";
+  };
+  const std::string negative =
+      "CASE WHEN $3 < 0 THEN error('Third argument in SUBSTR() cannot be negative') ELSE ";
+  return {
+      {2, "substr($1, " + start("length($1)") + ")", {Is(1, {kString})}},
+      {3, negative + "substr($1, " + start("length($1)") + ", $3) END", {Is(1, {kString})}},
+      {2, "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1))", {Is(1, {kBytes})}},
+      {3,
+       negative + "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1, 2 * $3)) END",
+       {Is(1, {kBytes})}}};
+}
+
 // The reciprocal of a DuckDB function, which BigQuery reports as an error at zero where DuckDB
 // returns infinity.
 std::vector<Rule> Reciprocal(std::string_view function) {
@@ -222,48 +279,106 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"DATE_FROM_UNIX_DATE",
        {{1, "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE)"}}},
 
-      // Strings. DuckDB's functions have no BYTES overloads, so most rules require a STRING.
+      // Strings. DuckDB has almost no BLOB functions, so the BYTES rules work on the hexadecimal
+      // digits, two to a byte; see Spaced().
       {"LENGTH", {{1, "octet_length($1)", {Is(1, {kBytes})}}, {1, "length($1)"}}},
       {"BYTE_LENGTH",
        {{1, "strlen($1)", {Is(1, {kString})}}, {1, "octet_length($1)", {Is(1, {kBytes})}}}},
-      {"INSTR", {{2, "strpos($1, $2)", {Is(1, {kString})}}}},
+      {"INSTR", Position()},
+      {"STRPOS", Position()},
       {"LEFT",
        {{2,
          "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE left($1, $2) END",
-         {Is(1, {kString})}}}},
+         {Is(1, {kString})}},
+        {2,
+         "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE unhex(left(hex($1), "
+         "2 * $2)) END",
+         {Is(1, {kBytes})}}}},
       {"RIGHT",
        {{2,
          "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE right($1, $2) END",
-         {Is(1, {kString})}}}},
-      // DuckDB has no default pad.
-      {"LPAD", {{{2, 3}, "lpad($1, CAST($2 AS INTEGER), $3)", {Is(1, {kString})}, {"' '"}}}},
-      {"RPAD", {{{2, 3}, "rpad($1, CAST($2 AS INTEGER), $3)", {Is(1, {kString})}, {"' '"}}}},
-      {"SPLIT", {{{1, 2}, "split($1, $2)", {Is(1, {kString})}, {"','"}}}},
+         {Is(1, {kString})}},
+        {2,
+         "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE "
+         "unhex(right(hex($1), 2 * $2)) END",
+         {Is(1, {kBytes})}}}},
+      {"LPAD", Pad("lpad")},
+      {"RPAD", Pad("rpad")},
+      {"SPLIT",
+       {{{1, 2}, "split($1, $2)", {Is(1, {kString})}, {"','"}},
+        // An empty delimiter splits the value into its bytes.
+        {2,
+         "list_transform(CASE WHEN octet_length($2) = 0 THEN regexp_extract_all(hex($1), '..') "
+         "ELSE list_transform(string_split(" +
+             Spaced("$1") + ", " + Spaced("$2") +
+             "), _p -> replace(_p, ' ', '')) END, _p -> unhex(_p))",
+         {Is(1, {kBytes})}}}},
       {"TRANSLATE", {{3, "translate($1, $2, $3)", {Is(1, {kString})}}}},
-      {"ASCII", {{1, "ascii($1)", {Is(1, {kString})}}}},
+      {"ASCII",
+       {{1, "ascii($1)", {Is(1, {kString})}},
+        {1,
+         "CASE WHEN octet_length($1) = 0 THEN 0 ELSE CAST('0x' || left(hex($1), 2) AS BIGINT) END",
+         {Is(1, {kBytes})}}}},
       {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {kString})}}}},
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
       {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {kString})}}}},
       // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
       {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {kString})}}}},
       {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {kString})}}}},
-      {"LOWER", Same("lower", 1, {Is(1, {kString})})},
-      {"UPPER", Same("upper", 1, {Is(1, {kString})})},
-      {"REVERSE", Same("reverse", 1, {Is(1, {kString})})},
-      {"TRIM", Same("trim", {1, 2}, {Is(1, {kString})})},
-      {"LTRIM", Same("ltrim", {1, 2}, {Is(1, {kString})})},
-      {"RTRIM", Same("rtrim", {1, 2}, {Is(1, {kString})})},
-      {"SUBSTR", Same("substr", {2, 3}, {Is(1, {kString})})},
-      {"SUBSTRING", Same("substr", {2, 3}, {Is(1, {kString})})},
-      {"STRPOS", Same("strpos", 2, {Is(1, {kString})})},
-      {"STARTS_WITH", Same("starts_with", 2, {Is(1, {kString})})},
-      {"ENDS_WITH", Same("ends_with", 2, {Is(1, {kString})})},
-      {"REPLACE", Same("replace", 3, {Is(1, {kString})})},
+      // A BLOB cast to VARCHAR escapes every byte but printable ASCII as \xHH, so the case
+      // mapping only touches ASCII letters, and the escapes read back in either case but \X.
+      {"LOWER",
+       {{1, "lower($1)", {Is(1, {kString})}},
+        {1, "CAST(lower(CAST($1 AS VARCHAR)) AS BLOB)", {Is(1, {kBytes})}}}},
+      {"UPPER",
+       {{1, "upper($1)", {Is(1, {kString})}},
+        {1, "CAST(replace(upper(CAST($1 AS VARCHAR)), '\\X', '\\x') AS BLOB)", {Is(1, {kBytes})}}}},
+      // Reversing the digits reverses the bytes and swaps the two digits of each.
+      {"REVERSE",
+       {{1, "reverse($1)", {Is(1, {kString})}},
+        {1,
+         "unhex(regexp_replace(reverse(hex($1)), '(.)(.)', '\\2\\1', 'g'))",
+         {Is(1, {kBytes})}}}},
+      {"TRIM", Trim("trim", "^(?:@)+|(?:@)+$")},
+      {"LTRIM", Trim("ltrim", "^(?:@)+")},
+      {"RTRIM", Trim("rtrim", "(?:@)+$")},
+      {"SUBSTR", Substr()},
+      {"SUBSTRING", Substr()},
+      {"STARTS_WITH",
+       {{2, "starts_with($1, $2)", {Is(1, {kString})}},
+        {2, "starts_with(hex($1), hex($2))", {Is(1, {kBytes})}}}},
+      {"ENDS_WITH",
+       {{2, "ends_with($1, $2)", {Is(1, {kString})}},
+        {2, "ends_with(hex($1), hex($2))", {Is(1, {kBytes})}}}},
+      {"REPLACE",
+       {{3, "replace($1, $2, $3)", {Is(1, {kString})}},
+        {3,
+         "unhex(replace(replace(" + Spaced("$1") + ", " + Spaced("$2") + ", " + Spaced("$3") +
+             "), ' ', ''))",
+         {Is(1, {kBytes})}}}},
 
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
       {"SHA256", {{1, "unhex(sha256($1))"}}},
+      // DuckDB lacks these; src/backend.cc registers GoogleSQL's implementations as bq_*.
+      // encode() takes a STRING's UTF-8 bytes.
+      {"SHA512",
+       {{1, "bq_sha512(encode($1))", {Is(1, {kString})}}, {1, "bq_sha512($1)", {Is(1, {kBytes})}}}},
+      {"FARM_FINGERPRINT",
+       {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {kString})}},
+        {1, "bq_farm_fingerprint($1)", {Is(1, {kBytes})}}}},
+      {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
+      // Without max_distance, the distance is not capped.
+      {"EDIT_DISTANCE",
+       {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {kString})}, {"9223372036854775807"}},
+        {{2, 3},
+         "bq_edit_distance_bytes($1, $2, $3)",
+         {Is(1, {kBytes})},
+         {"9223372036854775807"}}}},
+      {"REGEXP_INSTR",
+       {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {kString})}, {"1", "1", "0"}},
+        {{2, 5}, "bq_regexp_instr_bytes($1, $2, $3, $4, $5)", {Is(1, {kBytes})}, {"1", "1", "0"}}}},
       {"TO_HEX", {{1, "lower(hex($1))"}}},
       {"FROM_HEX", {{1, "unhex($1)", {Is(1, {kString})}}}},
       {"TO_BASE64", {{1, "to_base64($1)"}}},
@@ -281,7 +396,16 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
 
       {"ERROR", {{1, "error($1)"}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
-      {"ARRAY_TO_STRING", Same("array_to_string", {2, 3}, {Is(2, {kString})})},
+      // DuckDB's array_to_string() skips NULL elements and has no NULL text.
+      {"ARRAY_TO_STRING",
+       {{2, "array_to_string($1, $2)", {Is(2, {kString})}},
+        {3, "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)", {Is(2, {kString})}},
+        {2,
+         "unhex(array_to_string(list_transform($1, _e -> hex(_e)), hex($2)))",
+         {Is(2, {kBytes})}},
+        {3,
+         "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), hex($2)))",
+         {Is(2, {kBytes})}}}},
       // generate_series() has no floating point overload, and returns an empty list for a zero
       // step, which BigQuery rejects.
       {"GENERATE_ARRAY",

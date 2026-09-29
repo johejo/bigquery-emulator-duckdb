@@ -47,6 +47,10 @@ query JSON_QUERY SELECT JSON_QUERY('{"a": [1, 2]}', '$.a')
 query JSON_QUERY SELECT JSON_QUERY(JSON '{"a": [1, 2]}', '$.a')
 query JSON_EXTRACT SELECT JSON_EXTRACT('{"a": [1, 2]}', '$.a')
 query JSON_EXTRACT SELECT JSON_EXTRACT(JSON '{"a": [1, 2]}', '$.a')
+query JSON_REMOVE SELECT JSON_REMOVE(JSON '{"a": [1, 2]}', '$.a[0]', '$.b')
+query JSON_SET SELECT JSON_SET(JSON '{"a": [1, 2]}', '$.a[0]', 3, '$.b', 'x')
+query JSON_OBJECT SELECT JSON_OBJECT('a', 1, 'b', JSON '[2]')
+query JSON_OBJECT SELECT JSON_OBJECT(['a', 'b'], [1, 2])
 query ERROR SELECT IF(FALSE, ERROR('abc'), 1)
 query FORMAT SELECT FORMAT('%d-%s', 2, 'abc')
 query GROUPING SELECT x, GROUPING(x) FROM UNNEST([1, 2]) AS x GROUP BY ROLLUP(x)
@@ -82,9 +86,10 @@ query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 
 note BYTE_LENGTH counts the bytes of a STRING's UTF-8 encoding
 note LENGTH counts characters of a STRING and bytes of a BYTES
 note ARRAY_CONCAT returns NULL when any array is NULL
-note LPAD pads with spaces by default; the BYTES overload is unsupported
-note RPAD pads with spaces by default; the BYTES overload is unsupported
-note SPLIT the BYTES overload is unsupported
+note SUBSTR starts at the first character for a position of 0 or before the start
+note SUBSTRING starts at the first character for a position of 0 or before the start
+note LPAD pads with spaces by default
+note RPAD pads with spaces by default
 note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
 note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
 note DATE_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
