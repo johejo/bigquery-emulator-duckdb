@@ -103,9 +103,9 @@ what the emulator ignores or does differently, and the probe adds the features t
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`tables.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported |  |
-| [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Ignores `selectedFields` and `view`. Returns the reference, schema and row count; `numBytes` is always 0. |
+| [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Ignores `selectedFields` and `view`. Returns the reference and schema, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0. |
 | [`tables.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
-| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Supported | Keeps only `tableReference` and `schema`; views, partitioning, clustering, labels and descriptions are ignored. |
+| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Supported | Keeps `tableReference`, `schema` and GoogleSQL view definitions; partitioning, clustering, labels and descriptions are ignored. |
 | [`tables.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported | Ignores `maxResults` and `pageToken`, and returns every table in one page. |
 | [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Unsupported |  |
 | [`tables.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy` | Unsupported |  |

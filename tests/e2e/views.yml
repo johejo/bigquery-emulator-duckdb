@@ -1,0 +1,105 @@
+desc: GoogleSQL views support SQL and bq creation, live reads, metadata and deletion
+steps:
+  dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset views
+    test: current.exit_code == 0
+  source:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE TABLE views.source AS SELECT 1 AS id'
+    test: current.exit_code == 0
+  create:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE VIEW views.v (total) AS SELECT SUM(id) FROM views.source'
+    test: current.exit_code == 0
+  metadata:
+    exec:
+      command: tests/e2e/bq.sh show --format=json views.v
+    test: |
+      current.exit_code == 0 && current.stdout contains '"type":"VIEW"' &&
+      current.stdout contains '"query":"SELECT SUM(id) FROM views.source"' &&
+      current.stdout contains '"name":"total"' && current.stdout contains '"type":"INTEGER"'
+  if_not_exists_keeps_definition:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE VIEW IF NOT EXISTS views.v AS SELECT 999 AS ignored'
+    test: current.exit_code == 0
+  insert:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'INSERT INTO views.source VALUES (2)'
+    test: current.exit_code == 0
+  live_read:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT * FROM views.v'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"total":"3"}]'
+  metadata_unchanged:
+    exec:
+      command: tests/e2e/bq.sh show --format=json views.v
+    test: current.exit_code == 0 && current.stdout contains '"query":"SELECT SUM(id) FROM views.source"'
+  replace:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE OR REPLACE VIEW views.v AS SELECT id FROM views.source WHERE id > 1'
+    test: current.exit_code == 0
+  failed_replace:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE OR REPLACE VIEW views.v AS SELECT missing FROM views.source'
+    test: current.exit_code != 0
+  circular_replace_rejected:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE OR REPLACE VIEW views.v AS SELECT id FROM views.v'
+    test: current.exit_code != 0
+  api_create:
+    exec:
+      command: tests/e2e/bq.sh mk --view='SELECT id + 10 AS n FROM views.v' --use_legacy_sql=false views.nested
+    test: current.exit_code == 0
+  nested_read:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT * FROM views.nested'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"n":"12"}]'
+  list:
+    exec:
+      command: tests/e2e/bq.sh ls --format=json views
+    test: current.exit_code == 0 && current.stdout contains '"type":"VIEW"'
+  information_schema:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json "SELECT table_name, table_type, is_insertable_into, ddl FROM views.INFORMATION_SCHEMA.TABLES WHERE table_name IN ('source', 'nested') ORDER BY table_name"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"table_name":"nested","table_type":"VIEW"' &&
+      current.stdout contains '"ddl":"CREATE VIEW `' && current.stdout contains 'AS SELECT id + 10 AS n FROM views.v;"' &&
+      current.stdout contains '"table_name":"source","table_type":"BASE TABLE"'
+  dry_run:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'CREATE VIEW views.dry AS SELECT 1 AS x'
+    test: current.exit_code == 0
+  dry_run_did_not_create:
+    exec:
+      command: tests/e2e/bq.sh show views.dry
+    test: current.exit_code != 0
+  write_rejected:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --destination_table=views.v --replace 'SELECT 99 AS id'
+    test: current.exit_code != 0 && current.stdout contains 'Cannot write to a view'
+  copy_rejected:
+    exec:
+      command: tests/e2e/bq.sh cp views.v views.copy
+    test: current.exit_code != 0 && current.stdout contains 'Cannot copy a view'
+  head_rejected:
+    exec:
+      command: tests/e2e/bq.sh head views.v
+    test: current.exit_code != 0
+  api_delete:
+    exec:
+      command: tests/e2e/bq.sh rm -f -t views.nested
+    test: current.exit_code == 0
+  sql_delete:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'DROP VIEW views.v'
+    test: current.exit_code == 0
+  missing:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'SELECT * FROM views.v'
+    test: current.exit_code != 0
+  cleanup:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d views
+    test: current.exit_code == 0

@@ -54,6 +54,11 @@ class Backend {
   QueryResult ExecuteAll(const std::vector<std::string>& statements,
                          const std::vector<std::string>& setup = {});
 
+  // Creates a view, validates it and stores its metadata in one transaction. For IF NOT
+  // EXISTS, existence_query returns a row when creation and metadata must both be skipped.
+  void CreateView(const std::string& sql, const std::vector<std::string>& metadata_statements,
+                  const std::string& existence_query, const std::vector<std::string>& setup = {});
+
   // Validates `sql` and returns the schema of its result without running it. The result never
   // has rows; `has_rows` says whether the statement produces a result set at all.
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});

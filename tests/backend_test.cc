@@ -12,6 +12,23 @@ using nlohmann::json;
 
 TEST(BackendTest, ExecutesSelectOne) { EXPECT_EQ(ExecuteScalarString("SELECT 1"), "1"); }
 
+TEST(BackendTest, RollsBackViewCreationWhenMetadataFails) {
+  Backend backend;
+  EXPECT_THROW(backend.CreateView("CREATE VIEW v AS SELECT 1 AS x",
+                                  {"COMMENT ON VIEW missing IS 'metadata'"}, ""),
+               BackendError);
+  EXPECT_THROW(backend.Prepare("SELECT * FROM v"), BackendError);
+  backend.CreateView("CREATE VIEW v AS SELECT 2 AS x", {"COMMENT ON VIEW v IS 'original'"}, "");
+  EXPECT_THROW(backend.CreateView("CREATE OR REPLACE VIEW v AS SELECT 3 AS y",
+                                  {"COMMENT ON VIEW missing IS 'metadata'"}, ""),
+               BackendError);
+  const QueryResult metadata =
+      backend.Execute("SELECT comment FROM duckdb_views() WHERE view_name = 'v'");
+  ASSERT_EQ(metadata.rows.size(), 1);
+  EXPECT_EQ(metadata.rows[0]["f"][0]["v"], "original");
+  EXPECT_EQ(backend.Prepare("SELECT * FROM v").schema[0].name, "x");
+}
+
 TEST(BackendTest, ReturnsSchemaAndRows) {
   Backend backend;
   const QueryResult result = backend.Execute("SELECT 1 AS a, 'x' AS b, NULL AS c");

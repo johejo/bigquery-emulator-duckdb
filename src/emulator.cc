@@ -19,7 +19,9 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
 #include "src/api_error.h"
@@ -210,6 +212,48 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
+// What the emulator records in a DuckDB view's comment: the GoogleSQL query and its schema.
+struct ViewMetadata {
+  std::string query;
+  std::vector<FieldSchema> schema;
+};
+
+// The comment of the DuckDB view `table`, which is NULL when it has none, or nothing when
+// `table` is not a view.
+std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
+  const QueryResult views = backend.Execute(
+      "SELECT comment FROM duckdb_views() WHERE database_name = " + QuoteLiteral(table.project_id) +
+      " AND schema_name = " + QuoteLiteral(table.dataset_id) +
+      " AND view_name = " + QuoteLiteral(table.table_id));
+  if (views.rows.empty()) {
+    return std::nullopt;
+  }
+  return views.rows[0]["f"][0]["v"];
+}
+
+// Parses a view comment, or returns nothing for a view the emulator did not create, which has
+// no comment or a comment of its own.
+std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
+  if (!comment.is_string()) {
+    return std::nullopt;
+  }
+  const json metadata =
+      json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
+  if (!metadata.is_object() || !metadata.contains("query") || !metadata["query"].is_string() ||
+      !metadata.contains("fields") || !metadata["fields"].is_array()) {
+    return std::nullopt;
+  }
+  ViewMetadata view{metadata["query"].get<std::string>(), {}};
+  try {
+    for (const json& field : metadata["fields"]) {
+      view.schema.push_back(ParseField(field));
+    }
+  } catch (const json::exception&) {
+    return std::nullopt;
+  }
+  return view;
+}
+
 // Serves the analyzer the tables the emulator keeps in DuckDB.
 class DuckDbTableSource : public TableSource {
  public:
@@ -241,6 +285,17 @@ class DuckDbTableSource : public TableSource {
         backend_.Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
                          QuoteLiteral(project) + " AND table_schema = " + QuoteLiteral(dataset) +
                          " ORDER BY table_name"));
+  }
+
+  std::optional<std::string> FindViewQuery(const std::string& project, const std::string& dataset,
+                                           const std::string& table) override {
+    const std::optional<json> comment =
+        ViewComment(backend_, TableReference{project, dataset, table});
+    if (!comment.has_value()) {
+      return std::nullopt;
+    }
+    const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
+    return metadata.has_value() ? metadata->query : "";
   }
 
  private:
@@ -391,7 +446,33 @@ Emulator::Translation Emulator::Translate(const std::string& query,
   if (!sql.has_value()) {
     throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
   }
-  return {*std::move(sql), analyzed.result_schema()};
+  Translation translation{*std::move(sql), analyzed.result_schema(), {}, {}};
+  if (analyzed.statement().Is<googlesql::ResolvedCreateViewStmt>()) {
+    const auto& view = *analyzed.statement().GetAs<googlesql::ResolvedCreateViewStmt>();
+    const auto path = NormalizeTablePath(view.name_path(), default_project, default_dataset);
+    const TableReference table{path[0], path[1], path[2]};
+    json fields = json::array();
+    for (const auto& output : view.output_column_list()) {
+      const auto field = BigQueryFieldSchema(output->name(), output->column().type());
+      if (!field.ok()) {
+        throw ApiError::InvalidQuery(std::string(field.status().message()));
+      }
+      fields.push_back(field->ToJson());
+    }
+    const json metadata{{"query", view.sql()}, {"fields", fields}};
+    // DuckDB can create a circular view and only reject it when queried. Bind the
+    // new definition before committing so a failed replacement keeps the old view.
+    translation.view_metadata_statements = {
+        "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
+        "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
+    if (view.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
+      translation.view_existence_query =
+          "SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
+          QuoteLiteral(table.project_id) + " AND table_schema = " + QuoteLiteral(table.dataset_id) +
+          " AND table_name = " + QuoteLiteral(table.table_id);
+    }
+  }
+  return translation;
 }
 
 std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
@@ -448,6 +529,9 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     QueryResult result;
     if (request.dry_run) {
       result = Prepare(translation.sql, setup);
+    } else if (!translation.view_metadata_statements.empty()) {
+      backend_.CreateView(translation.sql, translation.view_metadata_statements,
+                          translation.view_existence_query, setup);
     } else if (request.destination_table.has_value()) {
       result = WriteDestination(request, *request.destination_table, translation.sql,
                                 *translation.schema, setup);
@@ -636,6 +720,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
       if (source.project_id.empty()) source.project_id = request.project_id;
       EnsureProject(source.project_id);
       const TableInfo table = GetTable(source);
+      if (table.view_query) {
+        throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
+      }
       if (sql.empty()) {
         schema = table.schema;
       } else if (SchemaToJson(table.schema) != SchemaToJson(schema)) {
@@ -707,6 +794,9 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
     if (error.http_status() != 404) {
       throw;
     }
+  }
+  if (existing.has_value() && existing->view_query) {
+    throw ApiError::Invalid("Cannot write to a view: " + TableName(destination));
   }
   if (!existing.has_value() && create == "CREATE_NEVER") {
     throw ApiError::NotFound("Not found: Table " + TableName(destination));
@@ -837,15 +927,35 @@ std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
               " AND table_schema = " + QuoteLiteral(dataset.dataset_id) + " ORDER BY table_name"));
 }
 
-TableInfo Emulator::GetTable(const TableReference& table) {
+std::vector<std::string> Emulator::ListViews(const DatasetReference& dataset) {
+  GetDataset(dataset);
+  return FirstColumnStrings(Execute("SELECT view_name FROM duckdb_views() WHERE database_name = " +
+                                    QuoteLiteral(dataset.project_id) +
+                                    " AND schema_name = " + QuoteLiteral(dataset.dataset_id) +
+                                    " AND NOT internal ORDER BY view_name"));
+}
+
+TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count) {
   const DatasetReference dataset{table.project_id, table.dataset_id};
   GetDataset(dataset);
   TableInfo info;
   info.reference = table;
+  if (const std::optional<json> comment = ViewComment(backend_, table); comment.has_value()) {
+    std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
+    if (!metadata.has_value()) {
+      throw ApiError::Invalid("View " + TableName(table) +
+                              " was not created by the emulator and has no GoogleSQL definition");
+    }
+    info.view_query = std::move(metadata->query);
+    info.schema = std::move(metadata->schema);
+    return info;
+  }
   try {
     info.schema = backend_.Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT 0").schema;
-    const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
-    info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
+    if (include_row_count) {
+      const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
+      info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
+    }
   } catch (const BackendError& error) {
     throw ApiError::NotFound("Not found: Table " + table.project_id + ":" + table.dataset_id + "." +
                              table.table_id);
@@ -876,14 +986,51 @@ void Emulator::CreateTable(const TableReference& table, const json& fields) {
   }
 }
 
+void Emulator::CreateView(const TableReference& table, const json& definition) {
+  GetDataset(DatasetReference{table.project_id, table.dataset_id});
+  if (definition.value("useLegacySql", true)) {
+    throw ApiError::Invalid("The emulator does not support legacy SQL views");
+  }
+  if (definition.contains("userDefinedFunctionResources")) {
+    throw ApiError::Invalid("The emulator does not support view userDefinedFunctionResources");
+  }
+  const std::string query = definition.value("query", "");
+  if (query.empty()) {
+    throw ApiError::Invalid("View query is required");
+  }
+  try {
+    const Translation translation =
+        Translate("CREATE VIEW " +
+                      googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
+                                                     "." + table.table_id) +
+                      " AS " + query,
+                  {}, table.project_id, "");
+    backend_.CreateView(translation.sql, translation.view_metadata_statements, "");
+  } catch (const BackendError& error) {
+    if (std::string(error.what()).find("already exists") != std::string::npos) {
+      throw ApiError::Duplicate("Already Exists: Table " + TableName(table));
+    }
+    throw ApiError::Invalid(error.what());
+  } catch (const std::runtime_error& error) {
+    throw ApiError::Invalid(error.what());
+  }
+}
+
 void Emulator::DeleteTable(const TableReference& table) {
-  GetTable(table);
+  // Views the emulator did not create have no metadata for GetTable, but can still be dropped.
+  if (ViewComment(backend_, table).has_value()) {
+    Execute("DROP VIEW " + QualifiedName(table));
+    return;
+  }
+  GetTable(table, false);
   Execute("DROP TABLE " + QualifiedName(table));
 }
 
 QueryResult Emulator::ListTableData(const TableReference& table, int64_t start_index,
                                     int64_t max_results) {
-  GetTable(table);
+  if (GetTable(table).view_query) {
+    throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
+  }
   return Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT " + std::to_string(max_results) +
                  " OFFSET " + std::to_string(start_index));
 }
@@ -894,7 +1041,11 @@ std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, 
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");
   }
-  const std::vector<FieldSchema> schema = GetTable(table).schema;
+  const TableInfo info = GetTable(table, false);
+  if (info.view_query) {
+    throw ApiError::Invalid("Cannot insert into a view: " + TableName(table));
+  }
+  const std::vector<FieldSchema>& schema = info.schema;
   std::vector<InsertError> errors;
   std::vector<std::string> statements;
   std::vector<size_t> indexes;

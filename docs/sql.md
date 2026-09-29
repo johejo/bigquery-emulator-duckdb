@@ -20,8 +20,8 @@ what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 2 |
-| Supported | 50 |
-| Unsupported | 25 |
+| Supported | 52 |
+| Unsupported | 24 |
 
 ## Queries
 
@@ -105,7 +105,8 @@ what it rejected.
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Unsupported | statement AlterSchemaStmt |
-| `CREATE VIEW` | Unsupported | statement CreateViewStmt |
+| `CREATE VIEW` | Supported | Stores the GoogleSQL definition and schema; view options are ignored. Temporary, recursive and value-table views are unsupported. |
+| `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |
 | `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |
 | `CREATE TABLE FUNCTION` | Unsupported | statement CreateTableFunctionStmt |

@@ -50,13 +50,15 @@ runn run --scopes run:exec "$@" tests/e2e/*.yml < /dev/null
 # id is escaped into the file name.
 tests/e2e/bq.sh mk --dataset persist
 tests/e2e/bq.sh query --nouse_legacy_sql "CREATE TABLE persist.t AS SELECT 1 AS a, ['x', 'y'] AS b"
+tests/e2e/bq.sh query --nouse_legacy_sql "CREATE VIEW persist.v AS SELECT a, b FROM persist.t"
 BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh mk --dataset scoped
 kill "${emulator_pid}"
 wait "${emulator_pid}"
 start_emulator
-rows="$(tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT a, b FROM persist.t')"
+rows="$(tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT a, b FROM persist.v')"
+view="$(tests/e2e/bq.sh show --format=json persist.v)"
 datasets="$(BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh ls --format=json)"
-if [[ "${rows}" != '[{"a":"1","b":["x","y"]}]' || "${datasets}" != *'"datasetId":"scoped"'* ]]; then
-  echo "data did not survive a restart: ${rows} ${datasets}" >&2
+if [[ "${rows}" != '[{"a":"1","b":["x","y"]}]' || "${view}" != *'"query":"SELECT a, b FROM persist.t"'* || "${datasets}" != *'"datasetId":"scoped"'* ]]; then
+  echo "data did not survive a restart: ${rows} ${view} ${datasets}" >&2
   exit 1
 fi

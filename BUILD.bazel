@@ -169,7 +169,9 @@ cc_library(
         ":gcs",
         ":query_parameters",
         ":translator",
+        "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
         "@nlohmann_json//:json",
     ],
 )
@@ -342,6 +344,8 @@ cc_test(
     srcs = ["tests/emulator_test.cc"],
     copts = ["-std=c++20"],
     deps = [
+        ":api_error",
+        ":backend",
         ":emulator",
         ":field_schema",
         ":query_parameters",

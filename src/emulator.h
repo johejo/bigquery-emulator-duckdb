@@ -34,6 +34,7 @@ struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
   int64_t num_rows = 0;
+  std::optional<std::string> view_query;
 };
 
 struct InsertError {
@@ -122,8 +123,11 @@ class Emulator {
   void DeleteDataset(const DatasetReference& dataset, bool delete_contents);
 
   std::vector<std::string> ListTables(const DatasetReference& dataset);
-  TableInfo GetTable(const TableReference& table);
+  // The names of the views among ListTables, sorted.
+  std::vector<std::string> ListViews(const DatasetReference& dataset);
+  TableInfo GetTable(const TableReference& table, bool include_row_count = true);
   void CreateTable(const TableReference& table, const nlohmann::json& fields);
+  void CreateView(const TableReference& table, const nlohmann::json& definition);
   void DeleteTable(const TableReference& table);
   QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);
   std::vector<InsertError> InsertTableData(const TableReference& table, const nlohmann::json& rows,
@@ -136,6 +140,8 @@ class Emulator {
   struct Translation {
     std::string sql;
     std::optional<std::vector<FieldSchema>> schema;
+    std::vector<std::string> view_metadata_statements;
+    std::string view_existence_query;
   };
   // Keeps the catalog, types and resolved AST alive until translation finishes.
   Translation Translate(const std::string& query, const QueryParameters& parameters,
