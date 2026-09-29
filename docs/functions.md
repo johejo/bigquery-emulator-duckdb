@@ -22,8 +22,8 @@ probe's own notes name what it rejected.
 | Status | Functions |
 | --- | --- |
 | Partial | 19 |
-| Supported | 191 |
-| Unsupported | 183 |
+| Supported | 197 |
+| Unsupported | 177 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
@@ -37,14 +37,14 @@ probe's own notes name what it rejected.
 | [`AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#agg) | aggregate_functions | Untested | no sample for <measure<T1>> |
 | [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | aggregate_functions | Supported |  |
 | [`APPENDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#appends) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_COUNT_DISTINCT |
-| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_QUANTILES |
-| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_TOP_COUNT |
+| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Supported |  |
+| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Supported |  |
+| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Supported |  |
 | [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_TOP_SUM |
 | [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | array_functions | Supported |  |
 | [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | aggregate_functions | Supported |  |
 | [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | array_functions | Supported | returns NULL when any array is NULL |
-| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Unsupported | aggregate or analytic function ARRAY_CONCAT_AGG |
+| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Supported |  |
 | [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | array_functions | Supported |  |
 | [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | array_functions | Supported |  |
 | [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | array_functions | Supported |  |
@@ -228,10 +228,10 @@ probe's own notes name what it rejected.
 | [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Supported |  |
 | [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported | type INTERVAL |
 | [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported |  |
-| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Unsupported | the analyzer does not know this function |
+| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Supported |  |
 | [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported |  |
 | [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported |  |
-| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Unsupported | the analyzer does not know this function |
+| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported |  |
 | [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported |  |
 | [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported | function HOST |
 | [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Unsupported | function IPV4_FROM_INT64 |

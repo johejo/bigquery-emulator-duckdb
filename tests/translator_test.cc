@@ -725,6 +725,37 @@ TEST_F(TranslatorTest, RunsAggregateLimitAndHavingModifiers) {
             (V{"yy", "x"}));
 }
 
+TEST_F(TranslatorTest, RunsApproximateAndByAggregates) {
+  EXPECT_EQ(Scalar("SELECT APPROX_COUNT_DISTINCT(a) FROM t"), "3");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t"), "[1,2,3]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(DISTINCT x, 4)) "
+                   "FROM UNNEST([1, 1, 1, 2, 3, 4, 5]) AS x"),
+            "[1,2,3,4,5]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t WHERE FALSE"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 2)) "
+                   "FROM UNNEST(['a', NULL, 'b', 'b', NULL, NULL]) AS x"),
+            R"([{"value":null,"count":3},{"value":"b","count":2}])");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 1)) FROM UNNEST([1, 2, 2]) AS x"),
+            R"([{"value":2,"count":2}])");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(a, 1)) FROM t WHERE FALSE"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT MAX_BY(b, a) FROM t"), "あ");
+  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) FROM t"), "x");
+  EXPECT_EQ(Scalar("SELECT MAX_BY(x, y) FROM UNNEST([STRUCT('a' AS x, 1 AS y), (NULL, 2)])"),
+            std::nullopt);
+  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) OVER () FROM t LIMIT 1"), "x");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x))) FROM "
+                   "(SELECT [1, 2] AS x UNION ALL SELECT NULL UNION ALL SELECT [3])"),
+            "[3,1,2]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x) DESC "
+                   "LIMIT 1)) FROM (SELECT [1, 2] AS x UNION ALL SELECT [3])"),
+            "[1,2]");
+  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x)) FROM "
+                   "(SELECT CAST(NULL AS ARRAY<INT64>) AS x)"),
+            std::nullopt);
+}
+
 TEST_F(TranslatorTest, RunsValueTables) {
   using V = std::vector<std::string>;
   const auto structs =

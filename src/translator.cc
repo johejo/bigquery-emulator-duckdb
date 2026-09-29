@@ -914,7 +914,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
-      !call.function()->IsGoogleSQLBuiltin() || call.where_expr() != nullptr) {
+      (!call.function()->IsGoogleSQLBuiltin() && name != "MAX_BY" && name != "MIN_BY") ||
+      call.where_expr() != nullptr) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
   }
   if (aggregate != nullptr &&
@@ -923,30 +924,39 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        aggregate->having_expr() != nullptr)) {
     return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
   }
-  static const std::map<std::string, std::string> aggregates = {{"COUNT", "count"},
-                                                                {"$COUNT_STAR", "count"},
-                                                                {"SUM", "sum"},
-                                                                {"AVG", "avg"},
-                                                                {"MIN", "min"},
-                                                                {"MAX", "max"},
-                                                                {"ANY_VALUE", "any_value"},
-                                                                {"ARRAY_AGG", "list"},
-                                                                {"STRING_AGG", "string_agg"},
-                                                                {"COUNTIF", "count_if"},
-                                                                {"LOGICAL_AND", "bool_and"},
-                                                                {"LOGICAL_OR", "bool_or"},
-                                                                {"BIT_AND", "bit_and"},
-                                                                {"BIT_OR", "bit_or"},
-                                                                {"BIT_XOR", "bit_xor"},
-                                                                {"STDDEV", "stddev_samp"},
-                                                                {"STDDEV_SAMP", "stddev_samp"},
-                                                                {"STDDEV_POP", "stddev_pop"},
-                                                                {"VARIANCE", "var_samp"},
-                                                                {"VAR_SAMP", "var_samp"},
-                                                                {"VAR_POP", "var_pop"},
-                                                                {"CORR", "corr"},
-                                                                {"COVAR_POP", "covar_pop"},
-                                                                {"COVAR_SAMP", "covar_samp"}};
+  static const std::map<std::string, std::string> aggregates = {
+      {"COUNT", "count"},
+      {"$COUNT_STAR", "count"},
+      {"SUM", "sum"},
+      {"AVG", "avg"},
+      {"MIN", "min"},
+      {"MAX", "max"},
+      {"ANY_VALUE", "any_value"},
+      {"ARRAY_AGG", "list"},
+      {"ARRAY_CONCAT_AGG", "list"},
+      // Exact, which is within any approximation error.
+      {"APPROX_COUNT_DISTINCT", "count"},
+      {"APPROX_QUANTILES", "quantile_disc"},
+      {"APPROX_TOP_COUNT", "histogram"},
+      // The _null variants return a NULL x instead of skipping its row.
+      {"MAX_BY", "arg_max_null"},
+      {"MIN_BY", "arg_min_null"},
+      {"STRING_AGG", "string_agg"},
+      {"COUNTIF", "count_if"},
+      {"LOGICAL_AND", "bool_and"},
+      {"LOGICAL_OR", "bool_or"},
+      {"BIT_AND", "bit_and"},
+      {"BIT_OR", "bit_or"},
+      {"BIT_XOR", "bit_xor"},
+      {"STDDEV", "stddev_samp"},
+      {"STDDEV_SAMP", "stddev_samp"},
+      {"STDDEV_POP", "stddev_pop"},
+      {"VARIANCE", "var_samp"},
+      {"VAR_SAMP", "var_samp"},
+      {"VAR_POP", "var_pop"},
+      {"CORR", "corr"},
+      {"COVAR_POP", "covar_pop"},
+      {"COVAR_SAMP", "covar_samp"}};
   static const std::map<std::string, std::string> analytics = {{"ROW_NUMBER", "row_number"},
                                                                {"RANK", "rank"},
                                                                {"DENSE_RANK", "dense_rank"},
@@ -985,8 +995,20 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     }
   }
   const auto unhex = [bytes](const std::string& sql) { return bytes ? "unhex(" + sql + ")" : sql; };
+  // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1.
+  if (name == "APPROX_QUANTILES") {
+    args.at(1) = "list_transform(range(" + args.at(1) + " + 1), lambda i: i / " + args.at(1) + ")";
+  }
+  // APPROX_TOP_COUNT's histogram() takes only the values; the count is applied afterwards.
+  const std::string top = name == "APPROX_TOP_COUNT" ? args.at(1) : "";
+  if (!top.empty()) {
+    if (call.distinct()) {
+      return Unsupported(scope, "APPROX_TOP_COUNT(DISTINCT ...)");
+    }
+    args.pop_back();
+  }
   std::string inner = name == "$COUNT_STAR" ? "*" : Join(args, ", ");
-  if (call.distinct()) {
+  if (call.distinct() || name == "APPROX_COUNT_DISTINCT") {
     inner = "DISTINCT " + inner;
   }
   std::vector<std::string> conditions;
@@ -996,11 +1018,22 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (call.null_handling_modifier() == googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
     if (name == "ARRAY_AGG") {
       conditions.push_back(args.at(0) + " IS NOT NULL");
+    } else if (name == "APPROX_QUANTILES") {
+      // quantile_disc() already skips NULLs, as APPROX_QUANTILES does by default.
     } else if (name == "FIRST_VALUE" || name == "LAST_VALUE" || name == "NTH_VALUE") {
       inner += " IGNORE NULLS";
     } else {
       return Unsupported(scope, name + " IGNORE NULLS");
     }
+  }
+  if (call.null_handling_modifier() ==
+          googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS &&
+      name == "APPROX_QUANTILES") {
+    return Unsupported(scope, name + " RESPECT NULLS");
+  }
+  // ARRAY_CONCAT_AGG skips NULL arrays.
+  if (name == "ARRAY_CONCAT_AGG") {
+    conditions.push_back(args.at(0) + " IS NOT NULL");
   }
   std::string order;
   if (aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
@@ -1027,14 +1060,31 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return unhex("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
                    (args.size() > 1 ? args.at(1) : "','") + ")");
     }
-    if (name != "ARRAY_AGG") {
+    if (name != "ARRAY_AGG" && name != "ARRAY_CONCAT_AGG") {
       return Unsupported(scope, "aggregate " + name + " with LIMIT");
     }
   }
-  const std::string sql =
-      function->second + "(" + inner + order + ")" +
+  const std::string tail =
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
-  return limit.empty() ? unhex(sql) : "list_slice(" + sql + ", 1, " + limit + ")";
+  std::string sql = function->second + "(" + inner + order + ")" + tail;
+  if (!limit.empty()) {
+    sql = "list_slice(" + sql + ", 1, " + limit + ")";
+  }
+  if (name == "ARRAY_CONCAT_AGG") {
+    return "flatten(" + sql + ")";
+  }
+  // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting
+  // the (count, value) structs descending puts the most frequent first, and no rows give NULL.
+  if (!top.empty()) {
+    const std::string rows = "count(*)" + tail;
+    const std::string nulls = rows + " - count(" + args.at(0) + ")" + tail;
+    return "CASE WHEN " + rows + " > 0 THEN list_transform(list_slice(list_sort(list_concat(" +
+           "list_transform(map_entries(" + sql +
+           "), lambda e: {'count': e.value::BIGINT, 'value': e.key}), CASE WHEN " + nulls +
+           " > 0 THEN [{'count': " + nulls + ", 'value': NULL}] END), 'DESC'), 1, " + top +
+           "), lambda e: {'value': e.value, 'count': e.count}) END";
+  }
+  return unhex(sql);
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,

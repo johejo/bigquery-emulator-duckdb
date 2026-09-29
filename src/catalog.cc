@@ -48,6 +48,17 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
             {googlesql::FunctionArgumentType(googlesql::types::StringType()),
              googlesql::FunctionArgumentType(googlesql::types::StringType())},
             /*context_id=*/static_cast<int64_t>(0))}));
+    for (const char* name : {"max_by", "min_by"}) {
+      catalog->AddOwnedFunction(new googlesql::Function(
+          name, "bigquery", googlesql::Function::AGGREGATE,
+          {googlesql::FunctionSignature(
+              googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
+              {googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
+               googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_2)},
+              /*context_id=*/static_cast<int64_t>(0))},
+          googlesql::FunctionOptions(googlesql::FunctionOptions::ORDER_OPTIONAL,
+                                     /*window_framing_support_in=*/true)));
+    }
     return catalog;
   }();
   return kCatalog;
