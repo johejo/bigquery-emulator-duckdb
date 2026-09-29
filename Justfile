@@ -1,7 +1,10 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-_bazel_files := "find . \\( -path './bazel-*' -o -path './external' \\) -prune -o -type f \\( -name 'BUILD' -o -name 'BUILD.bazel' -o -name '*.bzl' -o -name 'MODULE.bazel' \\) -print0"
-_cpp_files := "find src tests tools -type f \\( -name '*.cc' -o -name '*.h' \\) -print0"
+# Tracked and untracked files, minus those that .gitignore and .git/info/exclude ignore, such as
+# Bazel output symlinks and worktrees under .claude.
+_git_files := "git ls-files -z --cached --others --exclude-standard --"
+_bazel_files := _git_files + " ':(glob)**/BUILD' ':(glob)**/BUILD.bazel' ':(glob)**/*.bzl' ':(glob)**/MODULE.bazel'"
+_cpp_files := _git_files + " ':(glob)src/**/*.cc' ':(glob)src/**/*.h' ':(glob)tests/**/*.cc' ':(glob)tests/**/*.h' ':(glob)tools/**/*.cc' ':(glob)tools/**/*.h'"
 
 fmt:
     {{_bazel_files}} | xargs -0 buildifier
