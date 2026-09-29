@@ -23,15 +23,17 @@ bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050
 ### Connect with `bq`
 
 `bq` normally obtains credentials from `gcloud`; a dummy `--oauth_access_token` together with
-`--nouse_google_auth` skips that.
+`--nouse_google_auth` skips that. The emulator runs a query that does not set
+`--use_legacy_sql` as GoogleSQL, so `--nouse_legacy_sql` is unnecessary, although BigQuery itself
+may run such a query as legacy SQL.
 
 ```bash
 alias bqe='bq --api http://127.0.0.1:9050 --project_id test --oauth_access_token=dummy --nouse_google_auth'
 
 bqe mk --dataset ds
 bqe mk --table ds.users id:INTEGER,name:STRING,created:TIMESTAMP
-bqe query --nouse_legacy_sql "INSERT INTO ds.users VALUES (1, 'alice', CURRENT_TIMESTAMP())"
-bqe query --nouse_legacy_sql --format=json 'SELECT * FROM `test.ds.users`'
+bqe query "INSERT INTO ds.users VALUES (1, 'alice', CURRENT_TIMESTAMP())"
+bqe query --format=json 'SELECT * FROM `test.ds.users`'
 bqe head ds.users
 ```
 
