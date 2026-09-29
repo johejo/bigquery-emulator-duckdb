@@ -245,16 +245,6 @@ TEST_F(TranslatorTest, RunsDdl) {
 }
 
 TEST_F(TranslatorTest, RunsSafeCalls) {
-  EXPECT_EQ(Scalar("SELECT SAFE.LENGTH('abc')"), "3");
-  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS('abc', '(')"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, '(') FROM t WHERE a = 1"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1"), "true");
-  EXPECT_EQ(Scalar("SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1"), "Xz");
-  EXPECT_EQ(Scalar("SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)"), "2024-05-01");
-  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, 3)"), "bcd");
-  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR('abcdef', 2, -1)"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT SAFE.SUBSTR(b'abc', 2, -1)"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT SAFE.DIV(1, 0)"), std::nullopt);
   // Only the function's own errors become NULL, not those of its arguments.
   EXPECT_THROW(Execute("SELECT SAFE.ABS(1 / 0)"), BackendError);
 }
@@ -350,8 +340,6 @@ TEST_F(TranslatorTest, RunsOperatorsAndConditions) {
   EXPECT_EQ(result.rows[1]["f"][7]["v"], "10");
   EXPECT_TRUE(result.rows[1]["f"][11]["v"].is_null());
   EXPECT_THROW(Execute("SELECT 1 / 0"), BackendError);
-  EXPECT_EQ(Scalar("SELECT CAST(NULL AS FLOAT64) / 0"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT 1 / CAST(NULL AS FLOAT64)"), std::nullopt);
   const auto division = Translate("SELECT 1 / RAND()");
   if (!division) {
     FAIL() << "Expected translation";
@@ -367,7 +355,6 @@ TEST_F(TranslatorTest, RunsOperatorsAndConditions) {
   const auto left_random = left->find("random()");
   ASSERT_NE(left_random, std::string::npos);
   EXPECT_EQ(left->find("random()", left_random + 1), std::string::npos);
-  EXPECT_EQ(Scalar("SELECT LEFT('abc', CAST(RAND() * 0 AS INT64) + 2)"), "ab");
   EXPECT_EQ(Execute("SELECT IF(a = 1, 42, 1 / (a - 1)) FROM t WHERE a = 1").rows.at(0)["f"][0]["v"],
             "42.0");
   EXPECT_EQ(Execute("SELECT IF(FALSE, 1 / 0, 42)").rows.at(0)["f"][0]["v"], "42.0");
@@ -399,108 +386,12 @@ TEST_F(TranslatorTest, PreparesParameterizedTableQueries) {
   EXPECT_EQ(result.rows[0]["f"][0]["v"], "3");
 }
 
-TEST_F(TranslatorTest, RunsRenamedFunctions) {
-  // DuckDB's uuid() is typed UUID rather than a string, which the cast makes explicit.
-  EXPECT_EQ(Scalar("SELECT LENGTH(CAST(GENERATE_UUID() AS STRING))"), "36");
-  EXPECT_EQ(Scalar("SELECT RAND() >= 0 AND RAND() < 1"), "true");
-  EXPECT_EQ(Scalar("SELECT IS_INF(CAST('inf' AS FLOAT64))"), "true");
-  EXPECT_EQ(Scalar("SELECT IS_NAN(CAST('nan' AS FLOAT64))"), "true");
-  EXPECT_EQ(Scalar("SELECT ABS(BIGNUMERIC '-1.5') = 1.5"), "true");
-  EXPECT_EQ(Scalar(R"(SELECT JSON_EXTRACT_SCALAR('{"a": 1}', '$.a'))"), "1");
-  EXPECT_EQ(Scalar(R"(SELECT JSON_QUERY('{"a": {"b": 1}}', '$.a'))"), R"({"b":1})");
-  EXPECT_EQ(Scalar(R"(SELECT TO_JSON_STRING(PARSE_JSON('{"a":1}')))"), R"({"a":1})");
-}
-
-TEST_F(TranslatorTest, RunsDateAndTimeArithmetic) {
-  EXPECT_EQ(Scalar("SELECT DATE_SUB(DATE '2024-03-01', INTERVAL 1 DAY)"), "2024-02-29");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S',"
-                   "                       DATETIME_ADD(DATETIME '2024-01-01 00:00:00',"
-                   "                                    INTERVAL 90 MINUTE))"),
-            "2024-01-01 01:30:00");
-  EXPECT_EQ(Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S',"
-                   "                        TIMESTAMP_SUB(TIMESTAMP '2024-01-01 00:00:00',"
-                   "                                      INTERVAL 1 HOUR))"),
-            "2023-12-31 23:00:00");
-  EXPECT_EQ(Scalar("SELECT CAST(TIME_ADD(TIME '10:00:00', INTERVAL 1 HOUR) AS STRING)"),
-            "11:00:00");
-  EXPECT_EQ(Scalar("SELECT CAST(TIME_SUB(TIME '10:00:00', INTERVAL 30 MINUTE) AS STRING)"),
-            "09:30:00");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S',"
-                   "                       DATETIME_SUB(DATETIME '2024-01-01 00:00:00',"
-                   "                                    INTERVAL 1 SECOND))"),
-            "2023-12-31 23:59:59");
-}
-
-TEST_F(TranslatorTest, RunsDatePartFunctions) {
-  EXPECT_EQ(Scalar("SELECT TIMESTAMP_DIFF(TIMESTAMP '2024-01-02 00:00:00',"
-                   "                      TIMESTAMP '2024-01-01 00:00:00', HOUR)"),
-            "24");
-  EXPECT_EQ(Scalar("SELECT DATETIME_DIFF(DATETIME '2024-01-01 00:01:00',"
-                   "                     DATETIME '2024-01-01 00:00:00', SECOND)"),
-            "60");
-  EXPECT_EQ(Scalar("SELECT TIME_DIFF(TIME '11:00:00', TIME '10:00:00', MINUTE)"), "60");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S',"
-                   "                       DATETIME_TRUNC(DATETIME '2024-05-17 10:20:30', HOUR))"),
-            "2024-05-17 10:00:00");
-  EXPECT_EQ(
-      Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S',"
-             "                        TIMESTAMP_TRUNC(TIMESTAMP '2024-05-17 10:20:30', DAY))"),
-      "2024-05-17 00:00:00");
-}
-
-TEST_F(TranslatorTest, RunsFormattingAndParsing) {
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATE('%Y/%m/%d', DATE '2024-01-02')"), "2024/01/02");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S',"
-                   "                       PARSE_DATETIME('%Y-%m-%d %H:%M:%S',"
-                   "                                      '2024-01-02 03:04:05'))"),
-            "2024-01-02 03:04:05");
-  EXPECT_EQ(Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S',"
-                   "                        PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S',"
-                   "                                        '2024-01-02 03:04:05'))"),
-            "2024-01-02 03:04:05");
-}
-
-TEST_F(TranslatorTest, RunsEpochConversions) {
-  EXPECT_EQ(Scalar("SELECT UNIX_MICROS(TIMESTAMP '2020-01-01 00:00:00')"), "1577836800000000");
-  EXPECT_EQ(Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_SECONDS(1577836800))"),
-            "2020-01-01 00:00:00");
-  EXPECT_EQ(
-      Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MICROS(1577836800000000))"),
-      "2020-01-01 00:00:00");
-}
-
 // Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
 TEST_F(TranslatorTest, RunsStringBytesAndMathFunctions) {
-  EXPECT_EQ(Scalar("SELECT CHR(0)"), "");
-  EXPECT_EQ(Scalar("SELECT CHR(12354)"), "あ");
-  EXPECT_EQ(Scalar("SELECT UNICODE('')"), "0");
-  EXPECT_EQ(Scalar("SELECT UNICODE('あ')"), "12354");
-  EXPECT_EQ(Scalar("SELECT ASCII('A')"), "65");
-  EXPECT_EQ(Scalar("SELECT INSTR('abcb', 'b')"), "2");
-  EXPECT_EQ(Scalar("SELECT LEFT('abc', 2) || RIGHT('abc', 1)"), "abc");
   EXPECT_THROW(Execute("SELECT LEFT('abc', -1)"), BackendError);
-  EXPECT_EQ(Scalar("SELECT TRANSLATE('abc', 'ab', 'x')"), "xc");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(b'\\x00\\xff')"), "00ff");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(FROM_HEX('A'))"), "0a");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(MD5('a'))"), "0cc175b9c0f1b6a831c399e269772661");
-  EXPECT_EQ(Scalar("SELECT BYTE_LENGTH(SHA256('a'))"), "32");
-  EXPECT_EQ(Scalar("SELECT TO_BASE64(FROM_BASE64('AP8='))"), "AP8=");
-  EXPECT_EQ(Scalar("SELECT CAST(IEEE_DIVIDE(1, 0) AS STRING)"), "inf");
-  EXPECT_EQ(Scalar("SELECT BIT_COUNT(-1)"), "64");
-  EXPECT_EQ(Scalar("SELECT CAST(CBRT(8) AS INT64)"), "2");
-  EXPECT_EQ(Scalar("SELECT CAST(ATAN2(1, 1) * 4 * 1000 AS INT64)"), "3142");
-  EXPECT_EQ(Scalar("SELECT SAFE_ADD(9223372036854775807, 1)"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3"), "6");
-  EXPECT_EQ(Scalar("SELECT SAFE_NEGATE(1)"), "-1");
-  EXPECT_EQ(Scalar("SELECT SAFE_SUBTRACT(1, 2)"), "-1");
 }
 
 TEST_F(TranslatorTest, RunsSubstrAtBigQueryPositions) {
-  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 0, 2)"), "ab");
-  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -5, 2)"), "ab");
-  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', -2)"), "bc");
-  EXPECT_EQ(Scalar("SELECT SUBSTRING('あいう', 2, 1)"), "い");
-  EXPECT_EQ(Scalar("SELECT SUBSTR('abc', 4)"), "");
   EXPECT_THROW(Execute("SELECT SUBSTR('abc', 1, -1)"), BackendError);
 }
 
@@ -528,48 +419,12 @@ TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
   // 0x1f 0xf1 holds the digits of 0xff between its bytes.
   EXPECT_EQ(hex("REPLACE(b'\\x1f\\xf1\\xff', b'\\xff', b'z')"), "1ff17a");
   EXPECT_EQ(hex("REPLACE(b'abc', b'', b'z')"), "616263");
-  EXPECT_EQ(Scalar("SELECT STRPOS(b'\\x1f\\xf1\\xff', b'\\xff')"), "3");
-  EXPECT_EQ(Scalar("SELECT INSTR(b'abc', b'z')"), "0");
-  EXPECT_EQ(Scalar("SELECT STARTS_WITH(b'\\xffa', b'\\xff')"), "true");
-  EXPECT_EQ(Scalar("SELECT ENDS_WITH(b'\\xffa', b'\\xff')"), "false");
-  EXPECT_EQ(Scalar("SELECT ASCII(b'\\xffa')"), "255");
-  EXPECT_EQ(Scalar("SELECT ASCII(b'')"), "0");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
-                   "UNNEST(SPLIT(b'a\\x1f\\xf1b', b'\\xf1')) AS x), ',')"),
-            "611f,62");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM "
-                   "UNNEST(SPLIT(b'a\\xff', b'')) AS x), ',')"),
-            "61,ff");
   EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL, b'\\xff'], b'-')"), "612dff");
   EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL], b'-', b'\\xff')"), "612dff");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(['a', NULL, 'b'], '-', 'N')"), "a-N-b");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw ORDER BY a)) FROM t"), "612c00ff");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t"), "00ff");
 }
 
 // src/backend.cc registers GoogleSQL's implementations of these.
 TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
-  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('')"), "-7286425919675154353");
-  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('あ') = FARM_FINGERPRINT(b'\\xe3\\x81\\x82')"), "true");
-  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT(CAST(NULL AS STRING))"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT COUNT(DISTINCT FARM_FINGERPRINT(raw)) FROM t"), "2");
-  EXPECT_EQ(Scalar("SELECT TO_HEX(SHA512('abc'))"),
-            "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
-            "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
-  EXPECT_EQ(Scalar("SELECT SHA512(b'\\xff') = SHA512(FROM_HEX('ff'))"), "true");
-  EXPECT_EQ(Scalar("SELECT INITCAP('hello WORLD-everyone!')"), "Hello World-Everyone!");
-  EXPECT_EQ(Scalar("SELECT INITCAP('apples1oranges2pears', '12')"), "Apples1Oranges2Pears");
-  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting')"), "3");
-  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('あい', 'いあ')"), "2");
-  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting', max_distance => 2)"), "2");
-  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE(b'\\xe3\\x81\\x82', b'\\xe3\\x81\\x84')"), "1");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('ab@cd-ef', '@[^-]*')"), "3");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('あいう', 'う')"), "3");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 0)"), "6");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 1)"), "11");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'z')"), "0");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR(b'\\xe3\\x81\\x82b', b'b')"), "4");
-  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'b', NULL)"), std::nullopt);
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 0)"), BackendError);
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 1, 1, 2)"), BackendError);
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', '(')"), BackendError);
@@ -578,125 +433,15 @@ TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
 // Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
 // differently from BigQuery's.
 TEST_F(TranslatorTest, RunsDateTimeConstructorsAndExtract) {
-  EXPECT_EQ(Scalar("SELECT EXTRACT(DAYOFWEEK FROM DATE '2024-01-07')"), "1");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(DAYOFYEAR FROM DATE '2024-02-01')"), "32");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(WEEK FROM DATE '2024-01-07')"), "1");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(ISOWEEK FROM DATE '2024-01-07')"), "1");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(YEAR FROM DATETIME '2024-05-06 07:08:09')"), "2024");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(MILLISECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')"),
-            "345");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(MICROSECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')"),
-            "345678");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(HOUR FROM TIMESTAMP '2024-01-01 00:00:00' AT TIME ZONE "
-                   "'Asia/Tokyo')"),
-            "9");
-  EXPECT_EQ(Scalar("SELECT EXTRACT(DATE FROM TIMESTAMP '2024-01-01 20:00:00' AT TIME ZONE "
-                   "'Asia/Tokyo')"),
-            "2024-01-02");
-  EXPECT_EQ(Scalar("SELECT CAST(EXTRACT(TIME FROM DATETIME '2024-01-01 01:02:03') AS STRING)"),
-            "01:02:03");
-  EXPECT_EQ(Scalar("SELECT DATE_TRUNC(DATE '2024-01-10', WEEK)"), "2024-01-07");
-  EXPECT_EQ(Scalar("SELECT DATE_TRUNC(DATE '2024-01-10', ISOWEEK)"), "2024-01-08");
-  EXPECT_EQ(
-      Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d', DATETIME_TRUNC(DATETIME '2024-01-07 10:00:00', "
-             "WEEK))"),
-      "2024-01-07");
-  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-07', DATE '2024-01-06', WEEK)"), "1");
-  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-08', DATE '2024-01-07', ISOWEEK)"), "1");
-  EXPECT_EQ(Scalar("SELECT DATE_DIFF(DATE '2024-01-06', DATE '2024-01-01', WEEK)"), "0");
-  EXPECT_EQ(Scalar("SELECT TIMESTAMP_DIFF(TIMESTAMP '2001-02-01 01:00:00', "
-                   "TIMESTAMP '2001-02-01 00:00:01', HOUR)"),
-            "0");
-  EXPECT_EQ(Scalar("SELECT TIMESTAMP_DIFF(TIMESTAMP '2024-01-02 01:00:00', "
-                   "TIMESTAMP '2024-01-01 23:00:00', DAY)"),
-            "0");
-  EXPECT_EQ(Scalar("SELECT TIME_DIFF(TIME '09:59:00', TIME '10:00:30', MINUTE)"), "-1");
-  EXPECT_EQ(Scalar("SELECT DATETIME_DIFF(DATETIME '2024-01-02 00:00:00', "
-                   "DATETIME '2024-01-01 23:59:59', DAY)"),
-            "1");
-  EXPECT_EQ(Scalar("SELECT DATE(2024, 1, 2)"), "2024-01-02");
-  EXPECT_EQ(Scalar("SELECT DATE(TIMESTAMP '2024-01-01 20:00:00', 'Asia/Tokyo')"), "2024-01-02");
-  EXPECT_EQ(Scalar("SELECT DATE(DATETIME '2024-01-01 20:00:00')"), "2024-01-01");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(2024, 1, 2, 3, 4, 5))"),
-            "2024-01-02 03:04:05");
-  EXPECT_EQ(Scalar("SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(DATE '2024-01-02', TIME "
-                   "'03:04:05'))"),
-            "2024-01-02 03:04:05");
-  EXPECT_EQ(
-      Scalar(
-          "SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(TIMESTAMP '2024-01-01 00:00:00', "
-          "'Asia/Tokyo'))"),
-      "2024-01-01 09:00:00");
-  EXPECT_EQ(Scalar("SELECT CAST(TIME(1, 2, 3) AS STRING)"), "01:02:03");
-  EXPECT_EQ(Scalar("SELECT CAST(TIME(DATETIME '2024-01-01 04:05:06') AS STRING)"), "04:05:06");
-  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP(DATETIME '2024-01-01 09:00:00', "
-                   "'Asia/Tokyo'))"),
-            "1704067200");
-  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP(DATE '2024-01-01'))"), "1704067200");
-  EXPECT_EQ(Scalar("SELECT UNIX_SECONDS(TIMESTAMP('2024-01-01 09:00:00+09'))"), "1704067200");
-  EXPECT_EQ(Scalar("SELECT LAST_DAY(DATE '2024-02-10')"), "2024-02-29");
-  EXPECT_EQ(Scalar("SELECT LAST_DAY(DATE '2024-02-10', MONTH)"), "2024-02-29");
-  EXPECT_EQ(Scalar("SELECT UNIX_DATE(DATE '2020-01-01')"), "18262");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_DATE('%d', d) FROM "
-                   "UNNEST(GENERATE_DATE_ARRAY(DATE '2024-01-01', DATE '2024-01-15', "
-                   "INTERVAL 1 WEEK)) AS d), ',')"),
-            "01,08,15");
-  EXPECT_EQ(
-      Scalar("SELECT ARRAY_LENGTH(GENERATE_DATE_ARRAY(DATE '2024-01-01', DATE '2024-01-03'))"),
-      "3");
   EXPECT_EQ(Unsupported("SELECT GENERATE_DATE_ARRAY(DATE '2024-01-31', DATE '2024-05-01', "
                         "INTERVAL 1 MONTH)"),
             "function GENERATE_DATE_ARRAY");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%H:%M', t) FROM "
-                   "UNNEST(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01 00:00:00', "
-                   "TIMESTAMP '2024-01-01 01:00:00', INTERVAL 20 MINUTE)) AS t), ',')"),
-            "00:00,00:20,00:40,01:00");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
-                   "TIMESTAMP '2024-01-01', INTERVAL -1 DAY))"),
-            "3");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', "
-                   "TIMESTAMP '2024-01-01', INTERVAL 1 DAY))"),
-            "0");
-  EXPECT_EQ(Scalar("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', NULL, "
-                   "INTERVAL 1 DAY) IS NULL"),
-            "true");
   EXPECT_THROW(Execute("SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', "
                        "TIMESTAMP '2024-01-02', INTERVAL 0 DAY)"),
                BackendError);
 }
 
 TEST_F(TranslatorTest, Buckets) {
-  // The examples of the BigQuery reference.
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 2 DAY) AS "
-                   "STRING) FROM UNNEST([DATE '1949-12-29', DATE '1949-12-30', DATE '1949-12-31', "
-                   "DATE '1950-01-01', DATE '1950-01-02', DATE '1950-01-03']) AS d), ',')"),
-            "1949-12-28,1949-12-30,1949-12-30,1950-01-01,1950-01-01,1950-01-03");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 7 DAY, "
-                   "DATE '2000-12-24') AS STRING) FROM UNNEST([DATE '2000-12-20', "
-                   "DATE '2000-12-21', DATE '2000-12-24', DATE '2000-12-25']) AS d), ',')"),
-            "2000-12-17,2000-12-17,2000-12-24,2000-12-24");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', "
-                   "TIMESTAMP_BUCKET(t, INTERVAL 7 DAY, TIMESTAMP '2000-12-22 12:00:00')) FROM "
-                   "UNNEST([TIMESTAMP '2000-12-21 13:00:00', TIMESTAMP '2000-12-22 12:00:00', "
-                   "TIMESTAMP '2000-12-29 11:59:59']) AS t), ',')"),
-            "2000-12-15 12:00:00,2000-12-22 12:00:00,2000-12-22 12:00:00");
-  EXPECT_EQ(
-      Scalar("SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '1949-12-31 "
-             "13:00:00', INTERVAL 12 HOUR))"),
-      "1949-12-31 12:00:00");
-  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
-                   "INTERVAL 12 HOUR) AS STRING)"),
-            "1950-01-01 12:00:00");
-  EXPECT_EQ(Scalar("SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', "
-                   "INTERVAL '0:30' HOUR TO MINUTE) AS STRING)"),
-            "1950-01-01 13:00:00");
-  // Months count in the calendar, and last days of the month count as the same day.
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 1 QUARTER, "
-                   "DATE '2000-01-31') AS STRING) FROM UNNEST([DATE '2000-04-29', "
-                   "DATE '2000-04-30', DATE '1999-12-31', DATE '1999-10-30']) AS d), ',')"),
-            "2000-01-31,2000-04-30,1999-10-31,1999-07-31");
-  EXPECT_EQ(Scalar("SELECT CAST(DATE_BUCKET(DATE '2024-05-20', INTERVAL 1 YEAR) AS STRING)"),
-            "2024-01-01");
   EXPECT_THROW(Execute("SELECT DATE_BUCKET(DATE '2024-01-01', INTERVAL -1 DAY)"), BackendError);
   EXPECT_THROW(Execute("SELECT TIMESTAMP_BUCKET(TIMESTAMP '2024-01-01', INTERVAL 0 HOUR)"),
                BackendError);
@@ -769,52 +514,14 @@ TEST_F(TranslatorTest, RunsAggregatesAndDistinct) {
             (V{"1"}));
   EXPECT_EQ(Column(Execute("SELECT DISTINCT a > 1 AS big FROM t ORDER BY big")),
             (V{"NULL", "false", "true"}));
-  EXPECT_EQ(Scalar("SELECT COUNT(*) FROM t WHERE FALSE"), "0");
 }
 
 TEST_F(TranslatorTest, RunsAggregateLimitAndHavingModifiers) {
   using V = std::vector<std::string>;
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_AGG(b ORDER BY a LIMIT 2), ',') FROM t "
-                   "WHERE a IS NOT NULL"),
-            "x,yy");
-  EXPECT_EQ(Scalar("SELECT STRING_AGG(b, '|' ORDER BY a DESC LIMIT 2) FROM t"), "あ|yy");
-  EXPECT_EQ(Scalar("SELECT STRING_AGG(b LIMIT 1) FROM t WHERE FALSE"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_AGG(b HAVING MAX a), ',') FROM t"), "あ");
   EXPECT_EQ(Column(Execute("SELECT MOD(a, 2) AS k, ANY_VALUE(b HAVING MIN a), COUNT(*) FROM t "
                            "WHERE a IS NOT NULL GROUP BY k ORDER BY k"),
                    1),
             (V{"yy", "x"}));
-}
-
-TEST_F(TranslatorTest, RunsApproximateAndByAggregates) {
-  EXPECT_EQ(Scalar("SELECT APPROX_COUNT_DISTINCT(a) FROM t"), "3");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t"), "[1,2,3]");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(DISTINCT x, 4)) "
-                   "FROM UNNEST([1, 1, 1, 2, 3, 4, 5]) AS x"),
-            "[1,2,3,4,5]");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t WHERE FALSE"),
-            std::nullopt);
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 2)) "
-                   "FROM UNNEST(['a', NULL, 'b', 'b', NULL, NULL]) AS x"),
-            R"([{"value":null,"count":3},{"value":"b","count":2}])");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 1)) FROM UNNEST([1, 2, 2]) AS x"),
-            R"([{"value":2,"count":2}])");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(APPROX_TOP_COUNT(a, 1)) FROM t WHERE FALSE"),
-            std::nullopt);
-  EXPECT_EQ(Scalar("SELECT MAX_BY(b, a) FROM t"), "あ");
-  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) FROM t"), "x");
-  EXPECT_EQ(Scalar("SELECT MAX_BY(x, y) FROM UNNEST([STRUCT('a' AS x, 1 AS y), (NULL, 2)])"),
-            std::nullopt);
-  EXPECT_EQ(Scalar("SELECT MIN_BY(b, a) OVER () FROM t LIMIT 1"), "x");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x))) FROM "
-                   "(SELECT [1, 2] AS x UNION ALL SELECT NULL UNION ALL SELECT [3])"),
-            "[3,1,2]");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x) DESC "
-                   "LIMIT 1)) FROM (SELECT [1, 2] AS x UNION ALL SELECT [3])"),
-            "[1,2]");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x)) FROM "
-                   "(SELECT CAST(NULL AS ARRAY<INT64>) AS x)"),
-            std::nullopt);
 }
 
 TEST_F(TranslatorTest, RunsValueTables) {
@@ -827,7 +534,6 @@ TEST_F(TranslatorTest, RunsValueTables) {
   EXPECT_EQ(Rows(structs), (V{"3|あ", "2|yy", "1|x"}));
   EXPECT_EQ(Rows(Execute("SELECT AS VALUE a FROM t WHERE a > 1 ORDER BY a")), (V{"2", "3"}));
   EXPECT_EQ(Rows(Execute("SELECT AS VALUE STRUCT(a AS x) FROM t WHERE a = 1")), (V{"1"}));
-  EXPECT_EQ(Scalar("SELECT COUNT(*) FROM (SELECT AS VALUE a FROM t)"), "4");
 }
 
 TEST_F(TranslatorTest, RunsGroupingSets) {
@@ -940,14 +646,8 @@ TEST_F(TranslatorTest, RunsAnalyticFunctionsAndQualify) {
 
 TEST_F(TranslatorTest, RunsSubqueries) {
   using V = std::vector<std::string>;
-  EXPECT_EQ(Scalar("SELECT (SELECT MAX(a) FROM t)"), "3");
-  EXPECT_EQ(Scalar("SELECT EXISTS(SELECT 1 FROM t WHERE a = 2)"), "true");
   EXPECT_EQ(Column(Execute("SELECT a FROM t WHERE a IN (SELECT a + 1 FROM t) ORDER BY a")),
             (V{"2", "3"}));
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY(SELECT b FROM t WHERE b IS NOT NULL "
-                   "ORDER BY a DESC), ',')"),
-            "あ,yy,x");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t WHERE FALSE))"), "0");
   EXPECT_EQ(Column(Execute("SELECT (SELECT COUNT(*) FROM t AS i WHERE i.a < o.a) FROM t AS o "
                            "WHERE o.a IS NOT NULL ORDER BY o.a")),
             (V{"0", "1", "2"}));
@@ -963,7 +663,6 @@ TEST_F(TranslatorTest, RunsUnnestStructsAndArrays) {
       "ORDER BY o DESC");
   EXPECT_EQ(Column(unnested, 0), (V{"b", "a"}));
   EXPECT_EQ(Column(unnested, 1), (V{"1", "0"}));
-  EXPECT_EQ(Scalar("SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x"), "6");
   EXPECT_EQ(Column(Execute("SELECT a, x FROM t LEFT JOIN UNNEST(GENERATE_ARRAY(1, a - 1)) AS x "
                            "WHERE a IS NOT NULL ORDER BY a, x")),
             (V{"1", "2", "3", "3"}));
@@ -978,10 +677,6 @@ TEST_F(TranslatorTest, RunsUnnestStructsAndArrays) {
             (V{"1|1|NULL", "2|2|NULL", "3|3|NULL"}));
   EXPECT_THROW(Execute("SELECT x FROM UNNEST([1, 2] AS x, [3] AS y, mode => 'STRICT')"),
                BackendError);
-  EXPECT_EQ(Scalar("SELECT s.y FROM (SELECT STRUCT(1 AS x, 'z' AS y) AS s)"), "z");
-  EXPECT_EQ(Scalar("SELECT [10, 20, 30][OFFSET(1)]"), "20");
-  EXPECT_EQ(Scalar("SELECT [10, 20, 30][ORDINAL(1)]"), "10");
-  EXPECT_EQ(Scalar("SELECT [10, 20, 30][SAFE_OFFSET(3)]"), std::nullopt);
   EXPECT_THROW(Execute("SELECT [10, 20, 30][OFFSET(3)]"), BackendError);
 }
 
@@ -1074,45 +769,12 @@ TEST_F(TranslatorTest, MergesRows) {
 }
 
 TEST_F(TranslatorTest, RunsOperatorsAndArrayFunctions) {
-  // BigQuery's shifts drop the bits shifted out and fill with zeros, even for negative values.
-  EXPECT_EQ(Scalar("SELECT 1 << 63"), "-9223372036854775808");
-  EXPECT_EQ(Scalar("SELECT 3 << 62"), "-4611686018427387904");
-  EXPECT_EQ(Scalar("SELECT -8 >> 1"), "9223372036854775804");
-  EXPECT_EQ(Scalar("SELECT 1 << 64"), "0");
-  EXPECT_EQ(Scalar("SELECT 8 >> 2"), "2");
-  EXPECT_EQ(Scalar("SELECT CAST(NULL AS INT64) << 1"), std::nullopt);
   EXPECT_THROW(Execute("SELECT 1 << -1"), std::exception);
-  EXPECT_EQ(Scalar("SELECT 1 IS DISTINCT FROM NULL"), "true");
-  EXPECT_EQ(Scalar("SELECT NULL IS NOT DISTINCT FROM NULL"), "true");
-  EXPECT_EQ(Scalar("SELECT 2 IN UNNEST([1, 2])"), "true");
-  EXPECT_EQ(Scalar("SELECT 3 IN UNNEST([1, NULL])"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT NULL IN UNNEST([1])"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT 1 IN UNNEST(CAST([] AS ARRAY<INT64>))"), "false");
-  EXPECT_EQ(Scalar("SELECT 1 IN UNNEST(CAST(NULL AS ARRAY<INT64>))"), "false");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_CONCAT(['a'], ['b'], ['c']), ',')"), "a,b,c");
-  EXPECT_EQ(Scalar("SELECT ARRAY_CONCAT(['a'], CAST(NULL AS ARRAY<STRING>)) IS NULL"), "true");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(ARRAY_REVERSE(['a', 'b']), ',')"), "b,a");
-  EXPECT_EQ(Scalar("SELECT ARRAY_FIRST([4, 5])"), "4");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LAST([4, 5])"), "5");
   EXPECT_THROW(Execute("SELECT ARRAY_FIRST(CAST([] AS ARRAY<INT64>))"), std::exception);
   EXPECT_THROW(Execute("SELECT ERROR('boom')"), std::exception);
-  EXPECT_EQ(Scalar("SELECT IF(TRUE, 1, ERROR('boom'))"), "1");
-  EXPECT_EQ(Scalar("SELECT ROUND(1.25, 1)"), "1.3");
-  EXPECT_EQ(Scalar("SELECT ROUND(-2.5)"), "-3.0");
-  EXPECT_EQ(Scalar("SELECT LPAD('a', 3)"), "  a");
-  EXPECT_EQ(Scalar("SELECT RPAD('a', 3, 'xy')"), "axy");
-  EXPECT_EQ(Scalar("SELECT LPAD('abc', 2)"), "ab");
 }
 
 TEST_F(TranslatorTest, RunsRegularExpressionFunctions) {
-  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo123bar', r'\\d+')"), "123");
-  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo123bar', r'o(\\d)')"), "1");
-  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo', r'\\d')"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT REGEXP_EXTRACT('foo', r'(x)?f')"), "");
-  EXPECT_EQ(Scalar("SELECT REGEXP_SUBSTR('a1b2', r'[(]?\\d')"), "1");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b22', r'\\d+'), ',')"), "1,22");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b2', r'(?:[a-z])(\\d)'), ',')"),
-            "1,2");
   EXPECT_THROW(Execute("SELECT REGEXP_EXTRACT('ab', r'(a)(b)')"), std::exception);
   EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT(b, b) FROM p.ds.t"), "function REGEXP_EXTRACT");
   EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT('a', 'a', 2)"), "function REGEXP_EXTRACT");
@@ -1126,43 +788,18 @@ TEST_F(TranslatorTest, RunsJsonFunctions) {
   EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.n')"), std::nullopt);
   EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.missing')"), std::nullopt);
   EXPECT_EQ(Scalar("SELECT JSON_EXTRACT(" + doc + ", \"$['k.l']\")"), "2");
-  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT('{x', '$')"), std::nullopt);
   EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a.b[3]')"), "s");
   EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a.b[0]')"), "1");
   EXPECT_EQ(Scalar("SELECT JSON_VALUE(" + doc + ", '$.a')"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT JSON_EXTRACT_SCALAR('\"s\"')"), "s");
-  EXPECT_EQ(Scalar("SELECT JSON_VALUE(JSON '{\"a\": true}', '$.a')"), "true");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_QUERY(JSON '{\"a\": null}', '$.a'))"), "null");
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_QUERY_ARRAY(" + doc + ", '$.a.b'))"),
             R"(["1","null","{\"c\":\"x\"}","\"s\""])");
   EXPECT_EQ(Scalar("SELECT JSON_EXTRACT_ARRAY(" + doc + ", '$.a') IS NULL"), "true");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(JSON_QUERY_ARRAY('[]'))"), "0");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_VALUE_ARRAY('[1, null, \"s\"]'))"),
-            R"(["1",null,"s"])");
   EXPECT_EQ(Scalar("SELECT JSON_VALUE_ARRAY(" + doc + ", '$.a.b') IS NULL"), "true");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_EXTRACT_STRING_ARRAY(JSON '[true]'), ',')"),
-            "true");
-  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON '[1]')"), "array");
-  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON '1.5')"), "number");
-  EXPECT_EQ(Scalar("SELECT JSON_TYPE(JSON 'null')"), "null");
-  EXPECT_EQ(Scalar("SELECT JSON_TYPE(CAST(NULL AS JSON))"), std::nullopt);
   EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$[a]')"), "function JSON_QUERY");
   EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$.a[*]')"), "function JSON_QUERY");
 }
 
 TEST_F(TranslatorTest, BuildsAndChangesJson) {
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))"),
-            R"({"a":1,"b":[2,3]})");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON(CAST(NULL AS INT64)))"), "null");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(TO_JSON('s', stringify_wide_numbers => FALSE))"),
-            R"("s")");
-
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'b', NULL, 'c', JSON '[1]'))"),
-            R"({"a":1,"b":null,"c":[1]})");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT())"), "{}");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'a', 2))"), R"({"a":1})");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_OBJECT(['a', 'b'], [10, 20]))"),
-            R"({"a":10,"b":20})");
   EXPECT_THROW(Execute("SELECT JSON_OBJECT(['a'], [1, 2])"), BackendError);
   EXPECT_THROW(Execute("SELECT JSON_OBJECT(CAST(NULL AS STRING), 1)"), BackendError);
 
@@ -1171,7 +808,6 @@ TEST_F(TranslatorTest, BuildsAndChangesJson) {
             R"({"a":{"c":null},"d":[null,2]})");
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_REMOVE(" + doc + ", '$.x', NULL))"),
             R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
-  EXPECT_EQ(Scalar("SELECT JSON_REMOVE(CAST(NULL AS JSON), '$.a')"), std::nullopt);
   EXPECT_THROW(Execute("SELECT JSON_REMOVE(CAST(NULL AS JSON), 'a')"), BackendError);
 
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b', 'x', '$.e.f', [1]))"),
@@ -1179,8 +815,6 @@ TEST_F(TranslatorTest, BuildsAndChangesJson) {
   EXPECT_EQ(
       Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.e', 1, create_if_missing => FALSE))"),
       R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
-  EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(JSON '{}', '$.a', CAST(NULL AS INT64)))"),
-            R"({"a":null})");
   EXPECT_EQ(Scalar("SELECT TO_JSON_STRING(JSON_SET(" + doc + ", '$.a.b.c', 1))"),
             R"({"a":{"b":1,"c":null},"d":[1,null,2]})");
   EXPECT_THROW(Execute("SELECT JSON_SET(" + doc + ", 'a', 1)"), BackendError);
@@ -1193,18 +827,7 @@ TEST_F(TranslatorTest, BuildsAndChangesJson) {
 
   EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + "), ',')"), "a,a.b,a.c,d");
   EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(" + doc + ", 1), ',')"), "a,d");
-  EXPECT_EQ(Scalar("SELECT ARRAY_LENGTH(JSON_KEYS(JSON '[]'))"), "0");
-  EXPECT_EQ(Scalar("SELECT ARRAY_TO_STRING(JSON_KEYS(JSON '[{\"a\": 1}]', mode => 'lax'), ',')"),
-            "a");
   EXPECT_THROW(Execute("SELECT JSON_KEYS(" + doc + ", 0)"), BackendError);
-
-  EXPECT_EQ(Scalar("SELECT LAX_BOOL(JSON '\"TRUE\"')"), "true");
-  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '\"10\"')"), "10");
-  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '1.5')"), "2");
-  EXPECT_EQ(Scalar("SELECT LAX_INT64(JSON '[1]')"), std::nullopt);
-  EXPECT_EQ(Scalar("SELECT LAX_FLOAT64(JSON '\"1.5\"')"), "1.5");
-  EXPECT_EQ(Scalar("SELECT LAX_STRING(JSON '123')"), "123");
-  EXPECT_EQ(Scalar("SELECT LAX_STRING(CAST(NULL AS JSON))"), std::nullopt);
 }
 
 TEST_F(TranslatorTest, AccessesAndConvertsJson) {
@@ -1219,11 +842,8 @@ TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   EXPECT_THROW(Execute("SELECT INT64((" + doc + ").g)"), std::exception);
   EXPECT_THROW(Execute("SELECT INT64((" + doc + ").a)"), std::exception);
   EXPECT_EQ(Scalar("SELECT FLOAT64((" + doc + ").g)"), "2.5");
-  EXPECT_EQ(Scalar("SELECT FLOAT64(JSON '1', wide_number_mode => 'round')"), "1.0");
-  EXPECT_EQ(Scalar("SELECT BOOL(JSON 'true')"), "true");
   EXPECT_THROW(Execute("SELECT BOOL(JSON '1')"), std::exception);
   EXPECT_THROW(Execute("SELECT STRING(JSON '1')"), std::exception);
-  EXPECT_EQ(Scalar("SELECT INT64(CAST(NULL AS JSON))"), std::nullopt);
   EXPECT_EQ(Scalar("SELECT STRING((" + doc + ").missing)"), std::nullopt);
   EXPECT_EQ(Unsupported("SELECT FLOAT64(JSON '1', wide_number_mode => 'exact')"),
             "function FLOAT64");

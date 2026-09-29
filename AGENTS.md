@@ -7,7 +7,8 @@ including `bq`. Run `just` recipes (see the `Justfile`) rather than raw commands
 
 - End-to-end tests are the primary compatibility tests: [runn](https://github.com/k1LoW/runn)
   scenarios in `tests/e2e` drive the emulator with `bq` and the Go client (`just e2e`). Add
-  client-visible behavior checks there first.
+  client-visible behavior checks there first. A query that returns one value belongs in
+  `tests/e2e/goclient/testdata/scalars.txt`.
 - C++ tests (`just test`) cover internal boundaries that clients cannot observe, such as
   translation edge cases and raw HTTP details. Do not copy the same SQL and expected result
   between layers.

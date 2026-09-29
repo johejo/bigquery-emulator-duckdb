@@ -1,0 +1,791 @@
+
+# Queries that return one cell, run by TestScalars in scalars_test.go.
+#
+# Each case is a query, which may continue on following lines, then "=> " and the JSON of the
+# cell's "v" as jobs.query returns it: a string, or null for NULL. Lines starting with # and blank
+# lines between cases are ignored.
+#
+# The default dataset holds a table t (a INT64, b STRING, raw BYTES) with the rows
+# (3, 'あ', b'\x00\xff'), (1, 'x', b'a'), (2, 'yy', NULL) and (NULL, NULL, NULL).
+
+## Safe calls
+
+SELECT SAFE.LENGTH('abc')
+=> "3"
+
+SELECT SAFE.REGEXP_CONTAINS('abc', '(')
+=> null
+
+SELECT SAFE.REGEXP_CONTAINS(b, '(') FROM t WHERE a = 1
+=> null
+
+SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1
+=> "true"
+
+SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1
+=> "Xz"
+
+SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)
+=> "2024-05-01"
+
+SELECT SAFE.SUBSTR('abcdef', 2, 3)
+=> "bcd"
+
+SELECT SAFE.SUBSTR('abcdef', 2, -1)
+=> null
+
+SELECT SAFE.SUBSTR(b'abc', 2, -1)
+=> null
+
+SELECT SAFE.DIV(1, 0)
+=> null
+
+## Operators and conditions
+
+SELECT CAST(NULL AS FLOAT64) / 0
+=> null
+
+SELECT 1 / CAST(NULL AS FLOAT64)
+=> null
+
+SELECT LEFT('abc', CAST(RAND() * 0 AS INT64) + 2)
+=> "ab"
+
+## Renamed functions
+
+# DuckDB's uuid() is typed UUID rather than a string, which the cast makes explicit.
+SELECT LENGTH(CAST(GENERATE_UUID() AS STRING))
+=> "36"
+
+SELECT RAND() >= 0 AND RAND() < 1
+=> "true"
+
+SELECT IS_INF(CAST('inf' AS FLOAT64))
+=> "true"
+
+SELECT IS_NAN(CAST('nan' AS FLOAT64))
+=> "true"
+
+SELECT ABS(BIGNUMERIC '-1.5') = 1.5
+=> "true"
+
+SELECT JSON_EXTRACT_SCALAR('{"a": 1}', '$.a')
+=> "1"
+
+SELECT JSON_QUERY('{"a": {"b": 1}}', '$.a')
+=> "{\"b\":1}"
+
+SELECT TO_JSON_STRING(PARSE_JSON('{"a":1}'))
+=> "{\"a\":1}"
+
+## Date and time arithmetic
+
+SELECT DATE_SUB(DATE '2024-03-01', INTERVAL 1 DAY)
+=> "2024-02-29"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME_ADD(DATETIME '2024-01-01 00:00:00', INTERVAL 90
+  MINUTE))
+=> "2024-01-01 01:30:00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_SUB(TIMESTAMP '2024-01-01 00:00:00', INTERVAL
+  1 HOUR))
+=> "2023-12-31 23:00:00"
+
+SELECT CAST(TIME_ADD(TIME '10:00:00', INTERVAL 1 HOUR) AS STRING)
+=> "11:00:00"
+
+SELECT CAST(TIME_SUB(TIME '10:00:00', INTERVAL 30 MINUTE) AS STRING)
+=> "09:30:00"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME_SUB(DATETIME '2024-01-01 00:00:00', INTERVAL 1
+  SECOND))
+=> "2023-12-31 23:59:59"
+
+## Date part functions
+
+SELECT TIMESTAMP_DIFF(TIMESTAMP '2024-01-02 00:00:00', TIMESTAMP '2024-01-01 00:00:00', HOUR)
+=> "24"
+
+SELECT DATETIME_DIFF(DATETIME '2024-01-01 00:01:00', DATETIME '2024-01-01 00:00:00', SECOND)
+=> "60"
+
+SELECT TIME_DIFF(TIME '11:00:00', TIME '10:00:00', MINUTE)
+=> "60"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME_TRUNC(DATETIME '2024-05-17 10:20:30', HOUR))
+=> "2024-05-17 10:00:00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_TRUNC(TIMESTAMP '2024-05-17 10:20:30', DAY))
+=> "2024-05-17 00:00:00"
+
+## Formatting and parsing
+
+SELECT FORMAT_DATE('%Y/%m/%d', DATE '2024-01-02')
+=> "2024/01/02"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', PARSE_DATETIME('%Y-%m-%d %H:%M:%S',
+  '2024-01-02 03:04:05'))
+=> "2024-01-02 03:04:05"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', PARSE_TIMESTAMP('%Y-%m-%d %H:%M:%S',
+  '2024-01-02 03:04:05'))
+=> "2024-01-02 03:04:05"
+
+## Epoch conversions
+
+SELECT UNIX_MICROS(TIMESTAMP '2020-01-01 00:00:00')
+=> "1577836800000000"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_SECONDS(1577836800))
+=> "2020-01-01 00:00:00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MICROS(1577836800000000))
+=> "2020-01-01 00:00:00"
+
+## String bytes and math functions
+# Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
+
+SELECT CHR(0)
+=> ""
+
+SELECT CHR(12354)
+=> "あ"
+
+SELECT UNICODE('')
+=> "0"
+
+SELECT UNICODE('あ')
+=> "12354"
+
+SELECT ASCII('A')
+=> "65"
+
+SELECT INSTR('abcb', 'b')
+=> "2"
+
+SELECT LEFT('abc', 2) || RIGHT('abc', 1)
+=> "abc"
+
+SELECT TRANSLATE('abc', 'ab', 'x')
+=> "xc"
+
+SELECT TO_HEX(b'\x00\xff')
+=> "00ff"
+
+SELECT TO_HEX(FROM_HEX('A'))
+=> "0a"
+
+SELECT TO_HEX(MD5('a'))
+=> "0cc175b9c0f1b6a831c399e269772661"
+
+SELECT BYTE_LENGTH(SHA256('a'))
+=> "32"
+
+SELECT TO_BASE64(FROM_BASE64('AP8='))
+=> "AP8="
+
+SELECT CAST(IEEE_DIVIDE(1, 0) AS STRING)
+=> "inf"
+
+SELECT BIT_COUNT(-1)
+=> "64"
+
+SELECT CAST(CBRT(8) AS INT64)
+=> "2"
+
+SELECT CAST(ATAN2(1, 1) * 4 * 1000 AS INT64)
+=> "3142"
+
+SELECT SAFE_ADD(9223372036854775807, 1)
+=> null
+
+SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3
+=> "6"
+
+SELECT SAFE_NEGATE(1)
+=> "-1"
+
+SELECT SAFE_SUBTRACT(1, 2)
+=> "-1"
+
+## Substr at big query positions
+
+SELECT SUBSTR('abc', 0, 2)
+=> "ab"
+
+SELECT SUBSTR('abc', -5, 2)
+=> "ab"
+
+SELECT SUBSTR('abc', -2)
+=> "bc"
+
+SELECT SUBSTRING('あいう', 2, 1)
+=> "い"
+
+SELECT SUBSTR('abc', 4)
+=> ""
+
+## String functions on bytes
+# The BYTES overloads work on hexadecimal digits, so a byte that is not valid UTF-8 or looks
+# like part of another byte's digits must stay whole.
+
+SELECT STRPOS(b'\x1f\xf1\xff', b'\xff')
+=> "3"
+
+SELECT INSTR(b'abc', b'z')
+=> "0"
+
+SELECT STARTS_WITH(b'\xffa', b'\xff')
+=> "true"
+
+SELECT ENDS_WITH(b'\xffa', b'\xff')
+=> "false"
+
+SELECT ASCII(b'\xffa')
+=> "255"
+
+SELECT ASCII(b'')
+=> "0"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM UNNEST(SPLIT(b'a\x1f\xf1b', b'\xf1')) AS x), ',')
+=> "611f,62"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM UNNEST(SPLIT(b'a\xff', b'')) AS x), ',')
+=> "61,ff"
+
+SELECT ARRAY_TO_STRING(['a', NULL, 'b'], '-', 'N')
+=> "a-N-b"
+
+SELECT TO_HEX(STRING_AGG(raw ORDER BY a)) FROM t
+=> "612c00ff"
+
+SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t
+=> "00ff"
+
+## Google sql functions
+# src/backend.cc registers GoogleSQL's implementations of these.
+
+SELECT FARM_FINGERPRINT('')
+=> "-7286425919675154353"
+
+SELECT FARM_FINGERPRINT('あ') = FARM_FINGERPRINT(b'\xe3\x81\x82')
+=> "true"
+
+SELECT FARM_FINGERPRINT(CAST(NULL AS STRING))
+=> null
+
+SELECT COUNT(DISTINCT FARM_FINGERPRINT(raw)) FROM t
+=> "2"
+
+SELECT TO_HEX(SHA512('abc'))
+=> "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+
+SELECT SHA512(b'\xff') = SHA512(FROM_HEX('ff'))
+=> "true"
+
+SELECT INITCAP('hello WORLD-everyone!')
+=> "Hello World-Everyone!"
+
+SELECT INITCAP('apples1oranges2pears', '12')
+=> "Apples1Oranges2Pears"
+
+SELECT EDIT_DISTANCE('kitten', 'sitting')
+=> "3"
+
+SELECT EDIT_DISTANCE('あい', 'いあ')
+=> "2"
+
+SELECT EDIT_DISTANCE('kitten', 'sitting', max_distance => 2)
+=> "2"
+
+SELECT EDIT_DISTANCE(b'\xe3\x81\x82', b'\xe3\x81\x84')
+=> "1"
+
+SELECT REGEXP_INSTR('ab@cd-ef', '@[^-]*')
+=> "3"
+
+SELECT REGEXP_INSTR('あいう', 'う')
+=> "3"
+
+SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 0)
+=> "6"
+
+SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 1)
+=> "11"
+
+SELECT REGEXP_INSTR('abc', 'z')
+=> "0"
+
+SELECT REGEXP_INSTR(b'\xe3\x81\x82b', b'b')
+=> "4"
+
+SELECT REGEXP_INSTR('abc', 'b', NULL)
+=> null
+
+## Date time constructors and extract
+# Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
+# differently from BigQuery's.
+
+SELECT EXTRACT(DAYOFWEEK FROM DATE '2024-01-07')
+=> "1"
+
+SELECT EXTRACT(DAYOFYEAR FROM DATE '2024-02-01')
+=> "32"
+
+SELECT EXTRACT(WEEK FROM DATE '2024-01-07')
+=> "1"
+
+SELECT EXTRACT(ISOWEEK FROM DATE '2024-01-07')
+=> "1"
+
+SELECT EXTRACT(YEAR FROM DATETIME '2024-05-06 07:08:09')
+=> "2024"
+
+SELECT EXTRACT(MILLISECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')
+=> "345"
+
+SELECT EXTRACT(MICROSECOND FROM TIMESTAMP '2024-01-01 00:00:12.345678')
+=> "345678"
+
+SELECT EXTRACT(HOUR FROM TIMESTAMP '2024-01-01 00:00:00' AT TIME ZONE 'Asia/Tokyo')
+=> "9"
+
+SELECT EXTRACT(DATE FROM TIMESTAMP '2024-01-01 20:00:00' AT TIME ZONE 'Asia/Tokyo')
+=> "2024-01-02"
+
+SELECT CAST(EXTRACT(TIME FROM DATETIME '2024-01-01 01:02:03') AS STRING)
+=> "01:02:03"
+
+SELECT DATE_TRUNC(DATE '2024-01-10', WEEK)
+=> "2024-01-07"
+
+SELECT DATE_TRUNC(DATE '2024-01-10', ISOWEEK)
+=> "2024-01-08"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d', DATETIME_TRUNC(DATETIME '2024-01-07 10:00:00', WEEK))
+=> "2024-01-07"
+
+SELECT DATE_DIFF(DATE '2024-01-07', DATE '2024-01-06', WEEK)
+=> "1"
+
+SELECT DATE_DIFF(DATE '2024-01-08', DATE '2024-01-07', ISOWEEK)
+=> "1"
+
+SELECT DATE_DIFF(DATE '2024-01-06', DATE '2024-01-01', WEEK)
+=> "0"
+
+SELECT TIMESTAMP_DIFF(TIMESTAMP '2001-02-01 01:00:00', TIMESTAMP '2001-02-01 00:00:01', HOUR)
+=> "0"
+
+SELECT TIMESTAMP_DIFF(TIMESTAMP '2024-01-02 01:00:00', TIMESTAMP '2024-01-01 23:00:00', DAY)
+=> "0"
+
+SELECT TIME_DIFF(TIME '09:59:00', TIME '10:00:30', MINUTE)
+=> "-1"
+
+SELECT DATETIME_DIFF(DATETIME '2024-01-02 00:00:00', DATETIME '2024-01-01 23:59:59', DAY)
+=> "1"
+
+SELECT DATE(2024, 1, 2)
+=> "2024-01-02"
+
+SELECT DATE(TIMESTAMP '2024-01-01 20:00:00', 'Asia/Tokyo')
+=> "2024-01-02"
+
+SELECT DATE(DATETIME '2024-01-01 20:00:00')
+=> "2024-01-01"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(2024, 1, 2, 3, 4, 5))
+=> "2024-01-02 03:04:05"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(DATE '2024-01-02', TIME '03:04:05'))
+=> "2024-01-02 03:04:05"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d %H:%M:%S', DATETIME(TIMESTAMP '2024-01-01 00:00:00', 'Asia/Tokyo'))
+=> "2024-01-01 09:00:00"
+
+SELECT CAST(TIME(1, 2, 3) AS STRING)
+=> "01:02:03"
+
+SELECT CAST(TIME(DATETIME '2024-01-01 04:05:06') AS STRING)
+=> "04:05:06"
+
+SELECT UNIX_SECONDS(TIMESTAMP(DATETIME '2024-01-01 09:00:00', 'Asia/Tokyo'))
+=> "1704067200"
+
+SELECT UNIX_SECONDS(TIMESTAMP(DATE '2024-01-01'))
+=> "1704067200"
+
+SELECT UNIX_SECONDS(TIMESTAMP('2024-01-01 09:00:00+09'))
+=> "1704067200"
+
+SELECT LAST_DAY(DATE '2024-02-10')
+=> "2024-02-29"
+
+SELECT LAST_DAY(DATE '2024-02-10', MONTH)
+=> "2024-02-29"
+
+SELECT UNIX_DATE(DATE '2020-01-01')
+=> "18262"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_DATE('%d', d) FROM UNNEST(GENERATE_DATE_ARRAY(DATE
+  '2024-01-01', DATE '2024-01-15', INTERVAL 1 WEEK)) AS d), ',')
+=> "01,08,15"
+
+SELECT ARRAY_LENGTH(GENERATE_DATE_ARRAY(DATE '2024-01-01', DATE '2024-01-03'))
+=> "3"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%H:%M', t) FROM
+  UNNEST(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-01-01 01:00:00',
+  INTERVAL 20 MINUTE)) AS t), ',')
+=> "00:00,00:20,00:40,01:00"
+
+SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', TIMESTAMP '2024-01-01',
+  INTERVAL -1 DAY))
+=> "3"
+
+SELECT ARRAY_LENGTH(GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-03', TIMESTAMP '2024-01-01',
+  INTERVAL 1 DAY))
+=> "0"
+
+SELECT GENERATE_TIMESTAMP_ARRAY(TIMESTAMP '2024-01-01', NULL, INTERVAL 1 DAY) IS NULL
+=> "true"
+
+## Buckets
+
+# The examples of the BigQuery reference.
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 2 DAY) AS STRING) FROM UNNEST([DATE
+  '1949-12-29', DATE '1949-12-30', DATE '1949-12-31', DATE '1950-01-01', DATE '1950-01-02', DATE
+  '1950-01-03']) AS d), ',')
+=> "1949-12-28,1949-12-30,1949-12-30,1950-01-01,1950-01-01,1950-01-03"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 7 DAY, DATE '2000-12-24') AS
+  STRING) FROM UNNEST([DATE '2000-12-20', DATE '2000-12-21', DATE '2000-12-24', DATE '2000-12-25']) AS
+  d), ',')
+=> "2000-12-17,2000-12-17,2000-12-24,2000-12-24"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(t,
+  INTERVAL 7 DAY, TIMESTAMP '2000-12-22 12:00:00')) FROM UNNEST([TIMESTAMP '2000-12-21 13:00:00',
+  TIMESTAMP '2000-12-22 12:00:00', TIMESTAMP '2000-12-29 11:59:59']) AS t), ',')
+=> "2000-12-15 12:00:00,2000-12-22 12:00:00,2000-12-22 12:00:00"
+
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_BUCKET(TIMESTAMP '1949-12-31 13:00:00',
+  INTERVAL 12 HOUR))
+=> "1949-12-31 12:00:00"
+
+SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', INTERVAL 12 HOUR) AS STRING)
+=> "1950-01-01 12:00:00"
+
+SELECT CAST(DATETIME_BUCKET(DATETIME '1950-01-01 13:00:00', INTERVAL '0:30' HOUR TO MINUTE) AS
+  STRING)
+=> "1950-01-01 13:00:00"
+
+# Months count in the calendar, and last days of the month count as the same day.
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(DATE_BUCKET(d, INTERVAL 1 QUARTER, DATE '2000-01-31') AS
+  STRING) FROM UNNEST([DATE '2000-04-29', DATE '2000-04-30', DATE '1999-12-31', DATE '1999-10-30']) AS
+  d), ',')
+=> "2000-01-31,2000-04-30,1999-10-31,1999-07-31"
+
+SELECT CAST(DATE_BUCKET(DATE '2024-05-20', INTERVAL 1 YEAR) AS STRING)
+=> "2024-01-01"
+
+## Aggregates and distinct
+
+SELECT COUNT(*) FROM t WHERE FALSE
+=> "0"
+
+## Aggregate limit and having modifiers
+
+SELECT ARRAY_TO_STRING(ARRAY_AGG(b ORDER BY a LIMIT 2), ',') FROM t WHERE a IS NOT NULL
+=> "x,yy"
+
+SELECT STRING_AGG(b, '|' ORDER BY a DESC LIMIT 2) FROM t
+=> "あ|yy"
+
+SELECT STRING_AGG(b LIMIT 1) FROM t WHERE FALSE
+=> null
+
+SELECT ARRAY_TO_STRING(ARRAY_AGG(b HAVING MAX a), ',') FROM t
+=> "あ"
+
+## Approximate and by aggregates
+
+SELECT APPROX_COUNT_DISTINCT(a) FROM t
+=> "3"
+
+SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t
+=> "[1,2,3]"
+
+SELECT TO_JSON_STRING(APPROX_QUANTILES(DISTINCT x, 4)) FROM UNNEST([1, 1, 1, 2, 3, 4, 5]) AS x
+=> "[1,2,3,4,5]"
+
+SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t WHERE FALSE
+=> null
+
+SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 2)) FROM UNNEST(['a', NULL, 'b', 'b', NULL, NULL]) AS x
+=> "[{\"value\":null,\"count\":3},{\"value\":\"b\",\"count\":2}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 1)) FROM UNNEST([1, 2, 2]) AS x
+=> "[{\"value\":2,\"count\":2}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_COUNT(a, 1)) FROM t WHERE FALSE
+=> null
+
+SELECT MAX_BY(b, a) FROM t
+=> "あ"
+
+SELECT MIN_BY(b, a) FROM t
+=> "x"
+
+SELECT MAX_BY(x, y) FROM UNNEST([STRUCT('a' AS x, 1 AS y), (NULL, 2)])
+=> null
+
+SELECT MIN_BY(b, a) OVER () FROM t LIMIT 1
+=> "x"
+
+SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x))) FROM (SELECT [1, 2] AS x UNION
+  ALL SELECT NULL UNION ALL SELECT [3])
+=> "[3,1,2]"
+
+SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x) DESC LIMIT 1)) FROM (SELECT [1, 2]
+  AS x UNION ALL SELECT [3])
+=> "[1,2]"
+
+SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x)) FROM (SELECT CAST(NULL AS ARRAY<INT64>) AS x)
+=> null
+
+## Value tables
+
+SELECT COUNT(*) FROM (SELECT AS VALUE a FROM t)
+=> "4"
+
+## Subqueries
+
+SELECT (SELECT MAX(a) FROM t)
+=> "3"
+
+SELECT EXISTS(SELECT 1 FROM t WHERE a = 2)
+=> "true"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT b FROM t WHERE b IS NOT NULL ORDER BY a DESC), ',')
+=> "あ,yy,x"
+
+SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t WHERE FALSE))
+=> "0"
+
+## Unnest structs and arrays
+
+SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x
+=> "6"
+
+SELECT s.y FROM (SELECT STRUCT(1 AS x, 'z' AS y) AS s)
+=> "z"
+
+SELECT [10, 20, 30][OFFSET(1)]
+=> "20"
+
+SELECT [10, 20, 30][ORDINAL(1)]
+=> "10"
+
+SELECT [10, 20, 30][SAFE_OFFSET(3)]
+=> null
+
+## Operators and array functions
+
+# BigQuery's shifts drop the bits shifted out and fill with zeros, even for negative values.
+SELECT 1 << 63
+=> "-9223372036854775808"
+
+SELECT 3 << 62
+=> "-4611686018427387904"
+
+SELECT -8 >> 1
+=> "9223372036854775804"
+
+SELECT 1 << 64
+=> "0"
+
+SELECT 8 >> 2
+=> "2"
+
+SELECT CAST(NULL AS INT64) << 1
+=> null
+
+SELECT 1 IS DISTINCT FROM NULL
+=> "true"
+
+SELECT NULL IS NOT DISTINCT FROM NULL
+=> "true"
+
+SELECT 2 IN UNNEST([1, 2])
+=> "true"
+
+SELECT 3 IN UNNEST([1, NULL])
+=> null
+
+SELECT NULL IN UNNEST([1])
+=> null
+
+SELECT 1 IN UNNEST(CAST([] AS ARRAY<INT64>))
+=> "false"
+
+SELECT 1 IN UNNEST(CAST(NULL AS ARRAY<INT64>))
+=> "false"
+
+SELECT ARRAY_TO_STRING(ARRAY_CONCAT(['a'], ['b'], ['c']), ',')
+=> "a,b,c"
+
+SELECT ARRAY_CONCAT(['a'], CAST(NULL AS ARRAY<STRING>)) IS NULL
+=> "true"
+
+SELECT ARRAY_TO_STRING(ARRAY_REVERSE(['a', 'b']), ',')
+=> "b,a"
+
+SELECT ARRAY_FIRST([4, 5])
+=> "4"
+
+SELECT ARRAY_LAST([4, 5])
+=> "5"
+
+SELECT IF(TRUE, 1, ERROR('boom'))
+=> "1"
+
+SELECT ROUND(1.25, 1)
+=> "1.3"
+
+SELECT ROUND(-2.5)
+=> "-3.0"
+
+SELECT LPAD('a', 3)
+=> "  a"
+
+SELECT RPAD('a', 3, 'xy')
+=> "axy"
+
+SELECT LPAD('abc', 2)
+=> "ab"
+
+## Regular expression functions
+
+SELECT REGEXP_EXTRACT('foo123bar', r'\d+')
+=> "123"
+
+SELECT REGEXP_EXTRACT('foo123bar', r'o(\d)')
+=> "1"
+
+SELECT REGEXP_EXTRACT('foo', r'\d')
+=> null
+
+SELECT REGEXP_EXTRACT('foo', r'(x)?f')
+=> ""
+
+SELECT REGEXP_SUBSTR('a1b2', r'[(]?\d')
+=> "1"
+
+SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b22', r'\d+'), ',')
+=> "1,22"
+
+SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b2', r'(?:[a-z])(\d)'), ',')
+=> "1,2"
+
+## Json functions
+
+SELECT JSON_EXTRACT('{x', '$')
+=> null
+
+SELECT JSON_EXTRACT_SCALAR('"s"')
+=> "s"
+
+SELECT JSON_VALUE(JSON '{"a": true}', '$.a')
+=> "true"
+
+SELECT TO_JSON_STRING(JSON_QUERY(JSON '{"a": null}', '$.a'))
+=> "null"
+
+SELECT ARRAY_LENGTH(JSON_QUERY_ARRAY('[]'))
+=> "0"
+
+SELECT TO_JSON_STRING(JSON_VALUE_ARRAY('[1, null, "s"]'))
+=> "[\"1\",null,\"s\"]"
+
+SELECT ARRAY_TO_STRING(JSON_EXTRACT_STRING_ARRAY(JSON '[true]'), ',')
+=> "true"
+
+SELECT JSON_TYPE(JSON '[1]')
+=> "array"
+
+SELECT JSON_TYPE(JSON '1.5')
+=> "number"
+
+SELECT JSON_TYPE(JSON 'null')
+=> "null"
+
+SELECT JSON_TYPE(CAST(NULL AS JSON))
+=> null
+
+## Builds and changes json
+
+SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))
+=> "{\"a\":1,\"b\":[2,3]}"
+
+SELECT TO_JSON_STRING(TO_JSON(CAST(NULL AS INT64)))
+=> "null"
+
+SELECT TO_JSON_STRING(TO_JSON('s', stringify_wide_numbers => FALSE))
+=> "\"s\""
+
+SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'b', NULL, 'c', JSON '[1]'))
+=> "{\"a\":1,\"b\":null,\"c\":[1]}"
+
+SELECT TO_JSON_STRING(JSON_OBJECT())
+=> "{}"
+
+SELECT TO_JSON_STRING(JSON_OBJECT('a', 1, 'a', 2))
+=> "{\"a\":1}"
+
+SELECT TO_JSON_STRING(JSON_OBJECT(['a', 'b'], [10, 20]))
+=> "{\"a\":10,\"b\":20}"
+
+SELECT JSON_REMOVE(CAST(NULL AS JSON), '$.a')
+=> null
+
+SELECT TO_JSON_STRING(JSON_SET(JSON '{}', '$.a', CAST(NULL AS INT64)))
+=> "{\"a\":null}"
+
+SELECT ARRAY_LENGTH(JSON_KEYS(JSON '[]'))
+=> "0"
+
+SELECT ARRAY_TO_STRING(JSON_KEYS(JSON '[{"a": 1}]', mode => 'lax'), ',')
+=> "a"
+
+SELECT LAX_BOOL(JSON '"TRUE"')
+=> "true"
+
+SELECT LAX_INT64(JSON '"10"')
+=> "10"
+
+SELECT LAX_INT64(JSON '1.5')
+=> "2"
+
+SELECT LAX_INT64(JSON '[1]')
+=> null
+
+SELECT LAX_FLOAT64(JSON '"1.5"')
+=> "1.5"
+
+SELECT LAX_STRING(JSON '123')
+=> "123"
+
+SELECT LAX_STRING(CAST(NULL AS JSON))
+=> null
+
+## Accesses and converts json
+
+SELECT FLOAT64(JSON '1', wide_number_mode => 'round')
+=> "1.0"
+
+SELECT BOOL(JSON 'true')
+=> "true"
+
+SELECT INT64(CAST(NULL AS JSON))
+=> null
