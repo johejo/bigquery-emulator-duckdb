@@ -1,13 +1,20 @@
 #include "src/backend.h"
 
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "duckdb.h"
+#include "googlesql/public/functions/distance.h"
+#include "googlesql/public/functions/hash.h"
+#include "googlesql/public/functions/regexp.h"
+#include "googlesql/public/functions/string.h"
 #include "nlohmann/json.hpp"
 
 namespace bigquery_emulator_duckdb {
@@ -494,6 +501,179 @@ void RunSetup(duckdb_connection connection, const std::vector<std::string>& setu
   }
 }
 
+// The arguments of one row of a DuckDB function call.
+class Arguments {
+ public:
+  Arguments(duckdb_data_chunk input, idx_t row) : input_(input), row_(row) {}
+
+  [[nodiscard]] std::string String(idx_t column) const {
+    return VectorString(duckdb_data_chunk_get_vector(input_, column), row_);
+  }
+
+  [[nodiscard]] int64_t Int(idx_t column) const {
+    return static_cast<int64_t*>(
+        duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
+  }
+
+ private:
+  duckdb_data_chunk input_;
+  idx_t row_;
+};
+
+void SetResult(duckdb_vector output, idx_t row, int64_t value) {
+  static_cast<int64_t*>(duckdb_vector_get_data(output))[row] = value;
+}
+
+void SetResult(duckdb_vector output, idx_t row, const std::string& value) {
+  duckdb_vector_assign_string_element_len(output, row, value.data(), value.size());
+}
+
+// Sets each row of `output` to what `compute` returns for the row's arguments. A NULL argument
+// makes a NULL result, and an error fails the query.
+template <typename Compute>
+void EachRow(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
+             Compute compute) {
+  const idx_t columns = duckdb_data_chunk_get_column_count(input);
+  duckdb_vector_ensure_validity_writable(output);
+  uint64_t* output_validity = duckdb_vector_get_validity(output);
+  for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
+    bool null = false;
+    for (idx_t column = 0; column < columns; ++column) {
+      uint64_t* validity = duckdb_vector_get_validity(duckdb_data_chunk_get_vector(input, column));
+      null = null || (validity != nullptr && !duckdb_validity_row_is_valid(validity, row));
+    }
+    if (null) {
+      duckdb_validity_set_row_invalid(output_validity, row);
+      continue;
+    }
+    const auto result = compute(Arguments(input, row));
+    if (!result.ok()) {
+      duckdb_scalar_function_set_error(info, std::string(result.status().message()).c_str());
+      return;
+    }
+    SetResult(output, row, *result);
+  }
+}
+
+// Turns a GoogleSQL function's out parameter and error into a StatusOr.
+template <typename T>
+absl::StatusOr<T> ToStatusOr(bool ok, T value, const absl::Status& error) {
+  if (!ok) {
+    return error;
+  }
+  return value;
+}
+
+void FarmFingerprint(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
+    return googlesql::functions::FarmFingerprint(arguments.String(0));
+  });
+}
+
+void Sha512(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  const auto hasher = googlesql::functions::Hasher::Create(googlesql::functions::Hasher::kSha512);
+  EachRow(info, input, output,
+          [&hasher](const Arguments& arguments) -> absl::StatusOr<std::string> {
+            return hasher->Hash(arguments.String(0));
+          });
+}
+
+void InitCap(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [input](const Arguments& arguments) {
+    std::string out;
+    absl::Status error;
+    const bool ok =
+        duckdb_data_chunk_get_column_count(input) == 1
+            ? googlesql::functions::InitialCapitalizeDefault(arguments.String(0), &out, &error)
+            : googlesql::functions::InitialCapitalize(arguments.String(0), arguments.String(1),
+                                                      &out, &error);
+    return ToStatusOr(ok, out, error);
+  });
+}
+
+template <bool kBytes>
+void EditDistance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    return (kBytes ? googlesql::functions::EditDistanceBytes : googlesql::functions::EditDistance)(
+        arguments.String(0), arguments.String(1), arguments.Int(2));
+  });
+}
+
+// REGEXP_INSTR(source, regexp, position, occurrence, occurrence_position).
+template <bool kBytes>
+void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
+    const std::string pattern = arguments.String(1);
+    auto regexp = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
+                         : googlesql::functions::MakeRegExpUtf8(pattern);
+    if (!regexp.ok()) {
+      return regexp.status();
+    }
+    const int64_t occurrence_position = arguments.Int(4);
+    if (occurrence_position != 0 && occurrence_position != 1) {
+      return absl::OutOfRangeError(
+          "Invalid return_position_after_match; it must be 0 or 1 (in REGEXP_INSTR)");
+    }
+    const std::string source = arguments.String(0);
+    int64_t out = 0;
+    absl::Status error;
+    const bool ok = (*regexp)->Instr(
+        {.input_str = source,
+         .position_unit = kBytes ? googlesql::functions::RegExp::kBytes
+                                 : googlesql::functions::RegExp::kUtf8Chars,
+         .position = arguments.Int(2),
+         .occurrence_index = arguments.Int(3),
+         .return_position = occurrence_position == 0 ? googlesql::functions::RegExp::kStartOfMatch
+                                                     : googlesql::functions::RegExp::kEndOfMatch,
+         .out = &out},
+        /*use_legacy_position_behavior=*/false, &error);
+    return ToStatusOr(ok, out, error);
+  });
+}
+
+// Registers `function` under `name`, taking `parameters` and returning `result`.
+void Register(duckdb_connection connection, const char* name,
+              std::initializer_list<duckdb_type> parameters, duckdb_type result,
+              duckdb_scalar_function_t function) {
+  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
+      duckdb_create_scalar_function());
+  duckdb_scalar_function_set_name(scalar.get(), name);
+  for (const duckdb_type parameter : parameters) {
+    LogicalType type(duckdb_create_logical_type(parameter));
+    duckdb_scalar_function_add_parameter(scalar.get(), type.get());
+  }
+  LogicalType type(duckdb_create_logical_type(result));
+  duckdb_scalar_function_set_return_type(scalar.get(), type.get());
+  duckdb_scalar_function_set_function(scalar.get(), function);
+  if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
+    throw BackendError(std::string("DuckDB failed to register ") + name);
+  }
+}
+
+// The functions the translator calls beyond DuckDB's own, with GoogleSQL's implementations;
+// see src/functions.cc.
+void RegisterFunctions(duckdb_database database) {
+  Connection connection;
+  if (duckdb_connect(database, connection.out()) == DuckDBError) {
+    throw BackendError("DuckDB failed to connect");
+  }
+  constexpr duckdb_type kBlob = DUCKDB_TYPE_BLOB;
+  constexpr duckdb_type kVarchar = DUCKDB_TYPE_VARCHAR;
+  constexpr duckdb_type kBigint = DUCKDB_TYPE_BIGINT;
+  Register(connection.get(), "bq_farm_fingerprint", {kBlob}, kBigint, FarmFingerprint);
+  Register(connection.get(), "bq_sha512", {kBlob}, kBlob, Sha512);
+  Register(connection.get(), "bq_initcap", {kVarchar}, kVarchar, InitCap);
+  Register(connection.get(), "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, InitCap);
+  Register(connection.get(), "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,
+           EditDistance<false>);
+  Register(connection.get(), "bq_edit_distance_bytes", {kBlob, kBlob, kBigint}, kBigint,
+           EditDistance<true>);
+  Register(connection.get(), "bq_regexp_instr", {kVarchar, kVarchar, kBigint, kBigint, kBigint},
+           kBigint, RegexpInstr<false>);
+  Register(connection.get(), "bq_regexp_instr_bytes", {kBlob, kBlob, kBigint, kBigint, kBigint},
+           kBigint, RegexpInstr<true>);
+}
+
 }  // namespace
 
 json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::SchemaToJson(schema); }
@@ -520,6 +700,7 @@ struct Backend::Database {
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
+    RegisterFunctions(handle.get());
   }
 
   Connection Connect() const {
@@ -639,6 +820,7 @@ std::string ExecuteScalarString(const std::string& sql) {
   if (duckdb_open(nullptr, database.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to open database");
   }
+  RegisterFunctions(database.get());
   Connection connection;
   if (duckdb_connect(database.get(), connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");

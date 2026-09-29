@@ -543,6 +543,34 @@ TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
   EXPECT_EQ(Scalar("SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t"), "00ff");
 }
 
+// src/backend.cc registers GoogleSQL's implementations of these.
+TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('')"), "-7286425919675154353");
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT('あ') = FARM_FINGERPRINT(b'\\xe3\\x81\\x82')"), "true");
+  EXPECT_EQ(Scalar("SELECT FARM_FINGERPRINT(CAST(NULL AS STRING))"), std::nullopt);
+  EXPECT_EQ(Scalar("SELECT COUNT(DISTINCT FARM_FINGERPRINT(raw)) FROM t"), "2");
+  EXPECT_EQ(Scalar("SELECT TO_HEX(SHA512('abc'))"),
+            "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a"
+            "2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
+  EXPECT_EQ(Scalar("SELECT SHA512(b'\\xff') = SHA512(FROM_HEX('ff'))"), "true");
+  EXPECT_EQ(Scalar("SELECT INITCAP('hello WORLD-everyone!')"), "Hello World-Everyone!");
+  EXPECT_EQ(Scalar("SELECT INITCAP('apples1oranges2pears', '12')"), "Apples1Oranges2Pears");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting')"), "3");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('あい', 'いあ')"), "2");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE('kitten', 'sitting', max_distance => 2)"), "2");
+  EXPECT_EQ(Scalar("SELECT EDIT_DISTANCE(b'\\xe3\\x81\\x82', b'\\xe3\\x81\\x84')"), "1");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('ab@cd-ef', '@[^-]*')"), "3");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('あいう', 'う')"), "3");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 0)"), "6");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 1)"), "11");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'z')"), "0");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR(b'\\xe3\\x81\\x82b', b'b')"), "4");
+  EXPECT_EQ(Scalar("SELECT REGEXP_INSTR('abc', 'b', NULL)"), std::nullopt);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 0)"), BackendError);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 1, 1, 2)"), BackendError);
+  EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', '(')"), BackendError);
+}
+
 // Weeks, sub-second parts and differences below a day are where DuckDB's date functions answer
 // differently from BigQuery's.
 TEST_F(TranslatorTest, RunsDateTimeConstructorsAndExtract) {

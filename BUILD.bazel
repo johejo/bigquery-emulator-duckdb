@@ -134,6 +134,10 @@ cc_library(
     deps = [
         ":field_schema",
         "//third_party/duckdb",
+        "@googlesql//googlesql/public/functions:distance",
+        "@googlesql//googlesql/public/functions:hash",
+        "@googlesql//googlesql/public/functions:regexp",
+        "@googlesql//googlesql/public/functions:string",
         "@nlohmann_json//:json",
     ],
 )

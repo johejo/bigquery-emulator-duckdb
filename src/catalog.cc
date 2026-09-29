@@ -147,6 +147,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
     // cannot run at all.
     options->EnableMaximumLanguageFeatures();
+    // BigQuery has EDIT_DISTANCE over BYTES, which GoogleSQL still marks in development.
+    options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_EDIT_DISTANCE_BYTES);
     // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.
     options->set_product_mode(googlesql::PRODUCT_EXTERNAL);
     // The analyzer accepts only queries by default, but the emulator also runs DDL and DML.
