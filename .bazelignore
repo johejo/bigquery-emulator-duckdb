@@ -1,3 +1,5 @@
 # direnv materialises the flake inputs here, and because flake.nix lives in this repository one
 # of them is a copy of the repository itself. Without this, //... would match its packages too.
 .direnv
+# Claude Code keeps git worktrees of this repository here, each with its own Bazel output symlinks.
+.claude
