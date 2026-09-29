@@ -1,0 +1,25 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# DuckDB's official static libraries: the core, the extensions the release loads statically
+# (core_functions, icu, json, parquet, autocomplete) and the vendored third-party libraries, whose
+# symbols DuckDB keeps in its own namespaces. The unused tpch and tpcds extensions are left out.
+cc_library(
+    name = "duckdb",
+    srcs = glob(
+        ["*.a"],
+        exclude = [
+            "libtpcds_extension.a",
+            "libtpch_extension.a",
+        ],
+    ),
+    hdrs = ["duckdb.h"],
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-lpthread",
+            "-ldl",
+        ],
+        "//conditions:default": [],
+    }),
+)
