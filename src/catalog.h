@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -11,11 +12,11 @@
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
+#include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
 class LanguageOptions;
-class SimpleTable;
 class Type;
 class TypeFactory;
 }  // namespace googlesql
@@ -36,12 +37,38 @@ class TableSource {
   virtual std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                             const std::string& dataset,
                                                             const std::string& table) = 0;
+
+  // The datasets of `project`, sorted by name, for INFORMATION_SCHEMA. None by default.
+  virtual std::vector<std::string> ListDatasets(const std::string& /*project*/) { return {}; }
+
+  // The tables of `project`.`dataset`, sorted by name, for INFORMATION_SCHEMA. None by default.
+  virtual std::vector<std::string> ListTables(const std::string& /*project*/,
+                                              const std::string& /*dataset*/) {
+    return {};
+  }
 };
 
-// Normalizes a table path to {project, dataset, table}. An element with dots in it, which is how
-// `project.dataset.table` in backquotes arrives, is split first; dots before the colon in a
-// domain-scoped project ID are kept in the project. Missing parts come from the defaults.
-// Returns an empty vector for a path it cannot interpret.
+// A table whose rows are not stored but computed by a DuckDB query, such as an
+// INFORMATION_SCHEMA view. The query's columns have the table's column names.
+class SqlTable : public googlesql::SimpleTable {
+ public:
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a table is named before its query.
+  SqlTable(const std::string& name, std::string sql)
+      : googlesql::SimpleTable(name), sql_(std::move(sql)) {}
+
+  const std::string& sql() const { return sql_; }
+
+ private:
+  std::string sql_;
+};
+
+// Splits a table path into its dot-separated parts. An element with dots in it, which is how
+// `project.dataset.table` in backquotes arrives, is split too; dots before the colon in a
+// domain-scoped project ID are kept in the project.
+std::vector<std::string> SplitTablePath(absl::Span<const std::string> path);
+
+// Normalizes a table path to {project, dataset, table}, splitting it with SplitTablePath first.
+// Missing parts come from the defaults. Returns an empty vector for a path it cannot interpret.
 std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
                                             const std::string& default_dataset);

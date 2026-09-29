@@ -25,6 +25,7 @@
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "src/field_schema.h"
+#include "src/information_schema.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -156,9 +157,7 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
   return *kLanguageOptions;
 }
 
-std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
-                                            const std::string& default_project,
-                                            const std::string& default_dataset) {
+std::vector<std::string> SplitTablePath(absl::Span<const std::string> path) {
   std::vector<std::string> parts;
   for (const std::string& element : path) {
     for (const absl::string_view part : absl::StrSplit(element, '.')) {
@@ -179,6 +178,13 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
       break;
     }
   }
+  return parts;
+}
+
+std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
+                                            const std::string& default_project,
+                                            const std::string& default_dataset) {
+  std::vector<std::string> parts = SplitTablePath(path);
   if (parts.size() == 1) {
     parts.insert(parts.begin(), {default_project, default_dataset});
   } else if (parts.size() == 2) {
@@ -277,6 +283,23 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
                                         const googlesql::Table** table,
                                         const FindOptions& /*options*/) {
   *table = nullptr;
+  if (const std::vector<std::string> parts = SplitTablePath(path); IsInformationSchemaPath(parts)) {
+    // Keyed with an empty first part, which no normalized table path has.
+    std::vector<std::string> key = {""};
+    key.insert(key.end(), parts.begin(), parts.end());
+    if (auto it = tables_.find(key); it != tables_.end()) {
+      *table = it->second.get();
+      return absl::OkStatus();
+    }
+    absl::StatusOr<std::unique_ptr<SqlTable>> view =
+        InformationSchemaView(parts, source_, type_factory_, default_project_, default_dataset_);
+    if (!view.ok()) {
+      return view.status();
+    }
+    *table = view->get();
+    tables_.emplace(std::move(key), *std::move(view));
+    return absl::OkStatus();
+  }
   const std::vector<std::string> normalized =
       NormalizeTablePath(path, default_project_, default_dataset_);
   if (normalized.empty()) {

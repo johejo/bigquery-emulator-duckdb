@@ -20,7 +20,7 @@ what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 2 |
-| Supported | 46 |
+| Supported | 50 |
 | Unsupported | 25 |
 
 ## Queries
@@ -110,3 +110,12 @@ what it rejected.
 | `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |
 | `CREATE TABLE FUNCTION` | Unsupported | statement CreateTableFunctionStmt |
 | `CREATE PROCEDURE` | Unsupported | statement CreateProcedureStmt |
+
+## INFORMATION_SCHEMA
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| `SCHEMATA` | Supported | Creation times and options other than the location are NULL; every dataset is in the US. |
+| `TABLES` | Supported | Creation times are NULL. |
+| `COLUMNS` | Supported | Every column is nullable. |
+| `COLUMN_FIELD_PATHS` | Supported |  |

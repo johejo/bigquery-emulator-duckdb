@@ -158,3 +158,16 @@ query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
+
+section INFORMATION_SCHEMA
+
+query `SCHEMATA` | SELECT schema_name, ddl FROM INFORMATION_SCHEMA.SCHEMATA
+query `SCHEMATA` | SELECT schema_name FROM `test.region-us.INFORMATION_SCHEMA.SCHEMATA`
+note `SCHEMATA` | Creation times and options other than the location are NULL; every dataset is in the US.
+query `TABLES` | SELECT table_name, table_type, ddl FROM d.INFORMATION_SCHEMA.TABLES
+query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
+note `TABLES` | Creation times are NULL.
+query `COLUMNS` | SELECT column_name, ordinal_position, data_type FROM d.INFORMATION_SCHEMA.COLUMNS
+query `COLUMNS` | SELECT * FROM `region-us`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = 't'
+note `COLUMNS` | Every column is nullable.
+query `COLUMN_FIELD_PATHS` | SELECT field_path, data_type FROM d.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
