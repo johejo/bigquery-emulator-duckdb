@@ -19,9 +19,13 @@ of DuckDB execution details.
 [src/catalog.cc](../src/catalog.cc) looks tables up lazily through a `TableSource`, completes
 `table` and `dataset.table` paths from the default project and dataset, and maps BigQuery field
 types to GoogleSQL types. Functions and types come from GoogleSQL's built-ins, plus BigQuery
-functions GoogleSQL lacks. [src/analyzer.cc](../src/analyzer.cc) runs the analyzer with the same
-language options as the parser; a statement that fails analysis is reported as `invalidQuery`.
-For a query, the resolved output columns supply the result schema.
+functions GoogleSQL lacks. [src/information_schema.cc](../src/information_schema.cc) serves
+`INFORMATION_SCHEMA` views as tables whose rows are computed when the query is analyzed; the
+translator reads such a table from the DuckDB query that carries its rows.
+
+[src/analyzer.cc](../src/analyzer.cc) runs the analyzer with the same language options as the
+parser; a statement that fails analysis is reported as `invalidQuery`. For a query, the resolved
+output columns supply the result schema.
 
 ## Translator
 

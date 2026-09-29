@@ -90,6 +90,8 @@ Behavior that applies across them:
   `formatOptions.useInt64Timestamp`.
 - The `SAFE.` prefix returns NULL for the function's own errors while argument errors still
   propagate. It is unsupported on volatile functions.
+- Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier
+  `` `region-us` `` covers every dataset of the project and any other region none.
 
 ## Development
 

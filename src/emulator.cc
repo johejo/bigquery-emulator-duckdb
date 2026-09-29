@@ -227,6 +227,22 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  std::vector<std::string> ListDatasets(const std::string& project) override {
+    return FirstColumnStrings(backend_.Execute(
+        "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
+        QuoteLiteral(project) +
+        " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
+        " ORDER BY schema_name"));
+  }
+
+  std::vector<std::string> ListTables(const std::string& project,
+                                      const std::string& dataset) override {
+    return FirstColumnStrings(
+        backend_.Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
+                         QuoteLiteral(project) + " AND table_schema = " + QuoteLiteral(dataset) +
+                         " ORDER BY table_name"));
+  }
+
  private:
   Backend& backend_;
 };

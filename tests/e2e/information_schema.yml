@@ -1,0 +1,101 @@
+desc: INFORMATION_SCHEMA views describe the datasets, tables and columns of a project
+# A project of its own, so that the other scenarios' datasets do not show up in the views.
+steps:
+  mk_datasets:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh mk --dataset a &&
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh mk --dataset b
+    test: current.exit_code == 0
+  mk_tables:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE TABLE a.people (id INT64, name STRING, address STRUCT<city STRING, zip STRING>,
+         tags ARRAY<STRING>)" &&
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE TABLE b.events (id INT64)"
+    test: current.exit_code == 0
+  schemata:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT catalog_name, schema_name, location FROM INFORMATION_SCHEMA.SCHEMATA
+         ORDER BY schema_name'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"catalog_name":"infoschema","location":"US","schema_name":"a"},{"catalog_name":"infoschema","location":"US","schema_name":"b"}]'
+  schemata_in_a_region:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT schema_name, ddl FROM infoschema.`region-us`.INFORMATION_SCHEMA.SCHEMATA
+         WHERE schema_name = "a"'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"ddl":"CREATE SCHEMA `infoschema.a`\\nOPTIONS(\\n  location=\\"us\\"\\n);","schema_name":"a"}]'
+  tables_of_a_dataset:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT table_catalog, table_schema, table_name, table_type, ddl
+         FROM a.INFORMATION_SCHEMA.TABLES'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"ddl":"CREATE TABLE `infoschema.a.people`\\n(\\n  id INT64,\\n  name STRING,\\n  address STRUCT<city STRING, zip STRING>,\\n  tags ARRAY<STRING>\\n);","table_catalog":"infoschema","table_name":"people","table_schema":"a","table_type":"BASE TABLE"}]'
+  tables_of_a_region:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
+         ORDER BY table_schema'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"table_name":"people","table_schema":"a"},{"table_name":"events","table_schema":"b"}]'
+  columns:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT column_name, ordinal_position, is_nullable, data_type
+         FROM `infoschema.a.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = "people"
+         ORDER BY ordinal_position'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"column_name":"id","data_type":"INT64","is_nullable":"YES","ordinal_position":"1"},{"column_name":"name","data_type":"STRING","is_nullable":"YES","ordinal_position":"2"},{"column_name":"address","data_type":"STRUCT<city STRING, zip STRING>","is_nullable":"YES","ordinal_position":"3"},{"column_name":"tags","data_type":"ARRAY<STRING>","is_nullable":"YES","ordinal_position":"4"}]'
+  column_field_paths:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT field_path, data_type FROM a.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
+         WHERE column_name = "address" ORDER BY field_path'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"data_type":"STRUCT<city STRING, zip STRING>","field_path":"address"},{"data_type":"STRING","field_path":"address.city"},{"data_type":"STRING","field_path":"address.zip"}]'
+  select_star:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT * FROM b.INFORMATION_SCHEMA.COLUMNS'
+    test: |
+      current.exit_code == 0 && current.stdout contains '"column_name":"id"' &&
+      current.stdout contains '"is_generated":"NEVER"'
+  missing_dataset:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
+        'SELECT * FROM missing.INFORMATION_SCHEMA.TABLES'
+    test: |
+      current.exit_code != 0 && current.stdout contains "not found: missing.INFORMATION_SCHEMA.TABLES"
+  unqualified_tables:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
+        'SELECT * FROM INFORMATION_SCHEMA.TABLES'
+    test: |
+      current.exit_code != 0 && current.stdout contains "must be qualified with a dataset"
+  dml_is_rejected:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
+        'DELETE FROM a.INFORMATION_SCHEMA.TABLES WHERE true'
+    test: current.exit_code != 0

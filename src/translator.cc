@@ -1676,8 +1676,12 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
           alias);
       result.columns.emplace(column.column_id(), "q." + alias);
     }
+    // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
+    const auto* sql_table = dynamic_cast<const SqlTable*>(table->table());
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-                 " FROM " + QuoteIdentifierPath(table->table()->FullName());
+                 " FROM " +
+                 (sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
+                                       : QuoteIdentifierPath(table->table()->FullName()));
     return result;
   }
   if (scan.Is<googlesql::ResolvedJoinScan>()) {
@@ -1800,6 +1804,9 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
                        "INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, "
                        "ON CONFLICT or generated columns");
   }
+  if (dynamic_cast<const SqlTable*>(table->table()) != nullptr) {
+    return Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
+  }
   // The inserted columns are the table scan's columns; name them by the table's own columns.
   std::map<int, std::string> table_columns;
   for (int i = 0; i < table->column_list_size(); ++i) {
@@ -1871,6 +1878,9 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
       table.lock_mode() != nullptr || table.table()->IsValueTable() ||
       table.column_list_size() != table.column_index_list_size()) {
     return Unsupported(scope, "DML target with hints, FOR SYSTEM_TIME or a value table");
+  }
+  if (dynamic_cast<const SqlTable*>(table.table()) != nullptr) {
+    return Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
   }
   Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}, {}};
   for (int i = 0; i < table.column_list_size(); ++i) {

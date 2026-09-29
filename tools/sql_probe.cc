@@ -60,6 +60,15 @@ class EmulatorTables : public TableSource {
     }
   }
 
+  std::vector<std::string> ListDatasets(const std::string& project) override {
+    return emulator_.ListDatasets(project);
+  }
+
+  std::vector<std::string> ListTables(const std::string& project,
+                                      const std::string& dataset) override {
+    return emulator_.ListTables({project, dataset});
+  }
+
  private:
   Emulator& emulator_;
 };
