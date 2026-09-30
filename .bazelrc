@@ -4,6 +4,10 @@ common --enable_platform_specific_config
 build --cxxopt=-std=c++20
 build --host_cxxopt=-std=c++20
 
+# Use the development shell tools for target and exec actions, including on NixOS.
+build --action_env=PATH
+build --host_action_env=PATH
+
 # GoogleSQL loads time zones at runtime. Forward TZDIR, when set, to actions and tests for hosts
 # without /usr/share/zoneinfo, such as NixOS.
 build --action_env=TZDIR
@@ -52,10 +56,6 @@ build:ci --repository_cache=~/.cache/bazel-repo
 build:ci --experimental_disk_cache_gc_max_size=8G
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 test:ci --test_output=errors
-
-# Action PATH and TZDIR pinned to Nix store paths, written by the flake's development shell. They
-# keep the host environment out of action cache keys.
-try-import %workspace%/.bazelrc.devshell
 
 # Optional machine-specific settings (not checked into Git).
 try-import %workspace%/.bazelrc.local
