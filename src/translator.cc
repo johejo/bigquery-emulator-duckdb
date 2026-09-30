@@ -2314,6 +2314,20 @@ std::optional<std::string> UpdateItems(
   return Join(assignments, ", ");
 }
 
+// Materialize the source once so the cardinality check and the write see the same
+// rows, including when the source contains volatile expressions. The scalar guard
+// raises inside the DML statement, so DuckDB rolls back the entire write.
+std::string CheckedDmlSource(const std::string& source, const Target& target,
+                             const std::string& condition, const std::string& affected = "TRUE") {
+  return "WITH _bq_source AS MATERIALIZED (" + source +
+         ") SELECT * FROM _bq_source WHERE (SELECT CASE WHEN EXISTS (SELECT 1 FROM " +
+         target.table + " AS _t WHERE (SELECT count(*) FROM _bq_source AS q WHERE " + condition +
+         ") > 1 AND EXISTS (SELECT 1 FROM _bq_source AS q WHERE (" + condition + ") AND (" +
+         affected +
+         "))) THEN error('UPDATE/MERGE must match at most one source row for each target row') "
+         "ELSE TRUE END)";
+}
+
 std::optional<std::string> Update(const googlesql::ResolvedUpdateStmt& update, const Scope& scope) {
   if (update.assert_rows_modified() != nullptr || update.returning() != nullptr ||
       update.array_offset_column() != nullptr || update.generated_column_expr_list_size() != 0 ||
@@ -2327,6 +2341,7 @@ std::optional<std::string> Update(const googlesql::ResolvedUpdateStmt& update, c
   const Scope dml = DmlScope(scope, *target);
   Columns columns = target->columns;
   std::string from;
+  std::string source_sql;
   if (update.from_scan() != nullptr) {
     const auto relation = Scan(*update.from_scan(), dml);
     if (!relation) {
@@ -2334,19 +2349,25 @@ std::optional<std::string> Update(const googlesql::ResolvedUpdateStmt& update, c
     }
     columns.insert(relation->columns.begin(), relation->columns.end());
     from = relation->From();
+    source_sql = relation->sql;
   }
   const auto assignments = UpdateItems(update.update_item_list(), *target, dml, columns);
   if (!assignments) {
     return std::nullopt;
   }
-  std::string sql = "UPDATE " + target->table + " AS _t SET " + *assignments + from;
+  std::string condition = "TRUE";
   if (update.where_expr() != nullptr) {
     const auto where = Expression(*update.where_expr(), dml, columns);
     if (!where) {
       return std::nullopt;
     }
-    sql += " WHERE " + *where;
+    condition = *where;
   }
+  if (update.from_scan() != nullptr) {
+    from = " FROM (" + CheckedDmlSource(source_sql, *target, condition) + ") AS q";
+  }
+  std::string sql =
+      "UPDATE " + target->table + " AS _t SET " + *assignments + from + " WHERE " + condition;
   return sql;
 }
 
@@ -2455,8 +2476,27 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
     }
     clauses.push_back(*clause);
   }
-  return "MERGE INTO " + target->table + " AS _t USING (" + source->sql + ") AS q ON " +
-         *condition + " " + Join(clauses, " ");
+  std::vector<std::string> affected;
+  bool has_matched_update = false;
+  for (const auto& when : merge.when_clause_list()) {
+    if (when->match_type() != googlesql::ResolvedMergeWhen::MATCHED) {
+      continue;
+    }
+    has_matched_update |= when->action_type() == googlesql::ResolvedMergeWhen::UPDATE;
+    const auto predicate = when->match_expr() == nullptr
+                               ? std::optional<std::string>("TRUE")
+                               : Expression(*when->match_expr(), dml, columns);
+    if (!predicate) {
+      return std::nullopt;
+    }
+    affected.push_back("(" + *predicate + ")");
+  }
+  const std::string source_sql =
+      has_matched_update
+          ? CheckedDmlSource(source->sql, *target, *condition, Join(affected, " OR "))
+          : source->sql;
+  return "MERGE INTO " + target->table + " AS _t USING (" + source_sql + ") AS q ON " + *condition +
+         " " + Join(clauses, " ");
 }
 
 // DDL names tables and datasets by path rather than through the catalog, so the defaults the
