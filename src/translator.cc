@@ -2557,6 +2557,34 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   return type;
 }
 
+std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
+                                      const DefaultDataset& defaults, const Scope& scope) {
+  // DuckDB accepts only one action per ALTER. Reject the whole statement rather than
+  // applying only some of its actions.
+  if (alter.alter_action_list_size() != 1) {
+    return Unsupported(scope, "ALTER TABLE with multiple actions");
+  }
+  const auto& action = *alter.alter_action_list(0);
+  if (!action.Is<googlesql::ResolvedAddColumnAction>()) {
+    return Unsupported(scope, "ALTER TABLE action " + action.node_kind_string());
+  }
+  const auto& add = *action.GetAs<googlesql::ResolvedAddColumnAction>();
+  const auto& column = *add.column_definition();
+  if (column.is_hidden() || column.generated_column_info() != nullptr ||
+      column.default_value() != nullptr ||
+      (column.annotations() != nullptr && column.annotations()->not_null())) {
+    return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
+  }
+  const auto path = TablePath(alter.name_path(), defaults, scope);
+  const auto type = ColumnDefinitionType(column, scope);
+  if (!path || !type) {
+    return std::nullopt;
+  }
+  return std::string("ALTER TABLE ") + (alter.is_if_exists() ? "IF EXISTS " : "") + *path +
+         " ADD COLUMN " + (add.is_if_not_exists() ? "IF NOT EXISTS " : "") +
+         QuoteIdentifier(column.name()) + " " + *type;
+}
+
 // CREATE [OR REPLACE] TABLE [IF NOT EXISTS] path, shared with CREATE TABLE AS SELECT.
 // Partitioning, clustering and options only shape BigQuery storage, and BigQuery's primary and
 // foreign keys are never enforced, so they are all dropped.
@@ -2762,6 +2790,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
     return CreateTable(*statement.GetAs<googlesql::ResolvedCreateTableStmt>(), defaults, scope);
+  }
+  if (statement.Is<googlesql::ResolvedAlterTableStmt>()) {
+    return AlterTable(*statement.GetAs<googlesql::ResolvedAlterTableStmt>(), defaults, scope);
   }
   if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
     return CreateTableAsSelect(*statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>(),
