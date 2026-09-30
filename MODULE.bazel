@@ -48,14 +48,34 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 # DuckDB's ICU extension embeds ICU 66 and GoogleSQL links ICU 76. ICU versions nearly all of its
 # symbols, but the UCaseMap constructors and destructors sit outside the versioned namespace and
 # the two versions' layouts differ, so DuckDB's copies are made local to its archive.
+#
+# The checks around the localization fail the fetch when a new release no longer matches these
+# assumptions: the symbols must be defined in libicu_extension.a, no object may reference them
+# from outside (such a reference would silently bind to GoogleSQL's ICU 76 copy once DuckDB's is
+# local), and afterwards no archive may still export them.
+_UCASEMAP_ERROR = "echo 'DuckDB static-libs: %s; revisit the UCaseMap localization in MODULE.bazel' >&2; exit 1"
+
+_UCASEMAP_BEFORE = "; ".join([
+    "set -euo pipefail",
+    "defined=$(nm -g --defined-only libicu_extension.a | awk '/ZN8UCaseMap/ {print $3}')",
+    "if [ -z \"$defined\" ]; then " + _UCASEMAP_ERROR % "libicu_extension.a defines no UCaseMap symbols" + "; fi",
+    "undefined=$(nm -u lib*.a)",
+    "if grep -q ZN8UCaseMap <<<\"$undefined\"; then " + _UCASEMAP_ERROR % "an object references UCaseMap from outside its definition" + "; fi",
+]) + "; "
+
+_UCASEMAP_AFTER = "; " + "; ".join([
+    "exported=$(nm -g --defined-only lib*.a)",
+    "if grep -q ZN8UCaseMap <<<\"$exported\"; then " + _UCASEMAP_ERROR % "UCaseMap symbols are still exported" + "; fi",
+])
+
+_LOCALIZE_UCASEMAP_MACOS = _UCASEMAP_BEFORE + "printf '%s\\n' \"$defined\" > ucasemap.syms && nmedit -R ucasemap.syms libicu_extension.a && rm ucasemap.syms" + _UCASEMAP_AFTER
+
+_LOCALIZE_UCASEMAP_LINUX = _UCASEMAP_BEFORE + "objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a" + _UCASEMAP_AFTER
+
 http_archive(
     name = "duckdb_prebuilt_macos_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = [
-        "nm -gU libicu_extension.a | awk '/__ZN8UCaseMap/ {print $3}' > ucasemap.syms",
-        "nmedit -R ucasemap.syms libicu_extension.a",
-        "rm ucasemap.syms",
-    ],
+    patch_cmds = [_LOCALIZE_UCASEMAP_MACOS],
     sha256 = "d79ec66b8a4054b866faada82e9e31f859a713c555b3f1c4b71c4a43d3273e9c",
     urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-osx-arm64.zip"],
 )
@@ -63,7 +83,7 @@ http_archive(
 http_archive(
     name = "duckdb_prebuilt_linux_amd64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = ["objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a"],
+    patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
     sha256 = "deb47c5300f3c99725e84cdb14d214c3b12bbd748b613b1698b938c894cb68eb",
     urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-linux-amd64.zip"],
 )
@@ -71,7 +91,7 @@ http_archive(
 http_archive(
     name = "duckdb_prebuilt_linux_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = ["objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a"],
+    patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
     sha256 = "ea6a34cb49ec2db5ed23d9e8311237c53c32abf9cdbf5dd608c4176c3dd8bfeb",
     urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-linux-arm64.zip"],
 )
