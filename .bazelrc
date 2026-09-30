@@ -23,10 +23,18 @@ build --host_copt=--system-header-prefix=absl/
 build --host_copt=--system-header-prefix=google/
 build --host_copt=--system-header-prefix=googlesql/
 
+# GoogleSQL's py_binary relies on implicit __init__.py creation, which rules_python deprecates. No
+# Python target in the build needs it.
+build --incompatible_default_to_explicit_init_py
+
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-layering_check
 build:macos --features=-parse_headers
+# Apple's linker warns about the -lm and -lpthread that protobuf adds to each of its targets; Bazel
+# does not deduplicate link options across targets.
+build:macos --linkopt=-Wl,-no_warn_duplicate_libraries
+build:macos --host_linkopt=-Wl,-no_warn_duplicate_libraries
 
 # clang-tidy, run as a Bazel aspect so it sees the same toolchain flags as the build.
 build:clang-tidy --aspects=@bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
