@@ -419,16 +419,22 @@ json DatasetResource(const DatasetReference& dataset) {
 }
 
 json TableResource(const TableInfo& info) {
-  return json{{"kind", "bigquery#table"},
-              {"etag", ""},
-              {"id", info.reference.project_id + ":" + info.reference.dataset_id + "." +
-                         info.reference.table_id},
-              {"tableReference", TableReferenceJson(info.reference)},
-              {"schema", SchemaToJson(info.schema)},
-              {"type", "TABLE"},
-              {"numRows", std::to_string(info.num_rows)},
-              {"numBytes", "0"},
-              {"location", "US"}};
+  json resource{{"kind", "bigquery#table"},
+                {"etag", ""},
+                {"id", info.reference.project_id + ":" + info.reference.dataset_id + "." +
+                           info.reference.table_id},
+                {"tableReference", TableReferenceJson(info.reference)},
+                {"schema", SchemaToJson(info.schema)},
+                {"type", info.view_query ? "VIEW" : "TABLE"},
+                {"numRows", std::to_string(info.num_rows)},
+                {"numBytes", "0"},
+                {"location", "US"}};
+  if (info.view_query) {
+    resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
+    resource.erase("numRows");
+    resource.erase("numBytes");
+  }
+  return resource;
 }
 
 }  // namespace
@@ -802,13 +808,15 @@ class Server::Impl {
         Json([this](const httplib::Request& request, httplib::Response&) {
           const DatasetReference dataset{Param(request, "project"), Param(request, "dataset")};
           json tables = json::array();
+          const std::vector<std::string> views = emulator_.ListViews(dataset);
           for (const std::string& table_id : emulator_.ListTables(dataset)) {
             const TableReference table{dataset.project_id, dataset.dataset_id, table_id};
             tables.push_back(
                 json{{"kind", "bigquery#table"},
                      {"id", table.project_id + ":" + table.dataset_id + "." + table.table_id},
                      {"tableReference", TableReferenceJson(table)},
-                     {"type", "TABLE"}});
+                     {"type", std::binary_search(views.begin(), views.end(), table_id) ? "VIEW"
+                                                                                       : "TABLE"}});
           }
           return json{{"kind", "bigquery#tableList"},
                       {"etag", ""},
@@ -824,8 +832,12 @@ class Server::Impl {
            }
            const TableReference table{Param(request, "project"), Param(request, "dataset"),
                                       reference["tableId"].get<std::string>()};
-           emulator_.CreateTable(
-               table, body.value("schema", json::object()).value("fields", json::array()));
+           if (body.contains("view")) {
+             emulator_.CreateView(table, body.at("view"));
+           } else {
+             emulator_.CreateTable(
+                 table, body.value("schema", json::object()).value("fields", json::array()));
+           }
            return TableResource(emulator_.GetTable(table));
          }));
     Get("/projects/:project/datasets/:dataset/tables/:table",

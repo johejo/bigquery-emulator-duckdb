@@ -8,6 +8,8 @@
 
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
+#include "src/backend.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 
@@ -330,6 +332,49 @@ TEST(EmulatorPersistenceTest, StoresEachProjectInItsOwnFile) {
   }
   EXPECT_TRUE(std::filesystem::exists(data_dir / "proj.duckdb"));
   EXPECT_TRUE(std::filesystem::exists(data_dir / "example%2Ecom%3Aproj.duckdb"));
+}
+
+// A view written to the project file by other means has no GoogleSQL definition or schema.
+TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
+  const std::filesystem::path data_dir =
+      std::filesystem::path(::testing::TempDir()) / "emulator_foreign_view";
+  std::filesystem::remove_all(data_dir);
+  std::filesystem::create_directories(data_dir);
+  {
+    Backend backend;
+    backend.Execute("ATTACH '" + (data_dir / "proj.duckdb").string() + "' AS proj");
+    backend.Execute("CREATE SCHEMA proj.ds");
+    backend.Execute("CREATE VIEW proj.ds.v AS SELECT 1 AS x");
+  }
+  Emulator emulator(data_dir.string());
+  EXPECT_EQ(emulator.ListViews({"proj", "ds"}), std::vector<std::string>{"v"});
+  try {
+    emulator.GetTable({"proj", "ds", "v"});
+    ADD_FAILURE() << "GetTable succeeded";
+  } catch (const ApiError& error) {
+    EXPECT_EQ(error.http_status(), 400);
+    EXPECT_NE(std::string(error.what()).find("was not created by the emulator"), std::string::npos)
+        << error.what();
+  }
+
+  QueryRequest request;
+  request.project_id = "proj";
+  request.query =
+      "SELECT table_type, ddl IS NULL FROM ds.INFORMATION_SCHEMA.TABLES WHERE table_name = 'v'";
+  const std::shared_ptr<const Job> job = emulator.RunQuery(request);
+  if (job->error.has_value()) {
+    FAIL() << job->error->what();
+  }
+  if (!job->result.has_value()) {
+    FAIL() << "the job has neither a result nor an error";
+  }
+  const QueryResult& result = *job->result;
+  ASSERT_EQ(result.rows.size(), 1);
+  EXPECT_EQ(result.rows[0]["f"][0]["v"], "VIEW");
+  EXPECT_EQ(result.rows[0]["f"][1]["v"], "true");
+
+  emulator.DeleteTable({"proj", "ds", "v"});
+  EXPECT_TRUE(emulator.ListTables({"proj", "ds"}).empty());
 }
 
 }  // namespace

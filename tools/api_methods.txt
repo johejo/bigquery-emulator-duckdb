@@ -53,8 +53,9 @@ note bigquery.tabledata.list | Ignores `selectedFields` and `formatOptions.times
 
 request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
 request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
-note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference, schema and row count; `numBytes` is always 0.
+note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference and schema, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0.
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"v"},"view":{"query":"SELECT id FROM test.d.t","useLegacySql":false}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
-note bigquery.tables.insert | Keeps only `tableReference` and `schema`; views, partitioning, clustering, labels and descriptions are ignored.
+note bigquery.tables.insert | Keeps `tableReference`, `schema` and GoogleSQL view definitions; partitioning, clustering, labels and descriptions are ignored.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables
 note bigquery.tables.list | Ignores `maxResults` and `pageToken`, and returns every table in one page.

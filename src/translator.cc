@@ -2627,6 +2627,40 @@ std::optional<std::string> CreateTableAsSelect(
   return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
 }
 
+std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
+                                      const DefaultDataset& defaults, const Scope& scope) {
+  if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
+      create.recursive() || create.is_value_table()) {
+    return Unsupported(scope, "temporary, recursive or value-table views");
+  }
+  const auto path = TablePath(create.name_path(), defaults, scope);
+  const auto relation = Scan(*create.query(), scope);
+  if (!path || !relation) {
+    return std::nullopt;
+  }
+  std::vector<std::string> projections;
+  for (const auto& output : create.output_column_list()) {
+    const auto column = relation->columns.find(output->column().column_id());
+    const auto type = SqlType(output->column().type());
+    if (column == relation->columns.end() || !type) {
+      return std::nullopt;
+    }
+    // Preserve GoogleSQL result types when the view is later read through the catalog.
+    projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
+                          QuoteIdentifier(output->name()));
+  }
+  std::string head = "CREATE ";
+  if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE) {
+    head += "OR REPLACE ";
+  }
+  head += "VIEW ";
+  if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
+    head += "IF NOT EXISTS ";
+  }
+  return head + *path + " AS SELECT " + Join(projections, ", ") + relation->From() +
+         relation->Order();
+}
+
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
                                         const DefaultDataset& defaults, const Scope& scope) {
   if (create.collation_name() != nullptr) {
@@ -2650,7 +2684,7 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop,
                                 const DefaultDataset& defaults, const Scope& scope) {
   const std::string object_type = ToUpperAscii(drop.object_type());
   const bool is_schema = object_type == "SCHEMA";
-  if (object_type != "TABLE" && !is_schema) {
+  if (object_type != "TABLE" && object_type != "VIEW" && !is_schema) {
     return Unsupported(scope, "DROP " + object_type);
   }
   const auto path = is_schema ? DatasetPath(drop.name_path(), defaults, scope)
@@ -2692,6 +2726,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
     return CreateTableAsSelect(*statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>(),
                                defaults, scope);
+  }
+  if (statement.Is<googlesql::ResolvedCreateViewStmt>()) {
+    return CreateView(*statement.GetAs<googlesql::ResolvedCreateViewStmt>(), defaults, scope);
   }
   if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
     return CreateSchema(*statement.GetAs<googlesql::ResolvedCreateSchemaStmt>(), defaults, scope);

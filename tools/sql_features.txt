@@ -153,6 +153,11 @@ query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
 query `DROP SCHEMA` | DROP SCHEMA d CASCADE
 query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x')
 query `CREATE VIEW` | CREATE VIEW n AS SELECT id FROM t
+query `CREATE VIEW` | CREATE OR REPLACE VIEW n AS SELECT name FROM t
+query `CREATE VIEW` | CREATE VIEW IF NOT EXISTS n AS SELECT id FROM t
+query `CREATE VIEW` | CREATE VIEW n (renamed) AS SELECT id FROM t
+query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
+note `CREATE VIEW` | Stores the GoogleSQL definition and schema; view options are ignored. Temporary, recursive and value-table views are unsupported.
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)

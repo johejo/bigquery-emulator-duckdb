@@ -215,6 +215,11 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
          absl::StrJoin(columns, ",\n") + "\n);";
 }
 
+std::string ViewDdl(const std::string& project, const std::string& dataset,
+                    const std::string& table, const std::string& query) {
+  return "CREATE VIEW `" + project + "." + dataset + "." + table + "`\nAS " + query + ";";
+}
+
 // Appends a COLUMN_FIELD_PATHS row for `field` and for each field nested in it. The fields of
 // a repeated record are described by their own types, as BigQuery does.
 absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& table,
@@ -251,17 +256,25 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         continue;
       }
       if (view == "TABLES") {
-        absl::StatusOr<std::string> ddl =
-            TableDdl(dataset.project, dataset.dataset, table, *schema, type_factory);
-        if (!ddl.ok()) {
-          return ddl.status();
+        const std::optional<std::string> view_query =
+            source.FindViewQuery(dataset.project, dataset.dataset, table);
+        Cell ddl = kNull;
+        if (!view_query.has_value()) {
+          absl::StatusOr<std::string> table_ddl =
+              TableDdl(dataset.project, dataset.dataset, table, *schema, type_factory);
+          if (!table_ddl.ok()) {
+            return table_ddl.status();
+          }
+          ddl = String(*table_ddl);
+        } else if (!view_query->empty()) {
+          ddl = String(ViewDdl(dataset.project, dataset.dataset, table, *view_query));
         }
         rows.push_back({String(dataset.project),
                         String(dataset.dataset),
                         String(table),
-                        String("BASE TABLE"),
-                        String("NATIVE"),
-                        String("YES"),
+                        String(view_query.has_value() ? "VIEW" : "BASE TABLE"),
+                        view_query.has_value() ? kNull : String("NATIVE"),
+                        String(view_query.has_value() ? "NO" : "YES"),
                         String("NO"),
                         String("NO"),
                         String("NO"),
@@ -275,7 +288,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
                         kNull,
                         kNull,
                         kNull,
-                        String(*ddl),
+                        ddl,
                         kNull,
                         kNull,
                         kNull});

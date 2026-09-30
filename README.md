@@ -55,7 +55,8 @@ rows, err := query.Read(ctx)
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
 each project is stored in `DIR/<project>.duckdb` (characters outside `[A-Za-z0-9_-]` are
 percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its datasets
-and tables come back after a restart. Jobs are kept in memory only.
+and tables come back after a restart. Logical views, including their GoogleSQL definitions and
+schemas, are persisted too. Jobs are kept in memory only.
 
 On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project file. A
 project file can be open in only one process at a time, and a file written by a newer DuckDB
@@ -82,6 +83,9 @@ Behavior that applies across them:
 - Every statement is analyzed against the existing tables and parameter types first, so unknown
   names and type errors fail as in BigQuery. Constructs the translator does not handle fail as
   `invalidQuery`, naming the construct.
+- Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
+  and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
+  cannot read them. Temporary, recursive and value-table views are unsupported.
 - Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,
   `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from
   DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`,

@@ -47,3 +47,8 @@ project is a DuckDB catalog and each dataset a schema. The backend derives resul
 encodes rows in BigQuery's `{"f": [{"v": ...}]}` format. GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files, which
 DuckDB then reads.
+
+Logical views are native DuckDB views with translated SQL and explicit GoogleSQL output types.
+Their DuckDB comments hold the original GoogleSQL query and result schema as JSON. Creation and
+metadata writes share a transaction, so replacement failures preserve the previous definition.
+This metadata survives restarts and serves the REST API without executing the view.

@@ -46,6 +46,14 @@ class TableSource {
                                               const std::string& /*dataset*/) {
     return {};
   }
+
+  // The GoogleSQL query of `project`.`dataset`.`table` if it is a view, empty for a view whose
+  // query is unknown, or nothing for a table. For INFORMATION_SCHEMA; no views by default.
+  virtual std::optional<std::string> FindViewQuery(const std::string& /*project*/,
+                                                   const std::string& /*dataset*/,
+                                                   const std::string& /*table*/) {
+    return std::nullopt;
+  }
 };
 
 // A table whose rows are not stored but computed by a DuckDB query, such as an
