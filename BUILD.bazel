@@ -134,10 +134,6 @@ cc_library(
     srcs = ["src/backend.cc"],
     hdrs = ["src/backend.h"],
     copts = ["-std=c++20"],
-    linkopts = select({
-        "@platforms//os:macos": ["-Wl,-rpath,@loader_path"],
-        "//conditions:default": [],
-    }),
     deps = [
         ":field_schema",
         "//third_party/duckdb",

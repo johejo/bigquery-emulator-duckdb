@@ -27,7 +27,7 @@
             packages = with pkgs; [
               bazelisk
               buildifier
-              clang-tools
+              llvmPackages.clang-tools
               # For trying a query against the engine the emulator embeds without building
               # anything. Worth keeping at the version MODULE.bazel pins, which nixpkgs
               # happens to carry today; nothing enforces that they stay in step.
@@ -37,7 +37,14 @@
               google-cloud-sdk
               just
               runn
-            ] ++ lib.optionals stdenv.hostPlatform.isLinux [ clang ];
+            ]
+            # llvm provides llvm-nm and llvm-objcopy, which MODULE.bazel uses to patch DuckDB's
+            # archives. Its tools are all prefixed, so it does not change which ar, nm or ld the
+            # C++ toolchain finds.
+            ++ lib.optionals stdenv.hostPlatform.isLinux [
+              llvmPackages.clang
+              llvmPackages.llvm
+            ];
 
             shellHook =
               pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
@@ -46,8 +53,8 @@
               ''
               # Bazel runs genrules with /bin/bash, which NixOS does not have.
               + pkgs.lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
-                export CC=${pkgs.clang}/bin/clang
-                export CXX=${pkgs.clang}/bin/clang++
+                export CC=${pkgs.llvmPackages.clang}/bin/clang
+                export CXX=${pkgs.llvmPackages.clang}/bin/clang++
                 export BAZEL_SH=${pkgs.bash}/bin/bash
               '';
           };
