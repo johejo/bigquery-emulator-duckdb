@@ -32,8 +32,6 @@ build:macos --features=-parse_headers
 build:clang-tidy --aspects=@bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 build:clang-tidy --output_groups=report
 build:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
-# The aspect invokes clang-tidy from PATH, including under CI's strict action environment.
-build:clang-tidy --action_env=PATH
 # Report every file's findings in one run instead of stopping at the first failure.
 build:clang-tidy --keep_going
 
@@ -45,9 +43,11 @@ build:ci --repository_cache=~/.cache/bazel-repo
 # collects the disk cache once idle during the end-to-end tests.
 build:ci --experimental_disk_cache_gc_max_size=8G
 build:ci --experimental_disk_cache_gc_idle_delay=5s
-# Keep the host PATH out of action cache keys unless explicitly requested (e.g. clang-tidy).
-build:ci --incompatible_strict_action_env
 test:ci --test_output=errors
+
+# Action PATH and TZDIR pinned to Nix store paths, written by the flake's development shell. They
+# keep the host environment out of action cache keys.
+try-import %workspace%/.bazelrc.devshell
 
 # Optional machine-specific settings (not checked into Git).
 try-import %workspace%/.bazelrc.local

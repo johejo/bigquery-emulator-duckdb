@@ -15,3 +15,6 @@
 
 # Machine-specific Bazel settings
 /.bazelrc.local
+
+# Written by the Nix development shell
+/.bazelrc.devshell
