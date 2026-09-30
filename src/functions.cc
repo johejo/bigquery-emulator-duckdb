@@ -34,6 +34,8 @@ struct Condition {
   std::vector<ArgumentType> types;
   // Any of these date parts; empty accepts any argument.
   std::vector<std::string_view> date_parts;
+  // This rounding mode.
+  std::optional<std::string_view> rounding_mode;
   // A STRING literal with this value.
   std::optional<std::string_view> string_literal;
 };
@@ -44,6 +46,10 @@ Condition Is(std::size_t argument, std::initializer_list<ArgumentType> types) {
 
 Condition Part(std::size_t argument, std::initializer_list<std::string_view> date_parts) {
   return {.argument = argument, .date_parts = date_parts};
+}
+
+Condition Mode(std::size_t argument, std::string_view rounding_mode) {
+  return {.argument = argument, .rounding_mode = rounding_mode};
 }
 
 Condition SubDay(std::size_t argument) {
@@ -125,6 +131,18 @@ std::string Spaced(std::string_view value) {
   return "regexp_replace(hex(" + std::string(value) + "), '(..)', '\\1 ', 'g')";
 }
 
+// The BYTES value `value` as a string of one character per byte, U+0100 plus the byte, for the
+// string functions to work on. FromChars() turns such a string back into BYTES.
+std::string ToChars(std::string_view value) {
+  return "array_to_string(list_transform(regexp_extract_all(hex(" + std::string(value) +
+         "), '..'), _b -> chr(256 + CAST('0x' || _b AS INTEGER))), '')";
+}
+
+std::string FromChars(std::string_view chars) {
+  return "unhex(array_to_string(list_transform(regexp_extract_all(" + std::string(chars) +
+         ", '.'), _c -> lpad(hex(unicode(_c) - 256), 2, '0')), ''))";
+}
+
 // STRPOS and INSTR without a position or occurrence. A match in the spaced digits starts on a
 // byte, three characters each.
 std::vector<Rule> Position() {
@@ -176,6 +194,16 @@ std::vector<Rule> Substr() {
        {Is(1, {kBytes})}}};
 }
 
+// ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
+// its rounding away from zero, and the two then differ by one unit of the last digit.
+std::string RoundHalfEven() {
+  const std::string away = "round($1, CAST($2 AS INTEGER))";
+  const std::string toward = "trunc($1, CAST($2 AS INTEGER))";
+  return "CASE WHEN " + away + " = " + toward + " OR " + away + " - $1 <> $1 - " + toward +
+         " THEN " + away + " WHEN " + toward + " % (2 * (" + away + " - " + toward +
+         ")) = 0 THEN " + toward + " ELSE " + away + " END";
+}
+
 // The reciprocal of a DuckDB function, which BigQuery reports as an error at zero where DuckDB
 // returns infinity.
 std::vector<Rule> Reciprocal(std::string_view function) {
@@ -204,14 +232,26 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       // argument form takes the base first rather than last.
       {"LOG", {{1, "ln($1)"}, {2, "log($2, $1)"}}},
       // DuckDB takes the digits as an INTEGER.
-      {"ROUND", {{1, "round($1)"}, {2, "round($1, CAST($2 AS INTEGER))"}}},
+      // DuckDB rounds halfway values away from zero, and its round_even() goes through
+      // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
+      // value is even. Only NUMERIC and BIGNUMERIC take a rounding mode.
+      {"ROUND",
+       {{1, "round($1)"},
+        {2, "round($1, CAST($2 AS INTEGER))"},
+        {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
+        {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}}}},
       {"TRUNC", {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}},
       {"SEC", Reciprocal("cos")},
       {"CSC", Reciprocal("sin")},
       {"SECH", Reciprocal("cosh")},
       {"CSCH", Reciprocal("sinh")},
       {"COTH", Reciprocal("tanh")},
-      {"BIT_COUNT", {{1, "bit_count($1)", {Is(1, {kInt64})}}}},
+      // DuckDB cannot cast an empty BLOB to BIT.
+      {"BIT_COUNT",
+       {{1, "bit_count($1)", {Is(1, {kInt64})}},
+        {1,
+         "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
+         {Is(1, {kBytes})}}}},
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
@@ -313,7 +353,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
              Spaced("$1") + ", " + Spaced("$2") +
              "), _p -> replace(_p, ' ', '')) END, _p -> unhex(_p))",
          {Is(1, {kBytes})}}}},
-      {"TRANSLATE", {{3, "translate($1, $2, $3)", {Is(1, {kString})}}}},
+      {"TRANSLATE",
+       {{3, "translate($1, $2, $3)", {Is(1, {kString})}},
+        {3,
+         FromChars("translate(" + ToChars("$1") + ", " + ToChars("$2") + ", " + ToChars("$3") +
+                   ")"),
+         {Is(1, {kBytes})}}}},
       {"ASCII",
        {{1, "ascii($1)", {Is(1, {kString})}},
         {1,
@@ -477,6 +522,9 @@ bool Holds(const Condition& condition, const std::vector<FunctionArgument>& argu
                                         *argument.date_part) == condition.date_parts.end())) {
     return false;
   }
+  if (condition.rounding_mode && argument.rounding_mode != *condition.rounding_mode) {
+    return false;
+  }
   return !condition.string_literal || argument.string_literal == *condition.string_literal;
 }
 
@@ -496,12 +544,22 @@ bool Matches(const Rule& rule, const std::vector<FunctionArgument>& arguments) {
 }
 
 // SQL that is as cheap and as stable to repeat as a reference to it: a column, a number or a
-// string without quotes in it.
+// string without quotes in it, possibly negated or cast to a type such as BIGINT.
 bool Trivial(std::string_view sql) {
+  constexpr std::string_view kCast = "CAST(";
+  if (sql.starts_with(kCast) && sql.ends_with(")")) {
+    const std::string_view inner = sql.substr(kCast.size(), sql.size() - kCast.size() - 1);
+    const std::size_t as = inner.rfind(" AS ");
+    return as != std::string_view::npos && Trivial(inner.substr(0, as)) &&
+           Trivial(inner.substr(as + 4));
+  }
+  if (sql.size() >= 2 && sql.front() == '-' && sql[1] != '-') {
+    sql.remove_prefix(1);
+  }
   if (sql.size() >= 2 && sql.front() == '\'' && sql.back() == '\'') {
     return sql.find('\'', 1) == sql.size() - 1;
   }
-  return std::all_of(sql.begin(), sql.end(), [](char c) {
+  return !sql.empty() && std::all_of(sql.begin(), sql.end(), [](char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
            c == '.' || c == '"';
   });
@@ -532,8 +590,10 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   std::vector<std::string> references = sql;
   std::string fields;
   if (bind) {
+    // Trivial arguments stay as they are, so a literal that DuckDB needs as a constant, such as a
+    // rounding precision, remains one.
     for (std::size_t i = 0; i < sql.size(); ++i) {
-      if (uses[i] == 0) {
+      if (uses[i] == 0 || Trivial(sql[i])) {
         continue;
       }
       const std::string field = "a" + std::to_string(i + 1);

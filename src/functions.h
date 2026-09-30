@@ -28,6 +28,8 @@ struct FunctionArgument {
   ArgumentType type = ArgumentType::kOther;
   // The date part, such as "day", when the argument is one.
   std::optional<std::string> date_part;
+  // The rounding mode, such as "ROUND_HALF_EVEN", when the argument is one.
+  std::optional<std::string> rounding_mode;
   // The value of a STRING literal argument.
   std::optional<std::string> string_literal;
 };
