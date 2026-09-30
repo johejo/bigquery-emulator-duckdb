@@ -53,24 +53,27 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 # assumptions: the symbols must be defined in libicu_extension.a, no object may reference them
 # from outside (such a reference would silently bind to GoogleSQL's ICU 76 copy once DuckDB's is
 # local), and afterwards no archive may still export them.
+#
+# The tools are named explicitly so that no other nm or objcopy on PATH is picked up: Apple's own
+# on macOS, where nmedit exists only in cctools, and the devshell's LLVM on Linux.
 _UCASEMAP_ERROR = "echo 'DuckDB static-libs: %s; revisit the UCaseMap localization in MODULE.bazel' >&2; exit 1"
 
 _UCASEMAP_BEFORE = "; ".join([
     "set -euo pipefail",
-    "defined=$(nm -g --defined-only libicu_extension.a | awk '/ZN8UCaseMap/ {print $3}')",
+    "defined=$(\"$NM\" -g --defined-only libicu_extension.a | awk '/ZN8UCaseMap/ {print $3}')",
     "if [ -z \"$defined\" ]; then " + _UCASEMAP_ERROR % "libicu_extension.a defines no UCaseMap symbols" + "; fi",
-    "undefined=$(nm -u lib*.a)",
+    "undefined=$(\"$NM\" -u lib*.a)",
     "if grep -q ZN8UCaseMap <<<\"$undefined\"; then " + _UCASEMAP_ERROR % "an object references UCaseMap from outside its definition" + "; fi",
 ]) + "; "
 
 _UCASEMAP_AFTER = "; " + "; ".join([
-    "exported=$(nm -g --defined-only lib*.a)",
+    "exported=$(\"$NM\" -g --defined-only lib*.a)",
     "if grep -q ZN8UCaseMap <<<\"$exported\"; then " + _UCASEMAP_ERROR % "UCaseMap symbols are still exported" + "; fi",
 ])
 
-_LOCALIZE_UCASEMAP_MACOS = _UCASEMAP_BEFORE + "printf '%s\\n' \"$defined\" > ucasemap.syms && nmedit -R ucasemap.syms libicu_extension.a && rm ucasemap.syms" + _UCASEMAP_AFTER
+_LOCALIZE_UCASEMAP_MACOS = "NM=/usr/bin/nm; " + _UCASEMAP_BEFORE + "printf '%s\\n' \"$defined\" > ucasemap.syms && /usr/bin/nmedit -R ucasemap.syms libicu_extension.a && rm ucasemap.syms" + _UCASEMAP_AFTER
 
-_LOCALIZE_UCASEMAP_LINUX = _UCASEMAP_BEFORE + "objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a" + _UCASEMAP_AFTER
+_LOCALIZE_UCASEMAP_LINUX = "NM=llvm-nm; " + _UCASEMAP_BEFORE + "llvm-objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a" + _UCASEMAP_AFTER
 
 http_archive(
     name = "duckdb_prebuilt_macos_arm64",
