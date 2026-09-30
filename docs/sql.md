@@ -19,9 +19,9 @@ what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 2 |
+| Partial | 3 |
 | Supported | 52 |
-| Unsupported | 24 |
+| Unsupported | 23 |
 
 ## Queries
 
@@ -100,7 +100,7 @@ what it rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |
 | `CREATE EXTERNAL TABLE` | Unsupported | statement CreateExternalTableStmt |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Unsupported | statement AlterTableSetOptionsStmt; statement AlterTableStmt |
+| `ALTER TABLE` | Partial | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options are ignored; defaults, generated columns and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE action DropColumnAction; ALTER TABLE action RenameToAction; ALTER TABLE with multiple actions; statement AlterTableSetOptionsStmt |
 | `CREATE SCHEMA` | Supported |  |
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
