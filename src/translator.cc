@@ -276,6 +276,19 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
 }
 
+// The name of a rounding mode, such as ROUND_HALF_EVEN, which is also an enum literal after
+// analysis.
+std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->Equals(googlesql::types::RoundingModeEnumType())) {
+    return std::nullopt;
+  }
+  return value.EnumDisplayName();
+}
+
 // A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
 // INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
 struct BucketWidth {
@@ -489,6 +502,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     arguments.push_back({.sql = args[i],
                          .type = TypeOf(*argument.type()),
                          .date_part = DatePart(argument),
+                         .rounding_mode = RoundingMode(argument),
                          .string_literal = StringLiteral(argument)});
   }
   if (name == "$MAKE_ARRAY") {
@@ -934,6 +948,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       continue;
     }
     if (argument->type()->IsEnum()) {
+      if (const auto mode = RoundingMode(*argument)) {
+        args.push_back(QuoteLiteral(*mode));
+        continue;
+      }
       const auto part = DatePart(*argument);
       if (!part) {
         return Unsupported(scope, "function " + name + " date part");

@@ -18,6 +18,10 @@ FunctionArgument Part(const std::string& part) {
   return {.sql = "'" + part + "'", .date_part = part};
 }
 
+FunctionArgument Mode(const std::string& mode) {
+  return {.sql = "'" + mode + "'", .rounding_mode = mode};
+}
+
 TEST(FunctionsTest, MatchesTheArgumentCount) {
   EXPECT_EQ(TranslateFunction("LOG", {Sql("x")}), "ln(x)");
   EXPECT_EQ(TranslateFunction("LOG", {Sql("x"), Sql("b")}), "log(b, x)");
@@ -29,7 +33,7 @@ TEST(FunctionsTest, MatchesTheArgumentTypes) {
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("b", ArgumentType::kBytes)}), "octet_length(b)");
   // A function with rules is unsupported when none matches, rather than passed through.
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("x")}), std::nullopt);
-  EXPECT_EQ(TranslateFunction("TRANSLATE", {Sql("b", ArgumentType::kBytes), Sql("c"), Sql("d")}),
+  EXPECT_EQ(TranslateFunction("REGEXP_CONTAINS", {Sql("b", ArgumentType::kBytes), Sql("r")}),
             std::nullopt);
 }
 
@@ -56,6 +60,14 @@ TEST(FunctionsTest, MatchesDateParts) {
   EXPECT_EQ(TranslateFunction("LAST_DAY", {Sql("d"), Part("year")}), std::nullopt);
 }
 
+TEST(FunctionsTest, MatchesRoundingModes) {
+  EXPECT_EQ(TranslateFunction("ROUND", {Sql("x"), Sql("n"), Mode("ROUND_HALF_AWAY_FROM_ZERO")}),
+            "round(x, CAST(n AS INTEGER))");
+  // Rounding modes are enum literals, so a string argument does not match.
+  EXPECT_EQ(TranslateFunction("ROUND", {Sql("x"), Sql("n"), Sql("'ROUND_HALF_EVEN'")}),
+            std::nullopt);
+}
+
 TEST(FunctionsTest, MatchesStringLiterals) {
   FunctionArgument exact = Sql("'exact'", ArgumentType::kString);
   exact.string_literal = "exact";
@@ -71,10 +83,13 @@ TEST(FunctionsTest, BindsArgumentsUsedTwice) {
             "CASE WHEN q.a = 0 THEN '' ELSE chr(CAST(q.a AS INTEGER)) END");
   EXPECT_EQ(TranslateFunction("CHR", {Sql("65")}),
             "CASE WHEN 65 = 0 THEN '' ELSE chr(CAST(65 AS INTEGER)) END");
-  // Anything else is evaluated once, with the other arguments bound alongside.
+  EXPECT_EQ(TranslateFunction("CHR", {Sql("CAST(-65 AS BIGINT)")}),
+            "CASE WHEN CAST(-65 AS BIGINT) = 0 THEN '' ELSE chr(CAST(CAST(-65 AS BIGINT) AS "
+            "INTEGER)) END");
+  // Anything else is evaluated once, while trivial arguments stay as they are.
   EXPECT_EQ(TranslateFunction("LEFT", {Sql("q.s", ArgumentType::kString), Sql("(q.n + 1)")}),
-            "list_transform([struct_pack(a1 := q.s, a2 := (q.n + 1))], _fn -> CASE WHEN _fn.a2 < "
-            "0 THEN error('LEFT length must be non-negative') ELSE left(_fn.a1, _fn.a2) END)[1]");
+            "list_transform([struct_pack(a2 := (q.n + 1))], _fn -> CASE WHEN _fn.a2 < "
+            "0 THEN error('LEFT length must be non-negative') ELSE left(q.s, _fn.a2) END)[1]");
 }
 
 TEST(FunctionsTest, PassesThroughStringsOnly) {
