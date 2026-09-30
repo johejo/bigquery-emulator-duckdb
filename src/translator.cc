@@ -2392,6 +2392,19 @@ std::optional<std::string> Delete(const googlesql::ResolvedDeleteStmt& del, cons
   return sql;
 }
 
+std::optional<std::string> Truncate(const googlesql::ResolvedTruncateStmt& truncate,
+                                    const Scope& scope) {
+  // Partition filters cannot be preserved: partitioning is not represented in DuckDB.
+  if (truncate.where_expr() != nullptr) {
+    return Unsupported(scope, "TRUNCATE TABLE with WHERE");
+  }
+  const auto target = DmlTarget(*truncate.table_scan(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  return "TRUNCATE TABLE " + target->table;
+}
+
 std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
                                        const Target& target, const Scope& scope,
                                        const Columns& columns) {
@@ -2784,6 +2797,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedDeleteStmt>()) {
     return Delete(*statement.GetAs<googlesql::ResolvedDeleteStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedTruncateStmt>()) {
+    return Truncate(*statement.GetAs<googlesql::ResolvedTruncateStmt>(), scope);
   }
   if (statement.Is<googlesql::ResolvedMergeStmt>()) {
     return Merge(*statement.GetAs<googlesql::ResolvedMergeStmt>(), scope);

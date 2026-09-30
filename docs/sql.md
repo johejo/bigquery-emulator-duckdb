@@ -20,8 +20,8 @@ what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 3 |
-| Supported | 52 |
-| Unsupported | 23 |
+| Supported | 53 |
+| Unsupported | 22 |
 
 ## Queries
 
@@ -73,7 +73,7 @@ what it rejected.
 | `UPDATE` of array elements | Unsupported | UPDATE of array elements or nested DML |
 | Nested DML | Unsupported | UPDATE of array elements or nested DML |
 | `DELETE` | Supported |  |
-| `TRUNCATE TABLE` | Unsupported | statement TruncateStmt |
+| `TRUNCATE TABLE` | Supported |  |
 | `MERGE` | Supported | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies |
 | `ASSERT_ROWS_MODIFIED` | Unsupported | UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns |
 | `THEN RETURN` | Unsupported | DELETE with ASSERT_ROWS_MODIFIED, THEN RETURN or USING; INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, ON CONFLICT or generated columns |

@@ -1,0 +1,38 @@
+desc: TRUNCATE TABLE removes all rows and preserves the table schema
+steps:
+  dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset truncate_e2e
+    test: current.exit_code == 0
+  table:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE TABLE truncate_e2e.t AS SELECT id, CAST(id AS STRING) AS name FROM UNNEST([1, 2]) AS id'
+    test: current.exit_code == 0
+  dry_run:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'TRUNCATE TABLE truncate_e2e.t'
+    test: current.exit_code == 0 && current.stdout contains 'successfully validated'
+  rows_after_dry_run:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT COUNT(*) AS n FROM truncate_e2e.t'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"n":"2"}]'
+  truncate:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'TRUNCATE TABLE `test.truncate_e2e.t`'
+    test: current.exit_code == 0
+  empty_table:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT id, name FROM truncate_e2e.t'
+    test: current.exit_code == 0 && trim(current.stdout) == '[]'
+  insert_after_truncate:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql "INSERT INTO truncate_e2e.t VALUES (3, 'three')"
+    test: current.exit_code == 0
+  preserved_schema:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT id, name FROM truncate_e2e.t'
+    test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"3","name":"three"}]'
+  cleanup:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d truncate_e2e
+    test: current.exit_code == 0
