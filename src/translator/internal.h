@@ -13,6 +13,7 @@
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
 #include "src/translator.h"
+#include "src/type_mapping.h"
 
 namespace googlesql {
 class ResolvedAlterTableStmt;
@@ -32,8 +33,6 @@ class ResolvedMergeStmt;
 class ResolvedScan;
 class ResolvedTruncateStmt;
 class ResolvedUpdateStmt;
-class Type;
-class TypeParameters;
 class Value;
 }  // namespace googlesql
 
@@ -106,13 +105,7 @@ struct Relation {
   std::string Order() const { return ordering.empty() ? "" : " ORDER BY " + Join(ordering, ", "); }
 };
 
-// Types and literals, in types.cc.
-
-// The DuckDB type of `type`, narrowed by `parameters` when a column definition gives some.
-// DuckDB ignores lengths, so STRING(L) and BYTES(L) lose them; NUMERIC(P, S) keeps its rounding
-// as DECIMAL(P, S).
-std::optional<std::string> SqlType(const googlesql::Type* type,
-                                   const googlesql::TypeParameters* parameters = nullptr);
+// Literals, in literal.cc.
 
 std::optional<std::string> Literal(const googlesql::Value& value);
 

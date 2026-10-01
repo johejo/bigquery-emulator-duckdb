@@ -87,7 +87,7 @@ Scope Nested(const Scope& scope, const Columns& columns) {
 
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,
                                       const Columns& columns) {
-  const auto type = SqlType(expr.type());
+  const auto type = DuckDbType(expr.type());
   if (!type || expr.type_annotation_map() != nullptr) {
     return Unsupported(scope, "type " + expr.type()->DebugString());
   }

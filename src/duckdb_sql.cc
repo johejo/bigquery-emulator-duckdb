@@ -3,30 +3,8 @@
 #include <cctype>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 namespace bigquery_emulator_duckdb {
-namespace {
-
-// Type names that differ between GoogleSQL and DuckDB.
-const std::unordered_map<std::string, std::string>& TypeNames() {
-  static const auto* const kNames = new std::unordered_map<std::string, std::string>{
-      {"INT64", "BIGINT"},
-      {"FLOAT64", "DOUBLE"},
-      {"BOOL", "BOOLEAN"},
-      {"STRING", "VARCHAR"},
-      {"BYTES", "BLOB"},
-      {"NUMERIC", "DECIMAL(38, 9)"},
-      {"BIGNUMERIC", "DECIMAL(38, 19)"},
-      // BigQuery TIMESTAMP is an absolute instant; DATETIME is a civil time.
-      {"TIMESTAMP", "TIMESTAMPTZ"},
-      {"DATETIME", "TIMESTAMP"},
-  };
-  return *kNames;
-}
-
-}  // namespace
-
 std::string ToUpperAscii(std::string_view text) {
   std::string result(text);
   for (char& c : result) {
@@ -105,11 +83,6 @@ std::string ToHex(std::string_view value) {
     result += kDigits[byte & 0x0FU];
   }
   return result;
-}
-
-std::string DuckDbTypeName(std::string_view googlesql_name) {
-  const auto it = TypeNames().find(ToUpperAscii(googlesql_name));
-  return it == TypeNames().end() ? std::string(googlesql_name) : it->second;
 }
 
 }  // namespace bigquery_emulator_duckdb

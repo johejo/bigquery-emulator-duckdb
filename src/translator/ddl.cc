@@ -60,9 +60,9 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   if (HasCollation(column.annotations())) {
     return Unsupported(scope, "column collation");
   }
-  auto type =
-      SqlType(column.type(),
-              column.annotations() == nullptr ? nullptr : &column.annotations()->type_parameters());
+  auto type = DuckDbType(column.type(), column.annotations() == nullptr
+                                            ? nullptr
+                                            : &column.annotations()->type_parameters());
   if (!type) {
     return Unsupported(scope, "column type " + column.type()->DebugString());
   }
@@ -222,7 +222,7 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
-    const auto type = SqlType(output->column().type());
+    const auto type = DuckDbType(output->column().type());
     if (column == relation->columns.end() || !type) {
       return std::nullopt;
     }

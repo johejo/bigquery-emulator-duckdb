@@ -55,6 +55,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
+        ":type_mapping",
         "@nlohmann_json//:json",
     ],
 )
@@ -65,6 +66,18 @@ cc_library(
     hdrs = ["src/field_schema.h"],
     copts = ["-std=c++20"],
     deps = ["@nlohmann_json//:json"],
+)
+
+cc_library(
+    name = "type_mapping",
+    srcs = ["src/type_mapping.cc"],
+    hdrs = ["src/type_mapping.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":duckdb_sql",
+        ":field_schema",
+        "@googlesql//googlesql/public:type",
+    ],
 )
 
 cc_library(
@@ -81,6 +94,7 @@ cc_library(
     deps = [
         ":duckdb_sql",
         ":field_schema",
+        ":type_mapping",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:catalog_wrapper",
@@ -119,8 +133,8 @@ cc_library(
         "src/translator/expression.cc",
         "src/translator/function.cc",
         "src/translator/internal.h",
+        "src/translator/literal.cc",
         "src/translator/scan.cc",
-        "src/translator/types.cc",
     ],
     hdrs = ["src/translator.h"],
     copts = ["-std=c++20"],
@@ -130,6 +144,7 @@ cc_library(
         ":duckdb_sql",
         ":functions",
         ":query_parameters",
+        ":type_mapping",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:strings",
@@ -180,6 +195,7 @@ cc_library(
         ":gcs",
         ":query_parameters",
         ":translator",
+        ":type_mapping",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
@@ -344,6 +360,7 @@ cc_test(
         ":analyzer",
         ":catalog",
         ":field_schema",
+        ":type_mapping",
         "@com_google_googletest//:gtest_main",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",

@@ -23,12 +23,16 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-// A column of a view: its BigQuery type, which is also how its DuckDB type is chosen.
+// A column of a view and its BigQuery type, from which its GoogleSQL and DuckDB types follow.
 struct ViewColumn {
   std::string name;
   std::string type;
   bool repeated = false;
 };
+
+FieldSchema ColumnField(const ViewColumn& column) {
+  return {column.name, column.type, column.repeated ? "REPEATED" : "NULLABLE", {}};
+}
 
 // A cell as a DuckDB literal; nothing is NULL.
 using Cell = std::optional<std::string>;
@@ -38,18 +42,6 @@ Cell String(const std::string& value) { return QuoteLiteral(value); }
 Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 const Cell kEmptyArray = "[]";
-
-std::string DuckDbType(const ViewColumn& column) {
-  std::string type = "VARCHAR";
-  if (column.type == "INT64") {
-    type = "BIGINT";
-  } else if (column.type == "TIMESTAMP") {
-    type = "TIMESTAMPTZ";
-  } else if (column.type == "JSON") {
-    type = "JSON";
-  }
-  return column.repeated ? type + "[]" : type;
-}
 
 const std::vector<ViewColumn>& SchemataColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
@@ -164,12 +156,17 @@ struct DatasetTables {
 
 // Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
 // typed even when every row has NULL in it.
-std::string ViewSql(const std::vector<ViewColumn>& columns, const std::vector<Row>& rows) {
+absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
+                                    const std::vector<Row>& rows) {
   std::vector<std::string> names;
   std::vector<std::string> projections;
   for (size_t i = 0; i < columns.size(); ++i) {
+    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(columns[i]));
+    if (!type.ok()) {
+      return type.status();
+    }
     names.push_back("c" + std::to_string(i));
-    projections.push_back("CAST(" + names.back() + " AS " + DuckDbType(columns[i]) + ") AS " +
+    projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
                           QuoteIdentifier(columns[i].name));
   }
   std::vector<std::string> values;
@@ -424,14 +421,16 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     return not_found();
   }
 
-  auto table = std::make_unique<SqlTable>(view, ViewSql(columns, rows));
+  absl::StatusOr<std::string> sql = ViewSql(columns, rows);
+  if (!sql.ok()) {
+    return sql.status();
+  }
+  auto table = std::make_unique<SqlTable>(view, *std::move(sql));
   if (absl::Status status = table->set_full_name(absl::StrJoin(parts, ".")); !status.ok()) {
     return status;
   }
   for (const ViewColumn& column : columns) {
-    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(
-        FieldSchema{column.name, column.type, column.repeated ? "REPEATED" : "NULLABLE", {}},
-        type_factory);
+    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(ColumnField(column), type_factory);
     if (!type.ok()) {
       return type.status();
     }

@@ -162,6 +162,38 @@ TEST(BigQueryFieldSchemaTest, RejectsTypesBigQueryCannotDescribe) {
   EXPECT_THAT(BigQueryTypeOf(googlesql::types::Int32Type()), ::testing::HasSubstr("INT32"));
 }
 
+std::string ColumnType(const FieldSchema& field) {
+  absl::StatusOr<std::string> type = DuckDbColumnType(field);
+  return type.ok() ? *type : std::string(type.status().message());
+}
+
+TEST(DuckDbColumnTypeTest, MapsFieldsThroughTheirGoogleSqlTypes) {
+  EXPECT_EQ(ColumnType({.name = "c", .type = "INTEGER"}), "BIGINT");
+  EXPECT_EQ(ColumnType({.name = "c", .type = "TIMESTAMP"}), "TIMESTAMPTZ");
+  EXPECT_EQ(ColumnType({.name = "c", .type = "DATETIME"}), "TIMESTAMP");
+  EXPECT_EQ(ColumnType({.name = "c", .type = "NUMERIC"}), "DECIMAL(38,9)");
+  EXPECT_EQ(ColumnType({.name = "c",
+                        .type = "RECORD",
+                        .mode = "REPEATED",
+                        .fields = {{.name = "a", .type = "STRING", .mode = "REPEATED"}}}),
+            "STRUCT(\"a\" VARCHAR[])[]");
+}
+
+// Tables keep GEOGRAPHY as text, though queries over it are not translated.
+TEST(DuckDbColumnTypeTest, StoresGeographyAsText) {
+  EXPECT_EQ(ColumnType({.name = "c", .type = "GEOGRAPHY", .mode = "REPEATED"}), "VARCHAR[]");
+  EXPECT_EQ(DuckDbType(googlesql::types::GeographyType()), std::nullopt);
+}
+
+TEST(DuckDbColumnTypeTest, RejectsTypesDuckDbCannotStore) {
+  EXPECT_THAT(ColumnType({.name = "c", .type = "INTERVAL"}), ::testing::HasSubstr("INTERVAL"));
+  EXPECT_THAT(
+      ColumnType({.name = "c",
+                  .type = "RECORD",
+                  .fields = {{.name = "a", .type = "STRING"}, {.name = "A", .type = "INTEGER"}}}),
+      ::testing::HasSubstr("Unsupported field type"));
+}
+
 class BigQueryCatalogTest : public ::testing::Test {
  protected:
   BigQueryCatalogTest() {

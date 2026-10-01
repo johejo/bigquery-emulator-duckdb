@@ -14,6 +14,7 @@
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
+#include "src/type_mapping.h"
 
 namespace googlesql {
 class LanguageOptions;
@@ -80,17 +81,6 @@ std::vector<std::string> SplitTablePath(absl::Span<const std::string> path);
 std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
                                             const std::string& default_dataset);
-
-// Maps a BigQuery TableFieldSchema to the GoogleSQL type of the column; the GoogleSQL
-// counterpart of the emulator's DuckDB type mapping.
-absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
-                                                     googlesql::TypeFactory* type_factory);
-
-// The inverse of GoogleSqlType: describes a column of GoogleSQL type `type` the way BigQuery
-// reports it in a TableSchema. Struct fields without a name get BigQuery's `_field_n`. Fails
-// for a type BigQuery has no TableFieldSchema for, such as an array of arrays.
-absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
-                                                const googlesql::Type* type);
 
 // A catalog whose tables come from a TableSource and whose functions and types are the
 // GoogleSQL built-ins. Tables are looked up lazily, when the analyzer first refers to them,
