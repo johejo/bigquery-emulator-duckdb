@@ -35,8 +35,14 @@ struct FunctionArgument {
 };
 
 // The DuckDB spelling of a call to the BigQuery scalar function `upper_name`, or nullopt when
-// the declarative rules do not translate it. `upper_name` is the function name in upper case,
-// and the operators have their internal names such as $EXTRACT_DATE.
+// the declarative rules do not translate it.
+//
+// Each function is translated in one place. Its rules live here when every call it supports is
+// a fixed spelling of a fixed number of arguments, chosen only by what FunctionArgument records.
+// src/translator/function.cc translates the rest: calls taking any number of arguments, and
+// those that need more of the resolved AST, such as parsing a JSONPath or regular expression
+// literal, or splitting an INTERVAL into its parts. `upper_name` is the function name in upper
+// case, and the operators have their internal names such as $EXTRACT_DATE.
 std::optional<std::string> TranslateFunction(std::string_view upper_name,
                                              const std::vector<FunctionArgument>& arguments);
 

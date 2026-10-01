@@ -424,7 +424,7 @@ TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
   EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL], b'-', b'\\xff')"), "612dff");
 }
 
-// src/backend.cc registers GoogleSQL's implementations of these.
+// src/backend_functions.cc registers GoogleSQL's implementations of these.
 TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 0)"), BackendError);
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 1, 1, 2)"), BackendError);
