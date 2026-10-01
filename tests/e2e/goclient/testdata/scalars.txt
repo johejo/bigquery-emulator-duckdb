@@ -825,3 +825,40 @@ SELECT BOOL(JSON 'true')
 
 SELECT INT64(CAST(NULL AS JSON))
 => null
+
+## Net functions
+# IPv4 addresses are 4 bytes in network byte order; a negative integer is its 32-bit two's
+# complement.
+
+SELECT TO_HEX(NET.IPV4_FROM_INT64(0xABCDEF))
+=> "00abcdef"
+
+SELECT TO_HEX(NET.IPV4_FROM_INT64(0xFFFFFFFF))
+=> "ffffffff"
+
+SELECT TO_HEX(NET.IPV4_FROM_INT64(-2))
+=> "fffffffe"
+
+SELECT TO_HEX(NET.IPV4_FROM_INT64(-0x80000000))
+=> "80000000"
+
+SELECT SAFE.NET.IPV4_FROM_INT64(0x100000000)
+=> null
+
+SELECT SAFE.NET.IPV4_FROM_INT64(-0x80000001)
+=> null
+
+SELECT NET.IPV4_TO_INT64(b'\x00\x00\x01\xff')
+=> "511"
+
+SELECT NET.IPV4_TO_INT64(b'\xff\xff\xff\xff')
+=> "4294967295"
+
+SELECT NET.IPV4_TO_INT64(NET.IPV4_FROM_INT64(-1))
+=> "4294967295"
+
+SELECT SAFE.NET.IPV4_TO_INT64(b'\x01\x02\x03')
+=> null
+
+SELECT NET.IPV4_TO_INT64(CAST(NULL AS BYTES))
+=> null

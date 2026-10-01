@@ -22,8 +22,8 @@ probe's own notes name what it rejected.
 | Status | Functions |
 | --- | --- |
 | Partial | 16 |
-| Supported | 214 |
-| Unsupported | 163 |
+| Supported | 216 |
+| Unsupported | 161 |
 | Untested | 13 |
 
 | Function | Category | Status | Notes |
@@ -234,8 +234,8 @@ probe's own notes name what it rejected.
 | [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported |  |
 | [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported |  |
 | [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported | function HOST |
-| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Unsupported | function IPV4_FROM_INT64 |
-| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Unsupported | function IPV4_TO_INT64 |
+| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported |  |
+| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported |  |
 | [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Unsupported | function IP_FROM_STRING |
 | [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Unsupported | function IP_NET_MASK |
 | [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Unsupported | function IP_TO_STRING |
