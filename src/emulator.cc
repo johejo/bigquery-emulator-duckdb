@@ -9,11 +9,13 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -375,6 +377,47 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
 
 }  // namespace
 
+std::string_view DispositionName(CreateDisposition disposition) {
+  switch (disposition) {
+    case CreateDisposition::kCreateIfNeeded:
+      return "CREATE_IF_NEEDED";
+    case CreateDisposition::kCreateNever:
+      return "CREATE_NEVER";
+  }
+  return "";
+}
+
+std::string_view DispositionName(WriteDisposition disposition) {
+  switch (disposition) {
+    case WriteDisposition::kWriteEmpty:
+      return "WRITE_EMPTY";
+    case WriteDisposition::kWriteAppend:
+      return "WRITE_APPEND";
+    case WriteDisposition::kWriteTruncate:
+      return "WRITE_TRUNCATE";
+    case WriteDisposition::kWriteTruncateData:
+      return "WRITE_TRUNCATE_DATA";
+  }
+  return "";
+}
+
+std::optional<CreateDisposition> ParseCreateDisposition(std::string_view name) {
+  for (const CreateDisposition disposition :
+       {CreateDisposition::kCreateIfNeeded, CreateDisposition::kCreateNever}) {
+    if (DispositionName(disposition) == name) return disposition;
+  }
+  return std::nullopt;
+}
+
+std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
+  for (const WriteDisposition disposition :
+       {WriteDisposition::kWriteEmpty, WriteDisposition::kWriteAppend,
+        WriteDisposition::kWriteTruncate, WriteDisposition::kWriteTruncateData}) {
+    if (DispositionName(disposition) == name) return disposition;
+  }
+  return std::nullopt;
+}
+
 Emulator::Emulator(std::string data_dir) : data_dir_(std::move(data_dir)) {
   if (!data_dir_.empty()) {
     std::filesystem::create_directories(data_dir_);
@@ -456,17 +499,48 @@ Emulator::Translation Emulator::Translate(const std::string& query,
   return translation;
 }
 
+std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
+                                            const std::function<void(Job&)>& body) {
+  job->creation_time_ms = NowMillis();
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (job->job_id.empty()) {
+      do {
+        job->job_id = "job_" + std::to_string(next_job_number_++);
+      } while (jobs_.contains(JobKey(job->project_id, job->job_id)) ||
+               running_jobs_.contains(JobKey(job->project_id, job->job_id)));
+    }
+    if (!job->dry_run()) {
+      const std::string key = JobKey(job->project_id, job->job_id);
+      if (jobs_.contains(key) || running_jobs_.contains(key)) {
+        throw ApiError::Duplicate("Already Exists: Job " + key);
+      }
+      running_jobs_.insert(key);
+    }
+  }
+
+  try {
+    body(*job);
+  } catch (const ApiError& error) {
+    job->error = error;
+  } catch (const std::exception& error) {
+    job->error = job->query() != nullptr ? ApiError::InvalidQuery(error.what())
+                                         : ApiError::Invalid(error.what());
+  }
+  job->end_time_ms = NowMillis();
+
+  if (job->dry_run()) {
+    return job;
+  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  const std::string key = JobKey(job->project_id, job->job_id);
+  running_jobs_.erase(key);
+  jobs_[key] = job;
+  return job;
+}
+
 std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   EnsureProject(request.project_id);
-  auto job = std::make_shared<Job>();
-  job->project_id = request.project_id;
-  job->query = request.query;
-  job->dry_run = request.dry_run;
-  job->destination_table = request.destination_table;
-  job->create_disposition = request.create_disposition;
-  job->write_disposition = request.write_disposition;
-  job->creation_time_ms = NowMillis();
-
   std::vector<std::string> setup;
   AnalyzerSettings settings{.default_project = request.project_id};
   if (request.default_dataset.has_value()) {
@@ -482,26 +556,15 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     setup.push_back("USE " + QuoteIdentifier(request.project_id));
   }
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (request.job_id.empty()) {
-      do {
-        job->job_id = "job_" + std::to_string(next_job_number_++);
-      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
-               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
-    } else {
-      job->job_id = request.job_id;
-    }
-    if (!request.dry_run) {
-      const std::string key = JobKey(request.project_id, job->job_id);
-      if (jobs_.contains(key) || running_jobs_.contains(key)) {
-        throw ApiError::Duplicate("Already Exists: Job " + key);
-      }
-      running_jobs_.insert(key);
-    }
-  }
-
-  try {
+  auto job = std::make_shared<Job>();
+  job->project_id = request.project_id;
+  job->job_id = request.job_id;
+  job->configuration = QueryJob{.query = request.query,
+                                .dry_run = request.dry_run,
+                                .destination_table = request.destination_table,
+                                .create_disposition = request.create_disposition,
+                                .write_disposition = request.write_disposition};
+  return RunJob(std::move(job), [&](Job& job) {
     const Translation translation = Translate(request.query, request.parameters,
                                               settings.default_project, settings.default_dataset);
     if (request.destination_table.has_value() && !translation.schema.has_value()) {
@@ -514,29 +577,17 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
       backend_.CreateView(translation.sql, translation.view_metadata_statements,
                           translation.view_existence_query, setup);
     } else if (request.destination_table.has_value()) {
-      result = WriteDestination(request, *request.destination_table, translation.sql,
-                                *translation.schema, setup);
+      result = WriteDestination(request.project_id, *request.destination_table,
+                                request.create_disposition, request.write_disposition,
+                                translation.sql, *translation.schema, setup);
     } else {
       result = Execute(translation.sql, setup);
     }
     if (translation.schema.has_value()) {
       result.schema = ReconcileSchema(std::move(result.schema), *translation.schema);
     }
-    job->result = std::move(result);
-  } catch (const ApiError& error) {
-    job->error = error;
-  } catch (const std::exception& error) {
-    job->error = ApiError::InvalidQuery(error.what());
-  }
-  job->end_time_ms = NowMillis();
-
-  if (request.dry_run) {
-    return job;
-  }
-  std::lock_guard<std::mutex> lock(mutex_);
-  running_jobs_.erase(JobKey(request.project_id, job->job_id));
-  jobs_[JobKey(request.project_id, job->job_id)] = job;
-  return job;
+    job.result = std::move(result);
+  });
 }
 
 std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
@@ -544,30 +595,10 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
-  job->is_load = true;
-  job->load_configuration = request.configuration;
-  job->destination_table = request.destination_table;
-  job->create_disposition = request.configuration.value("createDisposition", "");
-  job->write_disposition = request.configuration.value("writeDisposition", "");
-  if (job->write_disposition.empty()) job->write_disposition = "WRITE_APPEND";
-  job->creation_time_ms = NowMillis();
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (job->job_id.empty()) {
-      do {
-        job->job_id = "job_" + std::to_string(next_job_number_++);
-      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
-               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
-    }
-    const std::string key = JobKey(request.project_id, job->job_id);
-    if (jobs_.contains(key) || running_jobs_.contains(key)) {
-      throw ApiError::Duplicate("Already Exists: Job " + key);
-    }
-    running_jobs_.insert(key);
-  }
-
-  try {
-    const json& config = request.configuration;
+  job->configuration = request.load;
+  return RunJob(std::move(job), [&](Job& job) {
+    const LoadJob& load = request.load;
+    const json& config = load.configuration;
     const std::string format = config.value("sourceFormat", "CSV");
     if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
       throw ApiError::Invalid("Unsupported source format: " + format);
@@ -623,8 +654,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     const std::string files = "[" + paths + "]";
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty()) {
-      TableReference destination = request.destination_table;
-      if (destination.project_id.empty()) destination.project_id = request.project_id;
+      TableReference destination = load.destination_table;
+      if (destination.project_id.empty()) destination.project_id = job.project_id;
       try {
         requested_schema = GetTable(destination).schema;
       } catch (const ApiError& error) {
@@ -661,25 +692,12 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       sql = "SELECT " + columns + " FROM (" + sql + ") AS source";
     }
     const QueryResult prepared = Prepare(sql);
-    QueryRequest destination_request;
-    destination_request.project_id = request.project_id;
-    destination_request.create_disposition = job->create_disposition;
-    destination_request.write_disposition = job->write_disposition;
-    QueryResult result =
-        WriteDestination(destination_request, request.destination_table, sql,
-                         requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
-    job->output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
-    job->result = QueryResult{};
-  } catch (const ApiError& error) {
-    job->error = error;
-  } catch (const std::exception& error) {
-    job->error = ApiError::Invalid(error.what());
-  }
-  job->end_time_ms = NowMillis();
-  std::lock_guard<std::mutex> lock(mutex_);
-  running_jobs_.erase(JobKey(request.project_id, job->job_id));
-  jobs_[JobKey(request.project_id, job->job_id)] = job;
-  return job;
+    const QueryResult result = WriteDestination(
+        job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
+        sql, requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
+    job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job.result = QueryResult{};
+  });
 }
 
 std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
@@ -687,33 +705,14 @@ std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
-  job->is_copy = true;
-  job->copy_configuration = request.configuration;
-  job->destination_table = request.destination_table;
-  job->create_disposition = request.configuration.value("createDisposition", "");
-  job->write_disposition = request.configuration.value("writeDisposition", "");
-  job->creation_time_ms = NowMillis();
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (job->job_id.empty()) {
-      do {
-        job->job_id = "job_" + std::to_string(next_job_number_++);
-      } while (jobs_.contains(JobKey(request.project_id, job->job_id)) ||
-               running_jobs_.contains(JobKey(request.project_id, job->job_id)));
-    }
-    const std::string key = JobKey(request.project_id, job->job_id);
-    if (jobs_.contains(key) || running_jobs_.contains(key)) {
-      throw ApiError::Duplicate("Already Exists: Job " + key);
-    }
-    running_jobs_.insert(key);
-  }
-
-  try {
-    if (request.source_tables.empty()) throw ApiError::Invalid("Source table is required");
+  job->configuration = request.copy;
+  return RunJob(std::move(job), [&](Job& job) {
+    const CopyJob& copy = request.copy;
+    if (copy.source_tables.empty()) throw ApiError::Invalid("Source table is required");
     std::vector<FieldSchema> schema;
     std::string sql;
-    for (TableReference source : request.source_tables) {
-      if (source.project_id.empty()) source.project_id = request.project_id;
+    for (TableReference source : copy.source_tables) {
+      if (source.project_id.empty()) source.project_id = job.project_id;
       EnsureProject(source.project_id);
       const TableInfo table = GetTable(source);
       if (table.view_query) {
@@ -727,41 +726,19 @@ std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
       sql += (sql.empty() ? "" : " UNION ALL ") + std::string("SELECT * FROM ") +
              QualifiedName(source);
     }
-    QueryRequest destination_request;
-    destination_request.project_id = request.project_id;
-    destination_request.create_disposition = job->create_disposition;
-    destination_request.write_disposition = job->write_disposition;
     const QueryResult result =
-        WriteDestination(destination_request, request.destination_table, sql, schema, {}, true);
-    job->output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
-    job->result = QueryResult{};
-  } catch (const ApiError& error) {
-    job->error = error;
-  } catch (const std::exception& error) {
-    job->error = ApiError::Invalid(error.what());
-  }
-  job->end_time_ms = NowMillis();
-  std::lock_guard<std::mutex> lock(mutex_);
-  running_jobs_.erase(JobKey(request.project_id, job->job_id));
-  jobs_[JobKey(request.project_id, job->job_id)] = job;
-  return job;
+        WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
+                         copy.write_disposition, sql, schema, {}, true);
+    job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job.result = QueryResult{};
+  });
 }
 
-QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReference destination,
+QueryResult Emulator::WriteDestination(const std::string& project_id, TableReference destination,
+                                       CreateDisposition create, WriteDisposition write,
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
                                        const std::vector<std::string>& setup, bool count_only) {
-  const std::string create =
-      request.create_disposition.empty() ? "CREATE_IF_NEEDED" : request.create_disposition;
-  const std::string write =
-      request.write_disposition.empty() ? "WRITE_EMPTY" : request.write_disposition;
-  if (create != "CREATE_IF_NEEDED" && create != "CREATE_NEVER") {
-    throw ApiError::Invalid("Invalid create disposition: " + create);
-  }
-  if (write != "WRITE_EMPTY" && write != "WRITE_APPEND" && write != "WRITE_TRUNCATE" &&
-      write != "WRITE_TRUNCATE_DATA") {
-    throw ApiError::Invalid("Invalid write disposition: " + write);
-  }
   std::set<std::string> names;
   std::string duplicates;
   for (const FieldSchema& field : schema) {
@@ -779,7 +756,7 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
   }
 
   if (destination.project_id.empty()) {
-    destination.project_id = request.project_id;
+    destination.project_id = project_id;
   }
   EnsureProject(destination.project_id);
   GetDataset(DatasetReference{destination.project_id, destination.dataset_id});
@@ -794,10 +771,10 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
   if (existing.has_value() && existing->view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(destination));
   }
-  if (!existing.has_value() && create == "CREATE_NEVER") {
+  if (!existing.has_value() && create == CreateDisposition::kCreateNever) {
     throw ApiError::NotFound("Not found: Table " + TableName(destination));
   }
-  if (existing.has_value() && write == "WRITE_EMPTY" && existing->num_rows > 0) {
+  if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
     throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
   }
 
@@ -814,7 +791,7 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
       "CREATE TEMP TABLE _bigquery_emulator_query_result AS SELECT * FROM (" + sql +
           ") AS _bigquery_emulator_query_result(" + aliases + ")",
       "BEGIN TRANSACTION"};
-  if (!existing.has_value() || write == "WRITE_TRUNCATE") {
+  if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {
     if (existing.has_value()) {
       statements.push_back("DROP TABLE " + target);
     }
@@ -827,7 +804,7 @@ QueryResult Emulator::WriteDestination(const QueryRequest& request, TableReferen
       statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table);
     }
   } else {
-    if (write == "WRITE_TRUNCATE_DATA") {
+    if (write == WriteDisposition::kWriteTruncateData) {
       statements.push_back("DELETE FROM " + target);
     }
     statements.push_back("INSERT INTO " + target + " BY NAME SELECT * FROM " + result_table);

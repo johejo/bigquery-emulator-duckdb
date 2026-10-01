@@ -2,12 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -42,28 +45,65 @@ struct InsertError {
   std::string message;
 };
 
-struct Job {
-  std::string project_id;
-  std::string job_id;
-  std::string location = "US";
+// Where a job writes its destination table. The enumerators take BigQuery's names.
+enum class CreateDisposition : std::uint8_t { kCreateIfNeeded, kCreateNever };
+enum class WriteDisposition : std::uint8_t {
+  kWriteEmpty,
+  kWriteAppend,
+  kWriteTruncate,
+  kWriteTruncateData
+};
+
+// BigQuery's name for each disposition, and the disposition a name stands for.
+std::string_view DispositionName(CreateDisposition disposition);
+std::string_view DispositionName(WriteDisposition disposition);
+std::optional<CreateDisposition> ParseCreateDisposition(std::string_view name);
+std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name);
+
+struct QueryJob {
   std::string query;
-  bool is_load = false;
-  bool is_copy = false;
-  nlohmann::json load_configuration;
-  nlohmann::json copy_configuration;
-  int64_t output_rows = 0;
   // A dry run job is validated but never executed, and it is not kept: BigQuery does not
   // create a job for it, so `GetJob` will not find it afterwards.
   bool dry_run = false;
   std::optional<TableReference> destination_table;
-  std::string create_disposition;
-  std::string write_disposition;
+  CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
+  WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
+};
+
+struct LoadJob {
+  TableReference destination_table;
+  CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
+  WriteDisposition write_disposition = WriteDisposition::kWriteAppend;
+  // The request's configuration.load, which also holds the source options.
+  nlohmann::json configuration;
+};
+
+struct CopyJob {
+  std::vector<TableReference> source_tables;
+  TableReference destination_table;
+  CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
+  WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
+  // The request's configuration.copy.
+  nlohmann::json configuration;
+};
+
+struct Job {
+  std::string project_id;
+  std::string job_id;
+  std::string location = "US";
+  std::variant<QueryJob, LoadJob, CopyJob> configuration;
+  // The rows a load or copy job wrote.
+  int64_t output_rows = 0;
   int64_t creation_time_ms = 0;
   int64_t end_time_ms = 0;
   // Exactly one of `result` and `error` is set once the job is done. Jobs always complete
   // synchronously in the emulator.
   std::optional<QueryResult> result;
   std::optional<ApiError> error;
+
+  // The query configuration, or null for other job types.
+  const QueryJob* query() const { return std::get_if<QueryJob>(&configuration); }
+  bool dry_run() const { return query() != nullptr && query()->dry_run; }
 };
 
 // A query to run as a job.
@@ -74,26 +114,22 @@ struct QueryRequest {
   std::string job_id;  // Generated when empty.
   QueryParameters parameters;
   bool dry_run = false;
-  // Where a query's result is written. The dispositions take BigQuery's names; empty means the
-  // default, CREATE_IF_NEEDED and WRITE_EMPTY.
+  // Where a query's result is written.
   std::optional<TableReference> destination_table;
-  std::string create_disposition;
-  std::string write_disposition;
+  CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
+  WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
 };
 
 struct LoadRequest {
   std::string project_id;
-  std::string job_id;
-  TableReference destination_table;
-  nlohmann::json configuration;
+  std::string job_id;  // Generated when empty.
+  LoadJob load;
 };
 
 struct CopyRequest {
   std::string project_id;
-  std::string job_id;
-  std::vector<TableReference> source_tables;
-  TableReference destination_table;
-  nlohmann::json configuration;
+  std::string job_id;  // Generated when empty.
+  CopyJob copy;
 };
 
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
@@ -148,9 +184,14 @@ class Emulator {
                         const std::string& default_project, const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
-  // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`, the
-  // request's destination table. Returns the query's result.
-  QueryResult WriteDestination(const QueryRequest& request, TableReference destination,
+  // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
+  // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
+  std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,
+                                    const std::function<void(Job&)>& body);
+  // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`
+  // with the given dispositions. Returns the query's result.
+  QueryResult WriteDestination(const std::string& project_id, TableReference destination,
+                               CreateDisposition create, WriteDisposition write,
                                const std::string& sql, const std::vector<FieldSchema>& schema,
                                const std::vector<std::string>& setup, bool count_only = false);
 

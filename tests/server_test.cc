@@ -157,6 +157,20 @@ TEST_F(ServerTest, ReportsDefaultQueryJobConfiguration) {
   EXPECT_EQ(query["writeDisposition"], "WRITE_EMPTY");
 }
 
+TEST_F(ServerTest, RejectsUnknownDispositionsWithoutCreatingJobs) {
+  Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  const json error = Post("/bigquery/v2/projects/p/jobs",
+                          {{"jobReference", {{"jobId", "bad"}}},
+                           {"configuration",
+                            {{"query",
+                              {{"query", "SELECT 1 AS x"},
+                               {"destinationTable", {{"datasetId", "ds"}, {"tableId", "t"}}},
+                               {"writeDisposition", "WRITE_SOMETIMES"}}}}}},
+                          400);
+  EXPECT_EQ(error["error"]["errors"][0]["reason"], "invalid");
+  Get("/bigquery/v2/projects/p/jobs/bad", 404);
+}
+
 TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
   const std::string jobs = "/projects/p/jobs";
   Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
