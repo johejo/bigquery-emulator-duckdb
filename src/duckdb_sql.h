@@ -20,8 +20,4 @@ std::string QuoteIdentifierPath(std::string_view path);
 
 std::string ToHex(std::string_view value);
 
-// Maps a GoogleSQL type name onto its DuckDB spelling, keeping the original name when the two
-// agree.
-std::string DuckDbTypeName(std::string_view googlesql_name);
-
 }  // namespace bigquery_emulator_duckdb

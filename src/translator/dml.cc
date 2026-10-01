@@ -37,7 +37,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}, {}};
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
-    if (!SqlType(column.type()) || column.type_annotation_map() != nullptr) {
+    if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
       return Unsupported(scope, "column type " + column.type()->DebugString());
     }
     const std::string name =
@@ -78,7 +78,7 @@ std::optional<std::string> UpdatedStruct(const std::string& original, const goog
   if (node.value) {
     return node.value;
   }
-  const auto sql_type = SqlType(type);
+  const auto sql_type = DuckDbType(type);
   if (!sql_type) {
     return std::nullopt;
   }
@@ -198,7 +198,7 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   std::vector<std::string> names;
   for (const auto& column : insert.insert_column_list()) {
     const auto name = table_columns.find(column.column_id());
-    if (name == table_columns.end() || !SqlType(column.type()) ||
+    if (name == table_columns.end() || !DuckDbType(column.type()) ||
         column.type_annotation_map() != nullptr) {
       return std::nullopt;
     }

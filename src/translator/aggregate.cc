@@ -459,7 +459,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   }
   for (const auto& computed : aggregate.aggregate_list()) {
     const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
-    const auto type = SqlType(computed->expr()->type());
+    const auto type = DuckDbType(computed->expr()->type());
     if (!computed->expr()->Is<googlesql::ResolvedAggregateFunctionCall>() || !type) {
       return std::nullopt;
     }
@@ -495,7 +495,7 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         return std::nullopt;
       }
       const auto* call = computed->expr()->GetAs<googlesql::ResolvedAnalyticFunctionCall>();
-      const auto type = SqlType(call->type());
+      const auto type = DuckDbType(call->type());
       const auto over = Window(*group, call->window_frame(), scope, input_columns);
       if (!type || !over) {
         return std::nullopt;

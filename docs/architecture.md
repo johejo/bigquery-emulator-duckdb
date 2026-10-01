@@ -17,9 +17,11 @@ resolved AST, with every name bound and every expression typed. The frontend sta
 of DuckDB execution details.
 
 [src/catalog.cc](../src/catalog.cc) looks tables up lazily through a `TableSource`, completes
-`table` and `dataset.table` paths from the default project and dataset, and maps BigQuery field
-types to GoogleSQL types. Functions and types come from GoogleSQL's built-ins, plus BigQuery
-functions GoogleSQL lacks. [src/information_schema.cc](../src/information_schema.cc) serves
+`table` and `dataset.table` paths from the default project and dataset.
+[src/type_mapping.cc](../src/type_mapping.cc) maps column types between BigQuery's
+TableFieldSchema, GoogleSQL and DuckDB; every DuckDB column type, of a table, a query parameter
+or a translated expression, is derived from the GoogleSQL type. Functions and types come from
+GoogleSQL's built-ins, plus BigQuery functions GoogleSQL lacks. [src/information_schema.cc](../src/information_schema.cc) serves
 `INFORMATION_SCHEMA` views as tables whose rows are computed when the query is analyzed; the
 translator reads such a table from the DuckDB query that carries its rows.
 

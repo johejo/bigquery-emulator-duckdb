@@ -8,6 +8,7 @@
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -40,30 +41,6 @@ const json& NoValue() {
   return *kNoValue;
 }
 
-std::string ToDuckDbType(const json& type) {
-  const std::string name = CanonicalTypeName(type);
-  if (name == "ARRAY") {
-    if (!type.contains("arrayType")) {
-      throw ApiError::Invalid("ARRAY query parameter is missing arrayType");
-    }
-    return ToDuckDbType(type["arrayType"]) + "[]";
-  }
-  if (name == "STRUCT") {
-    std::string fields;
-    for (const json& field : type.value("structTypes", json::array())) {
-      if (!fields.empty()) {
-        fields += ", ";
-      }
-      fields += QuoteIdentifier(field.value("name", "")) + " " + ToDuckDbType(field.at("type"));
-    }
-    return "STRUCT(" + fields + ")";
-  }
-  if (name == "GEOGRAPHY") {
-    return "VARCHAR";
-  }
-  return DuckDbTypeName(name);
-}
-
 FieldSchema ToFieldSchema(const std::string& name, const json& type) {
   FieldSchema field{.name = name, .type = CanonicalTypeName(type), .mode = "NULLABLE"};
   if (field.type == "ARRAY") {
@@ -83,6 +60,15 @@ FieldSchema ToFieldSchema(const std::string& name, const json& type) {
     }
   }
   return field;
+}
+
+std::string ToDuckDbType(const json& type) {
+  absl::StatusOr<std::string> duckdb_type = DuckDbColumnType(ToFieldSchema("", type));
+  if (!duckdb_type.ok()) {
+    throw ApiError::Invalid("Unsupported query parameter type: " +
+                            std::string(duckdb_type.status().message()));
+  }
+  return *std::move(duckdb_type);
 }
 
 // The scalar text of a ParameterValue. BigQuery sends every scalar as a string; a client that

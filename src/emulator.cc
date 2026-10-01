@@ -31,6 +31,7 @@
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/translator.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -105,49 +106,13 @@ std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   return values;
 }
 
-// Maps a BigQuery TableFieldSchema to a DuckDB column type.
-std::string ToDuckDbType(const json& field) {
-  const std::string type = field.value("type", "STRING");
-  std::string duckdb_type;
-  if (type == "INTEGER" || type == "INT64") {
-    duckdb_type = "BIGINT";
-  } else if (type == "FLOAT" || type == "FLOAT64") {
-    duckdb_type = "DOUBLE";
-  } else if (type == "BOOLEAN" || type == "BOOL") {
-    duckdb_type = "BOOLEAN";
-  } else if (type == "STRING" || type == "GEOGRAPHY") {
-    duckdb_type = "VARCHAR";
-  } else if (type == "BYTES") {
-    duckdb_type = "BLOB";
-  } else if (type == "DATE" || type == "TIME" || type == "JSON") {
-    duckdb_type = type;
-  } else if (type == "DATETIME") {
-    duckdb_type = "TIMESTAMP";
-  } else if (type == "TIMESTAMP") {
-    duckdb_type = "TIMESTAMPTZ";
-  } else if (type == "NUMERIC") {
-    duckdb_type = "DECIMAL(38, 9)";
-  } else if (type == "BIGNUMERIC") {
-    duckdb_type = "DECIMAL(38, 19)";
-  } else if (type == "RECORD" || type == "STRUCT") {
-    duckdb_type = "STRUCT(";
-    bool first = true;
-    for (const json& child : field.value("fields", json::array())) {
-      if (!first) {
-        duckdb_type += ", ";
-      }
-      first = false;
-      duckdb_type +=
-          QuoteIdentifier(child.at("name").get<std::string>()) + " " + ToDuckDbType(child);
-    }
-    duckdb_type += ")";
-  } else {
-    throw ApiError::Invalid("Unsupported field type: " + type);
+// The DuckDB column type of a BigQuery TableFieldSchema.
+std::string ToDuckDbType(const FieldSchema& field) {
+  absl::StatusOr<std::string> type = DuckDbColumnType(field);
+  if (!type.ok()) {
+    throw ApiError::Invalid(std::string(type.status().message()));
   }
-  if (field.value("mode", "NULLABLE") == "REPEATED") {
-    duckdb_type += "[]";
-  }
-  return duckdb_type;
+  return *std::move(type);
 }
 
 std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values);
@@ -177,7 +142,7 @@ std::string InsertRecord(const json& value, const FieldSchema& field, bool ignor
 }
 
 std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
-  const std::string type = ToDuckDbType(field.ToJson());
+  const std::string type = ToDuckDbType(field);
   if (value.is_null()) {
     return "CAST(NULL AS " + type + ")";
   }
@@ -402,7 +367,7 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
       columns += ", ";
     }
     try {
-      columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field.ToJson());
+      columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field);
     } catch (const ApiError&) {
       return std::nullopt;
     }
@@ -663,7 +628,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
         std::string columns;
         for (const FieldSchema& field : requested_schema) {
           columns += (columns.empty() ? "" : ", ") + QuoteLiteral(field.name) + ": " +
-                     QuoteLiteral(ToDuckDbType(field.ToJson()));
+                     QuoteLiteral(ToDuckDbType(field));
         }
         sql += ", columns={" + columns + "}";
       }
@@ -677,8 +642,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       std::string columns;
       for (const FieldSchema& field : requested_schema) {
         if (!columns.empty()) columns += ", ";
-        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " + ToDuckDbType(field.ToJson()) +
-                   ") AS " + QuoteIdentifier(field.name);
+        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " + ToDuckDbType(field) + ") AS " +
+                   QuoteIdentifier(field.name);
       }
       sql = "SELECT " + columns + " FROM (" + sql + ") AS source";
     }
@@ -988,7 +953,8 @@ void Emulator::CreateTable(const TableReference& table, const json& fields) {
     if (!columns.empty()) {
       columns += ", ";
     }
-    columns += QuoteIdentifier(field.at("name").get<std::string>()) + " " + ToDuckDbType(field);
+    columns += QuoteIdentifier(field.at("name").get<std::string>()) + " " +
+               ToDuckDbType(ParseField(field));
     if (field.value("mode", "NULLABLE") == "REQUIRED") {
       columns += " NOT NULL";
     }

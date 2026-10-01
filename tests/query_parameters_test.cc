@@ -31,7 +31,7 @@ TEST(QueryParametersTest, ConvertsScalarsToTypedLiterals) {
   EXPECT_EQ(parameters.ByName("s"), "CAST('it''s' AS VARCHAR)");
   EXPECT_EQ(parameters.ByName("d"), "CAST('2024-01-02' AS DATE)");
   EXPECT_EQ(parameters.ByName("ts"), "CAST('2024-01-02 03:04:05+00:00' AS TIMESTAMPTZ)");
-  EXPECT_EQ(parameters.ByName("n"), "CAST('1.25' AS DECIMAL(38, 9))");
+  EXPECT_EQ(parameters.ByName("n"), "CAST('1.25' AS DECIMAL(38,9))");
 }
 
 TEST(QueryParametersTest, MatchesNamesCaseInsensitively) {
