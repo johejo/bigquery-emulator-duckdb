@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -21,7 +22,11 @@ class ResolvedCreateTableStmt;
 class ResolvedCreateViewStmt;
 class ResolvedDeleteStmt;
 class ResolvedDropStmt;
+class ResolvedAggregateScan;
+class ResolvedAnalyticScan;
 class ResolvedExpr;
+class ResolvedFunctionCall;
+class ResolvedOrderByItem;
 class ResolvedInsertStmt;
 class ResolvedMergeStmt;
 class ResolvedScan;
@@ -56,13 +61,25 @@ struct WithQuery {
   size_t width;
 };
 
+// What the whole statement's translation shares: its inputs, and what it records on the way.
+struct Context {
+  const QueryParameters& parameters;
+  const DefaultDataset& defaults;
+  // The first construct found unsupported, reported in the error the statement fails with.
+  std::string unsupported;
+  int next_name = 0;
+
+  // A name no other call returns, for WITH queries and lambda parameters.
+  std::string FreshName(std::string_view prefix) {
+    return std::string(prefix) + std::to_string(next_name++);
+  }
+};
+
 // What a scan can see besides its own input: correlated columns of enclosing queries, which
 // are referenced unqualified because every scope aliases its input as q, and named WITH queries.
+// Nested scopes copy it; they all share one Context.
 struct Scope {
-  const QueryParameters& parameters;
-  int& next_name;
-  // The first construct found unsupported, reported in the error the statement fails with.
-  std::string& unsupported;
+  Context& context;
   Columns outer;
   std::map<std::string, WithQuery> with;
   // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
@@ -72,8 +89,8 @@ struct Scope {
 // Records why the statement is unsupported. The innermost failure is recorded first, and the
 // callers above it only propagate nullopt.
 inline std::nullopt_t Unsupported(const Scope& scope, std::string_view what) {
-  if (scope.unsupported.empty()) {
-    scope.unsupported = what;
+  if (scope.context.unsupported.empty()) {
+    scope.context.unsupported = what;
   }
   return std::nullopt;
 }
@@ -99,12 +116,37 @@ std::optional<std::string> SqlType(const googlesql::Type* type,
 
 std::optional<std::string> Literal(const googlesql::Value& value);
 
-// Queries and expressions, in translator.cc.
-
-std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& scope);
+// Expressions, in expression.cc.
 
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,
                                       const Columns& columns);
+
+// The scope of a subquery or lateral join, whose correlated references see `columns`.
+Scope Nested(const Scope& scope, const Columns& columns);
+
+// ORDER BY items, with BigQuery's default NULL ordering spelled out.
+std::optional<std::string> OrderItems(
+    const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,
+    const Scope& scope, const Columns& columns);
+
+// Scalar functions and operators, in function.cc.
+
+std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
+                                    const Columns& columns);
+
+// A JSONPath key as DuckDB spells it, or nullopt for the empty key, which DuckDB rejects.
+std::optional<std::string> JsonPathKey(std::string_view key);
+
+// Scans, in scan.cc.
+
+std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& scope);
+
+// Aggregation and analytic functions, in aggregate.cc.
+
+std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
+                                      const Scope& scope);
+std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& analytic,
+                                     const Scope& scope);
 
 // DML, in dml.cc.
 
@@ -118,17 +160,15 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
 // DDL, in ddl.cc.
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
-                                       const DefaultDataset& defaults, const Scope& scope);
+                                       const Scope& scope);
 std::optional<std::string> CreateTableAsSelect(
-    const googlesql::ResolvedCreateTableAsSelectStmt& create, const DefaultDataset& defaults,
-    const Scope& scope);
+    const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope);
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
-                                      const DefaultDataset& defaults, const Scope& scope);
+                                      const Scope& scope);
 std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
-                                      const DefaultDataset& defaults, const Scope& scope);
+                                      const Scope& scope);
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
-                                        const DefaultDataset& defaults, const Scope& scope);
-std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop,
-                                const DefaultDataset& defaults, const Scope& scope);
+                                        const Scope& scope);
+std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope);
 
 }  // namespace bigquery_emulator_duckdb::translator

@@ -113,9 +113,13 @@ cc_library(
     name = "translator",
     srcs = [
         "src/translator.cc",
+        "src/translator/aggregate.cc",
         "src/translator/ddl.cc",
         "src/translator/dml.cc",
+        "src/translator/expression.cc",
+        "src/translator/function.cc",
         "src/translator/internal.h",
+        "src/translator/scan.cc",
         "src/translator/types.cc",
     ],
     hdrs = ["src/translator.h"],

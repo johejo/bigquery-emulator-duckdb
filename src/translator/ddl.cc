@@ -13,9 +13,9 @@ namespace {
 
 // DDL names tables and datasets by path rather than through the catalog, so the defaults the
 // catalog resolves queries with are applied here.
-std::optional<std::string> TablePath(const std::vector<std::string>& path,
-                                     const DefaultDataset& defaults, const Scope& scope) {
-  const auto parts = NormalizeTablePath(path, defaults.project, defaults.dataset);
+std::optional<std::string> TablePath(const std::vector<std::string>& path, const Scope& scope) {
+  const auto parts =
+      NormalizeTablePath(path, scope.context.defaults.project, scope.context.defaults.dataset);
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
@@ -27,13 +27,13 @@ std::optional<std::string> TablePath(const std::vector<std::string>& path,
   return Join(quoted, ".");
 }
 
-std::optional<std::string> DatasetPath(const std::vector<std::string>& path,
-                                       const DefaultDataset& defaults, const Scope& scope) {
+std::optional<std::string> DatasetPath(const std::vector<std::string>& path, const Scope& scope) {
   // Reuse table path normalization so dots inside a domain-scoped project are handled
   // the same way for CREATE/DROP SCHEMA and table references.
   std::vector<std::string> table_path = path;
   table_path.push_back("_dataset_path_placeholder");
-  const auto parts = NormalizeTablePath(table_path, defaults.project, defaults.dataset);
+  const auto parts = NormalizeTablePath(table_path, scope.context.defaults.project,
+                                        scope.context.defaults.dataset);
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
@@ -73,7 +73,7 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
 // Partitioning, clustering and options only shape BigQuery storage, and BigQuery's primary and
 // foreign keys are never enforced, so they are all dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
-                                           const DefaultDataset& defaults, const Scope& scope) {
+                                           const Scope& scope) {
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
     return Unsupported(scope, "temporary tables");
   }
@@ -85,7 +85,7 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
       !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }
-  const auto path = TablePath(create.name_path(), defaults, scope);
+  const auto path = TablePath(create.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }
@@ -102,7 +102,7 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
 }  // namespace
 
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
-                                      const DefaultDataset& defaults, const Scope& scope) {
+                                      const Scope& scope) {
   // DuckDB accepts only one action per ALTER. Reject the whole statement rather than
   // applying only some of its actions.
   if (alter.alter_action_list_size() != 1) {
@@ -119,7 +119,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
       (column.annotations() != nullptr && column.annotations()->not_null())) {
     return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
   }
-  const auto path = TablePath(alter.name_path(), defaults, scope);
+  const auto path = TablePath(alter.name_path(), scope);
   const auto type = ColumnDefinitionType(column, scope);
   if (!path || !type) {
     return std::nullopt;
@@ -130,11 +130,11 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
 }
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
-                                       const DefaultDataset& defaults, const Scope& scope) {
+                                       const Scope& scope) {
   if (create.clone_from() != nullptr || create.copy_from() != nullptr) {
     return Unsupported(scope, "CREATE TABLE CLONE or COPY");
   }
-  const auto head = CreateTableHead(create, defaults, scope);
+  const auto head = CreateTableHead(create, scope);
   if (!head) {
     return std::nullopt;
   }
@@ -178,12 +178,11 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
 
 // The query's columns are cast to the declared types, which DuckDB would otherwise infer.
 std::optional<std::string> CreateTableAsSelect(
-    const googlesql::ResolvedCreateTableAsSelectStmt& create, const DefaultDataset& defaults,
-    const Scope& scope) {
+    const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope) {
   if (create.output_column_list_size() != create.column_definition_list_size()) {
     return Unsupported(scope, "CREATE TABLE AS SELECT columns");
   }
-  const auto head = CreateTableHead(create, defaults, scope);
+  const auto head = CreateTableHead(create, scope);
   if (!head) {
     return std::nullopt;
   }
@@ -210,12 +209,12 @@ std::optional<std::string> CreateTableAsSelect(
 }
 
 std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
-                                      const DefaultDataset& defaults, const Scope& scope) {
+                                      const Scope& scope) {
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
       create.recursive() || create.is_value_table()) {
     return Unsupported(scope, "temporary, recursive or value-table views");
   }
-  const auto path = TablePath(create.name_path(), defaults, scope);
+  const auto path = TablePath(create.name_path(), scope);
   const auto relation = Scan(*create.query(), scope);
   if (!path || !relation) {
     return std::nullopt;
@@ -244,11 +243,11 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
 }
 
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
-                                        const DefaultDataset& defaults, const Scope& scope) {
+                                        const Scope& scope) {
   if (create.collation_name() != nullptr) {
     return Unsupported(scope, "dataset collation");
   }
-  const auto path = DatasetPath(create.name_path(), defaults, scope);
+  const auto path = DatasetPath(create.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }
@@ -262,15 +261,14 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   }
 }
 
-std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop,
-                                const DefaultDataset& defaults, const Scope& scope) {
+std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope) {
   const std::string object_type = ToUpperAscii(drop.object_type());
   const bool is_schema = object_type == "SCHEMA";
   if (object_type != "TABLE" && object_type != "VIEW" && !is_schema) {
     return Unsupported(scope, "DROP " + object_type);
   }
-  const auto path = is_schema ? DatasetPath(drop.name_path(), defaults, scope)
-                              : TablePath(drop.name_path(), defaults, scope);
+  const auto path =
+      is_schema ? DatasetPath(drop.name_path(), scope) : TablePath(drop.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }
