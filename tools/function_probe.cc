@@ -27,6 +27,7 @@
 #include "googlesql/public/types/type_factory.h"
 #include "src/catalog.h"
 #include "src/emulator.h"
+#include "src/translator/functions.h"
 #include "tools/probe.h"
 
 namespace bigquery_emulator_duckdb {
@@ -54,6 +55,19 @@ probe's own notes name what it rejected.
 - **Unsupported**: the emulator rejects every call as unsupported.
 - **Broken**: a call translates but fails on DuckDB, which is a bug.
 - **Untested**: the probe could not build a valid call.
+
+The implementation column says how the emulator's function registry, in
+`src/translator/functions.cc`, implements the function:
+
+- **DuckDB function**: the DuckDB function of the same name.
+- **DuckDB function, renamed**: a DuckDB function of another name.
+- **DuckDB SQL**: DuckDB SQL templates, chosen by the arguments.
+- **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
+- **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
+- **SAFE. operator**: an operator with the `SAFE.` prefix.
+- **DuckDB aggregate** and **DuckDB window function**: a DuckDB aggregate or window function.
+
+It is empty for syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 )";
 
@@ -276,11 +290,17 @@ int Main(int argc, char** argv) {
     const googlesql::Function* function = nullptr;
     // Aliases such as CEILING resolve to the function they stand for.
     const std::vector<std::string> path = absl::StrSplit(name, '.');
+    const bool known = catalog.FindFunction(path, &function).ok();
+    // Functions spelled as syntax, such as EXTRACT, are operators such as $EXTRACT.
+    const translator::FunctionEntry* entry =
+        translator::FindFunction(known ? absl::AsciiStrToUpper(function->Name()) : "$" + name);
+    const std::string implementation =
+        entry == nullptr ? "" : std::string(translator::Describe(entry->implementation));
     if (const auto hinted = hints.find(name); hinted != hints.end()) {
       for (const std::string& sql : hinted->second) {
         probes.push_back(RunProbe(emulator, tables, sql));
       }
-    } else if (catalog.FindFunction(path, &function).ok()) {
+    } else if (known) {
       for (const googlesql::FunctionSignature& signature : function->signatures()) {
         if (!IsBigQuerySignature(signature)) {
           continue;
@@ -321,7 +341,8 @@ int Main(int argc, char** argv) {
       note += (note.empty() ? "" : "; ") + n;
     }
     rows << "| [`" << name << "`](" << kDocs << "/" << MainDoc(name, docs) << ") | "
-         << Categories(docs) << " | " << status << " | " << Escape(note) << " |\n";
+         << Categories(docs) << " | " << status << " | " << implementation << " | " << Escape(note)
+         << " |\n";
   }
   if (list_signatures) {
     return 0;
@@ -330,7 +351,8 @@ int Main(int argc, char** argv) {
   for (const auto& [status, count] : totals) {
     std::cout << "| " << status << " | " << count << " |\n";
   }
-  std::cout << "\n| Function | Category | Status | Notes |\n| --- | --- | --- | --- |\n"
+  std::cout << "\n| Function | Category | Status | Implementation | Notes |\n"
+            << "| --- | --- | --- | --- | --- |\n"
             << rows.str();
   return 0;
 }

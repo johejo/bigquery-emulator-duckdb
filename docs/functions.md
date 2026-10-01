@@ -19,6 +19,19 @@ probe's own notes name what it rejected.
 - **Broken**: a call translates but fails on DuckDB, which is a bug.
 - **Untested**: the probe could not build a valid call.
 
+The implementation column says how the emulator's function registry, in
+`src/translator/functions.cc`, implements the function:
+
+- **DuckDB function**: the DuckDB function of the same name.
+- **DuckDB function, renamed**: a DuckDB function of another name.
+- **DuckDB SQL**: DuckDB SQL templates, chosen by the arguments.
+- **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
+- **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
+- **SAFE. operator**: an operator with the `SAFE.` prefix.
+- **DuckDB aggregate** and **DuckDB window function**: a DuckDB aggregate or window function.
+
+It is empty for syntax such as `CASE` and for functions the analyzer rewrites into others.
+
 | Status | Functions |
 | --- | --- |
 | Partial | 16 |
@@ -26,411 +39,411 @@ probe's own notes name what it rejected.
 | Unsupported | 161 |
 | Untested | 13 |
 
-| Function | Category | Status | Notes |
-| --- | --- | --- | --- |
-| [`ABS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#abs) | mathematical_functions | Supported |  |
-| [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported |  |
-| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported |  |
-| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Unsupported | function DECRYPT_BYTES |
-| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Unsupported | function DECRYPT_STRING |
-| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Unsupported | function ENCRYPT |
-| [`AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#agg) | aggregate_functions | Untested | no sample for <measure<T1>> |
-| [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | aggregate_functions | Supported |  |
-| [`APPENDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#appends) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Supported |  |
-| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Supported |  |
-| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Supported |  |
-| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Unsupported | aggregate or analytic function APPROX_TOP_SUM |
-| [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | array_functions | Supported |  |
-| [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | aggregate_functions | Supported |  |
-| [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | array_functions | Supported | returns NULL when any array is NULL |
-| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Supported |  |
-| [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | array_functions | Supported |  |
-| [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | array_functions | Supported |  |
-| [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | array_functions | Supported |  |
-| [`ARRAY_REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_reverse) | array_functions | Supported |  |
-| [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | array_functions | Supported |  |
-| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Supported |  |
-| [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Supported |  |
-| [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported |  |
-| [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported |  |
-| [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported |  |
-| [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported |  |
-| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported |  |
-| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | unsupported construct |
-| [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported | the analyzer does not know this function |
-| [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | type ENUM<BITWISE_AGG_MODE> |
-| [`BIT_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions#bit_count) | bit_functions | Supported |  |
-| [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | aggregate_functions | Partial | type ENUM<BITWISE_AGG_MODE> |
-| [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | aggregate_functions | Partial | type ENUM<BITWISE_AGG_MODE> |
-| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | json_functions | Supported | from JSON, fails when the value has another JSON type |
-| [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | string_functions | Supported | counts the bytes of a STRING's UTF-8 encoding |
-| [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | conditional_expressions | Supported |  |
-| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | conversion_functions | Partial | CAST with FORMAT, time zone or type parameters |
-| [`CBRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cbrt) | mathematical_functions | Supported |  |
-| [`CEIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceil) | mathematical_functions | Supported |  |
-| [`CEILING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceiling) | mathematical_functions | Supported |  |
-| [`CHANGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#changes) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`CHARACTER_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#character_length) | string_functions | Supported |  |
-| [`CHAR_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#char_length) | string_functions | Supported |  |
-| [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | string_functions | Supported |  |
-| [`COALESCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#coalesce) | conditional_expressions | Supported |  |
-| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | string_functions | Unsupported | function CODE_POINTS_TO_BYTES |
-| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | string_functions | Unsupported | function CODE_POINTS_TO_STRING |
-| [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | string_functions | Unsupported | the analyzer does not know this function |
-| [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported |  |
-| [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported |  |
-| [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Supported |  |
-| [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported |  |
-| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported |  |
-| [`COSINE_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosine_distance) | mathematical_functions | Unsupported | function COSINE_DISTANCE |
-| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Supported |  |
-| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported |  |
-| [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | aggregate-dp-functions, aggregate_functions | Supported |  |
-| [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | aggregate_functions | Supported |  |
-| [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Supported |  |
-| [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Supported |  |
-| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported |  |
-| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported |  |
-| [`CUME_DIST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#cume_dist) | numbering_functions | Supported |  |
-| [`CURRENT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#current_date) | date_functions | Supported |  |
-| [`CURRENT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#current_datetime) | datetime_functions | Supported |  |
-| [`CURRENT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#current_time) | time_functions | Supported |  |
-| [`CURRENT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#current_timestamp) | timestamp_functions | Supported |  |
-| [`DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date) | date_functions | Supported | `SELECT DATE('abc')`: INVALID_ARGUMENT: Could not cast literal "abc" to type TIMESTAMP [at 1:13] |
-| [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | datetime_functions | Supported |  |
-| [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | datetime_functions | Supported |  |
-| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Supported |  |
-| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries |
-| [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | datetime_functions | Supported |  |
-| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
-| [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | date_functions | Supported |  |
-| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Supported |  |
-| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
-| [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | date_functions | Supported |  |
-| [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | date_functions | Supported |  |
-| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | date_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
-| [`DENSE_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#dense_rank) | numbering_functions | Supported |  |
-| [`DESTINATION_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#destination_node_id) | graph-sql-functions | Untested | no sample for <graph_edge> |
-| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | aead_encryption_functions | Unsupported | function DETERMINISTIC_DECRYPT_BYTES |
-| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | aead_encryption_functions | Unsupported | function DETERMINISTIC_DECRYPT_STRING |
-| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | aead_encryption_functions | Unsupported | function DETERMINISTIC_ENCRYPT |
-| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Supported |  |
-| [`DLP_DETERMINISTIC_DECRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_decrypt) | dlp_functions | Unsupported | the analyzer does not know this function |
-| [`DLP_DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_encrypt) | dlp_functions | Unsupported | the analyzer does not know this function |
-| [`DLP_KEY_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_key_chain) | dlp_functions | Unsupported | the analyzer does not know this function |
-| [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | string_functions | Supported |  |
-| [`ELEMENT_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#element_id) | graph-sql-functions | Untested | no sample for <graph_element> |
-| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Supported |  |
-| [`ERROR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions#error) | debugging_functions | Supported |  |
-| [`EUCLIDEAN_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#euclidean_distance) | mathematical_functions | Unsupported | function EUCLIDEAN_DISTANCE |
-| [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported |  |
-| [`EXTERNAL_OBJECT_TRANSFORM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in#external_object_transform) | table-functions-built-in | Unsupported | the analyzer does not know this function |
-| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | federated_query_functions | Unsupported | the analyzer does not know this function |
-| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
-| [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Supported |  |
-| [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported |  |
-| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | from JSON, fails when the value has another JSON type |
-| [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Supported |  |
-| [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported |  |
-| [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported |  |
-| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported |  |
-| [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported |  |
-| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Unsupported | function FROM_BASE32 |
-| [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported |  |
-| [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported |  |
-| [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported | the analyzer does not know this function |
-| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | function GENERATE_ARRAY |
-| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | takes only a DAY or WEEK step |
-| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
-| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported |  |
-| [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported |  |
-| [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported |  |
-| [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | aggregate_functions | Supported |  |
-| [`HLL_COUNT.EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countextract) | hll_functions | Unsupported | function EXTRACT |
-| [`HLL_COUNT.INIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countinit) | hll_functions | Unsupported | aggregate or analytic function INIT |
-| [`HLL_COUNT.MERGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge) | hll_functions | Unsupported | aggregate or analytic function MERGE |
-| [`HLL_COUNT.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge_partial) | hll_functions | Unsupported | aggregate or analytic function MERGE_PARTIAL |
-| [`IEEE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ieee_divide) | mathematical_functions | Supported |  |
-| [`IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#if) | conditional_expressions | Supported |  |
-| [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | conditional_expressions | Supported |  |
-| [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | string_functions | Supported |  |
-| [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | string_functions | Supported |  |
-| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | json_functions | Supported | from JSON, fails when the value has another JSON type |
-| [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`IS_INF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_inf) | mathematical_functions | Supported |  |
-| [`IS_NAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_nan) | mathematical_functions | Supported |  |
-| [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Unsupported | function JSON_ARRAY_APPEND |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Unsupported | function JSON_ARRAY_INSERT |
-| [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
-| [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported | function JSON_FLATTEN |
-| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported |  |
-| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported |  |
-| [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Supported |  |
-| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Supported |  |
-| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Supported |  |
-| [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported |  |
-| [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
-| [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JUSTIFY_DAYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_days) | interval_functions | Unsupported | type INTERVAL |
-| [`JUSTIFY_HOURS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_hours) | interval_functions | Unsupported | type INTERVAL |
-| [`JUSTIFY_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_interval) | interval_functions | Unsupported | type INTERVAL |
-| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | aead_encryption_functions | Unsupported | function NEW_KEYSET |
-| [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | aead_encryption_functions | Unsupported | function KEYSET_CHAIN |
-| [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | aead_encryption_functions | Unsupported | function KEYSET_FROM_JSON |
-| [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | aead_encryption_functions | Unsupported | function KEYSET_LENGTH |
-| [`KEYS.KEYSET_TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_to_json) | aead_encryption_functions | Unsupported | function KEYSET_TO_JSON |
-| [`KEYS.NEW_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_keyset) | aead_encryption_functions | Unsupported | function NEW_KEYSET |
-| [`KEYS.NEW_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_wrapped_keyset) | aead_encryption_functions | Unsupported | function NEW_WRAPPED_KEYSET |
-| [`KEYS.REWRAP_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrewrap_keyset) | aead_encryption_functions | Unsupported | function REWRAP_KEYSET |
-| [`KEYS.ROTATE_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_keyset) | aead_encryption_functions | Unsupported | function NEW_KEYSET |
-| [`KEYS.ROTATE_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_wrapped_keyset) | aead_encryption_functions | Unsupported | function ROTATE_WRAPPED_KEYSET |
-| [`KLL_QUANTILES.EXTRACT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_double) | kll_functions | Unsupported | function EXTRACT_FLOAT64 |
-| [`KLL_QUANTILES.EXTRACT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_int64) | kll_functions | Unsupported | function EXTRACT_INT64 |
-| [`KLL_QUANTILES.EXTRACT_POINT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_point_double) | kll_functions | Unsupported | aggregate or analytic function INIT_FLOAT64 |
-| [`KLL_QUANTILES.EXTRACT_POINT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_point_int64) | kll_functions | Unsupported | aggregate or analytic function INIT_INT64 |
-| [`KLL_QUANTILES.INIT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesinit_double) | kll_functions | Unsupported | aggregate or analytic function INIT_FLOAT64 |
-| [`KLL_QUANTILES.INIT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesinit_int64) | kll_functions | Unsupported | aggregate or analytic function INIT_INT64 |
-| [`KLL_QUANTILES.MERGE_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_double) | kll_functions | Unsupported | aggregate or analytic function MERGE_FLOAT64 |
-| [`KLL_QUANTILES.MERGE_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_int64) | kll_functions | Unsupported | aggregate or analytic function MERGE_INT64 |
-| [`KLL_QUANTILES.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_partial) | kll_functions | Unsupported | aggregate or analytic function MERGE_PARTIAL |
-| [`KLL_QUANTILES.MERGE_POINT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_point_double) | kll_functions | Unsupported | aggregate or analytic function INIT_FLOAT64 |
-| [`KLL_QUANTILES.MERGE_POINT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_point_int64) | kll_functions | Unsupported | aggregate or analytic function INIT_INT64 |
-| [`LABELS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#labels) | graph-sql-functions | Untested | no sample for <graph_element> |
-| [`LAG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lag) | navigation_functions | Supported |  |
-| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported |  |
-| [`LAST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#last_value) | navigation_functions | Supported |  |
-| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Supported |  |
-| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Supported |  |
-| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Supported |  |
-| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Supported |  |
-| [`LEAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lead) | navigation_functions | Supported |  |
-| [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported |  |
-| [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Supported |  |
-| [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | string_functions | Supported | counts characters of a STRING and bytes of a BYTES |
-| [`LN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ln) | mathematical_functions | Supported |  |
-| [`LOG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log) | mathematical_functions | Supported |  |
-| [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Supported |  |
-| [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | aggregate_functions | Supported |  |
-| [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | aggregate_functions | Supported |  |
-| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Supported |  |
-| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Supported | pads with spaces by default |
-| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Supported |  |
-| [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported | type INTERVAL |
-| [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported |  |
-| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Supported |  |
-| [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported |  |
-| [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported |  |
-| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported |  |
-| [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported |  |
-| [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported | function HOST |
-| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported |  |
-| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported |  |
-| [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Unsupported | function IP_FROM_STRING |
-| [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Unsupported | function IP_NET_MASK |
-| [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Unsupported | function IP_TO_STRING |
-| [`NET.IP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_trunc) | net_functions | Unsupported | function IP_TRUNC |
-| [`NET.PUBLIC_SUFFIX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netpublic_suffix) | net_functions | Unsupported | function PUBLIC_SUFFIX |
-| [`NET.REG_DOMAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netreg_domain) | net_functions | Unsupported | function REG_DOMAIN |
-| [`NET.SAFE_IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netsafe_ip_from_string) | net_functions | Unsupported | function SAFE_IP_FROM_STRING |
-| [`NODES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#nodes) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`NORMALIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize) | string_functions | Supported |  |
-| [`NORMALIZE_AND_CASEFOLD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize_and_casefold) | string_functions | Unsupported | function NORMALIZE_AND_CASEFOLD |
-| [`NTH_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#nth_value) | navigation_functions | Supported |  |
-| [`NTILE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#ntile) | numbering_functions | Supported |  |
-| [`NULLIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#nullif) | conditional_expressions | Supported |  |
-| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | objectref_functions | Unsupported | the analyzer does not know this function |
-| [`OBJ.GET_ACCESS_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_access_url) | objectref_functions | Unsupported | the analyzer does not know this function |
-| [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | objectref_functions | Unsupported | the analyzer does not know this function |
-| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | objectref_functions | Unsupported | the analyzer does not know this function |
-| [`OCTET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#octet_length) | string_functions | Supported |  |
-| [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Unsupported | function PARSE_BIGNUMERIC |
-| [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported |  |
-| [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported |  |
-| [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Partial | function PARSE_JSON |
-| [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported | function PARSE_NUMERIC |
-| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported |  |
-| [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
-| [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | graph-sql-functions | Untested | no sample for <graph_path> |
-| [`PERCENTILE_CONT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_cont) | aggregate-dp-functions, navigation_functions | Unsupported | aggregate or analytic function PERCENTILE_CONT |
-| [`PERCENTILE_DISC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_disc) | navigation_functions | Unsupported | aggregate or analytic function PERCENTILE_DISC |
-| [`PERCENT_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#percent_rank) | numbering_functions | Supported |  |
-| [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Supported |  |
-| [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported |  |
-| [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported |  |
-| [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported | type RANGE<DATE> |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Unsupported | function RANGE_BUCKET |
-| [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Unsupported | `SELECT RANGE_CONTAINS(RANGE<DATE> '[2024-01-01, 2024-02-01)', 2)`: INVALID_ARGUMENT: No matching signature for function RANGE_CONTAINS; type RANGE<DATE> |
-| [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Unsupported | type RANGE<DATE> |
-| [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Unsupported | type RANGE<DATE> |
-| [`RANGE_OVERLAPS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_overlaps) | range-functions | Unsupported | type RANGE<DATE> |
-| [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | range-functions | Unsupported | the analyzer does not know this function |
-| [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Unsupported | type RANGE<DATE> |
-| [`RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#rank) | numbering_functions | Supported |  |
-| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Partial | function REGEXP_CONTAINS |
-| [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
-| [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group and fails on more than one group; function REGEXP_EXTRACT_ALL |
-| [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Supported |  |
-| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | function REGEXP_REPLACE |
-| [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
-| [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported |  |
-| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Supported |  |
-| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Supported |  |
-| [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Supported |  |
-| [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | mathematical_functions | Supported |  |
-| [`ROW_NUMBER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#row_number) | numbering_functions | Supported |  |
-| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | string_functions | Supported | pads with spaces by default |
-| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Supported |  |
-| [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported |  |
-| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | conversion_functions | Supported |  |
-| [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | string_functions | Unsupported | function SAFE_CONVERT_BYTES_TO_STRING |
-| [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | mathematical_functions | Supported |  |
-| [`SAFE_MULTIPLY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_multiply) | mathematical_functions | Supported |  |
-| [`SAFE_NEGATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_negate) | mathematical_functions | Supported |  |
-| [`SAFE_SUBTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_subtract) | mathematical_functions | Supported |  |
-| [`SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search) | search_functions | Unsupported | the analyzer does not know this function |
-| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported |  |
-| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported |  |
-| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported | function SESSION_USER |
-| [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported |  |
-| [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported |  |
-| [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Supported |  |
-| [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported |  |
-| [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported |  |
-| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported |  |
-| [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported | function SOUNDEX |
-| [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested | no sample for <graph_edge> |
-| [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported |  |
-| [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported |  |
-| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Supported |  |
-| [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported |  |
-| [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported |  |
-| [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported |  |
-| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | from JSON, fails when the value has another JSON type; function STRING |
-| [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported |  |
-| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported |  |
-| [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_AZIMUTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_azimuth) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_BUFFER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_buffer) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | geography_functions | Unsupported | unsupported construct |
-| [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | geography_functions | Unsupported | aggregate or analytic function ST_CLUSTERDBSCAN |
-| [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_CONVEXHULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_DUMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dump) | geography_functions | Unsupported | type ARRAY<GEOGRAPHY> |
-| [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ENDPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_endpoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | geography_functions | Unsupported | aggregate or analytic function ST_EXTENT |
-| [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_GEOMETRYTYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geometrytype) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | geography_functions | Unsupported | type ARRAY<GEOGRAPHY> |
-| [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_NUMGEOMETRIES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numgeometries) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_NUMPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numpoints) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_PERIMETER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_perimeter) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_POINTN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_pointn) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_REGIONSTATS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_regionstats) | geography_functions | Unsupported | the analyzer does not know this function |
-| [`ST_SIMPLIFY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_simplify) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_SNAPTOGRID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_snaptogrid) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_STARTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_startpoint) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | geography_functions | Unsupported | unsupported construct |
-| [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | geography_functions | Unsupported | type GEOGRAPHY |
-| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Supported | starts at the first character for a position of 0 or before the start |
-| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | starts at the first character for a position of 0 or before the start |
-| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | unsupported construct |
-| [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported |  |
-| [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported |  |
-| [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported | the analyzer does not know this function |
-| [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported | the analyzer does not know this function |
-| [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported |  |
-| [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | function TIMESTAMP |
-| [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Supported |  |
-| [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | timestamp_functions | Supported | counts whole units rather than boundaries |
-| [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | timestamp_functions | Supported |  |
-| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | timestamp_functions | Supported | WEEK starts on Sunday and ISOWEEK on Monday |
-| [`TIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add) | time_functions | Supported |  |
-| [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | time_functions | Supported | counts whole units rather than boundaries |
-| [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | time_functions | Supported |  |
-| [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Supported |  |
-| [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Unsupported | function TO_BASE32 |
-| [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported |  |
-| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported | function TO_CODE_POINTS |
-| [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported |  |
-| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported |  |
-| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported |  |
-| [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Supported |  |
-| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Supported |  |
-| [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Supported |  |
-| [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | utility-functions | Supported |  |
-| [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | string_functions | Supported |  |
-| [`UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date) | date_functions | Supported |  |
-| [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | timestamp_functions | Supported |  |
-| [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported |  |
-| [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported |  |
-| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Supported |  |
-| [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported |  |
-| [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Supported |  |
-| [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Supported |  |
-| [`VECTOR_INDEX.STATISTICS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions#vector_indexstatistics) | vectorindex_functions | Unsupported | the analyzer does not know this function |
-| [`VECTOR_SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#vector_search) | search_functions | Unsupported | the analyzer does not know this function |
+| Function | Category | Status | Implementation | Notes |
+| --- | --- | --- | --- | --- |
+| [`ABS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#abs) | mathematical_functions | Supported | DuckDB function |  |
+| [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported | DuckDB function |  |
+| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported | DuckDB function |  |
+| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Unsupported |  | function DECRYPT_BYTES |
+| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Unsupported |  | function DECRYPT_STRING |
+| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Unsupported |  | function ENCRYPT |
+| [`AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#agg) | aggregate_functions | Untested |  | no sample for <measure<T1>> |
+| [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`APPENDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#appends) | time-series-functions | Unsupported |  | the analyzer does not know this function |
+| [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Unsupported |  | aggregate or analytic function APPROX_TOP_SUM |
+| [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | array_functions | Supported |  |  |
+| [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | array_functions | Supported | DuckDB SQL, in code | returns NULL when any array is NULL |
+| [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | array_functions | Supported |  |  |
+| [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | array_functions | Supported |  |  |
+| [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | array_functions | Supported | DuckDB function |  |
+| [`ARRAY_REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_reverse) | array_functions | Supported | DuckDB SQL |  |
+| [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | array_functions | Supported |  |  |
+| [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Supported | DuckDB SQL |  |
+| [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Supported | DuckDB SQL |  |
+| [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported | DuckDB function |  |
+| [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported | DuckDB function |  |
+| [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | DuckDB function |  |
+| [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | DuckDB function |  |
+| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | DuckDB function |  |
+| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
+| [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
+| [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
+| [`BIT_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions#bit_count) | bit_functions | Supported | DuckDB SQL |  |
+| [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
+| [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
+| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | string_functions | Supported | DuckDB SQL | counts the bytes of a STRING's UTF-8 encoding |
+| [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | conditional_expressions | Supported |  |  |
+| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | conversion_functions | Partial |  | CAST with FORMAT, time zone or type parameters |
+| [`CBRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cbrt) | mathematical_functions | Supported | DuckDB function |  |
+| [`CEIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceil) | mathematical_functions | Supported | DuckDB function |  |
+| [`CEILING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceiling) | mathematical_functions | Supported | DuckDB function |  |
+| [`CHANGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#changes) | time-series-functions | Unsupported |  | the analyzer does not know this function |
+| [`CHARACTER_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#character_length) | string_functions | Supported | DuckDB function |  |
+| [`CHAR_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#char_length) | string_functions | Supported | DuckDB function |  |
+| [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | string_functions | Supported | DuckDB SQL |  |
+| [`COALESCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#coalesce) | conditional_expressions | Supported | DuckDB function |  |
+| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | string_functions | Unsupported |  | function CODE_POINTS_TO_BYTES |
+| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | string_functions | Unsupported |  | function CODE_POINTS_TO_STRING |
+| [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | string_functions | Unsupported |  | the analyzer does not know this function |
+| [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported | DuckDB function |  |
+| [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported | DuckDB function, renamed |  |
+| [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported | DuckDB function |  |
+| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported | DuckDB function |  |
+| [`COSINE_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosine_distance) | mathematical_functions | Unsupported |  | function COSINE_DISTANCE |
+| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Supported | DuckDB function |  |
+| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | aggregate-dp-functions, aggregate_functions | Supported | DuckDB aggregate |  |
+| [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`CUME_DIST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#cume_dist) | numbering_functions | Supported | DuckDB window function |  |
+| [`CURRENT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#current_date) | date_functions | Supported | DuckDB SQL |  |
+| [`CURRENT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#current_datetime) | datetime_functions | Supported | DuckDB SQL |  |
+| [`CURRENT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#current_time) | time_functions | Supported | DuckDB SQL |  |
+| [`CURRENT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#current_timestamp) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date) | date_functions | Supported | DuckDB SQL | `SELECT DATE('abc')`: INVALID_ARGUMENT: Could not cast literal "abc" to type TIMESTAMP [at 1:13] |
+| [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | datetime_functions | Supported | DuckDB SQL |  |
+| [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | datetime_functions | Supported | DuckDB SQL |  |
+| [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
+| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries |
+| [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | datetime_functions | Supported | DuckDB SQL |  |
+| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | date_functions | Supported | DuckDB SQL |  |
+| [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
+| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | date_functions | Supported | DuckDB SQL |  |
+| [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | date_functions | Supported | DuckDB SQL |  |
+| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | date_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DENSE_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#dense_rank) | numbering_functions | Supported | DuckDB window function |  |
+| [`DESTINATION_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#destination_node_id) | graph-sql-functions | Untested |  | no sample for <graph_edge> |
+| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_BYTES |
+| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_STRING |
+| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_ENCRYPT |
+| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Supported | DuckDB function, renamed |  |
+| [`DLP_DETERMINISTIC_DECRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_decrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
+| [`DLP_DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_encrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
+| [`DLP_KEY_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_key_chain) | dlp_functions | Unsupported |  | the analyzer does not know this function |
+| [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | string_functions | Supported | GoogleSQL function |  |
+| [`ELEMENT_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#element_id) | graph-sql-functions | Untested |  | no sample for <graph_element> |
+| [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Supported | DuckDB SQL |  |
+| [`ERROR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions#error) | debugging_functions | Supported | DuckDB SQL |  |
+| [`EUCLIDEAN_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#euclidean_distance) | mathematical_functions | Unsupported |  | function EUCLIDEAN_DISTANCE |
+| [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported | DuckDB function |  |
+| [`EXTERNAL_OBJECT_TRANSFORM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in#external_object_transform) | table-functions-built-in | Unsupported |  | the analyzer does not know this function |
+| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | federated_query_functions | Unsupported |  | the analyzer does not know this function |
+| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
+| [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Supported | GoogleSQL function |  |
+| [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
+| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported | DuckDB function |  |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Supported | DuckDB function, renamed |  |
+| [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | DuckDB SQL |  |
+| [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | DuckDB SQL |  |
+| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | DuckDB SQL |  |
+| [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Unsupported |  | function FROM_BASE32 |
+| [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported | DuckDB SQL |  |
+| [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported | DuckDB SQL |  |
+| [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported |  | the analyzer does not know this function |
+| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | DuckDB SQL | function GENERATE_ARRAY |
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | DuckDB SQL | takes only a DAY or WEEK step |
+| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
+| [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported | DuckDB SQL |  |
+| [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported | DuckDB function, renamed |  |
+| [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported | DuckDB function |  |
+| [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | aggregate_functions | Supported |  |  |
+| [`HLL_COUNT.EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countextract) | hll_functions | Unsupported |  | function EXTRACT |
+| [`HLL_COUNT.INIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countinit) | hll_functions | Unsupported |  | aggregate or analytic function INIT |
+| [`HLL_COUNT.MERGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge) | hll_functions | Unsupported |  | aggregate or analytic function MERGE |
+| [`HLL_COUNT.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge_partial) | hll_functions | Unsupported |  | aggregate or analytic function MERGE_PARTIAL |
+| [`IEEE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ieee_divide) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#if) | conditional_expressions | Supported | DuckDB function |  |
+| [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | conditional_expressions | Supported | DuckDB function |  |
+| [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | string_functions | Supported | GoogleSQL function |  |
+| [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | string_functions | Supported | DuckDB SQL |  |
+| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`IS_INF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_inf) | mathematical_functions | Supported | DuckDB function, renamed |  |
+| [`IS_NAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_nan) | mathematical_functions | Supported | DuckDB function, renamed |  |
+| [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported | DuckDB function, renamed |  |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Unsupported |  | function JSON_ARRAY_APPEND |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Unsupported |  | function JSON_ARRAY_INSERT |
+| [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
+| [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported |  | function JSON_FLATTEN |
+| [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported | DuckDB SQL, in code |  |
+| [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Supported | DuckDB SQL, in code |  |
+| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Supported | DuckDB SQL, in code |  |
+| [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported | DuckDB SQL |  |
+| [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
+| [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JUSTIFY_DAYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_days) | interval_functions | Unsupported |  | type INTERVAL |
+| [`JUSTIFY_HOURS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_hours) | interval_functions | Unsupported |  | type INTERVAL |
+| [`JUSTIFY_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_interval) | interval_functions | Unsupported |  | type INTERVAL |
+| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | aead_encryption_functions | Unsupported |  | function ADD_KEY_FROM_RAW_BYTES |
+| [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | aead_encryption_functions | Unsupported |  | function KEYSET_CHAIN |
+| [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | aead_encryption_functions | Unsupported |  | function KEYSET_FROM_JSON |
+| [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | aead_encryption_functions | Unsupported |  | function KEYSET_LENGTH |
+| [`KEYS.KEYSET_TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_to_json) | aead_encryption_functions | Unsupported |  | function KEYSET_TO_JSON |
+| [`KEYS.NEW_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_keyset) | aead_encryption_functions | Unsupported |  | function NEW_KEYSET |
+| [`KEYS.NEW_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_wrapped_keyset) | aead_encryption_functions | Unsupported |  | function NEW_WRAPPED_KEYSET |
+| [`KEYS.REWRAP_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrewrap_keyset) | aead_encryption_functions | Unsupported |  | function REWRAP_KEYSET |
+| [`KEYS.ROTATE_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_keyset) | aead_encryption_functions | Unsupported |  | function ROTATE_KEYSET |
+| [`KEYS.ROTATE_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_wrapped_keyset) | aead_encryption_functions | Unsupported |  | function ROTATE_WRAPPED_KEYSET |
+| [`KLL_QUANTILES.EXTRACT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_double) | kll_functions | Unsupported |  | function EXTRACT_FLOAT64 |
+| [`KLL_QUANTILES.EXTRACT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_int64) | kll_functions | Unsupported |  | function EXTRACT_INT64 |
+| [`KLL_QUANTILES.EXTRACT_POINT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_point_double) | kll_functions | Unsupported |  | aggregate or analytic function INIT_FLOAT64 |
+| [`KLL_QUANTILES.EXTRACT_POINT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesextract_point_int64) | kll_functions | Unsupported |  | aggregate or analytic function INIT_INT64 |
+| [`KLL_QUANTILES.INIT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesinit_double) | kll_functions | Unsupported |  | aggregate or analytic function INIT_FLOAT64 |
+| [`KLL_QUANTILES.INIT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesinit_int64) | kll_functions | Unsupported |  | aggregate or analytic function INIT_INT64 |
+| [`KLL_QUANTILES.MERGE_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_double) | kll_functions | Unsupported |  | aggregate or analytic function MERGE_FLOAT64 |
+| [`KLL_QUANTILES.MERGE_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_int64) | kll_functions | Unsupported |  | aggregate or analytic function MERGE_INT64 |
+| [`KLL_QUANTILES.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_partial) | kll_functions | Unsupported |  | aggregate or analytic function MERGE_PARTIAL |
+| [`KLL_QUANTILES.MERGE_POINT_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_point_double) | kll_functions | Unsupported |  | aggregate or analytic function INIT_FLOAT64 |
+| [`KLL_QUANTILES.MERGE_POINT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_point_int64) | kll_functions | Unsupported |  | aggregate or analytic function INIT_INT64 |
+| [`LABELS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#labels) | graph-sql-functions | Untested |  | no sample for <graph_element> |
+| [`LAG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lag) | navigation_functions | Supported | DuckDB window function |  |
+| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported | DuckDB SQL |  |
+| [`LAST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#last_value) | navigation_functions | Supported | DuckDB window function |  |
+| [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Supported | GoogleSQL function |  |
+| [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Supported | GoogleSQL function |  |
+| [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Supported | GoogleSQL function |  |
+| [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Supported | GoogleSQL function |  |
+| [`LEAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lead) | navigation_functions | Supported | DuckDB window function |  |
+| [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported | DuckDB function |  |
+| [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Supported | DuckDB SQL |  |
+| [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | string_functions | Supported | DuckDB SQL | counts characters of a STRING and bytes of a BYTES |
+| [`LN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ln) | mathematical_functions | Supported | DuckDB function |  |
+| [`LOG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Supported | DuckDB function |  |
+| [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Supported | DuckDB SQL |  |
+| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Supported | DuckDB SQL | pads with spaces by default |
+| [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Supported | DuckDB SQL |  |
+| [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported |  | type INTERVAL |
+| [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported | DuckDB SQL |  |
+| [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported | DuckDB function |  |
+| [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported |  | function HOST |
+| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported | DuckDB SQL |  |
+| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported | DuckDB SQL |  |
+| [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Unsupported |  | function IP_FROM_STRING |
+| [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Unsupported |  | function IP_NET_MASK |
+| [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Unsupported |  | function IP_TO_STRING |
+| [`NET.IP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_trunc) | net_functions | Unsupported |  | function IP_TRUNC |
+| [`NET.PUBLIC_SUFFIX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netpublic_suffix) | net_functions | Unsupported |  | function PUBLIC_SUFFIX |
+| [`NET.REG_DOMAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netreg_domain) | net_functions | Unsupported |  | function REG_DOMAIN |
+| [`NET.SAFE_IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netsafe_ip_from_string) | net_functions | Unsupported |  | function SAFE_IP_FROM_STRING |
+| [`NODES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#nodes) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`NORMALIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize) | string_functions | Supported | DuckDB SQL |  |
+| [`NORMALIZE_AND_CASEFOLD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize_and_casefold) | string_functions | Unsupported |  | function NORMALIZE_AND_CASEFOLD |
+| [`NTH_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#nth_value) | navigation_functions | Supported | DuckDB window function |  |
+| [`NTILE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#ntile) | numbering_functions | Supported | DuckDB window function |  |
+| [`NULLIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#nullif) | conditional_expressions | Supported | DuckDB function |  |
+| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | objectref_functions | Unsupported |  | the analyzer does not know this function |
+| [`OBJ.GET_ACCESS_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_access_url) | objectref_functions | Unsupported |  | the analyzer does not know this function |
+| [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | objectref_functions | Unsupported |  | the analyzer does not know this function |
+| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | objectref_functions | Unsupported |  | the analyzer does not know this function |
+| [`OCTET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#octet_length) | string_functions | Supported | DuckDB SQL |  |
+| [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Unsupported |  | function PARSE_BIGNUMERIC |
+| [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | DuckDB SQL |  |
+| [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | DuckDB SQL |  |
+| [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Partial | DuckDB SQL | function PARSE_JSON |
+| [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported |  | function PARSE_NUMERIC |
+| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported | DuckDB SQL |  |
+| [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | DuckDB SQL | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
+| [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | graph-sql-functions | Untested |  | no sample for <graph_path> |
+| [`PERCENTILE_CONT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_cont) | aggregate-dp-functions, navigation_functions | Unsupported |  | aggregate or analytic function PERCENTILE_CONT |
+| [`PERCENTILE_DISC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_disc) | navigation_functions | Unsupported |  | aggregate or analytic function PERCENTILE_DISC |
+| [`PERCENT_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#percent_rank) | numbering_functions | Supported | DuckDB window function |  |
+| [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Supported | DuckDB function |  |
+| [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported | DuckDB function |  |
+| [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported | DuckDB function, renamed |  |
+| [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported |  | type RANGE<DATE> |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Unsupported |  | function RANGE_BUCKET |
+| [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Unsupported |  | `SELECT RANGE_CONTAINS(RANGE<DATE> '[2024-01-01, 2024-02-01)', 2)`: INVALID_ARGUMENT: No matching signature for function RANGE_CONTAINS; function RANGE_CONTAINS |
+| [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Unsupported |  | function RANGE_END |
+| [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Unsupported |  | type RANGE<DATE> |
+| [`RANGE_OVERLAPS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_overlaps) | range-functions | Unsupported |  | function RANGE_OVERLAPS |
+| [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | range-functions | Unsupported |  | the analyzer does not know this function |
+| [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Unsupported |  | function RANGE_START |
+| [`RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#rank) | numbering_functions | Supported | DuckDB window function |  |
+| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Partial | DuckDB SQL | function REGEXP_CONTAINS |
+| [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
+| [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group and fails on more than one group; function REGEXP_EXTRACT_ALL |
+| [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Supported | GoogleSQL function |  |
+| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | DuckDB SQL | function REGEXP_REPLACE |
+| [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
+| [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported | DuckDB function |  |
+| [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Supported | DuckDB SQL |  |
+| [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Supported | DuckDB SQL |  |
+| [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Supported | DuckDB SQL |  |
+| [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`ROW_NUMBER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#row_number) | numbering_functions | Supported | DuckDB window function |  |
+| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | string_functions | Supported | DuckDB SQL | pads with spaces by default |
+| [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | string_functions | Supported | DuckDB SQL |  |
+| [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | geography_functions | Unsupported |  | function S2_CELLIDFROMPOINT |
+| [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported |  | function S2_COVERINGCELLIDS |
+| [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported | SAFE. operator |  |
+| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | conversion_functions | Supported |  |  |
+| [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | string_functions | Unsupported |  | function SAFE_CONVERT_BYTES_TO_STRING |
+| [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`SAFE_MULTIPLY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_multiply) | mathematical_functions | Supported | SAFE. operator |  |
+| [`SAFE_NEGATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_negate) | mathematical_functions | Supported | SAFE. operator |  |
+| [`SAFE_SUBTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_subtract) | mathematical_functions | Supported | SAFE. operator |  |
+| [`SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search) | search_functions | Unsupported |  | the analyzer does not know this function |
+| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported |  | function SESSION_USER |
+| [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported | DuckDB SQL |  |
+| [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported | DuckDB SQL |  |
+| [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Supported | GoogleSQL function |  |
+| [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported | DuckDB function |  |
+| [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported | DuckDB function |  |
+| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported | DuckDB function |  |
+| [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported |  | function SOUNDEX |
+| [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested |  | no sample for <graph_edge> |
+| [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported | DuckDB SQL |  |
+| [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported | DuckDB function |  |
+| [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Supported | DuckDB SQL |  |
+| [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | DuckDB SQL | from JSON, fails when the value has another JSON type; function STRING |
+| [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported | DuckDB SQL |  |
+| [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported |  | function ST_ANGLE |
+| [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | geography_functions | Unsupported |  | function ST_AREA |
+| [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | geography_functions | Unsupported |  | function ST_ASBINARY |
+| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | geography_functions | Unsupported |  | function ST_ASGEOJSON |
+| [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | geography_functions | Unsupported |  | function ST_ASTEXT |
+| [`ST_AZIMUTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_azimuth) | geography_functions | Unsupported |  | function ST_AZIMUTH |
+| [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | geography_functions | Unsupported |  | function ST_BOUNDINGBOX |
+| [`ST_BUFFER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_buffer) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | geography_functions | Unsupported |  | unsupported construct |
+| [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | geography_functions | Unsupported |  | aggregate or analytic function ST_CLUSTERDBSCAN |
+| [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | geography_functions | Unsupported |  | function ST_CONTAINS |
+| [`ST_CONVEXHULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | geography_functions | Unsupported |  | function ST_COVEREDBY |
+| [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | geography_functions | Unsupported |  | function ST_COVERS |
+| [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | geography_functions | Unsupported |  | function ST_DIMENSION |
+| [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | geography_functions | Unsupported |  | function ST_DISJOINT |
+| [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | geography_functions | Unsupported |  | function ST_DISTANCE |
+| [`ST_DUMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dump) | geography_functions | Unsupported |  | type ARRAY<GEOGRAPHY> |
+| [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | geography_functions | Unsupported |  | function ST_DWITHIN |
+| [`ST_ENDPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_endpoint) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | geography_functions | Unsupported |  | function ST_EQUALS |
+| [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | geography_functions | Unsupported |  | aggregate or analytic function ST_EXTENT |
+| [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | geography_functions | Unsupported |  | function ST_GEOHASH |
+| [`ST_GEOMETRYTYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geometrytype) | geography_functions | Unsupported |  | function ST_GEOMETRYTYPE |
+| [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | geography_functions | Unsupported |  | function ST_HAUSDORFFDISTANCE |
+| [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | geography_functions | Unsupported |  | function ST_HAUSDORFFDWITHIN |
+| [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | geography_functions | Unsupported |  | type ARRAY<GEOGRAPHY> |
+| [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | geography_functions | Unsupported |  | function ST_INTERSECTS |
+| [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | geography_functions | Unsupported |  | function ST_INTERSECTSBOX |
+| [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | geography_functions | Unsupported |  | function ST_ISCLOSED |
+| [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | geography_functions | Unsupported |  | function ST_ISCOLLECTION |
+| [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | geography_functions | Unsupported |  | function ST_ISEMPTY |
+| [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | geography_functions | Unsupported |  | function ST_ISRING |
+| [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | geography_functions | Unsupported |  | function ST_LENGTH |
+| [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | geography_functions | Unsupported |  | function ST_LINELOCATEPOINT |
+| [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | geography_functions | Unsupported |  | function ST_MAXDISTANCE |
+| [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | geography_functions | Unsupported |  | function ST_NUMPOINTS |
+| [`ST_NUMGEOMETRIES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numgeometries) | geography_functions | Unsupported |  | function ST_NUMGEOMETRIES |
+| [`ST_NUMPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numpoints) | geography_functions | Unsupported |  | function ST_NUMPOINTS |
+| [`ST_PERIMETER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_perimeter) | geography_functions | Unsupported |  | function ST_PERIMETER |
+| [`ST_POINTN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_pointn) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_REGIONSTATS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_regionstats) | geography_functions | Unsupported |  | the analyzer does not know this function |
+| [`ST_SIMPLIFY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_simplify) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_SNAPTOGRID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_snaptogrid) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_STARTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_startpoint) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | geography_functions | Unsupported |  | function ST_TOUCHES |
+| [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | geography_functions | Unsupported |  | type GEOGRAPHY |
+| [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | geography_functions | Unsupported |  | unsupported construct |
+| [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | geography_functions | Unsupported |  | function ST_WITHIN |
+| [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | geography_functions | Unsupported |  | function ST_X |
+| [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | geography_functions | Unsupported |  | function ST_Y |
+| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Supported | DuckDB SQL | starts at the first character for a position of 0 or before the start |
+| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | DuckDB SQL | starts at the first character for a position of 0 or before the start |
+| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
+| [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported | DuckDB function |  |
+| [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported | DuckDB function |  |
+| [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
+| [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
+| [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported | DuckDB SQL |  |
+| [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | DuckDB SQL | function TIMESTAMP |
+| [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
+| [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | timestamp_functions | Supported | DuckDB SQL | counts whole units rather than boundaries |
+| [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | timestamp_functions | Supported | DuckDB function, renamed |  |
+| [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | timestamp_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`TIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add) | time_functions | Supported | DuckDB SQL |  |
+| [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | time_functions | Supported | DuckDB SQL | counts whole units rather than boundaries |
+| [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | time_functions | Supported | DuckDB SQL |  |
+| [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Supported | DuckDB SQL |  |
+| [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Unsupported |  | function TO_BASE32 |
+| [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported | DuckDB SQL |  |
+| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported |  | function TO_CODE_POINTS |
+| [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported | DuckDB SQL |  |
+| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported | DuckDB SQL, in code |  |
+| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported | DuckDB SQL |  |
+| [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Supported | DuckDB SQL |  |
+| [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Supported | DuckDB SQL |  |
+| [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | utility-functions | Supported |  |  |
+| [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | string_functions | Supported | DuckDB SQL |  |
+| [`UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date) | date_functions | Supported | DuckDB SQL |  |
+| [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | timestamp_functions | Supported | DuckDB function, renamed |  |
+| [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported | DuckDB function, renamed |  |
+| [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Supported | DuckDB SQL |  |
+| [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`VECTOR_INDEX.STATISTICS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions#vector_indexstatistics) | vectorindex_functions | Unsupported |  | the analyzer does not know this function |
+| [`VECTOR_SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#vector_search) | search_functions | Unsupported |  | the analyzer does not know this function |

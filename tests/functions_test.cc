@@ -1,4 +1,4 @@
-#include "src/functions.h"
+#include "src/translator/functions.h"
 
 #include <optional>
 #include <string>
@@ -7,10 +7,10 @@
 
 #include "gtest/gtest.h"
 
-namespace bigquery_emulator_duckdb {
+namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-FunctionArgument Sql(std::string sql, ArgumentType type = ArgumentType::kOther) {
+FunctionArgument Sql(std::string sql, googlesql::TypeKind type = googlesql::TYPE_UNKNOWN) {
   return {.sql = std::move(sql), .type = type};
 }
 
@@ -29,18 +29,19 @@ TEST(FunctionsTest, MatchesTheArgumentCount) {
 }
 
 TEST(FunctionsTest, MatchesTheArgumentTypes) {
-  EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("s", ArgumentType::kString)}), "strlen(s)");
-  EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("b", ArgumentType::kBytes)}), "octet_length(b)");
+  EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("s", googlesql::TYPE_STRING)}), "strlen(s)");
+  EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("b", googlesql::TYPE_BYTES)}), "octet_length(b)");
   // A function with rules is unsupported when none matches, rather than passed through.
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("x")}), std::nullopt);
-  EXPECT_EQ(TranslateFunction("REGEXP_CONTAINS", {Sql("b", ArgumentType::kBytes), Sql("r")}),
+  EXPECT_EQ(TranslateFunction("REGEXP_CONTAINS", {Sql("b", googlesql::TYPE_BYTES), Sql("r")}),
             std::nullopt);
 }
 
 TEST(FunctionsTest, FillsInDefaults) {
-  EXPECT_EQ(TranslateFunction("SPLIT", {Sql("s", ArgumentType::kString)}), "split(s, ',')");
-  EXPECT_EQ(TranslateFunction("SPLIT", {Sql("s", ArgumentType::kString), Sql("d")}), "split(s, d)");
-  EXPECT_EQ(TranslateFunction("LPAD", {Sql("s", ArgumentType::kString), Sql("n")}),
+  EXPECT_EQ(TranslateFunction("SPLIT", {Sql("s", googlesql::TYPE_STRING)}), "split(s, ',')");
+  EXPECT_EQ(TranslateFunction("SPLIT", {Sql("s", googlesql::TYPE_STRING), Sql("d")}),
+            "split(s, d)");
+  EXPECT_EQ(TranslateFunction("LPAD", {Sql("s", googlesql::TYPE_STRING), Sql("n")}),
             "lpad(s, CAST(n AS INTEGER), ' ')");
 }
 
@@ -69,11 +70,11 @@ TEST(FunctionsTest, MatchesRoundingModes) {
 }
 
 TEST(FunctionsTest, MatchesStringLiterals) {
-  FunctionArgument exact = Sql("'exact'", ArgumentType::kString);
+  FunctionArgument exact = Sql("'exact'", googlesql::TYPE_STRING);
   exact.string_literal = "exact";
   EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s")}), "json(s)");
   EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s"), exact}), "json(s)");
-  EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s"), Sql("'round'", ArgumentType::kString)}),
+  EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s"), Sql("'round'", googlesql::TYPE_STRING)}),
             std::nullopt);
 }
 
@@ -87,15 +88,29 @@ TEST(FunctionsTest, BindsArgumentsUsedTwice) {
             "CASE WHEN CAST(-65 AS BIGINT) = 0 THEN '' ELSE chr(CAST(CAST(-65 AS BIGINT) AS "
             "INTEGER)) END");
   // Anything else is evaluated once, while trivial arguments stay as they are.
-  EXPECT_EQ(TranslateFunction("LEFT", {Sql("q.s", ArgumentType::kString), Sql("(q.n + 1)")}),
+  EXPECT_EQ(TranslateFunction("LEFT", {Sql("q.s", googlesql::TYPE_STRING), Sql("(q.n + 1)")}),
             "list_transform([struct_pack(a2 := (q.n + 1))], _fn -> CASE WHEN _fn.a2 < "
             "0 THEN error('LEFT length must be non-negative') ELSE left(q.s, _fn.a2) END)[1]");
 }
 
+TEST(FunctionsTest, RaisesErrorsOrNullUnderSafe) {
+  EXPECT_EQ(TranslateFunction("LEFT", {Sql("s", googlesql::TYPE_STRING), Sql("n")}),
+            "CASE WHEN n < 0 THEN error('LEFT length must be non-negative') ELSE left(s, n) END");
+  EXPECT_EQ(TranslateFunction("LEFT", {Sql("s", googlesql::TYPE_STRING), Sql("n")}, true),
+            "CASE WHEN n < 0 THEN NULL ELSE left(s, n) END");
+  // An error message can use the arguments, which count towards binding them once.
+  EXPECT_EQ(TranslateFunction("IPV4_FROM_INT64", {Sql("(q.a + 1)", googlesql::TYPE_INT64)}, true),
+            "list_transform([struct_pack(a1 := (q.a + 1))], _fn -> CASE WHEN _fn.a1 < -2147483648 "
+            "OR _fn.a1 > 4294967295 THEN NULL ELSE unhex(lpad(hex(_fn.a1 & 4294967295), 8, '0')) "
+            "END)[1]");
+  EXPECT_EQ(TranslateFunction("ERROR", {Sql("m")}), "error(m)");
+  EXPECT_EQ(TranslateFunction("ERROR", {Sql("m")}, true), "NULL");
+}
+
 TEST(FunctionsTest, PassesThroughStringsOnly) {
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", ArgumentType::kString)}), "trim(s)");
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", ArgumentType::kString), Sql("c")}), "trim(s, c)");
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("b", ArgumentType::kBytes)}), std::nullopt);
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", googlesql::TYPE_STRING)}), "trim(s)");
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", googlesql::TYPE_STRING), Sql("c")}), "trim(s, c)");
+  EXPECT_EQ(TranslateFunction("TRIM", {Sql("b", googlesql::TYPE_BYTES)}), std::nullopt);
 }
 
 TEST(FunctionsTest, RenamesAndPassesThrough) {
@@ -104,5 +119,28 @@ TEST(FunctionsTest, RenamesAndPassesThrough) {
   EXPECT_EQ(TranslateFunction("NO_SUCH_FUNCTION", {Sql("a")}), std::nullopt);
 }
 
+TEST(FunctionsTest, RegistersEachFunctionWithItsImplementation) {
+  EXPECT_EQ(FindFunction("GREATEST")->implementation, Implementation::kSame);
+  EXPECT_EQ(FindFunction("RAND")->implementation, Implementation::kRenamed);
+  EXPECT_EQ(FindFunction("LEFT")->implementation, Implementation::kRules);
+  EXPECT_EQ(FindFunction("SHA512")->implementation, Implementation::kBackend);
+  EXPECT_EQ(FindFunction("JSON_QUERY")->implementation, Implementation::kHandler);
+  EXPECT_EQ(FindFunction("SAFE_ADD")->implementation, Implementation::kSafe);
+  EXPECT_EQ(FindFunction("SUM")->implementation, Implementation::kAggregate);
+  EXPECT_EQ(FindFunction("ROW_NUMBER")->implementation, Implementation::kAnalytic);
+  EXPECT_EQ(FindFunction("NO_SUCH_FUNCTION"), nullptr);
+  // Only the scalar implementations translate here.
+  EXPECT_EQ(TranslateFunction("SUM", {Sql("x")}), std::nullopt);
+}
+
+TEST(FunctionsTest, SpellsAggregateArguments) {
+  const auto& bytes = FindFunction("STRING_AGG")->aggregates.at(1);
+  EXPECT_EQ(AggregateArguments(bytes, {"b"}),
+            (std::vector<std::string>{"hex(b)", "hex(unhex('2C'))"}));
+  EXPECT_EQ(AggregateArguments(bytes, {"b", "d"}), (std::vector<std::string>{"hex(b)", "hex(d)"}));
+  EXPECT_EQ(AggregateArguments(FindFunction("SUM")->aggregates.at(0), {"x"}),
+            std::vector<std::string>{"x"});
+}
+
 }  // namespace
-}  // namespace bigquery_emulator_duckdb
+}  // namespace bigquery_emulator_duckdb::translator
