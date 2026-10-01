@@ -1,5 +1,6 @@
 #include "src/gcs.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <filesystem>
@@ -23,6 +24,23 @@ namespace cloud = google::cloud;
 namespace storage = cloud::storage;
 
 namespace {
+
+struct ObjectUri {
+  std::string bucket;
+  std::string object;
+};
+
+ObjectUri ParseUri(const std::string& uri) {
+  const size_t slash = uri.find('/', 5);
+  if (!uri.starts_with("gs://") || slash == std::string::npos || slash == 5 ||
+      slash + 1 == uri.size()) {
+    throw ApiError::Invalid("Invalid GCS URI: " + uri);
+  }
+  if (uri.substr(5, slash - 5).find('*') != std::string::npos) {
+    throw ApiError::Invalid("Wildcard is not allowed in a bucket name: " + uri);
+  }
+  return {uri.substr(5, slash - 5), uri.substr(slash + 1)};
+}
 
 struct Endpoint {
   std::string url;
@@ -89,14 +107,42 @@ const std::string& GcsClient::endpoint() const {
   return impl_->options.get<storage::RestEndpointOption>();
 }
 
-void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {
-  const size_t slash = uri.find('/', 5);
-  if (!uri.starts_with("gs://") || slash == std::string::npos || slash == 5 ||
-      slash + 1 == uri.size()) {
-    throw ApiError::Invalid("Invalid GCS URI: " + uri);
+std::vector<std::string> GcsClient::Expand(const std::string& uri) {
+  const auto [bucket, object] = ParseUri(uri);
+  const size_t wildcard = object.find('*');
+  if (wildcard == std::string::npos) return {uri};
+  if (object.find('*', wildcard + 1) != std::string::npos) {
+    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
   }
-  const std::string bucket = uri.substr(5, slash - 5);
-  const std::string object = uri.substr(slash + 1);
+  const std::string prefix = object.substr(0, wildcard);
+  const std::string suffix = object.substr(wildcard + 1);
+  // The documented file-name pattern (fed-sample*.csv) excludes subfolders,
+  // whereas *.csv and a trailing prefix wildcard include them.
+  // https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
+  const bool filename_pattern = !prefix.empty() && prefix.back() != '/' && !suffix.empty() &&
+                                suffix.find('/') == std::string::npos;
+  storage::Client client = impl_->client();
+  const std::string bucket_uri = "gs://" + bucket + "/";
+  std::vector<std::string> matches;
+  for (const auto& entry : client.ListObjects(bucket, storage::Prefix(prefix))) {
+    if (!entry) {
+      throw ApiError::Invalid("Could not list GCS objects: " + uri + " (" +
+                              entry.status().message() + ")");
+    }
+    const std::string& name = entry->name();
+    if (name.size() >= prefix.size() + suffix.size() && name.starts_with(prefix) &&
+        name.ends_with(suffix)) {
+      if (filename_pattern && name.find('/', prefix.size()) != std::string::npos) continue;
+      matches.push_back(bucket_uri + name);
+    }
+  }
+  if (matches.empty()) throw ApiError::Invalid("No GCS objects match: " + uri);
+  std::sort(matches.begin(), matches.end());
+  return matches;
+}
+
+void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {
+  const auto [bucket, object] = ParseUri(uri);
   // SDK copies share the connection pool. Concurrent calls on the same Client instance
   // are not guaranteed to work, so each download uses its own lightweight copy.
   storage::Client client = impl_->client();

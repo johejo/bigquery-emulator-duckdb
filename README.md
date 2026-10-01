@@ -68,6 +68,17 @@ Load jobs read `gs://` objects from [fake-gcs-server](https://github.com/fsouza/
 when `STORAGE_EMULATOR_HOST` is set, and from the public Storage API otherwise, using Application
 Default Credentials when they are available and anonymous access otherwise.
 
+GCS source URIs support one `*` in the object name, following the
+[BigQuery wildcard examples](https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards):
+`gs://bucket/events/*.jsonl` and `gs://bucket/events/part-*` include subfolders, while
+`gs://bucket/events/part-*.jsonl` matches only files in `events`. Bucket-name wildcards and
+multiple asterisks are rejected. Wildcard expansion requires permission to list objects;
+exact URIs are read without listing. The emulator rejects patterns with no matches.
+
+CSV and newline-delimited JSON loads accept gzip data from GCS, local files, and uploads.
+Compression is detected from the file contents, so a `.gz` extension is not required, and
+compressed and uncompressed files can be loaded together.
+
 ## Compatibility
 
 What the emulator supports is listed in generated pages:

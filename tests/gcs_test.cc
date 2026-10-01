@@ -58,6 +58,20 @@ class GcsTest : public ::testing::Test {
         if (previous_port != 0) EXPECT_EQ(request.remote_port, previous_port);
       }
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
+      if (list_objects_) {
+        EXPECT_EQ(request.path, "/storage/v1/b/bucket/o");
+        EXPECT_EQ(request.get_param_value("prefix"), "nested/a b+%");
+        response.status = status_;
+        if (request.get_param_value("pageToken").empty()) {
+          response.set_content(
+              R"({"items":[{"name":"nested/a b+%2.json"}],"nextPageToken":"next"})",
+              "application/json");
+        } else {
+          EXPECT_EQ(request.get_param_value("pageToken"), "next");
+          response.set_content(R"({"items":[{"name":"nested/a b+%1.json"}]})", "application/json");
+        }
+        return;
+      }
       EXPECT_EQ(request.path, expected_path_);
       EXPECT_EQ(request.get_param_value("alt"), "media");
       response.status = status_;
@@ -130,6 +144,7 @@ class GcsTest : public ::testing::Test {
   std::string endpoint_;
   std::string authorization_;
   std::string expected_path_ = "/storage/v1/b/bucket/o/nested/a b+%.json";
+  bool list_objects_ = false;
   bool require_adc_ = false;
   bool check_connection_reuse_ = false;
   std::atomic<int> peer_port_ = 0;
@@ -235,6 +250,25 @@ TEST_F(GcsTest, ReportsMissingObject) {
     EXPECT_EQ(error.reason(), "invalid");
     EXPECT_NE(std::string(error.what()).find(kUri), std::string::npos);
   }
+}
+
+TEST_F(GcsTest, ExactUriDoesNotListObjects) {
+  EXPECT_EQ(client().Expand(kUri), std::vector<std::string>({kUri}));
+  EXPECT_EQ(requests_, 0);
+}
+
+TEST_F(GcsTest, ListsAllPagesWithEscapedPrefix) {
+  list_objects_ = true;
+  EXPECT_EQ(client().Expand("gs://bucket/nested/a b+%*.json"),
+            std::vector<std::string>(
+                {"gs://bucket/nested/a b+%1.json", "gs://bucket/nested/a b+%2.json"}));
+  EXPECT_EQ(requests_, 2);
+}
+
+TEST_F(GcsTest, ReportsListingFailure) {
+  list_objects_ = true;
+  status_ = 403;
+  EXPECT_THROW(client().Expand("gs://bucket/nested/a b+%*.json"), ApiError);
 }
 
 TEST_F(GcsTest, RejectsMalformedUris) {

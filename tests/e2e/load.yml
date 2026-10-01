@@ -1,4 +1,4 @@
-desc: load jobs read local CSV files and GCS JSON objects from fake-gcs-server
+desc: load jobs support GCS wildcards and gzip CSV and JSON from uploads and GCS
 steps:
   mk_dataset:
     exec:
@@ -28,6 +28,103 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"},{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
+  load_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard 'gs://load-fixtures/wildcard/*-part.jsonl' id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  wildcard_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.wildcard
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
+  # https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
+  load_filename_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.filename 'gs://load-fixtures/wildcard-spec/fed-sample*.jsonl' id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  filename_excludes_subfolders:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.filename
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"3","name":"carol"}]'
+  load_prefix_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.prefix 'gs://load-fixtures/wildcard-spec/fed-sample*' id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  prefix_includes_subfolders:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.prefix
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"},{"id":"3","name":"carol"}]'
+  load_extension_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.extension 'gs://load-fixtures/wildcard-spec/*.jsonl' id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  extension_includes_subfolders:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.extension
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"},{"id":"3","name":"carol"}]'
+  load_gzip_upload:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
+        e2e_load.gzip "${E2E_LOAD_DIR}/people.csv.gz" id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  load_gzip_gcs:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
+        e2e_load.gzip gs://load-fixtures/compressed/people.csv.gz
+    test: current.exit_code == 0
+  gzip_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.gzip
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"},{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
+  no_match:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard 'gs://load-fixtures/missing/*.jsonl'
+    test: current.exit_code != 0 && current.stdout contains 'No GCS objects match'
+  multiple_wildcards:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard 'gs://load-fixtures/*/*.jsonl'
+    test: current.exit_code != 0 && current.stdout contains 'Only one wildcard'
+  bucket_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard 'gs://load-*/nested/people.jsonl'
+    test: current.exit_code != 0
+  corrupt_gzip:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard gs://load-fixtures/wildcard/broken.jsonl
+    test: current.exit_code != 0
+  failed_load_preserves_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.wildcard
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
   cleanup:
     exec:
       command: tests/e2e/bq.sh rm -r -f -d e2e_load
