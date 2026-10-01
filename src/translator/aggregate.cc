@@ -1,4 +1,3 @@
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -33,115 +32,68 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        aggregate->having_expr() != nullptr)) {
     return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
   }
-  static const std::map<std::string, std::string> aggregates = {
-      {"COUNT", "count"},
-      {"$COUNT_STAR", "count"},
-      {"SUM", "sum"},
-      {"AVG", "avg"},
-      {"MIN", "min"},
-      {"MAX", "max"},
-      {"ANY_VALUE", "any_value"},
-      {"ARRAY_AGG", "list"},
-      {"ARRAY_CONCAT_AGG", "list"},
-      // Exact, which is within any approximation error.
-      {"APPROX_COUNT_DISTINCT", "count"},
-      {"APPROX_QUANTILES", "quantile_disc"},
-      {"APPROX_TOP_COUNT", "histogram"},
-      // The _null variants return a NULL x instead of skipping its row.
-      {"MAX_BY", "arg_max_null"},
-      {"MIN_BY", "arg_min_null"},
-      {"STRING_AGG", "string_agg"},
-      {"COUNTIF", "count_if"},
-      {"LOGICAL_AND", "bool_and"},
-      {"LOGICAL_OR", "bool_or"},
-      {"BIT_AND", "bit_and"},
-      {"BIT_OR", "bit_or"},
-      {"BIT_XOR", "bit_xor"},
-      {"STDDEV", "stddev_samp"},
-      {"STDDEV_SAMP", "stddev_samp"},
-      {"STDDEV_POP", "stddev_pop"},
-      {"VARIANCE", "var_samp"},
-      {"VAR_SAMP", "var_samp"},
-      {"VAR_POP", "var_pop"},
-      {"CORR", "corr"},
-      {"COVAR_POP", "covar_pop"},
-      {"COVAR_SAMP", "covar_samp"}};
-  static const std::map<std::string, std::string> analytics = {{"ROW_NUMBER", "row_number"},
-                                                               {"RANK", "rank"},
-                                                               {"DENSE_RANK", "dense_rank"},
-                                                               {"PERCENT_RANK", "percent_rank"},
-                                                               {"CUME_DIST", "cume_dist"},
-                                                               {"NTILE", "ntile"},
-                                                               {"LAG", "lag"},
-                                                               {"LEAD", "lead"},
-                                                               {"FIRST_VALUE", "first_value"},
-                                                               {"LAST_VALUE", "last_value"},
-                                                               {"NTH_VALUE", "nth_value"}};
-  auto function = aggregates.find(name);
-  if (function == aggregates.end()) {
-    function = analytics.find(name);
-    if (function == analytics.end() || over.empty()) {
-      return Unsupported(scope, "aggregate or analytic function " + name);
+  const FunctionEntry* entry = FindFunction(name);
+  if (entry == nullptr ||
+      (entry->implementation != Implementation::kAggregate &&
+       entry->implementation != Implementation::kAnalytic) ||
+      (entry->implementation == Implementation::kAnalytic && over.empty())) {
+    return Unsupported(scope, "aggregate or analytic function " + name);
+  }
+  const googlesql::TypeKind first = call.argument_list().empty()
+                                        ? googlesql::TYPE_UNKNOWN
+                                        : call.argument_list(0)->type()->kind();
+  const AggregateRule* rule = nullptr;
+  for (const AggregateRule& candidate : entry->aggregates) {
+    if (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == first) {
+      rule = &candidate;
+      break;
     }
   }
-  std::vector<std::string> args;
+  if (rule == nullptr) {
+    return Unsupported(scope, "aggregate or analytic function " + name);
+  }
+  std::vector<std::string> arguments;
   for (const auto& argument : call.argument_list()) {
     const auto sql = Expression(*argument, scope, columns);
     if (!sql) {
       return std::nullopt;
     }
-    args.push_back(*sql);
+    arguments.push_back(*sql);
   }
-  // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their hexadecimal
-  // digits; the default delimiter is b','.
-  const bool bytes = name == "STRING_AGG" && call.argument_list(0)->type()->IsBytes();
-  if (bytes) {
-    args.at(0) = "hex(" + args.at(0) + ")";
-    if (args.size() > 1) {
-      args.at(1) = "hex(" + args.at(1) + ")";
-    } else {
-      args.emplace_back("'2C'");
-    }
+  const std::vector<std::string> args = AggregateArguments(*rule, arguments);
+  const auto finish = [&](const std::string& sql, const std::string& tail) {
+    return rule->finish == nullptr ? sql : rule->finish(sql, arguments, tail);
+  };
+  if (call.distinct() && rule->distinct == AggregateRule::Distinct::kUnsupported) {
+    return Unsupported(scope, name + "(DISTINCT ...)");
   }
-  const auto unhex = [bytes](const std::string& sql) { return bytes ? "unhex(" + sql + ")" : sql; };
-  // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1.
-  if (name == "APPROX_QUANTILES") {
-    args.at(1) = "list_transform(range(" + args.at(1) + " + 1), lambda i: i / " + args.at(1) + ")";
-  }
-  // APPROX_TOP_COUNT's histogram() takes only the values; the count is applied afterwards.
-  const std::string top = name == "APPROX_TOP_COUNT" ? args.at(1) : "";
-  if (!top.empty()) {
-    if (call.distinct()) {
-      return Unsupported(scope, "APPROX_TOP_COUNT(DISTINCT ...)");
-    }
-    args.pop_back();
-  }
-  std::string inner = name == "$COUNT_STAR" ? "*" : Join(args, ", ");
-  if (call.distinct() || name == "APPROX_COUNT_DISTINCT") {
+  std::string inner = Join(args, ", ");
+  if (call.distinct() || rule->distinct == AggregateRule::Distinct::kAlways) {
     inner = "DISTINCT " + inner;
   }
   std::vector<std::string> conditions;
   if (!having.empty()) {
     conditions.push_back(having);
   }
-  if (call.null_handling_modifier() == googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS) {
-    if (name == "ARRAY_AGG") {
-      conditions.push_back(args.at(0) + " IS NOT NULL");
-    } else if (name == "APPROX_QUANTILES") {
-      // quantile_disc() already skips NULLs, as APPROX_QUANTILES does by default.
-    } else if (name == "FIRST_VALUE" || name == "LAST_VALUE" || name == "NTH_VALUE") {
-      inner += " IGNORE NULLS";
-    } else {
-      return Unsupported(scope, name + " IGNORE NULLS");
-    }
+  switch (call.null_handling_modifier()) {
+    case googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS:
+      if (rule->nulls == AggregateRule::Nulls::kFilter) {
+        conditions.push_back(args.at(0) + " IS NOT NULL");
+      } else if (rule->nulls == AggregateRule::Nulls::kModifier) {
+        inner += " IGNORE NULLS";
+      } else if (rule->nulls != AggregateRule::Nulls::kIgnore) {
+        return Unsupported(scope, name + " IGNORE NULLS");
+      }
+      break;
+    case googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS:
+      if (rule->nulls == AggregateRule::Nulls::kIgnore) {
+        return Unsupported(scope, name + " RESPECT NULLS");
+      }
+      break;
+    default:
+      break;
   }
-  if (call.null_handling_modifier() ==
-          googlesql::ResolvedNonScalarFunctionCallBase::RESPECT_NULLS &&
-      name == "APPROX_QUANTILES") {
-    return Unsupported(scope, name + " RESPECT NULLS");
-  }
-  // ARRAY_CONCAT_AGG skips NULL arrays.
-  if (name == "ARRAY_CONCAT_AGG") {
+  if (rule->skip_nulls) {
     conditions.push_back(args.at(0) + " IS NOT NULL");
   }
   std::string order;
@@ -161,39 +113,26 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return std::nullopt;
     }
     limit = *sql;
-    if (name == "STRING_AGG") {
+    if (rule->limit == AggregateRule::Limit::kJoin) {
       conditions.push_back(args.at(0) + " IS NOT NULL");
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
                                args.at(0) + order + ") FILTER (WHERE " + Join(conditions, " AND ") +
                                ")";
-      return unhex("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
-                   (args.size() > 1 ? args.at(1) : "','") + ")");
+      return finish("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
+                        (args.size() > 1 ? args.at(1) : "','") + ")",
+                    over);
     }
-    if (name != "ARRAY_AGG" && name != "ARRAY_CONCAT_AGG") {
+    if (rule->limit != AggregateRule::Limit::kSlice) {
       return Unsupported(scope, "aggregate " + name + " with LIMIT");
     }
   }
   const std::string tail =
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
-  std::string sql = function->second + "(" + inner + order + ")" + tail;
+  std::string sql = std::string(rule->function) + "(" + inner + order + ")" + tail;
   if (!limit.empty()) {
     sql = "list_slice(" + sql + ", 1, " + limit + ")";
   }
-  if (name == "ARRAY_CONCAT_AGG") {
-    return "flatten(" + sql + ")";
-  }
-  // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting
-  // the (count, value) structs descending puts the most frequent first, and no rows give NULL.
-  if (!top.empty()) {
-    const std::string rows = "count(*)" + tail;
-    const std::string nulls = rows + " - count(" + args.at(0) + ")" + tail;
-    return "CASE WHEN " + rows + " > 0 THEN list_transform(list_slice(list_sort(list_concat(" +
-           "list_transform(map_entries(" + sql +
-           "), lambda e: {'count': e.value::BIGINT, 'value': e.key}), CASE WHEN " + nulls +
-           " > 0 THEN [{'count': " + nulls + ", 'value': NULL}] END), 'DESC'), 1, " + top +
-           "), lambda e: {'value': e.value, 'count': e.count}) END";
-  }
-  return unhex(sql);
+  return finish(sql, tail);
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,

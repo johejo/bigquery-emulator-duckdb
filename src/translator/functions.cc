@@ -1,8 +1,10 @@
-#include "src/functions.h"
+#include "src/translator/functions.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 #include <initializer_list>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,37 +13,14 @@
 #include <utility>
 #include <vector>
 
-namespace bigquery_emulator_duckdb {
+#include "src/translator/internal.h"
+
+namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-using enum ArgumentType;
+using enum googlesql::TypeKind;
 
-// The argument counts a rule accepts.
-struct Arity {
-  // NOLINTNEXTLINE(google-explicit-constructor): a bare count reads best in the table.
-  Arity(std::size_t count) : min(count), max(count) {}
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order reads as a range.
-  Arity(std::size_t min, std::size_t max) : min(min), max(max) {}
-
-  std::size_t min;
-  std::size_t max;
-};
-
-// What argument `argument` (counted from 1) has to be for a rule to apply. A condition on an
-// optional argument the call leaves out holds.
-struct Condition {
-  std::size_t argument;
-  // Any of these types; empty accepts any type.
-  std::vector<ArgumentType> types;
-  // Any of these date parts; empty accepts any argument.
-  std::vector<std::string_view> date_parts;
-  // This rounding mode.
-  std::optional<std::string_view> rounding_mode;
-  // A STRING literal with this value.
-  std::optional<std::string_view> string_literal;
-};
-
-Condition Is(std::size_t argument, std::initializer_list<ArgumentType> types) {
+Condition Is(std::size_t argument, std::initializer_list<googlesql::TypeKind> types) {
   return {.argument = argument, .types = types};
 }
 
@@ -60,17 +39,6 @@ Condition SubDay(std::size_t argument) {
 Condition Literal(std::size_t argument, std::string_view value) {
   return {.argument = argument, .string_literal = value};
 }
-
-// A DuckDB spelling of a BigQuery function. In the spelling, $n is argument n and #n argument
-// n, which has to be a date part, as a lower case string literal. An argument that the spelling
-// uses more than once is evaluated once, so volatile arguments stay consistent.
-struct Rule {
-  Arity arity;
-  std::string spelling;
-  std::vector<Condition> conditions = {};
-  // The spellings of the optional arguments, from the first one past arity.min on.
-  std::vector<std::string_view> defaults = {};
-};
 
 // BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
 std::string WeekStart(const std::string& value, bool iso) {
@@ -106,9 +74,9 @@ std::vector<Rule> WeekDiff() {
 std::vector<Rule> Civil(const std::string& target) {
   // DuckDB cannot cast a TIMESTAMPTZ to TIME, so it goes through the civil time in UTC, the
   // session's time zone.
-  return {{1, "CAST(CAST($1 AS TIMESTAMP) AS " + target + ")", {Is(1, {kTimestamp})}},
+  return {{1, "CAST(CAST($1 AS TIMESTAMP) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}},
           {1, "CAST($1 AS " + target + ")"},
-          {2, "CAST(timezone($2, $1) AS " + target + ")", {Is(1, {kTimestamp})}}};
+          {2, "CAST(timezone($2, $1) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}}};
 }
 
 // The DuckDB function of the same name, called with each argument count in `arity`, when the
@@ -147,17 +115,35 @@ std::string FromChars(std::string_view chars) {
 // STRPOS and INSTR without a position or occurrence. A match in the spaced digits starts on a
 // byte, three characters each.
 std::vector<Rule> Position() {
-  return {
-      {2, "strpos($1, $2)", {Is(1, {kString})}},
-      {2, "((strpos(" + Spaced("$1") + ", " + Spaced("$2") + ") + 2) // 3)", {Is(1, {kBytes})}}};
+  return {{2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
+          {2,
+           "((strpos(" + Spaced("$1") + ", " + Spaced("$2") + ") + 2) // 3)",
+           {Is(1, {TYPE_BYTES})}}};
+}
+
+// LEFT and RIGHT.
+std::vector<Rule> Side(const std::string& function, const std::string& name) {
+  const std::vector<std::string> errors = {"'" + name + " length must be non-negative'"};
+  return {{2,
+           "CASE WHEN $2 < 0 THEN !1 ELSE " + function + "($1, $2) END",
+           {Is(1, {TYPE_STRING})},
+           {},
+           errors},
+          {2,
+           "CASE WHEN $2 < 0 THEN !1 ELSE unhex(" + function + "(hex($1), 2 * $2)) END",
+           {Is(1, {TYPE_BYTES})},
+           {},
+           errors}};
 }
 
 // LPAD and RPAD. DuckDB has no default pad; the BYTES one is b' '.
 std::vector<Rule> Pad(const std::string& function) {
   return {
-      {{2, 3}, function + "($1, CAST($2 AS INTEGER), $3)", {Is(1, {kString})}, {"' '"}},
-      {2, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), '20'))", {Is(1, {kBytes})}},
-      {3, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), hex($3)))", {Is(1, {kBytes})}}};
+      {{2, 3}, function + "($1, CAST($2 AS INTEGER), $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
+      {2, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), '20'))", {Is(1, {TYPE_BYTES})}},
+      {3,
+       "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), hex($3)))",
+       {Is(1, {TYPE_BYTES})}}};
 }
 
 // TRIM, LTRIM and RTRIM. For BYTES, the regular expression `pattern` removes the bytes to trim
@@ -169,11 +155,11 @@ std::vector<Rule> Trim(const std::string& function, std::string_view pattern) {
   for (const char c : pattern) {
     regex += c == '@' ? bytes : std::string(1, c);
   }
-  auto rules = Same(function, {1, 2}, {Is(1, {kString})});
+  auto rules = Same(function, {1, 2}, {Is(1, {TYPE_STRING})});
   rules.push_back(
       {2,
        "unhex(replace(regexp_replace(" + Spaced("$1") + ", '" + regex + "', '', 'g'), ' ', ''))",
-       {Is(1, {kBytes})}});
+       {Is(1, {TYPE_BYTES})}});
   return rules;
 }
 
@@ -184,15 +170,23 @@ std::vector<Rule> Substr() {
     return "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -" + length + " THEN 1 ELSE " + length +
            " + $2 + 1 END";
   };
-  const std::string negative =
-      "CASE WHEN $3 < 0 THEN error('Third argument in SUBSTR() cannot be negative') ELSE ";
+  const std::string negative = "CASE WHEN $3 < 0 THEN !1 ELSE ";
+  const std::vector<std::string> errors = {"'Third argument in SUBSTR() cannot be negative'"};
   return {
-      {2, "substr($1, " + start("length($1)") + ")", {Is(1, {kString})}},
-      {3, negative + "substr($1, " + start("length($1)") + ", $3) END", {Is(1, {kString})}},
-      {2, "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1))", {Is(1, {kBytes})}},
+      {2, "substr($1, " + start("length($1)") + ")", {Is(1, {TYPE_STRING})}},
+      {3,
+       negative + "substr($1, " + start("length($1)") + ", $3) END",
+       {Is(1, {TYPE_STRING})},
+       {},
+       errors},
+      {2,
+       "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1))",
+       {Is(1, {TYPE_BYTES})}},
       {3,
        negative + "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1, 2 * $3)) END",
-       {Is(1, {kBytes})}}};
+       {Is(1, {TYPE_BYTES})},
+       {},
+       errors}};
 }
 
 // ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
@@ -209,10 +203,11 @@ std::string RoundHalfEven() {
 // returns infinity.
 std::vector<Rule> Reciprocal(std::string_view function) {
   const std::string value = std::string(function) + "($1)";
-  return {{1, "CASE WHEN " + value +
-                  " = 0 THEN error('Floating point error: division by zero') "
-                  "ELSE 1 / " +
-                  value + " END"}};
+  return {{1,
+           "CASE WHEN " + value + " = 0 THEN !1 ELSE 1 / " + value + " END",
+           {},
+           {},
+           {"'Floating point error: division by zero'"}}};
 }
 
 // INTERVAL n PART resolves to two arguments, the count and the date part. The three argument
@@ -279,9 +274,11 @@ std::vector<Rule> GenerateTimestampArray() {
                                                                        {"microsecond", "1"}}) {
     rules.push_back({4,
                      "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
-                         ")], _g -> CASE WHEN _g.s = 0 THEN error('Sequence step cannot be 0.') "
+                         ")], _g -> CASE WHEN _g.s = 0 THEN !1 "
                          "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
-                     {Part(4, {part})}});
+                     {Part(4, {part})},
+                     {},
+                     {"'Sequence step cannot be 0.'"}});
   }
   return rules;
 }
@@ -290,19 +287,23 @@ std::vector<Rule> GenerateTimestampArray() {
 // count negative indexes from the end.
 std::vector<Rule> ArrayAt(bool ordinal, bool safe) {
   const std::string out_of_range = ordinal ? "$2 < 1 OR $2 > len($1)" : "$2 < 0 OR $2 >= len($1)";
-  return {{2, "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN " + out_of_range + " THEN " +
-                  (safe ? "NULL" : "error('Array index ' || $2 || ' is out of bounds')") +
-                  " ELSE " + (ordinal ? "$1[$2]" : "$1[$2 + 1]") + " END"}};
+  return {{2,
+           "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN " + out_of_range + " THEN " +
+               (safe ? "NULL" : "!1") + " ELSE " + (ordinal ? "$1[$2]" : "$1[$2 + 1]") + " END",
+           {},
+           {},
+           {"'Array index ' || $2 || ' is out of bounds'"}}};
 }
 
 // DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits shifted
 // out and fill with zeros, which is what shifting a 64-bit BIT string does.
 std::vector<Rule> Shift(std::string_view op) {
   return {{2,
-           "CASE WHEN $2 < 0 THEN error('Bit shift by a negative value') WHEN $2 >= 64 THEN 0 "
-           "ELSE CAST(CAST($1 AS BIT) " +
+           "CASE WHEN $2 < 0 THEN !1 WHEN $2 >= 64 THEN 0 ELSE CAST(CAST($1 AS BIT) " +
                std::string(op) + " CAST($2 AS INTEGER) AS BIGINT) END",
-           {Is(1, {kInt64})}}};
+           {Is(1, {TYPE_INT64})},
+           {},
+           {"'Bit shift by a negative value'"}}};
 }
 
 // Conversions from JSON fail unless the value has the requested type; SQL NULL stays NULL.
@@ -310,9 +311,10 @@ std::vector<Rule> Shift(std::string_view op) {
 std::vector<Rule> FromJson(std::string_view when, std::string_view expected) {
   return {{{1, 2},
            "list_transform([$1], _j -> CASE WHEN _j IS NULL THEN NULL WHEN " + std::string(when) +
-               " ELSE error('The provided JSON input is not " + std::string(expected) +
-               "') END)[1]",
-           {Is(1, {kJson}), Literal(2, "round")}}};
+               " ELSE !1 END)[1]",
+           {Is(1, {TYPE_JSON}), Literal(2, "round")},
+           {},
+           {"'The provided JSON input is not " + std::string(expected) + "'"}}};
 }
 
 std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
@@ -323,7 +325,8 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
   return rules;
 }
 
-const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
+// Functions implemented by DuckDB SQL templates.
+const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
@@ -332,8 +335,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"$MULTIPLY", {{2, "($1 * $2)"}}},
       {"$DIVIDE",
        {{2,
-         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN error('division by zero') "
-         "ELSE $1 / $2 END"}}},
+         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE $1 / $2 END",
+         {},
+         {},
+         {"'division by zero'"}}}},
       {"$UNARY_MINUS", {{1, "(-$1)"}}},
       {"$EQUAL", {{2, "($1 = $2)"}}},
       {"$NOT_EQUAL", {{2, "($1 <> $2)"}}},
@@ -386,10 +391,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"COTH", Reciprocal("tanh")},
       // DuckDB cannot cast an empty BLOB to BIT.
       {"BIT_COUNT",
-       {{1, "bit_count($1)", {Is(1, {kInt64})}},
+       {{1, "bit_count($1)", {Is(1, {TYPE_INT64})}},
         {1,
          "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
-         {Is(1, {kBytes})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
@@ -433,12 +438,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"DATE", Concat({{{3, "make_date($1, $2, $3)"}}, Civil("DATE")})},
       {"TIME", Concat({{{3, "make_time($1, $2, $3)"}}, Civil("TIME")})},
       {"DATETIME", Concat({{{6, "make_timestamp($1, $2, $3, $4, $5, $6)"},
-                            {2, "($1 + $2)", {Is(1, {kDate}), Is(2, {kTime})}}},
+                            {2, "($1 + $2)", {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})}}},
                            Civil("TIMESTAMP")})},
       {"TIMESTAMP",
        {{1, "CAST($1 AS TIMESTAMPTZ)"},
         // A civil time in the given zone; a string with its own offset keeps the offset.
-        {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {kDate, kDatetime})}}}},
+        {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {TYPE_DATE, TYPE_DATETIME})}}}},
 
       // Formatting and parsing: DuckDB takes the value first and the format second.
       {"FORMAT_DATE", {{2, "strftime($2, $1)"}}},
@@ -462,127 +467,100 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
 
       // Strings. DuckDB has almost no BLOB functions, so the BYTES rules work on the hexadecimal
       // digits, two to a byte; see Spaced().
-      {"LENGTH", {{1, "octet_length($1)", {Is(1, {kBytes})}}, {1, "length($1)"}}},
+      {"LENGTH", {{1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}, {1, "length($1)"}}},
       {"BYTE_LENGTH",
-       {{1, "strlen($1)", {Is(1, {kString})}}, {1, "octet_length($1)", {Is(1, {kBytes})}}}},
+       {{1, "strlen($1)", {Is(1, {TYPE_STRING})}}, {1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}}},
       {"INSTR", Position()},
       {"STRPOS", Position()},
-      {"LEFT",
-       {{2,
-         "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE left($1, $2) END",
-         {Is(1, {kString})}},
-        {2,
-         "CASE WHEN $2 < 0 THEN error('LEFT length must be non-negative') ELSE unhex(left(hex($1), "
-         "2 * $2)) END",
-         {Is(1, {kBytes})}}}},
-      {"RIGHT",
-       {{2,
-         "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE right($1, $2) END",
-         {Is(1, {kString})}},
-        {2,
-         "CASE WHEN $2 < 0 THEN error('RIGHT length must be non-negative') ELSE "
-         "unhex(right(hex($1), 2 * $2)) END",
-         {Is(1, {kBytes})}}}},
+      {"LEFT", Side("left", "LEFT")},
+      {"RIGHT", Side("right", "RIGHT")},
       {"LPAD", Pad("lpad")},
       {"RPAD", Pad("rpad")},
       {"SPLIT",
-       {{{1, 2}, "split($1, $2)", {Is(1, {kString})}, {"','"}},
+       {{{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
         // An empty delimiter splits the value into its bytes.
         {2,
          "list_transform(CASE WHEN octet_length($2) = 0 THEN regexp_extract_all(hex($1), '..') "
          "ELSE list_transform(string_split(" +
              Spaced("$1") + ", " + Spaced("$2") +
              "), _p -> replace(_p, ' ', '')) END, _p -> unhex(_p))",
-         {Is(1, {kBytes})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
       {"TRANSLATE",
-       {{3, "translate($1, $2, $3)", {Is(1, {kString})}},
+       {{3, "translate($1, $2, $3)", {Is(1, {TYPE_STRING})}},
         {3,
          FromChars("translate(" + ToChars("$1") + ", " + ToChars("$2") + ", " + ToChars("$3") +
                    ")"),
-         {Is(1, {kBytes})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
       {"ASCII",
-       {{1, "ascii($1)", {Is(1, {kString})}},
+       {{1, "ascii($1)", {Is(1, {TYPE_STRING})}},
         {1,
          "CASE WHEN octet_length($1) = 0 THEN 0 ELSE CAST('0x' || left(hex($1), 2) AS BIGINT) END",
-         {Is(1, {kBytes})}}}},
-      {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {kString})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
+      {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {TYPE_STRING})}}}},
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
-      {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {kString})}}}},
+      {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {TYPE_STRING})}}}},
       // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
-      {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {kString})}}}},
-      {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {kString})}}}},
+      {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {TYPE_STRING})}}}},
+      {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {TYPE_STRING})}}}},
       // A BLOB cast to VARCHAR escapes every byte but printable ASCII as \xHH, so the case
       // mapping only touches ASCII letters, and the escapes read back in either case but \X.
       {"LOWER",
-       {{1, "lower($1)", {Is(1, {kString})}},
-        {1, "CAST(lower(CAST($1 AS VARCHAR)) AS BLOB)", {Is(1, {kBytes})}}}},
+       {{1, "lower($1)", {Is(1, {TYPE_STRING})}},
+        {1, "CAST(lower(CAST($1 AS VARCHAR)) AS BLOB)", {Is(1, {TYPE_BYTES})}}}},
       {"UPPER",
-       {{1, "upper($1)", {Is(1, {kString})}},
-        {1, "CAST(replace(upper(CAST($1 AS VARCHAR)), '\\X', '\\x') AS BLOB)", {Is(1, {kBytes})}}}},
+       {{1, "upper($1)", {Is(1, {TYPE_STRING})}},
+        {1,
+         "CAST(replace(upper(CAST($1 AS VARCHAR)), '\\X', '\\x') AS BLOB)",
+         {Is(1, {TYPE_BYTES})}}}},
       // Reversing the digits reverses the bytes and swaps the two digits of each.
       {"REVERSE",
-       {{1, "reverse($1)", {Is(1, {kString})}},
+       {{1, "reverse($1)", {Is(1, {TYPE_STRING})}},
         {1,
          "unhex(regexp_replace(reverse(hex($1)), '(.)(.)', '\\2\\1', 'g'))",
-         {Is(1, {kBytes})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
       {"TRIM", Trim("trim", "^(?:@)+|(?:@)+$")},
       {"LTRIM", Trim("ltrim", "^(?:@)+")},
       {"RTRIM", Trim("rtrim", "(?:@)+$")},
       {"SUBSTR", Substr()},
       {"SUBSTRING", Substr()},
       {"STARTS_WITH",
-       {{2, "starts_with($1, $2)", {Is(1, {kString})}},
-        {2, "starts_with(hex($1), hex($2))", {Is(1, {kBytes})}}}},
+       {{2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "starts_with(hex($1), hex($2))", {Is(1, {TYPE_BYTES})}}}},
       {"ENDS_WITH",
-       {{2, "ends_with($1, $2)", {Is(1, {kString})}},
-        {2, "ends_with(hex($1), hex($2))", {Is(1, {kBytes})}}}},
+       {{2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "ends_with(hex($1), hex($2))", {Is(1, {TYPE_BYTES})}}}},
       {"REPLACE",
-       {{3, "replace($1, $2, $3)", {Is(1, {kString})}},
+       {{3, "replace($1, $2, $3)", {Is(1, {TYPE_STRING})}},
         {3,
          "unhex(replace(replace(" + Spaced("$1") + ", " + Spaced("$2") + ", " + Spaced("$3") +
              "), ' ', ''))",
-         {Is(1, {kBytes})}}}},
+         {Is(1, {TYPE_BYTES})}}}},
 
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
       {"SHA256", {{1, "unhex(sha256($1))"}}},
-      // DuckDB lacks these; src/backend_functions.cc registers GoogleSQL's implementations as bq_*.
-      // encode() takes a STRING's UTF-8 bytes.
-      {"SHA512",
-       {{1, "bq_sha512(encode($1))", {Is(1, {kString})}}, {1, "bq_sha512($1)", {Is(1, {kBytes})}}}},
-      {"FARM_FINGERPRINT",
-       {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {kString})}},
-        {1, "bq_farm_fingerprint($1)", {Is(1, {kBytes})}}}},
-      {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
-      // Without max_distance, the distance is not capped.
-      {"EDIT_DISTANCE",
-       {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {kString})}, {"9223372036854775807"}},
-        {{2, 3},
-         "bq_edit_distance_bytes($1, $2, $3)",
-         {Is(1, {kBytes})},
-         {"9223372036854775807"}}}},
-      {"REGEXP_INSTR",
-       {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {kString})}, {"1", "1", "0"}},
-        {{2, 5}, "bq_regexp_instr_bytes($1, $2, $3, $4, $5)", {Is(1, {kBytes})}, {"1", "1", "0"}}}},
       // IPv4 addresses are 4 bytes in network byte order. A negative integer stands for its
       // 32-bit two's complement, which the mask makes non-negative for hex() to print.
       {"IPV4_FROM_INT64",
        {{1,
-         "CASE WHEN $1 < -2147483648 OR $1 > 4294967295 THEN error('NET.IPV4_FROM_INT64() "
-         "encountered an invalid integer IP. Expected range: [-0x80000000, 0xFFFFFFFF]; got ' || "
-         "$1) ELSE unhex(lpad(hex($1 & 4294967295), 8, '0')) END",
-         {Is(1, {kInt64})}}}},
+         "CASE WHEN $1 < -2147483648 OR $1 > 4294967295 THEN !1 ELSE unhex(lpad(hex($1 & "
+         "4294967295), 8, '0')) END",
+         {Is(1, {TYPE_INT64})},
+         {},
+         {"'NET.IPV4_FROM_INT64() encountered an invalid integer IP. Expected range: "
+          "[-0x80000000, 0xFFFFFFFF]; got ' || $1"}}}},
       {"IPV4_TO_INT64",
        {{1,
-         "CASE WHEN octet_length($1) <> 4 THEN error('NET.IPV4_TO_INT64() encountered a non-IPv4 "
-         "address. Expected 4 bytes but got ' || octet_length($1)) ELSE CAST('0x' || hex($1) AS "
-         "BIGINT) END",
-         {Is(1, {kBytes})}}}},
+         "CASE WHEN octet_length($1) <> 4 THEN !1 ELSE CAST('0x' || hex($1) AS BIGINT) END",
+         {Is(1, {TYPE_BYTES})},
+         {},
+         {"'NET.IPV4_TO_INT64() encountered a non-IPv4 address. Expected 4 bytes but got ' || "
+          "octet_length($1)"}}}},
       {"TO_HEX", {{1, "lower(hex($1))"}}},
-      {"FROM_HEX", {{1, "unhex($1)", {Is(1, {kString})}}}},
+      {"FROM_HEX", {{1, "unhex($1)", {Is(1, {TYPE_STRING})}}}},
       {"TO_BASE64", {{1, "to_base64($1)"}}},
-      {"FROM_BASE64", {{1, "from_base64($1)", {Is(1, {kString})}}}},
+      {"FROM_BASE64", {{1, "from_base64($1)", {Is(1, {TYPE_STRING})}}}},
 
       // JSON. Only the exact wide number mode keeps DuckDB's numbers as they are.
       {"PARSE_JSON", {{{1, 2}, "json($1)", {Literal(2, "exact")}}}},
@@ -601,18 +579,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"DOUBLE",
        FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)",
                 "a number")},
-      // These take and return JSON as its text; see src/backend_functions.cc.
-      {"LAX_BOOL", {{1, "bq_lax_bool(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
-      {"LAX_INT64", {{1, "bq_lax_int64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
-      {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
-      {"LAX_DOUBLE", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
-      {"LAX_STRING", {{1, "bq_lax_string(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
-      {"JSON_KEYS",
-       {{3,
-         "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
-         {Is(1, {kJson})}}}},
-      {"JSON_STRIP_NULLS",
-       {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {kJson})}}}},
       {"JSON_TYPE",
        {{1,
          "CASE json_type($1) WHEN 'OBJECT' THEN 'object' WHEN 'ARRAY' THEN 'array' "
@@ -620,26 +586,69 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
          "WHEN 'BIGINT' THEN 'number' WHEN 'UBIGINT' THEN 'number' "
          "WHEN 'DOUBLE' THEN 'number' END"}}},
 
-      {"ERROR", {{1, "error($1)"}}},
+      {"ERROR", {{1, "!1", {}, {}, {"$1"}}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
       // DuckDB's array_to_string() skips NULL elements and has no NULL text.
       {"ARRAY_TO_STRING",
-       {{2, "array_to_string($1, $2)", {Is(2, {kString})}},
-        {3, "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)", {Is(2, {kString})}},
+       {{2, "array_to_string($1, $2)", {Is(2, {TYPE_STRING})}},
+        {3,
+         "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)",
+         {Is(2, {TYPE_STRING})}},
         {2,
          "unhex(array_to_string(list_transform($1, _e -> hex(_e)), hex($2)))",
-         {Is(2, {kBytes})}},
+         {Is(2, {TYPE_BYTES})}},
         {3,
          "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), hex($2)))",
-         {Is(2, {kBytes})}}}},
+         {Is(2, {TYPE_BYTES})}}}},
       // generate_series() has no floating point overload, and returns an empty list for a zero
       // step, which BigQuery rejects.
       {"GENERATE_ARRAY",
        {{{2, 3},
-         "CASE WHEN $3 = 0 THEN error('Sequence step cannot be 0.') ELSE generate_series($1, $2, "
-         "$3) END",
-         {Is(1, {kInt64}), Is(2, {kInt64}), Is(3, {kInt64})},
-         {"1"}}}},
+         "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+         {Is(1, {TYPE_INT64}), Is(2, {TYPE_INT64}), Is(3, {TYPE_INT64})},
+         {"1"},
+         {"'Sequence step cannot be 0.'"}}}},
+  };
+  return *kRules;
+}
+
+// Functions implemented by templates that call GoogleSQL's own implementations, which
+// src/backend_functions.cc registers as bq_* DuckDB functions.
+const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
+  static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      // encode() takes a STRING's UTF-8 bytes.
+      {"SHA512",
+       {{1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
+        {1, "bq_sha512($1)", {Is(1, {TYPE_BYTES})}}}},
+      {"FARM_FINGERPRINT",
+       {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
+        {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}}}},
+      {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
+      // Without max_distance, the distance is not capped.
+      {"EDIT_DISTANCE",
+       {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"9223372036854775807"}},
+        {{2, 3},
+         "bq_edit_distance_bytes($1, $2, $3)",
+         {Is(1, {TYPE_BYTES})},
+         {"9223372036854775807"}}}},
+      {"REGEXP_INSTR",
+       {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {TYPE_STRING})}, {"1", "1", "0"}},
+        {{2, 5},
+         "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
+         {Is(1, {TYPE_BYTES})},
+         {"1", "1", "0"}}}},
+      // These take and return JSON as its text; see src/backend_functions.cc.
+      {"LAX_BOOL", {{1, "bq_lax_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"LAX_INT64", {{1, "bq_lax_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"LAX_DOUBLE", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"LAX_STRING", {{1, "bq_lax_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"JSON_KEYS",
+       {{3,
+         "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
+         {Is(1, {TYPE_JSON})}}}},
+      {"JSON_STRIP_NULLS",
+       {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {TYPE_JSON})}}}},
   };
   return *kRules;
 }
@@ -654,8 +663,6 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
       {"IS_INF", "isinf"},
       {"IS_NAN", "isnan"},
       {"JSON_ARRAY", "json_array"},
-      {"JSON_EXTRACT_SCALAR", "json_extract_string"},
-      {"JSON_QUERY", "json_extract"},
       {"RAND", "random"},
       {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
@@ -680,10 +687,199 @@ const std::unordered_set<std::string_view>& PlainFunctions() {
   return *kPlain;
 }
 
-// The argument a $n or #n at spelling[i] refers to, counted from 0.
+// Functions that src/translator/function.cc translates in code.
+const std::unordered_map<std::string_view, Handler>& Handlers() {
+  static const auto* const kHandlers = new std::unordered_map<std::string_view, Handler>{
+      {"$MAKE_ARRAY", MakeArray},
+      {"$AND", Logical},
+      {"$OR", Logical},
+      {"$IN", InList},
+      {"$CASE_NO_VALUE", Case},
+      {"$CASE_WITH_VALUE", Case},
+      {"$SUBSCRIPT", JsonSubscript},
+      {"DATE_BUCKET", Bucket},
+      {"DATETIME_BUCKET", Bucket},
+      {"TIMESTAMP_BUCKET", Bucket},
+      {"REGEXP_EXTRACT", RegexpExtract},
+      {"REGEXP_EXTRACT_ALL", RegexpExtract},
+      {"JSON_QUERY", JsonExtract},
+      {"JSON_EXTRACT", JsonExtract},
+      {"JSON_VALUE", JsonExtract},
+      {"JSON_EXTRACT_SCALAR", JsonExtract},
+      {"JSON_QUERY_ARRAY", JsonExtract},
+      {"JSON_EXTRACT_ARRAY", JsonExtract},
+      {"JSON_VALUE_ARRAY", JsonExtract},
+      {"JSON_EXTRACT_STRING_ARRAY", JsonExtract},
+      {"TO_JSON", ToJson},
+      {"JSON_REMOVE", JsonRemove},
+      {"JSON_SET", JsonSet},
+      {"JSON_OBJECT", JsonObject},
+      {"ARRAY_CONCAT", ArrayConcat},
+  };
+  return *kHandlers;
+}
+
+// SAFE_ADD and its siblings are the arithmetic operators with the SAFE. prefix.
+const std::unordered_map<std::string_view, std::string_view>& SafeFunctions() {
+  static const auto* const kSafe = new std::unordered_map<std::string_view, std::string_view>{
+      {"SAFE_ADD", "$ADD"},
+      {"SAFE_SUBTRACT", "$SUBTRACT"},
+      {"SAFE_MULTIPLY", "$MULTIPLY"},
+      {"SAFE_NEGATE", "$UNARY_MINUS"},
+  };
+  return *kSafe;
+}
+
+// histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting the
+// (count, value) structs descending puts the most frequent first, and no rows give NULL.
+std::string TopCount(const std::string& sql, const std::vector<std::string>& arguments,
+                     const std::string& tail) {
+  const std::string rows = "count(*)" + tail;
+  const std::string nulls = rows + " - count(" + arguments.at(0) + ")" + tail;
+  return "CASE WHEN " + rows + " > 0 THEN list_transform(list_slice(list_sort(list_concat(" +
+         "list_transform(map_entries(" + sql +
+         "), lambda e: {'count': e.value::BIGINT, 'value': e.key}), CASE WHEN " + nulls +
+         " > 0 THEN [{'count': " + nulls + ", 'value': NULL}] END), 'DESC'), 1, " +
+         arguments.at(1) + "), lambda e: {'value': e.value, 'count': e.count}) END";
+}
+
+std::string Unhex(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                  const std::string& /*tail*/) {
+  return "unhex(" + sql + ")";
+}
+
+std::string Flatten(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                    const std::string& /*tail*/) {
+  return "flatten(" + sql + ")";
+}
+
+// Aggregate functions, which also take a window.
+const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregates() {
+  using enum AggregateRule::Nulls;
+  using enum AggregateRule::Limit;
+  static const auto* const kAggregates =
+      new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
+          {"COUNT", {{.function = "count"}}},
+          {"$COUNT_STAR", {{.function = "count", .arguments = {"*"}}}},
+          {"SUM", {{.function = "sum"}}},
+          {"AVG", {{.function = "avg"}}},
+          {"MIN", {{.function = "min"}}},
+          {"MAX", {{.function = "max"}}},
+          {"ANY_VALUE", {{.function = "any_value"}}},
+          {"ARRAY_AGG", {{.function = "list", .nulls = kFilter, .limit = kSlice}}},
+          // ARRAY_CONCAT_AGG skips NULL arrays.
+          {"ARRAY_CONCAT_AGG",
+           {{.function = "list", .limit = kSlice, .skip_nulls = true, .finish = Flatten}}},
+          // Exact, which is within any approximation error.
+          {"APPROX_COUNT_DISTINCT",
+           {{.function = "count", .distinct = AggregateRule::Distinct::kAlways}}},
+          // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
+          // skips NULLs, as APPROX_QUANTILES does by default.
+          {"APPROX_QUANTILES",
+           {{.function = "quantile_disc",
+             .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
+             .nulls = kIgnore}}},
+          // histogram() takes only the values; TopCount() applies the count afterwards.
+          {"APPROX_TOP_COUNT",
+           {{.function = "histogram",
+             .arguments = {"$1"},
+             .distinct = AggregateRule::Distinct::kUnsupported,
+             .finish = TopCount}}},
+          // The _null variants return a NULL x instead of skipping its row.
+          {"MAX_BY", {{.function = "arg_max_null"}}},
+          {"MIN_BY", {{.function = "arg_min_null"}}},
+          // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
+          // hexadecimal digits; the default delimiter is b','.
+          {"STRING_AGG",
+           {{.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+            {.function = "string_agg",
+             .type = googlesql::TYPE_BYTES,
+             .arguments = {"hex($1)", "hex($2)"},
+             .defaults = {"", "unhex('2C')"},
+             .limit = kJoin,
+             .finish = Unhex}}},
+          {"COUNTIF", {{.function = "count_if"}}},
+          {"LOGICAL_AND", {{.function = "bool_and"}}},
+          {"LOGICAL_OR", {{.function = "bool_or"}}},
+          {"BIT_AND", {{.function = "bit_and"}}},
+          {"BIT_OR", {{.function = "bit_or"}}},
+          {"BIT_XOR", {{.function = "bit_xor"}}},
+          {"STDDEV", {{.function = "stddev_samp"}}},
+          {"STDDEV_SAMP", {{.function = "stddev_samp"}}},
+          {"STDDEV_POP", {{.function = "stddev_pop"}}},
+          {"VARIANCE", {{.function = "var_samp"}}},
+          {"VAR_SAMP", {{.function = "var_samp"}}},
+          {"VAR_POP", {{.function = "var_pop"}}},
+          {"CORR", {{.function = "corr"}}},
+          {"COVAR_POP", {{.function = "covar_pop"}}},
+          {"COVAR_SAMP", {{.function = "covar_samp"}}},
+      };
+  return *kAggregates;
+}
+
+// Functions that only take a window.
+const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytics() {
+  using enum AggregateRule::Nulls;
+  static const auto* const kAnalytics =
+      new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
+          {"ROW_NUMBER", {{.function = "row_number"}}},
+          {"RANK", {{.function = "rank"}}},
+          {"DENSE_RANK", {{.function = "dense_rank"}}},
+          {"PERCENT_RANK", {{.function = "percent_rank"}}},
+          {"CUME_DIST", {{.function = "cume_dist"}}},
+          {"NTILE", {{.function = "ntile"}}},
+          {"LAG", {{.function = "lag"}}},
+          {"LEAD", {{.function = "lead"}}},
+          {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier}}},
+          {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier}}},
+          {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier}}},
+      };
+  return *kAnalytics;
+}
+
+// Every function, from the tables above. A function is in one table only.
+const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
+  static const auto* const kRegistry = [] {
+    auto* registry = new std::unordered_map<std::string_view, FunctionEntry>();
+    const auto add = [registry](std::string_view name, FunctionEntry entry) {
+      if (!registry->emplace(name, std::move(entry)).second) {
+        std::cerr << "function " << name << " is registered twice\n";
+        std::abort();
+      }
+    };
+    for (const auto& [name, rules] : TemplateRules()) {
+      add(name, {.implementation = Implementation::kRules, .rules = rules});
+    }
+    for (const auto& [name, rules] : BackendRules()) {
+      add(name, {.implementation = Implementation::kBackend, .rules = rules});
+    }
+    for (const auto& [name, target] : FunctionNames()) {
+      add(name, {.implementation = Implementation::kRenamed, .target = target});
+    }
+    for (const std::string_view name : PlainFunctions()) {
+      add(name, {.implementation = Implementation::kSame});
+    }
+    for (const auto& [name, handler] : Handlers()) {
+      add(name, {.implementation = Implementation::kHandler, .handler = handler});
+    }
+    for (const auto& [name, target] : SafeFunctions()) {
+      add(name, {.implementation = Implementation::kSafe, .target = target});
+    }
+    for (const auto& [name, rules] : Aggregates()) {
+      add(name, {.implementation = Implementation::kAggregate, .aggregates = rules});
+    }
+    for (const auto& [name, rules] : Analytics()) {
+      add(name, {.implementation = Implementation::kAnalytic, .aggregates = rules});
+    }
+    return registry;
+  }();
+  return *kRegistry;
+}
+
+// The argument a $n, #n or !n at spelling[i] refers to, counted from 0; for !n, the error.
 std::optional<std::size_t> Placeholder(std::string_view spelling, std::size_t i) {
-  if ((spelling[i] != '$' && spelling[i] != '#') || i + 1 >= spelling.size() ||
-      spelling[i + 1] < '1' || spelling[i + 1] > '9') {
+  if ((spelling[i] != '$' && spelling[i] != '#' && spelling[i] != '!') ||
+      i + 1 >= spelling.size() || spelling[i + 1] < '1' || spelling[i + 1] > '9') {
     return std::nullopt;
   }
   return static_cast<std::size_t>(spelling[i + 1] - '1');
@@ -746,7 +942,23 @@ bool Trivial(std::string_view sql) {
   });
 }
 
-std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& arguments) {
+// The rule's spelling with each !n replaced by the SQL raising error n.
+std::string WithErrors(const Rule& rule, bool safe) {
+  std::string spelling;
+  for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
+    const auto index = Placeholder(rule.spelling, i);
+    if (index && rule.spelling[i] == '!') {
+      spelling += Raise(rule.errors.at(*index), safe);
+      ++i;
+    } else {
+      spelling += rule.spelling[i];
+    }
+  }
+  return spelling;
+}
+
+std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& arguments, bool safe) {
+  const std::string spelling = WithErrors(rule, safe);
   std::vector<std::string> sql;
   sql.reserve(std::max<std::size_t>(arguments.size(), rule.arity.max));
   for (const FunctionArgument& argument : arguments) {
@@ -757,8 +969,8 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
     sql.emplace_back(rule.defaults[i - rule.arity.min]);
   }
   std::vector<int> uses(sql.size());
-  for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
-    if (const auto index = Placeholder(rule.spelling, i); index && rule.spelling[i] == '$') {
+  for (std::size_t i = 0; i < spelling.size(); ++i) {
+    if (const auto index = Placeholder(spelling, i); index && spelling[i] == '$') {
       ++uses.at(*index);
     }
   }
@@ -783,12 +995,12 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
     }
   }
   std::string body;
-  for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
-    if (const auto index = Placeholder(rule.spelling, i)) {
-      body += rule.spelling[i] == '$' ? references.at(*index) : sql.at(*index);
+  for (std::size_t i = 0; i < spelling.size(); ++i) {
+    if (const auto index = Placeholder(spelling, i)) {
+      body += spelling[i] == '$' ? references.at(*index) : sql.at(*index);
       ++i;
     } else {
-      body += rule.spelling[i];
+      body += spelling[i];
     }
   }
   if (!bind) {
@@ -805,27 +1017,91 @@ std::string Invoke(std::string_view function, const std::vector<FunctionArgument
   return sql + ")";
 }
 
-}  // namespace
-
-std::optional<std::string> TranslateFunction(std::string_view upper_name,
-                                             const std::vector<FunctionArgument>& arguments) {
-  // A function with rules is translated by them alone, so a call no rule matches, such as one
-  // with an argument type the rules leave out, stays unsupported.
-  if (const auto rules = Rules().find(upper_name); rules != Rules().end()) {
-    for (const Rule& rule : rules->second) {
-      if (Matches(rule, arguments)) {
-        return Expand(rule, arguments);
-      }
+// Substitutes the translated arguments for each $n in `spelling`.
+std::string Substitute(std::string_view spelling, const std::vector<std::string>& arguments) {
+  std::string sql;
+  for (std::size_t i = 0; i < spelling.size(); ++i) {
+    if (const auto index = Placeholder(spelling, i); index && spelling[i] == '$') {
+      sql += arguments.at(*index);
+      ++i;
+    } else {
+      sql += spelling[i];
     }
-    return std::nullopt;
   }
-  if (const auto renamed = FunctionNames().find(upper_name); renamed != FunctionNames().end()) {
-    return Invoke(renamed->second, arguments);
-  }
-  if (PlainFunctions().contains(upper_name)) {
-    return Invoke(upper_name, arguments);
-  }
-  return std::nullopt;
+  return sql;
 }
 
-}  // namespace bigquery_emulator_duckdb
+}  // namespace
+
+std::string_view Describe(Implementation implementation) {
+  switch (implementation) {
+    case Implementation::kSame:
+      return "DuckDB function";
+    case Implementation::kRenamed:
+      return "DuckDB function, renamed";
+    case Implementation::kRules:
+      return "DuckDB SQL";
+    case Implementation::kBackend:
+      return "GoogleSQL function";
+    case Implementation::kHandler:
+      return "DuckDB SQL, in code";
+    case Implementation::kSafe:
+      return "SAFE. operator";
+    case Implementation::kAggregate:
+      return "DuckDB aggregate";
+    case Implementation::kAnalytic:
+      return "DuckDB window function";
+  }
+  return "";
+}
+
+const FunctionEntry* FindFunction(std::string_view upper_name) {
+  const auto entry = Registry().find(upper_name);
+  return entry == Registry().end() ? nullptr : &entry->second;
+}
+
+std::optional<std::string> TranslateFunction(std::string_view upper_name,
+                                             const std::vector<FunctionArgument>& arguments,
+                                             bool safe) {
+  const FunctionEntry* entry = FindFunction(upper_name);
+  if (entry == nullptr) {
+    return std::nullopt;
+  }
+  switch (entry->implementation) {
+    case Implementation::kSame:
+      return Invoke(upper_name, arguments);
+    case Implementation::kRenamed:
+      return Invoke(entry->target, arguments);
+    case Implementation::kRules:
+    case Implementation::kBackend:
+      // A function with rules is translated by them alone, so a call no rule matches, such as
+      // one with an argument type the rules leave out, stays unsupported.
+      for (const Rule& rule : entry->rules) {
+        if (Matches(rule, arguments)) {
+          return Expand(rule, arguments, safe);
+        }
+      }
+      return std::nullopt;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::vector<std::string> AggregateArguments(const AggregateRule& rule,
+                                            const std::vector<std::string>& arguments) {
+  if (rule.arguments.empty()) {
+    return arguments;
+  }
+  std::vector<std::string> given = arguments;
+  for (std::size_t i = given.size(); i < rule.defaults.size(); ++i) {
+    given.emplace_back(rule.defaults[i]);
+  }
+  std::vector<std::string> sql;
+  sql.reserve(rule.arguments.size());
+  for (const std::string_view spelling : rule.arguments) {
+    sql.push_back(Substitute(spelling, given));
+  }
+  return sql;
+}
+
+}  // namespace bigquery_emulator_duckdb::translator

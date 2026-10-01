@@ -40,13 +40,6 @@ cc_library(
 )
 
 cc_library(
-    name = "functions",
-    srcs = ["src/functions.cc"],
-    hdrs = ["src/functions.h"],
-    copts = ["-std=c++20"],
-)
-
-cc_library(
     name = "query_parameters",
     srcs = ["src/query_parameters.cc"],
     hdrs = ["src/query_parameters.h"],
@@ -132,23 +125,27 @@ cc_library(
         "src/translator/dml.cc",
         "src/translator/expression.cc",
         "src/translator/function.cc",
+        "src/translator/functions.cc",
         "src/translator/internal.h",
         "src/translator/literal.cc",
         "src/translator/scan.cc",
     ],
-    hdrs = ["src/translator.h"],
+    hdrs = [
+        "src/translator.h",
+        "src/translator/functions.h",
+    ],
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
         ":catalog",
         ":duckdb_sql",
-        ":functions",
         ":query_parameters",
         ":type_mapping",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:type_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
     ],
@@ -271,6 +268,7 @@ cc_binary(
         ":catalog",
         ":emulator",
         ":probe",
+        ":translator",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
     ],
@@ -387,7 +385,7 @@ cc_test(
     srcs = ["tests/functions_test.cc"],
     copts = ["-std=c++20"],
     deps = [
-        ":functions",
+        ":translator",
         "@com_google_googletest//:gtest_main",
     ],
 )
