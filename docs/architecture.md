@@ -35,16 +35,27 @@ are applied only at the output boundary, so duplicate or shadowed aliases never 
 DuckDB differs from BigQuery, the translator spells out BigQuery's semantics, such as default
 NULL ordering and result types.
 
+The translator's sources in [src/translator/](../src/translator) share
+[internal.h](../src/translator/internal.h): a `Context` for the whole statement, and the `Scope`
+of what a scan can see besides its input. Expressions, scalar functions, scans, aggregation, DML,
+DDL, and types and literals each have a file of their own.
+
 [src/functions.cc](../src/functions.cc) maps BigQuery functions to DuckDB with two rule tables.
 A **rename** replaces only the function name. A **template** rewrites the call using `$n` for
 the n-th argument and `#n` for that argument as a lowercase string literal, so
-`DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`.
+`DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`. A function belongs there when every
+call it supports is one template of a fixed number of arguments, chosen by their types, date
+parts, rounding modes and STRING literal values. Functions that take any number of arguments or
+read more of the resolved AST, such as a JSONPath literal, are spelled in
+[src/translator/function.cc](../src/translator/function.cc).
 
 ## Backend
 
 [DuckDB](https://duckdb.org/) executes translated statements through libduckdb's C++ API; each
 project is a DuckDB catalog and each dataset a schema. The backend derives result schemas and
-encodes rows in BigQuery's `{"f": [{"v": ...}]}` format. GCS load jobs download objects with
+encodes rows in BigQuery's `{"f": [{"v": ...}]}` format. Functions DuckDB lacks are registered
+from GoogleSQL's own implementations in [src/backend_functions.cc](../src/backend_functions.cc).
+GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files, which
 DuckDB then reads.
 

@@ -254,6 +254,42 @@ std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
   return view;
 }
 
+// What creating a view runs besides its CREATE VIEW, in the same transaction: the statements
+// that check the view and record its metadata in its comment, and for IF NOT EXISTS, a query
+// that finds an existing view, which is then kept as it is.
+struct ViewWrite {
+  std::vector<std::string> metadata_statements;
+  std::string existence_query;
+};
+
+ViewWrite CreateViewWrite(const googlesql::ResolvedCreateViewStmt& view,
+                          const std::string& default_project, const std::string& default_dataset) {
+  const auto path = NormalizeTablePath(view.name_path(), default_project, default_dataset);
+  const TableReference table{path[0], path[1], path[2]};
+  json fields = json::array();
+  for (const auto& output : view.output_column_list()) {
+    const auto field = BigQueryFieldSchema(output->name(), output->column().type());
+    if (!field.ok()) {
+      throw ApiError::InvalidQuery(std::string(field.status().message()));
+    }
+    fields.push_back(field->ToJson());
+  }
+  const json metadata{{"query", view.sql()}, {"fields", fields}};
+  ViewWrite write;
+  // DuckDB can create a circular view and only reject it when queried. Bind the new definition
+  // before committing so a failed replacement keeps the old view.
+  write.metadata_statements = {
+      "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
+      "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
+  if (view.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
+    write.existence_query = "SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
+                            QuoteLiteral(table.project_id) +
+                            " AND table_schema = " + QuoteLiteral(table.dataset_id) +
+                            " AND table_name = " + QuoteLiteral(table.table_id);
+  }
+  return write;
+}
+
 // Serves the analyzer the tables the emulator keeps in DuckDB.
 class DuckDbTableSource : public TableSource {
  public:
@@ -448,29 +484,11 @@ Emulator::Translation Emulator::Translate(const std::string& query,
   }
   Translation translation{*std::move(sql), analyzed.result_schema(), {}, {}};
   if (analyzed.statement().Is<googlesql::ResolvedCreateViewStmt>()) {
-    const auto& view = *analyzed.statement().GetAs<googlesql::ResolvedCreateViewStmt>();
-    const auto path = NormalizeTablePath(view.name_path(), default_project, default_dataset);
-    const TableReference table{path[0], path[1], path[2]};
-    json fields = json::array();
-    for (const auto& output : view.output_column_list()) {
-      const auto field = BigQueryFieldSchema(output->name(), output->column().type());
-      if (!field.ok()) {
-        throw ApiError::InvalidQuery(std::string(field.status().message()));
-      }
-      fields.push_back(field->ToJson());
-    }
-    const json metadata{{"query", view.sql()}, {"fields", fields}};
-    // DuckDB can create a circular view and only reject it when queried. Bind the
-    // new definition before committing so a failed replacement keeps the old view.
-    translation.view_metadata_statements = {
-        "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-        "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
-    if (view.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
-      translation.view_existence_query =
-          "SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
-          QuoteLiteral(table.project_id) + " AND table_schema = " + QuoteLiteral(table.dataset_id) +
-          " AND table_name = " + QuoteLiteral(table.table_id);
-    }
+    ViewWrite write =
+        CreateViewWrite(*analyzed.statement().GetAs<googlesql::ResolvedCreateViewStmt>(),
+                        default_project, default_dataset);
+    translation.view_metadata_statements = std::move(write.metadata_statements);
+    translation.view_existence_query = std::move(write.existence_query);
   }
   return translation;
 }

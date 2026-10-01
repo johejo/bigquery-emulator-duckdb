@@ -275,7 +275,7 @@ SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t
 => "00ff"
 
 ## Google sql functions
-# src/backend.cc registers GoogleSQL's implementations of these.
+# src/backend_functions.cc registers GoogleSQL's implementations of these.
 
 SELECT FARM_FINGERPRINT('')
 => "-7286425919675154353"

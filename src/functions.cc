@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
@@ -214,6 +215,106 @@ std::vector<Rule> Reciprocal(std::string_view function) {
                   value + " END"}};
 }
 
+// INTERVAL n PART resolves to two arguments, the count and the date part. The three argument
+// form of the date arithmetic functions is the two argument `spelling` of an INTERVAL value with
+// $2 multiplied out to that part.
+std::vector<Rule> WithInterval(const std::string& spelling) {
+  std::vector<Rule> rules = {{2, spelling}};
+  for (const std::string_view part : {"year", "quarter", "month", "week", "day", "hour", "minute",
+                                      "second", "millisecond", "microsecond"}) {
+    std::string expanded;
+    for (std::size_t i = 0; i < spelling.size(); ++i) {
+      if (spelling.compare(i, 2, "$2") == 0) {
+        expanded += "($2 * INTERVAL '1 " + std::string(part) + "')";
+        ++i;
+      } else {
+        expanded += spelling[i];
+      }
+    }
+    rules.push_back({3, expanded, {Part(3, {part})}});
+  }
+  return rules;
+}
+
+// EXTRACT, where a time zone argument moves a TIMESTAMP to the civil time there.
+std::vector<Rule> Extract() {
+  std::vector<Rule> rules;
+  for (const auto& [arity, value] :
+       {std::pair<std::size_t, std::string>{2, "$1"}, {3, "timezone($3, $1)"}}) {
+    rules.push_back(
+        {arity, "(date_part('dayofweek', " + value + ") + 1)", {Part(2, {"dayofweek"})}});
+    rules.push_back({arity, "CAST(strftime(" + value + ", '%U') AS BIGINT)", {Part(2, {"week"})}});
+    rules.push_back({arity, "date_part('week', " + value + ")", {Part(2, {"isoweek"})}});
+    // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
+    rules.push_back({arity, "(date_part(#2, " + value + ") % 1000)", {Part(2, {"millisecond"})}});
+    rules.push_back(
+        {arity, "(date_part(#2, " + value + ") % 1000000)", {Part(2, {"microsecond"})}});
+    rules.push_back({arity, "date_part(#2, " + value + ")"});
+  }
+  return rules;
+}
+
+// DuckDB's generate_series steps from the previous element, which only agrees with BigQuery
+// stepping from the start for parts of a fixed length.
+std::vector<Rule> GenerateDateArray() {
+  const auto series = [](const std::string& step) {
+    return "list_transform(generate_series(CAST($1 AS TIMESTAMP), CAST($2 AS TIMESTAMP), " + step +
+           "), _d -> CAST(_d AS DATE))";
+  };
+  return {{2, series("INTERVAL 1 DAY")},
+          {4, series("($3 * INTERVAL '1 day')"), {Part(4, {"day"})}},
+          {4, series("($3 * INTERVAL '1 week')"), {Part(4, {"week"})}}};
+}
+
+// Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return an
+// empty array for a zero step.
+std::vector<Rule> GenerateTimestampArray() {
+  std::vector<Rule> rules;
+  for (const auto& [part, micros] :
+       std::initializer_list<std::pair<std::string_view, std::string>>{{"day", "86400000000"},
+                                                                       {"hour", "3600000000"},
+                                                                       {"minute", "60000000"},
+                                                                       {"second", "1000000"},
+                                                                       {"millisecond", "1000"},
+                                                                       {"microsecond", "1"}}) {
+    rules.push_back({4,
+                     "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
+                         ")], _g -> CASE WHEN _g.s = 0 THEN error('Sequence step cannot be 0.') "
+                         "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
+                     {Part(4, {part})}});
+  }
+  return rules;
+}
+
+// $ARRAY_AT_OFFSET and its siblings. DuckDB would return NULL for an index out of range, and
+// count negative indexes from the end.
+std::vector<Rule> ArrayAt(bool ordinal, bool safe) {
+  const std::string out_of_range = ordinal ? "$2 < 1 OR $2 > len($1)" : "$2 < 0 OR $2 >= len($1)";
+  return {{2, "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN " + out_of_range + " THEN " +
+                  (safe ? "NULL" : "error('Array index ' || $2 || ' is out of bounds')") +
+                  " ELSE " + (ordinal ? "$1[$2]" : "$1[$2 + 1]") + " END"}};
+}
+
+// DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits shifted
+// out and fill with zeros, which is what shifting a 64-bit BIT string does.
+std::vector<Rule> Shift(std::string_view op) {
+  return {{2,
+           "CASE WHEN $2 < 0 THEN error('Bit shift by a negative value') WHEN $2 >= 64 THEN 0 "
+           "ELSE CAST(CAST($1 AS BIT) " +
+               std::string(op) + " CAST($2 AS INTEGER) AS BIGINT) END",
+           {Is(1, {kInt64})}}};
+}
+
+// Conversions from JSON fail unless the value has the requested type; SQL NULL stays NULL.
+// FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which is unsupported.
+std::vector<Rule> FromJson(std::string_view when, std::string_view expected) {
+  return {{{1, 2},
+           "list_transform([$1], _j -> CASE WHEN _j IS NULL THEN NULL WHEN " + std::string(when) +
+               " ELSE error('The provided JSON input is not " + std::string(expected) +
+               "') END)[1]",
+           {Is(1, {kJson}), Literal(2, "round")}}};
+}
+
 std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
   std::vector<Rule> rules;
   for (const auto& group : groups) {
@@ -224,6 +325,43 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
 
 const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      // Operators. Division binds its operands once, as every rule does, and stays an
+      // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
+      {"$ADD", {{2, "($1 + $2)"}}},
+      {"$SUBTRACT", {{2, "($1 - $2)"}}},
+      {"$MULTIPLY", {{2, "($1 * $2)"}}},
+      {"$DIVIDE",
+       {{2,
+         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN error('division by zero') "
+         "ELSE $1 / $2 END"}}},
+      {"$UNARY_MINUS", {{1, "(-$1)"}}},
+      {"$EQUAL", {{2, "($1 = $2)"}}},
+      {"$NOT_EQUAL", {{2, "($1 <> $2)"}}},
+      {"$LESS", {{2, "($1 < $2)"}}},
+      {"$LESS_OR_EQUAL", {{2, "($1 <= $2)"}}},
+      {"$GREATER", {{2, "($1 > $2)"}}},
+      {"$GREATER_OR_EQUAL", {{2, "($1 >= $2)"}}},
+      {"$BETWEEN", {{3, "($1 BETWEEN $2 AND $3)"}}},
+      {"$LIKE", {{2, "($1 LIKE $2)"}}},
+      {"$IS_DISTINCT_FROM", {{2, "($1 IS DISTINCT FROM $2)"}}},
+      {"$IS_NOT_DISTINCT_FROM", {{2, "($1 IS NOT DISTINCT FROM $2)"}}},
+      {"$IS_NULL", {{1, "($1 IS NULL)"}}},
+      {"$IS_TRUE", {{1, "($1 IS TRUE)"}}},
+      {"$IS_FALSE", {{1, "($1 IS FALSE)"}}},
+      {"$NOT", {{1, "(NOT $1)"}}},
+      {"$BITWISE_NOT", {{1, "(~$1)"}}},
+      {"$BITWISE_AND", {{2, "($1 & $2)"}}},
+      {"$BITWISE_OR", {{2, "($1 | $2)"}}},
+      {"$BITWISE_XOR", {{2, "xor($1, $2)"}}},
+      {"$BITWISE_LEFT_SHIFT", Shift("<<")},
+      {"$BITWISE_RIGHT_SHIFT", Shift(">>")},
+      // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
+      {"$IN_ARRAY", {{2, "($1 IN (SELECT unnest($2)))"}}},
+      {"$ARRAY_AT_OFFSET", ArrayAt(false, false)},
+      {"$ARRAY_AT_ORDINAL", ArrayAt(true, false)},
+      {"$SAFE_ARRAY_AT_OFFSET", ArrayAt(false, true)},
+      {"$SAFE_ARRAY_AT_ORDINAL", ArrayAt(true, true)},
+
       // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
       // make the zero itself disappear.
       {"SAFE_DIVIDE", {{2, "($1 / NULLIF($2, 0))"}}},
@@ -255,14 +393,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
-      {"DATE_ADD", {{2, "CAST($1 + $2 AS DATE)"}}},
-      {"DATE_SUB", {{2, "CAST($1 - $2 AS DATE)"}}},
-      {"DATETIME_ADD", {{2, "($1 + $2)"}}},
-      {"DATETIME_SUB", {{2, "($1 - $2)"}}},
-      {"TIMESTAMP_ADD", {{2, "($1 + $2)"}}},
-      {"TIMESTAMP_SUB", {{2, "($1 - $2)"}}},
-      {"TIME_ADD", {{2, "($1 + $2)"}}},
-      {"TIME_SUB", {{2, "($1 - $2)"}}},
+      {"DATE_ADD", WithInterval("CAST($1 + $2 AS DATE)")},
+      {"DATE_SUB", WithInterval("CAST($1 - $2 AS DATE)")},
+      {"DATETIME_ADD", WithInterval("($1 + $2)")},
+      {"DATETIME_SUB", WithInterval("($1 - $2)")},
+      {"TIMESTAMP_ADD", WithInterval("($1 + $2)")},
+      {"TIMESTAMP_SUB", WithInterval("($1 - $2)")},
+      {"TIME_ADD", WithInterval("($1 + $2)")},
+      {"TIME_SUB", WithInterval("($1 - $2)")},
+      {"$EXTRACT", Extract()},
+      {"GENERATE_DATE_ARRAY", GenerateDateArray()},
+      {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
       // Below a day, BigQuery counts whole units rather than the boundaries crossed, which is
       // DuckDB's date_sub rather than date_diff.
       {"DATE_DIFF", Concat({WeekDiff(),
@@ -406,7 +547,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
       {"SHA256", {{1, "unhex(sha256($1))"}}},
-      // DuckDB lacks these; src/backend.cc registers GoogleSQL's implementations as bq_*.
+      // DuckDB lacks these; src/backend_functions.cc registers GoogleSQL's implementations as bq_*.
       // encode() takes a STRING's UTF-8 bytes.
       {"SHA512",
        {{1, "bq_sha512(encode($1))", {Is(1, {kString})}}, {1, "bq_sha512($1)", {Is(1, {kBytes})}}}},
@@ -432,6 +573,32 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       // JSON. Only the exact wide number mode keeps DuckDB's numbers as they are.
       {"PARSE_JSON", {{{1, 2}, "json($1)", {Literal(2, "exact")}}}},
       {"TO_JSON_STRING", {{1, "CAST(to_json($1) AS VARCHAR)"}}},
+      {"BOOL", FromJson("json_type(_j) = 'BOOLEAN' THEN CAST(_j AS BOOLEAN)", "a boolean")},
+      {"STRING",
+       FromJson("json_type(_j) = 'VARCHAR' THEN json_extract_string(_j, '$')", "a string")},
+      {"INT64",
+       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT') THEN CAST(_j AS BIGINT) WHEN "
+                "json_type(_j) = 'DOUBLE' AND CAST(_j AS DOUBLE) = trunc(CAST(_j AS DOUBLE)) THEN "
+                "CAST(CAST(_j AS DOUBLE) AS BIGINT)",
+                "an integer")},
+      {"FLOAT64",
+       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)",
+                "a number")},
+      {"DOUBLE",
+       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)",
+                "a number")},
+      // These take and return JSON as its text; see src/backend_functions.cc.
+      {"LAX_BOOL", {{1, "bq_lax_bool(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
+      {"LAX_INT64", {{1, "bq_lax_int64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
+      {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
+      {"LAX_DOUBLE", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
+      {"LAX_STRING", {{1, "bq_lax_string(CAST($1 AS VARCHAR))", {Is(1, {kJson})}}}},
+      {"JSON_KEYS",
+       {{3,
+         "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
+         {Is(1, {kJson})}}}},
+      {"JSON_STRIP_NULLS",
+       {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {kJson})}}}},
       {"JSON_TYPE",
        {{1,
          "CASE json_type($1) WHEN 'OBJECT' THEN 'object' WHEN 'ARRAY' THEN 'array' "

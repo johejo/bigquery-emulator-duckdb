@@ -280,13 +280,11 @@ std::optional<size_t> CapturingGroups(std::string_view pattern) {
   return groups;
 }
 
-// The DuckDB spelling of a scalar call over already translated arguments.
+// The DuckDB spelling of a scalar call over already translated arguments. Only the functions
+// that the rules of src/functions.cc cannot express are spelled here; see TranslateFunction.
 std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
                                 const std::string& name, const std::vector<std::string>& args) {
   const size_t n = args.size();
-  const auto invoke = [&](std::string_view function) {
-    return std::string(function) + "(" + Join(args, ", ") + ")";
-  };
   std::vector<FunctionArgument> arguments;
   for (size_t i = 0; i < n; ++i) {
     const googlesql::ResolvedExpr& argument = *call.argument_list(static_cast<int>(i));
@@ -299,87 +297,8 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
   if (name == "$MAKE_ARRAY") {
     return "[" + Join(args, ", ") + "]";
   }
-  if (n == 2 && (name == "$ARRAY_AT_OFFSET" || name == "$ARRAY_AT_ORDINAL" ||
-                 name == "$SAFE_ARRAY_AT_OFFSET" || name == "$SAFE_ARRAY_AT_ORDINAL")) {
-    // Bound like division so both operands are evaluated once. DuckDB would return NULL for
-    // an index out of range, and count negative indexes from the end.
-    const bool ordinal = name.ends_with("ORDINAL");
-    const std::string out_of_range =
-        ordinal ? "_at.i < 1 OR _at.i > len(_at.a)" : "_at.i < 0 OR _at.i >= len(_at.a)";
-    return "list_transform([struct_pack(a := " + args[0] + ", i := " + args[1] +
-           ")], _at -> CASE WHEN _at.a IS NULL OR _at.i IS NULL THEN NULL WHEN " + out_of_range +
-           " THEN " +
-           (name.starts_with("$SAFE_") ? "NULL"
-                                       : "error('Array index ' || _at.i || ' is out of bounds')") +
-           " ELSE " + (ordinal ? "_at.a[_at.i]" : "_at.a[_at.i + 1]") + " END)[1]";
-  }
-  static const std::map<std::string, std::string> binary = {
-      {"$ADD", "+"},       {"$SUBTRACT", "-"},
-      {"$MULTIPLY", "*"},  {"$DIVIDE", "/"},
-      {"$EQUAL", "="},     {"$NOT_EQUAL", "<>"},
-      {"$LESS", "<"},      {"$LESS_OR_EQUAL", "<="},
-      {"$GREATER", ">"},   {"$GREATER_OR_EQUAL", ">="},
-      {"$LIKE", "LIKE"},   {"$BITWISE_AND", "&"},
-      {"$BITWISE_OR", "|"}};
-  if (name == "$BITWISE_XOR" && n == 2) {
-    return invoke("xor");
-  }
-  if (const auto op = binary.find(name); op != binary.end() && n == 2) {
-    if (name == "$DIVIDE") {
-      // Bind both operands once, including volatile expressions, while keeping this an
-      // expression that CASE/IF can short-circuit. DuckDB otherwise returns infinity on
-      // zero. A scalar subquery here would break conditional evaluation of the error.
-      return "list_transform([struct_pack(n := " + args[0] + ", d := " + args[1] +
-             ")], _div -> CASE WHEN _div.n IS NULL OR _div.d IS NULL THEN NULL "
-             "WHEN _div.d = 0 THEN error('division by zero') "
-             "ELSE _div.n / _div.d END)[1]";
-    }
-    return "(" + args[0] + " " + op->second + " " + args[1] + ")";
-  }
-  if ((name == "$IS_DISTINCT_FROM" || name == "$IS_NOT_DISTINCT_FROM") && n == 2) {
-    return "(" + args[0] +
-           (name == "$IS_DISTINCT_FROM" ? " IS DISTINCT FROM " : " IS NOT DISTINCT FROM ") +
-           args[1] + ")";
-  }
-  if ((name == "$BITWISE_LEFT_SHIFT" || name == "$BITWISE_RIGHT_SHIFT") && n == 2 &&
-      call.argument_list(0)->type()->IsInt64()) {
-    // DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits
-    // shifted out and fill with zeros, which is what shifting a 64-bit BIT string does.
-    return "list_transform([struct_pack(x := " + args[0] + ", s := " + args[1] +
-           ")], _sh -> CASE WHEN _sh.s < 0 THEN error('Bit shift by a negative value') "
-           "WHEN _sh.s >= 64 THEN 0 ELSE CAST(CAST(_sh.x AS BIT) " +
-           (name == "$BITWISE_LEFT_SHIFT" ? "<<" : ">>") +
-           " CAST(_sh.s AS INTEGER) AS BIGINT) END)[1]";
-  }
-  if (name == "$IN_ARRAY" && n == 2) {
-    // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
-    return "(" + args[0] + " IN (SELECT unnest(" + args[1] + ")))";
-  }
   if ((name == "$AND" || name == "$OR") && n >= 2) {
     return "(" + Join(args, name == "$AND" ? " AND " : " OR ") + ")";
-  }
-  if (n == 1) {
-    if (name == "$NOT") {
-      return "(NOT " + args[0] + ")";
-    }
-    if (name == "$UNARY_MINUS") {
-      return "(-" + args[0] + ")";
-    }
-    if (name == "$BITWISE_NOT") {
-      return "(~" + args[0] + ")";
-    }
-    if (name == "$IS_NULL") {
-      return "(" + args[0] + " IS NULL)";
-    }
-    if (name == "$IS_TRUE") {
-      return "(" + args[0] + " IS TRUE)";
-    }
-    if (name == "$IS_FALSE") {
-      return "(" + args[0] + " IS FALSE)";
-    }
-  }
-  if (name == "$BETWEEN" && n == 3) {
-    return "(" + args[0] + " BETWEEN " + args[1] + " AND " + args[2] + ")";
   }
   if (name == "$IN" && n >= 2) {
     const std::vector<std::string> values(args.begin() + 1, args.end());
@@ -399,63 +318,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "(" + sql + "ELSE " + args.back() + " END)";
   }
-  // A time zone argument moves a TIMESTAMP to the civil time there.
-  const auto civil = [&](size_t zone) {
-    return n > zone ? "timezone(" + args[zone] + ", " + args[0] + ")" : args[0];
-  };
   const auto type = [&](size_t i) { return call.argument_list(static_cast<int>(i))->type(); };
-  if (name == "$EXTRACT" && (n == 2 || n == 3)) {
-    const auto part = DatePart(*call.argument_list(1));
-    if (!part) {
-      return std::nullopt;
-    }
-    const std::string value = civil(2);
-    if (*part == "dayofweek") {
-      return "(date_part('dayofweek', " + value + ") + 1)";
-    }
-    if (*part == "week") {
-      return "CAST(strftime(" + value + ", '%U') AS BIGINT)";
-    }
-    if (*part == "isoweek") {
-      return "date_part('week', " + value + ")";
-    }
-    // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
-    if (*part == "millisecond" || *part == "microsecond") {
-      return "(date_part(" + args[1] + ", " + value + ") % " +
-             (*part == "millisecond" ? "1000" : "1000000") + ")";
-    }
-    return "date_part(" + args[1] + ", " + value + ")";
-  }
-  // DuckDB's generate_series steps from the previous element, which only agrees with BigQuery
-  // stepping from the start for parts of a fixed length.
-  if (name == "GENERATE_DATE_ARRAY" && (n == 2 || n == 4)) {
-    std::string step = "INTERVAL 1 DAY";
-    if (n == 4) {
-      const auto part = DatePart(*call.argument_list(3));
-      if (part != "day" && part != "week") {
-        return std::nullopt;
-      }
-      step = "(" + args[2] + " * INTERVAL '1 " + *part + "')";
-    }
-    return "list_transform(generate_series(CAST(" + args[0] + " AS TIMESTAMP), CAST(" + args[1] +
-           " AS TIMESTAMP), " + step + "), _d -> CAST(_d AS DATE))";
-  }
-  if (name == "GENERATE_TIMESTAMP_ARRAY" && n == 4) {
-    static const std::map<std::string, std::string> micros = {
-        {"day", "86400000000"}, {"hour", "3600000000"},  {"minute", "60000000"},
-        {"second", "1000000"},  {"millisecond", "1000"}, {"microsecond", "1"}};
-    const auto part = DatePart(*call.argument_list(3));
-    const auto step = part ? micros.find(*part) : micros.end();
-    if (step == micros.end()) {
-      return std::nullopt;
-    }
-    // Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return
-    // an empty array for a zero step.
-    return "list_transform([struct_pack(a := " + args[0] + ", b := " + args[1] +
-           ", s := " + args[2] + " * " + step->second +
-           ")], _g -> CASE WHEN _g.s = 0 THEN error('Sequence step cannot be 0.') ELSE "
-           "generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]";
-  }
   // The width is already a count of months, days or microseconds, see BucketWidthOf. Months
   // count from the origin in the calendar, while days and microseconds are fixed lengths;
   // TIMESTAMP and DATETIME take a day as 24 hours.
@@ -495,17 +358,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
            ")], _bk -> CASE WHEN _bk.w < 0 THEN error('Negative bucket width INTERVAL is not "
            "allowed') WHEN _bk.w = 0 THEN error('" +
            zero + "') ELSE " + bucket + " END)[1]";
-  }
-  // INTERVAL n PART becomes two arguments (INT64, enum) in the resolved AST.
-  if (n == 3 && (name == "DATE_ADD" || name == "DATE_SUB" || name == "DATETIME_ADD" ||
-                 name == "DATETIME_SUB" || name == "TIMESTAMP_ADD" || name == "TIMESTAMP_SUB" ||
-                 name == "TIME_ADD" || name == "TIME_SUB")) {
-    const auto part = DatePart(*call.argument_list(2));
-    if (!part || *part == "isoyear" || *part == "isoweek") {
-      return std::nullopt;
-    }
-    const std::string interval = "(" + args[1] + " * INTERVAL '1 " + *part + "')";
-    return TranslateFunction(name, {arguments[0], {.sql = interval}});
   }
   if ((name == "REGEXP_EXTRACT" || name == "REGEXP_EXTRACT_ALL") && n == 2 && type(0)->IsString()) {
     const auto pattern = StringLiteral(*call.argument_list(1));
@@ -581,30 +433,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
     }
     return "json_extract(" + args[0] + ", " + QuoteLiteral("$" + *path) + ")";
   }
-  // Conversions from JSON fail unless the value has the requested type; SQL NULL stays NULL.
-  static const std::map<std::string, std::pair<std::string, std::string>> json_conversions = {
-      {"BOOL", {"json_type(_j) = 'BOOLEAN' THEN CAST(_j AS BOOLEAN)", "a boolean"}},
-      {"STRING", {"json_type(_j) = 'VARCHAR' THEN json_extract_string(_j, '$')", "a string"}},
-      {"INT64",
-       {"json_type(_j) IN ('BIGINT', 'UBIGINT') THEN CAST(_j AS BIGINT) WHEN json_type(_j) = "
-        "'DOUBLE' AND CAST(_j AS DOUBLE) = trunc(CAST(_j AS DOUBLE)) THEN CAST(CAST(_j AS DOUBLE) "
-        "AS BIGINT)",
-        "an integer"}},
-      {"FLOAT64",
-       {"json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)", "a number"}},
-      {"DOUBLE",
-       {"json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)", "a number"}}};
-  if (const auto conversion = json_conversions.find(name);
-      conversion != json_conversions.end() && n >= 1 && type(0)->IsJson()) {
-    // FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which is unsupported.
-    if (n > 2 || (n == 2 && StringLiteral(*call.argument_list(1)) != "round")) {
-      return std::nullopt;
-    }
-    return "list_transform([" + args[0] + "], _j -> CASE WHEN _j IS NULL THEN NULL WHEN " +
-           conversion->second.first + " ELSE error('The provided JSON input is not " +
-           conversion->second.second + "') END)[1]";
-  }
-  // The JSON functions in src/backend.cc take and return JSON as its text.
+  // The JSON functions in src/backend_functions.cc take and return JSON as its text.
   const auto json_text = [&](size_t i) {
     return type(i)->IsJson() ? "CAST(" + args[i] + " AS VARCHAR)"
                              : "CAST(to_json(" + args[i] + ") AS VARCHAR)";
@@ -615,24 +444,6 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& call,
                   call.argument_list(1)->GetAs<googlesql::ResolvedLiteral>()->value() ==
                       googlesql::Value::Bool(false)))) {
     return "coalesce(to_json(" + args[0] + "), JSON 'null')";
-  }
-  static const std::map<std::string, std::string> lax_conversions = {
-      {"LAX_BOOL", "bq_lax_bool"},
-      {"LAX_INT64", "bq_lax_int64"},
-      {"LAX_FLOAT64", "bq_lax_float64"},
-      {"LAX_DOUBLE", "bq_lax_float64"},
-      {"LAX_STRING", "bq_lax_string"}};
-  if (const auto lax = lax_conversions.find(name);
-      lax != lax_conversions.end() && n == 1 && type(0)->IsJson()) {
-    return lax->second + "(" + json_text(0) + ")";
-  }
-  if (name == "JSON_KEYS" && n == 3) {
-    return "CAST(json(bq_json_keys(" + json_text(0) + ", " + args[1] + ", " + args[2] +
-           ")) AS VARCHAR[])";
-  }
-  if (name == "JSON_STRIP_NULLS" && n == 4) {
-    return "json(bq_json_strip_nulls(" + json_text(0) + ", " + args[1] + ", " + args[2] + ", " +
-           args[3] + "))";
   }
   // JSON_REMOVE and JSON_SET take the paths one by one, in order.
   if (name == "JSON_REMOVE" && n >= 2) {
