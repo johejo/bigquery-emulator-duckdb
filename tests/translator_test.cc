@@ -25,21 +25,22 @@ class TestTableSource : public TableSource {
       return std::nullopt;
     }
     if (table == "st") {
-      return std::vector<FieldSchema>{{.name = "id", .type = "INTEGER"},
-                                      {.name = "s",
-                                       .type = "RECORD",
-                                       .fields = {{.name = "x", .type = "INTEGER"},
-                                                  {.name = "y",
-                                                   .type = "RECORD",
-                                                   .fields = {{.name = "z", .type = "STRING"},
-                                                              {.name = "w", .type = "INTEGER"}}}}}};
+      return std::vector<FieldSchema>{
+          {.name = "id", .type = FieldType::kInteger},
+          {.name = "s",
+           .type = FieldType::kRecord,
+           .fields = {{.name = "x", .type = FieldType::kInteger},
+                      {.name = "y",
+                       .type = FieldType::kRecord,
+                       .fields = {{.name = "z", .type = FieldType::kString},
+                                  {.name = "w", .type = FieldType::kInteger}}}}}};
     }
     if (table != "t") {
       return std::nullopt;
     }
-    return std::vector<FieldSchema>{{.name = "a", .type = "INTEGER"},
-                                    {.name = "b", .type = "STRING"},
-                                    {.name = "raw", .type = "BYTES"}};
+    return std::vector<FieldSchema>{{.name = "a", .type = FieldType::kInteger},
+                                    {.name = "b", .type = FieldType::kString},
+                                    {.name = "raw", .type = FieldType::kBytes}};
   }
 };
 
@@ -122,8 +123,8 @@ TEST_F(TranslatorTest, PreservesScalarTypesAndOutputOrder) {
   ASSERT_EQ(result.rows.size(), 1);
   EXPECT_EQ(result.schema[0].name, "z");
   EXPECT_EQ(result.schema[1].name, "a");
-  EXPECT_EQ(result.schema[0].type, "INTEGER");
-  EXPECT_EQ(result.schema[1].type, "FLOAT");
+  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
+  EXPECT_EQ(result.schema[1].type, FieldType::kFloat);
   EXPECT_EQ(result.rows[0]["f"][0]["v"], "1");
   EXPECT_EQ(result.rows[0]["f"][1]["v"], "2.5");
   EXPECT_TRUE(result.rows[0]["f"][2]["v"].is_null());
@@ -217,8 +218,8 @@ TEST_F(TranslatorTest, RunsDdl) {
   ASSERT_EQ(result.rows.size(), 1);
   EXPECT_EQ(result.rows[0]["f"][1]["v"], "1.24");
   EXPECT_EQ(result.rows[0]["f"][2]["v"], "none");
-  EXPECT_EQ(result.schema[3].mode, "REPEATED");
-  EXPECT_EQ(result.schema[4].type, "RECORD");
+  EXPECT_EQ(result.schema[3].mode, FieldMode::kRepeated);
+  EXPECT_EQ(result.schema[4].type, FieldType::kRecord);
 
   EXPECT_THROW(Execute("CREATE TABLE other.typed (x INT64)"), BackendError);
   Execute("CREATE TABLE IF NOT EXISTS other.typed (x INT64)");
@@ -261,7 +262,7 @@ TEST_F(TranslatorTest, ReadsTablesAndKeepsHiddenSortColumns) {
   EXPECT_EQ(result.rows[1]["f"][1]["v"], "1");
   ASSERT_EQ(result.schema.size(), 2);
   EXPECT_EQ(result.schema[0].name, "bytes");
-  EXPECT_EQ(result.schema[0].type, "INTEGER");
+  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
 }
 
 TEST_F(TranslatorTest, ResolvesScopesAliasesAndStarModifiers) {
@@ -381,7 +382,7 @@ TEST_F(TranslatorTest, PreparesParameterizedTableQueries) {
   const auto prepared = backend_.Prepare(*sql);
   ASSERT_EQ(prepared.schema.size(), 1);
   EXPECT_EQ(prepared.schema[0].name, "x");
-  EXPECT_EQ(prepared.schema[0].type, "INTEGER");
+  EXPECT_EQ(prepared.schema[0].type, FieldType::kInteger);
   const auto result = backend_.Execute(*sql);
   ASSERT_EQ(result.rows.size(), 1);
   EXPECT_EQ(result.rows[0]["f"][0]["v"], "3");
@@ -497,7 +498,7 @@ TEST_F(TranslatorTest, RunsAggregatesAndDistinct) {
       "STRING_AGG(b, ',' ORDER BY a DESC), ARRAY_LENGTH(ARRAY_AGG(a IGNORE NULLS)), "
       "COUNTIF(a > 1), LOGICAL_AND(a > 0) FROM t");
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.schema[0].type, "INTEGER");
+  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
   const auto& row = result.rows[0]["f"];
   EXPECT_EQ(row[0]["v"], "6");
   EXPECT_EQ(row[1]["v"], "4");

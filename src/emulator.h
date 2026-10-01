@@ -126,7 +126,7 @@ class Emulator {
   // The names of the views among ListTables, sorted.
   std::vector<std::string> ListViews(const DatasetReference& dataset);
   TableInfo GetTable(const TableReference& table, bool include_row_count = true);
-  void CreateTable(const TableReference& table, const nlohmann::json& fields);
+  void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema);
   void CreateView(const TableReference& table, const nlohmann::json& definition);
   void DeleteTable(const TableReference& table);
   QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);

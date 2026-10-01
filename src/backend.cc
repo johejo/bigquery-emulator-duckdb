@@ -33,11 +33,11 @@ LogicalType ElementType(duckdb_logical_type type) {
 
 FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type);
 
-// Maps a DuckDB type to the BigQuery type name used in TableFieldSchema.type.
-std::string ToBigQueryTypeName(duckdb_logical_type type) {
+// Maps a DuckDB type to the BigQuery type of a TableFieldSchema.
+FieldType ToBigQueryType(duckdb_logical_type type) {
   switch (duckdb_get_type_id(type)) {
     case DUCKDB_TYPE_BOOLEAN:
-      return "BOOLEAN";
+      return FieldType::kBoolean;
     case DUCKDB_TYPE_TINYINT:
     case DUCKDB_TYPE_SMALLINT:
     case DUCKDB_TYPE_INTEGER:
@@ -46,43 +46,43 @@ std::string ToBigQueryTypeName(duckdb_logical_type type) {
     case DUCKDB_TYPE_USMALLINT:
     case DUCKDB_TYPE_UINTEGER:
     case DUCKDB_TYPE_UBIGINT:
-      return "INTEGER";
+      return FieldType::kInteger;
     case DUCKDB_TYPE_HUGEINT:
     case DUCKDB_TYPE_UHUGEINT:
-      return "BIGNUMERIC";
+      return FieldType::kBigNumeric;
     case DUCKDB_TYPE_FLOAT:
     case DUCKDB_TYPE_DOUBLE:
-      return "FLOAT";
+      return FieldType::kFloat;
     case DUCKDB_TYPE_DECIMAL:
-      return duckdb_decimal_scale(type) <= 9 ? "NUMERIC" : "BIGNUMERIC";
+      return duckdb_decimal_scale(type) <= 9 ? FieldType::kNumeric : FieldType::kBigNumeric;
     case DUCKDB_TYPE_VARCHAR:
     case DUCKDB_TYPE_UUID:
-      return "STRING";
+      return FieldType::kString;
     case DUCKDB_TYPE_BLOB:
-      return "BYTES";
+      return FieldType::kBytes;
     case DUCKDB_TYPE_DATE:
-      return "DATE";
+      return FieldType::kDate;
     case DUCKDB_TYPE_TIME:
     case DUCKDB_TYPE_TIME_TZ:
-      return "TIME";
+      return FieldType::kTime;
     // BigQuery TIMESTAMP is an absolute instant, which is DuckDB's TIMESTAMP WITH TIME ZONE.
     // BigQuery DATETIME is a civil time, which is DuckDB's plain TIMESTAMP.
     case DUCKDB_TYPE_TIMESTAMP_TZ:
-      return "TIMESTAMP";
+      return FieldType::kTimestamp;
     case DUCKDB_TYPE_TIMESTAMP:
     case DUCKDB_TYPE_TIMESTAMP_S:
     case DUCKDB_TYPE_TIMESTAMP_MS:
     case DUCKDB_TYPE_TIMESTAMP_NS:
-      return "DATETIME";
+      return FieldType::kDatetime;
     case DUCKDB_TYPE_INTERVAL:
-      return "INTERVAL";
+      return FieldType::kInterval;
     case DUCKDB_TYPE_STRUCT:
-      return "RECORD";
+      return FieldType::kRecord;
     case DUCKDB_TYPE_LIST:
     case DUCKDB_TYPE_ARRAY:
-      return ToBigQueryTypeName(ElementType(type).get());
+      return ToBigQueryType(ElementType(type).get());
     default:
-      return "STRING";
+      return FieldType::kString;
   }
 }
 
@@ -94,8 +94,8 @@ bool IsListLike(duckdb_logical_type type) {
 FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   FieldSchema field;
   field.name = name;
-  field.type = ToBigQueryTypeName(type);
-  field.mode = IsListLike(type) ? "REPEATED" : "NULLABLE";
+  field.type = ToBigQueryType(type);
+  field.mode = IsListLike(type) ? FieldMode::kRepeated : FieldMode::kNullable;
   LogicalType element(IsListLike(type) ? ElementType(type).release() : nullptr);
   duckdb_logical_type scalar_type = element.get() ? element.get() : type;
   if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
@@ -412,10 +412,10 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
   if (value.is_null()) {
     return value;
   }
-  if (field.type == "TIMESTAMP") {
+  if (field.type == FieldType::kTimestamp) {
     return EpochSecondsString(std::stoll(value.get<std::string>()));
   }
-  if (field.type == "RECORD") {
+  if (field.type == FieldType::kRecord) {
     return json{{"f", CellsAsSeconds(field.fields, value.at("f"))}};
   }
   return value;
@@ -426,7 +426,7 @@ json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
   for (size_t i = 0; i < schema.size() && i < cells.size(); ++i) {
     const FieldSchema& field = schema[i];
     const json& value = cells[i].at("v");
-    if (field.mode != "REPEATED" || value.is_null()) {
+    if (field.mode != FieldMode::kRepeated || value.is_null()) {
       result.push_back(json{{"v", ValueAsSeconds(field, value)}});
       continue;
     }
@@ -465,7 +465,7 @@ json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::Schema
 
 bool HasTimestampField(const std::vector<FieldSchema>& schema) {
   for (const FieldSchema& field : schema) {
-    if (field.type == "TIMESTAMP" || HasTimestampField(field.fields)) {
+    if (field.type == FieldType::kTimestamp || HasTimestampField(field.fields)) {
       return true;
     }
   }

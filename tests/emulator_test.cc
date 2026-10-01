@@ -100,7 +100,7 @@ TEST_F(EmulatorTest, RunsAndPreparesResolvedParameters) {
     EXPECT_EQ(result.schema[1].name, "bytes");
     EXPECT_EQ(result.schema[2].name, "f1_");
     for (const auto& field : result.schema) {
-      EXPECT_EQ(field.type, "INTEGER");
+      EXPECT_EQ(field.type, FieldType::kInteger);
     }
     if (!dry_run) {
       ASSERT_EQ(result.rows.size(), 1);
@@ -130,13 +130,13 @@ TEST_F(EmulatorTest, ReportsTheResolvedResultSchema) {
   ASSERT_EQ(schema.size(), 4);
   // DuckDB sums integers into a HUGEINT, which alone would be reported as BIGNUMERIC.
   EXPECT_EQ(schema[0].name, "s");
-  EXPECT_EQ(schema[0].type, "INTEGER");
+  EXPECT_EQ(schema[0].type, FieldType::kInteger);
   EXPECT_EQ(schema[1].name, "f0_");
-  EXPECT_EQ(schema[1].type, "STRING");
+  EXPECT_EQ(schema[1].type, FieldType::kString);
   EXPECT_EQ(schema[2].name, "f1_");
-  EXPECT_EQ(schema[2].type, "FLOAT");
+  EXPECT_EQ(schema[2].type, FieldType::kFloat);
   EXPECT_EQ(schema[3].name, "f2_");
-  EXPECT_EQ(schema[3].type, "DATE");
+  EXPECT_EQ(schema[3].type, FieldType::kDate);
 }
 
 // A value table of structs comes back as the structs' fields; any other value is one column.
@@ -148,9 +148,9 @@ TEST_F(EmulatorTest, ReturnsValueTablesAsColumns) {
   const std::vector<FieldSchema>& schema = job->result->schema;
   ASSERT_EQ(schema.size(), 2);
   EXPECT_EQ(schema[0].name, "a");
-  EXPECT_EQ(schema[0].type, "INTEGER");
+  EXPECT_EQ(schema[0].type, FieldType::kInteger);
   EXPECT_EQ(schema[1].name, "b");
-  EXPECT_EQ(schema[1].type, "STRING");
+  EXPECT_EQ(schema[1].type, FieldType::kString);
   ASSERT_EQ(job->result->rows.size(), 1);
   EXPECT_EQ(job->result->rows[0]["f"][1]["v"], "x");
   EXPECT_EQ(Scalar("SELECT AS VALUE 7"), "7");
@@ -162,8 +162,8 @@ TEST_F(EmulatorTest, AliasesUnnestedElements) {
 
 TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {
   emulator_.CreateDataset({"test", "ds"});
-  emulator_.CreateTable({"test", "ds", "t"}, nlohmann::json::parse(R"([
-      {"name": "a", "type": "INTEGER"}, {"name": "b", "type": "STRING"}])"));
+  emulator_.CreateTable({"test", "ds", "t"}, {{.name = "a", .type = FieldType::kInteger},
+                                              {.name = "b", .type = FieldType::kString}});
   QueryRequest request;
   request.project_id = "test";
   request.default_dataset = DatasetReference{"test", "ds"};
@@ -175,7 +175,7 @@ TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {
     FAIL() << ErrorMessage(*job);
   }
   EXPECT_EQ(job->result->schema.at(0).name, "f0_");
-  EXPECT_EQ(job->result->schema.at(0).type, "INTEGER");
+  EXPECT_EQ(job->result->schema.at(0).type, FieldType::kInteger);
   EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "3");
 
   request.query = "SELECT nope FROM t";
@@ -196,7 +196,7 @@ TEST_F(EmulatorTest, TypesQueryParameters) {
   if (!job->result.has_value()) {
     FAIL() << ErrorMessage(*job);
   }
-  EXPECT_EQ(job->result->schema.at(0).type, "INTEGER");
+  EXPECT_EQ(job->result->schema.at(0).type, FieldType::kInteger);
   EXPECT_EQ(job->result->rows.at(0)["f"][0]["v"], "4");
 
   // BigQuery does not coerce a STRING to a number, however DuckDB would.
@@ -269,7 +269,7 @@ TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   const TableInfo table = emulator_.GetTable(destination);
   ASSERT_EQ(table.schema.size(), 2);
   EXPECT_EQ(table.schema[1].name, "f0_");
-  EXPECT_EQ(table.schema[1].type, "INTEGER");
+  EXPECT_EQ(table.schema[1].type, FieldType::kInteger);
   EXPECT_EQ(values(), (std::vector<std::string>{"1/2"}));
 
   const std::shared_ptr<const Job> not_empty = write("SELECT 3 AS a, 4 AS f0_", "WRITE_EMPTY");
@@ -291,7 +291,7 @@ TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   const TableInfo replaced = emulator_.GetTable(destination);
   ASSERT_EQ(replaced.schema.size(), 2);
   EXPECT_EQ(replaced.schema[0].name, "b");
-  EXPECT_EQ(replaced.schema[0].type, "STRING");
+  EXPECT_EQ(replaced.schema[0].type, FieldType::kString);
   EXPECT_EQ(values(), (std::vector<std::string>{"x/5"}));
 
   // A failed write leaves the table as it was.

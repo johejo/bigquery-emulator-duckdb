@@ -102,19 +102,19 @@ TEST(QueryParametersTest, KeepsTheDeclaredTypes) {
   ASSERT_EQ(named.named_types().size(), 3);
   EXPECT_TRUE(named.positional_types().empty());
   EXPECT_EQ(named.named_types()[0].name, "i");
-  EXPECT_EQ(named.named_types()[0].type, "INT64");
-  EXPECT_EQ(named.named_types()[0].mode, "NULLABLE");
-  EXPECT_EQ(named.named_types()[1].type, "STRING");
-  EXPECT_EQ(named.named_types()[1].mode, "REPEATED");
-  EXPECT_EQ(named.named_types()[2].type, "STRUCT");
+  EXPECT_EQ(named.named_types()[0].type, FieldType::kInteger);
+  EXPECT_EQ(named.named_types()[0].mode, FieldMode::kNullable);
+  EXPECT_EQ(named.named_types()[1].type, FieldType::kString);
+  EXPECT_EQ(named.named_types()[1].mode, FieldMode::kRepeated);
+  EXPECT_EQ(named.named_types()[2].type, FieldType::kRecord);
   ASSERT_EQ(named.named_types()[2].fields.size(), 1);
   EXPECT_EQ(named.named_types()[2].fields[0].name, "x");
-  EXPECT_EQ(named.named_types()[2].fields[0].type, "INT64");
+  EXPECT_EQ(named.named_types()[2].fields[0].type, FieldType::kInteger);
 
   const QueryParameters positional = Parse(R"([
       {"parameterType": {"type": "BOOL"}, "parameterValue": {"value": "true"}}])");
   ASSERT_EQ(positional.positional_types().size(), 1);
-  EXPECT_EQ(positional.positional_types()[0].type, "BOOL");
+  EXPECT_EQ(positional.positional_types()[0].type, FieldType::kBoolean);
 }
 
 TEST(QueryParametersTest, ReportsUndeclaredParameters) {

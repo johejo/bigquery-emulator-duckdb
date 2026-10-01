@@ -1,5 +1,6 @@
 #include "src/query_parameters.h"
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,19 +43,24 @@ const json& NoValue() {
 }
 
 FieldSchema ToFieldSchema(const std::string& name, const json& type) {
-  FieldSchema field{.name = name, .type = CanonicalTypeName(type), .mode = "NULLABLE"};
-  if (field.type == "ARRAY") {
+  const std::string type_name = CanonicalTypeName(type);
+  if (type_name == "ARRAY") {
     if (!type.contains("arrayType")) {
       throw ApiError::Invalid("ARRAY query parameter is missing arrayType");
     }
-    field = ToFieldSchema(name, type["arrayType"]);
-    if (field.mode == "REPEATED") {
+    FieldSchema field = ToFieldSchema(name, type["arrayType"]);
+    if (field.mode == FieldMode::kRepeated) {
       throw ApiError::Invalid("ARRAY query parameter cannot contain an ARRAY");
     }
-    field.mode = "REPEATED";
+    field.mode = FieldMode::kRepeated;
     return field;
   }
-  if (field.type == "STRUCT") {
+  const std::optional<FieldType> field_type = ParseFieldType(type_name);
+  if (!field_type.has_value()) {
+    throw ApiError::Invalid("Unsupported query parameter type: " + type_name);
+  }
+  FieldSchema field{.name = name, .type = *field_type};
+  if (field.type == FieldType::kRecord) {
     for (const json& child : type.value("structTypes", json::array())) {
       field.fields.push_back(ToFieldSchema(child.value("name", ""), child.at("type")));
     }

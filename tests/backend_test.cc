@@ -50,7 +50,7 @@ TEST(BackendTest, EncodesScalarTypes) {
              'aGk='::BLOB AS bytes, 1.25::DECIMAL(10, 2) AS n)");
   json fields = json::array();
   for (const FieldSchema& field : result.schema) {
-    fields.push_back(field.type);
+    fields.push_back(FieldTypeName(field.type));
   }
   EXPECT_EQ(fields, json::parse(R"(["BOOLEAN", "FLOAT", "DATE", "TIME", "DATETIME",
                                      "TIMESTAMP", "BYTES", "NUMERIC"])"));
@@ -126,10 +126,10 @@ TEST(BackendTest, EncodesFixedArraysAndNullStructs) {
       SELECT [{'x': 1}, {'x': NULL}]::STRUCT(x INTEGER)[2] AS a,
              NULL::STRUCT(x INTEGER) AS s, NULL::INTEGER[2] AS n)";
   const QueryResult result = backend.Execute(sql);
-  EXPECT_EQ(result.schema[0].type, "RECORD");
-  EXPECT_EQ(result.schema[0].mode, "REPEATED");
+  EXPECT_EQ(result.schema[0].type, FieldType::kRecord);
+  EXPECT_EQ(result.schema[0].mode, FieldMode::kRepeated);
   ASSERT_EQ(result.schema[0].fields.size(), 1);
-  EXPECT_EQ(result.schema[0].fields[0].type, "INTEGER");
+  EXPECT_EQ(result.schema[0].fields[0].type, FieldType::kInteger);
   EXPECT_EQ(result.rows[0]["f"], json::parse(R"([
       {"v": [{"v": {"f": [{"v": "1"}]}}, {"v": {"f": [{"v": null}]}}]},
       {"v": null}, {"v": []}])"));
@@ -155,7 +155,7 @@ TEST(BackendTest, PreservesBinaryStringsAndDecimalPrecision) {
   EXPECT_EQ(result.rows[0]["f"][7]["v"], "-1234567890.123456");
   EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.1234567890");
   EXPECT_EQ(result.rows[0]["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
-  EXPECT_EQ(result.schema[8].type, "BIGNUMERIC");
+  EXPECT_EQ(result.schema[8].type, FieldType::kBigNumeric);
 }
 
 TEST(BackendTest, FormatsOtherDuckDBScalarTypes) {
