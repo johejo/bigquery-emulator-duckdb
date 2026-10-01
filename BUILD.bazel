@@ -72,6 +72,20 @@ cc_library(
 )
 
 cc_library(
+    name = "column_metadata",
+    srcs = ["src/column_metadata.cc"],
+    hdrs = ["src/column_metadata.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":duckdb_sql",
+        ":field_schema",
+        ":references",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "type_mapping",
     srcs = ["src/type_mapping.cc"],
     hdrs = ["src/type_mapping.h"],
@@ -199,6 +213,7 @@ cc_library(
         ":api_error",
         ":backend",
         ":catalog",
+        ":column_metadata",
         ":duckdb_sql",
         ":field_schema",
         ":gcs",
@@ -400,6 +415,18 @@ cc_test(
     deps = [
         ":translator",
         "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "column_metadata_test",
+    srcs = ["tests/column_metadata_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":column_metadata",
+        ":field_schema",
+        "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
     ],
 )
 

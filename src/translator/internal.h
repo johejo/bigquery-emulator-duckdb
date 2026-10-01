@@ -70,6 +70,8 @@ struct Context {
   // What DDL records about its target as it is translated.
   std::optional<TableReference> ddl_target_table;
   std::optional<DatasetReference> ddl_target_dataset;
+  std::optional<TableDefinition> table;
+  std::optional<AddedColumn> added_column;
   std::optional<ViewDefinition> view;
   int next_name = 0;
 

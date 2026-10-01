@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/strings/str_join.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -29,6 +30,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/catalog.h"
+#include "src/column_metadata.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
@@ -209,30 +211,98 @@ std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
   return view;
 }
 
-// What creating a view runs besides its CREATE VIEW, in the same transaction: the statements
-// that check the view and record its metadata in its comment, and for IF NOT EXISTS, a query
-// that finds an existing view, which is then kept as it is.
-struct ViewWrite {
+// What a DDL statement runs besides itself, in the same transaction: the statements that
+// record its BigQuery metadata, and a query that returns a row when the statement and its
+// metadata must both be skipped, which is how IF NOT EXISTS and IF EXISTS keep what is there.
+struct DdlWrite {
   std::vector<std::string> metadata_statements;
-  std::string existence_query;
+  std::string skip_query;
 };
 
-ViewWrite CreateViewWrite(const ViewDefinition& view) {
+std::string TableExists(const TableReference& table) {
+  return "EXISTS (SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
+         QuoteLiteral(table.project_id) + " AND table_schema = " + QuoteLiteral(table.dataset_id) +
+         " AND table_name = " + QuoteLiteral(table.table_id) + ")";
+}
+
+DdlWrite CreateViewWrite(const ViewDefinition& view) {
   const TableReference& table = view.table;
   const json metadata{{"query", view.query}, {"fields", SchemaToJson(view.schema).at("fields")}};
-  ViewWrite write;
+  DdlWrite write;
   // DuckDB can create a circular view and only reject it when queried. Bind the new definition
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
       "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
   if (view.if_not_exists) {
-    write.existence_query = "SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
-                            QuoteLiteral(table.project_id) +
-                            " AND table_schema = " + QuoteLiteral(table.dataset_id) +
-                            " AND table_name = " + QuoteLiteral(table.table_id);
+    write.skip_query = "SELECT 1 WHERE " + TableExists(table);
   }
   return write;
+}
+
+DdlWrite CreateTableWrite(const TableDefinition& definition) {
+  DdlWrite write{.metadata_statements =
+                     ColumnCommentStatements(definition.table, definition.schema)};
+  if (definition.if_not_exists) {
+    write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
+  }
+  return write;
+}
+
+DdlWrite AddColumnWrite(const AddedColumn& column) {
+  DdlWrite write{.metadata_statements = ColumnCommentStatements(column.table, {column.field})};
+  std::vector<std::string> skip;
+  if (column.if_table_exists) {
+    skip.push_back("NOT " + TableExists(column.table));
+  }
+  if (column.if_column_not_exists) {
+    skip.push_back("EXISTS (SELECT 1 FROM duckdb_columns() WHERE database_name = " +
+                   QuoteLiteral(column.table.project_id) +
+                   " AND schema_name = " + QuoteLiteral(column.table.dataset_id) +
+                   " AND table_name = " + QuoteLiteral(column.table.table_id) +
+                   " AND lower(column_name) = " + QuoteLiteral(ToLowerAscii(column.field.name)) +
+                   ")");
+  }
+  if (!skip.empty()) {
+    write.skip_query = "SELECT 1 WHERE " + absl::StrJoin(skip, " OR ");
+  }
+  return write;
+}
+
+// The metadata a translated statement records, if any.
+std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
+  if (statement.table.has_value()) {
+    return CreateTableWrite(*statement.table);
+  }
+  if (statement.added_column.has_value()) {
+    return AddColumnWrite(*statement.added_column);
+  }
+  if (statement.view.has_value()) {
+    return CreateViewWrite(*statement.view);
+  }
+  return std::nullopt;
+}
+
+// The BigQuery schema of `table`: its columns as DuckDB types describe them, each replaced by the
+// field its comment records. Throws BackendError when the table does not exist.
+std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
+  std::vector<FieldSchema> schema = backend.Prepare("SELECT * FROM " + QualifiedName(table)).schema;
+  std::vector<json> comments;
+  for (const json& row : backend.Execute(ColumnCommentsQuery(table)).rows) {
+    comments.push_back(row["f"][0]["v"]);
+  }
+  return ApplyColumnComments(std::move(schema), comments);
+}
+
+// Queries see a GEOGRAPHY column as the STRING it is stored as, since the emulator does not
+// translate GEOGRAPHY in SQL; tables.get still reports the column as GEOGRAPHY.
+void GeographyAsString(std::vector<FieldSchema>& schema) {
+  for (FieldSchema& field : schema) {
+    if (field.type == FieldType::kGeography) {
+      field.type = FieldType::kString;
+    }
+    GeographyAsString(field.fields);
+  }
 }
 
 // Serves the analyzer the tables the emulator keeps in DuckDB.
@@ -244,9 +314,10 @@ class DuckDbTableSource : public TableSource {
                                                     const std::string& dataset,
                                                     const std::string& table) override {
     try {
-      return backend_
-          .Prepare("SELECT * FROM " + QualifiedName(TableReference{project, dataset, table}))
-          .schema;
+      std::vector<FieldSchema> schema =
+          TableSchema(backend_, TableReference{project, dataset, table});
+      GeographyAsString(schema);
+      return schema;
     } catch (const BackendError&) {
       return std::nullopt;
     }
@@ -339,6 +410,12 @@ std::string TableName(const TableReference& table) {
   return table.project_id + ":" + table.dataset_id + "." + table.table_id;
 }
 
+// A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does.
+std::string ColumnDefinition(const FieldSchema& field) {
+  return QuoteIdentifier(field.name) + " " + ToDuckDbType(field) +
+         (field.mode == FieldMode::kRequired ? " NOT NULL" : "");
+}
+
 // Column definitions for a table that holds `schema`, or nullopt when a type has no column
 // type of its own in the emulator.
 std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
@@ -348,7 +425,7 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
       columns += ", ";
     }
     try {
-      columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field);
+      columns += ColumnDefinition(field);
     } catch (const ApiError&) {
       return std::nullopt;
     }
@@ -549,9 +626,8 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     QueryResult result;
     if (request.dry_run) {
       result = Prepare(translation.sql, setup);
-    } else if (translation.view.has_value()) {
-      const ViewWrite write = CreateViewWrite(*translation.view);
-      backend_.CreateView(translation.sql, write.metadata_statements, write.existence_query, setup);
+    } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
+      backend_.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
     } else if (request.destination_table.has_value()) {
       result = WriteDestination(request.project_id, *request.destination_table,
                                 request.create_disposition, request.write_disposition,
@@ -775,6 +851,9 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // schema rather than as whatever DuckDB computed.
     if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
       statements.push_back("CREATE TABLE " + target + " (" + *columns + ")");
+      for (std::string& comment : ColumnCommentStatements(destination, schema)) {
+        statements.push_back(std::move(comment));
+      }
       statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
     } else {
       statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table);
@@ -900,7 +979,7 @@ TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count
     return info;
   }
   try {
-    info.schema = backend_.Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT 0").schema;
+    info.schema = TableSchema(backend_, table);
     if (include_row_count) {
       const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
       info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
@@ -916,16 +995,12 @@ void Emulator::CreateTable(const TableReference& table, const std::vector<FieldS
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
-    if (!columns.empty()) {
-      columns += ", ";
-    }
-    columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field);
-    if (field.mode == FieldMode::kRequired) {
-      columns += " NOT NULL";
-    }
+    columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
   }
+  const DdlWrite write = CreateTableWrite(TableDefinition{.table = table, .schema = schema});
   try {
-    backend_.Execute("CREATE TABLE " + QualifiedName(table) + " (" + columns + ")");
+    backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + columns + ")",
+                        write.metadata_statements, write.skip_query);
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {
       throw ApiError::Duplicate("Already Exists: Table " + table.project_id + ":" +
@@ -957,7 +1032,7 @@ void Emulator::CreateView(const TableReference& table, const json& definition) {
     if (!translation.view.has_value()) {
       throw ApiError::Internal("CREATE VIEW was not translated to a view");
     }
-    backend_.CreateView(translation.sql, CreateViewWrite(*translation.view).metadata_statements,
+    backend_.ExecuteDdl(translation.sql, CreateViewWrite(*translation.view).metadata_statements,
                         "");
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {

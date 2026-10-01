@@ -14,7 +14,7 @@ steps:
         "CREATE TABLE a.people (id INT64, name STRING, address STRUCT<city STRING, zip STRING>,
          tags ARRAY<STRING>)" &&
         BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql
-        "CREATE TABLE b.events (id INT64)"
+        "CREATE TABLE b.events (id INT64 NOT NULL, payload JSON)"
     test: current.exit_code == 0
   schemata:
     exec:
@@ -62,6 +62,15 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"column_name":"id","data_type":"INT64","is_nullable":"YES","ordinal_position":"1"},{"column_name":"name","data_type":"STRING","is_nullable":"YES","ordinal_position":"2"},{"column_name":"address","data_type":"STRUCT<city STRING, zip STRING>","is_nullable":"YES","ordinal_position":"3"},{"column_name":"tags","data_type":"ARRAY<STRING>","is_nullable":"YES","ordinal_position":"4"}]'
+  columns_keep_bigquery_types:
+    exec:
+      command: >-
+        BQ_EMULATOR_PROJECT=infoschema tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT column_name, is_nullable, data_type FROM b.INFORMATION_SCHEMA.COLUMNS
+         ORDER BY ordinal_position'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"column_name":"id","data_type":"INT64","is_nullable":"NO"},{"column_name":"payload","data_type":"JSON","is_nullable":"YES"}]'
   column_field_paths:
     exec:
       command: >-
