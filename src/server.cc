@@ -835,8 +835,7 @@ class Server::Impl {
            if (body.contains("view")) {
              emulator_.CreateView(table, body.at("view"));
            } else {
-             emulator_.CreateTable(
-                 table, body.value("schema", json::object()).value("fields", json::array()));
+             emulator_.CreateTable(table, SchemaFromJson(body.value("schema", json::object())));
            }
            return TableResource(emulator_.GetTable(table));
          }));

@@ -94,17 +94,6 @@ struct DownloadedFiles {
   }
 };
 
-FieldSchema ParseField(const json& value) {
-  FieldSchema field{value.at("name").get<std::string>(),
-                    value.value("type", "STRING"),
-                    value.value("mode", "NULLABLE"),
-                    {}};
-  for (const json& child : value.value("fields", json::array())) {
-    field.fields.push_back(ParseField(child));
-  }
-  return field;
-}
-
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
   values.reserve(result.rows.size());
@@ -154,12 +143,12 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   if (value.is_null()) {
     return "CAST(NULL AS " + type + ")";
   }
-  if (field.mode == "REPEATED") {
+  if (field.mode == FieldMode::kRepeated) {
     if (!value.is_array()) {
       throw ApiError::Invalid("Expected an array for field " + field.name);
     }
     FieldSchema element = field;
-    element.mode = "NULLABLE";
+    element.mode = FieldMode::kNullable;
     std::string values;
     for (const json& item : value) {
       if (!values.empty()) {
@@ -169,17 +158,17 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     }
     return "CAST([" + values + "] AS " + type + ")";
   }
-  if (field.type == "RECORD") {
+  if (field.type == FieldType::kRecord) {
     return InsertRecord(value, field, ignore_unknown_values);
   }
   if (!value.is_primitive()) {
     throw ApiError::Invalid("Expected a scalar for field " + field.name);
   }
   const std::string scalar = value.is_string() ? value.get<std::string>() : value.dump();
-  if (field.type == "BYTES") {
+  if (field.type == FieldType::kBytes) {
     return "from_base64(" + QuoteLiteral(scalar) + ")";
   }
-  if (field.type == "TIMESTAMP" && value.is_number()) {
+  if (field.type == FieldType::kTimestamp && value.is_number()) {
     return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";
   }
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
@@ -219,9 +208,9 @@ std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
   ViewMetadata view{metadata["query"].get<std::string>(), {}};
   try {
     for (const json& field : metadata["fields"]) {
-      view.schema.push_back(ParseField(field));
+      view.schema.push_back(FieldSchemaFromJson(field));
     }
-  } catch (const json::exception&) {
+  } catch (const ApiError&) {
     return std::nullopt;
   }
   return view;
@@ -323,13 +312,14 @@ const googlesql::Type* ParameterType(const FieldSchema& field,
 // Types whose values the backend writes the same way on the wire, so that a column DuckDB
 // computed as one of them can be reported as another: all numbers are decimal strings, and
 // these textual types are plain strings.
-bool SameWireEncoding(const std::string& a, const std::string& b) {
-  static const auto* const kGroups = new std::vector<std::set<std::string>>{
-      {"INTEGER", "FLOAT", "NUMERIC", "BIGNUMERIC"}, {"STRING", "JSON", "GEOGRAPHY"}};
+bool SameWireEncoding(FieldType a, FieldType b) {
+  static const auto* const kGroups = new std::vector<std::set<FieldType>>{
+      {FieldType::kInteger, FieldType::kFloat, FieldType::kNumeric, FieldType::kBigNumeric},
+      {FieldType::kString, FieldType::kJson, FieldType::kGeography}};
   if (a == b) {
     return true;
   }
-  for (const std::set<std::string>& group : *kGroups) {
+  for (const std::set<FieldType>& group : *kGroups) {
     if (group.contains(a) && group.contains(b)) {
       return true;
     }
@@ -353,7 +343,7 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
     if (field.mode != resolved.mode) {
       continue;
     }
-    if (field.type == "RECORD" && resolved.type == "RECORD") {
+    if (field.type == FieldType::kRecord && resolved.type == FieldType::kRecord) {
       field.fields = ReconcileSchema(std::move(field.fields), resolved.fields);
     } else if (SameWireEncoding(field.type, resolved.type)) {
       field.type = resolved.type;
@@ -631,12 +621,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       paths += (paths.empty() ? "" : ", ") + QuoteLiteral(path);
     }
     const std::string files = "[" + paths + "]";
-    std::vector<FieldSchema> requested_schema;
-    if (config.contains("schema")) {
-      for (const json& field : config.at("schema").at("fields")) {
-        requested_schema.push_back(ParseField(field));
-      }
-    }
+    std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty()) {
       TableReference destination = request.destination_table;
       if (destination.project_id.empty()) destination.project_id = request.project_id;
@@ -974,16 +959,15 @@ TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count
   return info;
 }
 
-void Emulator::CreateTable(const TableReference& table, const json& fields) {
+void Emulator::CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema) {
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   std::string columns;
-  for (const json& field : fields) {
+  for (const FieldSchema& field : schema) {
     if (!columns.empty()) {
       columns += ", ";
     }
-    columns += QuoteIdentifier(field.at("name").get<std::string>()) + " " +
-               ToDuckDbType(ParseField(field));
-    if (field.value("mode", "NULLABLE") == "REQUIRED") {
+    columns += QuoteIdentifier(field.name) + " " + ToDuckDbType(field);
+    if (field.mode == FieldMode::kRequired) {
       columns += " NOT NULL";
     }
   }

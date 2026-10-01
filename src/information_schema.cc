@@ -26,12 +26,14 @@ namespace {
 // A column of a view and its BigQuery type, from which its GoogleSQL and DuckDB types follow.
 struct ViewColumn {
   std::string name;
-  std::string type;
+  FieldType type;
   bool repeated = false;
 };
 
 FieldSchema ColumnField(const ViewColumn& column) {
-  return {column.name, column.type, column.repeated ? "REPEATED" : "NULLABLE", {}};
+  return {.name = column.name,
+          .type = column.type,
+          .mode = column.repeated ? FieldMode::kRepeated : FieldMode::kNullable};
 }
 
 // A cell as a DuckDB literal; nothing is NULL.
@@ -45,87 +47,87 @@ const Cell kEmptyArray = "[]";
 
 const std::vector<ViewColumn>& SchemataColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
-      {"catalog_name", "STRING"},
-      {"schema_name", "STRING"},
-      {"schema_owner", "STRING"},
-      {"creation_time", "TIMESTAMP"},
-      {"last_modified_time", "TIMESTAMP"},
-      {"location", "STRING"},
-      {"ddl", "STRING"},
-      {"default_collation_name", "STRING"},
-      {"sync_status", "JSON"},
+      {"catalog_name", FieldType::kString},
+      {"schema_name", FieldType::kString},
+      {"schema_owner", FieldType::kString},
+      {"creation_time", FieldType::kTimestamp},
+      {"last_modified_time", FieldType::kTimestamp},
+      {"location", FieldType::kString},
+      {"ddl", FieldType::kString},
+      {"default_collation_name", FieldType::kString},
+      {"sync_status", FieldType::kJson},
   };
   return *kColumns;
 }
 
 const std::vector<ViewColumn>& TablesColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
-      {"table_catalog", "STRING"},
-      {"table_schema", "STRING"},
-      {"table_name", "STRING"},
-      {"table_type", "STRING"},
-      {"managed_table_type", "STRING"},
-      {"is_insertable_into", "STRING"},
-      {"is_fine_grained_mutations_enabled", "STRING"},
-      {"is_typed", "STRING"},
-      {"is_change_history_enabled", "STRING"},
-      {"creation_time", "TIMESTAMP"},
-      {"base_table_catalog", "STRING"},
-      {"base_table_schema", "STRING"},
-      {"base_table_name", "STRING"},
-      {"snapshot_time_ms", "TIMESTAMP"},
-      {"replica_source_catalog", "STRING"},
-      {"replica_source_schema", "STRING"},
-      {"replica_source_name", "STRING"},
-      {"replication_status", "STRING"},
-      {"replication_error", "STRING"},
-      {"ddl", "STRING"},
-      {"default_collation_name", "STRING"},
-      {"sync_status", "JSON"},
-      {"upsert_stream_apply_watermark", "TIMESTAMP"},
+      {"table_catalog", FieldType::kString},
+      {"table_schema", FieldType::kString},
+      {"table_name", FieldType::kString},
+      {"table_type", FieldType::kString},
+      {"managed_table_type", FieldType::kString},
+      {"is_insertable_into", FieldType::kString},
+      {"is_fine_grained_mutations_enabled", FieldType::kString},
+      {"is_typed", FieldType::kString},
+      {"is_change_history_enabled", FieldType::kString},
+      {"creation_time", FieldType::kTimestamp},
+      {"base_table_catalog", FieldType::kString},
+      {"base_table_schema", FieldType::kString},
+      {"base_table_name", FieldType::kString},
+      {"snapshot_time_ms", FieldType::kTimestamp},
+      {"replica_source_catalog", FieldType::kString},
+      {"replica_source_schema", FieldType::kString},
+      {"replica_source_name", FieldType::kString},
+      {"replication_status", FieldType::kString},
+      {"replication_error", FieldType::kString},
+      {"ddl", FieldType::kString},
+      {"default_collation_name", FieldType::kString},
+      {"sync_status", FieldType::kJson},
+      {"upsert_stream_apply_watermark", FieldType::kTimestamp},
   };
   return *kColumns;
 }
 
 const std::vector<ViewColumn>& ColumnsColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
-      {"table_catalog", "STRING"},
-      {"table_schema", "STRING"},
-      {"table_name", "STRING"},
-      {"column_name", "STRING"},
-      {"ordinal_position", "INT64"},
-      {"is_nullable", "STRING"},
-      {"data_type", "STRING"},
-      {"is_generated", "STRING"},
-      {"generation_expression", "STRING"},
-      {"is_stored", "STRING"},
-      {"is_hidden", "STRING"},
-      {"is_updatable", "STRING"},
-      {"is_system_defined", "STRING"},
-      {"is_partitioning_column", "STRING"},
-      {"clustering_ordinal_position", "INT64"},
-      {"collation_name", "STRING"},
-      {"column_default", "STRING"},
-      {"rounding_mode", "STRING"},
-      {"policy_tags", "STRING", /*repeated=*/true},
-      {"is_identity", "STRING"},
-      {"identity_generation", "STRING"},
-      {"identity_start", "INT64"},
-      {"identity_increment", "INT64"},
-      {"identity_maximum", "INT64"},
-      {"identity_minimum", "INT64"},
-      {"identity_cycle", "STRING"},
+      {"table_catalog", FieldType::kString},
+      {"table_schema", FieldType::kString},
+      {"table_name", FieldType::kString},
+      {"column_name", FieldType::kString},
+      {"ordinal_position", FieldType::kInteger},
+      {"is_nullable", FieldType::kString},
+      {"data_type", FieldType::kString},
+      {"is_generated", FieldType::kString},
+      {"generation_expression", FieldType::kString},
+      {"is_stored", FieldType::kString},
+      {"is_hidden", FieldType::kString},
+      {"is_updatable", FieldType::kString},
+      {"is_system_defined", FieldType::kString},
+      {"is_partitioning_column", FieldType::kString},
+      {"clustering_ordinal_position", FieldType::kInteger},
+      {"collation_name", FieldType::kString},
+      {"column_default", FieldType::kString},
+      {"rounding_mode", FieldType::kString},
+      {"policy_tags", FieldType::kString, /*repeated=*/true},
+      {"is_identity", FieldType::kString},
+      {"identity_generation", FieldType::kString},
+      {"identity_start", FieldType::kInteger},
+      {"identity_increment", FieldType::kInteger},
+      {"identity_maximum", FieldType::kInteger},
+      {"identity_minimum", FieldType::kInteger},
+      {"identity_cycle", FieldType::kString},
   };
   return *kColumns;
 }
 
 const std::vector<ViewColumn>& ColumnFieldPathsColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
-      {"table_catalog", "STRING"}, {"table_schema", "STRING"},
-      {"table_name", "STRING"},    {"column_name", "STRING"},
-      {"field_path", "STRING"},    {"data_type", "STRING"},
-      {"description", "STRING"},   {"collation_name", "STRING"},
-      {"rounding_mode", "STRING"}, {"policy_tags", "STRING", /*repeated=*/true},
+      {"table_catalog", FieldType::kString}, {"table_schema", FieldType::kString},
+      {"table_name", FieldType::kString},    {"column_name", FieldType::kString},
+      {"field_path", FieldType::kString},    {"data_type", FieldType::kString},
+      {"description", FieldType::kString},   {"collation_name", FieldType::kString},
+      {"rounding_mode", FieldType::kString}, {"policy_tags", FieldType::kString, /*repeated=*/true},
   };
   return *kColumns;
 }
@@ -206,7 +208,7 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
       return type.status();
     }
     columns.push_back("  " + field.name + " " + *type +
-                      (field.mode == "REQUIRED" ? " NOT NULL" : ""));
+                      (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
   }
   return "CREATE TABLE `" + project + "." + dataset + "." + table + "`\n(\n" +
          absl::StrJoin(columns, ",\n") + "\n);";
@@ -310,7 +312,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
                         String(table),
                         String(field.name),
                         Int(static_cast<int64_t>(i) + 1),
-                        String(field.mode == "REQUIRED" ? "NO" : "YES"),
+                        String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
                         String(*type),
                         String("NEVER"),
                         kNull,

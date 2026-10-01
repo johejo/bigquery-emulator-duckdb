@@ -18,84 +18,74 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-absl::StatusOr<const googlesql::Type*> ScalarType(const std::string& type) {
-  if (type == "INTEGER" || type == "INT64") {
-    return googlesql::types::Int64Type();
+const googlesql::Type* ScalarType(FieldType type) {
+  switch (type) {
+    case FieldType::kString:
+      return googlesql::types::StringType();
+    case FieldType::kBytes:
+      return googlesql::types::BytesType();
+    case FieldType::kInteger:
+      return googlesql::types::Int64Type();
+    case FieldType::kFloat:
+      return googlesql::types::DoubleType();
+    case FieldType::kNumeric:
+      return googlesql::types::NumericType();
+    case FieldType::kBigNumeric:
+      return googlesql::types::BigNumericType();
+    case FieldType::kBoolean:
+      return googlesql::types::BoolType();
+    case FieldType::kTimestamp:
+      return googlesql::types::TimestampType();
+    case FieldType::kDate:
+      return googlesql::types::DateType();
+    case FieldType::kTime:
+      return googlesql::types::TimeType();
+    case FieldType::kDatetime:
+      return googlesql::types::DatetimeType();
+    case FieldType::kInterval:
+      return googlesql::types::IntervalType();
+    case FieldType::kGeography:
+      return googlesql::types::GeographyType();
+    case FieldType::kJson:
+      return googlesql::types::JsonType();
+    case FieldType::kRecord:
+      break;
   }
-  if (type == "FLOAT" || type == "FLOAT64") {
-    return googlesql::types::DoubleType();
-  }
-  if (type == "BOOLEAN" || type == "BOOL") {
-    return googlesql::types::BoolType();
-  }
-  if (type == "STRING") {
-    return googlesql::types::StringType();
-  }
-  if (type == "BYTES") {
-    return googlesql::types::BytesType();
-  }
-  if (type == "DATE") {
-    return googlesql::types::DateType();
-  }
-  if (type == "TIME") {
-    return googlesql::types::TimeType();
-  }
-  if (type == "DATETIME") {
-    return googlesql::types::DatetimeType();
-  }
-  if (type == "TIMESTAMP") {
-    return googlesql::types::TimestampType();
-  }
-  if (type == "NUMERIC") {
-    return googlesql::types::NumericType();
-  }
-  if (type == "BIGNUMERIC") {
-    return googlesql::types::BigNumericType();
-  }
-  if (type == "JSON") {
-    return googlesql::types::JsonType();
-  }
-  if (type == "INTERVAL") {
-    return googlesql::types::IntervalType();
-  }
-  if (type == "GEOGRAPHY") {
-    return googlesql::types::GeographyType();
-  }
-  return absl::InvalidArgumentError("Unsupported field type: " + type);
+  return nullptr;
 }
 
-absl::StatusOr<std::string> BigQueryTypeName(const googlesql::Type* type) {
+absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
   switch (type->kind()) {
     case googlesql::TYPE_INT64:
-      return "INTEGER";
+      return FieldType::kInteger;
     case googlesql::TYPE_DOUBLE:
-      return "FLOAT";
+      return FieldType::kFloat;
     case googlesql::TYPE_BOOL:
-      return "BOOLEAN";
+      return FieldType::kBoolean;
     case googlesql::TYPE_STRING:
-      return "STRING";
+      return FieldType::kString;
     case googlesql::TYPE_BYTES:
-      return "BYTES";
+      return FieldType::kBytes;
     case googlesql::TYPE_DATE:
-      return "DATE";
+      return FieldType::kDate;
     case googlesql::TYPE_TIME:
-      return "TIME";
+      return FieldType::kTime;
     case googlesql::TYPE_DATETIME:
-      return "DATETIME";
+      return FieldType::kDatetime;
     case googlesql::TYPE_TIMESTAMP:
-      return "TIMESTAMP";
+      return FieldType::kTimestamp;
     case googlesql::TYPE_NUMERIC:
-      return "NUMERIC";
+      return FieldType::kNumeric;
     case googlesql::TYPE_BIGNUMERIC:
-      return "BIGNUMERIC";
+      return FieldType::kBigNumeric;
     case googlesql::TYPE_JSON:
-      return "JSON";
+      return FieldType::kJson;
     case googlesql::TYPE_INTERVAL:
-      return "INTERVAL";
+      return FieldType::kInterval;
     case googlesql::TYPE_GEOGRAPHY:
-      return "GEOGRAPHY";
+      return FieldType::kGeography;
     case googlesql::TYPE_STRUCT:
-      return "RECORD";
+      return FieldType::kRecord;
     default:
       return absl::InvalidArgumentError("Unsupported result type: " +
                                         type->ShortTypeName(googlesql::PRODUCT_EXTERNAL));
@@ -187,7 +177,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory) {
   const googlesql::Type* type = nullptr;
-  if (field.type == "RECORD" || field.type == "STRUCT") {
+  if (field.type == FieldType::kRecord) {
     std::vector<googlesql::StructField> struct_fields;
     for (const FieldSchema& child : field.fields) {
       absl::StatusOr<const googlesql::Type*> child_type = GoogleSqlType(child, type_factory);
@@ -203,13 +193,9 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
     }
     type = struct_type;
   } else {
-    absl::StatusOr<const googlesql::Type*> scalar_type = ScalarType(field.type);
-    if (!scalar_type.ok()) {
-      return scalar_type.status();
-    }
-    type = *scalar_type;
+    type = ScalarType(field.type);
   }
-  if (field.mode == "REPEATED") {
+  if (field.mode == FieldMode::kRepeated) {
     absl::StatusOr<const googlesql::ArrayType*> array_type = type_factory->MakeArrayType(type);
     if (!array_type.ok()) {
       return array_type.status();
@@ -223,19 +209,18 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
                                                 const googlesql::Type* type) {
   FieldSchema field;
   field.name = name;
-  field.mode = "NULLABLE";
   if (type->IsArray()) {
-    field.mode = "REPEATED";
+    field.mode = FieldMode::kRepeated;
     type = type->AsArray()->element_type();
     if (type->IsArray()) {
       return absl::InvalidArgumentError("Unsupported result type: an array of arrays");
     }
   }
-  absl::StatusOr<std::string> type_name = BigQueryTypeName(type);
-  if (!type_name.ok()) {
-    return type_name.status();
+  absl::StatusOr<FieldType> field_type = BigQueryFieldType(type);
+  if (!field_type.ok()) {
+    return field_type.status();
   }
-  field.type = *std::move(type_name);
+  field.type = *field_type;
   if (type->IsStruct()) {
     const std::vector<googlesql::StructField>& struct_fields = type->AsStruct()->fields();
     for (size_t i = 0; i < struct_fields.size(); ++i) {

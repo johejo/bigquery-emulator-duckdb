@@ -54,7 +54,8 @@ std::string TypeName(const FieldSchema& field) {
 
 // A field as "name TYPE MODE", followed by its child fields in parentheses for a RECORD.
 std::string Describe(const FieldSchema& field) {
-  std::string description = field.name + " " + field.type + " " + field.mode;
+  std::string description = field.name + " " + std::string(FieldTypeName(field.type)) + " " +
+                            std::string(FieldModeName(field.mode));
   if (!field.fields.empty()) {
     description += " (";
     for (size_t i = 0; i < field.fields.size(); ++i) {
@@ -98,43 +99,41 @@ TEST(NormalizeTablePathTest, RejectsWhatItCannotInterpret) {
 }
 
 TEST(GoogleSqlTypeTest, MapsScalarTypes) {
-  EXPECT_EQ(TypeName({.name = "c", .type = "INTEGER"}), "INT64");
-  EXPECT_EQ(TypeName({.name = "c", .type = "INT64"}), "INT64");
-  EXPECT_EQ(TypeName({.name = "c", .type = "FLOAT"}), "FLOAT64");
-  EXPECT_EQ(TypeName({.name = "c", .type = "BOOLEAN"}), "BOOL");
-  EXPECT_EQ(TypeName({.name = "c", .type = "STRING"}), "STRING");
-  EXPECT_EQ(TypeName({.name = "c", .type = "BYTES"}), "BYTES");
-  EXPECT_EQ(TypeName({.name = "c", .type = "DATE"}), "DATE");
-  EXPECT_EQ(TypeName({.name = "c", .type = "TIME"}), "TIME");
-  EXPECT_EQ(TypeName({.name = "c", .type = "DATETIME"}), "DATETIME");
-  EXPECT_EQ(TypeName({.name = "c", .type = "TIMESTAMP"}), "TIMESTAMP");
-  EXPECT_EQ(TypeName({.name = "c", .type = "NUMERIC"}), "NUMERIC");
-  EXPECT_EQ(TypeName({.name = "c", .type = "BIGNUMERIC"}), "BIGNUMERIC");
-  EXPECT_EQ(TypeName({.name = "c", .type = "JSON"}), "JSON");
-  EXPECT_EQ(TypeName({.name = "c", .type = "INTERVAL"}), "INTERVAL");
-  EXPECT_EQ(TypeName({.name = "c", .type = "GEOGRAPHY"}), "GEOGRAPHY");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kInteger}), "INT64");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kInteger}), "INT64");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kFloat}), "FLOAT64");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kBoolean}), "BOOL");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kString}), "STRING");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kBytes}), "BYTES");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kDate}), "DATE");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kTime}), "TIME");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kDatetime}), "DATETIME");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kTimestamp}), "TIMESTAMP");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kNumeric}), "NUMERIC");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kBigNumeric}), "BIGNUMERIC");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kJson}), "JSON");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kInterval}), "INTERVAL");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kGeography}), "GEOGRAPHY");
 }
 
 TEST(GoogleSqlTypeTest, MapsRepeatedAndRecordFields) {
-  EXPECT_EQ(TypeName({.name = "c", .type = "STRING", .mode = "REPEATED"}), "ARRAY<STRING>");
+  EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kString, .mode = FieldMode::kRepeated}),
+            "ARRAY<STRING>");
+  EXPECT_EQ(
+      TypeName(
+          {.name = "c",
+           .type = FieldType::kRecord,
+           .fields = {{.name = "a", .type = FieldType::kInteger},
+                      {.name = "b", .type = FieldType::kString, .mode = FieldMode::kRepeated}}}),
+      "STRUCT<a INT64, b ARRAY<STRING>>");
   EXPECT_EQ(TypeName({.name = "c",
-                      .type = "RECORD",
-                      .fields = {{.name = "a", .type = "INTEGER"},
-                                 {.name = "b", .type = "STRING", .mode = "REPEATED"}}}),
-            "STRUCT<a INT64, b ARRAY<STRING>>");
-  EXPECT_EQ(TypeName({.name = "c",
-                      .type = "RECORD",
-                      .mode = "REPEATED",
+                      .type = FieldType::kRecord,
+                      .mode = FieldMode::kRepeated,
                       .fields = {{.name = "a",
-                                  .type = "RECORD",
-                                  .mode = "REPEATED",
-                                  .fields = {{.name = "x", .type = "FLOAT"}}}}}),
+                                  .type = FieldType::kRecord,
+                                  .mode = FieldMode::kRepeated,
+                                  .fields = {{.name = "x", .type = FieldType::kFloat}}}}}),
             "ARRAY<STRUCT<a ARRAY<STRUCT<x FLOAT64>>>>");
-}
-
-TEST(GoogleSqlTypeTest, RejectsUnknownTypes) {
-  googlesql::TypeFactory type_factory;
-  EXPECT_FALSE(GoogleSqlType({.name = "c", .type = "NOPE"}, &type_factory).ok());
 }
 
 TEST(BigQueryFieldSchemaTest, MapsScalarTypes) {
@@ -148,11 +147,12 @@ TEST(BigQueryFieldSchemaTest, MapsScalarTypes) {
 
 TEST(BigQueryFieldSchemaTest, RoundTripsGoogleSqlType) {
   googlesql::TypeFactory type_factory;
-  const FieldSchema field = {.name = "c",
-                             .type = "RECORD",
-                             .mode = "REPEATED",
-                             .fields = {{.name = "x", .type = "DATE", .mode = "NULLABLE"},
-                                        {.name = "y", .type = "STRING", .mode = "REPEATED"}}};
+  const FieldSchema field = {
+      .name = "c",
+      .type = FieldType::kRecord,
+      .mode = FieldMode::kRepeated,
+      .fields = {{.name = "x", .type = FieldType::kDate, .mode = FieldMode::kNullable},
+                 {.name = "y", .type = FieldType::kString, .mode = FieldMode::kRepeated}}};
   absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
   ASSERT_TRUE(type.ok()) << type.status();
   EXPECT_EQ(BigQueryTypeOf(*type), Describe(field));
@@ -168,38 +168,42 @@ std::string ColumnType(const FieldSchema& field) {
 }
 
 TEST(DuckDbColumnTypeTest, MapsFieldsThroughTheirGoogleSqlTypes) {
-  EXPECT_EQ(ColumnType({.name = "c", .type = "INTEGER"}), "BIGINT");
-  EXPECT_EQ(ColumnType({.name = "c", .type = "TIMESTAMP"}), "TIMESTAMPTZ");
-  EXPECT_EQ(ColumnType({.name = "c", .type = "DATETIME"}), "TIMESTAMP");
-  EXPECT_EQ(ColumnType({.name = "c", .type = "NUMERIC"}), "DECIMAL(38,9)");
-  EXPECT_EQ(ColumnType({.name = "c",
-                        .type = "RECORD",
-                        .mode = "REPEATED",
-                        .fields = {{.name = "a", .type = "STRING", .mode = "REPEATED"}}}),
-            "STRUCT(\"a\" VARCHAR[])[]");
+  EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kInteger}), "BIGINT");
+  EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kTimestamp}), "TIMESTAMPTZ");
+  EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kDatetime}), "TIMESTAMP");
+  EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kNumeric}), "DECIMAL(38,9)");
+  EXPECT_EQ(
+      ColumnType(
+          {.name = "c",
+           .type = FieldType::kRecord,
+           .mode = FieldMode::kRepeated,
+           .fields = {{.name = "a", .type = FieldType::kString, .mode = FieldMode::kRepeated}}}),
+      "STRUCT(\"a\" VARCHAR[])[]");
 }
 
 // Tables keep GEOGRAPHY as text, though queries over it are not translated.
 TEST(DuckDbColumnTypeTest, StoresGeographyAsText) {
-  EXPECT_EQ(ColumnType({.name = "c", .type = "GEOGRAPHY", .mode = "REPEATED"}), "VARCHAR[]");
+  EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kGeography, .mode = FieldMode::kRepeated}),
+            "VARCHAR[]");
   EXPECT_EQ(DuckDbType(googlesql::types::GeographyType()), std::nullopt);
 }
 
 TEST(DuckDbColumnTypeTest, RejectsTypesDuckDbCannotStore) {
-  EXPECT_THAT(ColumnType({.name = "c", .type = "INTERVAL"}), ::testing::HasSubstr("INTERVAL"));
-  EXPECT_THAT(
-      ColumnType({.name = "c",
-                  .type = "RECORD",
-                  .fields = {{.name = "a", .type = "STRING"}, {.name = "A", .type = "INTEGER"}}}),
-      ::testing::HasSubstr("Unsupported field type"));
+  EXPECT_THAT(ColumnType({.name = "c", .type = FieldType::kInterval}),
+              ::testing::HasSubstr("INTERVAL"));
+  EXPECT_THAT(ColumnType({.name = "c",
+                          .type = FieldType::kRecord,
+                          .fields = {{.name = "a", .type = FieldType::kString},
+                                     {.name = "A", .type = FieldType::kInteger}}}),
+              ::testing::HasSubstr("Unsupported field type"));
 }
 
 class BigQueryCatalogTest : public ::testing::Test {
  protected:
   BigQueryCatalogTest() {
     source_.Add("p", "ds", "t",
-                {{.name = "a", .type = "INTEGER", .mode = "NULLABLE"},
-                 {.name = "b", .type = "STRING", .mode = "REPEATED"}});
+                {{.name = "a", .type = FieldType::kInteger, .mode = FieldMode::kNullable},
+                 {.name = "b", .type = FieldType::kString, .mode = FieldMode::kRepeated}});
   }
 
   AnalyzerResult Analyze(const std::string& sql, const AnalyzerSettings& settings = {}) {
