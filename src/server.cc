@@ -12,11 +12,11 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "httplib.h"
@@ -161,6 +161,46 @@ QueryRequest ToQueryRequest(const std::string& project_id, const json& config) {
   return request;
 }
 
+// Reads the dispositions in a job configuration into `job`, which keeps its job type's default
+// for any the configuration omits.
+template <typename T>
+void ParseDispositions(const json& config, T& job) {
+  if (config.contains("createDisposition")) {
+    const std::string name = config.value("createDisposition", "");
+    const std::optional<CreateDisposition> disposition = ParseCreateDisposition(name);
+    if (!disposition.has_value()) throw ApiError::Invalid("Invalid create disposition: " + name);
+    job.create_disposition = *disposition;
+  }
+  if (config.contains("writeDisposition")) {
+    const std::string name = config.value("writeDisposition", "");
+    const std::optional<WriteDisposition> disposition = ParseWriteDisposition(name);
+    if (!disposition.has_value()) throw ApiError::Invalid("Invalid write disposition: " + name);
+    job.write_disposition = *disposition;
+  }
+}
+
+// Reads the load job in a jobs.insert request `body`.
+LoadRequest ToLoadRequest(const std::string& project_id, const json& body) {
+  const json& load = body.at("configuration").at("load");
+  if (!load.is_object() || !load.contains("destinationTable") ||
+      !load.at("destinationTable").is_object()) {
+    throw ApiError::Invalid("Invalid destination table");
+  }
+  const json& table = load.at("destinationTable");
+  LoadRequest request;
+  request.project_id = project_id;
+  request.job_id = body.value("jobReference", json::object()).value("jobId", "");
+  request.load.destination_table = TableReference{
+      table.value("projectId", ""), table.value("datasetId", ""), table.value("tableId", "")};
+  if (request.load.destination_table.dataset_id.empty() ||
+      request.load.destination_table.table_id.empty()) {
+    throw ApiError::Invalid("Invalid destination table");
+  }
+  ParseDispositions(load, request.load);
+  request.load.configuration = load;
+  return request;
+}
+
 // Derives JobStatistics2.statementType from the leading keywords of the query.
 std::string StatementType(const std::string& query) {
   std::vector<std::string> words;
@@ -213,34 +253,31 @@ json JobStatus(const Job& job) {
 }
 
 json JobStatistics(const Job& job) {
-  if (job.is_copy) {
-    return json{{"creationTime", std::to_string(job.creation_time_ms)},
-                {"startTime", std::to_string(job.creation_time_ms)},
-                {"endTime", std::to_string(job.end_time_ms)},
-                {"copy", {{"copiedRows", std::to_string(job.output_rows)}}}};
+  json statistics = {{"creationTime", std::to_string(job.creation_time_ms)},
+                     {"startTime", std::to_string(job.creation_time_ms)},
+                     {"endTime", std::to_string(job.end_time_ms)}};
+  if (std::holds_alternative<CopyJob>(job.configuration)) {
+    statistics["copy"] = {{"copiedRows", std::to_string(job.output_rows)}};
+    return statistics;
   }
-  if (job.is_load) {
-    return json{{"creationTime", std::to_string(job.creation_time_ms)},
-                {"startTime", std::to_string(job.creation_time_ms)},
-                {"endTime", std::to_string(job.end_time_ms)},
-                {"load", {{"outputRows", std::to_string(job.output_rows)}}}};
+  if (std::holds_alternative<LoadJob>(job.configuration)) {
+    statistics["load"] = {{"outputRows", std::to_string(job.output_rows)}};
+    return statistics;
   }
   json query_statistics = {{"totalBytesProcessed", "0"},
                            {"totalBytesBilled", "0"},
                            {"cacheHit", false},
-                           {"statementType", StatementType(job.query)}};
+                           {"statementType", StatementType(job.query()->query)}};
   if (job.result.has_value() && job.result->affected_rows >= 0) {
     query_statistics["numDmlAffectedRows"] = std::to_string(job.result->affected_rows);
   }
   // A dry run reports what the query would return; that schema is all it produces.
-  if (job.dry_run && job.result.has_value() && job.result->has_rows) {
+  if (job.dry_run() && job.result.has_value() && job.result->has_rows) {
     query_statistics["schema"] = job.result->SchemaToJson();
   }
-  return json{{"creationTime", std::to_string(job.creation_time_ms)},
-              {"startTime", std::to_string(job.creation_time_ms)},
-              {"endTime", std::to_string(job.end_time_ms)},
-              {"totalBytesProcessed", "0"},
-              {"query", std::move(query_statistics)}};
+  statistics["totalBytesProcessed"] = "0";
+  statistics["query"] = std::move(query_statistics);
+  return statistics;
 }
 
 json TableReferenceJson(const TableReference& table) {
@@ -249,66 +286,49 @@ json TableReferenceJson(const TableReference& table) {
               {"tableId", table.table_id}};
 }
 
+// The configuration a job resource reports, with the defaults the request left out filled in.
+json JobConfiguration(const Job& job) {
+  const auto complete = [&job](TableReference table) {
+    if (table.project_id.empty()) table.project_id = job.project_id;
+    return TableReferenceJson(table);
+  };
+  if (const auto* copy = std::get_if<CopyJob>(&job.configuration)) {
+    json config = copy->configuration;
+    config["destinationTable"] = complete(copy->destination_table);
+    if (config.contains("sourceTable")) {
+      config["sourceTable"] = complete(copy->source_tables.at(0));
+    } else {
+      config["sourceTables"] = json::array();
+      for (const TableReference& source : copy->source_tables) {
+        config["sourceTables"].push_back(complete(source));
+      }
+    }
+    config["createDisposition"] = DispositionName(copy->create_disposition);
+    config["writeDisposition"] = DispositionName(copy->write_disposition);
+    return json{{"jobType", "COPY"}, {"copy", std::move(config)}};
+  }
+  if (const auto* load = std::get_if<LoadJob>(&job.configuration)) {
+    json config = load->configuration;
+    config["destinationTable"] = complete(load->destination_table);
+    return json{{"jobType", "LOAD"}, {"load", std::move(config)}};
+  }
+  const QueryJob& query = *job.query();
+  json config{{"query", query.query}, {"useLegacySql", false}};
+  if (query.destination_table.has_value()) {
+    config["destinationTable"] = complete(*query.destination_table);
+    config["createDisposition"] = DispositionName(query.create_disposition);
+    config["writeDisposition"] = DispositionName(query.write_disposition);
+  }
+  return json{{"jobType", "QUERY"}, {"dryRun", query.dry_run}, {"query", std::move(config)}};
+}
+
 json JobResource(const Job& job) {
-  if (job.is_copy) {
-    json copy = job.copy_configuration;
-    auto complete = [&job](json& table) {
-      if (table.value("projectId", "").empty()) table["projectId"] = job.project_id;
-    };
-    complete(copy["destinationTable"]);
-    if (copy.contains("sourceTable")) complete(copy["sourceTable"]);
-    if (copy.contains("sourceTables")) {
-      for (json& table : copy["sourceTables"]) complete(table);
-    }
-    copy["createDisposition"] =
-        job.create_disposition.empty() ? "CREATE_IF_NEEDED" : job.create_disposition;
-    copy["writeDisposition"] =
-        job.write_disposition.empty() ? "WRITE_EMPTY" : job.write_disposition;
-    return json{{"kind", "bigquery#job"},
-                {"etag", ""},
-                {"id", job.project_id + ":" + job.location + "." + job.job_id},
-                {"selfLink", ""},
-                {"jobReference", JobReference(job)},
-                {"configuration", {{"jobType", "COPY"}, {"copy", std::move(copy)}}},
-                {"status", JobStatus(job)},
-                {"statistics", JobStatistics(job)}};
-  }
-  if (job.is_load) {
-    if (!job.destination_table.has_value()) {
-      throw std::logic_error("Load job is missing its destination table");
-    }
-    json load = job.load_configuration;
-    TableReference destination = *job.destination_table;
-    if (destination.project_id.empty()) destination.project_id = job.project_id;
-    load["destinationTable"] = TableReferenceJson(destination);
-    return json{{"kind", "bigquery#job"},
-                {"etag", ""},
-                {"id", job.project_id + ":" + job.location + "." + job.job_id},
-                {"selfLink", ""},
-                {"jobReference", JobReference(job)},
-                {"configuration", {{"jobType", "LOAD"}, {"load", std::move(load)}}},
-                {"status", JobStatus(job)},
-                {"statistics", JobStatistics(job)}};
-  }
-  json query{{"query", job.query}, {"useLegacySql", false}};
-  if (job.destination_table.has_value()) {
-    TableReference destination = *job.destination_table;
-    if (destination.project_id.empty()) {
-      destination.project_id = job.project_id;
-    }
-    query["destinationTable"] = TableReferenceJson(destination);
-    query["createDisposition"] =
-        job.create_disposition.empty() ? "CREATE_IF_NEEDED" : job.create_disposition;
-    query["writeDisposition"] =
-        job.write_disposition.empty() ? "WRITE_EMPTY" : job.write_disposition;
-  }
   return json{{"kind", "bigquery#job"},
               {"etag", ""},
               {"id", job.project_id + ":" + job.location + "." + job.job_id},
               {"selfLink", ""},
               {"jobReference", JobReference(job)},
-              {"configuration",
-               {{"jobType", "QUERY"}, {"dryRun", job.dry_run}, {"query", std::move(query)}}},
+              {"configuration", JobConfiguration(job)},
               {"status", JobStatus(job)},
               {"statistics", JobStatistics(job)}};
 }
@@ -318,7 +338,7 @@ json JobListEntry(const Job& job, bool full) {
                 {"id", job.project_id + ":" + job.location + "." + job.job_id},
                 {"jobReference", JobReference(job)},
                 {"state", "DONE"},
-                {"configuration", JobResource(job)["configuration"]},
+                {"configuration", JobConfiguration(job)},
                 {"statistics", JobStatistics(job)}};
   if (job.error.has_value()) {
     entry["errorResult"] = ErrorProto(*job.error);
@@ -517,7 +537,7 @@ class Server::Impl {
            QueryRequest query_request = ToQueryRequest(Param(request, "project"), body);
            query_request.dry_run = body.value("dryRun", false);
            const auto job = emulator_.RunQuery(query_request);
-           if (job->dry_run) {
+           if (job->dry_run()) {
              // A dry run creates no job, so its response has no job reference either.
              return DryRunQueryResponse(*job);
            }
@@ -579,23 +599,7 @@ class Server::Impl {
       }
       const json config = body.value("configuration", json::object());
       if (config.contains("load")) {
-        const json& load = config.at("load");
-        if (!load.is_object() || !load.contains("destinationTable") ||
-            !load.at("destinationTable").is_object()) {
-          throw ApiError::Invalid("Invalid destination table");
-        }
-        const json& table = load.at("destinationTable");
-        LoadRequest load_request;
-        load_request.project_id = Param(request, "project");
-        load_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
-        load_request.destination_table = TableReference{
-            table.value("projectId", ""), table.value("datasetId", ""), table.value("tableId", "")};
-        if (load_request.destination_table.dataset_id.empty() ||
-            load_request.destination_table.table_id.empty()) {
-          throw ApiError::Invalid("Invalid destination table");
-        }
-        load_request.configuration = load;
-        return JobResource(*emulator_.RunLoad(load_request));
+        return JobResource(*emulator_.RunLoad(ToLoadRequest(Param(request, "project"), body)));
       }
       if (config.contains("copy")) {
         const json& copy = config.at("copy");
@@ -614,21 +618,22 @@ class Server::Impl {
         CopyRequest copy_request;
         copy_request.project_id = Param(request, "project");
         copy_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
-        copy_request.destination_table = parse_table(copy.at("destinationTable"));
+        copy_request.copy.destination_table = parse_table(copy.at("destinationTable"));
         if (copy.contains("sourceTable") == copy.contains("sourceTables")) {
           throw ApiError::Invalid("Specify sourceTable or sourceTables");
         }
         if (copy.contains("sourceTable")) {
-          copy_request.source_tables.push_back(parse_table(copy.at("sourceTable")));
+          copy_request.copy.source_tables.push_back(parse_table(copy.at("sourceTable")));
         } else {
           if (!copy.at("sourceTables").is_array() || copy.at("sourceTables").empty()) {
             throw ApiError::Invalid("sourceTables is required");
           }
           for (const json& table : copy.at("sourceTables")) {
-            copy_request.source_tables.push_back(parse_table(table));
+            copy_request.copy.source_tables.push_back(parse_table(table));
           }
         }
-        copy_request.configuration = copy;
+        ParseDispositions(copy, copy_request.copy);
+        copy_request.copy.configuration = copy;
         return JobResource(*emulator_.RunCopy(copy_request));
       }
       if (config.contains("extract")) {
@@ -650,8 +655,7 @@ class Server::Impl {
           throw ApiError::Invalid("Invalid destination table");
         }
       }
-      query_request.create_disposition = query_config.value("createDisposition", "");
-      query_request.write_disposition = query_config.value("writeDisposition", "");
+      ParseDispositions(query_config, query_request);
       return JobResource(*emulator_.RunQuery(query_request));
     });
     Post("/projects/:project/jobs", insert_job);
@@ -673,39 +677,30 @@ class Server::Impl {
                                                      Param(request, "project") + "/jobs/" + id);
                  return json::object();
                }));
-    http_.Put("/resumable/upload/bigquery/v2/projects/:project/jobs/:upload",
-              Json([this](const httplib::Request& request, httplib::Response&) {
-                json body;
-                {
-                  std::lock_guard<std::mutex> lock(uploads_mutex_);
-                  const auto it = uploads_.find(Param(request, "upload"));
-                  if (it == uploads_.end()) throw ApiError::NotFound("Upload session not found");
-                  body = std::move(it->second);
-                  uploads_.erase(it);
-                }
-                TemporaryUpload upload;
-                char pattern[] = "/tmp/bigquery-upload-XXXXXX";
-                const int fd = mkstemp(pattern);
-                if (fd < 0) throw ApiError::Internal("Could not create upload temporary file");
-                close(fd);
-                upload.path = pattern;
-                std::ofstream stream(upload.path, std::ios::binary);
-                stream.write(request.body.data(),
-                             static_cast<std::streamsize>(request.body.size()));
-                if (!stream) throw ApiError::Internal("Could not write upload temporary file");
-                stream.close();
-                json& config = body["configuration"]["load"];
-                config["sourceUris"] = json::array({upload.path});
-                const json& table = config.at("destinationTable");
-                LoadRequest load_request;
-                load_request.project_id = Param(request, "project");
-                load_request.job_id = body.value("jobReference", json::object()).value("jobId", "");
-                load_request.destination_table =
-                    TableReference{table.value("projectId", ""), table.value("datasetId", ""),
-                                   table.value("tableId", "")};
-                load_request.configuration = config;
-                return JobResource(*emulator_.RunLoad(load_request));
-              }));
+    http_.Put(
+        "/resumable/upload/bigquery/v2/projects/:project/jobs/:upload",
+        Json([this](const httplib::Request& request, httplib::Response&) {
+          json body;
+          {
+            std::lock_guard<std::mutex> lock(uploads_mutex_);
+            const auto it = uploads_.find(Param(request, "upload"));
+            if (it == uploads_.end()) throw ApiError::NotFound("Upload session not found");
+            body = std::move(it->second);
+            uploads_.erase(it);
+          }
+          TemporaryUpload upload;
+          char pattern[] = "/tmp/bigquery-upload-XXXXXX";
+          const int fd = mkstemp(pattern);
+          if (fd < 0) throw ApiError::Internal("Could not create upload temporary file");
+          close(fd);
+          upload.path = pattern;
+          std::ofstream stream(upload.path, std::ios::binary);
+          stream.write(request.body.data(), static_cast<std::streamsize>(request.body.size()));
+          if (!stream) throw ApiError::Internal("Could not write upload temporary file");
+          stream.close();
+          body["configuration"]["load"]["sourceUris"] = json::array({upload.path});
+          return JobResource(*emulator_.RunLoad(ToLoadRequest(Param(request, "project"), body)));
+        }));
     Get("/projects/:project/jobs",
         Json([this](const httplib::Request& request, httplib::Response&) {
           const std::string projection =
