@@ -1,5 +1,6 @@
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -12,22 +13,19 @@ namespace bigquery_emulator_duckdb::translator {
 namespace {
 
 // DDL names tables and datasets by path rather than through the catalog, so the defaults the
-// catalog resolves queries with are applied here.
-std::optional<std::string> TablePath(const std::vector<std::string>& path, const Scope& scope) {
+// catalog resolves queries with are applied here. The table or dataset named is the statement's
+// DDL target, which is recorded in the context.
+std::optional<std::string> TargetTable(const std::vector<std::string>& path, const Scope& scope) {
   const auto parts =
       NormalizeTablePath(path, scope.context.defaults.project, scope.context.defaults.dataset);
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
-  std::vector<std::string> quoted;
-  quoted.reserve(parts.size());
-  for (const auto& part : parts) {
-    quoted.push_back(QuoteIdentifier(part));
-  }
-  return Join(quoted, ".");
+  scope.context.ddl_target_table = TableReference{parts[0], parts[1], parts[2]};
+  return QualifiedName(*scope.context.ddl_target_table);
 }
 
-std::optional<std::string> DatasetPath(const std::vector<std::string>& path, const Scope& scope) {
+std::optional<std::string> TargetDataset(const std::vector<std::string>& path, const Scope& scope) {
   // Reuse table path normalization so dots inside a domain-scoped project are handled
   // the same way for CREATE/DROP SCHEMA and table references.
   std::vector<std::string> table_path = path;
@@ -37,7 +35,8 @@ std::optional<std::string> DatasetPath(const std::vector<std::string>& path, con
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
-  return QuoteIdentifier(parts[0]) + "." + QuoteIdentifier(parts[1]);
+  scope.context.ddl_target_dataset = DatasetReference{parts[0], parts[1]};
+  return QualifiedName(*scope.context.ddl_target_dataset);
 }
 
 bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
@@ -85,7 +84,7 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
       !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }
-  const auto path = TablePath(create.name_path(), scope);
+  const auto path = TargetTable(create.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }
@@ -119,7 +118,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
       (column.annotations() != nullptr && column.annotations()->not_null())) {
     return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
   }
-  const auto path = TablePath(alter.name_path(), scope);
+  const auto path = TargetTable(alter.name_path(), scope);
   const auto type = ColumnDefinitionType(column, scope);
   if (!path || !type) {
     return std::nullopt;
@@ -214,11 +213,16 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
       create.recursive() || create.is_value_table()) {
     return Unsupported(scope, "temporary, recursive or value-table views");
   }
-  const auto path = TablePath(create.name_path(), scope);
+  const auto path = TargetTable(create.name_path(), scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
   const auto relation = Scan(*create.query(), scope);
-  if (!path || !relation) {
+  if (!path || !target || !relation) {
     return std::nullopt;
   }
+  ViewDefinition view{.table = *target,
+                      .query = create.sql(),
+                      .if_not_exists = create.create_mode() ==
+                                       googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS};
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
@@ -226,6 +230,11 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
     if (column == relation->columns.end() || !type) {
       return std::nullopt;
     }
+    auto field = BigQueryFieldSchema(output->name(), output->column().type());
+    if (!field.ok()) {
+      return Unsupported(scope, field.status().message());
+    }
+    view.schema.push_back(*std::move(field));
     // Preserve GoogleSQL result types when the view is later read through the catalog.
     projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
                           QuoteIdentifier(output->name()));
@@ -238,6 +247,7 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
     head += "IF NOT EXISTS ";
   }
+  scope.context.view = std::move(view);
   return head + *path + " AS SELECT " + Join(projections, ", ") + relation->From() +
          relation->Order();
 }
@@ -247,7 +257,7 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   if (create.collation_name() != nullptr) {
     return Unsupported(scope, "dataset collation");
   }
-  const auto path = DatasetPath(create.name_path(), scope);
+  const auto path = TargetDataset(create.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }
@@ -268,7 +278,7 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
     return Unsupported(scope, "DROP " + object_type);
   }
   const auto path =
-      is_schema ? DatasetPath(drop.name_path(), scope) : TablePath(drop.name_path(), scope);
+      is_schema ? TargetDataset(drop.name_path(), scope) : TargetTable(drop.name_path(), scope);
   if (!path) {
     return std::nullopt;
   }

@@ -3,7 +3,6 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <cctype>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -201,42 +200,14 @@ LoadRequest ToLoadRequest(const std::string& project_id, const json& body) {
   return request;
 }
 
-// Derives JobStatistics2.statementType from the leading keywords of the query.
-std::string StatementType(const std::string& query) {
-  std::vector<std::string> words;
-  std::string word;
-  for (const char c : query) {
-    if (std::isalpha(static_cast<unsigned char>(c)) != 0) {
-      word += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    } else if (!word.empty()) {
-      words.push_back(word);
-      word.clear();
-      if (words.size() == 3) {
-        break;
-      }
-    }
-  }
-  if (!word.empty() && words.size() < 3) {
-    words.push_back(word);
-  }
-  if (words.empty()) {
-    return "SELECT";
-  }
-  const std::string& first = words[0];
-  if (first == "CREATE" || first == "DROP" || first == "ALTER") {
-    for (size_t i = 1; i < words.size(); ++i) {
-      if (words[i] == "TABLE" || words[i] == "VIEW" || words[i] == "SCHEMA" ||
-          words[i] == "FUNCTION") {
-        return first + "_" + words[i];
-      }
-    }
-    return first + "_TABLE";
-  }
-  if (first == "INSERT" || first == "UPDATE" || first == "DELETE" || first == "MERGE" ||
-      first == "TRUNCATE") {
-    return first;
-  }
-  return "SELECT";
+json TableReferenceJson(const TableReference& table) {
+  return json{{"projectId", table.project_id},
+              {"datasetId", table.dataset_id},
+              {"tableId", table.table_id}};
+}
+
+json DatasetReferenceJson(const DatasetReference& dataset) {
+  return json{{"projectId", dataset.project_id}, {"datasetId", dataset.dataset_id}};
 }
 
 json JobReference(const Job& job) {
@@ -264,10 +235,19 @@ json JobStatistics(const Job& job) {
     statistics["load"] = {{"outputRows", std::to_string(job.output_rows)}};
     return statistics;
   }
-  json query_statistics = {{"totalBytesProcessed", "0"},
-                           {"totalBytesBilled", "0"},
-                           {"cacheHit", false},
-                           {"statementType", StatementType(job.query()->query)}};
+  const QueryJob& query = *job.query();
+  json query_statistics = {
+      {"totalBytesProcessed", "0"}, {"totalBytesBilled", "0"}, {"cacheHit", false}};
+  // A query that failed before it was translated has no statement to describe.
+  if (!query.statement_type.empty()) {
+    query_statistics["statementType"] = query.statement_type;
+  }
+  if (query.ddl_target_table.has_value()) {
+    query_statistics["ddlTargetTable"] = TableReferenceJson(*query.ddl_target_table);
+  }
+  if (query.ddl_target_dataset.has_value()) {
+    query_statistics["ddlTargetDataset"] = DatasetReferenceJson(*query.ddl_target_dataset);
+  }
   if (job.result.has_value() && job.result->affected_rows >= 0) {
     query_statistics["numDmlAffectedRows"] = std::to_string(job.result->affected_rows);
   }
@@ -278,12 +258,6 @@ json JobStatistics(const Job& job) {
   statistics["totalBytesProcessed"] = "0";
   statistics["query"] = std::move(query_statistics);
   return statistics;
-}
-
-json TableReferenceJson(const TableReference& table) {
-  return json{{"projectId", table.project_id},
-              {"datasetId", table.dataset_id},
-              {"tableId", table.table_id}};
 }
 
 // The configuration a job resource reports, with the defaults the request left out filled in.

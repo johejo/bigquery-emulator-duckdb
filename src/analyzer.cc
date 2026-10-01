@@ -38,10 +38,15 @@ const googlesql::ResolvedStatement& AnalyzerResult::statement() const {
 }
 
 std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
-  if (!statement().Is<googlesql::ResolvedQueryStmt>()) {
+  return ResultSchema(statement());
+}
+
+std::optional<std::vector<FieldSchema>> ResultSchema(
+    const googlesql::ResolvedStatement& statement) {
+  if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return std::nullopt;
   }
-  const auto* query = statement().GetAs<googlesql::ResolvedQueryStmt>();
+  const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
   std::vector<FieldSchema> schema;
   if (query->is_value_table() && query->output_column_list_size() == 1 &&
       query->output_column_list(0)->column().type()->IsStruct()) {
