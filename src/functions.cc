@@ -565,6 +565,20 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& Rules() {
       {"REGEXP_INSTR",
        {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {kString})}, {"1", "1", "0"}},
         {{2, 5}, "bq_regexp_instr_bytes($1, $2, $3, $4, $5)", {Is(1, {kBytes})}, {"1", "1", "0"}}}},
+      // IPv4 addresses are 4 bytes in network byte order. A negative integer stands for its
+      // 32-bit two's complement, which the mask makes non-negative for hex() to print.
+      {"IPV4_FROM_INT64",
+       {{1,
+         "CASE WHEN $1 < -2147483648 OR $1 > 4294967295 THEN error('NET.IPV4_FROM_INT64() "
+         "encountered an invalid integer IP. Expected range: [-0x80000000, 0xFFFFFFFF]; got ' || "
+         "$1) ELSE unhex(lpad(hex($1 & 4294967295), 8, '0')) END",
+         {Is(1, {kInt64})}}}},
+      {"IPV4_TO_INT64",
+       {{1,
+         "CASE WHEN octet_length($1) <> 4 THEN error('NET.IPV4_TO_INT64() encountered a non-IPv4 "
+         "address. Expected 4 bytes but got ' || octet_length($1)) ELSE CAST('0x' || hex($1) AS "
+         "BIGINT) END",
+         {Is(1, {kBytes})}}}},
       {"TO_HEX", {{1, "lower(hex($1))"}}},
       {"FROM_HEX", {{1, "unhex($1)", {Is(1, {kString})}}}},
       {"TO_BASE64", {{1, "to_base64($1)"}}},
