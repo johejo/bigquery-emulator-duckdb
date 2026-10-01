@@ -65,15 +65,6 @@ std::string ProjectFileName(const std::string& project_id) {
   return name + ".duckdb";
 }
 
-std::string QualifiedName(const DatasetReference& dataset) {
-  return QuoteIdentifier(dataset.project_id) + "." + QuoteIdentifier(dataset.dataset_id);
-}
-
-std::string QualifiedName(const TableReference& table) {
-  return QuoteIdentifier(table.project_id) + "." + QuoteIdentifier(table.dataset_id) + "." +
-         QuoteIdentifier(table.table_id);
-}
-
 std::string JobKey(const std::string& project_id, const std::string& job_id) {
   return project_id + ":" + job_id;
 }
@@ -226,26 +217,16 @@ struct ViewWrite {
   std::string existence_query;
 };
 
-ViewWrite CreateViewWrite(const googlesql::ResolvedCreateViewStmt& view,
-                          const std::string& default_project, const std::string& default_dataset) {
-  const auto path = NormalizeTablePath(view.name_path(), default_project, default_dataset);
-  const TableReference table{path[0], path[1], path[2]};
-  json fields = json::array();
-  for (const auto& output : view.output_column_list()) {
-    const auto field = BigQueryFieldSchema(output->name(), output->column().type());
-    if (!field.ok()) {
-      throw ApiError::InvalidQuery(std::string(field.status().message()));
-    }
-    fields.push_back(field->ToJson());
-  }
-  const json metadata{{"query", view.sql()}, {"fields", fields}};
+ViewWrite CreateViewWrite(const ViewDefinition& view) {
+  const TableReference& table = view.table;
+  const json metadata{{"query", view.query}, {"fields", SchemaToJson(view.schema).at("fields")}};
   ViewWrite write;
   // DuckDB can create a circular view and only reject it when queried. Bind the new definition
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
       "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
-  if (view.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
+  if (view.if_not_exists) {
     write.existence_query = "SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
                             QuoteLiteral(table.project_id) +
                             " AND table_schema = " + QuoteLiteral(table.dataset_id) +
@@ -465,10 +446,9 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-Emulator::Translation Emulator::Translate(const std::string& query,
-                                          const QueryParameters& parameters,
-                                          const std::string& default_project,
-                                          const std::string& default_dataset) {
+TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
+                                        const std::string& default_project,
+                                        const std::string& default_dataset) {
   AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
@@ -482,21 +462,13 @@ Emulator::Translation Emulator::Translate(const std::string& query,
                           settings.default_dataset);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
-  std::optional<std::string> sql = TranslateToDuckDbSql(
+  std::optional<TranslatedStatement> translated = TranslateStatement(
       analyzed.statement(), parameters,
       DefaultDataset{settings.default_project, settings.default_dataset}, &unsupported);
-  if (!sql.has_value()) {
+  if (!translated.has_value()) {
     throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
   }
-  Translation translation{*std::move(sql), analyzed.result_schema(), {}, {}};
-  if (analyzed.statement().Is<googlesql::ResolvedCreateViewStmt>()) {
-    ViewWrite write =
-        CreateViewWrite(*analyzed.statement().GetAs<googlesql::ResolvedCreateViewStmt>(),
-                        default_project, default_dataset);
-    translation.view_metadata_statements = std::move(write.metadata_statements);
-    translation.view_existence_query = std::move(write.existence_query);
-  }
-  return translation;
+  return *std::move(translated);
 }
 
 std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
@@ -565,26 +537,30 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
                                 .create_disposition = request.create_disposition,
                                 .write_disposition = request.write_disposition};
   return RunJob(std::move(job), [&](Job& job) {
-    const Translation translation = Translate(request.query, request.parameters,
-                                              settings.default_project, settings.default_dataset);
-    if (request.destination_table.has_value() && !translation.schema.has_value()) {
+    const TranslatedStatement translation = Translate(
+        request.query, request.parameters, settings.default_project, settings.default_dataset);
+    QueryJob& query = std::get<QueryJob>(job.configuration);
+    query.statement_type = translation.statement_type;
+    query.ddl_target_table = translation.ddl_target_table;
+    query.ddl_target_dataset = translation.ddl_target_dataset;
+    if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
     QueryResult result;
     if (request.dry_run) {
       result = Prepare(translation.sql, setup);
-    } else if (!translation.view_metadata_statements.empty()) {
-      backend_.CreateView(translation.sql, translation.view_metadata_statements,
-                          translation.view_existence_query, setup);
+    } else if (translation.view.has_value()) {
+      const ViewWrite write = CreateViewWrite(*translation.view);
+      backend_.CreateView(translation.sql, write.metadata_statements, write.existence_query, setup);
     } else if (request.destination_table.has_value()) {
       result = WriteDestination(request.project_id, *request.destination_table,
                                 request.create_disposition, request.write_disposition,
-                                translation.sql, *translation.schema, setup);
+                                translation.sql, *translation.result_schema, setup);
     } else {
       result = Execute(translation.sql, setup);
     }
-    if (translation.schema.has_value()) {
-      result.schema = ReconcileSchema(std::move(result.schema), *translation.schema);
+    if (translation.result_schema.has_value()) {
+      result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
     }
     job.result = std::move(result);
   });
@@ -972,13 +948,17 @@ void Emulator::CreateView(const TableReference& table, const json& definition) {
     throw ApiError::Invalid("View query is required");
   }
   try {
-    const Translation translation =
+    const TranslatedStatement translation =
         Translate("CREATE VIEW " +
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id) +
                       " AS " + query,
                   {}, table.project_id, "");
-    backend_.CreateView(translation.sql, translation.view_metadata_statements, "");
+    if (!translation.view.has_value()) {
+      throw ApiError::Internal("CREATE VIEW was not translated to a view");
+    }
+    backend_.CreateView(translation.sql, CreateViewWrite(*translation.view).metadata_statements,
+                        "");
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {
       throw ApiError::Duplicate("Already Exists: Table " + TableName(table));

@@ -67,6 +67,10 @@ struct Context {
   const DefaultDataset& defaults;
   // The first construct found unsupported, reported in the error the statement fails with.
   std::string unsupported;
+  // What DDL records about its target as it is translated.
+  std::optional<TableReference> ddl_target_table;
+  std::optional<DatasetReference> ddl_target_dataset;
+  std::optional<ViewDefinition> view;
   int next_name = 0;
 
   // A name no other call returns, for WITH queries and lambda parameters.

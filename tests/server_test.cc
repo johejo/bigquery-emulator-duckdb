@@ -171,6 +171,16 @@ TEST_F(ServerTest, RejectsUnknownDispositionsWithoutCreatingJobs) {
   Get("/bigquery/v2/projects/p/jobs/bad", 404);
 }
 
+// No client library reads ddlTargetDataset, so it is checked here rather than end to end.
+TEST_F(ServerTest, ReportsTheDatasetOfSchemaDdl) {
+  const json job = Post("/bigquery/v2/projects/p/jobs",
+                        {{"configuration", {{"query", {{"query", "CREATE SCHEMA created"}}}}}});
+  EXPECT_EQ(job["statistics"]["query"]["statementType"], "CREATE_SCHEMA");
+  EXPECT_EQ(job["statistics"]["query"]["ddlTargetDataset"],
+            json::parse(R"({"projectId": "p", "datasetId": "created"})"));
+  EXPECT_FALSE(job["statistics"]["query"].contains("ddlTargetTable"));
+}
+
 TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
   const std::string jobs = "/projects/p/jobs";
   Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});

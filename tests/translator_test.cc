@@ -46,17 +46,24 @@ class TestTableSource : public TableSource {
 
 class TranslatorTest : public ::testing::Test {
  protected:
+  std::optional<TranslatedStatement> Statement(const std::string& sql,
+                                               const QueryParameters& parameters = {},
+                                               const AnalyzerSettings& settings = {}) {
+    const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
+    return TranslateStatement(analyzed.statement(), parameters, DefaultDataset{"p", "ds"});
+  }
+
   std::optional<std::string> Translate(const std::string& sql,
                                        const QueryParameters& parameters = {},
                                        const AnalyzerSettings& settings = {}) {
-    const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
-    return TranslateToDuckDbSql(analyzed.statement(), parameters, DefaultDataset{"p", "ds"});
+    const auto statement = Statement(sql, parameters, settings);
+    return statement ? std::optional<std::string>(statement->sql) : std::nullopt;
   }
 
   std::string Unsupported(const std::string& sql) {
     const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, {});
     std::string reason;
-    if (TranslateToDuckDbSql(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
+    if (TranslateStatement(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
             .has_value()) {
       throw std::runtime_error("Unexpected translation: " + sql);
     }
@@ -68,11 +75,11 @@ class TranslatorTest : public ::testing::Test {
     const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
     std::string reason;
     const auto translated =
-        TranslateToDuckDbSql(analyzed.statement(), parameters, DefaultDataset{"p", "ds"}, &reason);
+        TranslateStatement(analyzed.statement(), parameters, DefaultDataset{"p", "ds"}, &reason);
     if (!translated) {
       throw std::runtime_error("Unexpected unsupported construct (" + reason + "): " + sql);
     }
-    return backend_.Execute(*translated);
+    return backend_.Execute(translated->sql);
   }
 
   std::optional<std::string> Scalar(const std::string& sql) {
@@ -203,6 +210,29 @@ TEST_F(TranslatorTest, TranslatesDdlPaths) {
   EXPECT_EQ(Translate("DROP SCHEMA other CASCADE"), "DROP SCHEMA \"p\".\"other\" CASCADE");
   EXPECT_EQ(Translate("DROP TABLE IF EXISTS ds.new_t"),
             "DROP TABLE IF EXISTS \"p\".\"ds\".\"new_t\"");
+}
+
+// The emulator records a view's GoogleSQL query and BigQuery schema, which DuckDB does not keep.
+TEST_F(TranslatorTest, DescribesTheViewACreateViewDefines) {
+  const auto statement = Statement("CREATE VIEW IF NOT EXISTS v AS SELECT a, [b] AS bs FROM t");
+  if (!statement.has_value() || !statement->view.has_value()) {
+    FAIL() << "CREATE VIEW defines no view";
+  }
+  const ViewDefinition& view = *statement->view;
+  EXPECT_EQ(view.table.project_id, "p");
+  EXPECT_EQ(view.table.dataset_id, "ds");
+  EXPECT_EQ(view.table.table_id, "v");
+  EXPECT_EQ(view.query, "SELECT a, [b] AS bs FROM t");
+  EXPECT_TRUE(view.if_not_exists);
+  ASSERT_EQ(view.schema.size(), 2);
+  EXPECT_EQ(view.schema[0].type, FieldType::kInteger);
+  EXPECT_EQ(view.schema[1].type, FieldType::kString);
+  EXPECT_EQ(view.schema[1].mode, FieldMode::kRepeated);
+  const auto table = Statement("CREATE TABLE new_t (x INT64)");
+  if (!table.has_value()) {
+    FAIL() << "CREATE TABLE is not translated";
+  }
+  EXPECT_FALSE(table->view.has_value());
 }
 
 TEST_F(TranslatorTest, RunsDdl) {

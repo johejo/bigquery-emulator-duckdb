@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.h"
@@ -91,21 +92,67 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
 }
 
+// JobStatistics2.statementType of a statement the translator supports.
+std::string StatementType(const googlesql::ResolvedStatement& statement) {
+  if (statement.Is<googlesql::ResolvedInsertStmt>()) {
+    return "INSERT";
+  }
+  if (statement.Is<googlesql::ResolvedUpdateStmt>()) {
+    return "UPDATE";
+  }
+  if (statement.Is<googlesql::ResolvedDeleteStmt>()) {
+    return "DELETE";
+  }
+  if (statement.Is<googlesql::ResolvedTruncateStmt>()) {
+    return "TRUNCATE_TABLE";
+  }
+  if (statement.Is<googlesql::ResolvedMergeStmt>()) {
+    return "MERGE";
+  }
+  if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
+    return "CREATE_TABLE";
+  }
+  if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
+    return "CREATE_TABLE_AS_SELECT";
+  }
+  if (statement.Is<googlesql::ResolvedAlterTableStmt>()) {
+    return "ALTER_TABLE";
+  }
+  if (statement.Is<googlesql::ResolvedCreateViewStmt>()) {
+    return "CREATE_VIEW";
+  }
+  if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
+    return "CREATE_SCHEMA";
+  }
+  if (statement.Is<googlesql::ResolvedDropStmt>()) {
+    return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+  }
+  return "SELECT";
+}
+
 }  // namespace
 }  // namespace bigquery_emulator_duckdb::translator
 
 namespace bigquery_emulator_duckdb {
 
-std::optional<std::string> TranslateToDuckDbSql(const googlesql::ResolvedStatement& statement,
-                                                const QueryParameters& parameters,
-                                                const DefaultDataset& defaults,
-                                                std::string* unsupported) {
+std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedStatement& statement,
+                                                      const QueryParameters& parameters,
+                                                      const DefaultDataset& defaults,
+                                                      std::string* unsupported) {
   translator::Context context{.parameters = parameters, .defaults = defaults};
   auto sql = translator::Statement(statement, translator::Scope{.context = context});
-  if (!sql && unsupported != nullptr) {
-    *unsupported = context.unsupported.empty() ? "unsupported construct" : context.unsupported;
+  if (!sql) {
+    if (unsupported != nullptr) {
+      *unsupported = context.unsupported.empty() ? "unsupported construct" : context.unsupported;
+    }
+    return std::nullopt;
   }
-  return sql;
+  return TranslatedStatement{.sql = *std::move(sql),
+                             .statement_type = translator::StatementType(statement),
+                             .result_schema = ResultSchema(statement),
+                             .ddl_target_table = std::move(context.ddl_target_table),
+                             .ddl_target_dataset = std::move(context.ddl_target_dataset),
+                             .view = std::move(context.view)};
 }
 
 }  // namespace bigquery_emulator_duckdb

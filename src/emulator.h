@@ -19,19 +19,10 @@
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/query_parameters.h"
+#include "src/references.h"
+#include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
-
-struct DatasetReference {
-  std::string project_id;
-  std::string dataset_id;
-};
-
-struct TableReference {
-  std::string project_id;
-  std::string dataset_id;
-  std::string table_id;
-};
 
 struct TableInfo {
   TableReference reference;
@@ -68,6 +59,11 @@ struct QueryJob {
   std::optional<TableReference> destination_table;
   CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
   WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
+  // What the query's statement is, once it has been translated: JobStatistics2.statementType and
+  // the target of a DDL statement.
+  std::string statement_type;
+  std::optional<TableReference> ddl_target_table;
+  std::optional<DatasetReference> ddl_target_dataset;
 };
 
 struct LoadJob {
@@ -173,15 +169,10 @@ class Emulator {
   void EnsureProject(const std::string& project_id);
   // What EnsureProject attaches for `project_id`: a DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
-  struct Translation {
-    std::string sql;
-    std::optional<std::vector<FieldSchema>> schema;
-    std::vector<std::string> view_metadata_statements;
-    std::string view_existence_query;
-  };
   // Keeps the catalog, types and resolved AST alive until translation finishes.
-  Translation Translate(const std::string& query, const QueryParameters& parameters,
-                        const std::string& default_project, const std::string& default_dataset);
+  TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
+                                const std::string& default_project,
+                                const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
