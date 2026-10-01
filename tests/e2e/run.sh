@@ -41,6 +41,39 @@ curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test" \
 curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=nested%2Fpeople.jsonl" \
   -H 'Content-Type: application/json' --data-binary @tests/e2e/data/people.jsonl >/dev/null
 
+# Generate compressed fixtures deterministically, including gzip without a .gz suffix.
+export E2E_LOAD_DIR="${data_dir}/load"
+mkdir -p "${E2E_LOAD_DIR}"
+python3 - <<'PYTHON'
+import gzip
+import os
+from pathlib import Path
+
+root = Path(os.environ["E2E_LOAD_DIR"])
+csv = Path("tests/e2e/data/people.csv").read_bytes()
+rows = Path("tests/e2e/data/people.jsonl").read_bytes().splitlines(keepends=True)
+(root / "people.csv.gz").write_bytes(gzip.compress(csv, mtime=0))
+(root / "a-part.jsonl").write_bytes(rows[0])
+(root / "b-part.jsonl").write_bytes(gzip.compress(rows[1], mtime=0))
+(root / "broken.jsonl").write_bytes(b"\x1f\x8bcorrupt gzip")
+PYTHON
+for fixture in a-part.jsonl nested/b-part.jsonl excluded.txt broken.jsonl; do
+  source="${E2E_LOAD_DIR}/${fixture##*/}"
+  if [[ "${fixture}" == excluded.txt ]]; then source="${E2E_LOAD_DIR}/broken.jsonl"; fi
+  curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=wildcard/${fixture}" \
+    -H 'Content-Type: application/octet-stream' --data-binary "@${source}" >/dev/null
+done
+curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=compressed/people.csv.gz" \
+  -H 'Content-Type: application/octet-stream' --data-binary "@${E2E_LOAD_DIR}/people.csv.gz" >/dev/null
+
+# Match the three wildcard examples in the BigQuery batch-loading documentation.
+for fixture in fed-sample.jsonl fed-sample-sub/nested.jsonl; do
+  source="${E2E_LOAD_DIR}/a-part.jsonl"
+  if [[ "${fixture}" == */* ]]; then source=tests/e2e/data/people.jsonl; fi
+  curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=wildcard-spec/${fixture}" \
+    -H 'Content-Type: application/json' --data-binary "@${source}" >/dev/null
+done
+
 start_emulator
 
 # The exec runner is opt-in. runn also waits for stdin when it is not a TTY, so close it.

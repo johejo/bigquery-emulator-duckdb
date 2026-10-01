@@ -78,6 +78,14 @@ std::string JobKey(const std::string& project_id, const std::string& job_id) {
 
 struct DownloadedFiles {
   std::vector<std::string> paths;
+  std::string Create(const std::string& suffix = "") {
+    std::string pattern = "/tmp/bigquery-load-XXXXXX" + suffix;
+    const int fd = mkstemps(pattern.data(), static_cast<int>(suffix.size()));
+    if (fd < 0) throw ApiError::Internal("Could not create load temporary file");
+    close(fd);
+    paths.push_back(pattern);
+    return pattern;
+  }
   ~DownloadedFiles() {
     for (const std::string& path : paths) {
       std::error_code ignored;
@@ -577,18 +585,22 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     const json uris = config.value("sourceUris", json::array());
     if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("sourceUris is required");
     DownloadedFiles downloads;
-    std::string paths;
+    std::vector<std::string> sources;
     for (const json& item : uris) {
       if (!item.is_string()) throw ApiError::Invalid("Invalid source URI");
       const std::string uri = item.get<std::string>();
+      if (uri.starts_with("gs://")) {
+        const auto matches = gcs_client_.Expand(uri);
+        sources.insert(sources.end(), matches.begin(), matches.end());
+      } else {
+        sources.push_back(uri);
+      }
+    }
+    std::string paths;
+    for (const std::string& uri : sources) {
       std::string path;
       if (uri.starts_with("gs://")) {
-        char pattern[] = "/tmp/bigquery-load-XXXXXX";
-        const int fd = mkstemp(pattern);
-        if (fd < 0) throw ApiError::Internal("Could not create load temporary file");
-        close(fd);
-        path = pattern;
-        downloads.paths.push_back(path);
+        path = downloads.Create();
         gcs_client_.Download(uri, std::filesystem::path(path));
       } else if (uri.starts_with("file://")) {
         path = uri.substr(7);
@@ -599,6 +611,22 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       }
       if (path.empty() || !std::filesystem::is_regular_file(path)) {
         throw ApiError::Invalid("Source file does not exist: " + uri);
+      }
+      // Uploads and downloads lose their original suffix. DuckDB selects gzip by suffix,
+      // so inspect the bytes and stage gzip inputs under a name its readers recognize.
+      if (format != "PARQUET") {
+        std::ifstream input(path, std::ios::binary);
+        const bool gzip = input.get() == 0x1f && input.get() == 0x8b;
+        if (gzip) {
+          const std::string compressed = downloads.Create(".gz");
+          if (uri.starts_with("gs://")) {
+            std::filesystem::rename(path, compressed);
+          } else {
+            std::filesystem::copy_file(path, compressed,
+                                       std::filesystem::copy_options::overwrite_existing);
+          }
+          path = compressed;
+        }
       }
       paths += (paths.empty() ? "" : ", ") + QuoteLiteral(path);
     }
