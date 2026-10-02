@@ -18,6 +18,12 @@ namespace bigquery_emulator_duckdb {
 std::vector<std::string> ColumnCommentStatements(const TableReference& table,
                                                  const std::vector<FieldSchema>& schema);
 
+// BigQuery stores a missing ARRAY as an empty one, so a row that leaves out a REPEATED column
+// reads back []. The statements that make [] the default of the REPEATED columns of `table`
+// that have no default of their own.
+std::vector<std::string> RepeatedColumnDefaultStatements(const TableReference& table,
+                                                         const std::vector<FieldSchema>& schema);
+
 // A query for the comments of the columns of `table`, one row per column in column order.
 std::string ColumnCommentsQuery(const TableReference& table);
 
