@@ -64,6 +64,14 @@ Endpoint EndpointFromEnvironment() {
 
 }  // namespace
 
+size_t FindGcsWildcard(const std::string& uri) {
+  const size_t wildcard = uri.find('*', uri.size() - ParseUri(uri).object.size());
+  if (wildcard != std::string::npos && uri.find('*', wildcard + 1) != std::string::npos) {
+    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
+  }
+  return wildcard;
+}
+
 struct GcsClient::Impl {
   Impl(std::string endpoint, bool emulator)
       : options(cloud::Options{}
@@ -108,12 +116,9 @@ const std::string& GcsClient::endpoint() const {
 }
 
 std::vector<std::string> GcsClient::Expand(const std::string& uri) {
+  if (FindGcsWildcard(uri) == std::string::npos) return {uri};
   const auto [bucket, object] = ParseUri(uri);
   const size_t wildcard = object.find('*');
-  if (wildcard == std::string::npos) return {uri};
-  if (object.find('*', wildcard + 1) != std::string::npos) {
-    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
-  }
   const std::string prefix = object.substr(0, wildcard);
   const std::string suffix = object.substr(wildcard + 1);
   // The documented file-name pattern (fed-sample*.csv) excludes subfolders,
@@ -149,6 +154,16 @@ void GcsClient::Download(const std::string& uri, const std::filesystem::path& ou
   const cloud::Status status = client.DownloadToFile(bucket, object, output.string());
   if (!status.ok()) {
     throw ApiError::Invalid("Could not read GCS object: " + uri + " (" + status.message() + ")");
+  }
+}
+
+void GcsClient::Upload(const std::filesystem::path& input, const std::string& uri) {
+  const auto [bucket, object] = ParseUri(uri);
+  storage::Client client = impl_->client();
+  const auto metadata = client.UploadFile(input.string(), bucket, object);
+  if (!metadata) {
+    throw ApiError::Invalid("Could not write GCS object: " + uri + " (" +
+                            metadata.status().message() + ")");
   }
 }
 

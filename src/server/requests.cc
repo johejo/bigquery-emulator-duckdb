@@ -171,6 +171,33 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
   return request;
 }
 
+ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) {
+  const json config = Configuration(body);
+  const json& extract = config["extract"];
+  if (!extract.is_object()) throw ApiError::Invalid("Invalid extract configuration");
+  if (extract.contains("sourceModel")) {
+    throw ApiError::Invalid("The emulator does not support extracting models");
+  }
+  if (!extract.contains("sourceTable")) throw ApiError::Invalid("Source table is required");
+  ExtractRequest request;
+  request.project_id = project_id;
+  request.job_id = JobId(body);
+  request.extract.source_table = ParseTableReference(extract["sourceTable"], "source table");
+  // destinationUri is the deprecated spelling of a single destination.
+  const json uris = extract.contains("destinationUris")
+                        ? extract["destinationUris"]
+                        : json::array({extract.value("destinationUri", json())});
+  if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("destinationUris is required");
+  for (const json& uri : uris) {
+    if (!uri.is_string() || uri.get<std::string>().empty()) {
+      throw ApiError::Invalid("Invalid destination URI");
+    }
+    request.extract.destination_uris.push_back(uri.get<std::string>());
+  }
+  request.extract.configuration = extract;
+  return request;
+}
+
 }  // namespace
 
 std::string Param(const httplib::Request& request, const char* name) {
@@ -273,10 +300,10 @@ JobRequest ParseJobInsert(const std::string& project_id, const json& body) {
     return ParseCopyJob(project_id, body);
   }
   if (config.contains("extract")) {
-    throw ApiError::Invalid("The emulator does not support extract jobs");
+    return ParseExtractJob(project_id, body);
   }
   if (!config.contains("query")) {
-    throw ApiError::Invalid("Only query, load, and copy jobs are supported");
+    throw ApiError::Invalid("Only query, load, copy, and extract jobs are supported");
   }
   return ParseQueryJob(project_id, body);
 }

@@ -36,14 +36,19 @@ for _ in $(seq 1 50); do
   fi
   sleep 0.1
 done
-curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test" \
-  -H 'Content-Type: application/json' -d '{"name":"load-fixtures"}' >/dev/null
+for bucket in load-fixtures extract-output; do
+  curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test" \
+    -H 'Content-Type: application/json' -d "{\"name\":\"${bucket}\"}" >/dev/null
+done
 curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/upload/storage/v1/b/load-fixtures/o?uploadType=media&name=nested%2Fpeople.jsonl" \
   -H 'Content-Type: application/json' --data-binary @tests/e2e/data/people.jsonl >/dev/null
 
 # Generate compressed fixtures deterministically, including gzip without a .gz suffix.
 export E2E_LOAD_DIR="${data_dir}/load"
 mkdir -p "${E2E_LOAD_DIR}"
+# Where extract scenarios download the files they inspect.
+export E2E_EXTRACT_DIR="${data_dir}/extract"
+mkdir -p "${E2E_EXTRACT_DIR}"
 python3 - <<'PYTHON'
 import gzip
 import os

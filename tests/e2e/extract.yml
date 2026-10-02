@@ -1,0 +1,147 @@
+desc: extract jobs write CSV, newline-delimited JSON and Parquet to GCS
+steps:
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset e2e_extract
+    test: current.exit_code == 0
+  scalars:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql "CREATE TABLE e2e_extract.scalars AS SELECT
+        1 AS i, 2.5 AS f, NUMERIC '1.5' AS n, TRUE AS b, b'ab' AS bt,
+        TIMESTAMP '2020-01-02 03:04:05.12 UTC' AS ts, DATETIME '2020-01-02 03:04:05.5' AS dt,
+        DATE '2020-01-02' AS d, JSON '{\"b\": 1, \"a\": [1, 2]}' AS j,
+        CAST(NULL AS INT64) AS nul, 'x,\"y\"<&>' AS s"
+    test: current.exit_code == 0
+  nested:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql "CREATE TABLE e2e_extract.nested AS SELECT
+        1 AS i, STRUCT(1 AS x, CAST(NULL AS STRING) AS y, TIME '01:02:03' AS t,
+        TIMESTAMP '2020-01-02 03:04:05 UTC' AS ts) AS r,
+        [STRUCT(2 AS x, 'z' AS y)] AS rs, [3, 4] AS ri, CAST(NULL AS STRUCT<a INT64>) AS nr"
+    test: current.exit_code == 0
+  view:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE VIEW e2e_extract.v AS SELECT 1 AS i"
+    test: current.exit_code == 0
+
+  csv:
+    exec:
+      command: >-
+        tests/e2e/bq.sh --job_id=e2e_extract_csv extract e2e_extract.scalars
+        gs://extract-output/scalars.csv
+    test: current.exit_code == 0
+  csv_content:
+    exec:
+      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/scalars.csv?alt=media"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == 'i,f,n,b,bt,ts,dt,d,j,nul,s\n1,2.5,1.5,true,YWI=,2020-01-02 03:04:05.12 UTC,2020-01-02T03:04:05.5,2020-01-02,"{""a"":[1,2],""b"":1}",,"x,""y""<&>"\n'
+  csv_job:
+    exec:
+      command: tests/e2e/bq.sh show --format=json -j e2e_extract_csv
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"jobType":"EXTRACT"' &&
+      current.stdout contains '"destinationUriFileCounts":["1"]'
+  csv_options:
+    exec:
+      command: >-
+        tests/e2e/bq.sh extract --compression=GZIP --field_delimiter='|' --noprint_header
+        e2e_extract.scalars 'gs://extract-output/gzip/part-*.csv.gz'
+    test: current.exit_code == 0
+  csv_options_content:
+    exec:
+      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/gzip%2Fpart-000000000000.csv.gz?alt=media" | gzip -dc
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '1|2.5|1.5|true|YWI=|2020-01-02 03:04:05.12 UTC|2020-01-02T03:04:05.5|2020-01-02|"{""a"":[1,2],""b"":1}"||"x,""y""<&>"\n'
+  csv_nested:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.nested gs://extract-output/nested.csv
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'nested schema. Field: r'
+
+  json:
+    exec:
+      command: >-
+        tests/e2e/bq.sh extract --destination_format=NEWLINE_DELIMITED_JSON
+        e2e_extract.scalars gs://extract-output/scalars.json
+    test: current.exit_code == 0
+  json_content:
+    exec:
+      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/scalars.json?alt=media"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '{"i":"1","f":2.5,"n":"1.5","b":true,"bt":"YWI=","ts":"2020-01-02 03:04:05.12 UTC","dt":"2020-01-02T03:04:05.5","d":"2020-01-02","j":{"a":[1,2],"b":1},"s":"x,\\"y\\"\\u003c\\u0026\\u003e"}\n'
+  json_nested:
+    exec:
+      command: >-
+        tests/e2e/bq.sh extract --destination_format=NEWLINE_DELIMITED_JSON
+        e2e_extract.nested gs://extract-output/nested.json
+    test: current.exit_code == 0
+  json_nested_content:
+    exec:
+      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.json?alt=media"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '{"i":"1","r":{"x":"1","t":"01:02:03","ts":"2020-01-02 03:04:05 UTC"},"rs":[{"x":"2","y":"z"}],"ri":["3","4"]}\n'
+
+  parquet:
+    exec:
+      command: >-
+        tests/e2e/bq.sh extract --destination_format=PARQUET --compression=SNAPPY
+        e2e_extract.nested gs://extract-output/nested.parquet
+    test: current.exit_code == 0
+  parquet_content:
+    exec:
+      command: >-
+        curl -fsS -o "${E2E_EXTRACT_DIR}/nested.parquet" "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.parquet?alt=media" &&
+        duckdb -csv -noheader -c "SELECT r.x, r.t, r.ts, rs[1].y, ri FROM '${E2E_EXTRACT_DIR}/nested.parquet'"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '1,01:02:03+00,2020-01-02 03:04:05,z,"[3, 4]"\n'
+  parquet_schema:
+    exec:
+      command: >-
+        duckdb -csv -noheader -c "SELECT name, logical_type FROM
+        parquet_schema('${E2E_EXTRACT_DIR}/nested.parquet') WHERE name IN ('t', 'ts')"
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains 't,"TimeType(isAdjustedToUTC=1' &&
+      current.stdout contains 'ts,"TimestampType(isAdjustedToUTC=0'
+
+  avro:
+    exec:
+      command: >-
+        tests/e2e/bq.sh extract --destination_format=AVRO
+        e2e_extract.scalars gs://extract-output/scalars.avro
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'Avro extracts'
+  bucket_wildcard:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.scalars 'gs://extract-*/scalars.csv'
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'bucket name'
+  two_wildcards:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.scalars 'gs://extract-output/*/part-*.csv'
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'Only one wildcard'
+  extract_view:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.v gs://extract-output/v.csv
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'Cannot extract a view'
+  rm_dataset:
+    exec:
+      command: tests/e2e/bq.sh rm -r -f -d e2e_extract
+    test: current.exit_code == 0

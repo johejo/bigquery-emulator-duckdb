@@ -75,7 +75,7 @@ struct MediaUpload {
   std::string content;
 };
 
-using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest>;
+using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractRequest>;
 
 std::string Param(const httplib::Request& request, const char* name);
 bool QueryParamBool(const httplib::Request& request, const char* name);

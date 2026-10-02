@@ -94,11 +94,18 @@ struct CopyJob {
   nlohmann::json configuration;
 };
 
+struct ExtractJob {
+  TableReference source_table;
+  std::vector<std::string> destination_uris;
+  // The request's configuration.extract, which also holds the format options.
+  nlohmann::json configuration;
+};
+
 struct Job {
   std::string project_id;
   std::string job_id;
   std::string location = kLocation;
-  std::variant<QueryJob, LoadJob, CopyJob> configuration;
+  std::variant<QueryJob, LoadJob, CopyJob, ExtractJob> configuration;
   // The rows a load or copy job wrote.
   int64_t output_rows = 0;
   int64_t creation_time_ms = 0;
@@ -139,6 +146,12 @@ struct CopyRequest {
   CopyJob copy;
 };
 
+struct ExtractRequest {
+  std::string project_id;
+  std::string job_id;  // Generated when empty.
+  ExtractJob extract;
+};
+
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
@@ -148,7 +161,7 @@ class Emulator {
   // created when missing, and a project's data comes back the next time it is used.
   explicit Emulator(std::string data_dir = "");
 
-  // The Storage API endpoint that load jobs read gs:// objects from.
+  // The Storage API endpoint that load jobs read gs:// objects from and extract jobs write to.
   const std::string& storage_endpoint() const { return gcs_client_.endpoint(); }
 
   // Runs `request` as a job and returns it. A failed query is reported through the job's
@@ -156,6 +169,7 @@ class Emulator {
   std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
   std::shared_ptr<const Job> RunLoad(const LoadRequest& request);
   std::shared_ptr<const Job> RunCopy(const CopyRequest& request);
+  std::shared_ptr<const Job> RunExtract(const ExtractRequest& request);
   std::shared_ptr<const Job> GetJob(const std::string& project_id, const std::string& job_id);
   std::vector<std::shared_ptr<const Job>> ListJobs(const std::string& project_id);
   void DeleteJob(const std::string& project_id, const std::string& job_id);
