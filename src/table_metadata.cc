@@ -174,6 +174,14 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
   }
 }
 
+// Tables do not expire in the emulator, so a Table resource cannot set an expiration; a null one,
+// which clears it, is accepted.
+void RejectExpiration(const json& table) {
+  if (!Member(table, "expirationTime").is_null()) {
+    throw Unsupported("table expiration");
+  }
+}
+
 // The top-level field of `schema` named `name` in any case, or null.
 const FieldSchema* FindField(const std::vector<FieldSchema>& schema, const std::string& name) {
   const auto it = std::ranges::find_if(schema, [&](const FieldSchema& field) {
@@ -286,12 +294,14 @@ json TableMetadata::ToJson() const {
 
 TableMetadata TableMetadataFromJson(const json& table) {
   TableMetadata metadata;
+  RejectExpiration(table);
   ParsePartitioning(table, metadata);
   UpdateTableMetadata(metadata, table, /*patch=*/false);
   return metadata;
 }
 
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
+  RejectExpiration(body);
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&

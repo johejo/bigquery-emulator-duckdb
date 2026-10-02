@@ -21,8 +21,8 @@ what the emulator ignores or does differently, and the probe adds the features t
 
 | Status | Methods |
 | --- | --- |
-| Partial | 4 |
-| Supported | 17 |
+| Partial | 8 |
+| Supported | 13 |
 | Unsupported | 26 |
 
 ## datasets
@@ -32,7 +32,7 @@ what the emulator ignores or does differently, and the probe adds the features t
 | [`datasets.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}` | Supported |  |
 | [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns only the dataset's reference and location `US`. |
 | [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Supported | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored. |
-| [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Supported | Ignores `filter`. |
+| [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Partial | Rejected as unsupported: filter. |
 | [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Supported | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
 | [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Supported | Behaves like `datasets.patch`. |
@@ -96,7 +96,7 @@ what the emulator ignores or does differently, and the probe adds the features t
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`tabledata.insertAll`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/insertAll` | Partial | Ignores `insertId`, so retried rows are not deduplicated. Rejected as unsupported: templateSuffix. |
-| [`tabledata.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/data` | Supported | Ignores `selectedFields` and `formatOptions.timestampOutputFormat`. |
+| [`tabledata.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/data` | Partial | Ignores `formatOptions.timestampOutputFormat`. Rejected as unsupported: selectedFields. |
 
 ## tables
 
@@ -105,9 +105,9 @@ what the emulator ignores or does differently, and the probe adds the features t
 | [`tables.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported |  |
 | [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Ignores `selectedFields` and `view`. Returns the reference, schema, description, friendly name, labels, partitioning and clustering, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0. |
 | [`tables.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
-| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | Keeps `tableReference`, `schema`, GoogleSQL view definitions, `description`, `friendlyName`, `labels`, `timePartitioning` on a column, `rangePartitioning` and `clustering`. Partitions do not expire. Rejected as unsupported: ingestion-time partitioning. |
+| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | Keeps `tableReference`, `schema`, GoogleSQL view definitions, `description`, `friendlyName`, `labels`, `timePartitioning` on a column, `rangePartitioning` and `clustering`. Partitions do not expire. Rejected as unsupported: ingestion-time partitioning, table expiration. |
 | [`tables.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported |  |
-| [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Changes `schema`, view definitions, `description`, `friendlyName`, `labels` and `clustering` only, ignoring other fields such as `expirationTime`; partitioning cannot change. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag. |
+| [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | Changes `schema`, view definitions, `description`, `friendlyName`, `labels` and `clustering` only, ignoring other fields; partitioning cannot change. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag. Rejected as unsupported: table expiration. |
 | [`tables.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy` | Unsupported |  |
 | [`tables.testIamPermissions`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/testIamPermissions) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:testIamPermissions` | Unsupported |  |
-| [`tables.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Behaves like `tables.patch`, except that it replaces the description, friendly name, labels and clustering; `schema` and view definitions the request leaves out are kept rather than cleared. |
+| [`tables.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | Behaves like `tables.patch`, except that it replaces the description, friendly name, labels and clustering; `schema` and view definitions the request leaves out are kept rather than cleared. Rejected as unsupported: table expiration. |

@@ -9,6 +9,11 @@ steps:
       command: tests/e2e/bq.sh ls --format=json
     test: |
       current.exit_code == 0 && current.stdout contains '"datasetId":"e2e"'
+  ls_datasets_with_filter:
+    exec:
+      command: tests/e2e/bq.sh ls --filter labels.env:test
+    test: |
+      current.exit_code != 0 && current.stdout contains 'The emulator does not support filter'
   update_dataset:
     exec:
       command: tests/e2e/bq.sh update --dataset --description 'e2e data' --set_label env:test e2e
@@ -74,6 +79,16 @@ steps:
       command: tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
     test: |
       current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
+  head_selected_fields:
+    exec:
+      command: tests/e2e/bq.sh head --selected_fields=id e2e.users
+    test: |
+      current.exit_code != 0 && current.stdout contains 'The emulator does not support selectedFields'
+  update_expiration:
+    exec:
+      command: tests/e2e/bq.sh update --expiration 3600 e2e.users
+    test: |
+      current.exit_code != 0 && current.stdout contains 'does not support table'
   update:
     exec:
       command: >-

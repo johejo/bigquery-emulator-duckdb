@@ -54,8 +54,8 @@ struct TableMetadata {
 };
 
 // The metadata of the Table resource `table`; a field it leaves out or sets to null is unset.
-// Throws ApiError::Invalid for a field of the wrong type, a label BigQuery rejects, or
-// partitioning the emulator does not support.
+// Throws ApiError::Invalid for a field of the wrong type, a label BigQuery rejects, or an
+// expiration or partitioning the emulator does not support.
 TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields

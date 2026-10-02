@@ -25,7 +25,7 @@ note bigquery.datasets.get | Returns only the dataset's reference and location `
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}}
 note bigquery.datasets.insert | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored.
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
-note bigquery.datasets.list | Ignores `filter`.
+request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:test
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 note bigquery.datasets.patch | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored.
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
@@ -58,7 +58,8 @@ request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}
 note bigquery.tabledata.insertAll | Ignores `insertId`, so retried rows are not deduplicated.
 request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?maxResults=1&startIndex=0
-note bigquery.tabledata.list | Ignores `selectedFields` and `formatOptions.timestampOutputFormat`.
+request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?selectedFields=id
+note bigquery.tabledata.list | Ignores `formatOptions.timestampOutputFormat`.
 
 request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
 request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
@@ -67,11 +68,14 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "p"}, "schema": {"fields": [{"name": "d", "type": "DATE"}, {"name": "a", "type": "STRING"}]}, "timePartitioning": {"type": "DAY", "field": "d"}, "clustering": {"fields": ["a"]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "i"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "timePartitioning": {"type": "DAY"}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "x"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "expirationTime": "1893456000000"}
 note bigquery.tables.insert | Keeps `tableReference`, `schema`, GoogleSQL view definitions, `description`, `friendlyName`, `labels`, `timePartitioning` on a column, `rangePartitioning` and `clustering`. Partitions do not expire.
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
-note bigquery.tables.patch | Changes `schema`, view definitions, `description`, `friendlyName`, `labels` and `clustering` only, ignoring other fields such as `expirationTime`; partitioning cannot change. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag.
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
+note bigquery.tables.patch | Changes `schema`, view definitions, `description`, `friendlyName`, `labels` and `clustering` only, ignoring other fields; partitioning cannot change. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag.
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
+request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "expirationTime": "1893456000000"}
 note bigquery.tables.update | Behaves like `tables.patch`, except that it replaces the description, friendly name, labels and clustering; `schema` and view definitions the request leaves out are kept rather than cleared.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
