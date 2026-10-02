@@ -1,6 +1,7 @@
 #include "src/column_metadata.h"
 
 #include <cstddef>
+#include <format>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,17 +21,18 @@ std::vector<std::string> ColumnCommentStatements(const TableReference& table,
   std::vector<std::string> statements;
   statements.reserve(schema.size());
   for (const FieldSchema& field : schema) {
-    statements.push_back("COMMENT ON COLUMN " + QualifiedName(table) + "." +
-                         QuoteIdentifier(field.name) + " IS " +
-                         QuoteLiteral(field.ToJson().dump()));
+    statements.push_back(std::format("COMMENT ON COLUMN {}.{} IS {}", QualifiedName(table),
+                                     QuoteIdentifier(field.name),
+                                     QuoteLiteral(field.ToJson().dump())));
   }
   return statements;
 }
 
 std::string ColumnCommentsQuery(const TableReference& table) {
-  return "SELECT comment FROM duckdb_columns() WHERE database_name = " +
-         QuoteLiteral(table.project_id) + " AND schema_name = " + QuoteLiteral(table.dataset_id) +
-         " AND table_name = " + QuoteLiteral(table.table_id) + " ORDER BY column_index";
+  return std::format(
+      "SELECT comment FROM duckdb_columns()"
+      " WHERE database_name = {} AND schema_name = {} AND table_name = {} ORDER BY column_index",
+      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
 }
 
 std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
