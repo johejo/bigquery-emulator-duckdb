@@ -215,6 +215,45 @@ TEST_F(ServerTest, ReportsCopyJobStatisticsAndErrors) {
   EXPECT_EQ(missing["status"]["errorResult"]["reason"], "notFound");
 }
 
+// Every job type reads table references the same way, so a malformed one is a bad request
+// rather than an internal error, and the job is never run.
+TEST_F(ServerTest, RejectsMalformedTableReferencesInEveryJobType) {
+  const std::string jobs = "/projects/p/jobs";
+  const json source = {{"datasetId", "ds"}, {"tableId", "source"}};
+  for (const json& table :
+       {json("ds.t"), json{{"datasetId", "ds"}, {"tableId", 1}}, json{{"datasetId", "ds"}}}) {
+    Post(jobs,
+         {{"configuration", {{"query", {{"query", "SELECT 1"}, {"destinationTable", table}}}}}},
+         400);
+    Post(jobs,
+         {{"configuration",
+           {{"load", {{"sourceUris", json::array({"a.csv"})}, {"destinationTable", table}}}}}},
+         400);
+    Post(jobs,
+         {{"configuration", {{"copy", {{"sourceTable", table}, {"destinationTable", source}}}}}},
+         400);
+  }
+  EXPECT_FALSE(Get(jobs).contains("jobs"));
+}
+
+// A resumable upload session is only opened for a load job the emulator can run.
+TEST_F(ServerTest, RejectsResumableUploadsOfInvalidLoadJobs) {
+  for (const std::string path : {"/resumable/upload/bigquery/v2/projects/p/jobs",
+                                 "/upload/bigquery/v2/projects/p/jobs?uploadType=resumable"}) {
+    const httplib::Result query =
+        client_->Post(path, json{{"configuration", {{"query", {{"query", "SELECT 1"}}}}}}.dump(),
+                      "application/json");
+    ASSERT_TRUE(query);
+    EXPECT_EQ(query->status, 400) << query->body;
+    const httplib::Result load = client_->Post(
+        path, json{{"configuration", {{"load", {{"destinationTable", "ds.t"}}}}}}.dump(),
+        "application/json");
+    ASSERT_TRUE(load);
+    EXPECT_EQ(load->status, 400) << load->body;
+    EXPECT_FALSE(load->has_header("Location"));
+  }
+}
+
 TEST_F(ServerTest, ReportsDryRunResponsesWithoutCreatingJobs) {
   Post("/bigquery/v2/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
   Post("/bigquery/v2/projects/p/queries", {{"query", "CREATE TABLE ds.t (id INT64)"}});

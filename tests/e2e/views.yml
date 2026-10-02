@@ -58,7 +58,9 @@ steps:
   list:
     exec:
       command: tests/e2e/bq.sh ls --format=json views
-    test: current.exit_code == 0 && current.stdout contains '"type":"VIEW"'
+    test: |
+      current.exit_code == 0 && current.stdout contains '"type":"VIEW"' &&
+      current.stdout contains '"type":"TABLE"'
   information_schema:
     exec:
       command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json "SELECT table_name, table_type, is_insertable_into, ddl FROM views.INFORMATION_SCHEMA.TABLES WHERE table_name IN ('source', 'nested') ORDER BY table_name"

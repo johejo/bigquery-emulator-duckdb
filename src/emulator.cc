@@ -1,7 +1,5 @@
 #include "src/emulator.h"
 
-#include <unistd.h>
-
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -17,7 +15,6 @@
 #include <set>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -35,6 +32,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/temporary_files.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
 
@@ -71,24 +69,6 @@ std::string ProjectFileName(const std::string& project_id) {
 std::string JobKey(const std::string& project_id, const std::string& job_id) {
   return project_id + ":" + job_id;
 }
-
-struct DownloadedFiles {
-  std::vector<std::string> paths;
-  std::string Create(const std::string& suffix = "") {
-    std::string pattern = "/tmp/bigquery-load-XXXXXX" + suffix;
-    const int fd = mkstemps(pattern.data(), static_cast<int>(suffix.size()));
-    if (fd < 0) throw ApiError::Internal("Could not create load temporary file");
-    close(fd);
-    paths.push_back(pattern);
-    return pattern;
-  }
-  ~DownloadedFiles() {
-    for (const std::string& path : paths) {
-      std::error_code ignored;
-      std::filesystem::remove(path, ignored);
-    }
-  }
-};
 
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
@@ -178,10 +158,10 @@ std::string DatasetsQuery(const std::string& project) {
       QuoteLiteral(project));
 }
 
-// The tables and views of `dataset`, by name.
+// The tables and views of `dataset` by name, and the type of each.
 std::string TablesQuery(const DatasetReference& dataset) {
   return std::format(
-      "SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
+      "SELECT table_name, table_type FROM information_schema.tables WHERE table_catalog = {}"
       " AND table_schema = {} ORDER BY table_name",
       QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
 }
@@ -668,7 +648,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     }
     const json uris = config.value("sourceUris", json::array());
     if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("sourceUris is required");
-    DownloadedFiles downloads;
+    TemporaryFiles downloads;
     std::vector<std::string> sources;
     for (const json& item : uris) {
       if (!item.is_string()) throw ApiError::Invalid("Invalid source URI");
@@ -961,12 +941,14 @@ std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
-std::vector<std::string> Emulator::ListViews(const DatasetReference& dataset) {
+std::vector<TableListEntry> Emulator::ListTableEntries(const DatasetReference& dataset) {
   GetDataset(dataset);
-  return FirstColumnStrings(Execute(std::format(
-      "SELECT view_name FROM duckdb_views()"
-      " WHERE database_name = {} AND schema_name = {} AND NOT internal ORDER BY view_name",
-      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id))));
+  std::vector<TableListEntry> entries;
+  for (const json& row : Execute(TablesQuery(dataset)).rows) {
+    entries.push_back({.table_id = row["f"][0]["v"].get<std::string>(),
+                       .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable});
+  }
+  return entries;
 }
 
 TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count) {

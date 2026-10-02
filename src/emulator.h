@@ -24,6 +24,17 @@
 
 namespace bigquery_emulator_duckdb {
 
+// The location of every dataset, table and job. The emulator does not model locations.
+inline constexpr char kLocation[] = "US";
+
+// What kind of table a dataset holds. The emulator creates only tables and views.
+enum class TableType : std::uint8_t { kTable, kView };
+
+struct TableListEntry {
+  std::string table_id;
+  TableType type = TableType::kTable;
+};
+
 struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
@@ -86,7 +97,7 @@ struct CopyJob {
 struct Job {
   std::string project_id;
   std::string job_id;
-  std::string location = "US";
+  std::string location = kLocation;
   std::variant<QueryJob, LoadJob, CopyJob> configuration;
   // The rows a load or copy job wrote.
   int64_t output_rows = 0;
@@ -155,8 +166,8 @@ class Emulator {
   void DeleteDataset(const DatasetReference& dataset, bool delete_contents);
 
   std::vector<std::string> ListTables(const DatasetReference& dataset);
-  // The names of the views among ListTables, sorted.
-  std::vector<std::string> ListViews(const DatasetReference& dataset);
+  // The tables of ListTables, each with its type.
+  std::vector<TableListEntry> ListTableEntries(const DatasetReference& dataset);
   TableInfo GetTable(const TableReference& table, bool include_row_count = true);
   void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema);
   void CreateView(const TableReference& table, const nlohmann::json& definition);
