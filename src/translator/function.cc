@@ -48,6 +48,18 @@ std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr) {
   return value.EnumDisplayName();
 }
 
+// The name of a NORMALIZE mode, such as NFKC.
+std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->Equals(googlesql::types::NormalizeModeEnumType())) {
+    return std::nullopt;
+  }
+  return value.EnumDisplayName();
+}
+
 // A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
 // INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
 struct BucketWidth {
@@ -591,6 +603,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
     if (argument->type()->IsEnum()) {
       if (const auto mode = RoundingMode(*argument)) {
+        args.push_back(QuoteLiteral(*mode));
+        continue;
+      }
+      if (const auto mode = NormalizeMode(*argument)) {
         args.push_back(QuoteLiteral(*mode));
         continue;
       }

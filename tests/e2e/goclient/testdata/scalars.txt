@@ -438,8 +438,73 @@ SELECT SUBSTR('abc', 4)
 => ""
 
 ## String functions on bytes
-# The BYTES overloads work on hexadecimal digits, so a byte that is not valid UTF-8 or looks
-# like part of another byte's digits must stay whole.
+# A byte that is not valid UTF-8 must stay whole.
+
+SELECT TO_HEX(LEFT(b'\xffab', 2))
+=> "ff61"
+
+SELECT TO_HEX(RIGHT(b'\xffab', 1))
+=> "62"
+
+SELECT SAFE.LEFT(b'abc', -1)
+=> null
+
+SELECT TO_HEX(SUBSTR(b'\xffab', 2))
+=> "6162"
+
+SELECT TO_HEX(SUBSTR(b'\xffab', 0, 2))
+=> "ff61"
+
+SELECT TO_HEX(SUBSTRING(b'\xffab', -2, 1))
+=> "61"
+
+SELECT TO_HEX(REVERSE(b'\x01\xffa'))
+=> "61ff01"
+
+SELECT TO_HEX(LOWER(b'\\\xffAz'))
+=> "5cff617a"
+
+SELECT TO_HEX(UPPER(b'\\\xffAz'))
+=> "5cff415a"
+
+SELECT TO_HEX(LPAD(b'a', 4, b'\xff'))
+=> "ffffff61"
+
+SELECT TO_HEX(RPAD(b'a', 2))
+=> "6120"
+
+SELECT TO_HEX(LPAD(b'abc', 2))
+=> "6162"
+
+SELECT TO_HEX(TRIM(b'\xffa\xffb\xff', b'\xff'))
+=> "61ff62"
+
+SELECT TO_HEX(LTRIM(b'aab', b'a'))
+=> "62"
+
+SELECT TO_HEX(RTRIM(b'abb', b'ab'))
+=> ""
+
+SELECT TO_HEX(REPLACE(b'\x1f\xf1\xff', b'\xff', b'z'))
+=> "1ff17a"
+
+SELECT TO_HEX(REPLACE(b'abc', b'', b'z'))
+=> "616263"
+
+SELECT INSTR(b'abcb', b'b', 1, 2)
+=> "4"
+
+SELECT INSTR(b'abcb', b'b', -1)
+=> "4"
+
+SELECT ARRAY_LENGTH(SPLIT(b'', b','))
+=> "1"
+
+SELECT TO_HEX(ARRAY_TO_STRING([b'a', NULL, b'\xff'], b'-'))
+=> "612dff"
+
+SELECT TO_HEX(ARRAY_TO_STRING([b'a', NULL], b'-', b'\xff'))
+=> "612dff"
 
 SELECT STRPOS(b'\x1f\xf1\xff', b'\xff')
 => "3"
@@ -497,6 +562,99 @@ SELECT SHA512(b'\xff') = SHA512(FROM_HEX('ff'))
 
 SELECT INITCAP('hello WORLD-everyone!')
 => "Hello World-Everyone!"
+
+## Google sql string functions
+# Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
+
+SELECT UPPER('straße')
+=> "STRASSE"
+
+SELECT LOWER('ΑΣ')
+=> "ας"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS(REVERSE('a\u0301b'))) AS x), ',')
+=> "98,769,97"
+
+SELECT REVERSE(b) FROM t WHERE a IS NULL
+=> null
+
+SELECT TRIM(' \t\u3000a\n')
+=> "a"
+
+SELECT LTRIM('\u00a0a ') || RTRIM(' a\u2003')
+=> "a  a"
+
+SELECT TRIM('xax', 'x')
+=> "a"
+
+SELECT SAFE.TRANSLATE('abca', 'aa', 'xy')
+=> null
+
+SELECT SAFE.TRANSLATE(b'abca', b'aa', b'xy')
+=> null
+
+SELECT SAFE.TRANSLATE(REPEAT('a', 1048576), 'a', 'é') IS NULL
+=> "true"
+
+SELECT SAFE.REPLACE(REPEAT('a', 1048576), 'a', 'aa') IS NULL
+=> "true"
+
+SELECT ASCII('')
+=> "0"
+
+SELECT SAFE.ASCII('é')
+=> null
+
+SELECT SAFE.LEFT('abc', -1)
+=> null
+
+SELECT SAFE.RIGHT('abc', -1)
+=> null
+
+SELECT SAFE.LPAD('abc', 5, '')
+=> null
+
+SELECT SAFE.RPAD('abc', -1)
+=> null
+
+SELECT SAFE.LPAD('a', 1048577) IS NULL
+=> "true"
+
+SELECT RPAD('あ', 3, 'い')
+=> "あいい"
+
+SELECT INSTR('abcb', 'b', 1, 2)
+=> "4"
+
+SELECT INSTR('abcb', 'b', -1, 2)
+=> "2"
+
+SELECT SAFE.INSTR('abc', 'b', 0)
+=> null
+
+SELECT NORMALIZE('\uff21\u2460', NFKC)
+=> "A1"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS(NORMALIZE('\u00e9', NFD))) AS x), ',')
+=> "101,769"
+
+SELECT NORMALIZE_AND_CASEFOLD('Straße', NFKC)
+=> "strasse"
+
+SELECT CONTAINS_SUBSTR('the blue house', 'Blue')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('\uff21bc', 'a')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', '')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', 'd')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(b, 'x') FROM t WHERE a IS NULL
+=> null
 
 SELECT INITCAP('apples1oranges2pears', '12')
 => "Apples1Oranges2Pears"
