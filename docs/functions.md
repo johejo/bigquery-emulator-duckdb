@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 16 |
-| Supported | 216 |
-| Unsupported | 161 |
+| Supported | 219 |
+| Unsupported | 158 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -88,8 +88,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`CHAR_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#char_length) | string_functions | Supported | DuckDB function |  |
 | [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | string_functions | Supported | DuckDB SQL |  |
 | [`COALESCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#coalesce) | conditional_expressions | Supported | DuckDB function |  |
-| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | string_functions | Unsupported |  | function CODE_POINTS_TO_BYTES |
-| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | string_functions | Unsupported |  | function CODE_POINTS_TO_STRING |
+| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | string_functions | Supported | DuckDB SQL |  |
+| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | string_functions | Supported | DuckDB SQL |  |
 | [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | string_functions | Unsupported |  | the analyzer does not know this function |
 | [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported | DuckDB function |  |
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported | DuckDB function, renamed |  |
@@ -428,7 +428,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Supported | DuckDB SQL |  |
 | [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Unsupported |  | function TO_BASE32 |
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported | DuckDB SQL |  |
-| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Unsupported |  | function TO_CODE_POINTS |
+| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported | DuckDB SQL |  |
