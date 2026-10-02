@@ -198,6 +198,7 @@ cc_library(
         "@googlesql//googlesql/public/functions:json",
         "@googlesql//googlesql/public/functions:json_internal",
         "@googlesql//googlesql/public/functions:math",
+        "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
         "@googlesql//googlesql/public/functions:regexp",
         "@googlesql//googlesql/public/functions:string",
         "@nlohmann_json//:json",

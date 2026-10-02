@@ -4,6 +4,8 @@
 #include <initializer_list>
 #include <optional>
 #include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -18,6 +20,7 @@
 #include "googlesql/public/functions/json.h"
 #include "googlesql/public/functions/json_internal.h"
 #include "googlesql/public/functions/math.h"
+#include "googlesql/public/functions/normalize_mode.pb.h"
 #include "googlesql/public/functions/regexp.h"
 #include "googlesql/public/functions/string.h"
 #include "googlesql/public/json_value.h"
@@ -78,6 +81,18 @@ void SetResult(duckdb_vector output, idx_t row, double value) {
 
 void SetResult(duckdb_vector output, idx_t row, const std::string& value) {
   duckdb_vector_assign_string_element_len(output, row, value.data(), value.size());
+}
+
+// An ARRAY<STRING> or ARRAY<BYTES>, appended to the list's child vector.
+void SetResult(duckdb_vector output, idx_t row, const std::vector<std::string>& values) {
+  const idx_t offset = duckdb_list_vector_get_size(output);
+  duckdb_list_vector_reserve(output, offset + values.size());
+  duckdb_vector child = duckdb_list_vector_get_child(output);
+  for (idx_t i = 0; i < values.size(); ++i) {
+    duckdb_vector_assign_string_element_len(child, offset + i, values[i].data(), values[i].size());
+  }
+  duckdb_list_vector_set_size(output, offset + values.size());
+  static_cast<duckdb_list_entry*>(duckdb_vector_get_data(output))[row] = {offset, values.size()};
 }
 
 template <typename T>
@@ -148,13 +163,67 @@ void Math2(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector out
   });
 }
 
-// REPEAT, which is byte for byte for STRING as for BYTES.
-void Repeat(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+// The parameters of a GoogleSQL string function: its arguments, then an out parameter and an
+// error.
+template <typename Function>
+struct Signature;
+
+template <typename... Parameters>
+struct Signature<bool (*)(Parameters...)> {
+  static constexpr std::size_t kArity = sizeof...(Parameters) - 2;
+  template <std::size_t I>
+  using Parameter = std::tuple_element_t<I, std::tuple<Parameters...>>;
+  using Out = std::remove_pointer_t<Parameter<kArity>>;
+};
+
+// A STRING or BYTES argument as a string_view parameter, or an INT64 one.
+template <typename T>
+auto Argument(const Arguments& arguments, idx_t column) {
+  if constexpr (std::is_same_v<T, int64_t>) {
+    return arguments.Int(column);
+  } else {
+    return arguments.String(column);
+  }
+}
+
+// A string_view result points into the arguments, which do not outlive the row.
+template <typename T>
+auto Owned(T value) {
+  if constexpr (std::is_same_v<T, absl::string_view>) {
+    return std::string(value);
+  } else {
+    return value;
+  }
+}
+
+// The GoogleSQL function `kFunction` of STRING, BYTES and INT64 arguments, such as LowerUtf8,
+// taking the columns in order.
+template <auto kFunction>
+void Apply(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  using S = Signature<decltype(kFunction)>;
   EachRow(info, input, output, [](const Arguments& arguments) {
+    return [&]<std::size_t... I>(std::index_sequence<I...>) {
+      const std::tuple values{Argument<typename S::template Parameter<I>>(arguments, I)...};
+      typename S::Out out{};
+      absl::Status error;
+      const bool ok = kFunction(std::get<I>(values)..., &out, &error);
+      return ToStatusOr(ok, Owned(std::move(out)), error);
+    }(std::make_index_sequence<S::kArity>());
+  });
+}
+
+// NORMALIZE and NORMALIZE_AND_CASEFOLD, with the mode by its name, such as NFKC.
+template <bool kCasefold>
+void Normalize(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    googlesql::functions::NormalizeMode mode;
+    if (!googlesql::functions::NormalizeMode_Parse(arguments.String(1), &mode)) {
+      return absl::OutOfRangeError("Invalid normalize mode");
+    }
     std::string out;
     absl::Status error;
     const bool ok =
-        googlesql::functions::Repeat(arguments.String(0), arguments.Int(1), &out, &error);
+        googlesql::functions::Normalize(arguments.String(0), mode, kCasefold, &out, &error);
     return ToStatusOr(ok, out, error);
   });
 }
@@ -445,7 +514,7 @@ void JsonObject(duckdb_function_info info, duckdb_data_chunk input, duckdb_vecto
 // Registers `function` under `name`, taking `parameters` and returning `result`. Unless `nulls`
 // is false, DuckDB makes the result NULL for a NULL argument without calling `function`.
 void Register(duckdb_connection connection, const char* name,
-              std::initializer_list<duckdb_type> parameters, duckdb_type result,
+              const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls = true) {
   Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
       duckdb_create_scalar_function());
@@ -454,8 +523,7 @@ void Register(duckdb_connection connection, const char* name,
     LogicalType type(duckdb_create_logical_type(parameter));
     duckdb_scalar_function_add_parameter(scalar.get(), type.get());
   }
-  LogicalType type(duckdb_create_logical_type(result));
-  duckdb_scalar_function_set_return_type(scalar.get(), type.get());
+  duckdb_scalar_function_set_return_type(scalar.get(), result);
   duckdb_scalar_function_set_function(scalar.get(), function);
   if (!nulls) {
     duckdb_scalar_function_set_special_handling(scalar.get());
@@ -463,6 +531,13 @@ void Register(duckdb_connection connection, const char* name,
   if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
     throw BackendError(std::string("DuckDB failed to register ") + name);
   }
+}
+
+void Register(duckdb_connection connection, const char* name,
+              const std::vector<duckdb_type>& parameters, duckdb_type result,
+              duckdb_scalar_function_t function, bool nulls = true) {
+  LogicalType type(duckdb_create_logical_type(result));
+  Register(connection, name, parameters, type.get(), function, nulls);
 }
 
 }  // namespace
@@ -503,8 +578,66 @@ void RegisterBackendFunctions(duckdb_database database) {
        }) {
     Register(connection.get(), name, {kDouble}, kDouble, function);
   }
-  Register(connection.get(), "bq_repeat", {kVarchar, kBigint}, kVarchar, Repeat);
-  Register(connection.get(), "bq_repeat_bytes", {kBlob, kBigint}, kBlob, Repeat);
+  // String functions, where DuckDB differs in case mapping, whitespace, errors and limits, or
+  // has no BYTES overload.
+  for (const auto& [name, parameters, result, function] :
+       std::initializer_list<std::tuple<const char*, std::vector<duckdb_type>, duckdb_type,
+                                        duckdb_scalar_function_t>>{
+           {"bq_repeat", {kVarchar, kBigint}, kVarchar, Apply<fn::Repeat>},
+           {"bq_repeat_bytes", {kBlob, kBigint}, kBlob, Apply<fn::Repeat>},
+           {"bq_lower", {kVarchar}, kVarchar, Apply<fn::LowerUtf8>},
+           {"bq_lower_bytes", {kBlob}, kBlob, Apply<fn::LowerBytes>},
+           {"bq_upper", {kVarchar}, kVarchar, Apply<fn::UpperUtf8>},
+           {"bq_upper_bytes", {kBlob}, kBlob, Apply<fn::UpperBytes>},
+           {"bq_reverse", {kVarchar}, kVarchar, Apply<fn::ReverseUtf8>},
+           {"bq_reverse_bytes", {kBlob}, kBlob, Apply<fn::ReverseBytes>},
+           {"bq_replace", {kVarchar, kVarchar, kVarchar}, kVarchar, Apply<fn::ReplaceUtf8>},
+           {"bq_replace_bytes", {kBlob, kBlob, kBlob}, kBlob, Apply<fn::ReplaceBytes>},
+           {"bq_translate", {kVarchar, kVarchar, kVarchar}, kVarchar, Apply<fn::TranslateUtf8>},
+           {"bq_translate_bytes", {kBlob, kBlob, kBlob}, kBlob, Apply<fn::TranslateBytes>},
+           {"bq_starts_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::StartsWithBytes>},
+           {"bq_ends_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::EndsWithBytes>},
+           {"bq_ascii", {kVarchar}, kBigint, Apply<fn::FirstCharOfStringToASCII>},
+           {"bq_ascii_bytes", {kBlob}, kBigint, Apply<fn::FirstByteOfBytesToASCII>},
+           {"bq_instr",
+            {kVarchar, kVarchar, kBigint, kBigint},
+            kBigint,
+            Apply<fn::StrPosOccurrenceUtf8>},
+           {"bq_instr_bytes",
+            {kBlob, kBlob, kBigint, kBigint},
+            kBigint,
+            Apply<fn::StrPosOccurrenceBytes>},
+           {"bq_left", {kVarchar, kBigint}, kVarchar, Apply<fn::LeftUtf8>},
+           {"bq_left_bytes", {kBlob, kBigint}, kBlob, Apply<fn::LeftBytes>},
+           {"bq_right", {kVarchar, kBigint}, kVarchar, Apply<fn::RightUtf8>},
+           {"bq_right_bytes", {kBlob, kBigint}, kBlob, Apply<fn::RightBytes>},
+           {"bq_substr_bytes", {kBlob, kBigint, kBigint}, kBlob, Apply<fn::SubstrWithLengthBytes>},
+           {"bq_lpad", {kVarchar, kBigint, kVarchar}, kVarchar, Apply<fn::LeftPadUtf8>},
+           {"bq_lpad_bytes", {kBlob, kBigint, kBlob}, kBlob, Apply<fn::LeftPadBytes>},
+           {"bq_rpad", {kVarchar, kBigint, kVarchar}, kVarchar, Apply<fn::RightPadUtf8>},
+           {"bq_rpad_bytes", {kBlob, kBigint, kBlob}, kBlob, Apply<fn::RightPadBytes>},
+           {"bq_trim", {kVarchar}, kVarchar, Apply<fn::TrimSpacesUtf8>},
+           {"bq_trim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::TrimUtf8>},
+           {"bq_trim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::TrimBytes>},
+           {"bq_ltrim", {kVarchar}, kVarchar, Apply<fn::LeftTrimSpacesUtf8>},
+           {"bq_ltrim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::LeftTrimUtf8>},
+           {"bq_ltrim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::LeftTrimBytes>},
+           {"bq_rtrim", {kVarchar}, kVarchar, Apply<fn::RightTrimSpacesUtf8>},
+           {"bq_rtrim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::RightTrimUtf8>},
+           {"bq_rtrim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::RightTrimBytes>},
+           {"bq_normalize", {kVarchar, kVarchar}, kVarchar, Normalize<false>},
+           {"bq_normalize_and_casefold", {kVarchar, kVarchar}, kVarchar, Normalize<true>},
+       }) {
+    Register(connection.get(), name, parameters, result, function);
+  }
+  {
+    LogicalType blob(duckdb_create_logical_type(kBlob));
+    LogicalType list(duckdb_create_list_type(blob.get()));
+    Register(
+        connection.get(), "bq_split_bytes", {kBlob, kBlob}, list.get(),
+        Apply<static_cast<bool (*)(absl::string_view, absl::string_view, std::vector<std::string>*,
+                                   absl::Status*)>(fn::SplitBytes)>);
+  }
   Register(connection.get(), "bq_pow", {kDouble, kDouble}, kDouble, Math2<fn::Pow<double>>);
   Register(connection.get(), "bq_log", {kDouble, kDouble}, kDouble, Math2<fn::Logarithm<double>>);
   Register(connection.get(), "bq_farm_fingerprint", {kBlob}, kBigint, FarmFingerprint);

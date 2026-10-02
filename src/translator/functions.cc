@@ -94,48 +94,6 @@ std::vector<Rule> Same(std::string_view function, Arity arity,
   return rules;
 }
 
-// The hexadecimal digits of the BYTES value `value` with a space after each byte, as in
-// "FF 61 ". A search for one such string in another only matches on byte boundaries.
-std::string Spaced(std::string_view value) {
-  return "regexp_replace(hex(" + std::string(value) + "), '(..)', '\\1 ', 'g')";
-}
-
-// The BYTES value `value` as a string of one character per byte, U+0100 plus the byte, for the
-// string functions to work on. FromChars() turns such a string back into BYTES.
-std::string ToChars(std::string_view value) {
-  return "array_to_string(list_transform(regexp_extract_all(hex(" + std::string(value) +
-         "), '..'), _b -> chr(256 + CAST('0x' || _b AS INTEGER))), '')";
-}
-
-std::string FromChars(std::string_view chars) {
-  return "unhex(array_to_string(list_transform(regexp_extract_all(" + std::string(chars) +
-         ", '.'), _c -> lpad(hex(unicode(_c) - 256), 2, '0')), ''))";
-}
-
-// STRPOS and INSTR without a position or occurrence. A match in the spaced digits starts on a
-// byte, three characters each.
-std::vector<Rule> Position() {
-  return {{2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
-          {2,
-           "((strpos(" + Spaced("$1") + ", " + Spaced("$2") + ") + 2) // 3)",
-           {Is(1, {TYPE_BYTES})}}};
-}
-
-// LEFT and RIGHT.
-std::vector<Rule> Side(const std::string& function, const std::string& name) {
-  const std::vector<std::string> errors = {"'" + name + " length must be non-negative'"};
-  return {{2,
-           "CASE WHEN $2 < 0 THEN !1 ELSE " + function + "($1, $2) END",
-           {Is(1, {TYPE_STRING})},
-           {},
-           errors},
-          {2,
-           "CASE WHEN $2 < 0 THEN !1 ELSE unhex(" + function + "(hex($1), 2 * $2)) END",
-           {Is(1, {TYPE_BYTES})},
-           {},
-           errors}};
-}
-
 // CODE_POINTS_TO_STRING and CODE_POINTS_TO_BYTES, by the type `result` they return. They are NULL
 // when an element is NULL and raise an error for the first element out of range.
 std::vector<Rule> CodePointsTo(googlesql::TypeKind result) {
@@ -156,57 +114,20 @@ std::vector<Rule> CodePointsTo(googlesql::TypeKind result) {
        {std::string(bytes ? "'Invalid ASCII value '" : "'Invalid codepoint '") + " || " + first}}};
 }
 
-// LPAD and RPAD. DuckDB has no default pad; the BYTES one is b' '.
-std::vector<Rule> Pad(const std::string& function) {
-  return {
-      {{2, 3}, function + "($1, CAST($2 AS INTEGER), $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
-      {2, "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), '20'))", {Is(1, {TYPE_BYTES})}},
-      {3,
-       "unhex(" + function + "(hex($1), CAST(2 * $2 AS INTEGER), hex($3)))",
-       {Is(1, {TYPE_BYTES})}}};
-}
-
-// TRIM, LTRIM and RTRIM. For BYTES, the regular expression `pattern` removes the bytes to trim
-// from the spaced digits, with @ standing for the alternatives of the bytes of the second
-// argument.
-std::vector<Rule> Trim(const std::string& function, std::string_view pattern) {
-  const std::string bytes = "' || substr(regexp_replace(hex($2), '(..)', '|\\1 ', 'g'), 2) || '";
-  std::string regex;
-  for (const char c : pattern) {
-    regex += c == '@' ? bytes : std::string(1, c);
-  }
-  auto rules = Same(function, {1, 2}, {Is(1, {TYPE_STRING})});
-  rules.push_back(
-      {2,
-       "unhex(replace(regexp_replace(" + Spaced("$1") + ", '" + regex + "', '', 'g'), ' ', ''))",
-       {Is(1, {TYPE_BYTES})}});
-  return rules;
-}
-
 // SUBSTR and SUBSTRING. BigQuery starts at the first character for a position of 0 or one
-// before the start, where DuckDB takes as many characters fewer.
+// before the start, where DuckDB takes as many characters fewer. BYTES go to GoogleSQL, without
+// a length taking the rest.
 std::vector<Rule> Substr() {
-  const auto start = [](const std::string& length) {
-    return "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -" + length + " THEN 1 ELSE " + length +
-           " + $2 + 1 END";
-  };
-  const std::string negative = "CASE WHEN $3 < 0 THEN !1 ELSE ";
-  const std::vector<std::string> errors = {"'Third argument in SUBSTR() cannot be negative'"};
-  return {
-      {2, "substr($1, " + start("length($1)") + ")", {Is(1, {TYPE_STRING})}},
-      {3,
-       negative + "substr($1, " + start("length($1)") + ", $3) END",
-       {Is(1, {TYPE_STRING})},
-       {},
-       errors},
-      {2,
-       "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1))",
-       {Is(1, {TYPE_BYTES})}},
-      {3,
-       negative + "unhex(substr(hex($1), 2 * (" + start("octet_length($1)") + ") - 1, 2 * $3)) END",
-       {Is(1, {TYPE_BYTES})},
-       {},
-       errors}};
+  const std::string start =
+      "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -length($1) THEN 1 ELSE length($1) + $2 + 1 "
+      "END";
+  return {{2, "substr($1, " + start + ")", {Is(1, {TYPE_STRING})}},
+          {3,
+           "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
+           {Is(1, {TYPE_STRING})},
+           {},
+           {"'Third argument in SUBSTR() cannot be negative'"}},
+          {{2, 3}, "bq_substr_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"9223372036854775807"}}};
 }
 
 // ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
@@ -338,6 +259,27 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
     rules.insert(rules.end(), group.begin(), group.end());
   }
   return rules;
+}
+
+// A function that src/backend_functions.cc registers as `function` for STRING and as
+// `function`_bytes for BYTES.
+std::vector<Rule> Strings(std::string_view function, Arity arity) {
+  return Concat({Same(function, arity, {Is(1, {TYPE_STRING})}),
+                 Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})})});
+}
+
+// TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
+// DuckDB's trim() only trims spaces.
+std::vector<Rule> Trim(const std::string& function) {
+  return {{1, function + "($1)", {Is(1, {TYPE_STRING})}},
+          {2, function + "_chars($1, $2)", {Is(1, {TYPE_STRING})}},
+          {2, function + "_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}};
+}
+
+// LPAD and RPAD, which pad with spaces by default.
+std::vector<Rule> Pad(const std::string& function) {
+  return {{{2, 3}, function + "($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
+          {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}}};
 }
 
 // Functions implemented by DuckDB SQL templates.
@@ -501,37 +443,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"DATE_FROM_UNIX_DATE",
        {{1, "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE)"}}},
 
-      // Strings. DuckDB has almost no BLOB functions, so the BYTES rules work on the hexadecimal
-      // digits, two to a byte; see Spaced().
+      // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
+      // BackendRules().
       {"LENGTH", {{1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}, {1, "length($1)"}}},
       {"BYTE_LENGTH",
        {{1, "strlen($1)", {Is(1, {TYPE_STRING})}}, {1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}}},
-      {"INSTR", Position()},
-      {"STRPOS", Position()},
-      {"LEFT", Side("left", "LEFT")},
-      {"RIGHT", Side("right", "RIGHT")},
-      {"LPAD", Pad("lpad")},
-      {"RPAD", Pad("rpad")},
-      {"SPLIT",
-       {{{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
-        // An empty delimiter splits the value into its bytes.
-        {2,
-         "list_transform(CASE WHEN octet_length($2) = 0 THEN regexp_extract_all(hex($1), '..') "
-         "ELSE list_transform(string_split(" +
-             Spaced("$1") + ", " + Spaced("$2") +
-             "), _p -> replace(_p, ' ', '')) END, _p -> unhex(_p))",
-         {Is(1, {TYPE_BYTES})}}}},
-      {"TRANSLATE",
-       {{3, "translate($1, $2, $3)", {Is(1, {TYPE_STRING})}},
-        {3,
-         FromChars("translate(" + ToChars("$1") + ", " + ToChars("$2") + ", " + ToChars("$3") +
-                   ")"),
-         {Is(1, {TYPE_BYTES})}}}},
-      {"ASCII",
-       {{1, "ascii($1)", {Is(1, {TYPE_STRING})}},
-        {1,
-         "CASE WHEN octet_length($1) = 0 THEN 0 ELSE CAST('0x' || left(hex($1), 2) AS BIGINT) END",
-         {Is(1, {TYPE_BYTES})}}}},
       {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {TYPE_STRING})}}}},
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
       // '.' would skip line breaks without the s flag.
@@ -544,44 +460,9 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {Is(1, {TYPE_BYTES})}}}},
       {"CODE_POINTS_TO_STRING", CodePointsTo(TYPE_STRING)},
       {"CODE_POINTS_TO_BYTES", CodePointsTo(TYPE_BYTES)},
-      {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {TYPE_STRING})}}}},
       // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
       {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {TYPE_STRING})}}}},
       {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {TYPE_STRING})}}}},
-      // A BLOB cast to VARCHAR escapes every byte but printable ASCII as \xHH, so the case
-      // mapping only touches ASCII letters, and the escapes read back in either case but \X.
-      {"LOWER",
-       {{1, "lower($1)", {Is(1, {TYPE_STRING})}},
-        {1, "CAST(lower(CAST($1 AS VARCHAR)) AS BLOB)", {Is(1, {TYPE_BYTES})}}}},
-      {"UPPER",
-       {{1, "upper($1)", {Is(1, {TYPE_STRING})}},
-        {1,
-         "CAST(replace(upper(CAST($1 AS VARCHAR)), '\\X', '\\x') AS BLOB)",
-         {Is(1, {TYPE_BYTES})}}}},
-      // Reversing the digits reverses the bytes and swaps the two digits of each.
-      {"REVERSE",
-       {{1, "reverse($1)", {Is(1, {TYPE_STRING})}},
-        {1,
-         "unhex(regexp_replace(reverse(hex($1)), '(.)(.)', '\\2\\1', 'g'))",
-         {Is(1, {TYPE_BYTES})}}}},
-      {"TRIM", Trim("trim", "^(?:@)+|(?:@)+$")},
-      {"LTRIM", Trim("ltrim", "^(?:@)+")},
-      {"RTRIM", Trim("rtrim", "(?:@)+$")},
-      {"SUBSTR", Substr()},
-      {"SUBSTRING", Substr()},
-      {"STARTS_WITH",
-       {{2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "starts_with(hex($1), hex($2))", {Is(1, {TYPE_BYTES})}}}},
-      {"ENDS_WITH",
-       {{2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "ends_with(hex($1), hex($2))", {Is(1, {TYPE_BYTES})}}}},
-      {"REPLACE",
-       {{3, "replace($1, $2, $3)", {Is(1, {TYPE_STRING})}},
-        {3,
-         "unhex(replace(replace(" + Spaced("$1") + ", " + Spaced("$2") + ", " + Spaced("$3") +
-             "), ' ', ''))",
-         {Is(1, {TYPE_BYTES})}}}},
-
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
@@ -687,9 +568,50 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"CSCH", Float64("bq_csch")},
       {"SECH", Float64("bq_sech")},
       {"COTH", Float64("bq_coth")},
-      {"REPEAT",
-       {{2, "bq_repeat($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "bq_repeat_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      // Strings. DuckDB's BLOB has almost no functions, its case mapping is simple rather than
+      // full, it reverses grapheme clusters rather than characters, it trims spaces rather than
+      // whitespace, and it neither raises BigQuery's errors nor has its output limit. Where it
+      // agrees, the STRING overload stays DuckDB's.
+      {"REPEAT", Strings("bq_repeat", 2)},
+      {"LOWER", Strings("bq_lower", 1)},
+      {"UPPER", Strings("bq_upper", 1)},
+      {"REVERSE", Strings("bq_reverse", 1)},
+      {"REPLACE", Strings("bq_replace", 3)},
+      {"TRANSLATE", Strings("bq_translate", 3)},
+      {"ASCII", Strings("bq_ascii", 1)},
+      {"LEFT", Strings("bq_left", 2)},
+      {"RIGHT", Strings("bq_right", 2)},
+      {"LPAD", Pad("bq_lpad")},
+      {"RPAD", Pad("bq_rpad")},
+      {"TRIM", Trim("bq_trim")},
+      {"LTRIM", Trim("bq_ltrim")},
+      {"RTRIM", Trim("bq_rtrim")},
+      {"INSTR",
+       {{{2, 4}, "bq_instr($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
+        {{2, 4}, "bq_instr_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}}}},
+      {"STRPOS",
+       {{2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "bq_instr_bytes($1, $2, 1, 1)", {Is(1, {TYPE_BYTES})}}}},
+      {"STARTS_WITH",
+       {{2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "bq_starts_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      {"ENDS_WITH",
+       {{2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "bq_ends_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      {"SUBSTR", Substr()},
+      {"SUBSTRING", Substr()},
+      {"SPLIT",
+       {{{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
+        {2, "bq_split_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      // The mode is passed by its name.
+      {"NORMALIZE", {{{1, 2}, "bq_normalize($1, $2)", {}, {"'NFC'"}}}},
+      {"NORMALIZE_AND_CASEFOLD", {{{1, 2}, "bq_normalize_and_casefold($1, $2)", {}, {"'NFC'"}}}},
+      // BigQuery compares the NFKC normal forms, case folded. Only the STRING overload is
+      // declared.
+      {"CONTAINS_SUBSTR",
+       {{2,
+         "contains(bq_normalize_and_casefold($1, 'NFKC'), bq_normalize_and_casefold($2, 'NFKC'))",
+         {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})}}}},
       // encode() takes a STRING's UTF-8 bytes.
       {"SHA512",
        {{1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
@@ -730,7 +652,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
 // BigQuery functions that DuckDB has under another name, with the same arguments.
 const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
   static const auto* const kNames = new std::unordered_map<std::string_view, std::string_view>{
-      {"CONTAINS_SUBSTR", "contains"},
       {"FORMAT", "printf"},
       {"GENERATE_UUID", "uuid"},
       {"IS_INF", "isinf"},

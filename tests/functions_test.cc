@@ -42,7 +42,7 @@ TEST(FunctionsTest, FillsInDefaults) {
   EXPECT_EQ(TranslateFunction("SPLIT", {Sql("s", googlesql::TYPE_STRING), Sql("d")}),
             "split(s, d)");
   EXPECT_EQ(TranslateFunction("LPAD", {Sql("s", googlesql::TYPE_STRING), Sql("n")}),
-            "lpad(s, CAST(n AS INTEGER), ' ')");
+            "bq_lpad(s, n, ' ')");
 }
 
 TEST(FunctionsTest, MatchesDateParts) {
@@ -88,16 +88,22 @@ TEST(FunctionsTest, BindsArgumentsUsedTwice) {
             "CASE WHEN CAST(-65 AS BIGINT) = 0 THEN '' ELSE chr(CAST(CAST(-65 AS BIGINT) AS "
             "INTEGER)) END");
   // Anything else is evaluated once, while trivial arguments stay as they are.
-  EXPECT_EQ(TranslateFunction("LEFT", {Sql("q.s", googlesql::TYPE_STRING), Sql("(q.n + 1)")}),
-            "list_transform([struct_pack(a2 := (q.n + 1))], _fn -> CASE WHEN _fn.a2 < "
-            "0 THEN error('LEFT length must be non-negative') ELSE left(q.s, _fn.a2) END)[1]");
+  EXPECT_EQ(TranslateFunction("$BITWISE_LEFT_SHIFT",
+                              {Sql("q.a", googlesql::TYPE_INT64), Sql("(q.n + 1)")}),
+            "list_transform([struct_pack(a2 := (q.n + 1))], _fn -> CASE WHEN _fn.a2 < 0 THEN "
+            "error('Bit shift by a negative value') WHEN _fn.a2 >= 64 THEN 0 ELSE CAST(CAST(q.a "
+            "AS BIT) << CAST(_fn.a2 AS INTEGER) AS BIGINT) END)[1]");
 }
 
 TEST(FunctionsTest, RaisesErrorsOrNullUnderSafe) {
-  EXPECT_EQ(TranslateFunction("LEFT", {Sql("s", googlesql::TYPE_STRING), Sql("n")}),
-            "CASE WHEN n < 0 THEN error('LEFT length must be non-negative') ELSE left(s, n) END");
-  EXPECT_EQ(TranslateFunction("LEFT", {Sql("s", googlesql::TYPE_STRING), Sql("n")}, true),
-            "CASE WHEN n < 0 THEN NULL ELSE left(s, n) END");
+  EXPECT_EQ(TranslateFunction("SUBSTR", {Sql("s", googlesql::TYPE_STRING), Sql("p"), Sql("n")}),
+            "CASE WHEN n < 0 THEN error('Third argument in SUBSTR() cannot be negative') ELSE "
+            "substr(s, CASE WHEN p > 0 THEN p WHEN p = 0 OR p < -length(s) THEN 1 ELSE length(s) "
+            "+ p + 1 END, n) END");
+  EXPECT_EQ(
+      TranslateFunction("SUBSTR", {Sql("s", googlesql::TYPE_STRING), Sql("p"), Sql("n")}, true),
+      "CASE WHEN n < 0 THEN NULL ELSE substr(s, CASE WHEN p > 0 THEN p WHEN p = 0 OR p < "
+      "-length(s) THEN 1 ELSE length(s) + p + 1 END, n) END");
   // An error message can use the arguments, which count towards binding them once.
   EXPECT_EQ(TranslateFunction("IPV4_FROM_INT64", {Sql("(q.a + 1)", googlesql::TYPE_INT64)}, true),
             "list_transform([struct_pack(a1 := (q.a + 1))], _fn -> CASE WHEN _fn.a1 < -2147483648 "
@@ -108,9 +114,8 @@ TEST(FunctionsTest, RaisesErrorsOrNullUnderSafe) {
 }
 
 TEST(FunctionsTest, PassesThroughStringsOnly) {
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", googlesql::TYPE_STRING)}), "trim(s)");
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("s", googlesql::TYPE_STRING), Sql("c")}), "trim(s, c)");
-  EXPECT_EQ(TranslateFunction("TRIM", {Sql("b", googlesql::TYPE_BYTES)}), std::nullopt);
+  EXPECT_EQ(TranslateFunction("FROM_BASE64", {Sql("s", googlesql::TYPE_STRING)}), "from_base64(s)");
+  EXPECT_EQ(TranslateFunction("FROM_BASE64", {Sql("b", googlesql::TYPE_BYTES)}), std::nullopt);
 }
 
 TEST(FunctionsTest, RenamesAndPassesThrough) {
@@ -122,7 +127,7 @@ TEST(FunctionsTest, RenamesAndPassesThrough) {
 TEST(FunctionsTest, RegistersEachFunctionWithItsImplementation) {
   EXPECT_EQ(FindFunction("COALESCE")->implementation, Implementation::kSame);
   EXPECT_EQ(FindFunction("RAND")->implementation, Implementation::kRenamed);
-  EXPECT_EQ(FindFunction("LEFT")->implementation, Implementation::kRules);
+  EXPECT_EQ(FindFunction("CHR")->implementation, Implementation::kRules);
   EXPECT_EQ(FindFunction("SHA512")->implementation, Implementation::kBackend);
   EXPECT_EQ(FindFunction("JSON_QUERY")->implementation, Implementation::kHandler);
   EXPECT_EQ(FindFunction("SAFE_ADD")->implementation, Implementation::kSafe);

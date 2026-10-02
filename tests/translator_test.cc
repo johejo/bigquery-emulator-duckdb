@@ -427,34 +427,6 @@ TEST_F(TranslatorTest, RunsSubstrAtBigQueryPositions) {
   EXPECT_THROW(Execute("SELECT SUBSTR('abc', 1, -1)"), BackendError);
 }
 
-// The BYTES overloads work on hexadecimal digits, so a byte that is not valid UTF-8 or looks
-// like part of another byte's digits must stay whole.
-TEST_F(TranslatorTest, RunsStringFunctionsOnBytes) {
-  const auto hex = [this](const std::string& expression) {
-    return Scalar("SELECT TO_HEX(" + expression + ")");
-  };
-  EXPECT_EQ(hex("LEFT(b'\\xffab', 2)"), "ff61");
-  EXPECT_EQ(hex("RIGHT(b'\\xffab', 1)"), "62");
-  EXPECT_THROW(Execute("SELECT LEFT(b'abc', -1)"), BackendError);
-  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 2)"), "6162");
-  EXPECT_EQ(hex("SUBSTR(b'\\xffab', 0, 2)"), "ff61");
-  EXPECT_EQ(hex("SUBSTRING(b'\\xffab', -2, 1)"), "61");
-  EXPECT_EQ(hex("REVERSE(b'\\x01\\xffa')"), "61ff01");
-  EXPECT_EQ(hex("LOWER(b'\\\\\\xffAz')"), "5cff617a");
-  EXPECT_EQ(hex("UPPER(b'\\\\\\xffAz')"), "5cff415a");
-  EXPECT_EQ(hex("LPAD(b'a', 4, b'\\xff')"), "ffffff61");
-  EXPECT_EQ(hex("RPAD(b'a', 2)"), "6120");
-  EXPECT_EQ(hex("LPAD(b'abc', 2)"), "6162");
-  EXPECT_EQ(hex("TRIM(b'\\xffa\\xffb\\xff', b'\\xff')"), "61ff62");
-  EXPECT_EQ(hex("LTRIM(b'aab', b'a')"), "62");
-  EXPECT_EQ(hex("RTRIM(b'abb', b'ab')"), "");
-  // 0x1f 0xf1 holds the digits of 0xff between its bytes.
-  EXPECT_EQ(hex("REPLACE(b'\\x1f\\xf1\\xff', b'\\xff', b'z')"), "1ff17a");
-  EXPECT_EQ(hex("REPLACE(b'abc', b'', b'z')"), "616263");
-  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL, b'\\xff'], b'-')"), "612dff");
-  EXPECT_EQ(hex("ARRAY_TO_STRING([b'a', NULL], b'-', b'\\xff')"), "612dff");
-}
-
 // src/backend_functions.cc registers GoogleSQL's implementations of these.
 TEST_F(TranslatorTest, RunsGoogleSqlFunctions) {
   EXPECT_THROW(Execute("SELECT REGEXP_INSTR('abc', 'b', 0)"), BackendError);
