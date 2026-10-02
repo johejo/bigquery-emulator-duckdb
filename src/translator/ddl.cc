@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -122,7 +123,8 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
       !entry->field(1).type->IsString()) {
     return false;
   }
-  for (const googlesql::Value& element : value.elements()) {
+  for (int i = 0; i < value.num_elements(); ++i) {
+    const googlesql::Value& element = value.element(i);
     if (element.is_null() || element.field(0).is_null() || element.field(1).is_null()) {
       return false;
     }
@@ -235,8 +237,103 @@ std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition
 }
 
 // CREATE [OR REPLACE] TABLE [IF NOT EXISTS] path, shared with CREATE TABLE AS SELECT.
-// Partitioning and clustering only shape BigQuery storage, and BigQuery's primary and foreign
-// keys are never enforced, so they are all dropped.
+// The column `expression` reads, or "" when it is not a column.
+std::string ColumnName(const googlesql::ResolvedExpr& expression) {
+  return expression.Is<googlesql::ResolvedColumnRef>()
+             ? expression.GetAs<googlesql::ResolvedColumnRef>()->column().name()
+             : "";
+}
+
+// The INT64 literals of GENERATE_ARRAY(start, end[, interval]) as a range.
+std::optional<RangePartitioning> GenerateArrayRange(const googlesql::ResolvedExpr& expression,
+                                                    const std::string& field) {
+  if (!expression.Is<googlesql::ResolvedFunctionCall>()) {
+    return std::nullopt;
+  }
+  const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
+  std::vector<int64_t> values;
+  for (const auto& argument : call.argument_list()) {
+    if (!argument->Is<googlesql::ResolvedLiteral>()) {
+      return std::nullopt;
+    }
+    const googlesql::Value& value = argument->GetAs<googlesql::ResolvedLiteral>()->value();
+    if (value.is_null() || !value.type()->IsInt64()) {
+      return std::nullopt;
+    }
+    values.push_back(value.int64_value());
+  }
+  if (call.function()->Name() != "generate_array" || values.size() < 2) {
+    return std::nullopt;
+  }
+  return RangePartitioning{.field = field,
+                           .start = values[0],
+                           .end = values[1],
+                           .interval = values.size() > 2 ? values[2] : 1};
+}
+
+// Records the partitioning that a PARTITION BY expression gives on `metadata`: a DATE column,
+// DATE of a TIMESTAMP or DATETIME column, TIMESTAMP_TRUNC, DATETIME_TRUNC or DATE_TRUNC of one,
+// or RANGE_BUCKET of an INT64 column over GENERATE_ARRAY. Partitioning by ingestion time adds
+// pseudo-columns, which the emulator does not have.
+bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& metadata) {
+  if (const std::string column = ColumnName(expression); !column.empty()) {
+    metadata.time_partitioning = TimePartitioning{.type = "DAY", .field = column};
+    return expression.type()->IsDate();
+  }
+  if (!expression.Is<googlesql::ResolvedFunctionCall>()) {
+    return false;
+  }
+  const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
+  const std::string function = call.function()->Name();
+  const auto& arguments = call.argument_list();
+  const std::string column = arguments.empty() ? "" : ColumnName(*arguments[0]);
+  if (column.empty()) {
+    return false;
+  }
+  const googlesql::Type* type = arguments[0]->type();
+  if (function == "date" && arguments.size() == 1) {
+    metadata.time_partitioning = TimePartitioning{.type = "DAY", .field = column};
+    return type->IsTimestamp() || type->IsDatetime();
+  }
+  if (function == "range_bucket" && arguments.size() == 2) {
+    metadata.range_partitioning = GenerateArrayRange(*arguments[1], column);
+    return metadata.range_partitioning.has_value();
+  }
+  const bool truncates = (function == "timestamp_trunc" && type->IsTimestamp()) ||
+                         (function == "datetime_trunc" && type->IsDatetime()) ||
+                         (function == "date_trunc" && type->IsDate());
+  if (!truncates || arguments.size() != 2 || !arguments[1]->Is<googlesql::ResolvedLiteral>()) {
+    return false;
+  }
+  const std::string part =
+      arguments[1]->GetAs<googlesql::ResolvedLiteral>()->value().EnumDisplayName();
+  metadata.time_partitioning = TimePartitioning{.type = part, .field = column};
+  return part == "MONTH" || part == "YEAR" ||
+         (!type->IsDate() && (part == "DAY" || part == "HOUR"));
+}
+
+// Records the PARTITION BY and CLUSTER BY of a CREATE TABLE [AS SELECT] on `metadata`.
+template <typename CreateTable>
+bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadata,
+                               const Scope& scope) {
+  for (const auto& expression : create.partition_by_list()) {
+    if (create.partition_by_list_size() != 1 || !Partitioning(*expression, metadata)) {
+      Unsupported(scope, "this PARTITION BY expression");
+      return false;
+    }
+  }
+  for (const auto& expression : create.cluster_by_list()) {
+    const std::string column = ColumnName(*expression);
+    if (column.empty()) {
+      Unsupported(scope, "this CLUSTER BY expression");
+      return false;
+    }
+    metadata.clustering.push_back(column);
+  }
+  return true;
+}
+
+// BigQuery's primary and foreign keys are never enforced, so they are dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
@@ -311,7 +408,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
   auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
-  if (!head || !target || !metadata) {
+  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
   TableDefinition table{
@@ -366,7 +463,7 @@ std::optional<std::string> CreateTableAsSelect(
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
   auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
-  if (!head || !target || !metadata) {
+  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
   const auto relation = Scan(*create.query(), scope);

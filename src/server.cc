@@ -237,20 +237,14 @@ class Server::Impl {
           return TableResource(emulator_.GetTable(TableFromPath(request)));
         }));
     // tables.patch and tables.update differ in which fields BigQuery keeps when the request leaves
-    // them out: tables.update replaces the description, friendly name and labels, while
-    // tables.patch keeps what it leaves out. The emulator keeps the schema and view for both.
+    // them out; see UpdateTableMetadata. The emulator keeps the schema and view for both.
     const auto update_table = [this](bool patch) {
       return Json([this, patch](const httplib::Request& request, httplib::Response&) {
         const TableReference table = TableFromPath(request);
         const json body = ParseBody(request);
         const TableUpdateRequest update = ParseTableUpdate(body);
-        TableMetadata metadata;
-        if (patch) {
-          metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
-          PatchTableMetadata(metadata, body);
-        } else {
-          metadata = TableMetadataFromJson(body);
-        }
+        TableMetadata metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
+        UpdateTableMetadata(metadata, body, patch);
         emulator_.UpdateTable(table, update.schema, update.view, metadata);
         return TableResource(emulator_.GetTable(table));
       });

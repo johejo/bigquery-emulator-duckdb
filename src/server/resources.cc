@@ -374,13 +374,9 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
               {"id", TableId(table)},
               {"tableReference", TableReferenceJson(table)},
               {"type", TableTypeName(entry.type)}};
-    // A list entry carries the friendly name and labels but not the description.
-    if (!entry.metadata.friendly_name.empty()) {
-      item["friendlyName"] = entry.metadata.friendly_name;
-    }
-    if (!entry.metadata.labels.empty()) {
-      item["labels"] = entry.metadata.labels;
-    }
+    // A list entry carries the metadata but the description.
+    item.update(entry.metadata.ToJson());
+    item.erase("description");
     entries.push_back(std::move(item));
   }
   response["tables"] = std::move(entries);

@@ -19,8 +19,8 @@ what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 5 |
-| Supported | 51 |
+| Partial | 6 |
+| Supported | 50 |
 | Unsupported | 22 |
 
 ## Queries
@@ -89,7 +89,7 @@ what it rejected.
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported | NOT NULL in CREATE TABLE AS SELECT |
 | Table and column options | Partial | Stores the description, friendly name and labels of tables and the description of columns; CREATE TABLE option expiration_timestamp; column option rounding_mode |
-| Partitioning and clustering | Supported | Accepted and dropped |
+| Partitioning and clustering | Partial | Stores the partitioning and clustering of tables. Ingestion-time partitioning (`_PARTITIONDATE`, `_PARTITIONTIME`) is unsupported, and partitions do not expire; CREATE TABLE option require_partition_filter |
 | Primary and foreign keys | Supported | Accepted and dropped; BigQuery does not enforce them either |
 | Collation | Unsupported | COLLATE |
 | Generated columns | Unsupported | generated columns |

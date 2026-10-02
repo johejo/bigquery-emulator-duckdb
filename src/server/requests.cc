@@ -107,6 +107,17 @@ std::string JobId(const json& body) {
   return StringField(reference, "jobId", "job ID");
 }
 
+// Query and load jobs that create their destination table could also partition and cluster it,
+// which the emulator does not support yet.
+void RejectDestinationLayout(const json& config) {
+  for (const char* key : {"timePartitioning", "rangePartitioning", "clustering"}) {
+    if (config.contains(key) && !config[key].is_null()) {
+      throw ApiError::Invalid(std::string("The emulator does not support ") + key +
+                              " for a destination table");
+    }
+  }
+}
+
 json Configuration(const json& body) {
   const json config = body.value("configuration", json::object());
   if (!config.is_object()) throw ApiError::Invalid("Invalid job configuration");
@@ -124,6 +135,7 @@ QueryRequest ParseQueryJob(const std::string& project_id, const json& body) {
     request.destination_table = ParseTableReference(query["destinationTable"], "destination table");
   }
   ParseDispositions(query, request);
+  RejectDestinationLayout(query);
   return request;
 }
 
@@ -139,6 +151,7 @@ LoadRequest ParseLoadJob(const std::string& project_id, const json& body) {
   request.load.destination_table =
       ParseTableReference(load["destinationTable"], "destination table");
   ParseDispositions(load, request.load);
+  RejectDestinationLayout(load);
   request.load.configuration = load;
   return request;
 }

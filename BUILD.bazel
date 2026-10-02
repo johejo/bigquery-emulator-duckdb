@@ -78,6 +78,7 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":field_schema",
         "@nlohmann_json//:json",
     ],
 )
