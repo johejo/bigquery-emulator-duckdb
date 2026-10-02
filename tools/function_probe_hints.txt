@@ -43,7 +43,7 @@ query STRING SELECT STRING(JSON '"abc"')
 query FROM_BASE64 SELECT FROM_BASE64('YWJj')
 query PARSE_JSON SELECT PARSE_JSON('{"a": 1}')
 query PARSE_JSON SELECT PARSE_JSON('1.5', wide_number_mode => 'round')
-# JSONPaths must be literals the translator can parse.
+# Generated string arguments are not valid JSONPaths.
 query JSON_QUERY SELECT JSON_QUERY('{"a": [1, 2]}', '$.a')
 query JSON_QUERY SELECT JSON_QUERY(JSON '{"a": [1, 2]}', '$.a')
 query JSON_EXTRACT SELECT JSON_EXTRACT('{"a": [1, 2]}', '$.a')
@@ -102,14 +102,6 @@ note DATE_DIFF WEEK starts on Sunday and ISOWEEK on Monday
 note DATETIME_DIFF WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries
 note TIMESTAMP_DIFF counts whole units rather than boundaries
 note TIME_DIFF counts whole units rather than boundaries
-note JSON_QUERY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
-note JSON_VALUE needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL
-note JSON_QUERY_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
-note JSON_VALUE_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
-note JSON_EXTRACT needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
-note JSON_EXTRACT_SCALAR needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL
-note JSON_EXTRACT_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
-note JSON_EXTRACT_STRING_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
 note INT64 from JSON, fails when the value has another JSON type
 note FLOAT64 from JSON, fails when the value has another JSON type
 note BOOL from JSON, fails when the value has another JSON type

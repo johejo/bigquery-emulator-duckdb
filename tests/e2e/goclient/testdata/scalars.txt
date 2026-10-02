@@ -976,7 +976,7 @@ SELECT TO_JSON_STRING(APPROX_QUANTILES(DISTINCT x, 4)) FROM UNNEST([1, 1, 1, 2, 
 => "[1,2,3,4,5]"
 
 SELECT TO_JSON_STRING(APPROX_QUANTILES(a, 2)) FROM t WHERE FALSE
-=> null
+=> "null"
 
 SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 2)) FROM UNNEST(['a', NULL, 'b', 'b', NULL, NULL]) AS x
 => "[{\"value\":null,\"count\":3},{\"value\":\"b\",\"count\":2}]"
@@ -985,7 +985,7 @@ SELECT TO_JSON_STRING(APPROX_TOP_COUNT(x, 1)) FROM UNNEST([1, 2, 2]) AS x
 => "[{\"value\":2,\"count\":2}]"
 
 SELECT TO_JSON_STRING(APPROX_TOP_COUNT(a, 1)) FROM t WHERE FALSE
-=> null
+=> "null"
 
 SELECT MAX_BY(b, a) FROM t
 => "あ"
@@ -1008,7 +1008,7 @@ SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x ORDER BY ARRAY_LENGTH(x) DESC LIMIT 1))
 => "[1,2]"
 
 SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(x)) FROM (SELECT CAST(NULL AS ARRAY<INT64>) AS x)
-=> null
+=> "null"
 
 ## Value tables
 
@@ -1266,6 +1266,51 @@ SELECT JSON_TYPE(JSON 'null')
 SELECT JSON_TYPE(CAST(NULL AS JSON))
 => null
 
+SELECT JSON_QUERY('{"a": null}', '$.a')
+=> null
+
+SELECT JSON_QUERY(JSON '{"a": null}', '$.b') IS NULL
+=> "true"
+
+SELECT JSON_VALUE('{"a": null}', '$.a')
+=> null
+
+SELECT JSON_QUERY('{"a": "x\\u00e9\\n"}', '$.a')
+=> "\"xé\\n\""
+
+SELECT JSON_VALUE('{"a": "x\\u00e9\\n"}', '$.a')
+=> "xé\n"
+
+SELECT JSON_QUERY('{"a.b": 1}', '$."a.b"')
+=> "1"
+
+SELECT JSON_EXTRACT('{"a.b": 1}', "$['a.b']")
+=> "1"
+
+SELECT JSON_VALUE(JSON '{"a": 12345678901234567}', '$.a')
+=> "12345678901234567"
+
+SELECT SAFE.JSON_QUERY('{}', 'a')
+=> null
+
+SELECT SAFE.JSON_QUERY('{}', '$[a]')
+=> null
+
+SELECT TO_JSON_STRING(JSON_QUERY(JSON '{"a": [{"b": 1}, {"b": 2}]}', 'lax $.a.b'))
+=> "[1,2]"
+
+SELECT TO_JSON_STRING(JSON_QUERY_ARRAY('[1, null, {"a": 2}, "s"]'))
+=> "[\"1\",\"null\",\"{\\\"a\\\":2}\",\"\\\"s\\\"\"]"
+
+SELECT TO_JSON_STRING(JSON_QUERY_ARRAY(JSON '[1, null, {"a": 2}]'))
+=> "[1,null,{\"a\":2}]"
+
+SELECT JSON_VALUE_ARRAY('[1, [2]]') IS NULL
+=> "true"
+
+SELECT JSON_TYPE(JSON '-0.0')
+=> "number"
+
 ## Builds and changes json
 
 SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))
@@ -1322,6 +1367,88 @@ SELECT LAX_STRING(JSON '123')
 SELECT LAX_STRING(CAST(NULL AS JSON))
 => null
 
+SELECT TO_JSON_STRING(1e20)
+=> "1e+20"
+
+SELECT TO_JSON_STRING(-0.0)
+=> "0"
+
+SELECT TO_JSON_STRING(CAST('nan' AS FLOAT64))
+=> "\"NaN\""
+
+SELECT TO_JSON_STRING(9007199254740992)
+=> "9007199254740992"
+
+SELECT TO_JSON_STRING(9007199254740993)
+=> "\"9007199254740993\""
+
+SELECT TO_JSON_STRING(STRUCT(NUMERIC '1' AS n, NUMERIC '1.5' AS f, BIGNUMERIC '-0.5' AS b))
+=> "{\"n\":1,\"f\":\"1.5\",\"b\":\"-0.5\"}"
+
+SELECT TO_JSON_STRING(STRUCT(b'\xff' AS b, TIMESTAMP '2020-01-01 00:00:00.5+00' AS t,
+  DATETIME '2020-01-01 01:02:03' AS d, TIME '01:02:03.25' AS ti))
+=> "{\"b\":\"/w==\",\"t\":\"2020-01-01T00:00:00.500Z\",\"d\":\"2020-01-01T01:02:03\",\"ti\":\"01:02:03.250\"}"
+
+SELECT TO_JSON_STRING('"<\u2028\x01é')
+=> "\"\\\"<\\u2028\\u0001é\""
+
+SELECT TO_JSON_STRING(STRUCT(1 AS a, [JSON '{"x" : 1}'] AS b), true)
+=> "{\n  \"a\": 1,\n  \"b\": [\n    {\n      \"x\": 1\n    }\n  ]\n}"
+
+SELECT TO_JSON_STRING(CAST(NULL AS INT64))
+=> "null"
+
+SELECT TO_JSON_STRING(1, CAST(NULL AS BOOL))
+=> null
+
+SELECT TO_JSON_STRING(TO_JSON(9007199254740993))
+=> "9007199254740993"
+
+SELECT TO_JSON_STRING(TO_JSON(9007199254740993, stringify_wide_numbers => TRUE))
+=> "\"9007199254740993\""
+
+SELECT TO_JSON_STRING(TO_JSON(NUMERIC '99999999999999999999.5', stringify_wide_numbers => TRUE))
+=> "\"99999999999999999999.5\""
+
+SELECT TO_JSON_STRING(TO_JSON(NUMERIC '99999999999999999999.5'))
+=> "1e+20"
+
+SELECT TO_JSON_STRING(TO_JSON(STRUCT(1.5 AS f, TIMESTAMP '2020-01-01 00:00:00+00' AS t)))
+=> "{\"f\":1.5,\"t\":\"2020-01-01T00:00:00Z\"}"
+
+SELECT TO_JSON_STRING(PARSE_JSON('{"a" : 1.50, "b": [1, 2]}'))
+=> "{\"a\":1.5,\"b\":[1,2]}"
+
+SELECT SAFE.PARSE_JSON('{"a": 1,}')
+=> null
+
+SELECT SAFE.PARSE_JSON('12345678901234567890123')
+=> null
+
+SELECT TO_JSON_STRING(PARSE_JSON('12345678901234567890123', wide_number_mode => 'round'))
+=> "1.2345678901234568e+22"
+
+SELECT SAFE.PARSE_JSON('1', wide_number_mode => 'x')
+=> null
+
+SELECT TO_JSON_STRING(JSON_ARRAY(1.5, CAST('nan' AS FLOAT64), b'\x01', NUMERIC '1.5', 9007199254740993))
+=> "[1.5,\"NaN\",\"AQ==\",1.5,9007199254740993]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY())
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY(NULL, [1, 2]))
+=> "[null,[1,2]]"
+
+SELECT TO_JSON_STRING(JSON_OBJECT('a', 1e20, 'b', b'\x01'))
+=> "{\"a\":1e+20,\"b\":\"AQ==\"}"
+
+SELECT SAFE.JSON_OBJECT(['a', NULL], [1, 2])
+=> null
+
+SELECT TO_JSON_STRING(JSON_SET(JSON '{"a": 1}', '$.a', [1e20], '$.b', JSON 'null'))
+=> "{\"a\":[1e+20],\"b\":null}"
+
 ## Accesses and converts json
 
 SELECT FLOAT64(JSON '1', wide_number_mode => 'round')
@@ -1331,6 +1458,48 @@ SELECT BOOL(JSON 'true')
 => "true"
 
 SELECT INT64(CAST(NULL AS JSON))
+=> null
+
+SELECT TO_JSON_STRING(JSON '{"a": {"b": 1}}'.a)
+=> "{\"b\":1}"
+
+SELECT TO_JSON_STRING(JSON '{"a": null}'.a)
+=> "null"
+
+SELECT JSON '{"a": null}'.b
+=> null
+
+SELECT TO_JSON_STRING(JSON '{"": 3}'[''])
+=> "3"
+
+SELECT TO_JSON_STRING(JSON '[1, 2]'[1])
+=> "2"
+
+SELECT JSON '[1, 2]'[-1]
+=> null
+
+SELECT INT64(JSON '1e2')
+=> "100"
+
+SELECT SAFE.INT64(JSON '1.5')
+=> null
+
+SELECT SAFE.INT64(JSON '9223372036854775808')
+=> null
+
+SELECT SAFE.BOOL(JSON '1')
+=> null
+
+SELECT STRING(JSON '"é"')
+=> "é"
+
+SELECT FLOAT64(JSON '9007199254740993')
+=> "9007199254740992.0"
+
+SELECT SAFE.FLOAT64(JSON '9007199254740993', wide_number_mode => 'exact')
+=> null
+
+SELECT SAFE.FLOAT64(JSON '1', wide_number_mode => 'x')
 => null
 
 ## Net functions

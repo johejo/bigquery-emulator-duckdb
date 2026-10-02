@@ -36,10 +36,6 @@ Condition SubDay(std::size_t argument) {
   return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});
 }
 
-Condition Literal(std::size_t argument, std::string_view value) {
-  return {.argument = argument, .string_literal = value};
-}
-
 // BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
 std::string WeekStart(const std::string& value, bool iso) {
   return iso ? "date_trunc('week', " + value + ")"
@@ -250,15 +246,15 @@ std::vector<Rule> Shift(std::string_view op) {
            {"'Bit shift by a negative value'"}}};
 }
 
-// Conversions from JSON fail unless the value has the requested type; SQL NULL stays NULL.
-// FLOAT64's wide_number_mode 'exact' fails on a loss of precision, which is unsupported.
-std::vector<Rule> FromJson(std::string_view when, std::string_view expected) {
-  return {{{1, 2},
-           "list_transform([$1], _j -> CASE WHEN _j IS NULL THEN NULL WHEN " + std::string(when) +
-               " ELSE !1 END)[1]",
-           {Is(1, {TYPE_JSON}), Literal(2, "round")},
-           {},
-           {"'The provided JSON input is not " + std::string(expected) + "'"}}};
+// JSON_QUERY and the other extractions of `function` in src/backend_functions.cc, of a STRING
+// or of JSON. `standard` is false for the legacy JSON_EXTRACT functions' JSONPath.
+std::vector<Rule> JsonExtract(std::string_view function, bool standard, bool json_result) {
+  const std::string flag = standard ? "true" : "false";
+  const std::string of_json =
+      std::string(function) + "_json(CAST($1 AS VARCHAR), $2, " + flag + ")";
+  return {
+      {{1, 2}, json_result ? "json(" + of_json + ")" : of_json, {Is(1, {TYPE_JSON})}, {"'$'"}},
+      {{1, 2}, std::string(function) + "($1, $2, " + flag + ")", {Is(1, {TYPE_STRING})}, {"'$'"}}};
 }
 
 std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
@@ -483,30 +479,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"TO_BASE64", {{1, "to_base64($1)"}}},
       {"FROM_BASE64", {{1, "from_base64($1)", {Is(1, {TYPE_STRING})}}}},
 
-      // JSON. Only the exact wide number mode keeps DuckDB's numbers as they are.
-      {"PARSE_JSON", {{{1, 2}, "json($1)", {Literal(2, "exact")}}}},
-      {"TO_JSON_STRING", {{1, "CAST(to_json($1) AS VARCHAR)"}}},
-      {"BOOL", FromJson("json_type(_j) = 'BOOLEAN' THEN CAST(_j AS BOOLEAN)", "a boolean")},
-      {"STRING",
-       FromJson("json_type(_j) = 'VARCHAR' THEN json_extract_string(_j, '$')", "a string")},
-      {"INT64",
-       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT') THEN CAST(_j AS BIGINT) WHEN "
-                "json_type(_j) = 'DOUBLE' AND CAST(_j AS DOUBLE) = trunc(CAST(_j AS DOUBLE)) THEN "
-                "CAST(CAST(_j AS DOUBLE) AS BIGINT)",
-                "an integer")},
-      {"FLOAT64",
-       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)",
-                "a number")},
-      {"DOUBLE",
-       FromJson("json_type(_j) IN ('BIGINT', 'UBIGINT', 'DOUBLE') THEN CAST(_j AS DOUBLE)",
-                "a number")},
-      {"JSON_TYPE",
-       {{1,
-         "CASE json_type($1) WHEN 'OBJECT' THEN 'object' WHEN 'ARRAY' THEN 'array' "
-         "WHEN 'VARCHAR' THEN 'string' WHEN 'BOOLEAN' THEN 'boolean' WHEN 'NULL' THEN 'null' "
-         "WHEN 'BIGINT' THEN 'number' WHEN 'UBIGINT' THEN 'number' "
-         "WHEN 'DOUBLE' THEN 'number' END"}}},
-
       {"ERROR", {{1, "!1", {}, {}, {"$1"}}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
       // DuckDB's array_to_string() skips NULL elements and has no NULL text.
@@ -647,7 +619,31 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
          "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
          {Is(1, {TYPE_BYTES})},
          {"1", "1", "0"}}}},
-      // These take and return JSON as its text; see src/backend_functions.cc.
+      // JSON goes to GoogleSQL as its text; see src/backend_functions.cc.
+      {"PARSE_JSON", {{{1, 2}, "json(bq_parse_json($1, $2))", {}, {"'exact'"}}}},
+      {"BOOL", {{1, "bq_json_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"STRING", {{1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"INT64", {{1, "bq_json_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"FLOAT64",
+       {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}}},
+      {"DOUBLE",
+       {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}}},
+      {"JSON_TYPE", {{1, "bq_json_type(CAST($1 AS VARCHAR))"}}},
+      {"$SUBSCRIPT",
+       {{2,
+         "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
+         {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})}},
+        {2,
+         "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
+         {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})}}}},
+      {"JSON_QUERY", JsonExtract("bq_json_query", true, true)},
+      {"JSON_EXTRACT", JsonExtract("bq_json_query", false, true)},
+      {"JSON_VALUE", JsonExtract("bq_json_value", true, false)},
+      {"JSON_EXTRACT_SCALAR", JsonExtract("bq_json_value", false, false)},
+      {"JSON_QUERY_ARRAY", JsonExtract("bq_json_query_array", true, false)},
+      {"JSON_EXTRACT_ARRAY", JsonExtract("bq_json_query_array", false, false)},
+      {"JSON_VALUE_ARRAY", JsonExtract("bq_json_value_array", true, false)},
+      {"JSON_EXTRACT_STRING_ARRAY", JsonExtract("bq_json_value_array", false, false)},
       {"LAX_BOOL", {{1, "bq_lax_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
       {"LAX_INT64", {{1, "bq_lax_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
       {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
@@ -666,8 +662,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
 // BigQuery functions that DuckDB has under another name, with the same arguments.
 const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
   static const auto* const kNames = new std::unordered_map<std::string_view, std::string_view>{
-      {"GENERATE_UUID", "uuid"},    {"IS_INF", "isinf"}, {"IS_NAN", "isnan"},
-      {"JSON_ARRAY", "json_array"}, {"RAND", "random"},  {"TIMESTAMP_SECONDS", "to_timestamp"},
+      {"GENERATE_UUID", "uuid"},
+      {"IS_INF", "isinf"},
+      {"IS_NAN", "isnan"},
+      {"RAND", "random"},
+      {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
   };
   return *kNames;
@@ -693,19 +692,12 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"$IN", InList},
       {"$CASE_NO_VALUE", Case},
       {"$CASE_WITH_VALUE", Case},
-      {"$SUBSCRIPT", JsonSubscript},
       {"DATE_BUCKET", Bucket},
       {"DATETIME_BUCKET", Bucket},
       {"TIMESTAMP_BUCKET", Bucket},
-      {"JSON_QUERY", JsonExtract},
-      {"JSON_EXTRACT", JsonExtract},
-      {"JSON_VALUE", JsonExtract},
-      {"JSON_EXTRACT_SCALAR", JsonExtract},
-      {"JSON_QUERY_ARRAY", JsonExtract},
-      {"JSON_EXTRACT_ARRAY", JsonExtract},
-      {"JSON_VALUE_ARRAY", JsonExtract},
-      {"JSON_EXTRACT_STRING_ARRAY", JsonExtract},
       {"TO_JSON", ToJson},
+      {"TO_JSON_STRING", ToJson},
+      {"JSON_ARRAY", JsonArray},
       {"JSON_REMOVE", JsonRemove},
       {"JSON_SET", JsonSet},
       {"JSON_OBJECT", JsonObject},
@@ -898,10 +890,7 @@ bool Holds(const Condition& condition, const std::vector<FunctionArgument>& argu
                                         *argument.date_part) == condition.date_parts.end())) {
     return false;
   }
-  if (condition.rounding_mode && argument.rounding_mode != *condition.rounding_mode) {
-    return false;
-  }
-  return !condition.string_literal || argument.string_literal == *condition.string_literal;
+  return !condition.rounding_mode || argument.rounding_mode == *condition.rounding_mode;
 }
 
 bool Matches(const Rule& rule, const std::vector<FunctionArgument>& arguments) {

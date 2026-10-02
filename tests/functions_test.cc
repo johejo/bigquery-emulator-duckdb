@@ -68,15 +68,6 @@ TEST(FunctionsTest, MatchesRoundingModes) {
             std::nullopt);
 }
 
-TEST(FunctionsTest, MatchesStringLiterals) {
-  FunctionArgument exact = Sql("'exact'", googlesql::TYPE_STRING);
-  exact.string_literal = "exact";
-  EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s")}), "json(s)");
-  EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s"), exact}), "json(s)");
-  EXPECT_EQ(TranslateFunction("PARSE_JSON", {Sql("s"), Sql("'round'", googlesql::TYPE_STRING)}),
-            std::nullopt);
-}
-
 TEST(FunctionsTest, BindsArgumentsUsedTwice) {
   // Columns and literals are repeated as they are.
   EXPECT_EQ(TranslateFunction("CHR", {Sql("q.a")}),
@@ -128,7 +119,7 @@ TEST(FunctionsTest, RegistersEachFunctionWithItsImplementation) {
   EXPECT_EQ(FindFunction("RAND")->implementation, Implementation::kRenamed);
   EXPECT_EQ(FindFunction("CHR")->implementation, Implementation::kRules);
   EXPECT_EQ(FindFunction("SHA512")->implementation, Implementation::kBackend);
-  EXPECT_EQ(FindFunction("JSON_QUERY")->implementation, Implementation::kHandler);
+  EXPECT_EQ(FindFunction("CONCAT")->implementation, Implementation::kHandler);
   EXPECT_EQ(FindFunction("SAFE_ADD")->implementation, Implementation::kSafe);
   EXPECT_EQ(FindFunction("SUM")->implementation, Implementation::kAggregate);
   EXPECT_EQ(FindFunction("ROW_NUMBER")->implementation, Implementation::kAnalytic);
