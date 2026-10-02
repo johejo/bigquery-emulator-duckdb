@@ -136,6 +136,26 @@ std::vector<Rule> Side(const std::string& function, const std::string& name) {
            errors}};
 }
 
+// CODE_POINTS_TO_STRING and CODE_POINTS_TO_BYTES, by the type `result` they return. They are NULL
+// when an element is NULL and raise an error for the first element out of range.
+std::vector<Rule> CodePointsTo(googlesql::TypeKind result) {
+  const bool bytes = result == TYPE_BYTES;
+  const std::string first =
+      std::string("list_filter($1, _p -> ") +
+      (bytes ? "_p < 0 OR _p > 255" : "_p < 0 OR _p > 1114111 OR _p BETWEEN 55296 AND 57343") +
+      ")[1]";
+  const std::string spelling =
+      bytes ? "unhex(array_to_string(list_transform($1, _p -> lpad(hex(_p), 2, '0')), ''))"
+            : "array_to_string(list_transform($1, _p -> chr(CAST(_p AS INTEGER))), '')";
+  return {
+      {1,
+       "CASE WHEN list_count($1) <> len($1) THEN NULL WHEN " + first +
+           " IS NOT NULL THEN !1 ELSE " + spelling + " END",
+       {},
+       {},
+       {std::string(bytes ? "'Invalid ASCII value '" : "'Invalid codepoint '") + " || " + first}}};
+}
+
 // LPAD and RPAD. DuckDB has no default pad; the BYTES one is b' '.
 std::vector<Rule> Pad(const std::string& function) {
   return {
@@ -498,6 +518,16 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {Is(1, {TYPE_BYTES})}}}},
       {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {TYPE_STRING})}}}},
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
+      // '.' would skip line breaks without the s flag.
+      {"TO_CODE_POINTS",
+       {{1,
+         "list_transform(regexp_extract_all($1, '(?s).'), _c -> CAST(unicode(_c) AS BIGINT))",
+         {Is(1, {TYPE_STRING})}},
+        {1,
+         "list_transform(regexp_extract_all(hex($1), '..'), _b -> CAST('0x' || _b AS BIGINT))",
+         {Is(1, {TYPE_BYTES})}}}},
+      {"CODE_POINTS_TO_STRING", CodePointsTo(TYPE_STRING)},
+      {"CODE_POINTS_TO_BYTES", CodePointsTo(TYPE_BYTES)},
       {"NORMALIZE", {{1, "nfc_normalize($1)", {Is(1, {TYPE_STRING})}}}},
       // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
       {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {TYPE_STRING})}}}},
