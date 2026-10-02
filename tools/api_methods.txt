@@ -24,8 +24,8 @@ request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
 note bigquery.datasets.get | Returns only the dataset's reference and location `US`.
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}}
 note bigquery.datasets.insert | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored.
-request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1
-note bigquery.datasets.list | Ignores `all` and `filter`. Without `maxResults`, returns every dataset in one page.
+request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
+note bigquery.datasets.list | Ignores `filter`.
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 note bigquery.datasets.patch | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored.
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
@@ -69,4 +69,3 @@ request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/table
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
 note bigquery.tables.update | Behaves like `tables.patch`: fields the request leaves out, including `schema`, are kept rather than cleared.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
-note bigquery.tables.list | Without `maxResults`, returns every table in one page.

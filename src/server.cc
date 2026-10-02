@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "httplib.h"
 #include "nlohmann/json.hpp"
@@ -175,7 +176,12 @@ class Server::Impl {
     Get("/projects/:project/datasets",
         Json([this](const httplib::Request& request, httplib::Response&) {
           const std::string project = Param(request, "project");
-          return DatasetList(project, emulator_.ListDatasets(project), ParseListPage(request));
+          std::vector<std::string> dataset_ids = emulator_.ListDatasets(project);
+          // Datasets whose names start with an underscore are hidden unless `all` asks for them.
+          if (!QueryParamBool(request, "all")) {
+            std::erase_if(dataset_ids, [](const std::string& id) { return id.starts_with('_'); });
+          }
+          return DatasetList(project, dataset_ids, ParseListPage(request));
         }));
     Post("/projects/:project/datasets",
          Json([this](const httplib::Request& request, httplib::Response&) {
