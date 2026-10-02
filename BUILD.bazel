@@ -78,6 +78,7 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":duckdb_sql",
         ":field_schema",
         "@nlohmann_json//:json",
     ],
@@ -292,7 +293,9 @@ cc_library(
         ":duckdb_sql",
         ":references",
         ":table_comments",
+        ":table_metadata",
         ":translator",
+        "@nlohmann_json//:json",
     ],
 )
 

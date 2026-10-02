@@ -19,8 +19,8 @@ what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 6 |
-| Supported | 50 |
+| Partial | 7 |
+| Supported | 49 |
 | Unsupported | 22 |
 
 ## Queries
@@ -101,7 +101,7 @@ what it rejected.
 | `CREATE EXTERNAL TABLE` | Unsupported | statement CreateExternalTableStmt |
 | `DROP TABLE` | Supported |  |
 | `ALTER TABLE` | Partial | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE action DropColumnAction; ALTER TABLE action RenameToAction; ALTER TABLE with multiple actions; statement AlterTableSetOptionsStmt |
-| `CREATE SCHEMA` | Supported |  |
+| `CREATE SCHEMA` | Partial | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.; CREATE SCHEMA option default_table_expiration_days; CREATE SCHEMA option location |
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Unsupported | statement AlterSchemaStmt |

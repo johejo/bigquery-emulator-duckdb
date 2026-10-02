@@ -51,6 +51,11 @@ struct ListPage {
   std::string page_token;
 };
 
+struct DatasetInsertRequest {
+  DatasetReference dataset;
+  DatasetMetadata metadata;
+};
+
 struct TableInsertRequest {
   TableReference table;
   // The view definition, when the request creates a view rather than a table.
@@ -103,7 +108,7 @@ LoadRequest ParseLoadInsert(const std::string& project_id, const nlohmann::json&
 JobListRequest ParseJobList(const httplib::Request& request);
 // datasets.list and tables.list.
 ListPage ParseListPage(const httplib::Request& request);
-DatasetReference ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
+DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
 TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
@@ -118,10 +123,10 @@ nlohmann::json JobList(const std::vector<std::shared_ptr<const Job>>& jobs,
 nlohmann::json JobCancelResponse(const Job& job);
 nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
 nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
-nlohmann::json DatasetResource(const DatasetReference& dataset);
-// `dataset_ids` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
+nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata);
+// `datasets` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
 nlohmann::json DatasetList(const std::string& project_id,
-                           const std::vector<std::string>& dataset_ids, const ListPage& page);
+                           const std::vector<DatasetListEntry>& datasets, const ListPage& page);
 nlohmann::json TableResource(const TableInfo& info);
 nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
                          const ListPage& page);

@@ -73,6 +73,7 @@ struct Context {
   std::optional<TableDefinition> table;
   std::optional<AddedColumn> added_column;
   std::optional<ViewDefinition> view;
+  std::optional<DatasetDefinition> dataset;
   int next_name = 0;
 
   // A name no other call returns, for WITH queries and lambda parameters.

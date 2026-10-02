@@ -37,6 +37,11 @@ struct TableListEntry {
   TableMetadata metadata;
 };
 
+struct DatasetListEntry {
+  std::string dataset_id;
+  DatasetMetadata metadata;
+};
+
 struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
@@ -178,8 +183,13 @@ class Emulator {
   void DeleteJob(const std::string& project_id, const std::string& job_id);
 
   std::vector<std::string> ListDatasets(const std::string& project_id);
-  void GetDataset(const DatasetReference& dataset);  // Throws when the dataset is missing.
-  void CreateDataset(const DatasetReference& dataset);
+  // The datasets of ListDatasets, each with its metadata.
+  std::vector<DatasetListEntry> ListDatasetEntries(const std::string& project_id);
+  // The metadata of `dataset`. Throws when the dataset is missing.
+  DatasetMetadata GetDataset(const DatasetReference& dataset);
+  void CreateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata = {});
+  // datasets.patch and datasets.update: gives `dataset` the metadata `metadata`.
+  void UpdateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata);
   void DeleteDataset(const DatasetReference& dataset, bool delete_contents);
 
   std::vector<std::string> ListTables(const DatasetReference& dataset);

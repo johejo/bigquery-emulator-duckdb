@@ -154,7 +154,8 @@ std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedS
                              .ddl_target_dataset = std::move(context.ddl_target_dataset),
                              .table = std::move(context.table),
                              .added_column = std::move(context.added_column),
-                             .view = std::move(context.view)};
+                             .view = std::move(context.view),
+                             .dataset = std::move(context.dataset)};
 }
 
 }  // namespace bigquery_emulator_duckdb

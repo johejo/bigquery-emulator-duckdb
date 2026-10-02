@@ -69,4 +69,7 @@ This metadata survives restarts and serves the REST API without executing the vi
 
 BigQuery metadata that DuckDB types cannot carry lives in DuckDB comments as JSON: each column's
 TableFieldSchema in its column comment, and a table's description, friendly name, labels,
-partitioning and clustering in its table comment, or in its view comment next to the query.
+partitioning and clustering in its table comment, or in its view comment next to the query. DuckDB
+cannot comment on a schema, so a dataset's description, friendly name and labels live as JSON in
+the `emulator_datasets` table of the project's `main` schema, which is not a dataset; the same
+transaction that creates or drops the schema writes them.

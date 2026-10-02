@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "src/references.h"
+#include "src/table_metadata.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -15,6 +17,20 @@ struct DdlWrite {
   std::vector<std::string> metadata_statements;
   std::string skip_query;
 };
+
+// DuckDB cannot comment on a schema, so the emulator records each dataset's DatasetMetadata as
+// JSON in this table of the project's `main` schema, which is not a dataset. A dataset the table
+// has no row for has no metadata. Writes to it share the transaction that creates or drops the
+// dataset's schema.
+std::string DatasetMetadataTable(const std::string& project);
+
+// The statements that record `metadata` for `dataset`, replacing what was recorded before.
+// Throws ApiError::Invalid for labels BigQuery rejects.
+std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,
+                                                   const DatasetMetadata& metadata);
+
+// What DROP SCHEMA of `dataset` runs besides itself: it forgets the dataset's metadata.
+DdlWrite DropDatasetWrite(const DatasetReference& dataset);
 
 // What CREATE TABLE of `definition` runs besides itself.
 DdlWrite CreateTableWrite(const TableDefinition& definition);

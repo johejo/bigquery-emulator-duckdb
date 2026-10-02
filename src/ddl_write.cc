@@ -8,10 +8,12 @@
 #include <vector>
 
 #include "absl/strings/str_join.h"
+#include "nlohmann/json.hpp"
 #include "src/column_metadata.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 #include "src/table_comments.h"
+#include "src/table_metadata.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -22,6 +24,22 @@ std::string TableExists(const TableReference& table) {
       "EXISTS (SELECT 1 FROM information_schema.tables"
       " WHERE table_catalog = {} AND table_schema = {} AND table_name = {})",
       QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
+}
+
+std::string DatasetExists(const DatasetReference& dataset) {
+  return std::format(
+      "EXISTS (SELECT 1 FROM information_schema.schemata"
+      " WHERE catalog_name = {} AND schema_name = {})",
+      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+}
+
+DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
+  DdlWrite write{.metadata_statements =
+                     DatasetMetadataStatements(definition.dataset, definition.metadata)};
+  if (definition.if_not_exists) {
+    write.skip_query = "SELECT 1 WHERE " + DatasetExists(definition.dataset);
+  }
+  return write;
 }
 
 DdlWrite AddColumnWrite(const AddedColumn& column) {
@@ -44,6 +62,29 @@ DdlWrite AddColumnWrite(const AddedColumn& column) {
 }
 
 }  // namespace
+
+std::string DatasetMetadataTable(const std::string& project) {
+  return QuoteIdentifier(project) + ".main.emulator_datasets";
+}
+
+std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,
+                                                   const DatasetMetadata& metadata) {
+  ValidateLabels(metadata.labels);
+  const std::string table = DatasetMetadataTable(dataset.project_id);
+  std::vector<std::string> statements = {
+      std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id))};
+  if (!metadata.empty()) {
+    statements.push_back(std::format("INSERT INTO {} VALUES ({}, {})", table,
+                                     QuoteLiteral(dataset.dataset_id),
+                                     QuoteLiteral(metadata.ToJson().dump())));
+  }
+  return statements;
+}
+
+// DROP SCHEMA IF EXISTS of a missing dataset forgets nothing.
+DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
+  return {.metadata_statements = {DatasetMetadataStatements(dataset, {}).front()}};
+}
 
 DdlWrite CreateViewWrite(const ViewDefinition& view) {
   const TableReference& table = view.table;
@@ -83,6 +124,12 @@ std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
   }
   if (statement.view.has_value()) {
     return CreateViewWrite(*statement.view);
+  }
+  if (statement.dataset.has_value()) {
+    return CreateDatasetWrite(*statement.dataset);
+  }
+  if (statement.statement_type == "DROP_SCHEMA" && statement.ddl_target_dataset.has_value()) {
+    return DropDatasetWrite(*statement.ddl_target_dataset);
   }
   return std::nullopt;
 }

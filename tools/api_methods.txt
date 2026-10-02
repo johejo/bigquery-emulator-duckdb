@@ -21,15 +21,20 @@ setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "con
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
-note bigquery.datasets.get | Returns only the dataset's reference and location `US`.
-request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}}
-note bigquery.datasets.insert | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored.
+note bigquery.datasets.get | Returns the reference, description, friendly name and labels, and location `US`.
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "description": "data", "friendlyName": "E", "labels": {"env": "test"}, "location": "US"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "access": [{"role": "READER", "specialGroup": "projectReaders"}]}
+note bigquery.datasets.insert | Keeps `datasetReference`, `description`, `friendlyName` and `labels`. Every dataset is in the US; other fields are unsupported.
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:test
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
-note bigquery.datasets.patch | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored.
+request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
+note bigquery.datasets.patch | Changes `description`, `friendlyName` and `labels`, as `datasets.insert` keeps them. Ignores the etag.
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
-note bigquery.datasets.update | Behaves like `datasets.patch`.
+request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
+note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name and labels.
 
 request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | Jobs finish before `jobs.insert` returns, so cancelling returns the finished job unchanged.

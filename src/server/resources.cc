@@ -321,21 +321,30 @@ json GetQueryResultsResponse(const Job& job, const ResultPage& page) {
   return response;
 }
 
-json DatasetResource(const DatasetReference& dataset) {
-  return json{{"kind", "bigquery#dataset"},
-              {"etag", kEtag},
-              {"id", dataset.project_id + ":" + dataset.dataset_id},
-              {"datasetReference", DatasetReferenceJson(dataset)},
-              {"location", kLocation}};
+json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata) {
+  json resource{{"kind", "bigquery#dataset"},
+                {"etag", kEtag},
+                {"id", dataset.project_id + ":" + dataset.dataset_id},
+                {"datasetReference", DatasetReferenceJson(dataset)},
+                {"location", kLocation}};
+  resource.update(metadata.ToJson());
+  return resource;
 }
 
-json DatasetList(const std::string& project_id, const std::vector<std::string>& dataset_ids,
+json DatasetList(const std::string& project_id, const std::vector<DatasetListEntry>& entries,
                  const ListPage& page) {
   json response = {{"kind", "bigquery#datasetList"}, {"etag", kEtag}};
   json datasets = json::array();
-  for (const std::string& dataset_id :
-       ListPageItems(dataset_ids, page, std::identity{}, response)) {
-    datasets.push_back(DatasetResource(DatasetReference{project_id, dataset_id}));
+  for (const DatasetListEntry& entry :
+       ListPageItems(entries, page, &DatasetListEntry::dataset_id, response)) {
+    json item{{"kind", "bigquery#dataset"},
+              {"id", project_id + ":" + entry.dataset_id},
+              {"datasetReference", DatasetReferenceJson({project_id, entry.dataset_id})},
+              {"location", kLocation}};
+    // A list entry carries the metadata but the description.
+    item.update(entry.metadata.ToJson());
+    item.erase("description");
+    datasets.push_back(std::move(item));
   }
   // BigQuery omits the datasets of a project that has none.
   if (!datasets.empty()) {
