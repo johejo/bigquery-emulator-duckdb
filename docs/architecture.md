@@ -67,5 +67,5 @@ metadata writes share a transaction, so replacement failures preserve the previo
 This metadata survives restarts and serves the REST API without executing the view.
 
 BigQuery metadata that DuckDB types cannot carry lives in DuckDB comments as JSON: each column's
-TableFieldSchema in its column comment, and a table's description, friendly name and labels in
-its table comment, or in its view comment next to the query.
+TableFieldSchema in its column comment, and a table's description, friendly name, labels,
+partitioning and clustering in its table comment, or in its view comment next to the query.

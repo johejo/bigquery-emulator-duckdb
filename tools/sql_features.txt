@@ -129,7 +129,8 @@ note Table and column options | Stores the description, friendly name and labels
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
-note Partitioning and clustering | Accepted and dropped
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE)
+note Partitioning and clustering | Stores the partitioning and clustering of tables. Ingestion-time partitioning (`_PARTITIONDATE`, `_PARTITIONTIME`) is unsupported, and partitions do not expire
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
 query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
 note Primary and foreign keys | Accepted and dropped; BigQuery does not enforce them either

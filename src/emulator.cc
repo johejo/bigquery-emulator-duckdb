@@ -219,9 +219,11 @@ TableMetadata CommentMetadata(const json& comment) {
   }
 }
 
-// The statement that records `metadata` on the DuckDB table `table`.
-std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata) {
+// The statement that records `metadata` on the DuckDB table `table`, whose schema is `schema`.
+std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata,
+                                  const std::vector<FieldSchema>& schema) {
   ValidateLabels(metadata.labels);
+  ValidatePartitioning(metadata, schema);
   return std::format("COMMENT ON TABLE {} IS {}", QualifiedName(table),
                      metadata.empty() ? "NULL" : QuoteLiteral(metadata.ToJson().dump()));
 }
@@ -229,6 +231,9 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
 // The statement that records `view` on the DuckDB view `table`.
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
   ValidateLabels(view.metadata.labels);
+  if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
+    throw ApiError::Invalid("A view cannot be partitioned or clustered");
+  }
   json comment = view.metadata.ToJson();
   comment["query"] = view.query;
   comment["fields"] = SchemaToJson(view.schema).at("fields");
@@ -291,7 +296,7 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
                     std::back_inserter(write.metadata_statements));
   if (!definition.metadata.empty()) {
     write.metadata_statements.push_back(
-        TableCommentStatement(definition.table, definition.metadata));
+        TableCommentStatement(definition.table, definition.metadata, definition.schema));
   }
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
@@ -1239,7 +1244,7 @@ void Emulator::UpdateTable(const TableReference& table,
     std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
   }
   if (metadata.has_value()) {
-    statements.push_back(TableCommentStatement(table, *metadata));
+    statements.push_back(TableCommentStatement(table, *metadata, schema.value_or(info.schema)));
   }
   if (statements.empty()) {
     return;
