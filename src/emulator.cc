@@ -169,6 +169,21 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
+// The datasets of `project`, by name; DuckDB's own schemas are not datasets.
+std::string DatasetsQuery(const std::string& project) {
+  return "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
+         QuoteLiteral(project) +
+         " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
+         " ORDER BY schema_name";
+}
+
+// The tables and views of `dataset`, by name.
+std::string TablesQuery(const DatasetReference& dataset) {
+  return "SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
+         QuoteLiteral(dataset.project_id) +
+         " AND table_schema = " + QuoteLiteral(dataset.dataset_id) + " ORDER BY table_name";
+}
+
 // What the emulator records in a DuckDB view's comment: the GoogleSQL query and its schema.
 struct ViewMetadata {
   std::string query;
@@ -324,19 +339,12 @@ class DuckDbTableSource : public TableSource {
   }
 
   std::vector<std::string> ListDatasets(const std::string& project) override {
-    return FirstColumnStrings(backend_.Execute(
-        "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
-        QuoteLiteral(project) +
-        " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
-        " ORDER BY schema_name"));
+    return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
   }
 
   std::vector<std::string> ListTables(const std::string& project,
                                       const std::string& dataset) override {
-    return FirstColumnStrings(
-        backend_.Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
-                         QuoteLiteral(project) + " AND table_schema = " + QuoteLiteral(dataset) +
-                         " ORDER BY table_name"));
+    return FirstColumnStrings(backend_.Execute(TablesQuery(DatasetReference{project, dataset})));
   }
 
   std::optional<std::string> FindViewQuery(const std::string& project, const std::string& dataset,
@@ -911,11 +919,7 @@ void Emulator::DeleteJob(const std::string& project_id, const std::string& job_i
 
 std::vector<std::string> Emulator::ListDatasets(const std::string& project_id) {
   EnsureProject(project_id);
-  return FirstColumnStrings(
-      Execute("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
-              QuoteLiteral(project_id) +
-              " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
-              " ORDER BY schema_name"));
+  return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
 void Emulator::GetDataset(const DatasetReference& dataset) {
@@ -949,10 +953,7 @@ void Emulator::DeleteDataset(const DatasetReference& dataset, bool delete_conten
 
 std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
   GetDataset(dataset);
-  return FirstColumnStrings(
-      Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
-              QuoteLiteral(dataset.project_id) +
-              " AND table_schema = " + QuoteLiteral(dataset.dataset_id) + " ORDER BY table_name"));
+  return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
 std::vector<std::string> Emulator::ListViews(const DatasetReference& dataset) {
