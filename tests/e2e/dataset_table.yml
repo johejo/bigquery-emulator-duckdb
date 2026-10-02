@@ -9,6 +9,15 @@ steps:
       command: tests/e2e/bq.sh ls --format=json
     test: |
       current.exit_code == 0 && current.stdout contains '"datasetId":"e2e"'
+  update_dataset:
+    exec:
+      command: tests/e2e/bq.sh update --dataset --description 'e2e data' --set_label env:test e2e
+    test: current.exit_code == 0
+  update_missing_dataset:
+    exec:
+      command: tests/e2e/bq.sh update --dataset --description 'e2e data' missing
+    test: |
+      current.exit_code != 0 && current.stdout contains 'Not found: Dataset test:missing'
   mk_table:
     exec:
       command: tests/e2e/bq.sh mk --table e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
