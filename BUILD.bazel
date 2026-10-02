@@ -259,6 +259,16 @@ cc_library(
     copts = ["-std=c++20"],
 )
 
+# cpp-httplib configured for the emulator. Its settings are macros read by the header-only library,
+# so every target that includes httplib.h depends on this one to see the same values.
+cc_library(
+    name = "httplib",
+    # The default backlog of 5 resets connections when clients open many at once, such as
+    # parallel queries from a test suite. The kernel caps it at its own limit (SOMAXCONN).
+    defines = ["CPPHTTPLIB_LISTEN_BACKLOG=1024"],
+    deps = ["@cpp-httplib//:httplib"],
+)
+
 cc_library(
     name = "server",
     srcs = [
@@ -274,10 +284,10 @@ cc_library(
         ":discovery_document",
         ":emulator",
         ":field_schema",
+        ":httplib",
         ":query_parameters",
         ":references",
         ":temporary_files",
-        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )
@@ -371,9 +381,9 @@ cc_binary(
     copts = ["-std=c++20"],
     deps = [
         ":emulator",
+        ":httplib",
         ":probe",
         ":server",
-        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )
@@ -490,8 +500,8 @@ cc_test(
     deps = [
         ":api_error",
         ":gcs",
+        ":httplib",
         "@com_google_googletest//:gtest_main",
-        "@cpp-httplib//:httplib",
     ],
 )
 
@@ -501,9 +511,9 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":emulator",
+        ":httplib",
         ":server",
         "@com_google_googletest//:gtest_main",
-        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )

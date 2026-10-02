@@ -1,8 +1,11 @@
 #include "src/server.h"
 
+#include <atomic>
+#include <latch>
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "httplib.h"
@@ -57,6 +60,26 @@ TEST_F(ServerTest, ServesDiscoveryDocument) {
   EXPECT_EQ(document["rootUrl"], server_->root_url() + "/");
   EXPECT_EQ(document["baseUrl"], server_->root_url() + "/bigquery/v2/");
   EXPECT_TRUE(document["resources"].contains("jobs"));
+}
+
+// Clients such as test suites open many connections at once; with a short listen backlog the
+// kernel resets the ones that do not fit instead of queueing them.
+TEST_F(ServerTest, AcceptsBurstOfConnections) {
+  constexpr int kClients = 100;
+  std::latch start(kClients);
+  std::atomic<int> failures = 0;
+  std::vector<std::thread> clients;
+  clients.reserve(kClients);
+  for (int i = 0; i < kClients; ++i) {
+    clients.emplace_back([&] {
+      httplib::Client client(server_->root_url());
+      start.arrive_and_wait();
+      const httplib::Result result = client.Get("/bigquery/v2/projects/p/datasets");
+      if (!result || result->status != 200) ++failures;
+    });
+  }
+  for (std::thread& client : clients) client.join();
+  EXPECT_EQ(failures, 0);
 }
 
 TEST_F(ServerTest, ReportsQueryErrors) {
