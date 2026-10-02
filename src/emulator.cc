@@ -495,8 +495,12 @@ void SchemaUpdateStatements(const TableReference& table, const std::string& path
       throw ApiError::Invalid("The emulator does not support adding field " + prefix + added.name +
                               " with a default value");
     }
-    statements.push_back(std::format("ALTER TABLE {} ADD COLUMN {}{} {}", QualifiedName(table),
-                                     path, QuoteIdentifier(added.name), ToDuckDbType(added)));
+    // Existing rows read an added REPEATED column as empty, as rows that leave it out later do;
+    // see RepeatedColumnDefaultStatements. DuckDB takes no default for a field of a record.
+    const bool empty_default = path.empty() && added.mode == FieldMode::kRepeated;
+    statements.push_back(std::format("ALTER TABLE {} ADD COLUMN {}{} {}{}", QualifiedName(table),
+                                     path, QuoteIdentifier(added.name), ToDuckDbType(added),
+                                     empty_default ? " DEFAULT []" : ""));
   }
 }
 
