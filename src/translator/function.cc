@@ -468,6 +468,31 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call) {
   return "(" + Join(Sqls(call), " || ") + ")";
 }
 
+// FORMAT goes to GoogleSQL's implementation, which src/backend_functions.cc registers to tell
+// the type of each value by its DuckDB type. The values are cast to the DuckDB type that stands
+// for their type; a value of another type, such as NUMERIC, is unsupported.
+std::optional<std::string> Format(const ScalarCall& call) {
+  static const std::map<googlesql::TypeKind, std::string_view> types = {
+      {googlesql::TYPE_STRING, "VARCHAR"},
+      {googlesql::TYPE_BYTES, "BLOB"},
+      {googlesql::TYPE_INT64, "BIGINT"},
+      {googlesql::TYPE_DOUBLE, "DOUBLE"},
+      {googlesql::TYPE_BOOL, "BOOLEAN"},
+      {googlesql::TYPE_DATE, "DATE"},
+      {googlesql::TYPE_TIME, "TIME"},
+      {googlesql::TYPE_DATETIME, "TIMESTAMP"},
+      {googlesql::TYPE_TIMESTAMP, "TIMESTAMPTZ"}};
+  std::vector<std::string> arguments;
+  for (const FunctionArgument& argument : call.arguments) {
+    const auto type = types.find(argument.type);
+    if (type == types.end()) {
+      return std::nullopt;
+    }
+    arguments.push_back("CAST(" + argument.sql + " AS " + std::string(type->second) + ")");
+  }
+  return "bq_format(" + Join(arguments, ", ") + ")";
+}
+
 // GREATEST and LEAST are NULL when any argument is, where DuckDB's skip NULL, and NaN when any
 // argument is, which DuckDB orders above every other number and so only GREATEST gets right.
 std::optional<std::string> Extremum(const ScalarCall& call) {

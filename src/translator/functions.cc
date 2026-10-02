@@ -140,6 +140,14 @@ std::string RoundHalfEven() {
          ")) = 0 THEN " + toward + " ELSE " + away + " END";
 }
 
+// FORMAT_DATE, FORMAT_DATETIME and FORMAT_TIMESTAMP, by the type of the value. A TIMESTAMP is
+// formatted in the given time zone, by default UTC.
+std::vector<Rule> FormatDateTime() {
+  return {{2, "bq_format_date($1, $2)", {Is(2, {TYPE_DATE})}},
+          {2, "bq_format_datetime($1, $2)", {Is(2, {TYPE_DATETIME})}},
+          {{2, 3}, "bq_format_timestamp($1, $2, $3)", {Is(2, {TYPE_TIMESTAMP})}, {"'UTC'"}}};
+}
+
 // A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers. The NUMERIC
 // and BIGNUMERIC overloads are left out: going through FLOAT64 would lose their precision.
 std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
@@ -420,17 +428,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
         // A civil time in the given zone; a string with its own offset keeps the offset.
         {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {TYPE_DATE, TYPE_DATETIME})}}}},
 
-      // Formatting and parsing: DuckDB takes the value first and the format second.
-      {"FORMAT_DATE", {{2, "strftime($2, $1)"}}},
-      {"FORMAT_DATETIME", {{2, "strftime($2, $1)"}}},
-      {"FORMAT_TIMESTAMP", {{2, "strftime($2, $1)"}}},
-      // DuckDB's strftime() has no TIME overload.
-      {"FORMAT_TIME", {{2, "strftime(DATE '1970-01-01' + $2, $1)"}}},
-      {"PARSE_DATE", {{2, "CAST(strptime($2, $1) AS DATE)"}}},
-      {"PARSE_DATETIME", {{2, "strptime($2, $1)"}}},
-      {"PARSE_TIME", {{2, "CAST(strptime($2, $1) AS TIME)"}}},
-      {"PARSE_TIMESTAMP", {{2, "CAST(strptime($2, $1) AS TIMESTAMPTZ)"}}},
-
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
       // to arrive at the instant BigQuery means.
       // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
@@ -601,6 +598,18 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
        {{{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
         {2, "bq_split_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
       // The mode is passed by its name.
+      // Formatting and parsing dates and times. DuckDB's strftime() and strptime() differ in
+      // the format elements, in how leniently they parse and in their errors. FORMAT_DATE,
+      // FORMAT_DATETIME and FORMAT_TIMESTAMP each also take the other two types.
+      {"FORMAT_DATE", FormatDateTime()},
+      {"FORMAT_DATETIME", FormatDateTime()},
+      {"FORMAT_TIMESTAMP", FormatDateTime()},
+      {"FORMAT_TIME", {{2, "bq_format_time($1, $2)"}}},
+      {"PARSE_DATE", {{2, "bq_parse_date($1, $2)"}}},
+      {"PARSE_DATETIME", {{2, "bq_parse_datetime($1, $2)"}}},
+      {"PARSE_TIME", {{2, "bq_parse_time($1, $2)"}}},
+      // A string without a time zone is in the given one, by default UTC.
+      {"PARSE_TIMESTAMP", {{{2, 3}, "bq_parse_timestamp($1, $2, $3)", {}, {"'UTC'"}}}},
       {"NORMALIZE", {{{1, 2}, "bq_normalize($1, $2)", {}, {"'NFC'"}}}},
       {"NORMALIZE_AND_CASEFOLD", {{{1, 2}, "bq_normalize_and_casefold($1, $2)", {}, {"'NFC'"}}}},
       // BigQuery compares the NFKC normal forms, case folded. Only the STRING overload is
@@ -657,13 +666,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
 // BigQuery functions that DuckDB has under another name, with the same arguments.
 const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
   static const auto* const kNames = new std::unordered_map<std::string_view, std::string_view>{
-      {"FORMAT", "printf"},
-      {"GENERATE_UUID", "uuid"},
-      {"IS_INF", "isinf"},
-      {"IS_NAN", "isnan"},
-      {"JSON_ARRAY", "json_array"},
-      {"RAND", "random"},
-      {"TIMESTAMP_SECONDS", "to_timestamp"},
+      {"GENERATE_UUID", "uuid"},    {"IS_INF", "isinf"}, {"IS_NAN", "isnan"},
+      {"JSON_ARRAY", "json_array"}, {"RAND", "random"},  {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
   };
   return *kNames;
@@ -705,6 +709,7 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"JSON_REMOVE", JsonRemove},
       {"JSON_SET", JsonSet},
       {"JSON_OBJECT", JsonObject},
+      {"FORMAT", Format},
       {"ARRAY_CONCAT", ArrayConcat},
       {"CONCAT", ConcatStrings},
       {"GREATEST", Extremum},
