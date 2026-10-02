@@ -23,9 +23,9 @@ FunctionArgument Mode(const std::string& mode) {
 }
 
 TEST(FunctionsTest, MatchesTheArgumentCount) {
-  EXPECT_EQ(TranslateFunction("LOG", {Sql("x")}), "ln(x)");
-  EXPECT_EQ(TranslateFunction("LOG", {Sql("x"), Sql("b")}), "log(b, x)");
-  EXPECT_EQ(TranslateFunction("LOG", {Sql("x"), Sql("b"), Sql("c")}), std::nullopt);
+  EXPECT_EQ(TranslateFunction("TRUNC", {Sql("x")}), "trunc(x)");
+  EXPECT_EQ(TranslateFunction("TRUNC", {Sql("x"), Sql("d")}), "trunc(x, CAST(d AS INTEGER))");
+  EXPECT_EQ(TranslateFunction("TRUNC", {Sql("x"), Sql("d"), Sql("e")}), std::nullopt);
 }
 
 TEST(FunctionsTest, MatchesTheArgumentTypes) {
@@ -115,12 +115,12 @@ TEST(FunctionsTest, PassesThroughStringsOnly) {
 
 TEST(FunctionsTest, RenamesAndPassesThrough) {
   EXPECT_EQ(TranslateFunction("RAND", {}), "random()");
-  EXPECT_EQ(TranslateFunction("GREATEST", {Sql("a"), Sql("b"), Sql("c")}), "GREATEST(a, b, c)");
+  EXPECT_EQ(TranslateFunction("COALESCE", {Sql("a"), Sql("b"), Sql("c")}), "COALESCE(a, b, c)");
   EXPECT_EQ(TranslateFunction("NO_SUCH_FUNCTION", {Sql("a")}), std::nullopt);
 }
 
 TEST(FunctionsTest, RegistersEachFunctionWithItsImplementation) {
-  EXPECT_EQ(FindFunction("GREATEST")->implementation, Implementation::kSame);
+  EXPECT_EQ(FindFunction("COALESCE")->implementation, Implementation::kSame);
   EXPECT_EQ(FindFunction("RAND")->implementation, Implementation::kRenamed);
   EXPECT_EQ(FindFunction("LEFT")->implementation, Implementation::kRules);
   EXPECT_EQ(FindFunction("SHA512")->implementation, Implementation::kBackend);

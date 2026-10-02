@@ -507,6 +507,29 @@ std::optional<std::string> ArrayConcat(const ScalarCall& call) {
          Join(nulls, " OR ") + " THEN NULL ELSE list_concat(" + Join(lists, ", ") + ") END)[1]";
 }
 
+// DuckDB's concat() skips NULL, where BigQuery returns NULL; its || operator does not.
+std::optional<std::string> ConcatStrings(const ScalarCall& call) {
+  if (call.arguments.empty()) {
+    return std::nullopt;
+  }
+  return "(" + Join(Sqls(call), " || ") + ")";
+}
+
+// GREATEST and LEAST are NULL when any argument is, where DuckDB's skip NULL, and NaN when any
+// argument is, which DuckDB orders above every other number and so only GREATEST gets right.
+std::optional<std::string> Extremum(const ScalarCall& call) {
+  if (call.arguments.empty()) {
+    return std::nullopt;
+  }
+  const bool greatest = call.name == "GREATEST";
+  std::string body = "CASE WHEN list_count(_ext) < len(_ext) THEN NULL ";
+  if (!greatest && call.resolved.type()->IsDouble()) {
+    body += "WHEN isnan(list_max(_ext)) THEN list_max(_ext) ";
+  }
+  body += std::string("ELSE ") + (greatest ? "list_max" : "list_min") + "(_ext) END";
+  return "list_transform([[" + Join(Sqls(call), ", ") + "]], _ext -> " + body + ")[1]";
+}
+
 // A JSONPath key as DuckDB spells it. Quoting every key keeps DuckDB's wildcards and other
 // extensions from applying. DuckDB rejects the empty key.
 std::optional<std::string> JsonPathKey(std::string_view key) {

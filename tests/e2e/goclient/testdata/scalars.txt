@@ -78,6 +78,164 @@ SELECT JSON_QUERY('{"a": {"b": 1}}', '$.a')
 SELECT TO_JSON_STRING(PARSE_JSON('{"a":1}'))
 => "{\"a\":1}"
 
+## Where DuckDB's function of the same name differs
+
+SELECT CONCAT('a', NULL)
+=> null
+
+SELECT CONCAT(b'a', CAST(NULL AS BYTES))
+=> null
+
+SELECT CONCAT('a', b, 'c') FROM t WHERE a = 1
+=> "axc"
+
+SELECT GREATEST(1, NULL, 3)
+=> null
+
+SELECT LEAST(1, NULL, 3)
+=> null
+
+SELECT LEAST(2, 1, 3)
+=> "1"
+
+SELECT GREATEST('a', b) FROM t WHERE a = 2
+=> "yy"
+
+SELECT IS_NAN(GREATEST(1.0, CAST('nan' AS FLOAT64)))
+=> "true"
+
+SELECT IS_NAN(LEAST(1.0, CAST('nan' AS FLOAT64)))
+=> "true"
+
+SELECT LEAST(2, 1.5)
+=> "1.5"
+
+SELECT SAFE.MOD(5, 0)
+=> null
+
+SELECT MOD(CAST(NULL AS INT64), 0)
+=> null
+
+SELECT MOD(-5, 3)
+=> "-2"
+
+SELECT MOD(-9223372036854775808, -1)
+=> "0"
+
+SELECT MOD(NUMERIC '7.5', 2) = NUMERIC '1.5'
+=> "true"
+
+SELECT SAFE.MOD(NUMERIC '7.5', 0)
+=> null
+
+SELECT DIV(-7, 2)
+=> "-3"
+
+SELECT DIV(CAST(NULL AS INT64), 0)
+=> null
+
+SELECT REPEAT('ab', 2)
+=> "abab"
+
+SELECT REPEAT(b'ab', 2)
+=> "YWJhYg=="
+
+SELECT REPEAT('ab', 0)
+=> ""
+
+SELECT REPEAT(CAST(NULL AS STRING), -1)
+=> null
+
+SELECT SAFE.REPEAT('ab', -1)
+=> null
+
+SELECT SAFE.REPEAT('ab', 1000000)
+=> null
+
+SELECT IS_NAN(SIGN(CAST('nan' AS FLOAT64)))
+=> "true"
+
+SELECT SIGN(-2.5)
+=> "-1.0"
+
+SELECT SIGN(-5)
+=> "-1"
+
+SELECT SQRT(4)
+=> "2.0"
+
+SELECT SAFE.SQRT(-1)
+=> null
+
+SELECT SAFE.EXP(1000)
+=> null
+
+SELECT EXP(CAST('-inf' AS FLOAT64))
+=> "0.0"
+
+SELECT SAFE.LN(0)
+=> null
+
+SELECT IS_NAN(LN(CAST('-inf' AS FLOAT64)))
+=> "true"
+
+SELECT SAFE.LOG(8, 1)
+=> null
+
+SELECT LOG(8, 2)
+=> "3.0"
+
+SELECT SAFE.POW(10, 400)
+=> null
+
+SELECT SAFE.POW(0, -1)
+=> null
+
+SELECT POWER(2, 10)
+=> "1024.0"
+
+SELECT IS_NAN(SIN(CAST('inf' AS FLOAT64)))
+=> "true"
+
+SELECT IS_NAN(ASIN(CAST('inf' AS FLOAT64)))
+=> "true"
+
+SELECT SAFE.ASIN(2)
+=> null
+
+SELECT SAFE.SINH(1000)
+=> null
+
+SELECT SAFE.ACOSH(0)
+=> null
+
+SELECT SAFE.ATANH(1)
+=> null
+
+SELECT IS_NAN(ATANH(CAST('inf' AS FLOAT64)))
+=> "true"
+
+SELECT SAFE.COT(0)
+=> null
+
+SELECT IS_NAN(CSC(CAST('inf' AS FLOAT64)))
+=> "true"
+
+SELECT SECH(1000)
+=> "0.0"
+
+SELECT CBRT(-8)
+=> "-2.0"
+
+SELECT UNIX_SECONDS(TIMESTAMP '1970-01-01 00:00:00.5')
+=> "0"
+
+SELECT UNIX_SECONDS(TIMESTAMP '1969-12-31 23:59:59.5')
+=> "-1"
+
+SELECT UNIX_MILLIS(TIMESTAMP '1969-12-31 23:59:59.9995')
+=> "-1"
+
 ## Date and time arithmetic
 
 SELECT DATE_SUB(DATE '2024-03-01', INTERVAL 1 DAY)
