@@ -1,5 +1,8 @@
+#include <map>
+#include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -11,6 +14,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/table_metadata.h"
 #include "src/translator/internal.h"
 #include "src/type_mapping.h"
 
@@ -78,35 +82,109 @@ bool IfNotExists(const googlesql::ResolvedCreateStatement& create) {
   return create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS;
 }
 
+using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
+
+// The literal an option of a CREATE statement assigns, or nullptr for any other value.
+const googlesql::Value* OptionLiteral(const googlesql::ResolvedOption& option) {
+  if (!option.qualifier().empty() ||
+      option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN ||
+      !option.value()->Is<googlesql::ResolvedLiteral>()) {
+    return nullptr;
+  }
+  return &option.value()->GetAs<googlesql::ResolvedLiteral>()->value();
+}
+
+// A STRING option into `into`; NULL leaves it unset.
+bool StringOption(const googlesql::Value& value, std::string& into) {
+  if (value.is_null()) {
+    into.clear();
+    return true;
+  }
+  if (!value.type()->IsString()) {
+    return false;
+  }
+  into = value.string_value();
+  return true;
+}
+
+// The labels option, an ARRAY<STRUCT<STRING, STRING>> of keys and values, into `into`.
+bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::string>& into) {
+  into.clear();
+  if (value.is_null()) {
+    return true;
+  }
+  const googlesql::Type* type = value.type();
+  if (!type->IsArray() || !type->AsArray()->element_type()->IsStruct()) {
+    return false;
+  }
+  const googlesql::StructType* entry = type->AsArray()->element_type()->AsStruct();
+  if (entry->num_fields() != 2 || !entry->field(0).type->IsString() ||
+      !entry->field(1).type->IsString()) {
+    return false;
+  }
+  for (const googlesql::Value& element : value.elements()) {
+    if (element.is_null() || element.field(0).is_null() || element.field(1).is_null()) {
+      return false;
+    }
+    into[element.field(0).string_value()] = element.field(1).string_value();
+  }
+  return true;
+}
+
+// The description, friendly name and labels the OPTIONS of a CREATE TABLE or CREATE VIEW set.
+// The other options change how BigQuery stores, expires or reads the table, which the emulator
+// does not emulate, so they are unsupported.
+std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
+                                             const Scope& scope) {
+  TableMetadata metadata;
+  for (const auto& option : options) {
+    const std::string name = ToLowerAscii(option->name());
+    const googlesql::Value* value = OptionLiteral(*option);
+    const bool applied =
+        value != nullptr &&
+        ((name == "description" && StringOption(*value, metadata.description)) ||
+         (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
+         (name == "labels" && LabelsOption(*value, metadata.labels)));
+    if (!applied) {
+      return Unsupported(scope, std::string(statement) + " option " + option->name());
+    }
+  }
+  return metadata;
+}
+
 // Records NOT NULL as REQUIRED and the description in OPTIONS on `field`, and the same for the
-// fields of a struct.
-void ApplyAnnotations(const googlesql::Type* type,
-                      const googlesql::ResolvedColumnAnnotations& annotations, FieldSchema& field) {
+// fields of a struct. Other column options are unsupported.
+bool ApplyAnnotations(const googlesql::Type* type,
+                      const googlesql::ResolvedColumnAnnotations& annotations, FieldSchema& field,
+                      const Scope& scope) {
   if (annotations.not_null() && field.mode == FieldMode::kNullable) {
     field.mode = FieldMode::kRequired;
   }
   for (const auto& option : annotations.option_list()) {
-    if (ToLowerAscii(option->name()) != "description" ||
-        !option->value()->Is<googlesql::ResolvedLiteral>()) {
-      continue;
-    }
-    const googlesql::Value& value = option->value()->GetAs<googlesql::ResolvedLiteral>()->value();
-    if (value.type()->IsString() && !value.is_null()) {
-      field.description = value.string_value();
+    const googlesql::Value* value = OptionLiteral(*option);
+    if (ToLowerAscii(option->name()) != "description" || value == nullptr ||
+        !StringOption(*value, field.description)) {
+      Unsupported(scope, "column option " + option->name());
+      return false;
     }
   }
   // An array's one child annotates its elements, which `field` describes too, and a struct's
   // children its fields.
   if (type->IsArray() && annotations.child_list_size() > 0) {
-    ApplyAnnotations(type->AsArray()->element_type(), *annotations.child_list(0), field);
-  } else if (type->IsStruct()) {
+    return ApplyAnnotations(type->AsArray()->element_type(), *annotations.child_list(0), field,
+                            scope);
+  }
+  if (type->IsStruct()) {
     for (int i = 0; i < annotations.child_list_size() &&
                     i < static_cast<int>(field.fields.size()) && i < type->AsStruct()->num_fields();
          ++i) {
-      ApplyAnnotations(type->AsStruct()->field(i).type, *annotations.child_list(i),
-                       field.fields[i]);
+      if (!ApplyAnnotations(type->AsStruct()->field(i).type, *annotations.child_list(i),
+                            field.fields[i], scope)) {
+        return false;
+      }
     }
   }
+  return true;
 }
 
 // Records the parameters of a parameterized type, STRING(10) or NUMERIC(10, 2), on `field`.
@@ -145,7 +223,9 @@ std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition
     return Unsupported(scope, field.status().message());
   }
   if (column.annotations() != nullptr) {
-    ApplyAnnotations(column.type(), *column.annotations(), *field);
+    if (!ApplyAnnotations(column.type(), *column.annotations(), *field, scope)) {
+      return std::nullopt;
+    }
     ApplyTypeParameters(column.type(), column.annotations()->type_parameters(), *field);
   }
   if (column.default_value() != nullptr) {
@@ -155,8 +235,8 @@ std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition
 }
 
 // CREATE [OR REPLACE] TABLE [IF NOT EXISTS] path, shared with CREATE TABLE AS SELECT.
-// Partitioning, clustering and options only shape BigQuery storage, and BigQuery's primary and
-// foreign keys are never enforced, so they are all dropped.
+// Partitioning and clustering only shape BigQuery storage, and BigQuery's primary and foreign
+// keys are never enforced, so they are all dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
@@ -230,10 +310,12 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   }
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
-  if (!head || !target) {
+  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
+  if (!head || !target || !metadata) {
     return std::nullopt;
   }
-  TableDefinition table{.table = *target, .if_not_exists = IfNotExists(create)};
+  TableDefinition table{
+      .table = *target, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
   std::vector<std::string> columns;
   for (const auto& column : create.column_definition_list()) {
     if (column->is_hidden() || column->generated_column_info() != nullptr) {
@@ -283,14 +365,16 @@ std::optional<std::string> CreateTableAsSelect(
   }
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
-  if (!head || !target) {
+  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
+  if (!head || !target || !metadata) {
     return std::nullopt;
   }
   const auto relation = Scan(*create.query(), scope);
   if (!relation) {
     return std::nullopt;
   }
-  TableDefinition table{.table = *target, .if_not_exists = IfNotExists(create)};
+  TableDefinition table{
+      .table = *target, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
@@ -321,11 +405,14 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   const auto path = TargetTable(create.name_path(), scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
   const auto relation = Scan(*create.query(), scope);
-  if (!path || !target || !relation) {
+  auto metadata = OptionsMetadata(create.option_list(), "CREATE VIEW", scope);
+  if (!path || !target || !relation || !metadata) {
     return std::nullopt;
   }
-  ViewDefinition view{
-      .table = *target, .query = create.sql(), .if_not_exists = IfNotExists(create)};
+  ViewDefinition view{.table = *target,
+                      .query = create.sql(),
+                      .metadata = *std::move(metadata),
+                      .if_not_exists = IfNotExists(create)};
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());

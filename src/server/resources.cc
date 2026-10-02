@@ -14,6 +14,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/server/internal.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {
 namespace {
@@ -353,6 +354,7 @@ json TableResource(const TableInfo& info) {
                 {"numRows", std::to_string(info.num_rows)},
                 {"numBytes", "0"},
                 {"location", kLocation}};
+  resource.update(info.metadata.ToJson());
   if (info.view_query) {
     resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
     resource.erase("numRows");
@@ -368,10 +370,18 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   for (const TableListEntry& entry :
        ListPageItems(tables, page, &TableListEntry::table_id, response)) {
     const TableReference table{dataset.project_id, dataset.dataset_id, entry.table_id};
-    entries.push_back(json{{"kind", "bigquery#table"},
-                           {"id", TableId(table)},
-                           {"tableReference", TableReferenceJson(table)},
-                           {"type", TableTypeName(entry.type)}});
+    json item{{"kind", "bigquery#table"},
+              {"id", TableId(table)},
+              {"tableReference", TableReferenceJson(table)},
+              {"type", TableTypeName(entry.type)}};
+    // A list entry carries the friendly name and labels but not the description.
+    if (!entry.metadata.friendly_name.empty()) {
+      item["friendlyName"] = entry.metadata.friendly_name;
+    }
+    if (!entry.metadata.labels.empty()) {
+      item["labels"] = entry.metadata.labels;
+    }
+    entries.push_back(std::move(item));
   }
   response["tables"] = std::move(entries);
   return response;

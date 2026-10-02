@@ -19,6 +19,7 @@
 #include "src/discovery_document.h"
 #include "src/emulator.h"
 #include "src/server/internal.h"
+#include "src/table_metadata.h"
 #include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
@@ -225,9 +226,9 @@ class Server::Impl {
            const TableInsertRequest insert =
                ParseTableInsert(DatasetFromPath(request), ParseBody(request));
            if (insert.view.has_value()) {
-             emulator_.CreateView(insert.table, *insert.view);
+             emulator_.CreateView(insert.table, *insert.view, insert.metadata);
            } else {
-             emulator_.CreateTable(insert.table, insert.schema);
+             emulator_.CreateTable(insert.table, insert.schema, insert.metadata);
            }
            return TableResource(emulator_.GetTable(insert.table));
          }));
@@ -235,16 +236,27 @@ class Server::Impl {
         Json([this](const httplib::Request& request, httplib::Response&) {
           return TableResource(emulator_.GetTable(TableFromPath(request)));
         }));
-    // tables.patch and tables.update differ only in which fields BigQuery keeps when the request
-    // leaves them out; the emulator keeps all of them for both.
-    const auto update_table = Json([this](const httplib::Request& request, httplib::Response&) {
-      const TableReference table = TableFromPath(request);
-      const TableUpdateRequest update = ParseTableUpdate(ParseBody(request));
-      emulator_.UpdateTable(table, update.schema, update.view);
-      return TableResource(emulator_.GetTable(table));
-    });
-    Patch("/projects/:project/datasets/:dataset/tables/:table", update_table);
-    Put("/projects/:project/datasets/:dataset/tables/:table", update_table);
+    // tables.patch and tables.update differ in which fields BigQuery keeps when the request leaves
+    // them out: tables.update replaces the description, friendly name and labels, while
+    // tables.patch keeps what it leaves out. The emulator keeps the schema and view for both.
+    const auto update_table = [this](bool patch) {
+      return Json([this, patch](const httplib::Request& request, httplib::Response&) {
+        const TableReference table = TableFromPath(request);
+        const json body = ParseBody(request);
+        const TableUpdateRequest update = ParseTableUpdate(body);
+        TableMetadata metadata;
+        if (patch) {
+          metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
+          PatchTableMetadata(metadata, body);
+        } else {
+          metadata = TableMetadataFromJson(body);
+        }
+        emulator_.UpdateTable(table, update.schema, update.view, metadata);
+        return TableResource(emulator_.GetTable(table));
+      });
+    };
+    Patch("/projects/:project/datasets/:dataset/tables/:table", update_table(/*patch=*/true));
+    Put("/projects/:project/datasets/:dataset/tables/:table", update_table(/*patch=*/false));
     Delete("/projects/:project/datasets/:dataset/tables/:table",
            Json([this](const httplib::Request& request, httplib::Response& response) {
              emulator_.DeleteTable(TableFromPath(request));

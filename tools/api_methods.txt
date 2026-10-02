@@ -61,14 +61,14 @@ note bigquery.tabledata.list | Ignores `selectedFields` and `formatOptions.times
 
 request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
 request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
-note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference and schema, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0.
+note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference, schema, description, friendly name and labels, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0.
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"v"},"view":{"query":"SELECT id FROM test.d.t","useLegacySql":false}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
-note bigquery.tables.insert | Keeps `tableReference`, `schema` and GoogleSQL view definitions; partitioning, clustering, labels and descriptions are ignored.
+note bigquery.tables.insert | Keeps `tableReference`, `schema`, GoogleSQL view definitions, `description`, `friendlyName` and `labels`; partitioning and clustering are ignored.
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
-note bigquery.tables.patch | Changes `schema` and view definitions only, ignoring other fields such as `description`, `labels` and `expirationTime`. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag.
+note bigquery.tables.patch | Changes `schema`, view definitions, `description`, `friendlyName` and `labels` only, ignoring other fields such as `expirationTime`. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag.
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
-note bigquery.tables.update | Behaves like `tables.patch`: fields the request leaves out, including `schema`, are kept rather than cleared.
+note bigquery.tables.update | Behaves like `tables.patch`, except that it replaces the description, friendly name and labels; `schema` and view definitions the request leaves out are kept rather than cleared.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1

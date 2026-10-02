@@ -72,6 +72,17 @@ cc_library(
 )
 
 cc_library(
+    name = "table_metadata",
+    srcs = ["src/table_metadata.cc"],
+    hdrs = ["src/table_metadata.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "column_metadata",
     srcs = ["src/column_metadata.cc"],
     hdrs = ["src/column_metadata.h"],
@@ -185,6 +196,7 @@ cc_library(
         ":field_schema",
         ":query_parameters",
         ":references",
+        ":table_metadata",
         ":type_mapping",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:function",
@@ -245,6 +257,7 @@ cc_library(
         ":gcs",
         ":query_parameters",
         ":references",
+        ":table_metadata",
         ":temporary_files",
         ":translator",
         ":type_mapping",
@@ -311,6 +324,7 @@ cc_library(
         ":httplib",
         ":query_parameters",
         ":references",
+        ":table_metadata",
         ":temporary_files",
         "@nlohmann_json//:json",
     ],

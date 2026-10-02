@@ -34,6 +34,7 @@
 #include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/table_metadata.h"
 #include "src/temporary_files.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
@@ -160,47 +161,90 @@ std::string DatasetsQuery(const std::string& project) {
       QuoteLiteral(project));
 }
 
-// The tables and views of `dataset` by name, and the type of each.
+// The tables and views of `dataset` by name.
 std::string TablesQuery(const DatasetReference& dataset) {
   return std::format(
-      "SELECT table_name, table_type FROM information_schema.tables WHERE table_catalog = {}"
+      "SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
       " AND table_schema = {} ORDER BY table_name",
       QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
 }
 
-// What the emulator records in a DuckDB view's comment: the GoogleSQL query and its schema.
+// The emulator records a table's TableMetadata as JSON in the comment of its DuckDB table, and a
+// view's in the comment of its DuckDB view, next to the GoogleSQL query and its schema. Like a
+// column comment, it lives and dies with the table, so CREATE OR REPLACE starts it afresh.
 struct ViewMetadata {
   std::string query;
   std::vector<FieldSchema> schema;
+  TableMetadata metadata;
 };
 
-// The comment of the DuckDB view `table`, which is NULL when it has none, or nothing when
-// `table` is not a view.
-std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
-  const QueryResult views = backend.Execute(
-      std::format("SELECT comment FROM duckdb_views()"
-                  " WHERE database_name = {} AND schema_name = {} AND view_name = {}",
-                  QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
-                  QuoteLiteral(table.table_id)));
-  if (views.rows.empty()) {
+// The comment of `table` in `relations`, duckdb_tables() or duckdb_views(), whose `name` column
+// names it. The comment is NULL when it has none, and nothing is returned when there is no such
+// table or view.
+std::optional<json> RelationComment(Backend& backend, std::string_view relations,
+                                    std::string_view name, const TableReference& table) {
+  const QueryResult result = backend.Execute(std::format(
+      "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}", relations,
+      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), name,
+      QuoteLiteral(table.table_id)));
+  if (result.rows.empty()) {
     return std::nullopt;
   }
-  return views.rows[0]["f"][0]["v"];
+  return result.rows[0]["f"][0]["v"];
+}
+
+std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
+  return RelationComment(backend, "duckdb_views()", "view_name", table);
+}
+
+// The JSON object a comment holds, or null for a comment the emulator did not write.
+json ParseComment(const json& comment) {
+  if (!comment.is_string()) {
+    return nullptr;
+  }
+  json parsed = json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
+  return parsed.is_object() ? parsed : json(nullptr);
+}
+
+// The metadata a table or view comment records, or none for a comment of someone else's.
+TableMetadata CommentMetadata(const json& comment) {
+  const json object = ParseComment(comment);
+  if (object.is_null()) {
+    return {};
+  }
+  try {
+    return TableMetadataFromJson(object);
+  } catch (const ApiError&) {
+    return {};
+  }
+}
+
+// The statement that records `metadata` on the DuckDB table `table`.
+std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata) {
+  ValidateLabels(metadata.labels);
+  return std::format("COMMENT ON TABLE {} IS {}", QualifiedName(table),
+                     metadata.empty() ? "NULL" : QuoteLiteral(metadata.ToJson().dump()));
+}
+
+// The statement that records `view` on the DuckDB view `table`.
+std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
+  ValidateLabels(view.metadata.labels);
+  json comment = view.metadata.ToJson();
+  comment["query"] = view.query;
+  comment["fields"] = SchemaToJson(view.schema).at("fields");
+  return std::format("COMMENT ON VIEW {} IS {}", QualifiedName(table),
+                     QuoteLiteral(comment.dump()));
 }
 
 // Parses a view comment, or returns nothing for a view the emulator did not create, which has
 // no comment or a comment of its own.
 std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
-  if (!comment.is_string()) {
-    return std::nullopt;
-  }
-  const json metadata =
-      json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
+  const json metadata = ParseComment(comment);
   if (!metadata.is_object() || !metadata.contains("query") || !metadata["query"].is_string() ||
       !metadata.contains("fields") || !metadata["fields"].is_array()) {
     return std::nullopt;
   }
-  ViewMetadata view{metadata["query"].get<std::string>(), {}};
+  ViewMetadata view{metadata["query"].get<std::string>(), {}, CommentMetadata(comment)};
   try {
     for (const json& field : metadata["fields"]) {
       view.schema.push_back(FieldSchemaFromJson(field));
@@ -228,13 +272,12 @@ std::string TableExists(const TableReference& table) {
 
 DdlWrite CreateViewWrite(const ViewDefinition& view) {
   const TableReference& table = view.table;
-  const json metadata{{"query", view.query}, {"fields", SchemaToJson(view.schema).at("fields")}};
   DdlWrite write;
   // DuckDB can create a circular view and only reject it when queried. Bind the new definition
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-      std::format("COMMENT ON VIEW {} IS {}", QualifiedName(table), QuoteLiteral(metadata.dump()))};
+      ViewCommentStatement(table, {view.query, view.schema, view.metadata})};
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);
   }
@@ -246,6 +289,10 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
                      ColumnCommentStatements(definition.table, definition.schema)};
   std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
                     std::back_inserter(write.metadata_statements));
+  if (!definition.metadata.empty()) {
+    write.metadata_statements.push_back(
+        TableCommentStatement(definition.table, definition.metadata));
+  }
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
   }
@@ -1089,10 +1136,19 @@ std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
 
 std::vector<TableListEntry> Emulator::ListTableEntries(const DatasetReference& dataset) {
   GetDataset(dataset);
+  const std::string where =
+      std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
+                  QuoteLiteral(dataset.dataset_id));
   std::vector<TableListEntry> entries;
-  for (const json& row : Execute(TablesQuery(dataset)).rows) {
+  for (const json& row :
+       Execute(std::format("SELECT table_name, 'TABLE', comment FROM duckdb_tables() {}"
+                           " UNION ALL SELECT view_name, 'VIEW', comment FROM duckdb_views() {}"
+                           " ORDER BY 1",
+                           where, where))
+           .rows) {
     entries.push_back({.table_id = row["f"][0]["v"].get<std::string>(),
-                       .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable});
+                       .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable,
+                       .metadata = CommentMetadata(row["f"][2]["v"])});
   }
   return entries;
 }
@@ -1110,10 +1166,13 @@ TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count
     }
     info.view_query = std::move(metadata->query);
     info.schema = std::move(metadata->schema);
+    info.metadata = std::move(metadata->metadata);
     return info;
   }
   try {
     info.schema = TableSchema(backend_, table);
+    info.metadata = CommentMetadata(
+        RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(nullptr));
     if (include_row_count) {
       const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
       info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
@@ -1125,13 +1184,15 @@ TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count
   return info;
 }
 
-void Emulator::CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema) {
+void Emulator::CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema,
+                           const TableMetadata& metadata) {
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
     columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
   }
-  const DdlWrite write = CreateTableWrite(TableDefinition{.table = table, .schema = schema});
+  const DdlWrite write =
+      CreateTableWrite(TableDefinition{.table = table, .schema = schema, .metadata = metadata});
   try {
     backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + columns + ")",
                         write.metadata_statements, write.skip_query);
@@ -1144,13 +1205,15 @@ void Emulator::CreateTable(const TableReference& table, const std::vector<FieldS
   }
 }
 
-void Emulator::CreateView(const TableReference& table, const json& definition) {
-  WriteView(table, definition, /*replace=*/false);
+void Emulator::CreateView(const TableReference& table, const json& definition,
+                          const TableMetadata& metadata) {
+  WriteView(table, definition, metadata, /*replace=*/false);
 }
 
 void Emulator::UpdateTable(const TableReference& table,
                            const std::optional<std::vector<FieldSchema>>& schema,
-                           const std::optional<json>& view) {
+                           const std::optional<json>& view,
+                           const std::optional<TableMetadata>& metadata) {
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
     if (schema.has_value()) {
@@ -1161,19 +1224,23 @@ void Emulator::UpdateTable(const TableReference& table,
       // Every view the emulator keeps is GoogleSQL.
       json definition = {{"query", *info.view_query}, {"useLegacySql", false}};
       definition.update(*view);
-      WriteView(table, definition, /*replace=*/true);
+      WriteView(table, definition, metadata.value_or(info.metadata), /*replace=*/true);
+    } else if (metadata.has_value()) {
+      Execute(ViewCommentStatement(table, {*info.view_query, info.schema, *metadata}));
     }
     return;
   }
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
   }
-  if (!schema.has_value()) {
-    return;
-  }
   std::vector<std::string> statements;
-  SchemaUpdateStatements(table, "", "", info.schema, *schema, statements);
-  std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
+  if (schema.has_value()) {
+    SchemaUpdateStatements(table, "", "", info.schema, *schema, statements);
+    std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
+  }
+  if (metadata.has_value()) {
+    statements.push_back(TableCommentStatement(table, *metadata));
+  }
   if (statements.empty()) {
     return;
   }
@@ -1184,7 +1251,8 @@ void Emulator::UpdateTable(const TableReference& table,
   }
 }
 
-void Emulator::WriteView(const TableReference& table, const json& definition, bool replace) {
+void Emulator::WriteView(const TableReference& table, const json& definition,
+                         const TableMetadata& metadata, bool replace) {
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   if (definition.value("useLegacySql", true)) {
     throw ApiError::Invalid("The emulator does not support legacy SQL views");
@@ -1206,8 +1274,9 @@ void Emulator::WriteView(const TableReference& table, const json& definition, bo
     if (!translation.view.has_value()) {
       throw ApiError::Internal("CREATE VIEW was not translated to a view");
     }
-    backend_.ExecuteDdl(translation.sql, CreateViewWrite(*translation.view).metadata_statements,
-                        "");
+    ViewDefinition view = *translation.view;
+    view.metadata = metadata;
+    backend_.ExecuteDdl(translation.sql, CreateViewWrite(view).metadata_statements, "");
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {
       throw ApiError::Duplicate("Already Exists: Table " + TableName(table));

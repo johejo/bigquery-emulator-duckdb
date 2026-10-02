@@ -7,6 +7,7 @@
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 
 namespace googlesql {
 class ResolvedStatement;
@@ -22,19 +23,22 @@ struct DefaultDataset {
 };
 
 // The view a CREATE VIEW defines, which the emulator records next to the DuckDB view: DuckDB
-// keeps neither the GoogleSQL query nor its BigQuery schema.
+// keeps neither the GoogleSQL query, its BigQuery schema nor the metadata its OPTIONS give.
 struct ViewDefinition {
   TableReference table;
   std::string query;
   std::vector<FieldSchema> schema;
+  TableMetadata metadata;
   bool if_not_exists = false;
 };
 
 // The table a CREATE TABLE [AS SELECT] defines, whose BigQuery schema the emulator records with
-// it: the declared types, NOT NULL as REQUIRED, type parameters, defaults and descriptions.
+// it: the declared types, NOT NULL as REQUIRED, type parameters, defaults and descriptions, and
+// the description, friendly name and labels its OPTIONS give.
 struct TableDefinition {
   TableReference table;
   std::vector<FieldSchema> schema;
+  TableMetadata metadata;
   bool if_not_exists = false;
 };
 

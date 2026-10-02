@@ -19,8 +19,8 @@ what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 3 |
-| Supported | 53 |
+| Partial | 5 |
+| Supported | 51 |
 | Unsupported | 22 |
 
 ## Queries
@@ -88,7 +88,7 @@ what it rejected.
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported | NOT NULL in CREATE TABLE AS SELECT |
-| Table and column options | Supported | Accepted and dropped |
+| Table and column options | Partial | Stores the description, friendly name and labels of tables and the description of columns; CREATE TABLE option expiration_timestamp; column option rounding_mode |
 | Partitioning and clustering | Supported | Accepted and dropped |
 | Primary and foreign keys | Supported | Accepted and dropped; BigQuery does not enforce them either |
 | Collation | Unsupported | COLLATE |
@@ -100,12 +100,12 @@ what it rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |
 | `CREATE EXTERNAL TABLE` | Unsupported | statement CreateExternalTableStmt |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options are ignored; defaults, generated columns and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE action DropColumnAction; ALTER TABLE action RenameToAction; ALTER TABLE with multiple actions; statement AlterTableSetOptionsStmt |
+| `ALTER TABLE` | Partial | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE action DropColumnAction; ALTER TABLE action RenameToAction; ALTER TABLE with multiple actions; statement AlterTableSetOptionsStmt |
 | `CREATE SCHEMA` | Supported |  |
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Unsupported | statement AlterSchemaStmt |
-| `CREATE VIEW` | Supported | Stores the GoogleSQL definition and schema; view options are ignored. Temporary, recursive and value-table views are unsupported. |
+| `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views are unsupported.; CREATE VIEW option expiration_timestamp |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |
 | `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |

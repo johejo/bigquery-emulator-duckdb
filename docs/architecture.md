@@ -65,3 +65,7 @@ Logical views are native DuckDB views with translated SQL and explicit GoogleSQL
 Their DuckDB comments hold the original GoogleSQL query and result schema as JSON. Creation and
 metadata writes share a transaction, so replacement failures preserve the previous definition.
 This metadata survives restarts and serves the REST API without executing the view.
+
+BigQuery metadata that DuckDB types cannot carry lives in DuckDB comments as JSON: each column's
+TableFieldSchema in its column comment, and a table's description, friendly name and labels in
+its table comment, or in its view comment next to the query.
