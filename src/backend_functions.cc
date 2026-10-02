@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -16,6 +17,7 @@
 #include "googlesql/public/functions/hash.h"
 #include "googlesql/public/functions/json.h"
 #include "googlesql/public/functions/json_internal.h"
+#include "googlesql/public/functions/math.h"
 #include "googlesql/public/functions/regexp.h"
 #include "googlesql/public/functions/string.h"
 #include "googlesql/public/json_value.h"
@@ -39,6 +41,11 @@ class Arguments {
 
   [[nodiscard]] int64_t Int(idx_t column) const {
     return static_cast<int64_t*>(
+        duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
+  }
+
+  [[nodiscard]] double Double(idx_t column) const {
+    return static_cast<double*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
   }
 
@@ -117,6 +124,39 @@ absl::StatusOr<T> ToStatusOr(bool ok, T value, const absl::Status& error) {
     return error;
   }
   return value;
+}
+
+// A FLOAT64 function of one argument, such as SQRT, which fails where GoogleSQL's does.
+template <bool (*kFunction)(double, double*, absl::Status*)>
+void Math(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    double out = 0;
+    absl::Status error;
+    const bool ok = kFunction(arguments.Double(0), &out, &error);
+    return ToStatusOr(ok, out, error);
+  });
+}
+
+// A FLOAT64 function of two arguments, such as POW.
+template <bool (*kFunction)(double, double, double*, absl::Status*)>
+void Math2(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    double out = 0;
+    absl::Status error;
+    const bool ok = kFunction(arguments.Double(0), arguments.Double(1), &out, &error);
+    return ToStatusOr(ok, out, error);
+  });
+}
+
+// REPEAT, which is byte for byte for STRING as for BYTES.
+void Repeat(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    std::string out;
+    absl::Status error;
+    const bool ok =
+        googlesql::functions::Repeat(arguments.String(0), arguments.Int(1), &out, &error);
+    return ToStatusOr(ok, out, error);
+  });
 }
 
 void FarmFingerprint(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -436,6 +476,37 @@ void RegisterBackendFunctions(duckdb_database database) {
   constexpr duckdb_type kVarchar = DUCKDB_TYPE_VARCHAR;
   constexpr duckdb_type kBigint = DUCKDB_TYPE_BIGINT;
   constexpr duckdb_type kBoolean = DUCKDB_TYPE_BOOLEAN;
+  constexpr duckdb_type kDouble = DUCKDB_TYPE_DOUBLE;
+  namespace fn = googlesql::functions;
+  for (const auto& [name, function] :
+       std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
+           {"bq_sqrt", Math<fn::Sqrt<double>>},
+           {"bq_cbrt", Math<fn::Cbrt<double>>},
+           {"bq_exp", Math<fn::Exp<double>>},
+           {"bq_ln", Math<fn::NaturalLogarithm<double>>},
+           {"bq_log10", Math<fn::DecimalLogarithm<double>>},
+           {"bq_sin", Math<fn::Sin<double>>},
+           {"bq_cos", Math<fn::Cos<double>>},
+           {"bq_tan", Math<fn::Tan<double>>},
+           {"bq_asin", Math<fn::Asin<double>>},
+           {"bq_acos", Math<fn::Acos<double>>},
+           {"bq_sinh", Math<fn::Sinh<double>>},
+           {"bq_cosh", Math<fn::Cosh<double>>},
+           {"bq_acosh", Math<fn::Acosh<double>>},
+           {"bq_atanh", Math<fn::Atanh<double>>},
+           {"bq_csc", Math<fn::Csc<double>>},
+           {"bq_sec", Math<fn::Sec<double>>},
+           {"bq_cot", Math<fn::Cot<double>>},
+           {"bq_csch", Math<fn::Csch<double>>},
+           {"bq_sech", Math<fn::Sech<double>>},
+           {"bq_coth", Math<fn::Coth<double>>},
+       }) {
+    Register(connection.get(), name, {kDouble}, kDouble, function);
+  }
+  Register(connection.get(), "bq_repeat", {kVarchar, kBigint}, kVarchar, Repeat);
+  Register(connection.get(), "bq_repeat_bytes", {kBlob, kBigint}, kBlob, Repeat);
+  Register(connection.get(), "bq_pow", {kDouble, kDouble}, kDouble, Math2<fn::Pow<double>>);
+  Register(connection.get(), "bq_log", {kDouble, kDouble}, kDouble, Math2<fn::Logarithm<double>>);
   Register(connection.get(), "bq_farm_fingerprint", {kBlob}, kBigint, FarmFingerprint);
   Register(connection.get(), "bq_sha512", {kBlob}, kBlob, Sha512);
   Register(connection.get(), "bq_initcap", {kVarchar}, kVarchar, InitCap);
@@ -452,7 +523,7 @@ void RegisterBackendFunctions(duckdb_database database) {
            LaxConvert<bool, googlesql::functions::LaxConvertJsonToBool>);
   Register(connection.get(), "bq_lax_int64", {kVarchar}, kBigint,
            LaxConvert<int64_t, googlesql::functions::LaxConvertJsonToInt64>);
-  Register(connection.get(), "bq_lax_float64", {kVarchar}, DUCKDB_TYPE_DOUBLE,
+  Register(connection.get(), "bq_lax_float64", {kVarchar}, kDouble,
            LaxConvert<double, googlesql::functions::LaxConvertJsonToFloat64>);
   Register(connection.get(), "bq_lax_string", {kVarchar}, kVarchar,
            LaxConvert<std::string, googlesql::functions::LaxConvertJsonToString>);

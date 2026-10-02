@@ -219,15 +219,10 @@ std::string RoundHalfEven() {
          ")) = 0 THEN " + toward + " ELSE " + away + " END";
 }
 
-// The reciprocal of a DuckDB function, which BigQuery reports as an error at zero where DuckDB
-// returns infinity.
-std::vector<Rule> Reciprocal(std::string_view function) {
-  const std::string value = std::string(function) + "($1)";
-  return {{1,
-           "CASE WHEN " + value + " = 0 THEN !1 ELSE 1 / " + value + " END",
-           {},
-           {},
-           {"'Floating point error: division by zero'"}}};
+// A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers. The NUMERIC
+// and BIGNUMERIC overloads are left out: going through FLOAT64 would lose their precision.
+std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
+  return Same(function, arity, {Is(1, {TYPE_DOUBLE})});
 }
 
 // INTERVAL n PART resolves to two arguments, the count and the date part. The three argument
@@ -391,9 +386,32 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // make the zero itself disappear.
       {"SAFE_DIVIDE", {{2, "($1 / NULLIF($2, 0))"}}},
       {"IEEE_DIVIDE", {{2, "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
-      // DuckDB's log() is the base 10 logarithm, BigQuery's LOG() the natural one, and the two
-      // argument form takes the base first rather than last.
-      {"LOG", {{1, "ln($1)"}, {2, "log($2, $1)"}}},
+      // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
+      // in DuckDB where it is 0 in BigQuery.
+      {"MOD",
+       {{2,
+         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 WHEN $2 = -1 THEN 0 "
+         "ELSE mod($1, $2) END",
+         {Is(1, {TYPE_INT64})},
+         {},
+         {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}},
+        {2,
+         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE mod($1, $2) END",
+         {},
+         {},
+         {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}}}},
+      // DuckDB's divide() of DECIMAL values returns a DOUBLE, so only INT64 is supported.
+      {"DIV",
+       {{2,
+         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE divide($1, $2) "
+         "END",
+         {Is(1, {TYPE_INT64})},
+         {},
+         {"'division by zero: ' || $1 || ' / ' || $2"}}}},
+      // DuckDB's sign() is 0 for NaN.
+      {"SIGN",
+       {{1, "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END", {Is(1, {TYPE_DOUBLE})}},
+        {1, "sign($1)"}}},
       // DuckDB takes the digits as an INTEGER.
       // DuckDB rounds halfway values away from zero, and its round_even() goes through
       // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
@@ -404,11 +422,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
         {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
         {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}}}},
       {"TRUNC", {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}},
-      {"SEC", Reciprocal("cos")},
-      {"CSC", Reciprocal("sin")},
-      {"SECH", Reciprocal("cosh")},
-      {"CSCH", Reciprocal("sinh")},
-      {"COTH", Reciprocal("tanh")},
       // DuckDB cannot cast an empty BLOB to BIT.
       {"BIT_COUNT",
        {{1, "bit_count($1)", {Is(1, {TYPE_INT64})}},
@@ -478,7 +491,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
       // to arrive at the instant BigQuery means.
-      {"UNIX_SECONDS", {{1, "CAST(epoch($1) AS BIGINT)"}}},
+      // Both round down, where casting epoch() rounds to the nearest second and epoch_ms()
+      // truncates toward zero.
+      {"UNIX_SECONDS", {{1, "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"}}},
+      {"UNIX_MILLIS", {{1, "epoch_ms(date_trunc('millisecond', $1))"}}},
       {"UNIX_DATE", {{1, "date_diff('day', DATE '1970-01-01', $1)"}}},
       {"TIMESTAMP_MILLIS", {{1, "(epoch_ms($1) AT TIME ZONE 'UTC')"}}},
       {"TIMESTAMP_MICROS", {{1, "(make_timestamp($1) AT TIME ZONE 'UTC')"}}},
@@ -646,6 +662,34 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 // src/backend_functions.cc registers as bq_* DuckDB functions.
 const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
+      // infinities where BigQuery raises errors, such as EXP(1000).
+      {"SQRT", Float64("bq_sqrt")},
+      {"CBRT", Float64("bq_cbrt")},
+      {"POW", Float64("bq_pow", 2)},
+      {"POWER", Float64("bq_pow", 2)},
+      {"EXP", Float64("bq_exp")},
+      {"LN", Float64("bq_ln")},
+      {"LOG10", Float64("bq_log10")},
+      {"LOG", Concat({Float64("bq_ln"), Float64("bq_log", 2)})},
+      {"SIN", Float64("bq_sin")},
+      {"COS", Float64("bq_cos")},
+      {"TAN", Float64("bq_tan")},
+      {"ASIN", Float64("bq_asin")},
+      {"ACOS", Float64("bq_acos")},
+      {"SINH", Float64("bq_sinh")},
+      {"COSH", Float64("bq_cosh")},
+      {"ACOSH", Float64("bq_acosh")},
+      {"ATANH", Float64("bq_atanh")},
+      {"CSC", Float64("bq_csc")},
+      {"SEC", Float64("bq_sec")},
+      {"COT", Float64("bq_cot")},
+      {"CSCH", Float64("bq_csch")},
+      {"SECH", Float64("bq_sech")},
+      {"COTH", Float64("bq_coth")},
+      {"REPEAT",
+       {{2, "bq_repeat($1, $2)", {Is(1, {TYPE_STRING})}},
+        {2, "bq_repeat_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
       // encode() takes a STRING's UTF-8 bytes.
       {"SHA512",
        {{1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
@@ -687,7 +731,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
 const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
   static const auto* const kNames = new std::unordered_map<std::string_view, std::string_view>{
       {"CONTAINS_SUBSTR", "contains"},
-      {"DIV", "divide"},
       {"FORMAT", "printf"},
       {"GENERATE_UUID", "uuid"},
       {"IS_INF", "isinf"},
@@ -696,7 +739,6 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
       {"RAND", "random"},
       {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
-      {"UNIX_MILLIS", "epoch_ms"},
   };
   return *kNames;
 }
@@ -706,14 +748,9 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
 // with different semantics. Extend this list with execution coverage.
 const std::unordered_set<std::string_view>& PlainFunctions() {
   static const auto* const kPlain = new std::unordered_set<std::string_view>{
-      "ABS",    "SIGN",   "CEIL",         "CEILING",     "FLOOR",
-      "SQRT",   "POW",    "POWER",        "EXP",         "LN",
-      "LOG10",  "MOD",    "GREATEST",     "LEAST",       "IF",
-      "IFNULL", "NULLIF", "COALESCE",     "CHAR_LENGTH", "CHARACTER_LENGTH",
-      "CONCAT", "REPEAT", "ARRAY_LENGTH", "SIN",         "COS",
-      "TAN",    "ASIN",   "ACOS",         "ATAN",        "ATAN2",
-      "TANH",   "ASINH",  "CBRT",         "ACOSH",       "ATANH",
-      "SINH",   "COSH",   "COT"};
+      "ABS",          "CEIL",   "CEILING",  "FLOOR",       "IF",
+      "IFNULL",       "NULLIF", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH",
+      "ARRAY_LENGTH", "ATAN",   "ATAN2",    "TANH",        "ASINH"};
   return *kPlain;
 }
 
@@ -745,6 +782,9 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"JSON_SET", JsonSet},
       {"JSON_OBJECT", JsonObject},
       {"ARRAY_CONCAT", ArrayConcat},
+      {"CONCAT", ConcatStrings},
+      {"GREATEST", Extremum},
+      {"LEAST", Extremum},
   };
   return *kHandlers;
 }

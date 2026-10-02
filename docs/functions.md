@@ -34,16 +34,16 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 16 |
-| Supported | 219 |
+| Partial | 25 |
+| Supported | 210 |
 | Unsupported | 158 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
 | --- | --- | --- | --- | --- |
 | [`ABS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#abs) | mathematical_functions | Supported | DuckDB function |  |
-| [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported | DuckDB function |  |
-| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported | DuckDB function |  |
+| [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Unsupported |  | function DECRYPT_BYTES |
 | [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Unsupported |  | function DECRYPT_STRING |
 | [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Unsupported |  | function ENCRYPT |
@@ -65,11 +65,11 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | array_functions | Supported |  |  |
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Supported | DuckDB SQL |  |
 | [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Supported | DuckDB SQL |  |
-| [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported | DuckDB function |  |
+| [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | DuckDB function |  |
-| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | DuckDB function |  |
+| [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
@@ -80,7 +80,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | string_functions | Supported | DuckDB SQL | counts the bytes of a STRING's UTF-8 encoding |
 | [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | conditional_expressions | Supported |  |  |
 | [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | conversion_functions | Partial |  | CAST with FORMAT, time zone or type parameters |
-| [`CBRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cbrt) | mathematical_functions | Supported | DuckDB function |  |
+| [`CBRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cbrt) | mathematical_functions | Partial | GoogleSQL function | function CBRT |
 | [`CEIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceil) | mathematical_functions | Supported | DuckDB function |  |
 | [`CEILING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ceiling) | mathematical_functions | Supported | DuckDB function |  |
 | [`CHANGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#changes) | time-series-functions | Unsupported |  | the analyzer does not know this function |
@@ -91,20 +91,20 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | string_functions | Supported | DuckDB SQL |  |
 | [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | string_functions | Supported | DuckDB SQL |  |
 | [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | string_functions | Unsupported |  | the analyzer does not know this function |
-| [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported | DuckDB function |  |
+| [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported | DuckDB function, renamed |  |
 | [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
-| [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported | DuckDB function |  |
-| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported | DuckDB function |  |
+| [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`COSINE_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosine_distance) | mathematical_functions | Unsupported |  | function COSINE_DISTANCE |
-| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Supported | DuckDB function |  |
-| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`COT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cot) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | aggregate-dp-functions, aggregate_functions | Supported | DuckDB aggregate |  |
 | [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
-| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`CUME_DIST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#cume_dist) | numbering_functions | Supported | DuckDB window function |  |
 | [`CURRENT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#current_date) | date_functions | Supported | DuckDB SQL |  |
 | [`CURRENT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#current_datetime) | datetime_functions | Supported | DuckDB SQL |  |
@@ -128,7 +128,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_BYTES |
 | [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_STRING |
 | [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_ENCRYPT |
-| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Supported | DuckDB function, renamed |  |
+| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Partial | DuckDB SQL | function DIV |
 | [`DLP_DETERMINISTIC_DECRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_decrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
 | [`DLP_DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_encrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
 | [`DLP_KEY_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_key_chain) | dlp_functions | Unsupported |  | the analyzer does not know this function |
@@ -138,7 +138,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | string_functions | Supported | DuckDB SQL |  |
 | [`ERROR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/debugging_functions#error) | debugging_functions | Supported | DuckDB SQL |  |
 | [`EUCLIDEAN_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#euclidean_distance) | mathematical_functions | Unsupported |  | function EUCLIDEAN_DISTANCE |
-| [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported | DuckDB function |  |
+| [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Partial | GoogleSQL function | function EXP |
 | [`EXTERNAL_OBJECT_TRANSFORM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in#external_object_transform) | table-functions-built-in | Unsupported |  | the analyzer does not know this function |
 | [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | federated_query_functions | Unsupported |  | the analyzer does not know this function |
 | [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
@@ -160,7 +160,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported | DuckDB SQL |  |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported | DuckDB function, renamed |  |
-| [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported | DuckDB function |  |
+| [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported | DuckDB SQL, in code |  |
 | [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | aggregate_functions | Supported |  |  |
 | [`HLL_COUNT.EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countextract) | hll_functions | Unsupported |  | function EXTRACT |
 | [`HLL_COUNT.INIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countinit) | hll_functions | Unsupported |  | aggregate or analytic function INIT |
@@ -228,12 +228,12 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | json_functions | Supported | GoogleSQL function |  |
 | [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | json_functions | Supported | GoogleSQL function |  |
 | [`LEAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lead) | navigation_functions | Supported | DuckDB window function |  |
-| [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported | DuckDB function |  |
+| [`LEAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#least) | mathematical_functions | Supported | DuckDB SQL, in code |  |
 | [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | string_functions | Supported | DuckDB SQL |  |
 | [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | string_functions | Supported | DuckDB SQL | counts characters of a STRING and bytes of a BYTES |
-| [`LN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ln) | mathematical_functions | Supported | DuckDB function |  |
-| [`LOG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Supported | DuckDB function |  |
+| [`LN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#ln) | mathematical_functions | Partial | GoogleSQL function | function LN |
+| [`LOG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log) | mathematical_functions | Partial | GoogleSQL function | function LOG |
+| [`LOG10`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#log10) | mathematical_functions | Partial | GoogleSQL function | function LOG10 |
 | [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Supported | DuckDB SQL |  |
@@ -245,7 +245,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported | DuckDB SQL |  |
 | [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported | DuckDB aggregate |  |
-| [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported | DuckDB function |  |
+| [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported |  | function HOST |
 | [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported | DuckDB SQL |  |
 | [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported | DuckDB SQL |  |
@@ -280,8 +280,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`PERCENTILE_CONT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_cont) | aggregate-dp-functions, navigation_functions | Unsupported |  | aggregate or analytic function PERCENTILE_CONT |
 | [`PERCENTILE_DISC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_disc) | navigation_functions | Unsupported |  | aggregate or analytic function PERCENTILE_DISC |
 | [`PERCENT_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#percent_rank) | numbering_functions | Supported | DuckDB window function |  |
-| [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Supported | DuckDB function |  |
-| [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported | DuckDB function |  |
+| [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Partial | GoogleSQL function | function POW |
+| [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Partial | GoogleSQL function | function POW |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported | DuckDB function, renamed |  |
 | [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported |  | type RANGE<DATE> |
 | [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Unsupported |  | function RANGE_BUCKET |
@@ -298,7 +298,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Supported | GoogleSQL function |  |
 | [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | DuckDB SQL | function REGEXP_REPLACE |
 | [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
-| [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported | DuckDB function |  |
+| [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported | GoogleSQL function |  |
 | [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Supported | DuckDB SQL |  |
 | [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Supported | DuckDB SQL |  |
 | [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | string_functions | Supported | DuckDB SQL |  |
@@ -316,19 +316,19 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SAFE_NEGATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_negate) | mathematical_functions | Supported | SAFE. operator |  |
 | [`SAFE_SUBTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_subtract) | mathematical_functions | Supported | SAFE. operator |  |
 | [`SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search) | search_functions | Unsupported |  | the analyzer does not know this function |
-| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported |  | function SESSION_USER |
 | [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported | DuckDB SQL |  |
 | [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported | DuckDB SQL |  |
 | [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Supported | GoogleSQL function |  |
-| [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported | DuckDB function |  |
-| [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported | DuckDB function |  |
-| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported | DuckDB function |  |
+| [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported | DuckDB SQL |  |
+| [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported |  | function SOUNDEX |
 | [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested |  | no sample for <graph_edge> |
 | [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported | DuckDB SQL |  |
-| [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported | DuckDB function |  |
+| [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Partial | GoogleSQL function | function SQRT |
 | [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Supported | DuckDB SQL |  |
 | [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
@@ -408,7 +408,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Supported | DuckDB SQL | starts at the first character for a position of 0 or before the start |
 | [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | DuckDB SQL | starts at the first character for a position of 0 or before the start |
 | [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
-| [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported | DuckDB function |  |
+| [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported | DuckDB function |  |
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
@@ -439,7 +439,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | string_functions | Supported | DuckDB SQL |  |
 | [`UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date) | date_functions | Supported | DuckDB SQL |  |
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | timestamp_functions | Supported | DuckDB function, renamed |  |
-| [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported | DuckDB function, renamed |  |
+| [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Supported | DuckDB SQL |  |
 | [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
