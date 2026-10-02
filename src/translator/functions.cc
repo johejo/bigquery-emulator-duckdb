@@ -460,9 +460,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {Is(1, {TYPE_BYTES})}}}},
       {"CODE_POINTS_TO_STRING", CodePointsTo(TYPE_STRING)},
       {"CODE_POINTS_TO_BYTES", CodePointsTo(TYPE_BYTES)},
-      // REGEXP_REPLACE replaces every occurrence; DuckDB needs the global flag for that.
-      {"REGEXP_REPLACE", {{3, "regexp_replace($1, $2, $3, 'g')", {Is(1, {TYPE_STRING})}}}},
-      {"REGEXP_CONTAINS", {{2, "regexp_matches($1, $2)", {Is(1, {TYPE_STRING})}}}},
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
@@ -627,6 +624,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
          "bq_edit_distance_bytes($1, $2, $3)",
          {Is(1, {TYPE_BYTES})},
          {"9223372036854775807"}}}},
+      // Regular expressions. DuckDB raises no error for a replacement that refers to a missing
+      // group, and returns '' or NULL elements where a capturing group takes no part in a match.
+      {"REGEXP_CONTAINS", Strings("bq_regexp_contains", 2)},
+      {"REGEXP_REPLACE", Strings("bq_regexp_replace", 3)},
+      {"REGEXP_EXTRACT",
+       {{{2, 4}, "bq_regexp_extract($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
+        {{2, 4}, "bq_regexp_extract_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}}}},
+      {"REGEXP_EXTRACT_ALL", Strings("bq_regexp_extract_all", 2)},
       {"REGEXP_INSTR",
        {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {TYPE_STRING})}, {"1", "1", "0"}},
         {{2, 5},
@@ -688,8 +693,6 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"DATE_BUCKET", Bucket},
       {"DATETIME_BUCKET", Bucket},
       {"TIMESTAMP_BUCKET", Bucket},
-      {"REGEXP_EXTRACT", RegexpExtract},
-      {"REGEXP_EXTRACT_ALL", RegexpExtract},
       {"JSON_QUERY", JsonExtract},
       {"JSON_EXTRACT", JsonExtract},
       {"JSON_VALUE", JsonExtract},

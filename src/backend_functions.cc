@@ -263,36 +263,122 @@ void EditDistance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
+// Sets each row to what `compute` returns for the row's arguments and its regular expression,
+// the second argument, which GoogleSQL compiles as UTF-8 for STRING or as bytes for BYTES.
+template <bool kBytes, typename Compute>
+void WithRegExp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
+                Compute compute) {
+  EachRow(info, input, output, [&compute](const Arguments& arguments) {
+    const std::string pattern = arguments.String(1);
+    const auto regexp = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
+                               : googlesql::functions::MakeRegExpUtf8(pattern);
+    using Result = decltype(compute(**regexp, arguments));
+    if (!regexp.ok()) {
+      return Result(regexp.status());
+    }
+    return compute(**regexp, arguments);
+  });
+}
+
+constexpr googlesql::functions::RegExp::PositionUnit PositionUnit(bool bytes) {
+  return bytes ? googlesql::functions::RegExp::kBytes : googlesql::functions::RegExp::kUtf8Chars;
+}
+
+template <bool kBytes>
+void RegexpContains(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithRegExp<kBytes>(info, input, output,
+                     [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
+                       bool out = false;
+                       absl::Status error;
+                       const bool ok = regexp.Contains(arguments.String(0), &out, &error);
+                       return ToStatusOr(ok, out, error);
+                     });
+}
+
+// REGEXP_REPLACE(source, regexp, replacement).
+template <bool kBytes>
+void RegexpReplace(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithRegExp<kBytes>(info, input, output,
+                     [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
+                       std::string out;
+                       absl::Status error;
+                       const bool ok =
+                           regexp.Replace(arguments.String(0), arguments.String(2), &out, &error);
+                       return ToStatusOr(ok, out, error);
+                     });
+}
+
+// REGEXP_EXTRACT(source, regexp, position, occurrence), which is NULL without a match or when
+// the capturing group takes no part in it.
+template <bool kBytes>
+void RegexpExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithRegExp<kBytes>(
+      info, input, output,
+      [](const googlesql::functions::RegExp& regexp,
+         const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+        const std::string source = arguments.String(0);
+        absl::string_view out;
+        bool is_null = true;
+        absl::Status error;
+        if (!regexp.Extract(source, PositionUnit(kBytes), arguments.Int(2), arguments.Int(3),
+                            /*use_legacy_position_behavior=*/false, &out, &is_null, &error)) {
+          return error;
+        }
+        if (is_null) {
+          return std::nullopt;
+        }
+        return std::string(out);
+      });
+}
+
+// REGEXP_EXTRACT_ALL(source, regexp).
+template <bool kBytes>
+void RegexpExtractAll(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithRegExp<kBytes>(info, input, output,
+                     [](const googlesql::functions::RegExp& regexp,
+                        const Arguments& arguments) -> absl::StatusOr<std::vector<std::string>> {
+                       const std::string source = arguments.String(0);
+                       auto matches = regexp.CreateExtractAllIterator(source);
+                       std::vector<std::string> out;
+                       absl::string_view match;
+                       absl::Status error;
+                       while (matches.Next(&match, &error)) {
+                         out.emplace_back(match);
+                       }
+                       if (!error.ok()) {
+                         return error;
+                       }
+                       return out;
+                     });
+}
+
 // REGEXP_INSTR(source, regexp, position, occurrence, occurrence_position).
 template <bool kBytes>
 void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
-    const std::string pattern = arguments.String(1);
-    auto regexp = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
-                         : googlesql::functions::MakeRegExpUtf8(pattern);
-    if (!regexp.ok()) {
-      return regexp.status();
-    }
-    const int64_t occurrence_position = arguments.Int(4);
-    if (occurrence_position != 0 && occurrence_position != 1) {
-      return absl::OutOfRangeError(
-          "Invalid return_position_after_match; it must be 0 or 1 (in REGEXP_INSTR)");
-    }
-    const std::string source = arguments.String(0);
-    int64_t out = 0;
-    absl::Status error;
-    const bool ok = (*regexp)->Instr(
-        {.input_str = source,
-         .position_unit = kBytes ? googlesql::functions::RegExp::kBytes
-                                 : googlesql::functions::RegExp::kUtf8Chars,
-         .position = arguments.Int(2),
-         .occurrence_index = arguments.Int(3),
-         .return_position = occurrence_position == 0 ? googlesql::functions::RegExp::kStartOfMatch
-                                                     : googlesql::functions::RegExp::kEndOfMatch,
-         .out = &out},
-        /*use_legacy_position_behavior=*/false, &error);
-    return ToStatusOr(ok, out, error);
-  });
+  WithRegExp<kBytes>(
+      info, input, output,
+      [](const googlesql::functions::RegExp& regexp,
+         const Arguments& arguments) -> absl::StatusOr<int64_t> {
+        const int64_t occurrence_position = arguments.Int(4);
+        if (occurrence_position != 0 && occurrence_position != 1) {
+          return absl::OutOfRangeError(
+              "Invalid return_position_after_match; it must be 0 or 1 (in REGEXP_INSTR)");
+        }
+        const std::string source = arguments.String(0);
+        int64_t out = 0;
+        absl::Status error;
+        const bool ok =
+            regexp.Instr({.input_str = source,
+                          .position_unit = PositionUnit(kBytes),
+                          .position = arguments.Int(2),
+                          .occurrence_index = arguments.Int(3),
+                          .return_position = occurrence_position == 0
+                                                 ? googlesql::functions::RegExp::kStartOfMatch
+                                                 : googlesql::functions::RegExp::kEndOfMatch,
+                          .out = &out},
+                         /*use_legacy_position_behavior=*/false, &error);
+        return ToStatusOr(ok, out, error);
+      });
 }
 
 // JSON goes in and out of the JSON functions as its text.
@@ -652,6 +738,26 @@ void RegisterBackendFunctions(duckdb_database database) {
            kBigint, RegexpInstr<false>);
   Register(connection.get(), "bq_regexp_instr_bytes", {kBlob, kBlob, kBigint, kBigint, kBigint},
            kBigint, RegexpInstr<true>);
+  Register(connection.get(), "bq_regexp_contains", {kVarchar, kVarchar}, kBoolean,
+           RegexpContains<false>);
+  Register(connection.get(), "bq_regexp_contains_bytes", {kBlob, kBlob}, kBoolean,
+           RegexpContains<true>);
+  Register(connection.get(), "bq_regexp_replace", {kVarchar, kVarchar, kVarchar}, kVarchar,
+           RegexpReplace<false>);
+  Register(connection.get(), "bq_regexp_replace_bytes", {kBlob, kBlob, kBlob}, kBlob,
+           RegexpReplace<true>);
+  Register(connection.get(), "bq_regexp_extract", {kVarchar, kVarchar, kBigint, kBigint}, kVarchar,
+           RegexpExtract<false>);
+  Register(connection.get(), "bq_regexp_extract_bytes", {kBlob, kBlob, kBigint, kBigint}, kBlob,
+           RegexpExtract<true>);
+  for (const auto& [name, type, function] :
+       std::initializer_list<std::tuple<const char*, duckdb_type, duckdb_scalar_function_t>>{
+           {"bq_regexp_extract_all", kVarchar, RegexpExtractAll<false>},
+           {"bq_regexp_extract_all_bytes", kBlob, RegexpExtractAll<true>}}) {
+    LogicalType element(duckdb_create_logical_type(type));
+    LogicalType list(duckdb_create_list_type(element.get()));
+    Register(connection.get(), name, {type, type}, list.get(), function);
+  }
   Register(connection.get(), "bq_lax_bool", {kVarchar}, kBoolean,
            LaxConvert<bool, googlesql::functions::LaxConvertJsonToBool>);
   Register(connection.get(), "bq_lax_int64", {kVarchar}, kBigint,

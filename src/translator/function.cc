@@ -181,41 +181,6 @@ std::optional<std::string> JsonPath(const googlesql::ResolvedExpr& expr, bool le
   return QuoteLiteral(sql);
 }
 
-// The number of capturing groups in an RE2 pattern, or nullopt if it cannot tell.
-std::optional<size_t> CapturingGroups(std::string_view pattern) {
-  size_t groups = 0;
-  for (size_t i = 0; i < pattern.size(); ++i) {
-    if (pattern[i] == '\\') {
-      if (i + 1 < pattern.size() && pattern[i + 1] == 'Q') {
-        return std::nullopt;
-      }
-      ++i;
-    } else if (pattern[i] == '[') {
-      // A ] right after [ or [^ is literal.
-      size_t j = i + 1;
-      if (j < pattern.size() && pattern[j] == '^') {
-        ++j;
-      }
-      if (j < pattern.size() && pattern[j] == ']') {
-        ++j;
-      }
-      for (; j < pattern.size() && pattern[j] != ']'; ++j) {
-        if (pattern[j] == '\\') {
-          ++j;
-        }
-      }
-      i = j;
-    } else if (pattern[i] == '(') {
-      const std::string_view rest = pattern.substr(i + 1);
-      if (!rest.starts_with("?") || rest.starts_with("?P<") ||
-          (rest.starts_with("?<") && !rest.starts_with("?<=") && !rest.starts_with("?<!"))) {
-        ++groups;
-      }
-    }
-  }
-  return groups;
-}
-
 // The translated arguments of a call.
 std::vector<std::string> Sqls(const ScalarCall& call) {
   std::vector<std::string> sqls;
@@ -334,30 +299,6 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
          ")], _bk -> CASE WHEN _bk.w < 0 THEN " +
          call.Raise("'Negative bucket width INTERVAL is not allowed'") + " WHEN _bk.w = 0 THEN " +
          call.Raise(zero) + " ELSE " + bucket + " END)[1]";
-}
-
-std::optional<std::string> RegexpExtract(const ScalarCall& call) {
-  const std::vector<std::string> args = Sqls(call);
-  if (args.size() != 2 || !TypeOf(call, 0)->IsString()) {
-    return std::nullopt;
-  }
-  const auto pattern = StringLiteral(*call.resolved.argument_list(1));
-  const auto groups = pattern ? CapturingGroups(*pattern) : std::nullopt;
-  if (!groups) {
-    return std::nullopt;
-  }
-  if (*groups > 1) {
-    return call.Raise(
-        "'Regular expressions passed into extraction functions must not have more than 1 "
-        "capturing group'");
-  }
-  const std::string group = std::to_string(*groups);
-  if (call.name == "REGEXP_EXTRACT_ALL") {
-    return "regexp_extract_all(" + args[0] + ", " + args[1] + ", " + group + ")";
-  }
-  // DuckDB returns an empty string rather than NULL when nothing matches.
-  return "list_transform([" + args[0] + "], _rx -> CASE WHEN regexp_matches(_rx, " + args[1] +
-         ") THEN regexp_extract(_rx, " + args[1] + ", " + group + ") END)[1]";
 }
 
 std::optional<std::string> JsonExtract(const ScalarCall& call) {

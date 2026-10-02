@@ -33,8 +33,7 @@ TEST(FunctionsTest, MatchesTheArgumentTypes) {
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("b", googlesql::TYPE_BYTES)}), "octet_length(b)");
   // A function with rules is unsupported when none matches, rather than passed through.
   EXPECT_EQ(TranslateFunction("BYTE_LENGTH", {Sql("x")}), std::nullopt);
-  EXPECT_EQ(TranslateFunction("REGEXP_CONTAINS", {Sql("b", googlesql::TYPE_BYTES), Sql("r")}),
-            std::nullopt);
+  EXPECT_EQ(TranslateFunction("UNICODE", {Sql("b", googlesql::TYPE_BYTES)}), std::nullopt);
 }
 
 TEST(FunctionsTest, FillsInDefaults) {

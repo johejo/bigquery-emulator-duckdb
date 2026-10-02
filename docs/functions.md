@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 25 |
-| Supported | 211 |
+| Partial | 20 |
+| Supported | 216 |
 | Unsupported | 157 |
 | Untested | 13 |
 
@@ -292,12 +292,12 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | range-functions | Unsupported |  | the analyzer does not know this function |
 | [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Unsupported |  | function RANGE_START |
 | [`RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#rank) | numbering_functions | Supported | DuckDB window function |  |
-| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Partial | DuckDB SQL | function REGEXP_CONTAINS |
-| [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
-| [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group and fails on more than one group; function REGEXP_EXTRACT_ALL |
+| [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Supported | GoogleSQL function |  |
+| [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Supported | GoogleSQL function |  |
+| [`REGEXP_EXTRACT_ALL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract_all) | string_functions | Supported | GoogleSQL function |  |
 | [`REGEXP_INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_instr) | string_functions | Supported | GoogleSQL function |  |
-| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Partial | DuckDB SQL | function REGEXP_REPLACE |
-| [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Partial | DuckDB SQL, in code | needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group; function REGEXP_EXTRACT |
+| [`REGEXP_REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_replace) | string_functions | Supported | GoogleSQL function |  |
+| [`REGEXP_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_substr) | string_functions | Supported | GoogleSQL function |  |
 | [`REPEAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#repeat) | string_functions | Supported | GoogleSQL function |  |
 | [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | string_functions | Supported | GoogleSQL function |  |
 | [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | string_functions | Supported | GoogleSQL function |  |

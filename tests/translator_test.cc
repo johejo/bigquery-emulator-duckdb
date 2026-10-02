@@ -778,13 +778,6 @@ TEST_F(TranslatorTest, RunsOperatorsAndArrayFunctions) {
   EXPECT_THROW(Execute("SELECT ERROR('boom')"), std::exception);
 }
 
-TEST_F(TranslatorTest, RunsRegularExpressionFunctions) {
-  EXPECT_THROW(Execute("SELECT REGEXP_EXTRACT('ab', r'(a)(b)')"), std::exception);
-  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT(b, b) FROM p.ds.t"), "function REGEXP_EXTRACT");
-  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT('a', 'a', 2)"), "function REGEXP_EXTRACT");
-  EXPECT_EQ(Unsupported("SELECT REGEXP_EXTRACT(b'a', b'a')"), "function REGEXP_EXTRACT");
-}
-
 TEST_F(TranslatorTest, RunsJsonFunctions) {
   const std::string doc = R"('{"a": {"b": [1, null, {"c": "x"}, "s"]}, "k.l": 2, "n": null}')";
   EXPECT_EQ(Scalar("SELECT JSON_QUERY(" + doc + ", '$.a.b[2]')"), R"({"c":"x"})");
