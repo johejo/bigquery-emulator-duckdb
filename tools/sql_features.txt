@@ -122,8 +122,10 @@ query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
 query `CREATE TABLE AS SELECT` | CREATE TABLE n AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (id INT64 NOT NULL) AS SELECT id FROM t
-query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', labels = [('k', 'v')])
-note Table and column options | Accepted and dropped
+query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', friendly_name = 'z', labels = [('k', 'v')])
+query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
+query Table and column options | CREATE TABLE n (a INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))
+note Table and column options | Stores the description, friendly name and labels of tables and the description of columns
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
@@ -148,7 +150,7 @@ query `ALTER TABLE` | ALTER TABLE t ADD COLUMN IF NOT EXISTS name STRING
 query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ADD COLUMN x INT64
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, ADD COLUMN y STRING
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64 DEFAULT 5
-note `ALTER TABLE` | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options are ignored; defaults, generated columns and top-level NOT NULL are unsupported.
+note `ALTER TABLE` | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported.
 query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name
 query `ALTER TABLE` | ALTER TABLE t RENAME TO n
 query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x')
@@ -163,8 +165,10 @@ query `CREATE VIEW` | CREATE VIEW n AS SELECT id FROM t
 query `CREATE VIEW` | CREATE OR REPLACE VIEW n AS SELECT name FROM t
 query `CREATE VIEW` | CREATE VIEW IF NOT EXISTS n AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n (renamed) AS SELECT id FROM t
+query `CREATE VIEW` | CREATE VIEW n OPTIONS (description = 'x', labels = [('k', 'v')]) AS SELECT id FROM t
+query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC') AS SELECT id FROM t
 query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
-note `CREATE VIEW` | Stores the GoogleSQL definition and schema; view options are ignored. Temporary, recursive and value-table views are unsupported.
+note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views are unsupported.
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)

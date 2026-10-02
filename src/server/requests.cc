@@ -14,6 +14,7 @@
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/server/internal.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {
 namespace {
@@ -368,6 +369,7 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   } else {
     request.schema = SchemaFromJson(body.value("schema", json::object()));
   }
+  request.metadata = TableMetadataFromJson(body);
   return request;
 }
 

@@ -29,6 +29,28 @@ steps:
       current.exit_code == 0 &&
       current.stdout contains '"name":"created"' &&
       current.stdout contains '"type":"TIMESTAMP"'
+  mk_labeled_table:
+    exec:
+      command: >-
+        tests/e2e/bq.sh mk --table --description 'labeled users' --label env:test
+        e2e.labeled id:INTEGER
+    test: current.exit_code == 0
+  update_table_labels:
+    exec:
+      command: tests/e2e/bq.sh update --set_label tier:1 --clear_label env e2e.labeled
+    test: current.exit_code == 0
+  ls_tables_with_labels:
+    exec:
+      command: tests/e2e/bq.sh ls --format=json e2e
+    test: |
+      current.exit_code == 0 && current.stdout contains '"labels":{"tier":"1"}'
+  show_labeled_table:
+    exec:
+      command: tests/e2e/bq.sh show --format=json e2e.labeled
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"description":"labeled users"' &&
+      current.stdout contains '"labels":{"tier":"1"}'
   insert:
     exec:
       command: >-
@@ -130,6 +152,10 @@ steps:
   rm_nested_table:
     exec:
       command: tests/e2e/bq.sh rm -f -t e2e.nested
+    test: current.exit_code == 0
+  rm_labeled_table:
+    exec:
+      command: tests/e2e/bq.sh rm -f -t e2e.labeled
     test: current.exit_code == 0
   rm_table:
     exec:

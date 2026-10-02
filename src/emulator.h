@@ -20,6 +20,7 @@
 #include "src/gcs.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 #include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
@@ -33,11 +34,13 @@ enum class TableType : std::uint8_t { kTable, kView };
 struct TableListEntry {
   std::string table_id;
   TableType type = TableType::kTable;
+  TableMetadata metadata;
 };
 
 struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
+  TableMetadata metadata;
   int64_t num_rows = 0;
   std::optional<std::string> view_query;
 };
@@ -183,13 +186,17 @@ class Emulator {
   // The tables of ListTables, each with its type.
   std::vector<TableListEntry> ListTableEntries(const DatasetReference& dataset);
   TableInfo GetTable(const TableReference& table, bool include_row_count = true);
-  void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema);
-  void CreateView(const TableReference& table, const nlohmann::json& definition);
+  void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema,
+                   const TableMetadata& metadata = {});
+  void CreateView(const TableReference& table, const nlohmann::json& definition,
+                  const TableMetadata& metadata = {});
   // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
-  // `view`. What is left out is kept, including the fields of `view` it omits.
+  // `view`, and either the metadata `metadata`. What is left out is kept, including the fields
+  // of `view` it omits.
   void UpdateTable(const TableReference& table,
                    const std::optional<std::vector<FieldSchema>>& schema,
-                   const std::optional<nlohmann::json>& view);
+                   const std::optional<nlohmann::json>& view,
+                   const std::optional<TableMetadata>& metadata = std::nullopt);
   void DeleteTable(const TableReference& table);
   QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);
   std::vector<InsertError> InsertTableData(const TableReference& table, const nlohmann::json& rows,
@@ -205,9 +212,10 @@ class Emulator {
                                 const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
-  // Creates the view `table` from the ViewDefinition `definition`, replacing the one there when
-  // `replace` is set.
-  void WriteView(const TableReference& table, const nlohmann::json& definition, bool replace);
+  // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
+  // one there when `replace` is set.
+  void WriteView(const TableReference& table, const nlohmann::json& definition,
+                 const TableMetadata& metadata, bool replace);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
   // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
   std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,

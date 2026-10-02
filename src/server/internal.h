@@ -15,6 +15,7 @@
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {
 
@@ -55,6 +56,7 @@ struct TableInsertRequest {
   // The view definition, when the request creates a view rather than a table.
   std::optional<nlohmann::json> view;
   std::vector<FieldSchema> schema;
+  TableMetadata metadata;
 };
 
 // What tables.patch and tables.update change. The emulator keeps what they leave out.
