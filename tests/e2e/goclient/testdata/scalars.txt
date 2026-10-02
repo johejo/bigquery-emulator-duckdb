@@ -1071,7 +1071,7 @@ SELECT REGEXP_EXTRACT('foo', r'\d')
 => null
 
 SELECT REGEXP_EXTRACT('foo', r'(x)?f')
-=> ""
+=> null
 
 SELECT REGEXP_SUBSTR('a1b2', r'[(]?\d')
 => "1"
@@ -1081,6 +1081,69 @@ SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b22', r'\d+'), ',')
 
 SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('a1b2', r'(?:[a-z])(\d)'), ',')
 => "1,2"
+
+SELECT REGEXP_EXTRACT('a1b2', r'\d', 1, 2)
+=> "2"
+
+SELECT REGEXP_EXTRACT('a1b2', r'\d', 3)
+=> "2"
+
+SELECT REGEXP_EXTRACT('a1', r'\d', 3)
+=> null
+
+SELECT SAFE.REGEXP_EXTRACT('a1', r'\d', 0)
+=> null
+
+SELECT SAFE.REGEXP_EXTRACT('ab', r'(a)(b)')
+=> null
+
+SELECT REGEXP_EXTRACT(b, b) FROM t WHERE a = 1
+=> "x"
+
+SELECT REGEXP_EXTRACT(b, NULL) FROM t WHERE a = 1
+=> null
+
+SELECT TO_HEX(REGEXP_EXTRACT(b'\xff1', b'\\d'))
+=> "31"
+
+SELECT ARRAY_TO_STRING(REGEXP_EXTRACT_ALL('', '(abc)?'), ',', 'N')
+=> ""
+
+SELECT ARRAY_LENGTH(REGEXP_EXTRACT_ALL('ab', '(x)?b'))
+=> "1"
+
+SELECT SAFE.REGEXP_EXTRACT_ALL('ab', r'(a)(b)') IS NULL
+=> "true"
+
+SELECT ARRAY_LENGTH(REGEXP_EXTRACT_ALL(b'a\xffa', b'a'))
+=> "2"
+
+SELECT REGEXP_CONTAINS(b'\xffa', b'a')
+=> "true"
+
+SELECT REGEXP_CONTAINS('abc', NULL)
+=> null
+
+SELECT REGEXP_REPLACE('abc', '', 'x')
+=> "xaxbxcx"
+
+SELECT REGEXP_REPLACE('abc', 'b*', 'x')
+=> "xaxcx"
+
+SELECT REGEXP_REPLACE('banana', '(.)a(.)', r'\1\2')
+=> "bnana"
+
+SELECT REGEXP_REPLACE('a.b', r'\.', r'\\')
+=> "a\\b"
+
+SELECT SAFE.REGEXP_REPLACE('abc', 'abc', r'\1')
+=> null
+
+SELECT SAFE.REGEXP_REPLACE('abc', 'b', r'\x')
+=> null
+
+SELECT TO_HEX(REGEXP_REPLACE(b'a\xffb', b'\xff', b'-'))
+=> "612d62"
 
 ## Json functions
 

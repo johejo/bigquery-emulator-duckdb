@@ -101,9 +101,6 @@ note DATE_DIFF WEEK starts on Sunday and ISOWEEK on Monday
 note DATETIME_DIFF WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries
 note TIMESTAMP_DIFF counts whole units rather than boundaries
 note TIME_DIFF counts whole units rather than boundaries
-note REGEXP_EXTRACT needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group
-note REGEXP_SUBSTR needs a literal STRING pattern; returns the capturing group, NULL when nothing matches, and fails on more than one group
-note REGEXP_EXTRACT_ALL needs a literal STRING pattern; returns the capturing group and fails on more than one group
 note JSON_QUERY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
 note JSON_VALUE needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL
 note JSON_QUERY_ARRAY needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL
