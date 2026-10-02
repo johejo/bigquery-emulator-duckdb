@@ -27,4 +27,9 @@ inline std::string QualifiedName(const TableReference& table) {
          QuoteIdentifier(table.table_id);
 }
 
+// How BigQuery names `table` in messages: project:dataset.table.
+inline std::string TableName(const TableReference& table) {
+  return table.project_id + ":" + table.dataset_id + "." + table.table_id;
+}
+
 }  // namespace bigquery_emulator_duckdb

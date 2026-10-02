@@ -183,6 +183,7 @@ cc_library(
         "src/translator/functions.cc",
         "src/translator/internal.h",
         "src/translator/literal.cc",
+        "src/translator/rules.cc",
         "src/translator/scan.cc",
     ],
     hdrs = [
@@ -215,6 +216,11 @@ cc_library(
         "src/backend.cc",
         "src/backend_functions.cc",
         "src/backend_functions.h",
+        "src/backend_functions/datetime.cc",
+        "src/backend_functions/internal.h",
+        "src/backend_functions/json.cc",
+        "src/backend_functions/math.cc",
+        "src/backend_functions/string.cc",
         "src/duckdb_handle.h",
     ],
     hdrs = ["src/backend.h"],
@@ -247,6 +253,66 @@ cc_library(
 )
 
 cc_library(
+    name = "table_comments",
+    srcs = ["src/table_comments.cc"],
+    hdrs = ["src/table_comments.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":duckdb_sql",
+        ":field_schema",
+        ":references",
+        ":table_metadata",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "schema_sql",
+    srcs = ["src/schema_sql.cc"],
+    hdrs = ["src/schema_sql.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":duckdb_sql",
+        ":field_schema",
+        ":references",
+        ":type_mapping",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "ddl_write",
+    srcs = ["src/ddl_write.cc"],
+    hdrs = ["src/ddl_write.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":column_metadata",
+        ":duckdb_sql",
+        ":references",
+        ":table_comments",
+        ":translator",
+    ],
+)
+
+cc_library(
+    name = "load",
+    srcs = ["src/load.cc"],
+    hdrs = ["src/load.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":duckdb_sql",
+        ":field_schema",
+        ":gcs",
+        ":schema_sql",
+        ":temporary_files",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "emulator",
     srcs = ["src/emulator.cc"],
     hdrs = ["src/emulator.h"],
@@ -257,12 +323,16 @@ cc_library(
         ":backend",
         ":catalog",
         ":column_metadata",
+        ":ddl_write",
         ":duckdb_sql",
         ":extract",
         ":field_schema",
         ":gcs",
+        ":load",
         ":query_parameters",
         ":references",
+        ":schema_sql",
+        ":table_comments",
         ":table_metadata",
         ":temporary_files",
         ":translator",
