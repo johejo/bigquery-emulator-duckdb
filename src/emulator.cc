@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <memory>
@@ -169,6 +170,22 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
+// The datasets of `project`, by name; DuckDB's own schemas are not datasets.
+std::string DatasetsQuery(const std::string& project) {
+  return std::format(
+      "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
+      " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog') ORDER BY schema_name",
+      QuoteLiteral(project));
+}
+
+// The tables and views of `dataset`, by name.
+std::string TablesQuery(const DatasetReference& dataset) {
+  return std::format(
+      "SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
+      " AND table_schema = {} ORDER BY table_name",
+      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+}
+
 // What the emulator records in a DuckDB view's comment: the GoogleSQL query and its schema.
 struct ViewMetadata {
   std::string query;
@@ -179,9 +196,10 @@ struct ViewMetadata {
 // `table` is not a view.
 std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
   const QueryResult views = backend.Execute(
-      "SELECT comment FROM duckdb_views() WHERE database_name = " + QuoteLiteral(table.project_id) +
-      " AND schema_name = " + QuoteLiteral(table.dataset_id) +
-      " AND view_name = " + QuoteLiteral(table.table_id));
+      std::format("SELECT comment FROM duckdb_views()"
+                  " WHERE database_name = {} AND schema_name = {} AND view_name = {}",
+                  QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+                  QuoteLiteral(table.table_id)));
   if (views.rows.empty()) {
     return std::nullopt;
   }
@@ -220,9 +238,10 @@ struct DdlWrite {
 };
 
 std::string TableExists(const TableReference& table) {
-  return "EXISTS (SELECT 1 FROM information_schema.tables WHERE table_catalog = " +
-         QuoteLiteral(table.project_id) + " AND table_schema = " + QuoteLiteral(table.dataset_id) +
-         " AND table_name = " + QuoteLiteral(table.table_id) + ")";
+  return std::format(
+      "EXISTS (SELECT 1 FROM information_schema.tables"
+      " WHERE table_catalog = {} AND table_schema = {} AND table_name = {})",
+      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
 }
 
 DdlWrite CreateViewWrite(const ViewDefinition& view) {
@@ -233,7 +252,7 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-      "COMMENT ON VIEW " + QualifiedName(table) + " IS " + QuoteLiteral(metadata.dump())};
+      std::format("COMMENT ON VIEW {} IS {}", QualifiedName(table), QuoteLiteral(metadata.dump()))};
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);
   }
@@ -256,12 +275,11 @@ DdlWrite AddColumnWrite(const AddedColumn& column) {
     skip.push_back("NOT " + TableExists(column.table));
   }
   if (column.if_column_not_exists) {
-    skip.push_back("EXISTS (SELECT 1 FROM duckdb_columns() WHERE database_name = " +
-                   QuoteLiteral(column.table.project_id) +
-                   " AND schema_name = " + QuoteLiteral(column.table.dataset_id) +
-                   " AND table_name = " + QuoteLiteral(column.table.table_id) +
-                   " AND lower(column_name) = " + QuoteLiteral(ToLowerAscii(column.field.name)) +
-                   ")");
+    skip.push_back(std::format(
+        "EXISTS (SELECT 1 FROM duckdb_columns() WHERE database_name = {} AND schema_name = {}"
+        " AND table_name = {} AND lower(column_name) = {})",
+        QuoteLiteral(column.table.project_id), QuoteLiteral(column.table.dataset_id),
+        QuoteLiteral(column.table.table_id), QuoteLiteral(ToLowerAscii(column.field.name))));
   }
   if (!skip.empty()) {
     write.skip_query = "SELECT 1 WHERE " + absl::StrJoin(skip, " OR ");
@@ -324,19 +342,12 @@ class DuckDbTableSource : public TableSource {
   }
 
   std::vector<std::string> ListDatasets(const std::string& project) override {
-    return FirstColumnStrings(backend_.Execute(
-        "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
-        QuoteLiteral(project) +
-        " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
-        " ORDER BY schema_name"));
+    return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
   }
 
   std::vector<std::string> ListTables(const std::string& project,
                                       const std::string& dataset) override {
-    return FirstColumnStrings(
-        backend_.Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
-                         QuoteLiteral(project) + " AND table_schema = " + QuoteLiteral(dataset) +
-                         " ORDER BY table_name"));
+    return FirstColumnStrings(backend_.Execute(TablesQuery(DatasetReference{project, dataset})));
   }
 
   std::optional<std::string> FindViewQuery(const std::string& project, const std::string& dataset,
@@ -730,18 +741,18 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
       }
       sql += ")";
     } else if (format == "NEWLINE_DELIMITED_JSON") {
-      sql = "SELECT * FROM read_json(" + files + ", format='newline_delimited')";
+      sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
     } else {
-      sql = "SELECT * FROM read_parquet(" + files + ")";
+      sql = std::format("SELECT * FROM read_parquet({})", files);
     }
     if (!requested_schema.empty() && format != "CSV") {
       std::string columns;
       for (const FieldSchema& field : requested_schema) {
         if (!columns.empty()) columns += ", ";
-        columns += "CAST(" + QuoteIdentifier(field.name) + " AS " + ToDuckDbType(field) + ") AS " +
-                   QuoteIdentifier(field.name);
+        columns += std::format("CAST({0} AS {1}) AS {0}", QuoteIdentifier(field.name),
+                               ToDuckDbType(field));
       }
-      sql = "SELECT " + columns + " FROM (" + sql + ") AS source";
+      sql = std::format("SELECT {} FROM ({}) AS source", columns, sql);
     }
     const QueryResult prepared = Prepare(sql);
     const QueryResult result = WriteDestination(
@@ -840,8 +851,9 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
   const std::string target = QualifiedName(destination);
   std::vector<std::string> statements = {
-      "CREATE TEMP TABLE _bigquery_emulator_query_result AS SELECT * FROM (" + sql +
-          ") AS _bigquery_emulator_query_result(" + aliases + ")",
+      std::format("CREATE TEMP TABLE _bigquery_emulator_query_result AS"
+                  " SELECT * FROM ({}) AS _bigquery_emulator_query_result({})",
+                  sql, aliases),
       "BEGIN TRANSACTION"};
   if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {
     if (existing.has_value()) {
@@ -850,7 +862,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // The columns take BigQuery's types for the result, so the table reads back as the query's
     // schema rather than as whatever DuckDB computed.
     if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
-      statements.push_back("CREATE TABLE " + target + " (" + *columns + ")");
+      statements.push_back(std::format("CREATE TABLE {} ({})", target, *columns));
       for (std::string& comment : ColumnCommentStatements(destination, schema)) {
         statements.push_back(std::move(comment));
       }
@@ -911,18 +923,15 @@ void Emulator::DeleteJob(const std::string& project_id, const std::string& job_i
 
 std::vector<std::string> Emulator::ListDatasets(const std::string& project_id) {
   EnsureProject(project_id);
-  return FirstColumnStrings(
-      Execute("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
-              QuoteLiteral(project_id) +
-              " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog')"
-              " ORDER BY schema_name"));
+  return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
 void Emulator::GetDataset(const DatasetReference& dataset) {
   EnsureProject(dataset.project_id);
-  const QueryResult result = Execute(
-      "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = " +
-      QuoteLiteral(dataset.project_id) + " AND schema_name = " + QuoteLiteral(dataset.dataset_id));
+  const QueryResult result =
+      Execute(std::format("SELECT schema_name FROM information_schema.schemata"
+                          " WHERE catalog_name = {} AND schema_name = {}",
+                          QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)));
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
   }
@@ -949,18 +958,15 @@ void Emulator::DeleteDataset(const DatasetReference& dataset, bool delete_conten
 
 std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
   GetDataset(dataset);
-  return FirstColumnStrings(
-      Execute("SELECT table_name FROM information_schema.tables WHERE table_catalog = " +
-              QuoteLiteral(dataset.project_id) +
-              " AND table_schema = " + QuoteLiteral(dataset.dataset_id) + " ORDER BY table_name"));
+  return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
 std::vector<std::string> Emulator::ListViews(const DatasetReference& dataset) {
   GetDataset(dataset);
-  return FirstColumnStrings(Execute("SELECT view_name FROM duckdb_views() WHERE database_name = " +
-                                    QuoteLiteral(dataset.project_id) +
-                                    " AND schema_name = " + QuoteLiteral(dataset.dataset_id) +
-                                    " AND NOT internal ORDER BY view_name"));
+  return FirstColumnStrings(Execute(std::format(
+      "SELECT view_name FROM duckdb_views()"
+      " WHERE database_name = {} AND schema_name = {} AND NOT internal ORDER BY view_name",
+      QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id))));
 }
 
 TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count) {

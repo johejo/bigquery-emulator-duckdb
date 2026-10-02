@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <format>
 #include <map>
 #include <optional>
 #include <string>
@@ -144,8 +145,8 @@ std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const 
     if (!body) {
       return std::nullopt;
     }
-    definitions.push_back(QuoteIdentifier(query.name) + "(" + Join(names, ", ") + ") AS (" + *body +
-                          ")");
+    definitions.push_back(
+        std::format("{}({}) AS ({})", QuoteIdentifier(query.name), Join(names, ", "), *body));
     inner.with[entry->with_query_name()] = query;
   }
   auto result = Scan(*with.query(), inner);
@@ -168,7 +169,7 @@ Relation WithRead(const WithQuery& query, const std::vector<googlesql::ResolvedC
     result.columns.emplace(id, "q." + ColumnName(id));
   }
   result.sql =
-      "SELECT " + Join(projections, ", ") + " FROM " + QuoteIdentifier(query.name) + " AS q";
+      std::format("SELECT {} FROM {} AS q", Join(projections, ", "), QuoteIdentifier(query.name));
   return result;
 }
 
@@ -292,16 +293,17 @@ std::optional<Relation> ZippedArrayScan(const googlesql::ResolvedArrayScan& arra
   } else if (mode == "TRUNCATE") {
     count = "least(" + Join(lengths, ", ") + ")";
   } else if (mode == "STRICT") {
-    count = "CASE WHEN least(" + Join(lengths, ", ") + ") = greatest(" + Join(lengths, ", ") +
-            ") THEN greatest(" + Join(lengths, ", ") +
-            ") ELSE error('Unnested arrays under STRICT mode must have equal lengths') END";
+    count = std::format(
+        "CASE WHEN least({0}) = greatest({0}) THEN greatest({0})"
+        " ELSE error('Unnested arrays under STRICT mode must have equal lengths') END",
+        Join(lengths, ", "));
   } else {
     return Unsupported(scope, "UNNEST mode " + mode);
   }
   picks.emplace_back("u.o");
-  const std::string unnest = "(SELECT " + Join(picks, ", ") + " FROM (SELECT " +
-                             Join(arrays, ", ") + ") AS z, range(1, " + count +
-                             " + 1) AS u(o)) AS u";
+  const std::string unnest =
+      std::format("(SELECT {} FROM (SELECT {}) AS z, range(1, {} + 1) AS u(o)) AS u",
+                  Join(picks, ", "), Join(arrays, ", "), count);
   return JoinArrays(array, input, unnest, input.columns, elements, scope);
 }
 
