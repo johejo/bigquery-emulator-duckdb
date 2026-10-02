@@ -219,6 +219,7 @@ cc_library(
         ":gcs",
         ":query_parameters",
         ":references",
+        ":temporary_files",
         ":translator",
         ":type_mapping",
         "@googlesql//googlesql/public:strings",
@@ -226,6 +227,14 @@ cc_library(
         "@googlesql//googlesql/resolved_ast",
         "@nlohmann_json//:json",
     ],
+)
+
+cc_library(
+    name = "temporary_files",
+    srcs = ["src/temporary_files.cc"],
+    hdrs = ["src/temporary_files.h"],
+    copts = ["-std=c++20"],
+    deps = [":api_error"],
 )
 
 cc_library(
@@ -250,7 +259,12 @@ cc_library(
 
 cc_library(
     name = "server",
-    srcs = ["src/server.cc"],
+    srcs = [
+        "src/server.cc",
+        "src/server/internal.h",
+        "src/server/requests.cc",
+        "src/server/resources.cc",
+    ],
     hdrs = ["src/server.h"],
     copts = ["-std=c++20"],
     deps = [
@@ -259,6 +273,8 @@ cc_library(
         ":emulator",
         ":field_schema",
         ":query_parameters",
+        ":references",
+        ":temporary_files",
         "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],

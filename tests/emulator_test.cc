@@ -352,7 +352,10 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
     backend.Execute("CREATE VIEW proj.ds.v AS SELECT 1 AS x");
   }
   Emulator emulator(data_dir.string());
-  EXPECT_EQ(emulator.ListViews({"proj", "ds"}), std::vector<std::string>{"v"});
+  const std::vector<TableListEntry> entries = emulator.ListTableEntries({"proj", "ds"});
+  ASSERT_EQ(entries.size(), 1);
+  EXPECT_EQ(entries[0].table_id, "v");
+  EXPECT_EQ(entries[0].type, TableType::kView);
   try {
     emulator.GetTable({"proj", "ds", "v"});
     ADD_FAILURE() << "GetTable succeeded";
