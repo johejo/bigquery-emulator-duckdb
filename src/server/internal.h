@@ -43,6 +43,13 @@ struct JobListRequest {
   int64_t max_creation_time = INT64_MAX;
 };
 
+// A page of datasets.list or tables.list. Both list by id, so the page token is the id of the
+// last entry of the previous page; pages stay consistent when entries are added or removed.
+struct ListPage {
+  int64_t max_results = INT64_MAX;
+  std::string page_token;
+};
+
 struct TableInsertRequest {
   TableReference table;
   // The view definition, when the request creates a view rather than a table.
@@ -90,6 +97,8 @@ JobRequest ParseJobInsert(const std::string& project_id, const nlohmann::json& b
 // jobs.insert with a job resource that has to be a load job, as media uploads do.
 LoadRequest ParseLoadInsert(const std::string& project_id, const nlohmann::json& body);
 JobListRequest ParseJobList(const httplib::Request& request);
+// datasets.list and tables.list.
+ListPage ParseListPage(const httplib::Request& request);
 DatasetReference ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
 TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
@@ -106,11 +115,12 @@ nlohmann::json JobCancelResponse(const Job& job);
 nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
 nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
 nlohmann::json DatasetResource(const DatasetReference& dataset);
+// `dataset_ids` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
 nlohmann::json DatasetList(const std::string& project_id,
-                           const std::vector<std::string>& dataset_ids);
+                           const std::vector<std::string>& dataset_ids, const ListPage& page);
 nlohmann::json TableResource(const TableInfo& info);
-nlohmann::json TableList(const DatasetReference& dataset,
-                         const std::vector<TableListEntry>& tables);
+nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
+                         const ListPage& page);
 // `result` holds the rows from `page.start_index` on; the table has `total_rows`.
 nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page);
 nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
