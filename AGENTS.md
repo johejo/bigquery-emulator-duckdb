@@ -31,7 +31,7 @@ evidence of compatibility.
 1. **DuckDB as is** (`PlainFunctions`, `FunctionNames`): only when DuckDB agrees on every input,
    including NULL, NaN and infinities, overflow and errors. Names can match while semantics do
    not: DuckDB's `concat` skips NULL where BigQuery's `CONCAT` returns NULL.
-2. **GoogleSQL's implementation** (`BackendRules`, registered in `src/backend_functions.cc`): the
+2. **GoogleSQL's implementation** (`BackendRules`, registered in `src/backend_functions/`): the
    default for regular expressions, STRING and BYTES handling, JSON, and parsing or formatting
    text, where engines differ in edge cases. If a DuckDB spelling needs tricks such as walking
    BYTES as hex digits, use this instead.

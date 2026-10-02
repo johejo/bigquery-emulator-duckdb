@@ -56,7 +56,8 @@ modes and STRING literal values. AGENTS.md says which implementation to choose.
 [DuckDB](https://duckdb.org/) executes translated statements through libduckdb's C++ API; each
 project is a DuckDB catalog and each dataset a schema. The backend derives result schemas and
 encodes rows in BigQuery's `{"f": [{"v": ...}]}` format. Functions DuckDB lacks are registered
-from GoogleSQL's own implementations in [src/backend_functions.cc](../src/backend_functions.cc).
+from GoogleSQL's own implementations in [src/backend_functions/](../src/backend_functions/), one
+source per area.
 GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files, which
 DuckDB then reads.
