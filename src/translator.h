@@ -30,6 +30,22 @@ struct ViewDefinition {
   bool if_not_exists = false;
 };
 
+// The table a CREATE TABLE [AS SELECT] defines, whose BigQuery schema the emulator records with
+// it: the declared types, NOT NULL as REQUIRED, type parameters, defaults and descriptions.
+struct TableDefinition {
+  TableReference table;
+  std::vector<FieldSchema> schema;
+  bool if_not_exists = false;
+};
+
+// The column an ALTER TABLE ADD COLUMN adds.
+struct AddedColumn {
+  TableReference table;
+  FieldSchema field;
+  bool if_table_exists = false;
+  bool if_column_not_exists = false;
+};
+
 // A statement translated to DuckDB, with what the emulator needs to know about it besides its SQL.
 struct TranslatedStatement {
   std::string sql;
@@ -40,7 +56,9 @@ struct TranslatedStatement {
   // The table or view, or the dataset, that a DDL statement creates, alters or drops.
   std::optional<TableReference> ddl_target_table;
   std::optional<DatasetReference> ddl_target_dataset;
-  // Set for CREATE VIEW, whose definition the emulator records once the view exists.
+  // What the emulator records besides DuckDB's own catalog, at most one of which is set.
+  std::optional<TableDefinition> table;
+  std::optional<AddedColumn> added_column;
   std::optional<ViewDefinition> view;
 };
 

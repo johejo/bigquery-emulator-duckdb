@@ -550,16 +550,15 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   return query_result;
 }
 
-void Backend::CreateView(const std::string& sql,
+void Backend::ExecuteDdl(const std::string& sql,
                          const std::vector<std::string>& metadata_statements,
-                         const std::string& existence_query,
-                         const std::vector<std::string>& setup) {
+                         const std::string& skip_query, const std::vector<std::string>& setup) {
   Connection connection = db_->Connect();
   RunSetup(connection.get(), setup);
   Query(connection.get(), "BEGIN TRANSACTION");
-  if (!existence_query.empty()) {
+  if (!skip_query.empty()) {
     Result existing;
-    Query(connection.get(), existence_query, existing);
+    Query(connection.get(), skip_query, existing);
     if (duckdb_row_count(&existing.result) != 0) {
       Query(connection.get(), "COMMIT");
       return;

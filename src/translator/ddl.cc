@@ -3,10 +3,16 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
+#include "googlesql/public/type.h"
+#include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/translator/internal.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
@@ -68,6 +74,86 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   return type;
 }
 
+bool IfNotExists(const googlesql::ResolvedCreateStatement& create) {
+  return create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS;
+}
+
+// Records NOT NULL as REQUIRED and the description in OPTIONS on `field`, and the same for the
+// fields of a struct.
+void ApplyAnnotations(const googlesql::Type* type,
+                      const googlesql::ResolvedColumnAnnotations& annotations, FieldSchema& field) {
+  if (annotations.not_null() && field.mode == FieldMode::kNullable) {
+    field.mode = FieldMode::kRequired;
+  }
+  for (const auto& option : annotations.option_list()) {
+    if (ToLowerAscii(option->name()) != "description" ||
+        !option->value()->Is<googlesql::ResolvedLiteral>()) {
+      continue;
+    }
+    const googlesql::Value& value = option->value()->GetAs<googlesql::ResolvedLiteral>()->value();
+    if (value.type()->IsString() && !value.is_null()) {
+      field.description = value.string_value();
+    }
+  }
+  // An array's one child annotates its elements, which `field` describes too, and a struct's
+  // children its fields.
+  if (type->IsArray() && annotations.child_list_size() > 0) {
+    ApplyAnnotations(type->AsArray()->element_type(), *annotations.child_list(0), field);
+  } else if (type->IsStruct()) {
+    for (int i = 0; i < annotations.child_list_size() &&
+                    i < static_cast<int>(field.fields.size()) && i < type->AsStruct()->num_fields();
+         ++i) {
+      ApplyAnnotations(type->AsStruct()->field(i).type, *annotations.child_list(i),
+                       field.fields[i]);
+    }
+  }
+}
+
+// Records the parameters of a parameterized type, STRING(10) or NUMERIC(10, 2), on `field`.
+void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParameters& parameters,
+                         FieldSchema& field) {
+  if (parameters.IsStringTypeParameters()) {
+    if (!parameters.string_type_parameters().is_max_length()) {
+      field.max_length = parameters.string_type_parameters().max_length();
+    }
+    return;
+  }
+  if (parameters.IsNumericTypeParameters()) {
+    const auto& numeric = parameters.numeric_type_parameters();
+    if (!numeric.is_max_precision()) {
+      field.precision = numeric.precision();
+    }
+    field.scale = numeric.scale();
+    return;
+  }
+  if (type->IsArray() && parameters.num_children() > 0) {
+    ApplyTypeParameters(type->AsArray()->element_type(), parameters.child(0), field);
+  } else if (type->IsStruct()) {
+    for (int i = 0; i < static_cast<int>(parameters.num_children()) &&
+                    i < static_cast<int>(field.fields.size()) && i < type->AsStruct()->num_fields();
+         ++i) {
+      ApplyTypeParameters(type->AsStruct()->field(i).type, parameters.child(i), field.fields[i]);
+    }
+  }
+}
+
+// The TableFieldSchema BigQuery reports for a column a DDL statement defines.
+std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition& column,
+                                       const Scope& scope) {
+  absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(column.name(), column.type());
+  if (!field.ok()) {
+    return Unsupported(scope, field.status().message());
+  }
+  if (column.annotations() != nullptr) {
+    ApplyAnnotations(column.type(), *column.annotations(), *field);
+    ApplyTypeParameters(column.type(), column.annotations()->type_parameters(), *field);
+  }
+  if (column.default_value() != nullptr) {
+    field->default_value_expression = column.default_value()->sql();
+  }
+  return *std::move(field);
+}
+
 // CREATE [OR REPLACE] TABLE [IF NOT EXISTS] path, shared with CREATE TABLE AS SELECT.
 // Partitioning, clustering and options only shape BigQuery storage, and BigQuery's primary and
 // foreign keys are never enforced, so they are all dropped.
@@ -119,10 +205,16 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
   }
   const auto path = TargetTable(alter.name_path(), scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
   const auto type = ColumnDefinitionType(column, scope);
-  if (!path || !type) {
+  auto field = ColumnField(column, scope);
+  if (!path || !target || !type || !field) {
     return std::nullopt;
   }
+  scope.context.added_column = AddedColumn{.table = *target,
+                                           .field = *std::move(field),
+                                           .if_table_exists = alter.is_if_exists(),
+                                           .if_column_not_exists = add.is_if_not_exists()};
   return std::string("ALTER TABLE ") + (alter.is_if_exists() ? "IF EXISTS " : "") + *path +
          " ADD COLUMN " + (add.is_if_not_exists() ? "IF NOT EXISTS " : "") +
          QuoteIdentifier(column.name()) + " " + *type;
@@ -134,18 +226,22 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
     return Unsupported(scope, "CREATE TABLE CLONE or COPY");
   }
   const auto head = CreateTableHead(create, scope);
-  if (!head) {
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  if (!head || !target) {
     return std::nullopt;
   }
+  TableDefinition table{.table = *target, .if_not_exists = IfNotExists(create)};
   std::vector<std::string> columns;
   for (const auto& column : create.column_definition_list()) {
     if (column->is_hidden() || column->generated_column_info() != nullptr) {
       return Unsupported(scope, "generated columns");
     }
     const auto type = ColumnDefinitionType(*column, scope);
-    if (!type) {
+    auto field = ColumnField(*column, scope);
+    if (!type || !field) {
       return std::nullopt;
     }
+    table.schema.push_back(*std::move(field));
     std::string sql = QuoteIdentifier(column->name()) + " " + *type;
     if (column->annotations() != nullptr && column->annotations()->not_null()) {
       sql += " NOT NULL";
@@ -172,6 +268,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   if (columns.empty()) {
     return Unsupported(scope, "CREATE TABLE without columns");
   }
+  scope.context.table = std::move(table);
   return *head + " (" + Join(columns, ", ") + ")";
 }
 
@@ -182,13 +279,15 @@ std::optional<std::string> CreateTableAsSelect(
     return Unsupported(scope, "CREATE TABLE AS SELECT columns");
   }
   const auto head = CreateTableHead(create, scope);
-  if (!head) {
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  if (!head || !target) {
     return std::nullopt;
   }
   const auto relation = Scan(*create.query(), scope);
   if (!relation) {
     return std::nullopt;
   }
+  TableDefinition table{.table = *target, .if_not_exists = IfNotExists(create)};
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
@@ -198,12 +297,15 @@ std::optional<std::string> CreateTableAsSelect(
     }
     const auto column = relation->columns.find(create.output_column_list(i)->column().column_id());
     const auto type = ColumnDefinitionType(definition, scope);
-    if (column == relation->columns.end() || !type) {
+    auto field = ColumnField(definition, scope);
+    if (column == relation->columns.end() || !type || !field) {
       return std::nullopt;
     }
+    table.schema.push_back(*std::move(field));
     projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
                           QuoteIdentifier(definition.name()));
   }
+  scope.context.table = std::move(table);
   return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
 }
 
@@ -219,10 +321,8 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   if (!path || !target || !relation) {
     return std::nullopt;
   }
-  ViewDefinition view{.table = *target,
-                      .query = create.sql(),
-                      .if_not_exists = create.create_mode() ==
-                                       googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS};
+  ViewDefinition view{
+      .table = *target, .query = create.sql(), .if_not_exists = IfNotExists(create)};
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());

@@ -152,6 +152,8 @@ std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedS
                              .result_schema = ResultSchema(statement),
                              .ddl_target_table = std::move(context.ddl_target_table),
                              .ddl_target_dataset = std::move(context.ddl_target_dataset),
+                             .table = std::move(context.table),
+                             .added_column = std::move(context.added_column),
                              .view = std::move(context.view)};
 }
 
