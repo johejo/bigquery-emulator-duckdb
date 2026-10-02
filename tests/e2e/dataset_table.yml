@@ -72,6 +72,22 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"ALICE/ann"},{"id":"3","name":"carol"}]'
+  update_schema_adds_column:
+    exec:
+      command: tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP,email:STRING
+    test: current.exit_code == 0
+  select_added_column:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT id, email FROM `test.e2e.users` ORDER BY id'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"email":null,"id":"1"},{"email":null,"id":"3"}]'
+  update_schema_cannot_drop_column:
+    exec:
+      command: tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
+    test: current.exit_code != 0 && current.stdout contains 'Field email is missing in new schema'
   create_table_with_nested_types:
     exec:
       command: >-

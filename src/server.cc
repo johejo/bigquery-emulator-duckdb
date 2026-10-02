@@ -74,6 +74,14 @@ class Server::Impl {
     http_.Post(kApiPrefix + path, handler);
     http_.Post(path, std::move(handler));
   }
+  void Put(const std::string& path, httplib::Server::Handler handler) {
+    http_.Put(kApiPrefix + path, handler);
+    http_.Put(path, std::move(handler));
+  }
+  void Patch(const std::string& path, httplib::Server::Handler handler) {
+    http_.Patch(kApiPrefix + path, handler);
+    http_.Patch(path, std::move(handler));
+  }
   void Delete(const std::string& path, httplib::Server::Handler handler) {
     http_.Delete(kApiPrefix + path, handler);
     http_.Delete(path, std::move(handler));
@@ -211,6 +219,16 @@ class Server::Impl {
         Json([this](const httplib::Request& request, httplib::Response&) {
           return TableResource(emulator_.GetTable(TableFromPath(request)));
         }));
+    // tables.patch and tables.update differ only in which fields BigQuery keeps when the request
+    // leaves them out; the emulator keeps all of them for both.
+    const auto update_table = Json([this](const httplib::Request& request, httplib::Response&) {
+      const TableReference table = TableFromPath(request);
+      const TableUpdateRequest update = ParseTableUpdate(ParseBody(request));
+      emulator_.UpdateTable(table, update.schema, update.view);
+      return TableResource(emulator_.GetTable(table));
+    });
+    Patch("/projects/:project/datasets/:dataset/tables/:table", update_table);
+    Put("/projects/:project/datasets/:dataset/tables/:table", update_table);
     Delete("/projects/:project/datasets/:dataset/tables/:table",
            Json([this](const httplib::Request& request, httplib::Response& response) {
              emulator_.DeleteTable(TableFromPath(request));

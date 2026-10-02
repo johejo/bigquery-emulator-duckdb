@@ -337,6 +337,19 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   return request;
 }
 
+TableUpdateRequest ParseTableUpdate(const json& body) {
+  if (!body.is_object()) throw ApiError::Invalid("Invalid table resource");
+  TableUpdateRequest request;
+  if (body.contains("schema") && !body["schema"].is_null()) {
+    request.schema = SchemaFromJson(body["schema"]);
+  }
+  if (body.contains("view") && !body["view"].is_null()) {
+    if (!body["view"].is_object()) throw ApiError::Invalid("Invalid view definition");
+    request.view = body["view"];
+  }
+  return request;
+}
+
 InsertAllRequest ParseInsertAll(const json& body) {
   if (!body.contains("rows")) {
     throw ApiError::Invalid("Required parameter is missing: rows");

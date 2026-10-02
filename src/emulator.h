@@ -171,6 +171,11 @@ class Emulator {
   TableInfo GetTable(const TableReference& table, bool include_row_count = true);
   void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema);
   void CreateView(const TableReference& table, const nlohmann::json& definition);
+  // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
+  // `view`. What is left out is kept, including the fields of `view` it omits.
+  void UpdateTable(const TableReference& table,
+                   const std::optional<std::vector<FieldSchema>>& schema,
+                   const std::optional<nlohmann::json>& view);
   void DeleteTable(const TableReference& table);
   QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);
   std::vector<InsertError> InsertTableData(const TableReference& table, const nlohmann::json& rows,
@@ -186,6 +191,9 @@ class Emulator {
                                 const std::string& default_dataset);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
+  // Creates the view `table` from the ViewDefinition `definition`, replacing the one there when
+  // `replace` is set.
+  void WriteView(const TableReference& table, const nlohmann::json& definition, bool replace);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
   // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
   std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,

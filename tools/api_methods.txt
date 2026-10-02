@@ -16,6 +16,7 @@ file people.csv | 1
 
 setup POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "d"}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}]}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "w"}, "view": {"query": "SELECT 1 AS id", "useLegacySql": false}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
@@ -57,5 +58,11 @@ note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the refe
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"v"},"view":{"query":"SELECT id FROM test.d.t","useLegacySql":false}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
 note bigquery.tables.insert | Keeps `tableReference`, `schema` and GoogleSQL view definitions; partitioning, clustering, labels and descriptions are ignored.
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
+note bigquery.tables.patch | Changes `schema` and view definitions only, ignoring other fields such as `description`, `labels` and `expirationTime`. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag.
+request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
+request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
+note bigquery.tables.update | Behaves like `tables.patch`: fields the request leaves out, including `schema`, are kept rather than cleared.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables
 note bigquery.tables.list | Ignores `maxResults` and `pageToken`, and returns every table in one page.

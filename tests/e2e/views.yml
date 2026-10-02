@@ -47,6 +47,20 @@ steps:
     exec:
       command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE OR REPLACE VIEW views.v AS SELECT id FROM views.v'
     test: current.exit_code != 0
+  api_update:
+    exec:
+      command: tests/e2e/bq.sh update --view='SELECT id FROM views.source WHERE id >= 2' views.v
+    test: current.exit_code == 0
+  api_update_metadata:
+    exec:
+      command: tests/e2e/bq.sh show --format=json views.v
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"query":"SELECT id FROM views.source WHERE id >= 2"'
+  api_update_rejects_table:
+    exec:
+      command: tests/e2e/bq.sh update --view='SELECT 1 AS id' views.source
+    test: current.exit_code != 0 && current.stdout contains 'is not a view'
   api_create:
     exec:
       command: tests/e2e/bq.sh mk --view='SELECT id + 10 AS n FROM views.v' --use_legacy_sql=false views.nested
