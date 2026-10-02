@@ -190,6 +190,16 @@ class Server::Impl {
           emulator_.GetDataset(dataset);
           return DatasetResource(dataset);
         }));
+    // datasets.patch and datasets.update: the emulator keeps no dataset metadata besides the
+    // reference, so both only check that the dataset exists.
+    const auto update_dataset = Json([this](const httplib::Request& request, httplib::Response&) {
+      const DatasetReference dataset = DatasetFromPath(request);
+      if (!ParseBody(request).is_object()) throw ApiError::Invalid("Invalid dataset resource");
+      emulator_.GetDataset(dataset);
+      return DatasetResource(dataset);
+    });
+    Patch("/projects/:project/datasets/:dataset", update_dataset);
+    Put("/projects/:project/datasets/:dataset", update_dataset);
     Delete("/projects/:project/datasets/:dataset",
            Json([this](const httplib::Request& request, httplib::Response& response) {
              emulator_.DeleteDataset(DatasetFromPath(request),

@@ -22,8 +22,8 @@ what the emulator ignores or does differently, and the probe adds the features t
 | Status | Methods |
 | --- | --- |
 | Partial | 3 |
-| Supported | 16 |
-| Unsupported | 28 |
+| Supported | 18 |
+| Unsupported | 26 |
 
 ## datasets
 
@@ -33,9 +33,9 @@ what the emulator ignores or does differently, and the probe adds the features t
 | [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns only the dataset's reference and location `US`. |
 | [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Supported | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored. |
 | [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Supported | Ignores `all`, `filter`, `maxResults` and `pageToken`, and returns every dataset in one page. |
-| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Unsupported |  |
+| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Supported | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
-| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Unsupported |  |
+| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Supported | Behaves like `datasets.patch`. |
 
 ## jobs
 

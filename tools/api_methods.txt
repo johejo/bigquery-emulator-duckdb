@@ -26,6 +26,10 @@ request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"da
 note bigquery.datasets.insert | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored.
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets
 note bigquery.datasets.list | Ignores `all`, `filter`, `maxResults` and `pageToken`, and returns every dataset in one page.
+request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
+note bigquery.datasets.patch | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored.
+request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
+note bigquery.datasets.update | Behaves like `datasets.patch`.
 
 request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | Jobs finish before `jobs.insert` returns, so cancelling returns the finished job unchanged.
