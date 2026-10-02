@@ -65,7 +65,8 @@ func TestTableUpdateSchema(t *testing.T) {
 		t.Fatalf("tables.get after tables.patch: got %v, %v", metadata, err)
 	}
 
-	// Existing rows read the added fields as NULL, and the relaxed column takes NULL.
+	// Existing rows read the added fields as NULL, or empty for a REPEATED column, and the relaxed
+	// column takes NULL.
 	run := func(sql string) error {
 		job, err := client.Query(sql).Run(ctx)
 		if err != nil {
@@ -80,12 +81,12 @@ func TestTableUpdateSchema(t *testing.T) {
 	if err := run("INSERT go_table_update.t (point, doc) VALUES (STRUCT(3, 4), JSON '{}')"); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := client.Query(`SELECT id, point.y, items[SAFE_OFFSET(0)].count, doc
+	rows, err := client.Query(`SELECT id, point.y, items[SAFE_OFFSET(0)].count, doc, ARRAY_LENGTH(tags)
 		FROM go_table_update.t ORDER BY id`).Read(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range [][]bigquery.Value{{nil, int64(4), nil, "{}"}, {int64(1), nil, nil, nil}} {
+	for _, want := range [][]bigquery.Value{{nil, int64(4), nil, "{}", int64(0)}, {int64(1), nil, nil, nil, int64(0)}} {
 		var row []bigquery.Value
 		if err := rows.Next(&row); err != nil || !reflect.DeepEqual(row, want) {
 			t.Fatalf("row = %#v, want %#v; error = %v", row, want, err)
