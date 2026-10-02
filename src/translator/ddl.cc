@@ -215,9 +215,12 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
                                            .field = *std::move(field),
                                            .if_table_exists = alter.is_if_exists(),
                                            .if_column_not_exists = add.is_if_not_exists()};
+  // Existing rows read an added ARRAY column as empty, as rows that leave it out later do; see
+  // RepeatedColumnDefaultStatements.
   return std::string("ALTER TABLE ") + (alter.is_if_exists() ? "IF EXISTS " : "") + *path +
          " ADD COLUMN " + (add.is_if_not_exists() ? "IF NOT EXISTS " : "") +
-         QuoteIdentifier(column.name()) + " " + *type;
+         QuoteIdentifier(column.name()) + " " + *type +
+         (column.type()->IsArray() ? " DEFAULT []" : "");
 }
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,

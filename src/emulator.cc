@@ -9,6 +9,7 @@
 #include <format>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -242,6 +243,8 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
 DdlWrite CreateTableWrite(const TableDefinition& definition) {
   DdlWrite write{.metadata_statements =
                      ColumnCommentStatements(definition.table, definition.schema)};
+  std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
+                    std::back_inserter(write.metadata_statements));
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
   }
@@ -846,6 +849,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
       for (std::string& comment : ColumnCommentStatements(destination, schema)) {
         statements.push_back(std::move(comment));
       }
+      std::ranges::move(RepeatedColumnDefaultStatements(destination, schema),
+                        std::back_inserter(statements));
       statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
     } else {
       statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table);

@@ -28,6 +28,18 @@ std::vector<std::string> ColumnCommentStatements(const TableReference& table,
   return statements;
 }
 
+std::vector<std::string> RepeatedColumnDefaultStatements(const TableReference& table,
+                                                         const std::vector<FieldSchema>& schema) {
+  std::vector<std::string> statements;
+  for (const FieldSchema& field : schema) {
+    if (field.mode == FieldMode::kRepeated && field.default_value_expression.empty()) {
+      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} SET DEFAULT []",
+                                       QualifiedName(table), QuoteIdentifier(field.name)));
+    }
+  }
+  return statements;
+}
+
 std::string ColumnCommentsQuery(const TableReference& table) {
   return std::format(
       "SELECT comment FROM duckdb_columns()"
