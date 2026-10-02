@@ -64,6 +64,14 @@ Endpoint EndpointFromEnvironment() {
 
 }  // namespace
 
+size_t FindGcsWildcard(const std::string& uri) {
+  const size_t wildcard = uri.find('*', uri.size() - ParseUri(uri).object.size());
+  if (wildcard != std::string::npos && uri.find('*', wildcard + 1) != std::string::npos) {
+    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
+  }
+  return wildcard;
+}
+
 struct GcsClient::Impl {
   Impl(std::string endpoint, bool emulator)
       : options(cloud::Options{}
@@ -108,12 +116,9 @@ const std::string& GcsClient::endpoint() const {
 }
 
 std::vector<std::string> GcsClient::Expand(const std::string& uri) {
+  if (FindGcsWildcard(uri) == std::string::npos) return {uri};
   const auto [bucket, object] = ParseUri(uri);
   const size_t wildcard = object.find('*');
-  if (wildcard == std::string::npos) return {uri};
-  if (object.find('*', wildcard + 1) != std::string::npos) {
-    throw ApiError::Invalid("Only one wildcard is allowed in a GCS URI: " + uri);
-  }
   const std::string prefix = object.substr(0, wildcard);
   const std::string suffix = object.substr(wildcard + 1);
   // The documented file-name pattern (fed-sample*.csv) excludes subfolders,

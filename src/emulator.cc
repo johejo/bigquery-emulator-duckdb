@@ -881,17 +881,14 @@ std::shared_ptr<const Job> Emulator::RunExtract(const ExtractRequest& request) {
     if (extract.destination_uris.size() != 1) {
       throw ApiError::Invalid("The emulator does not support multiple destination URIs");
     }
-    // The whole table fits in the first file of a wildcard URI's sequence.
     std::string uri = extract.destination_uris.front();
-    if (const size_t wildcard = uri.find('*'); wildcard != std::string::npos) {
-      if (uri.find('*', wildcard + 1) != std::string::npos) {
-        throw ApiError::Invalid("Only one wildcard is allowed in a destination URI: " + uri);
-      }
-      uri.replace(wildcard, 1, "000000000000");
-    }
     TemporaryFiles uploads;
     std::string path;
     if (uri.starts_with("gs://")) {
+      // The whole table fits in the first file of a wildcard URI's sequence.
+      if (const size_t wildcard = FindGcsWildcard(uri); wildcard != std::string::npos) {
+        uri.replace(wildcard, 1, "000000000000");
+      }
       path = uploads.Create();
     } else if (uri.starts_with("file://")) {
       path = uri.substr(7);

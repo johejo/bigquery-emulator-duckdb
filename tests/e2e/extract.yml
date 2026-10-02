@@ -123,6 +123,18 @@ steps:
     test: |
       current.exit_code != 0 &&
       current.stdout contains 'Avro extracts'
+  bucket_wildcard:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.scalars 'gs://extract-*/scalars.csv'
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'bucket name'
+  two_wildcards:
+    exec:
+      command: tests/e2e/bq.sh extract e2e_extract.scalars 'gs://extract-output/*/part-*.csv'
+    test: |
+      current.exit_code != 0 &&
+      current.stdout contains 'Only one wildcard'
   extract_view:
     exec:
       command: tests/e2e/bq.sh extract e2e_extract.v gs://extract-output/v.csv

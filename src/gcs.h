@@ -1,11 +1,19 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
+
+// The position of the wildcard in the gs:// URI `uri`, or npos when it has none. Loads and
+// extracts alike allow one `*`, in the object name. Throws ApiError for a malformed URI, a
+// wildcard in the bucket name or more than one wildcard.
+// https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
+// https://cloud.google.com/bigquery/docs/exporting-data#exporting_data_into_one_or_more_files
+size_t FindGcsWildcard(const std::string& uri);
 
 // Retains SDK connection pools and credentials for the lifetime of the emulator. Concurrent
 // downloads and uploads are supported.

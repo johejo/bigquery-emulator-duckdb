@@ -41,7 +41,7 @@ request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configurat
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "t"}, "writeDisposition": "WRITE_APPEND"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
-request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t-*.csv"]}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.avro"], "destinationFormat": "AVRO"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/a-*.csv", "$DIR/b-*.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceModel": {"projectId": "test", "datasetId": "d", "modelId": "m"}, "destinationUris": ["$DIR/m"]}}}
