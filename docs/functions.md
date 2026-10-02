@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 20 |
-| Supported | 216 |
+| Partial | 21 |
+| Supported | 215 |
 | Unsupported | 157 |
 | Untested | 13 |
 
@@ -146,11 +146,11 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
 | [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported | DuckDB function |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Supported | DuckDB function, renamed |  |
-| [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | DuckDB SQL |  |
-| [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | DuckDB SQL |  |
-| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | DuckDB SQL |  |
-| [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported | DuckDB SQL |  |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | NUMERIC, BIGNUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT |
+| [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | GoogleSQL function |  |
+| [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | GoogleSQL function |  |
+| [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | GoogleSQL function |  |
+| [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported | GoogleSQL function |  |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Unsupported |  | function FROM_BASE32 |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported | DuckDB SQL |  |
@@ -268,12 +268,12 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | objectref_functions | Unsupported |  | the analyzer does not know this function |
 | [`OCTET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#octet_length) | string_functions | Supported | DuckDB SQL |  |
 | [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Unsupported |  | function PARSE_BIGNUMERIC |
-| [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | DuckDB SQL |  |
-| [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | DuckDB SQL |  |
+| [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | GoogleSQL function |  |
+| [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Partial | DuckDB SQL | function PARSE_JSON |
 | [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported |  | function PARSE_NUMERIC |
-| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported | DuckDB SQL |  |
-| [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | DuckDB SQL | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
+| [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported | GoogleSQL function |  |
+| [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | GoogleSQL function | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
 | [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | graph-sql-functions | Untested |  | no sample for <graph_path> |

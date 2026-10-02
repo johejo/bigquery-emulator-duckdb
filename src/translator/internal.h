@@ -151,6 +151,7 @@ std::optional<std::string> JsonSet(const ScalarCall& call);
 std::optional<std::string> JsonObject(const ScalarCall& call);
 std::optional<std::string> ArrayConcat(const ScalarCall& call);
 std::optional<std::string> ConcatStrings(const ScalarCall& call);
+std::optional<std::string> Format(const ScalarCall& call);
 std::optional<std::string> Extremum(const ScalarCall& call);
 
 // Scans, in scan.cc.

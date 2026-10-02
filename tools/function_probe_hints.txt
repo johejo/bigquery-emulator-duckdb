@@ -54,6 +54,7 @@ query JSON_OBJECT SELECT JSON_OBJECT('a', 1, 'b', JSON '[2]')
 query JSON_OBJECT SELECT JSON_OBJECT(['a', 'b'], [1, 2])
 query ERROR SELECT IF(FALSE, ERROR('abc'), 1)
 query FORMAT SELECT FORMAT('%d-%s', 2, 'abc')
+query FORMAT SELECT FORMAT('%t', NUMERIC '1.5')
 query GROUPING SELECT x, GROUPING(x) FROM UNNEST([1, 2]) AS x GROUP BY ROLLUP(x)
 query PERCENTILE_CONT SELECT PERCENTILE_CONT(x, 0.5) OVER () FROM UNNEST([1.5, 2.5]) AS x
 query PERCENTILE_DISC SELECT PERCENTILE_DISC(x, 0.5) OVER () FROM UNNEST([1, 2]) AS x
@@ -113,3 +114,4 @@ note INT64 from JSON, fails when the value has another JSON type
 note FLOAT64 from JSON, fails when the value has another JSON type
 note BOOL from JSON, fails when the value has another JSON type
 note STRING from JSON, fails when the value has another JSON type
+note FORMAT NUMERIC, BIGNUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported
