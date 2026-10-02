@@ -22,8 +22,8 @@ what the emulator ignores or does differently, and the probe adds the features t
 | Status | Methods |
 | --- | --- |
 | Partial | 3 |
-| Supported | 14 |
-| Unsupported | 30 |
+| Supported | 16 |
+| Unsupported | 28 |
 
 ## datasets
 
@@ -107,7 +107,7 @@ what the emulator ignores or does differently, and the probe adds the features t
 | [`tables.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
 | [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Supported | Keeps `tableReference`, `schema` and GoogleSQL view definitions; partitioning, clustering, labels and descriptions are ignored. |
 | [`tables.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported | Ignores `maxResults` and `pageToken`, and returns every table in one page. |
-| [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Unsupported |  |
+| [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Changes `schema` and view definitions only, ignoring other fields such as `description`, `labels` and `expirationTime`. A schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax REQUIRED to NULLABLE and change descriptions; existing fields keep their order. Changing a view's schema is not supported. Ignores `autodetect_schema` and the etag. |
 | [`tables.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy` | Unsupported |  |
 | [`tables.testIamPermissions`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/testIamPermissions) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:testIamPermissions` | Unsupported |  |
-| [`tables.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Unsupported |  |
+| [`tables.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Behaves like `tables.patch`: fields the request leaves out, including `schema`, are kept rather than cleared. |

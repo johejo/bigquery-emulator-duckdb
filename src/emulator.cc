@@ -9,6 +9,7 @@
 #include <format>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -422,6 +423,79 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
     }
   }
   return columns;
+}
+
+// Checks that BigQuery lets the fields `current` of `table` become `updated` through tables.patch
+// or tables.update, and appends to `statements` the ALTER TABLE statements that make the change.
+// Existing fields keep their order, name, type, type parameters and default; REQUIRED may become
+// NULLABLE; NULLABLE and REPEATED fields may be added after them. `path` is the DuckDB column
+// path of the record that holds the fields, with a trailing dot, or empty for the table's
+// columns, and `prefix` its BigQuery field path for errors.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the two paths of one record.
+void SchemaUpdateStatements(const TableReference& table, const std::string& path,
+                            const std::string& prefix, const std::vector<FieldSchema>& current,
+                            const std::vector<FieldSchema>& updated,
+                            std::vector<std::string>& statements) {
+  const std::string mismatch =
+      std::format("Provided Schema does not match Table {}.", TableName(table));
+  for (size_t i = 0; i < current.size(); ++i) {
+    const FieldSchema& before = current[i];
+    const std::string name = prefix + before.name;
+    if (i >= updated.size() || updated[i].name != before.name) {
+      const bool kept = std::ranges::any_of(
+          updated, [&](const FieldSchema& field) { return field.name == before.name; });
+      throw ApiError::Invalid(std::format(
+          "{} Field {} {}", mismatch, name,
+          kept ? "has changed position; the emulator keeps existing fields in their order"
+               : "is missing in new schema"));
+    }
+    const FieldSchema& after = updated[i];
+    if (after.type != before.type) {
+      throw ApiError::Invalid(std::format("{} Field {} has changed type from {} to {}", mismatch,
+                                          name, FieldTypeName(before.type),
+                                          FieldTypeName(after.type)));
+    }
+    if (after.max_length != before.max_length || after.precision != before.precision ||
+        after.scale != before.scale) {
+      throw ApiError::Invalid(
+          std::format("{} Field {} has changed its type parameters", mismatch, name));
+    }
+    if (after.mode != before.mode &&
+        !(before.mode == FieldMode::kRequired && after.mode == FieldMode::kNullable)) {
+      throw ApiError::Invalid(std::format("{} Field {} has changed mode from {} to {}", mismatch,
+                                          name, FieldModeName(before.mode),
+                                          FieldModeName(after.mode)));
+    }
+    if (after.default_value_expression != before.default_value_expression) {
+      throw ApiError::Invalid("The emulator does not support changing the default value of field " +
+                              name);
+    }
+    // DuckDB enforces REQUIRED only on columns; a field of a record keeps it in its metadata.
+    if (after.mode != before.mode && path.empty()) {
+      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL",
+                                       QualifiedName(table), QuoteIdentifier(before.name)));
+    }
+    if (before.type == FieldType::kRecord) {
+      SchemaUpdateStatements(table,
+                             path + QuoteIdentifier(before.name) +
+                                 (before.mode == FieldMode::kRepeated ? ".element." : "."),
+                             name + ".", before.fields, after.fields, statements);
+    }
+  }
+  for (size_t i = current.size(); i < updated.size(); ++i) {
+    const FieldSchema& added = updated[i];
+    if (added.mode == FieldMode::kRequired) {
+      throw ApiError::Invalid(
+          std::format("{} Cannot add required fields to an existing schema. (field: {}{})",
+                      mismatch, prefix, added.name));
+    }
+    if (!added.default_value_expression.empty()) {
+      throw ApiError::Invalid("The emulator does not support adding field " + prefix + added.name +
+                              " with a default value");
+    }
+    statements.push_back(std::format("ALTER TABLE {} ADD COLUMN {}{} {}", QualifiedName(table),
+                                     path, QuoteIdentifier(added.name), ToDuckDbType(added)));
+  }
 }
 
 }  // namespace
@@ -999,6 +1073,46 @@ void Emulator::CreateTable(const TableReference& table, const std::vector<FieldS
 }
 
 void Emulator::CreateView(const TableReference& table, const json& definition) {
+  WriteView(table, definition, /*replace=*/false);
+}
+
+void Emulator::UpdateTable(const TableReference& table,
+                           const std::optional<std::vector<FieldSchema>>& schema,
+                           const std::optional<json>& view) {
+  const TableInfo info = GetTable(table, /*include_row_count=*/false);
+  if (info.view_query.has_value()) {
+    if (schema.has_value()) {
+      throw ApiError::Invalid(
+          "The emulator does not support changing the schema of a view; change its query instead");
+    }
+    if (view.has_value()) {
+      // Every view the emulator keeps is GoogleSQL.
+      json definition = {{"query", *info.view_query}, {"useLegacySql", false}};
+      definition.update(*view);
+      WriteView(table, definition, /*replace=*/true);
+    }
+    return;
+  }
+  if (view.has_value()) {
+    throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
+  }
+  if (!schema.has_value()) {
+    return;
+  }
+  std::vector<std::string> statements;
+  SchemaUpdateStatements(table, "", "", info.schema, *schema, statements);
+  std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
+  if (statements.empty()) {
+    return;
+  }
+  try {
+    backend_.ExecuteDdl(statements.front(), {statements.begin() + 1, statements.end()}, "");
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
+  }
+}
+
+void Emulator::WriteView(const TableReference& table, const json& definition, bool replace) {
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   if (definition.value("useLegacySql", true)) {
     throw ApiError::Invalid("The emulator does not support legacy SQL views");
@@ -1012,7 +1126,7 @@ void Emulator::CreateView(const TableReference& table, const json& definition) {
   }
   try {
     const TranslatedStatement translation =
-        Translate("CREATE VIEW " +
+        Translate(std::string(replace ? "CREATE OR REPLACE VIEW " : "CREATE VIEW ") +
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id) +
                       " AS " + query,

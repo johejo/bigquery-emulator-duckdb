@@ -50,6 +50,12 @@ struct TableInsertRequest {
   std::vector<FieldSchema> schema;
 };
 
+// What tables.patch and tables.update change. The emulator keeps what they leave out.
+struct TableUpdateRequest {
+  std::optional<std::vector<FieldSchema>> schema;
+  std::optional<nlohmann::json> view;
+};
+
 struct InsertAllRequest {
   nlohmann::json rows;
   bool skip_invalid_rows = false;
@@ -86,6 +92,7 @@ LoadRequest ParseLoadInsert(const std::string& project_id, const nlohmann::json&
 JobListRequest ParseJobList(const httplib::Request& request);
 DatasetReference ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
+TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
 
 // resources.cc: the emulator's structs to BigQuery's JSON resources and responses.
