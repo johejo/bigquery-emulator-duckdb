@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -20,7 +19,6 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
-#include "absl/strings/str_join.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -30,10 +28,15 @@
 #include "src/backend.h"
 #include "src/catalog.h"
 #include "src/column_metadata.h"
+#include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/load.h"
+#include "src/references.h"
+#include "src/schema_sql.h"
+#include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
 #include "src/translator.h"
@@ -82,77 +85,6 @@ std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   return values;
 }
 
-// The DuckDB column type of a BigQuery TableFieldSchema.
-std::string ToDuckDbType(const FieldSchema& field) {
-  absl::StatusOr<std::string> type = DuckDbColumnType(field);
-  if (!type.ok()) {
-    throw ApiError::Invalid(std::string(type.status().message()));
-  }
-  return *std::move(type);
-}
-
-std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values);
-
-std::string InsertRecord(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
-  if (!value.is_object()) {
-    throw ApiError::Invalid("Expected an object for field " + field.name);
-  }
-  for (auto it = value.begin(); it != value.end(); ++it) {
-    const bool known =
-        std::any_of(field.fields.begin(), field.fields.end(),
-                    [&](const FieldSchema& child) { return child.name == it.key(); });
-    if (!known && !ignore_unknown_values) {
-      throw ApiError::Invalid("Unknown field: " + it.key());
-    }
-  }
-  std::string fields;
-  for (const FieldSchema& child : field.fields) {
-    if (!fields.empty()) {
-      fields += ", ";
-    }
-    const auto it = value.find(child.name);
-    fields += QuoteIdentifier(child.name) + " := " +
-              InsertValue(it == value.end() ? json(nullptr) : *it, child, ignore_unknown_values);
-  }
-  return "struct_pack(" + fields + ")";
-}
-
-std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
-  const std::string type = ToDuckDbType(field);
-  if (value.is_null()) {
-    return "CAST(NULL AS " + type + ")";
-  }
-  if (field.mode == FieldMode::kRepeated) {
-    if (!value.is_array()) {
-      throw ApiError::Invalid("Expected an array for field " + field.name);
-    }
-    FieldSchema element = field;
-    element.mode = FieldMode::kNullable;
-    std::string values;
-    for (const json& item : value) {
-      if (!values.empty()) {
-        values += ", ";
-      }
-      values += InsertValue(item, element, ignore_unknown_values);
-    }
-    return "CAST([" + values + "] AS " + type + ")";
-  }
-  if (field.type == FieldType::kRecord) {
-    return InsertRecord(value, field, ignore_unknown_values);
-  }
-  if (!value.is_primitive()) {
-    throw ApiError::Invalid("Expected a scalar for field " + field.name);
-  }
-  const std::string scalar = value.is_string() ? value.get<std::string>() : value.dump();
-  if (field.type == FieldType::kBytes) {
-    return "from_base64(" + QuoteLiteral(scalar) + ")";
-  }
-  if (field.type == FieldType::kTimestamp && value.is_number()) {
-    return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";
-  }
-  return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
-}
-
 // The datasets of `project`, by name; DuckDB's own schemas are not datasets.
 std::string DatasetsQuery(const std::string& project) {
   return std::format(
@@ -168,15 +100,6 @@ std::string TablesQuery(const DatasetReference& dataset) {
       " AND table_schema = {} ORDER BY table_name",
       QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
 }
-
-// The emulator records a table's TableMetadata as JSON in the comment of its DuckDB table, and a
-// view's in the comment of its DuckDB view, next to the GoogleSQL query and its schema. Like a
-// column comment, it lives and dies with the table, so CREATE OR REPLACE starts it afresh.
-struct ViewMetadata {
-  std::string query;
-  std::vector<FieldSchema> schema;
-  TableMetadata metadata;
-};
 
 // The comment of `table` in `relations`, duckdb_tables() or duckdb_views(), whose `name` column
 // names it. The comment is NULL when it has none, and nothing is returned when there is no such
@@ -195,146 +118,6 @@ std::optional<json> RelationComment(Backend& backend, std::string_view relations
 
 std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
   return RelationComment(backend, "duckdb_views()", "view_name", table);
-}
-
-// The JSON object a comment holds, or null for a comment the emulator did not write.
-json ParseComment(const json& comment) {
-  if (!comment.is_string()) {
-    return nullptr;
-  }
-  json parsed = json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
-  return parsed.is_object() ? parsed : json(nullptr);
-}
-
-// The metadata a table or view comment records, or none for a comment of someone else's.
-TableMetadata CommentMetadata(const json& comment) {
-  const json object = ParseComment(comment);
-  if (object.is_null()) {
-    return {};
-  }
-  try {
-    return TableMetadataFromJson(object);
-  } catch (const ApiError&) {
-    return {};
-  }
-}
-
-// The statement that records `metadata` on the DuckDB table `table`, whose schema is `schema`.
-std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata,
-                                  const std::vector<FieldSchema>& schema) {
-  ValidateLabels(metadata.labels);
-  ValidatePartitioning(metadata, schema);
-  return std::format("COMMENT ON TABLE {} IS {}", QualifiedName(table),
-                     metadata.empty() ? "NULL" : QuoteLiteral(metadata.ToJson().dump()));
-}
-
-// The statement that records `view` on the DuckDB view `table`.
-std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
-  ValidateLabels(view.metadata.labels);
-  if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
-    throw ApiError::Invalid("A view cannot be partitioned or clustered");
-  }
-  json comment = view.metadata.ToJson();
-  comment["query"] = view.query;
-  comment["fields"] = SchemaToJson(view.schema).at("fields");
-  return std::format("COMMENT ON VIEW {} IS {}", QualifiedName(table),
-                     QuoteLiteral(comment.dump()));
-}
-
-// Parses a view comment, or returns nothing for a view the emulator did not create, which has
-// no comment or a comment of its own.
-std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
-  const json metadata = ParseComment(comment);
-  if (!metadata.is_object() || !metadata.contains("query") || !metadata["query"].is_string() ||
-      !metadata.contains("fields") || !metadata["fields"].is_array()) {
-    return std::nullopt;
-  }
-  ViewMetadata view{metadata["query"].get<std::string>(), {}, CommentMetadata(comment)};
-  try {
-    for (const json& field : metadata["fields"]) {
-      view.schema.push_back(FieldSchemaFromJson(field));
-    }
-  } catch (const ApiError&) {
-    return std::nullopt;
-  }
-  return view;
-}
-
-// What a DDL statement runs besides itself, in the same transaction: the statements that
-// record its BigQuery metadata, and a query that returns a row when the statement and its
-// metadata must both be skipped, which is how IF NOT EXISTS and IF EXISTS keep what is there.
-struct DdlWrite {
-  std::vector<std::string> metadata_statements;
-  std::string skip_query;
-};
-
-std::string TableExists(const TableReference& table) {
-  return std::format(
-      "EXISTS (SELECT 1 FROM information_schema.tables"
-      " WHERE table_catalog = {} AND table_schema = {} AND table_name = {})",
-      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
-}
-
-DdlWrite CreateViewWrite(const ViewDefinition& view) {
-  const TableReference& table = view.table;
-  DdlWrite write;
-  // DuckDB can create a circular view and only reject it when queried. Bind the new definition
-  // before committing so a failed replacement keeps the old view.
-  write.metadata_statements = {
-      "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-      ViewCommentStatement(table, {view.query, view.schema, view.metadata})};
-  if (view.if_not_exists) {
-    write.skip_query = "SELECT 1 WHERE " + TableExists(table);
-  }
-  return write;
-}
-
-DdlWrite CreateTableWrite(const TableDefinition& definition) {
-  DdlWrite write{.metadata_statements =
-                     ColumnCommentStatements(definition.table, definition.schema)};
-  std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
-                    std::back_inserter(write.metadata_statements));
-  if (!definition.metadata.empty()) {
-    write.metadata_statements.push_back(
-        TableCommentStatement(definition.table, definition.metadata, definition.schema));
-  }
-  if (definition.if_not_exists) {
-    write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
-  }
-  return write;
-}
-
-DdlWrite AddColumnWrite(const AddedColumn& column) {
-  DdlWrite write{.metadata_statements = ColumnCommentStatements(column.table, {column.field})};
-  std::vector<std::string> skip;
-  if (column.if_table_exists) {
-    skip.push_back("NOT " + TableExists(column.table));
-  }
-  if (column.if_column_not_exists) {
-    skip.push_back(std::format(
-        "EXISTS (SELECT 1 FROM duckdb_columns() WHERE database_name = {} AND schema_name = {}"
-        " AND table_name = {} AND lower(column_name) = {})",
-        QuoteLiteral(column.table.project_id), QuoteLiteral(column.table.dataset_id),
-        QuoteLiteral(column.table.table_id), QuoteLiteral(ToLowerAscii(column.field.name))));
-  }
-  if (!skip.empty()) {
-    write.skip_query = "SELECT 1 WHERE " + absl::StrJoin(skip, " OR ");
-  }
-  return write;
-}
-
-// The metadata a translated statement records, if any.
-std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
-  if (statement.table.has_value()) {
-    return CreateTableWrite(*statement.table);
-  }
-  if (statement.added_column.has_value()) {
-    return AddColumnWrite(*statement.added_column);
-  }
-  if (statement.view.has_value()) {
-    return CreateViewWrite(*statement.view);
-  }
-  return std::nullopt;
 }
 
 // The BigQuery schema of `table`: its columns as DuckDB types describe them, each replaced by the
@@ -451,110 +234,6 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
     }
   }
   return duckdb_schema;
-}
-
-std::string TableName(const TableReference& table) {
-  return table.project_id + ":" + table.dataset_id + "." + table.table_id;
-}
-
-// A DuckDB column definition for `field`, which enforces REQUIRED as BigQuery does.
-std::string ColumnDefinition(const FieldSchema& field) {
-  return QuoteIdentifier(field.name) + " " + ToDuckDbType(field) +
-         (field.mode == FieldMode::kRequired ? " NOT NULL" : "");
-}
-
-// Column definitions for a table that holds `schema`, or nullopt when a type has no column
-// type of its own in the emulator.
-std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
-  std::string columns;
-  for (const FieldSchema& field : schema) {
-    if (!columns.empty()) {
-      columns += ", ";
-    }
-    try {
-      columns += ColumnDefinition(field);
-    } catch (const ApiError&) {
-      return std::nullopt;
-    }
-  }
-  return columns;
-}
-
-// Checks that BigQuery lets the fields `current` of `table` become `updated` through tables.patch
-// or tables.update, and appends to `statements` the ALTER TABLE statements that make the change.
-// Existing fields keep their order, name, type, type parameters and default; REQUIRED may become
-// NULLABLE; NULLABLE and REPEATED fields may be added after them. `path` is the DuckDB column
-// path of the record that holds the fields, with a trailing dot, or empty for the table's
-// columns, and `prefix` its BigQuery field path for errors.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the two paths of one record.
-void SchemaUpdateStatements(const TableReference& table, const std::string& path,
-                            const std::string& prefix, const std::vector<FieldSchema>& current,
-                            const std::vector<FieldSchema>& updated,
-                            std::vector<std::string>& statements) {
-  const std::string mismatch =
-      std::format("Provided Schema does not match Table {}.", TableName(table));
-  for (size_t i = 0; i < current.size(); ++i) {
-    const FieldSchema& before = current[i];
-    const std::string name = prefix + before.name;
-    if (i >= updated.size() || updated[i].name != before.name) {
-      const bool kept = std::ranges::any_of(
-          updated, [&](const FieldSchema& field) { return field.name == before.name; });
-      throw ApiError::Invalid(std::format(
-          "{} Field {} {}", mismatch, name,
-          kept ? "has changed position; the emulator keeps existing fields in their order"
-               : "is missing in new schema"));
-    }
-    const FieldSchema& after = updated[i];
-    if (after.type != before.type) {
-      throw ApiError::Invalid(std::format("{} Field {} has changed type from {} to {}", mismatch,
-                                          name, FieldTypeName(before.type),
-                                          FieldTypeName(after.type)));
-    }
-    if (after.max_length != before.max_length || after.precision != before.precision ||
-        after.scale != before.scale) {
-      throw ApiError::Invalid(
-          std::format("{} Field {} has changed its type parameters", mismatch, name));
-    }
-    if (after.mode != before.mode &&
-        !(before.mode == FieldMode::kRequired && after.mode == FieldMode::kNullable)) {
-      throw ApiError::Invalid(std::format("{} Field {} has changed mode from {} to {}", mismatch,
-                                          name, FieldModeName(before.mode),
-                                          FieldModeName(after.mode)));
-    }
-    if (after.default_value_expression != before.default_value_expression) {
-      throw ApiError::Invalid("The emulator does not support changing the default value of field " +
-                              name);
-    }
-    // DuckDB enforces REQUIRED only on columns; a field of a record keeps it in its metadata.
-    if (after.mode != before.mode && path.empty()) {
-      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} DROP NOT NULL",
-                                       QualifiedName(table), QuoteIdentifier(before.name)));
-    }
-    if (before.type == FieldType::kRecord) {
-      SchemaUpdateStatements(table,
-                             path + QuoteIdentifier(before.name) +
-                                 (before.mode == FieldMode::kRepeated ? ".element." : "."),
-                             name + ".", before.fields, after.fields, statements);
-    }
-  }
-  for (size_t i = current.size(); i < updated.size(); ++i) {
-    const FieldSchema& added = updated[i];
-    if (added.mode == FieldMode::kRequired) {
-      throw ApiError::Invalid(
-          std::format("{} Cannot add required fields to an existing schema. (field: {}{})",
-                      mismatch, prefix, added.name));
-    }
-    if (!added.default_value_expression.empty()) {
-      throw ApiError::Invalid("The emulator does not support adding field " + prefix + added.name +
-                              " with a default value");
-    }
-    // Existing rows read an added REPEATED column as empty, as rows that leave it out later do;
-    // see RepeatedColumnDefaultStatements. DuckDB takes no default for a field of a record.
-    const bool empty_default = path.empty() && added.mode == FieldMode::kRepeated;
-    statements.push_back(std::format("ALTER TABLE {} ADD COLUMN {}{} {}{}", QualifiedName(table),
-                                     path, QuoteIdentifier(added.name), ToDuckDbType(added),
-                                     empty_default ? " DEFAULT []" : ""));
-  }
 }
 
 }  // namespace
@@ -779,55 +458,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
     if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
       throw ApiError::Invalid("Unsupported source format: " + format);
     }
-    const json uris = config.value("sourceUris", json::array());
-    if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("sourceUris is required");
     TemporaryFiles downloads;
-    std::vector<std::string> sources;
-    for (const json& item : uris) {
-      if (!item.is_string()) throw ApiError::Invalid("Invalid source URI");
-      const std::string uri = item.get<std::string>();
-      if (uri.starts_with("gs://")) {
-        const auto matches = gcs_client_.Expand(uri);
-        sources.insert(sources.end(), matches.begin(), matches.end());
-      } else {
-        sources.push_back(uri);
-      }
-    }
-    std::string paths;
-    for (const std::string& uri : sources) {
-      std::string path;
-      if (uri.starts_with("gs://")) {
-        path = downloads.Create();
-        gcs_client_.Download(uri, std::filesystem::path(path));
-      } else if (uri.starts_with("file://")) {
-        path = uri.substr(7);
-      } else if (uri.find("://") == std::string::npos) {
-        path = uri;
-      } else {
-        throw ApiError::Invalid("Unsupported source URI: " + uri);
-      }
-      if (path.empty() || !std::filesystem::is_regular_file(path)) {
-        throw ApiError::Invalid("Source file does not exist: " + uri);
-      }
-      // Uploads and downloads lose their original suffix. DuckDB selects gzip by suffix,
-      // so inspect the bytes and stage gzip inputs under a name its readers recognize.
-      if (format != "PARQUET") {
-        std::ifstream input(path, std::ios::binary);
-        const bool gzip = input.get() == 0x1f && input.get() == 0x8b;
-        if (gzip) {
-          const std::string compressed = downloads.Create(".gz");
-          if (uri.starts_with("gs://")) {
-            std::filesystem::rename(path, compressed);
-          } else {
-            std::filesystem::copy_file(path, compressed,
-                                       std::filesystem::copy_options::overwrite_existing);
-          }
-          path = compressed;
-        }
-      }
-      paths += (paths.empty() ? "" : ", ") + QuoteLiteral(path);
-    }
-    const std::string files = "[" + paths + "]";
+    const std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty()) {
       TableReference destination = load.destination_table;
@@ -838,35 +470,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
         if (error.http_status() != 404) throw;
       }
     }
-    std::string sql;
-    if (format == "CSV") {
-      sql = "SELECT * FROM read_csv(" + files +
-            ", header=false, skip=" + std::to_string(config.value("skipLeadingRows", 0)) +
-            ", delim=" + QuoteLiteral(config.value("fieldDelimiter", ","));
-      if (!requested_schema.empty()) {
-        sql += ", auto_detect=false";
-        std::string columns;
-        for (const FieldSchema& field : requested_schema) {
-          columns += (columns.empty() ? "" : ", ") + QuoteLiteral(field.name) + ": " +
-                     QuoteLiteral(ToDuckDbType(field));
-        }
-        sql += ", columns={" + columns + "}";
-      }
-      sql += ")";
-    } else if (format == "NEWLINE_DELIMITED_JSON") {
-      sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
-    } else {
-      sql = std::format("SELECT * FROM read_parquet({})", files);
-    }
-    if (!requested_schema.empty() && format != "CSV") {
-      std::string columns;
-      for (const FieldSchema& field : requested_schema) {
-        if (!columns.empty()) columns += ", ";
-        columns += std::format("CAST({0} AS {1}) AS {0}", QuoteIdentifier(field.name),
-                               ToDuckDbType(field));
-      }
-      sql = std::format("SELECT {} FROM ({}) AS source", columns, sql);
-    }
+    const std::string sql = LoadQuery(format, paths, config, requested_schema);
     const QueryResult prepared = Prepare(sql);
     const QueryResult result = WriteDestination(
         job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
@@ -1240,7 +844,7 @@ void Emulator::UpdateTable(const TableReference& table,
   }
   std::vector<std::string> statements;
   if (schema.has_value()) {
-    SchemaUpdateStatements(table, "", "", info.schema, *schema, statements);
+    statements = SchemaUpdateStatements(table, info.schema, *schema);
     std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
   }
   if (metadata.has_value()) {
