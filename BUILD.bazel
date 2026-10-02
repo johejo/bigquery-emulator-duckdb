@@ -183,6 +183,7 @@ cc_library(
         "src/translator/functions.cc",
         "src/translator/internal.h",
         "src/translator/literal.cc",
+        "src/translator/rules.cc",
         "src/translator/scan.cc",
     ],
     hdrs = [
