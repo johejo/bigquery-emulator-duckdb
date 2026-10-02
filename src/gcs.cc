@@ -152,4 +152,14 @@ void GcsClient::Download(const std::string& uri, const std::filesystem::path& ou
   }
 }
 
+void GcsClient::Upload(const std::filesystem::path& input, const std::string& uri) {
+  const auto [bucket, object] = ParseUri(uri);
+  storage::Client client = impl_->client();
+  const auto metadata = client.UploadFile(input.string(), bucket, object);
+  if (!metadata) {
+    throw ApiError::Invalid("Could not write GCS object: " + uri + " (" +
+                            metadata.status().message() + ")");
+  }
+}
+
 }  // namespace bigquery_emulator_duckdb

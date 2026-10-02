@@ -273,6 +273,9 @@ class Server::Impl {
   }
   std::shared_ptr<const Job> Run(const LoadRequest& request) { return emulator_.RunLoad(request); }
   std::shared_ptr<const Job> Run(const CopyRequest& request) { return emulator_.RunCopy(request); }
+  std::shared_ptr<const Job> Run(const ExtractRequest& request) {
+    return emulator_.RunExtract(request);
+  }
 
   // Loads `content`, the media of an upload, as `request` describes.
   json RunUploadedLoad(LoadRequest request, std::string_view content) {

@@ -8,7 +8,7 @@
 namespace bigquery_emulator_duckdb {
 
 // Retains SDK connection pools and credentials for the lifetime of the emulator. Concurrent
-// downloads are supported.
+// downloads and uploads are supported.
 class GcsClient {
  public:
   // Reads the endpoint from the environment: CLOUD_STORAGE_EMULATOR_ENDPOINT or
@@ -29,6 +29,9 @@ class GcsClient {
 
   // Throws ApiError.
   void Download(const std::string& uri, const std::filesystem::path& output);
+
+  // Writes the file `input` to the object `uri`, replacing it. Throws ApiError.
+  void Upload(const std::filesystem::path& input, const std::string& uri);
 
  private:
   struct Impl;

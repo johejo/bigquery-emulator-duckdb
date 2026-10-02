@@ -31,6 +31,7 @@
 #include "src/catalog.h"
 #include "src/column_metadata.h"
 #include "src/duckdb_sql.h"
+#include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/temporary_files.h"
@@ -853,6 +854,72 @@ std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
                          copy.write_disposition, sql, schema, {}, true);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job.result = QueryResult{};
+  });
+}
+
+std::shared_ptr<const Job> Emulator::RunExtract(const ExtractRequest& request) {
+  EnsureProject(request.project_id);
+  auto job = std::make_shared<Job>();
+  job->project_id = request.project_id;
+  job->job_id = request.job_id;
+  job->configuration = request.extract;
+  return RunJob(std::move(job), [&](Job& job) {
+    const ExtractJob& extract = request.extract;
+    const json& config = extract.configuration;
+    const std::string format = config.value("destinationFormat", "CSV");
+    const std::string compression = config.value("compression", "NONE");
+    if (format == "AVRO") throw ApiError::Invalid("The emulator does not support Avro extracts");
+    if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
+      throw ApiError::Invalid("Unsupported destination format: " + format);
+    }
+    const bool parquet = format == "PARQUET";
+    if (compression != "NONE" && compression != "GZIP" &&
+        !(parquet && (compression == "SNAPPY" || compression == "ZSTD"))) {
+      throw ApiError::Invalid("Unsupported compression " + compression + " for " + format);
+    }
+    if (extract.destination_uris.size() != 1) {
+      throw ApiError::Invalid("The emulator does not support multiple destination URIs");
+    }
+    // The whole table fits in the first file of a wildcard URI's sequence.
+    std::string uri = extract.destination_uris.front();
+    if (const size_t wildcard = uri.find('*'); wildcard != std::string::npos) {
+      if (uri.find('*', wildcard + 1) != std::string::npos) {
+        throw ApiError::Invalid("Only one wildcard is allowed in a destination URI: " + uri);
+      }
+      uri.replace(wildcard, 1, "000000000000");
+    }
+    TemporaryFiles uploads;
+    std::string path;
+    if (uri.starts_with("gs://")) {
+      path = uploads.Create();
+    } else if (uri.starts_with("file://")) {
+      path = uri.substr(7);
+    } else if (uri.find("://") == std::string::npos) {
+      path = uri;
+    } else {
+      throw ApiError::Invalid("Unsupported destination URI: " + uri);
+    }
+
+    TableReference source = extract.source_table;
+    if (source.project_id.empty()) source.project_id = job.project_id;
+    EnsureProject(source.project_id);
+    const TableInfo table = GetTable(source);
+    if (table.view_query) throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
+    if (parquet) {
+      Execute(std::format("COPY (SELECT {} FROM {}) TO {} (FORMAT parquet, COMPRESSION {})",
+                          ParquetExtractColumns(table.schema), QualifiedName(source),
+                          QuoteLiteral(path),
+                          compression == "NONE" ? "uncompressed" : ToLowerAscii(compression)));
+    } else {
+      WriteTextExtract(table.schema, Execute("SELECT * FROM " + QualifiedName(source)).rows,
+                       {.json = format == "NEWLINE_DELIMITED_JSON",
+                        .gzip = compression == "GZIP",
+                        .field_delimiter = config.value("fieldDelimiter", ","),
+                        .print_header = config.value("printHeader", true)},
+                       path);
+    }
+    if (uri.starts_with("gs://")) gcs_client_.Upload(path, uri);
     job.result = QueryResult{};
   });
 }

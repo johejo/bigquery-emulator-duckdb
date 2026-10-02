@@ -93,6 +93,15 @@ json JobStatistics(const Job& job) {
     statistics["load"] = {{"outputRows", std::to_string(job.output_rows)}};
     return statistics;
   }
+  if (const auto* extract = std::get_if<ExtractJob>(&job.configuration)) {
+    // A finished extract writes one file per destination URI.
+    json counts = json::array();
+    if (!job.error.has_value()) {
+      for (size_t i = 0; i < extract->destination_uris.size(); ++i) counts.push_back("1");
+    }
+    statistics["extract"] = {{"destinationUriFileCounts", std::move(counts)}};
+    return statistics;
+  }
   const QueryJob& query = *job.query();
   json query_statistics = {
       {"totalBytesProcessed", "0"}, {"totalBytesBilled", "0"}, {"cacheHit", false}};
@@ -143,6 +152,11 @@ json JobConfiguration(const Job& job) {
     json config = load->configuration;
     config["destinationTable"] = complete(load->destination_table);
     return json{{"jobType", "LOAD"}, {"load", std::move(config)}};
+  }
+  if (const auto* extract = std::get_if<ExtractJob>(&job.configuration)) {
+    json config = extract->configuration;
+    config["sourceTable"] = complete(extract->source_table);
+    return json{{"jobType", "EXTRACT"}, {"extract", std::move(config)}};
   }
   const QueryJob& query = *job.query();
   json config{{"query", query.query}, {"useLegacySql", false}};
