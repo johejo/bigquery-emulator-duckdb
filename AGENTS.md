@@ -3,6 +3,43 @@
 C++20 built with Bazel; prefer the standard library. `nix develop` provides the toolchain,
 including `bq`. Run `just` recipes (see the `Justfile`) rather than raw commands.
 
+## Implementing functions
+
+Compatibility comes first; prefer implementations with less code and fewer special cases. Leave
+out an overload, argument type or form whose semantics would cost too much rather than approximate
+it; a call no rule or handler matches stays unsupported. `src/translator/functions.cc` registers
+each function under one implementation; pick the first that fits. Existing registrations are not
+evidence of compatibility.
+
+1. **DuckDB as is** (`PlainFunctions`, `FunctionNames`): only when DuckDB agrees on every input,
+   including NULL, NaN and infinities, overflow and errors. Names can match while semantics do
+   not: DuckDB's `concat` skips NULL where BigQuery's `CONCAT` returns NULL.
+2. **GoogleSQL's implementation** (`BackendRules`, registered in `src/backend_functions.cc`): the
+   default for regular expressions, STRING and BYTES handling, JSON, and parsing or formatting
+   text, where engines differ in edge cases. If a DuckDB spelling needs tricks such as walking
+   BYTES as hex digits, use this instead.
+3. **A template** (`TemplateRules`): a DuckDB function plus a small fixed difference, such as
+   argument order, a default, a date part, or an error DuckDB lacks.
+4. **A handler** (`Handlers`, `src/translator/function.cc`): when the spelling depends on more of
+   the resolved AST than a template sees, such as a variable number of arguments or a literal
+   pattern or path. A handler that reimplements the function's semantics belongs in GoogleSQL's
+   implementation instead.
+
+Aggregate and window functions map to DuckDB ones through `AggregateRule`. A function its fields
+cannot express stays unsupported unless it is common enough to justify a custom aggregate.
+
+Check each overload against BigQuery's documentation for:
+
+- **NULL**: NULL arguments, NULL array elements, and empty strings, bytes and arrays.
+- **Types**: the DuckDB result type matches the type GoogleSQL resolves, for every argument type
+  the function accepts (STRING or BYTES; INT64, NUMERIC, BIGNUMERIC or FLOAT64).
+- **Errors**: where BigQuery fails, the emulator fails too, rather than returning NULL, an infinity
+  or a clamped value; raise it with `!n` or `Raise()` so `SAFE.` turns it into NULL. Use
+  BigQuery's message where it is known.
+- **Evaluation**: a handler that uses an argument more than once binds it once, as templates do.
+
+Cover each of these that applies with a case in `scalars.txt`.
+
 ## Testing
 
 - End-to-end tests are the primary compatibility tests: [runn](https://github.com/k1LoW/runn)

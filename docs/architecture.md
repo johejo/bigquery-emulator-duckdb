@@ -42,14 +42,14 @@ The translator's sources in [src/translator/](../src/translator) share
 of what a scan can see besides its input. Expressions, scalar functions, scans, aggregation, DML,
 DDL, and types and literals each have a file of their own.
 
-[src/functions.cc](../src/functions.cc) maps BigQuery functions to DuckDB with two rule tables.
-A **rename** replaces only the function name. A **template** rewrites the call using `$n` for
-the n-th argument and `#n` for that argument as a lowercase string literal, so
-`DATE_DIFF(a, b, DAY)` becomes `date_diff('day', b, a)`. A function belongs there when every
-call it supports is one template of a fixed number of arguments, chosen by their types, date
-parts, rounding modes and STRING literal values. Functions that take any number of arguments or
-read more of the resolved AST, such as a JSONPath literal, are spelled in
-[src/translator/function.cc](../src/translator/function.cc).
+[src/translator/functions.cc](../src/translator/functions.cc) is the registry of the functions the
+emulator supports, each under one implementation: a DuckDB function of the same or another name,
+DuckDB SQL templates, GoogleSQL's own implementation, code in
+[src/translator/function.cc](../src/translator/function.cc), or a DuckDB aggregate or window
+function. A **template** rewrites the call using `$n` for the n-th argument and `#n` for that
+argument as a lowercase string literal, so `DATE_DIFF(a, b, DAY)` becomes
+`date_diff('day', b, a)`; the rules are chosen by argument count, types, date parts, rounding
+modes and STRING literal values. AGENTS.md says which implementation to choose.
 
 ## Backend
 
