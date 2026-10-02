@@ -3,6 +3,23 @@
 C++20 built with Bazel; prefer the standard library. `nix develop` provides the toolchain,
 including `bq`. Run `just` recipes (see the `Justfile`) rather than raw commands.
 
+## Partial support
+
+The emulator is useful because it fails locally where BigQuery would behave differently, so a
+statement, clause, option or API field is supported only as far as clients cannot tell it apart
+from BigQuery. Decide each one by what a client can observe:
+
+- **Accept and ignore** it only when neither results nor metadata depend on it, such as a
+  request's `timeoutMs`, since jobs run synchronously.
+- **Store and return** it when it is only metadata, such as a table's description or labels;
+  storing it is the whole implementation, and DDL and the REST API should agree.
+- **Reject** anything that changes behavior, such as a required partition filter or an
+  expiration, as unsupported until it is implemented. Never accept a form and silently drop what
+  it does, even to let more queries run.
+
+A feature that rejects some of its forms is Partial in the probes under `tools/`, not Supported.
+Deliberate exceptions, kept for convenience, are listed in the README's Compatibility section.
+
 ## Implementing functions
 
 Compatibility comes first; prefer implementations with less code and fewer special cases. Leave

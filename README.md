@@ -110,6 +110,14 @@ Behavior that applies across them:
 - Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier
   `` `region-us` `` covers every dataset of the project and any other region none.
 
+The emulator rejects what it cannot emulate rather than accepting it and behaving differently.
+These differences are deliberate exceptions, kept for convenience:
+
+- A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
+  SQL. Legacy SQL itself is unsupported.
+- `BIGNUMERIC` is DuckDB's `DECIMAL(38, 19)`, not BigQuery's 76 digits with a scale of 38: values
+  with more than 19 integer digits fail, and fractional digits beyond 19 are rounded.
+
 ## Development
 
 See [AGENTS.md](AGENTS.md) for building and testing, and
