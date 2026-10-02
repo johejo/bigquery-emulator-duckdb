@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <variant>
@@ -33,6 +35,21 @@ json TableReferenceJson(const TableReference& table) {
 
 json DatasetReferenceJson(const DatasetReference& dataset) {
   return json{{"projectId", dataset.project_id}, {"datasetId", dataset.dataset_id}};
+}
+
+// The entries of `items`, sorted by `id`, that `page` asks for. Sets nextPageToken on `response`
+// when more entries follow.
+template <typename T, typename Id>
+std::span<const T> ListPageItems(const std::vector<T>& items, const ListPage& page, Id id,
+                                 json& response) {
+  const auto begin = page.page_token.empty() ? items.begin()
+                                             : std::ranges::upper_bound(items, page.page_token,
+                                                                        std::ranges::less{}, id);
+  const auto end = begin + std::min<int64_t>(items.end() - begin, page.max_results);
+  if (end != items.end()) {
+    response["nextPageToken"] = std::invoke(id, *(end - 1));
+  }
+  return {begin, end};
 }
 
 std::string TableId(const TableReference& table) {
@@ -297,12 +314,19 @@ json DatasetResource(const DatasetReference& dataset) {
               {"location", kLocation}};
 }
 
-json DatasetList(const std::string& project_id, const std::vector<std::string>& dataset_ids) {
+json DatasetList(const std::string& project_id, const std::vector<std::string>& dataset_ids,
+                 const ListPage& page) {
+  json response = {{"kind", "bigquery#datasetList"}, {"etag", kEtag}};
   json datasets = json::array();
-  for (const std::string& dataset_id : dataset_ids) {
+  for (const std::string& dataset_id :
+       ListPageItems(dataset_ids, page, std::identity{}, response)) {
     datasets.push_back(DatasetResource(DatasetReference{project_id, dataset_id}));
   }
-  return json{{"kind", "bigquery#datasetList"}, {"etag", kEtag}, {"datasets", std::move(datasets)}};
+  // BigQuery omits the datasets of a project that has none.
+  if (!datasets.empty()) {
+    response["datasets"] = std::move(datasets);
+  }
+  return response;
 }
 
 json TableResource(const TableInfo& info) {
@@ -323,19 +347,20 @@ json TableResource(const TableInfo& info) {
   return resource;
 }
 
-json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables) {
+json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
+               const ListPage& page) {
+  json response = {{"kind", "bigquery#tableList"}, {"etag", kEtag}, {"totalItems", tables.size()}};
   json entries = json::array();
-  for (const TableListEntry& entry : tables) {
+  for (const TableListEntry& entry :
+       ListPageItems(tables, page, &TableListEntry::table_id, response)) {
     const TableReference table{dataset.project_id, dataset.dataset_id, entry.table_id};
     entries.push_back(json{{"kind", "bigquery#table"},
                            {"id", TableId(table)},
                            {"tableReference", TableReferenceJson(table)},
                            {"type", TableTypeName(entry.type)}});
   }
-  return json{{"kind", "bigquery#tableList"},
-              {"etag", kEtag},
-              {"totalItems", entries.size()},
-              {"tables", std::move(entries)}};
+  response["tables"] = std::move(entries);
+  return response;
 }
 
 json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page) {

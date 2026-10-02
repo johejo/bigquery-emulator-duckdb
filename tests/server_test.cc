@@ -97,6 +97,12 @@ TEST_F(ServerTest, ListsJobsWithFiltersAndProjection) {
   Get(path + "?projection=unknown", 400);
 }
 
+TEST_F(ServerTest, RejectsInvalidListPageSize) {
+  Post("/projects/p/datasets", {{"datasetReference", {{"datasetId", "ds"}}}});
+  Get("/projects/p/datasets?maxResults=0", 400);
+  Get("/projects/p/datasets/ds/tables?maxResults=x", 400);
+}
+
 TEST_F(ServerTest, CancelsCompletedJobWithoutChangingIt) {
   const std::string path = "/projects/p/jobs";
   const json job = Post(path, {{"jobReference", {{"jobId", "done"}}},

@@ -175,7 +175,7 @@ class Server::Impl {
     Get("/projects/:project/datasets",
         Json([this](const httplib::Request& request, httplib::Response&) {
           const std::string project = Param(request, "project");
-          return DatasetList(project, emulator_.ListDatasets(project));
+          return DatasetList(project, emulator_.ListDatasets(project), ParseListPage(request));
         }));
     Post("/projects/:project/datasets",
          Json([this](const httplib::Request& request, httplib::Response&) {
@@ -212,7 +212,7 @@ class Server::Impl {
     Get("/projects/:project/datasets/:dataset/tables",
         Json([this](const httplib::Request& request, httplib::Response&) {
           const DatasetReference dataset = DatasetFromPath(request);
-          return TableList(dataset, emulator_.ListTableEntries(dataset));
+          return TableList(dataset, emulator_.ListTableEntries(dataset), ParseListPage(request));
         }));
     Post("/projects/:project/datasets/:dataset/tables",
          Json([this](const httplib::Request& request, httplib::Response&) {

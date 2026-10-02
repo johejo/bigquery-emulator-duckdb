@@ -313,6 +313,13 @@ JobListRequest ParseJobList(const httplib::Request& request) {
   return result;
 }
 
+ListPage ParseListPage(const httplib::Request& request) {
+  ListPage result{.max_results = QueryParamInt(request, "maxResults", INT64_MAX),
+                  .page_token = request.get_param_value("pageToken")};
+  if (result.max_results <= 0) throw ApiError::Invalid("Invalid value for maxResults");
+  return result;
+}
+
 DatasetReference ParseDatasetInsert(const std::string& project_id, const json& body) {
   const json reference = body.value("datasetReference", json::object());
   if (!reference.is_object() || !reference.contains("datasetId")) {
