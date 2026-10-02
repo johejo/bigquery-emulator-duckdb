@@ -176,6 +176,7 @@ class Server::Impl {
     // datasets
     Get("/projects/:project/datasets",
         Json([this](const httplib::Request& request, httplib::Response&) {
+          RejectQueryParam(request, "filter");
           const std::string project = Param(request, "project");
           std::vector<std::string> dataset_ids = emulator_.ListDatasets(project);
           // Datasets whose names start with an underscore are hidden unless `all` asks for them.
@@ -259,6 +260,7 @@ class Server::Impl {
            }));
     Get("/projects/:project/datasets/:dataset/tables/:table/data",
         Json([this](const httplib::Request& request, httplib::Response&) {
+          RejectQueryParam(request, "selectedFields");
           const TableReference table = TableFromPath(request);
           const ResultPage page = ParseResultPage(request);
           const QueryResult result =

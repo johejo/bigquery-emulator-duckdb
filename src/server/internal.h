@@ -81,6 +81,8 @@ using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractR
 
 std::string Param(const httplib::Request& request, const char* name);
 bool QueryParamBool(const httplib::Request& request, const char* name);
+// Rejects a non-empty query parameter `name` that would change the response but is not emulated.
+void RejectQueryParam(const httplib::Request& request, const char* name);
 DatasetReference DatasetFromPath(const httplib::Request& request);
 TableReference TableFromPath(const httplib::Request& request);
 

@@ -222,6 +222,12 @@ bool QueryParamBool(const httplib::Request& request, const char* name) {
   return request.has_param(name) && request.get_param_value(name) == "true";
 }
 
+void RejectQueryParam(const httplib::Request& request, const char* name) {
+  if (!request.get_param_value(name).empty()) {
+    throw ApiError::Invalid(std::string("The emulator does not support ") + name);
+  }
+}
+
 DatasetReference DatasetFromPath(const httplib::Request& request) {
   return DatasetReference{Param(request, "project"), Param(request, "dataset")};
 }
