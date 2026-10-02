@@ -118,69 +118,6 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
   return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts[0];
 }
 
-std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
-  if (!expr.Is<googlesql::ResolvedLiteral>()) {
-    return std::nullopt;
-  }
-  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
-  if (value.is_null() || !value.type()->IsString()) {
-    return std::nullopt;
-  }
-  return value.string_value();
-}
-
-// A literal JSONPath as a DuckDB path literal. The legacy JSON_EXTRACT functions escape keys as
-// ['a.b'], the standard ones as ."a.b". Paths outside this subset are unsupported.
-std::optional<std::string> JsonPath(const googlesql::ResolvedExpr& expr, bool legacy) {
-  const auto path = StringLiteral(expr);
-  if (!path || !path->starts_with("$")) {
-    return std::nullopt;
-  }
-  std::string sql = "$";
-  for (size_t i = 1; i < path->size();) {
-    const char c = (*path)[i++];
-    std::optional<std::string> element;
-    if (c == '.' && !legacy && i < path->size() && (*path)[i] == '"') {
-      const size_t end = path->find('"', i + 1);
-      if (end == std::string::npos ||
-          path->substr(i + 1, end - i - 1).find('\\') != std::string::npos) {
-        return std::nullopt;
-      }
-      element = JsonPathKey(path->substr(i + 1, end - i - 1));
-      i = end + 1;
-    } else if (c == '.') {
-      const size_t end = std::min(path->find_first_of(".[", i), path->size());
-      const std::string key = path->substr(i, end - i);
-      if (key.find_first_of("\"'] \t\n\r") != std::string::npos) {
-        return std::nullopt;
-      }
-      element = JsonPathKey(key);
-      i = end;
-    } else if (c == '[' && legacy && i < path->size() && (*path)[i] == '\'') {
-      const size_t end = path->find('\'', i + 1);
-      if (end == std::string::npos || end + 1 >= path->size() || (*path)[end + 1] != ']') {
-        return std::nullopt;
-      }
-      element = JsonPathKey(path->substr(i + 1, end - i - 1));
-      i = end + 2;
-    } else if (c == '[') {
-      const size_t end = path->find(']', i);
-      const std::string index = end == std::string::npos ? "" : path->substr(i, end - i);
-      if (index.empty() || index.size() > 18 ||
-          index.find_first_not_of("0123456789") != std::string::npos) {
-        return std::nullopt;
-      }
-      element = "[" + index + "]";
-      i = end + 1;
-    }
-    if (!element) {
-      return std::nullopt;
-    }
-    sql += *element;
-  }
-  return QuoteLiteral(sql);
-}
-
 // The translated arguments of a call.
 std::vector<std::string> Sqls(const ScalarCall& call) {
   std::vector<std::string> sqls;
@@ -209,8 +146,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
     call.arguments.push_back({.sql = args[i],
                               .type = argument.type()->kind(),
                               .date_part = DatePart(argument),
-                              .rounding_mode = RoundingMode(argument),
-                              .string_literal = StringLiteral(argument)});
+                              .rounding_mode = RoundingMode(argument)});
   }
   if (entry->implementation == Implementation::kHandler) {
     return entry->handler(call);
@@ -301,88 +237,45 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
          call.Raise(zero) + " ELSE " + bucket + " END)[1]";
 }
 
-std::optional<std::string> JsonExtract(const ScalarCall& call) {
-  const std::vector<std::string> args = Sqls(call);
-  const size_t n = args.size();
-  // The legacy functions escape keys as ['a.b'], the standard ones as ."a.b".
-  const bool legacy = call.name.starts_with("JSON_EXTRACT");
-  if ((n != 1 && n != 2) || !(TypeOf(call, 0)->IsString() || TypeOf(call, 0)->IsJson())) {
-    return std::nullopt;
-  }
-  const auto path = n == 1 ? std::optional<std::string>("'$'")
-                           : JsonPath(*call.resolved.argument_list(1), legacy);
-  if (!path) {
-    return std::nullopt;
-  }
-  const bool strings = TypeOf(call, 0)->IsString();
-  const std::string value = "json_extract(_j, " + *path + ")";
-  const std::string elements = "CAST(" + value + " AS JSON[])";
-  std::string sql;
-  if (call.name == "JSON_QUERY" || call.name == "JSON_EXTRACT") {
-    // A JSON null in a STRING is SQL NULL, and in JSON the JSON null.
-    if (!strings) {
-      return "json_extract(" + args[0] + ", " + *path + ")";
-    }
-    sql = "CASE WHEN json_type(" + value + ") <> 'NULL' THEN " + value + " END";
-  } else if (call.name == "JSON_VALUE" || call.name == "JSON_EXTRACT_SCALAR") {
-    sql = "CASE WHEN json_type(" + value +
-          ") NOT IN ('OBJECT', 'ARRAY') THEN json_extract_string(" + value + ", '$') END";
-  } else if (call.name == "JSON_QUERY_ARRAY" || call.name == "JSON_EXTRACT_ARRAY") {
-    // Indexing keeps JSON nulls, which a cast to JSON[] turns into SQL NULLs.
-    sql = "CASE WHEN json_type(" + value + ") = 'ARRAY' THEN list_transform(range(CAST(" +
-          "json_array_length(" + value + ") AS BIGINT)), _i -> json_extract(" + value +
-          ", _i)) END";
-  } else {
-    // NULL unless every element is a scalar; JSON nulls become SQL NULLs.
-    sql = "CASE WHEN json_type(" + value + ") = 'ARRAY' AND len(list_filter(" + elements +
-          ", _e -> json_type(_e) IN ('OBJECT', 'ARRAY'))) = 0 THEN list_transform(" + elements +
-          ", _e -> json_extract_string(_e, '$')) END";
-  }
-  // A malformed JSON string gives NULL rather than an error.
-  if (strings) {
-    sql = "CASE WHEN json_valid(_j) THEN " + sql + " END";
-  }
-  return "list_transform([" + args[0] + "], _j -> " + sql + ")[1]";
-}
-
-std::optional<std::string> JsonSubscript(const ScalarCall& call) {
-  const std::vector<std::string> args = Sqls(call);
-  if (args.size() != 2 || !TypeOf(call, 0)->IsJson()) {
-    return std::nullopt;
-  }
-  if (TypeOf(call, 1)->IsInt64()) {
-    // DuckDB counts negative indexes from the end.
-    return "list_transform([struct_pack(j := " + args[0] + ", i := " + args[1] +
-           ")], _js -> CASE WHEN _js.i >= 0 THEN json_extract(_js.j, _js.i) END)[1]";
-  }
-  const auto key = StringLiteral(*call.resolved.argument_list(1));
-  const auto path = key ? JsonPathKey(*key) : std::nullopt;
-  if (!path) {
-    return std::nullopt;
-  }
-  return "json_extract(" + args[0] + ", " + QuoteLiteral("$" + *path) + ")";
-}
-
 namespace {
 
-// The JSON functions in src/backend_functions.cc take and return JSON as its text.
-std::string JsonText(const ScalarCall& call, size_t i) {
-  const std::string& sql = call.arguments[i].sql;
-  return TypeOf(call, i)->IsJson() ? "CAST(" + sql + " AS VARCHAR)"
-                                   : "CAST(to_json(" + sql + ") AS VARCHAR)";
+// An argument cast to the DuckDB type that stands for its GoogleSQL type, which the JSON
+// functions in src/backend_functions.cc read as a GoogleSQL value.
+std::optional<std::string> JsonArgument(const ScalarCall& call, size_t i) {
+  const auto type = DuckDbType(TypeOf(call, i));
+  if (!type) {
+    return std::nullopt;
+  }
+  return "CAST(" + call.arguments[i].sql + " AS " + *type + ")";
+}
+
+// The JSON arguments of a call, or nullopt when one has a type DuckDB cannot hold.
+std::optional<std::vector<std::string>> JsonArguments(const ScalarCall& call) {
+  std::vector<std::string> arguments;
+  for (size_t i = 0; i < call.arguments.size(); ++i) {
+    const auto argument = JsonArgument(call, i);
+    if (!argument) {
+      return std::nullopt;
+    }
+    arguments.push_back(*argument);
+  }
+  return arguments;
 }
 
 }  // namespace
 
-// BigQuery's TO_JSON makes JSON null of NULL. Stringifying wide numbers is unsupported.
+// TO_JSON(value, stringify_wide_numbers) and TO_JSON_STRING(value, pretty_print).
 std::optional<std::string> ToJson(const ScalarCall& call) {
   const size_t n = call.arguments.size();
-  if (n == 1 || (n == 2 && call.resolved.argument_list(1)->Is<googlesql::ResolvedLiteral>() &&
-                 call.resolved.argument_list(1)->GetAs<googlesql::ResolvedLiteral>()->value() ==
-                     googlesql::Value::Bool(false))) {
-    return "coalesce(to_json(" + call.arguments[0].sql + "), JSON 'null')";
+  const auto value = n == 1 || n == 2 ? JsonArgument(call, 0) : std::nullopt;
+  if (!value) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  const std::string flag = n == 2 ? call.arguments[1].sql : "false";
+  if (call.name == "TO_JSON_STRING") {
+    return "bq_to_json_string(" + *value + ", " + flag + ")";
+  }
+  return "json(bq_to_json(" + *value + ", " + flag + "))";
 }
 
 // JSON_REMOVE and JSON_SET take the paths one by one, in order.
@@ -391,7 +284,7 @@ std::optional<std::string> JsonRemove(const ScalarCall& call) {
   if (args.size() < 2) {
     return std::nullopt;
   }
-  std::string result = JsonText(call, 0);
+  std::string result = "CAST(" + args[0] + " AS VARCHAR)";
   for (size_t i = 1; i < args.size(); ++i) {
     result.insert(0, "bq_json_remove(").append(", ").append(args[i]).append(")");
   }
@@ -404,13 +297,17 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
   if (n < 4 || n % 2 != 0) {
     return std::nullopt;
   }
-  std::string result = JsonText(call, 0);
+  std::string result = "CAST(" + args[0] + " AS VARCHAR)";
   for (size_t i = 1; i + 1 < n; i += 2) {
+    const auto value = JsonArgument(call, i + 1);
+    if (!value) {
+      return std::nullopt;
+    }
     result.insert(0, "bq_json_set(")
         .append(", ")
         .append(args[i])
         .append(", ")
-        .append(JsonText(call, i + 1))
+        .append(*value)
         .append(", ")
         .append(args[n - 1])
         .append(")");
@@ -418,23 +315,22 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
   return "json(" + result + ")";
 }
 
-std::optional<std::string> JsonObject(const ScalarCall& call) {
-  const std::vector<std::string> args = Sqls(call);
-  const size_t n = args.size();
-  if (n == 2 && TypeOf(call, 0)->IsArray()) {
-    return "json(bq_json_object(" + JsonText(call, 0) + ", " + JsonText(call, 1) + "))";
-  }
-  if (n % 2 != 0) {
+// JSON_ARRAY(values...).
+std::optional<std::string> JsonArray(const ScalarCall& call) {
+  const auto args = JsonArguments(call);
+  if (!args) {
     return std::nullopt;
   }
-  std::vector<std::string> keys;
-  std::vector<std::string> values;
-  for (size_t i = 0; i < n; i += 2) {
-    keys.push_back(args[i]);
-    values.push_back(args[i + 1]);
+  return args->empty() ? "JSON '[]'" : "json(bq_json_array(" + Join(*args, ", ") + "))";
+}
+
+// JSON_OBJECT(key, value, ...) and JSON_OBJECT(keys, values).
+std::optional<std::string> JsonObject(const ScalarCall& call) {
+  const auto args = JsonArguments(call);
+  if (!args || args->size() % 2 != 0) {
+    return std::nullopt;
   }
-  return "json(bq_json_object(CAST(json_array(" + Join(keys, ", ") +
-         ") AS VARCHAR), CAST(json_array(" + Join(values, ", ") + ") AS VARCHAR)))";
+  return args->empty() ? "JSON '{}'" : "json(bq_json_object(" + Join(*args, ", ") + "))";
 }
 
 std::optional<std::string> ArrayConcat(const ScalarCall& call) {
@@ -506,22 +402,6 @@ std::optional<std::string> Extremum(const ScalarCall& call) {
   }
   body += std::string("ELSE ") + (greatest ? "list_max" : "list_min") + "(_ext) END";
   return "list_transform([[" + Join(Sqls(call), ", ") + "]], _ext -> " + body + ")[1]";
-}
-
-// A JSONPath key as DuckDB spells it. Quoting every key keeps DuckDB's wildcards and other
-// extensions from applying. DuckDB rejects the empty key.
-std::optional<std::string> JsonPathKey(std::string_view key) {
-  if (key.empty()) {
-    return std::nullopt;
-  }
-  std::string quoted = ".\"";
-  for (const char c : key) {
-    if (c == '"' || c == '\\') {
-      quoted += '\\';
-    }
-    quoted += c;
-  }
-  return quoted + "\"";
 }
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,

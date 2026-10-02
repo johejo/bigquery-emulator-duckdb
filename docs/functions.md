@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 21 |
-| Supported | 215 |
+| Partial | 20 |
+| Supported | 216 |
 | Unsupported | 157 |
 | Untested | 13 |
 
@@ -76,7 +76,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`BIT_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions#bit_count) | bit_functions | Supported | DuckDB SQL |  |
 | [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
 | [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
-| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | string_functions | Supported | DuckDB SQL | counts the bytes of a STRING's UTF-8 encoding |
 | [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | conditional_expressions | Supported |  |  |
 | [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | conversion_functions | Partial |  | CAST with FORMAT, time zone or type parameters |
@@ -144,7 +144,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
 | [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Supported | GoogleSQL function |  |
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
-| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported | DuckDB function |  |
 | [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | NUMERIC, BIGNUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | GoogleSQL function |  |
@@ -171,30 +171,30 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | conditional_expressions | Supported | DuckDB function |  |
 | [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | string_functions | Supported | GoogleSQL function |  |
 | [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | string_functions | Supported | GoogleSQL function |  |
-| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | json_functions | Supported | DuckDB SQL | from JSON, fails when the value has another JSON type |
+| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`IS_INF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_inf) | mathematical_functions | Supported | DuckDB function, renamed |  |
 | [`IS_NAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#is_nan) | mathematical_functions | Supported | DuckDB function, renamed |  |
 | [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested |  | no sample for <graph_path> |
-| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported | DuckDB function, renamed |  |
+| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Unsupported |  | function JSON_ARRAY_APPEND |
 | [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Unsupported |  | function JSON_ARRAY_INSERT |
-| [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
-| [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported |  | function JSON_FLATTEN |
 | [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported | DuckDB SQL, in code |  |
-| [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
-| [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | json_functions | Supported | GoogleSQL function |  |
-| [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported | DuckDB SQL |  |
-| [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings and JSON nulls give NULL |
-| [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | DuckDB SQL, in code | needs a literal JSONPath of keys and indexes; malformed JSON strings give NULL |
+| [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | GoogleSQL function |  |
+| [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | GoogleSQL function |  |
 | [`JUSTIFY_DAYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_days) | interval_functions | Unsupported |  | type INTERVAL |
 | [`JUSTIFY_HOURS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_hours) | interval_functions | Unsupported |  | type INTERVAL |
 | [`JUSTIFY_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_interval) | interval_functions | Unsupported |  | type INTERVAL |
@@ -270,7 +270,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Unsupported |  | function PARSE_BIGNUMERIC |
 | [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | GoogleSQL function |  |
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | GoogleSQL function |  |
-| [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Partial | DuckDB SQL | function PARSE_JSON |
+| [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Supported | GoogleSQL function |  |
 | [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported |  | function PARSE_NUMERIC |
 | [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported | GoogleSQL function |  |
 | [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | GoogleSQL function | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
@@ -333,7 +333,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
-| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | DuckDB SQL | from JSON, fails when the value has another JSON type; function STRING |
+| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | GoogleSQL function | from JSON, fails when the value has another JSON type; function STRING |
 | [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported | GoogleSQL function |  |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported |  | function ST_ANGLE |
@@ -431,7 +431,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | json_functions | Supported | DuckDB SQL, in code |  |
-| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported | DuckDB SQL |  |
+| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | string_functions | Supported | GoogleSQL function |  |
 | [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | string_functions | Supported | GoogleSQL function |  |
 | [`TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#trunc) | mathematical_functions | Supported | DuckDB SQL |  |

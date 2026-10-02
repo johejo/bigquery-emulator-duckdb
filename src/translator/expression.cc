@@ -153,11 +153,11 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   if (expr.Is<googlesql::ResolvedGetJsonField>()) {
     const auto* get = expr.GetAs<googlesql::ResolvedGetJsonField>();
     const auto input = Expression(*get->expr(), scope, columns);
-    const auto path = JsonPathKey(get->field_name());
-    if (!input || !path) {
-      return input ? Unsupported(scope, "empty JSON field name") : std::nullopt;
+    if (!input) {
+      return std::nullopt;
     }
-    return "json_extract(" + *input + ", " + QuoteLiteral("$" + *path) + ")";
+    return "json(bq_json_field(CAST(" + *input + " AS VARCHAR), " +
+           QuoteLiteral(get->field_name()) + "))";
   }
   if (expr.Is<googlesql::ResolvedSubqueryExpr>()) {
     return Subquery(*expr.GetAs<googlesql::ResolvedSubqueryExpr>(), *type, scope, columns);

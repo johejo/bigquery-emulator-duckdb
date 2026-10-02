@@ -134,20 +134,16 @@ std::optional<std::string> OrderItems(
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns);
 
-// A JSONPath key as DuckDB spells it, or nullopt for the empty key, which DuckDB rejects.
-std::optional<std::string> JsonPathKey(std::string_view key);
-
 // The handlers that the registry in functions.cc names, in function.cc.
 std::optional<std::string> MakeArray(const ScalarCall& call);
 std::optional<std::string> Logical(const ScalarCall& call);
 std::optional<std::string> InList(const ScalarCall& call);
 std::optional<std::string> Case(const ScalarCall& call);
 std::optional<std::string> Bucket(const ScalarCall& call);
-std::optional<std::string> JsonExtract(const ScalarCall& call);
-std::optional<std::string> JsonSubscript(const ScalarCall& call);
 std::optional<std::string> ToJson(const ScalarCall& call);
 std::optional<std::string> JsonRemove(const ScalarCall& call);
 std::optional<std::string> JsonSet(const ScalarCall& call);
+std::optional<std::string> JsonArray(const ScalarCall& call);
 std::optional<std::string> JsonObject(const ScalarCall& call);
 std::optional<std::string> ArrayConcat(const ScalarCall& call);
 std::optional<std::string> ConcatStrings(const ScalarCall& call);

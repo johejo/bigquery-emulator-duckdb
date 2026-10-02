@@ -792,8 +792,6 @@ TEST_F(TranslatorTest, RunsJsonFunctions) {
             R"(["1","null","{\"c\":\"x\"}","\"s\""])");
   EXPECT_EQ(Scalar("SELECT JSON_EXTRACT_ARRAY(" + doc + ", '$.a') IS NULL"), "true");
   EXPECT_EQ(Scalar("SELECT JSON_VALUE_ARRAY(" + doc + ", '$.a.b') IS NULL"), "true");
-  EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$[a]')"), "function JSON_QUERY");
-  EXPECT_EQ(Unsupported("SELECT JSON_QUERY('{}', '$.a[*]')"), "function JSON_QUERY");
 }
 
 TEST_F(TranslatorTest, BuildsAndChangesJson) {
@@ -842,8 +840,6 @@ TEST_F(TranslatorTest, AccessesAndConvertsJson) {
   EXPECT_THROW(Execute("SELECT BOOL(JSON '1')"), std::exception);
   EXPECT_THROW(Execute("SELECT STRING(JSON '1')"), std::exception);
   EXPECT_EQ(Scalar("SELECT STRING((" + doc + ").missing)"), std::nullopt);
-  EXPECT_EQ(Unsupported("SELECT FLOAT64(JSON '1', wide_number_mode => 'exact')"),
-            "function FLOAT64");
 }
 
 TEST_F(TranslatorTest, DoesNotReportParameterErrorsAsUnsupported) {

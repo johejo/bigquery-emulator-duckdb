@@ -27,8 +27,6 @@ struct FunctionArgument {
   std::optional<std::string> date_part;
   // The rounding mode, such as "ROUND_HALF_EVEN", when the argument is one.
   std::optional<std::string> rounding_mode;
-  // The value of a STRING literal argument.
-  std::optional<std::string> string_literal;
 };
 
 // The SQL that raises the error whose message is the DuckDB string expression `message`, or NULL
@@ -96,8 +94,6 @@ struct Condition {
   std::vector<std::string_view> date_parts;
   // This rounding mode.
   std::optional<std::string_view> rounding_mode;
-  // A STRING literal with this value.
-  std::optional<std::string_view> string_literal;
 };
 
 // A DuckDB spelling of a BigQuery function. In the spelling, $n is argument n, #n argument n,
