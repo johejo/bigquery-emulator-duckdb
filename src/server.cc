@@ -95,7 +95,8 @@ class Server::Impl {
                                           httplib::Response& response) {
       try {
         const json body = handler(request, response);
-        response.set_content(body.dump(), "application/json");
+        // A 204 response has no body; sending one corrupts the next response on the connection.
+        if (response.status != 204) response.set_content(body.dump(), "application/json");
       } catch (const ApiError& error) {
         response.status = error.http_status();
         response.set_content(ErrorBody(error).dump(), "application/json");

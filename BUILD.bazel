@@ -631,7 +631,6 @@ cc_test(
         ":httplib",
         ":server",
         "@com_google_googletest//:gtest_main",
-        "@nlohmann_json//:json",
     ],
 )
 

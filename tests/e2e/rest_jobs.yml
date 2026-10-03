@@ -1,0 +1,593 @@
+desc: the jobs and queries REST methods return BigQuery's status codes and response fields
+# Each group of steps uses its own project, since the emulator is shared across scenarios and
+# some steps count the jobs in a project.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  query_error:
+    req:
+      /bigquery/v2/projects/rest-query/queries:
+        post:
+          body:
+            application/json: {query: SELECT * FROM nope}
+    test: |
+      current.res.status == 200 && current.res.body.errors[0].reason == "invalidQuery"
+  legacy_sql_query:
+    req:
+      /bigquery/v2/projects/rest-query/queries:
+        post:
+          body:
+            application/json: {query: SELECT 1, useLegacySql: true}
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  legacy_sql_job:
+    req:
+      /bigquery/v2/projects/rest-query/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1, useLegacySql: true}}
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  standard_sql_query:
+    req:
+      /bigquery/v2/projects/rest-query/queries:
+        post:
+          body:
+            application/json: {query: SELECT 1, useLegacySql: false}
+    test: current.res.status == 200
+
+  # jobs.list filters and projections
+  list_job_a:
+    req:
+      /bigquery/v2/projects/rest-list/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: a}
+              configuration: {query: {query: SELECT 1}}
+    test: current.res.status == 200
+  list_job_b:
+    req:
+      /bigquery/v2/projects/rest-list/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: b}
+              configuration: {query: {query: SELECT * FROM missing}}
+    test: current.res.status == 200
+  list_job_in_other_project:
+    req:
+      /projects/rest-list-other/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: c}
+              configuration: {query: {query: SELECT 1}}
+    test: current.res.status == 200
+  list_minimal:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?projection=minimal:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.kind == "bigquery#jobList" &&
+      len(current.res.body.jobs) == 2 &&
+      !("status" in current.res.body.jobs[0])
+  list_full:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?pageToken=:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      len(current.res.body.jobs) == 2 &&
+      "status" in current.res.body.jobs[0]
+  list_running:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?stateFilter=running:
+        get:
+          body: null
+    test: current.res.status == 200 && !("jobs" in current.res.body)
+  list_children:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?parentJobId=parent:
+        get:
+          body: null
+    test: current.res.status == 200 && !("jobs" in current.res.body)
+  list_negative_page_size:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?maxResults=-1:
+        get:
+          body: null
+    test: current.res.status == 400
+  list_unknown_projection:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?projection=unknown:
+        get:
+          body: null
+    test: current.res.status == 400
+
+  # jobs.cancel leaves a completed job as it is
+  cancel_job:
+    req:
+      /projects/rest-cancel/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: done}
+              configuration: {query: {query: SELECT 1}}
+    test: current.res.status == 200
+  cancel:
+    req:
+      /projects/rest-cancel/jobs/done/cancel:
+        post:
+          body:
+            application/json: {}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.kind == "bigquery#jobCancelResponse" &&
+      current.res.body.job == steps.cancel_job.res.body
+  cancelled_job:
+    req:
+      /projects/rest-cancel/jobs/done:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body == steps.cancel_job.res.body
+  cancel_missing:
+    req:
+      /projects/rest-cancel/jobs/missing/cancel:
+        post:
+          body:
+            application/json: {}
+    test: current.res.status == 404
+
+  # jobs.delete removes the job's metadata but keeps its destination table
+  delete_dataset:
+    req:
+      /projects/rest-delete/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  delete_job:
+    req:
+      /bigquery/v2/projects/rest-delete/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: old}
+              configuration:
+                query:
+                  query: SELECT 1 AS x
+                  destinationTable: {datasetId: ds, tableId: result}
+    test: current.res.status == 200
+  delete_job_results:
+    req:
+      /projects/rest-delete/queries/old:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.kind == "bigquery#getQueryResultsResponse"
+  delete:
+    req:
+      /bigquery/v2/projects/rest-delete/jobs/old/delete?location=US:
+        delete:
+          body: null
+    test: current.res.status == 204 && (current.res.headers["Content-Length"] ?? ["0"])[0] == "0"
+  deleted_job:
+    req:
+      /bigquery/v2/projects/rest-delete/jobs/old:
+        get:
+          body: null
+    test: current.res.status == 404
+  deleted_job_results:
+    req:
+      /projects/rest-delete/queries/old:
+        get:
+          body: null
+    test: current.res.status == 404
+  deleted_job_list:
+    req:
+      /bigquery/v2/projects/rest-delete/jobs:
+        get:
+          body: null
+    test: current.res.status == 200 && !("jobs" in current.res.body)
+  kept_destination_table:
+    req:
+      /projects/rest-delete/datasets/ds/tables/result/data:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1"
+  delete_again:
+    req:
+      /bigquery/v2/projects/rest-delete/jobs/old/delete:
+        delete:
+          body: null
+    test: current.res.status == 404
+
+  # A duplicate job id is rejected without running the query
+  duplicate_first:
+    req:
+      /bigquery/v2/projects/rest-duplicate/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: same}
+              configuration: {query: {query: SELECT 1 AS x}}
+    test: current.res.status == 200
+  duplicate_second:
+    req:
+      /bigquery/v2/projects/rest-duplicate/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: same}
+              configuration: {query: {query: SELECT 2 AS x}}
+    test: |
+      current.res.status == 409 &&
+      current.res.body.error.errors[0].reason == "duplicate" &&
+      current.res.body.error.status == "ALREADY_EXISTS"
+  duplicate_results:
+    req:
+      /bigquery/v2/projects/rest-duplicate/queries/same:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1"
+
+  # Query job configuration defaults and validation
+  config_dataset:
+    req:
+      /bigquery/v2/projects/rest-config/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  default_configuration:
+    req:
+      /bigquery/v2/projects/rest-config/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                query:
+                  query: SELECT 1 AS x
+                  destinationTable: {datasetId: ds, tableId: t}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.statistics.query.statementType == "SELECT" &&
+      current.res.body.configuration.query.destinationTable.projectId == "rest-config" &&
+      current.res.body.configuration.query.createDisposition == "CREATE_IF_NEEDED" &&
+      current.res.body.configuration.query.writeDisposition == "WRITE_EMPTY"
+  unknown_disposition:
+    req:
+      /bigquery/v2/projects/rest-config/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: bad}
+              configuration:
+                query:
+                  query: SELECT 1 AS x
+                  destinationTable: {datasetId: ds, tableId: t}
+                  writeDisposition: WRITE_SOMETIMES
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  unknown_disposition_job:
+    req:
+      /bigquery/v2/projects/rest-config/jobs/bad:
+        get:
+          body: null
+    test: current.res.status == 404
+  # No client library reads ddlTargetDataset, so only the REST response shows it.
+  schema_ddl:
+    req:
+      /bigquery/v2/projects/rest-config/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: CREATE SCHEMA created}}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.statistics.query.statementType == "CREATE_SCHEMA" &&
+      current.res.body.statistics.query.ddlTargetDataset ==
+        {"projectId": "rest-config", "datasetId": "created"} &&
+      !("ddlTargetTable" in current.res.body.statistics.query)
+
+  # Copy job statistics and errors
+  copy_dataset:
+    req:
+      /projects/rest-copy/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  copy_source:
+    req:
+      /projects/rest-copy/queries:
+        post:
+          body:
+            application/json: {query: CREATE TABLE ds.source AS SELECT 1 AS id}
+    test: current.res.status == 200
+  copy:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: copy1}
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: target}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.configuration.jobType == "COPY" &&
+      current.res.body.configuration.copy.sourceTable.projectId == "rest-copy" &&
+      current.res.body.statistics.copy.copiedRows == "1"
+  copy_get:
+    req:
+      /projects/rest-copy/jobs/copy1:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body == steps.copy.res.body
+  copy_to_existing_table:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: target}
+    test: |
+      current.res.status == 200 && current.res.body.status.errorResult.reason == "duplicate"
+  copy_append_from_two_sources:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTables:
+                    - {datasetId: ds, tableId: source}
+                    - {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: target}
+                  writeDisposition: WRITE_APPEND
+    test: current.res.status == 200 && current.res.body.statistics.copy.copiedRows == "2"
+  copy_create_never:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: absent}
+                  createDisposition: CREATE_NEVER
+    test: |
+      current.res.status == 200 && current.res.body.status.errorResult.reason == "notFound"
+
+  # Every job type reads table references the same way, so a malformed one is a bad request
+  # rather than an internal error, and the job is never run.
+  malformed_query_string:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1, destinationTable: ds.t}}
+    test: current.res.status == 400
+  malformed_query_type:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1, destinationTable: {datasetId: ds, tableId: 1}}}
+    test: current.res.status == 400
+  malformed_query_missing:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1, destinationTable: {datasetId: ds}}}
+    test: current.res.status == 400
+  malformed_load_string:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {load: {sourceUris: [a.csv], destinationTable: ds.t}}
+    test: current.res.status == 400
+  malformed_load_type:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {load: {sourceUris: [a.csv], destinationTable: {datasetId: ds, tableId: 1}}}
+    test: current.res.status == 400
+  malformed_load_missing:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {load: {sourceUris: [a.csv], destinationTable: {datasetId: ds}}}
+    test: current.res.status == 400
+  malformed_copy_string:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {copy: {sourceTable: ds.t, destinationTable: {datasetId: ds, tableId: source}}}
+    test: current.res.status == 400
+  malformed_copy_type:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: 1}
+                  destinationTable: {datasetId: ds, tableId: source}
+    test: current.res.status == 400
+  malformed_copy_missing:
+    req:
+      /projects/rest-malformed/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds}
+                  destinationTable: {datasetId: ds, tableId: source}
+    test: current.res.status == 400
+  malformed_no_jobs:
+    req:
+      /projects/rest-malformed/jobs:
+        get:
+          body: null
+    test: current.res.status == 200 && !("jobs" in current.res.body)
+
+  # A resumable upload session is only opened for a load job the emulator can run.
+  resumable_query:
+    req:
+      /resumable/upload/bigquery/v2/projects/rest-upload/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1}}
+    test: current.res.status == 400
+  resumable_malformed_load:
+    req:
+      /resumable/upload/bigquery/v2/projects/rest-upload/jobs:
+        post:
+          body:
+            application/json:
+              configuration: {load: {destinationTable: ds.t}}
+    test: current.res.status == 400 && !("Location" in current.res.headers)
+  upload_resumable_query:
+    req:
+      /upload/bigquery/v2/projects/rest-upload/jobs?uploadType=resumable:
+        post:
+          body:
+            application/json:
+              configuration: {query: {query: SELECT 1}}
+    test: current.res.status == 400
+  upload_resumable_malformed_load:
+    req:
+      /upload/bigquery/v2/projects/rest-upload/jobs?uploadType=resumable:
+        post:
+          body:
+            application/json:
+              configuration: {load: {destinationTable: ds.t}}
+    test: current.res.status == 400 && !("Location" in current.res.headers)
+
+  # Dry runs validate a statement without running it or creating a job.
+  dry_run_dataset:
+    req:
+      /bigquery/v2/projects/rest-dry-run/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  dry_run_table:
+    req:
+      /bigquery/v2/projects/rest-dry-run/queries:
+        post:
+          body:
+            application/json: {query: CREATE TABLE ds.t (id INT64)}
+    test: current.res.status == 200
+  dry_run_query:
+    req:
+      /bigquery/v2/projects/rest-dry-run/queries:
+        post:
+          body:
+            application/json: {query: SELECT id FROM `rest-dry-run.ds.t`, dryRun: true}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.kind == "bigquery#queryResponse" &&
+      current.res.body.jobComplete == true &&
+      current.res.body.schema.fields[0].name == "id" &&
+      !("jobReference" in current.res.body) &&
+      !("rows" in current.res.body)
+  dry_run_job:
+    req:
+      /bigquery/v2/projects/rest-dry-run/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: dry1}
+              configuration:
+                dryRun: true
+                query: {query: INSERT INTO ds.t VALUES (1)}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.configuration.dryRun == true &&
+      !("errorResult" in current.res.body.status)
+  dry_run_job_get:
+    req:
+      /bigquery/v2/projects/rest-dry-run/jobs/dry1:
+        get:
+          body: null
+    test: current.res.status == 404
+  dry_run_rows:
+    req:
+      /bigquery/v2/projects/rest-dry-run/datasets/ds/tables/t/data:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.totalRows == "0"
+  dry_run_invalid_query:
+    req:
+      /bigquery/v2/projects/rest-dry-run/queries:
+        post:
+          body:
+            application/json: {query: SELECT * FROM missing, dryRun: true}
+    test: current.res.status == 400
+
+  # Timestamps are seconds unless formatOptions.useInt64Timestamp asks for microseconds.
+  timestamp_seconds:
+    req:
+      /bigquery/v2/projects/rest-timestamps/queries:
+        post:
+          body:
+            application/json: {query: "SELECT TIMESTAMP '2020-01-02 03:04:05+00' AS ts"}
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1577934245"
+  timestamp_microseconds:
+    req:
+      /bigquery/v2/projects/rest-timestamps/queries:
+        post:
+          body:
+            application/json:
+              query: "SELECT TIMESTAMP '2020-01-02 03:04:05+00' AS ts"
+              formatOptions: {useInt64Timestamp: true}
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1577934245000000"
+  timestamp_job:
+    req:
+      /bigquery/v2/projects/rest-timestamps/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: ts1}
+              configuration: {query: {query: "SELECT TIMESTAMP '2020-01-02 03:04:05+00' AS ts"}}
+    test: current.res.status == 200
+  timestamp_job_results:
+    req:
+      /bigquery/v2/projects/rest-timestamps/queries/ts1?formatOptions.useInt64Timestamp=true:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1577934245000000"
