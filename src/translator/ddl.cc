@@ -154,6 +154,29 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
   return metadata;
 }
 
+// The description, friendly name and labels the OPTIONS of a CREATE SCHEMA set. Every dataset is
+// in the US, so a location elsewhere is unsupported, and so are the other options, which change
+// how BigQuery treats the dataset's tables.
+std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
+  DatasetMetadata metadata;
+  for (const auto& option : options) {
+    const std::string name = ToLowerAscii(option->name());
+    const googlesql::Value* value = OptionLiteral(*option);
+    std::string location;
+    const bool applied =
+        value != nullptr &&
+        ((name == "description" && StringOption(*value, metadata.description)) ||
+         (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
+         (name == "labels" && LabelsOption(*value, metadata.labels)) ||
+         (name == "location" && StringOption(*value, location) &&
+          (value->is_null() || ToUpperAscii(location) == "US")));
+    if (!applied) {
+      return Unsupported(scope, "CREATE SCHEMA option " + option->name());
+    }
+  }
+  return metadata;
+}
+
 // Records NOT NULL as REQUIRED and the description in OPTIONS on `field`, and the same for the
 // fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
@@ -545,9 +568,16 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
     return Unsupported(scope, "dataset collation");
   }
   const auto path = TargetDataset(create.name_path(), scope);
-  if (!path) {
+  const std::optional<DatasetReference>& dataset = scope.context.ddl_target_dataset;
+  if (!path || !dataset) {
     return std::nullopt;
   }
+  std::optional<DatasetMetadata> metadata = SchemaOptionsMetadata(create.option_list(), scope);
+  if (!metadata) {
+    return std::nullopt;
+  }
+  scope.context.dataset = DatasetDefinition{
+      .dataset = *dataset, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
   switch (create.create_mode()) {
     case googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE:
       return Unsupported(scope, "CREATE OR REPLACE SCHEMA");

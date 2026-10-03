@@ -53,6 +53,19 @@ struct TableMetadata {
   nlohmann::json ToJson() const;
 };
 
+// What a dataset carries besides its reference: Dataset.description, friendlyName and labels. The
+// emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
+struct DatasetMetadata {
+  std::string description;
+  std::string friendly_name;
+  std::map<std::string, std::string> labels;
+
+  bool empty() const { return description.empty() && friendly_name.empty() && labels.empty(); }
+
+  // The fields of a Dataset resource that it sets.
+  nlohmann::json ToJson() const;
+};
+
 // The metadata of the Table resource `table`; a field it leaves out or sets to null is unset.
 // Throws ApiError::Invalid for a field of the wrong type, a label BigQuery rejects, or an
 // expiration or partitioning the emulator does not support.
@@ -64,6 +77,17 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // cannot change, so both keep it and reject a different one. Throws as TableMetadataFromJson
 // does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
+
+// The metadata of the Dataset resource `dataset`. Every dataset is in the US, so a location
+// elsewhere is unsupported, and so is any other field with a value besides those that identify
+// the dataset or that the server reports, since they change how BigQuery treats the dataset's
+// tables. Throws ApiError::Invalid for those, for a field of the wrong type and for a label
+// BigQuery rejects.
+DatasetMetadata DatasetMetadataFromJson(const nlohmann::json& dataset);
+
+// datasets.patch (`patch`) or datasets.update applied to `metadata`, as UpdateTableMetadata does
+// for tables. Throws as DatasetMetadataFromJson does.
+void UpdateDatasetMetadata(DatasetMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // Throws ApiError::Invalid for labels BigQuery rejects: more than 64, a key that is empty or
 // does not start with a lowercase letter, or a key or value longer than 63 characters or with

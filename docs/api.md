@@ -21,8 +21,8 @@ what the emulator ignores or does differently, and the probe adds the features t
 
 | Status | Methods |
 | --- | --- |
-| Partial | 8 |
-| Supported | 13 |
+| Partial | 11 |
+| Supported | 10 |
 | Unsupported | 26 |
 
 ## datasets
@@ -30,12 +30,12 @@ what the emulator ignores or does differently, and the probe adds the features t
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`datasets.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}` | Supported |  |
-| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns only the dataset's reference and location `US`. |
-| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Supported | Keeps only `datasetReference`; other fields such as `location`, `labels` and `access` are ignored. |
+| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name and labels, and location `US`. |
+| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | Keeps `datasetReference`, `description`, `friendlyName` and `labels`. Every dataset is in the US; other fields are unsupported. Rejected as unsupported: dataset field access, dataset field defaultTableExpirationMs, dataset location EU. |
 | [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Partial | Rejected as unsupported: filter. |
-| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Supported | Checks only that the dataset exists and returns it as `datasets.get` does; every field of the request, such as `description`, `labels` and `defaultTableExpirationMs`, is ignored. |
+| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Partial | Changes `description`, `friendlyName` and `labels`, as `datasets.insert` keeps them. Ignores the etag. Rejected as unsupported: dataset field defaultTableExpirationMs. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
-| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Supported | Behaves like `datasets.patch`. |
+| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Partial | Behaves like `datasets.patch`, except that it replaces the description, friendly name and labels. Rejected as unsupported: dataset field defaultTableExpirationMs. |
 
 ## jobs
 

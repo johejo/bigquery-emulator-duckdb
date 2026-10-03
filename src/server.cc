@@ -178,36 +178,41 @@ class Server::Impl {
         Json([this](const httplib::Request& request, httplib::Response&) {
           RejectQueryParam(request, "filter");
           const std::string project = Param(request, "project");
-          std::vector<std::string> dataset_ids = emulator_.ListDatasets(project);
+          std::vector<DatasetListEntry> datasets = emulator_.ListDatasetEntries(project);
           // Datasets whose names start with an underscore are hidden unless `all` asks for them.
           if (!QueryParamBool(request, "all")) {
-            std::erase_if(dataset_ids, [](const std::string& id) { return id.starts_with('_'); });
+            std::erase_if(datasets, [](const DatasetListEntry& entry) {
+              return entry.dataset_id.starts_with('_');
+            });
           }
-          return DatasetList(project, dataset_ids, ParseListPage(request));
+          return DatasetList(project, datasets, ParseListPage(request));
         }));
     Post("/projects/:project/datasets",
          Json([this](const httplib::Request& request, httplib::Response&) {
-           const DatasetReference dataset =
+           const DatasetInsertRequest insert =
                ParseDatasetInsert(Param(request, "project"), ParseBody(request));
-           emulator_.CreateDataset(dataset);
-           return DatasetResource(dataset);
+           emulator_.CreateDataset(insert.dataset, insert.metadata);
+           return DatasetResource(insert.dataset, emulator_.GetDataset(insert.dataset));
          }));
     Get("/projects/:project/datasets/:dataset",
         Json([this](const httplib::Request& request, httplib::Response&) {
           const DatasetReference dataset = DatasetFromPath(request);
-          emulator_.GetDataset(dataset);
-          return DatasetResource(dataset);
+          return DatasetResource(dataset, emulator_.GetDataset(dataset));
         }));
-    // datasets.patch and datasets.update: the emulator keeps no dataset metadata besides the
-    // reference, so both only check that the dataset exists.
-    const auto update_dataset = Json([this](const httplib::Request& request, httplib::Response&) {
-      const DatasetReference dataset = DatasetFromPath(request);
-      if (!ParseBody(request).is_object()) throw ApiError::Invalid("Invalid dataset resource");
-      emulator_.GetDataset(dataset);
-      return DatasetResource(dataset);
-    });
-    Patch("/projects/:project/datasets/:dataset", update_dataset);
-    Put("/projects/:project/datasets/:dataset", update_dataset);
+    // datasets.patch and datasets.update differ as tables.patch and tables.update do; see
+    // UpdateDatasetMetadata.
+    const auto update_dataset = [this](bool patch) {
+      return Json([this, patch](const httplib::Request& request, httplib::Response&) {
+        const DatasetReference dataset = DatasetFromPath(request);
+        const json body = ParseBody(request);
+        DatasetMetadata metadata = emulator_.GetDataset(dataset);
+        UpdateDatasetMetadata(metadata, body, patch);
+        emulator_.UpdateDataset(dataset, metadata);
+        return DatasetResource(dataset, emulator_.GetDataset(dataset));
+      });
+    };
+    Patch("/projects/:project/datasets/:dataset", update_dataset(/*patch=*/true));
+    Put("/projects/:project/datasets/:dataset", update_dataset(/*patch=*/false));
     Delete("/projects/:project/datasets/:dataset",
            Json([this](const httplib::Request& request, httplib::Response& response) {
              emulator_.DeleteDataset(DatasetFromPath(request),

@@ -85,12 +85,38 @@ std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   return values;
 }
 
-// The datasets of `project`, by name; DuckDB's own schemas are not datasets.
+// DuckDB's own schemas, which are not datasets. `main` holds what the emulator records about
+// the project's datasets; see DatasetMetadataTable.
+constexpr std::string_view kDuckDbSchemas = "('main', 'information_schema', 'pg_catalog')";
+
+bool IsDuckDbSchema(const std::string& name) {
+  return name == "main" || name == "information_schema" || name == "pg_catalog";
+}
+
+// The datasets of `project`, by name.
 std::string DatasetsQuery(const std::string& project) {
   return std::format(
       "SELECT schema_name FROM information_schema.schemata WHERE catalog_name = {}"
-      " AND schema_name NOT IN ('main', 'information_schema', 'pg_catalog') ORDER BY schema_name",
-      QuoteLiteral(project));
+      " AND schema_name NOT IN {} ORDER BY schema_name",
+      QuoteLiteral(project), kDuckDbSchemas);
+}
+
+// The datasets of `project` by name, each with the metadata recorded for it, or only `dataset`.
+std::string DatasetEntriesQuery(const std::string& project,
+                                const std::optional<std::string>& dataset = std::nullopt) {
+  return std::format(
+      "SELECT schema_name, (SELECT metadata FROM {} WHERE dataset_id = schema_name)"
+      " FROM information_schema.schemata WHERE catalog_name = {} AND schema_name NOT IN {}{}"
+      " ORDER BY schema_name",
+      DatasetMetadataTable(project), QuoteLiteral(project), kDuckDbSchemas,
+      dataset.has_value() ? " AND schema_name = " + QuoteLiteral(*dataset) : "");
+}
+
+DatasetMetadata ParseDatasetMetadata(const json& recorded) {
+  if (!recorded.is_string()) {
+    return {};
+  }
+  return DatasetMetadataFromJson(json::parse(recorded.get<std::string>()));
 }
 
 // The tables and views of `dataset` by name.
@@ -150,6 +176,9 @@ class DuckDbTableSource : public TableSource {
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
                                                     const std::string& table) override {
+    if (IsDuckDbSchema(dataset)) {
+      return std::nullopt;
+    }
     try {
       std::vector<FieldSchema> schema =
           TableSchema(backend_, TableReference{project, dataset, table});
@@ -303,6 +332,8 @@ void Emulator::EnsureProject(const std::string& project_id) {
   const std::string database = ProjectDatabase(project_id);
   try {
     backend_.Execute("ATTACH " + QuoteLiteral(database) + " AS " + QuoteIdentifier(project_id));
+    backend_.Execute("CREATE TABLE IF NOT EXISTS " + DatasetMetadataTable(project_id) +
+                     " (dataset_id VARCHAR, metadata VARCHAR)");
   } catch (const BackendError& error) {
     // Most likely another process holds the file's lock.
     throw ApiError::Internal("Failed to open " + database + ": " + error.what());
@@ -423,6 +454,18 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
+    // DDL names its target by path, so a path into DuckDB's own schemas reaches past the
+    // datasets.
+    if (const auto& target = translation.ddl_target_table;
+        target.has_value() && IsDuckDbSchema(target->dataset_id)) {
+      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
+                               target->dataset_id);
+    }
+    if (const auto& target = translation.ddl_target_dataset;
+        target.has_value() && IsDuckDbSchema(target->dataset_id)) {
+      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
+                               target->dataset_id);
+    }
     if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
@@ -708,24 +751,46 @@ std::vector<std::string> Emulator::ListDatasets(const std::string& project_id) {
   return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
-void Emulator::GetDataset(const DatasetReference& dataset) {
+std::vector<DatasetListEntry> Emulator::ListDatasetEntries(const std::string& project_id) {
+  EnsureProject(project_id);
+  std::vector<DatasetListEntry> entries;
+  for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
+    entries.push_back({.dataset_id = row["f"][0]["v"].get<std::string>(),
+                       .metadata = ParseDatasetMetadata(row["f"][1]["v"])});
+  }
+  return entries;
+}
+
+DatasetMetadata Emulator::GetDataset(const DatasetReference& dataset) {
   EnsureProject(dataset.project_id);
-  const QueryResult result =
-      Execute(std::format("SELECT schema_name FROM information_schema.schemata"
-                          " WHERE catalog_name = {} AND schema_name = {}",
-                          QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id)));
+  const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
   }
+  return ParseDatasetMetadata(result.rows[0]["f"][1]["v"]);
 }
 
-void Emulator::CreateDataset(const DatasetReference& dataset) {
+void Emulator::CreateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata) {
   EnsureProject(dataset.project_id);
+  const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
   try {
-    backend_.Execute("CREATE SCHEMA " + QualifiedName(dataset));
+    backend_.ExecuteDdl("CREATE SCHEMA " + QualifiedName(dataset), statements, "");
   } catch (const BackendError& error) {
-    throw ApiError::Duplicate("Already Exists: Dataset " + dataset.project_id + ":" +
-                              dataset.dataset_id);
+    if (std::string(error.what()).find("already exists") != std::string::npos) {
+      throw ApiError::Duplicate("Already Exists: Dataset " + dataset.project_id + ":" +
+                                dataset.dataset_id);
+    }
+    throw ApiError::Invalid(error.what());
+  }
+}
+
+void Emulator::UpdateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata) {
+  GetDataset(dataset);
+  const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
+  try {
+    backend_.ExecuteDdl(statements.front(), {statements.begin() + 1, statements.end()}, "");
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
   }
 }
 
@@ -735,7 +800,13 @@ void Emulator::DeleteDataset(const DatasetReference& dataset, bool delete_conten
     throw ApiError::Invalid("Dataset " + dataset.project_id + ":" + dataset.dataset_id +
                             " is still in use");
   }
-  Execute("DROP SCHEMA " + QualifiedName(dataset) + (delete_contents ? " CASCADE" : ""));
+  try {
+    backend_.ExecuteDdl(
+        "DROP SCHEMA " + QualifiedName(dataset) + (delete_contents ? " CASCADE" : ""),
+        DropDatasetWrite(dataset).metadata_statements, "");
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
+  }
 }
 
 std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {

@@ -367,12 +367,15 @@ ListPage ParseListPage(const httplib::Request& request) {
   return result;
 }
 
-DatasetReference ParseDatasetInsert(const std::string& project_id, const json& body) {
+DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& body) {
+  if (!body.is_object()) throw ApiError::Invalid("Invalid dataset resource");
   const json reference = body.value("datasetReference", json::object());
   if (!reference.is_object() || !reference.contains("datasetId")) {
     throw ApiError::Invalid("Required parameter is missing: datasetId");
   }
-  return DatasetReference{project_id, StringField(reference, "datasetId", "dataset ID")};
+  return {
+      .dataset = DatasetReference{project_id, StringField(reference, "datasetId", "dataset ID")},
+      .metadata = DatasetMetadataFromJson(body)};
 }
 
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& body) {

@@ -18,6 +18,18 @@ steps:
     exec:
       command: tests/e2e/bq.sh update --dataset --description 'e2e data' --set_label env:test e2e
     test: current.exit_code == 0
+  show_dataset:
+    exec:
+      command: tests/e2e/bq.sh show --format=json e2e
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"description":"e2e data"' &&
+      current.stdout contains '"labels":{"env":"test"}'
+  ls_datasets_with_labels:
+    exec:
+      command: tests/e2e/bq.sh ls --format=json
+    test: |
+      current.exit_code == 0 && current.stdout contains '"labels":{"env":"test"}'
   update_missing_dataset:
     exec:
       command: tests/e2e/bq.sh update --dataset --description 'e2e data' missing

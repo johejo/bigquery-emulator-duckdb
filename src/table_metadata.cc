@@ -16,6 +16,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
@@ -182,6 +183,59 @@ void RejectExpiration(const json& table) {
   }
 }
 
+// Applies the description, friendly name and labels of a Table or Dataset resource `body` to
+// `metadata`, as UpdateTableMetadata documents.
+template <typename Metadata>
+void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
+  if (!patch) {
+    metadata.labels.clear();
+  }
+  const auto set = [&](const char* key, auto apply) {
+    if (const auto it = body.find(key); it != body.end()) {
+      apply(*it);
+    } else if (!patch) {
+      apply(json());
+    }
+  };
+  set("description",
+      [&](const json& value) { metadata.description = StringValue(value, "description"); });
+  set("friendlyName",
+      [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
+  set("labels", [&](const json& value) { MergeLabels(value, metadata.labels); });
+  ValidateLabels(metadata.labels);
+}
+
+// Throws for the fields of a Dataset resource the emulator does not keep; see
+// DatasetMetadataFromJson. A null field, or an empty object or array such as the resourceTags bq
+// sends, is accepted, since it sets nothing.
+void CheckDatasetFields(const json& dataset) {
+  if (!dataset.is_object()) {
+    throw ApiError::Invalid("Invalid dataset resource");
+  }
+  static constexpr std::string_view kKnown[] = {"kind",
+                                                "etag",
+                                                "id",
+                                                "selfLink",
+                                                "datasetReference",
+                                                "creationTime",
+                                                "lastModifiedTime",
+                                                "description",
+                                                "friendlyName",
+                                                "labels"};
+  for (const auto& [key, value] : dataset.items()) {
+    if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
+        std::ranges::find(kKnown, key) != std::end(kKnown)) {
+      continue;
+    }
+    if (key != "location") {
+      throw Unsupported("dataset field " + key);
+    }
+    if (ToUpperAscii(StringValue(value, "location")) != "US") {
+      throw Unsupported("dataset location " + value.get<std::string>());
+    }
+  }
+}
+
 // The top-level field of `schema` named `name` in any case, or null.
 const FieldSchema* FindField(const std::vector<FieldSchema>& schema, const std::string& name) {
   const auto it = std::ranges::find_if(schema, [&](const FieldSchema& field) {
@@ -292,6 +346,20 @@ json TableMetadata::ToJson() const {
   return fields;
 }
 
+json DatasetMetadata::ToJson() const {
+  json fields = json::object();
+  if (!description.empty()) {
+    fields["description"] = description;
+  }
+  if (!friendly_name.empty()) {
+    fields["friendlyName"] = friendly_name;
+  }
+  if (!labels.empty()) {
+    fields["labels"] = labels;
+  }
+  return fields;
+}
+
 TableMetadata TableMetadataFromJson(const json& table) {
   TableMetadata metadata;
   RejectExpiration(table);
@@ -309,23 +377,23 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
        partitioning.range_partitioning != metadata.range_partitioning)) {
     throw ApiError::Invalid("Cannot change the partitioning of an existing table");
   }
-  if (!patch) {
-    metadata.labels.clear();
+  UpdateDescriptiveFields(metadata, body, patch);
+  if (const auto it = body.find("clustering"); it != body.end()) {
+    metadata.clustering = ParseClustering(*it);
+  } else if (!patch) {
+    metadata.clustering.clear();
   }
-  const auto set = [&](const char* key, auto apply) {
-    if (const auto it = body.find(key); it != body.end()) {
-      apply(*it);
-    } else if (!patch) {
-      apply(json());
-    }
-  };
-  set("description",
-      [&](const json& value) { metadata.description = StringValue(value, "description"); });
-  set("friendlyName",
-      [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
-  set("labels", [&](const json& value) { MergeLabels(value, metadata.labels); });
-  set("clustering", [&](const json& value) { metadata.clustering = ParseClustering(value); });
-  ValidateLabels(metadata.labels);
+}
+
+DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
+  DatasetMetadata metadata;
+  UpdateDatasetMetadata(metadata, dataset, /*patch=*/false);
+  return metadata;
+}
+
+void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
+  CheckDatasetFields(body);
+  UpdateDescriptiveFields(metadata, body, patch);
 }
 
 void ValidateLabels(const std::map<std::string, std::string>& labels) {

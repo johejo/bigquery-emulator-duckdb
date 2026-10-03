@@ -158,6 +158,10 @@ query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x')
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (description = 'x', friendly_name = 'E', labels = [('k', 'v')])
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU')
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (default_table_expiration_days = 1)
+note `CREATE SCHEMA` | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.
 query `CREATE OR REPLACE SCHEMA` | CREATE OR REPLACE SCHEMA e
 query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
 query `DROP SCHEMA` | DROP SCHEMA d CASCADE

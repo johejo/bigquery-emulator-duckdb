@@ -42,6 +42,14 @@ struct TableDefinition {
   bool if_not_exists = false;
 };
 
+// The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS
+// give, which the emulator records next to the DuckDB schema.
+struct DatasetDefinition {
+  DatasetReference dataset;
+  DatasetMetadata metadata;
+  bool if_not_exists = false;
+};
+
 // The column an ALTER TABLE ADD COLUMN adds.
 struct AddedColumn {
   TableReference table;
@@ -64,6 +72,7 @@ struct TranslatedStatement {
   std::optional<TableDefinition> table;
   std::optional<AddedColumn> added_column;
   std::optional<ViewDefinition> view;
+  std::optional<DatasetDefinition> dataset;
 };
 
 // Translates queries: projections, table reads, filters, ordering, limits, joins, CTEs,
