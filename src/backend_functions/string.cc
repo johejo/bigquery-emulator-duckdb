@@ -18,6 +18,7 @@
 #include "googlesql/public/functions/hash.h"
 #include "googlesql/public/functions/normalize_mode.pb.h"
 #include "googlesql/public/functions/regexp.h"
+#include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
 #include "src/duckdb_handle.h"
 
@@ -242,6 +243,18 @@ void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
       });
 }
 
+// The text of a DECIMAL, which DuckDB pads with zeros to its scale, as BigQuery writes a NUMERIC
+// or BIGNUMERIC, without trailing fractional zeros. Every DECIMAL fits a BIGNUMERIC.
+void DecimalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const auto value = googlesql::BigNumericValue::FromString(arguments.String(0));
+    if (!value.ok()) {
+      return value.status();
+    }
+    return value->ToString();
+  });
+}
+
 }  // namespace
 
 void RegisterStringFunctions(duckdb_connection connection) {
@@ -309,6 +322,7 @@ void RegisterStringFunctions(duckdb_connection connection) {
   Register(connection, "bq_farm_fingerprint", {kBlob}, kBigint, FarmFingerprint);
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);
   Register(connection, "bq_initcap", {kVarchar}, kVarchar, InitCap);
+  Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, DecimalString);
   Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, InitCap);
   Register(connection, "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,
            EditDistance<false>);

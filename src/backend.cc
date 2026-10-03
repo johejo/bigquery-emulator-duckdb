@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "duckdb.h"
+#include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_functions.h"
 #include "src/duckdb_handle.h"
@@ -384,6 +385,18 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
         text[10] = 'T';
       }
       value = std::move(text);
+      break;
+    }
+    case DUCKDB_TYPE_DECIMAL: {
+      // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Every DECIMAL
+      // fits a BIGNUMERIC.
+      const auto number =
+          googlesql::BigNumericValue::FromString(ValueString(VectorValue(vector, type, row).get()));
+      if (!number.ok()) {
+        throw BackendError("DuckDB returned an invalid DECIMAL: " +
+                           std::string(number.status().message()));
+      }
+      value = number->ToString();
       break;
     }
     default:
