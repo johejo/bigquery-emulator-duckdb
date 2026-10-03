@@ -24,7 +24,7 @@ constexpr char kUri[] = "gs://bucket/nested/a b+%.json";
 
 std::string ReadFile(const std::filesystem::path& path) {
   std::ifstream file(path);
-  return std::string(std::istreambuf_iterator<char>(file), {});
+  return {std::istreambuf_iterator<char>(file), {}};
 }
 
 class GcsTest : public ::testing::Test {
@@ -34,7 +34,7 @@ class GcsTest : public ::testing::Test {
          {"STORAGE_EMULATOR_HOST", "GOOGLE_APPLICATION_CREDENTIALS",
           "CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
       const char* value = std::getenv(name);
-      environment_[name] = value ? std::optional<std::string>(value) : std::nullopt;
+      environment_[name] = value != nullptr ? std::optional<std::string>(value) : std::nullopt;
       unsetenv(name);
     }
     std::string pattern = ::testing::TempDir() + "/gcs-test-XXXXXX";

@@ -73,8 +73,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 class NoTables : public TableSource {
  public:
-  std::optional<std::vector<FieldSchema>> FindTable(const std::string&, const std::string&,
-                                                    const std::string&) override {
+  std::optional<std::vector<FieldSchema>> FindTable(const std::string& /*project*/,
+                                                    const std::string& /*dataset*/,
+                                                    const std::string& /*table*/) override {
     return std::nullopt;
   }
 };
@@ -109,7 +110,7 @@ std::optional<std::string> Sample(const googlesql::Type* type) {
                : std::nullopt;
   }
   if (type->IsRange()) {
-    const auto element = type->AsRange()->element_type();
+    const auto* element = type->AsRange()->element_type();
     return "RANGE<" + element->TypeName(googlesql::PRODUCT_EXTERNAL) + "> '[" +
            (element->IsDate() ? "2024-01-01, 2024-02-01"
                               : "2024-01-01 00:00:00, 2024-02-01 00:00:00") +
@@ -153,7 +154,7 @@ std::optional<std::string> Sample(const googlesql::Type* type) {
 // STRING, so that T1 and T2 can differ).
 std::optional<std::string> Sample(const googlesql::FunctionArgumentType& argument) {
   if (argument.IsConcrete() || argument.kind() == googlesql::ARG_KIND_EXPR_FIXED) {
-    return argument.type() ? Sample(argument.type()) : std::nullopt;
+    return argument.type() != nullptr ? Sample(argument.type()) : std::nullopt;
   }
   switch (argument.kind()) {
     case googlesql::ARG_KIND_EXPR_ANY_1:

@@ -321,6 +321,8 @@ std::optional<std::string> Truncate(const googlesql::ResolvedTruncateStmt& trunc
   return "TRUNCATE TABLE " + target->table;
 }
 
+namespace {
+
 std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
                                        const Target& target, const Scope& scope,
                                        const Columns& columns) {
@@ -380,6 +382,8 @@ std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
       return Unsupported(scope, "MERGE action");
   }
 }
+
+}  // namespace
 
 std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, const Scope& scope) {
   const auto target = DmlTarget(*merge.table_scan(), scope);

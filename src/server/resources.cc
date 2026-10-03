@@ -221,7 +221,7 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   }
   response["schema"] = result.SchemaToJson();
   response["totalRows"] = std::to_string(result.rows.size());
-  const int64_t total = static_cast<int64_t>(result.rows.size());
+  const auto total = static_cast<int64_t>(result.rows.size());
   const int64_t begin = std::clamp<int64_t>(page.start_index, 0, total);
   const int64_t end = std::min(total, begin + std::max<int64_t>(page.max_results, 0));
   response["rows"] = RowsForResponse(result, begin, end, page.int64_timestamps);
@@ -237,7 +237,7 @@ json DryRunQueryResponse(const Job& job) {
                    {"totalBytesProcessed", "0"},
                    {"cacheHit", false}};
   if (job.error.has_value()) {
-    throw *job.error;
+    throw ApiError(*job.error);
   }
   if (job.result.has_value() && job.result->has_rows) {
     response["schema"] = job.result->SchemaToJson();
@@ -290,7 +290,7 @@ json JobList(const std::vector<std::shared_ptr<const Job>>& jobs, const JobListR
     if (index++ < request.offset) {
       continue;
     }
-    if (static_cast<int64_t>(entries.size()) == request.max_results) {
+    if (std::cmp_equal(entries.size(), request.max_results)) {
       response["nextPageToken"] = std::to_string(index - 1);
       break;
     }

@@ -97,7 +97,7 @@ FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   field.type = ToBigQueryType(type);
   field.mode = IsListLike(type) ? FieldMode::kRepeated : FieldMode::kNullable;
   LogicalType element(IsListLike(type) ? ElementType(type).release() : nullptr);
-  duckdb_logical_type scalar_type = element.get() ? element.get() : type;
+  duckdb_logical_type scalar_type = element.get() != nullptr ? element.get() : type;
   if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
     for (idx_t i = 0; i < duckdb_struct_type_child_count(scalar_type); ++i) {
       DuckString child_name(duckdb_struct_type_child_name(scalar_type, i));
@@ -155,7 +155,7 @@ std::string Base64(const std::string& bytes) {
 // Reconstruct values through the C API so DuckDB formats scalar values itself.
 Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
-  if (validity && !duckdb_validity_row_is_valid(validity, row)) {
+  if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
     return Value(duckdb_create_null_value());
   }
   switch (duckdb_get_type_id(type)) {
@@ -217,7 +217,7 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
           break;
         }
         case DUCKDB_TYPE_BIGINT: {
-          const int64_t value = VectorElement<int64_t>(vector, row);
+          const auto value = VectorElement<int64_t>(vector, row);
           number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
           break;
         }
@@ -324,7 +324,7 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
 
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
-  const bool is_null = validity && !duckdb_validity_row_is_valid(validity, row);
+  const bool is_null = validity != nullptr && !duckdb_validity_row_is_valid(validity, row);
   if (IsListLike(type)) {
     json elements = json::array();
     if (!is_null) {
@@ -442,7 +442,7 @@ json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
 void Query(duckdb_connection connection, const std::string& sql, Result& result) {
   if (duckdb_query(connection, sql.c_str(), &result.result) == DuckDBError) {
     const char* error = duckdb_result_error(&result.result);
-    throw BackendError(error ? error : "DuckDB query failed");
+    throw BackendError(error != nullptr ? error : "DuckDB query failed");
   }
 }
 
@@ -464,12 +464,9 @@ void RunSetup(duckdb_connection connection, const std::vector<std::string>& setu
 json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::SchemaToJson(schema); }
 
 bool HasTimestampField(const std::vector<FieldSchema>& schema) {
-  for (const FieldSchema& field : schema) {
-    if (field.type == FieldType::kTimestamp || HasTimestampField(field.fields)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(schema, [](const FieldSchema& field) {
+    return field.type == FieldType::kTimestamp || HasTimestampField(field.fields);
+  });
 }
 
 json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row) {
@@ -534,7 +531,7 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   }
   while (true) {
     Chunk chunk(duckdb_fetch_chunk(result.result));
-    if (!chunk.get()) {
+    if (chunk.get() == nullptr) {
       break;
     }
     for (idx_t row = 0; row < duckdb_data_chunk_get_size(chunk.get()); ++row) {
@@ -580,7 +577,7 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
   Prepared prepared;
   if (duckdb_prepare(connection.get(), sql.c_str(), prepared.out()) == DuckDBError) {
     const char* error = duckdb_prepare_error(prepared.get());
-    throw BackendError(error ? error : "DuckDB failed to prepare the query");
+    throw BackendError(error != nullptr ? error : "DuckDB failed to prepare the query");
   }
 
   QueryResult query_result;
@@ -608,7 +605,7 @@ std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     Result result;
     if (duckdb_query(connection.get(), statements[i].c_str(), &result.result) == DuckDBError) {
       const char* error = duckdb_result_error(&result.result);
-      errors.emplace_back(i, error ? error : "DuckDB insert failed");
+      errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");
       if (!skip_invalid_rows) {
         Query(connection.get(), "ROLLBACK");
         return errors;
@@ -634,13 +631,13 @@ std::string ExecuteScalarString(const std::string& sql) {
   Result result;
   Query(connection.get(), sql, result);
   Chunk chunk(duckdb_fetch_chunk(result.result));
-  if (!chunk.get() || duckdb_data_chunk_get_size(chunk.get()) == 0 ||
+  if (chunk.get() == nullptr || duckdb_data_chunk_get_size(chunk.get()) == 0 ||
       duckdb_data_chunk_get_column_count(chunk.get()) == 0) {
     throw BackendError("DuckDB query returned no scalar value");
   }
   duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), 0);
   uint64_t* validity = duckdb_vector_get_validity(vector);
-  if (validity && !duckdb_validity_row_is_valid(validity, 0)) {
+  if (validity != nullptr && !duckdb_validity_row_is_valid(validity, 0)) {
     return "NULL";
   }
   LogicalType type(duckdb_vector_get_column_type(vector));

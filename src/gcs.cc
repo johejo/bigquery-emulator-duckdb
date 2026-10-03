@@ -142,7 +142,7 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
     }
   }
   if (matches.empty()) throw ApiError::Invalid("No GCS objects match: " + uri);
-  std::sort(matches.begin(), matches.end());
+  std::ranges::sort(matches);
   return matches;
 }
 

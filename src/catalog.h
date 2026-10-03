@@ -96,7 +96,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   std::string FullName() const override { return "bigquery"; }
 
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
-                         const FindOptions& options = FindOptions()) override;
+                         const FindOptions& options) override;
 
  private:
   TableSource& source_;

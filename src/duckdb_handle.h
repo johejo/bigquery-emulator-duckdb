@@ -43,7 +43,7 @@ inline T VectorElement(duckdb_vector vector, idx_t row) {
 }
 
 inline std::string VectorString(duckdb_vector vector, idx_t row) {
-  duckdb_string_t value = VectorElement<duckdb_string_t>(vector, row);
+  auto value = VectorElement<duckdb_string_t>(vector, row);
   return {duckdb_string_t_data(&value), duckdb_string_t_length(value)};
 }
 

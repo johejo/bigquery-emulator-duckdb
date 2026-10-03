@@ -97,7 +97,7 @@ int64_t Int64Member(const json& value, const char* key) {
     return it->get<int64_t>();
   }
   if (it != value.end() && it->is_string()) {
-    const std::string& text = it->get_ref<const std::string&>();
+    const auto& text = it->get_ref<const std::string&>();
     int64_t parsed = 0;
     const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
     if (error == std::errc() && end == text.data() + text.size()) {
@@ -126,7 +126,7 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
   if (!value.value("expirationMs", json()).is_null()) {
     throw Unsupported("partition expiration");
   }
-  if (value.value("requirePartitionFilter", false) == true) {
+  if (value.value("requirePartitionFilter", false)) {
     throw Unsupported("requirePartitionFilter");
   }
   return partitioning;
@@ -286,7 +286,7 @@ void ValidateRangePartitioning(const RangePartitioning& partitioning,
   // The partition count, rounded up, without overflowing: end - start may exceed INT64_MAX.
   const auto span =
       static_cast<uint64_t>(partitioning.end) - static_cast<uint64_t>(partitioning.start);
-  if ((span - 1) / static_cast<uint64_t>(partitioning.interval) + 1 >
+  if (((span - 1) / static_cast<uint64_t>(partitioning.interval)) + 1 >
       static_cast<uint64_t>(kMaxRangePartitions)) {
     throw ApiError::Invalid("Range partitioning cannot have more than 10000 partitions");
   }
@@ -403,7 +403,7 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
   for (const auto& [key, value] : labels) {
     const std::string what = "Label key \"" + key + "\"";
     if (key.empty() ||
-        !((key[0] >= 'a' && key[0] <= 'z') || static_cast<unsigned char>(key[0]) >= 0x80)) {
+        ((key[0] < 'a' || key[0] > 'z') && static_cast<unsigned char>(key[0]) < 0x80)) {
       throw ApiError::Invalid(what + " must start with a lowercase letter");
     }
     if (const std::string problem = LabelTextProblem(key); !problem.empty()) {

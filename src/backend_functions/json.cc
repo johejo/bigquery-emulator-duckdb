@@ -201,7 +201,7 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
     }
     case googlesql::TYPE_ARRAY: {
       LogicalType child_type(duckdb_list_type_child_type(duck_type));
-      const duckdb_list_entry entry = VectorElement<duckdb_list_entry>(vector, row);
+      const auto entry = VectorElement<duckdb_list_entry>(vector, row);
       duckdb_vector child = duckdb_list_vector_get_child(vector);
       std::vector<googlesql::Value> elements;
       for (idx_t i = 0; i < entry.length; ++i) {
@@ -606,7 +606,7 @@ void JsonElement(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
         }
         const googlesql::JSONValueConstRef json = document->GetConstRef();
         const int64_t index = arguments.Int(1);
-        if (!json.IsArray() || index < 0 || static_cast<uint64_t>(index) >= json.GetArraySize()) {
+        if (!json.IsArray() || index < 0 || std::cmp_greater_equal(index, json.GetArraySize())) {
           return std::nullopt;
         }
         return json.GetArrayElement(index).ToString();

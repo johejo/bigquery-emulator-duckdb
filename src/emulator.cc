@@ -232,12 +232,9 @@ bool SameWireEncoding(FieldType a, FieldType b) {
   if (a == b) {
     return true;
   }
-  for (const std::set<FieldType>& group : *kGroups) {
-    if (group.contains(a) && group.contains(b)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(*kGroups, [&](const std::set<FieldType>& group) {
+    return group.contains(a) && group.contains(b);
+  });
 }
 
 // Takes the column names, and the types where it can, from the schema the analyzer resolved,
@@ -325,7 +322,7 @@ void Emulator::EnsureProject(const std::string& project_id) {
   if (project_id.empty()) {
     throw ApiError::Invalid("Project id is required");
   }
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (projects_.contains(project_id)) {
     return;
   }
@@ -386,12 +383,12 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
                                             const std::function<void(Job&)>& body) {
   job->creation_time_ms = NowMillis();
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     if (job->job_id.empty()) {
-      do {
+      while (job->job_id.empty() || jobs_.contains(JobKey(job->project_id, job->job_id)) ||
+             running_jobs_.contains(JobKey(job->project_id, job->job_id))) {
         job->job_id = "job_" + std::to_string(next_job_number_++);
-      } while (jobs_.contains(JobKey(job->project_id, job->job_id)) ||
-               running_jobs_.contains(JobKey(job->project_id, job->job_id)));
+      }
     }
     if (!job->dry_run()) {
       const std::string key = JobKey(job->project_id, job->job_id);
@@ -415,7 +412,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
   if (job->dry_run()) {
     return job;
   }
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   const std::string key = JobKey(job->project_id, job->job_id);
   running_jobs_.erase(key);
   jobs_[key] = job;
@@ -450,7 +447,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   return RunJob(std::move(job), [&](Job& job) {
     const TranslatedStatement translation = Translate(
         request.query, request.parameters, settings.default_project, settings.default_dataset);
-    QueryJob& query = std::get<QueryJob>(job.configuration);
+    auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
@@ -629,8 +626,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   std::string duplicates;
   for (const FieldSchema& field : schema) {
     std::string name = field.name;
-    std::transform(name.begin(), name.end(), name.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(name, name.begin(), [](unsigned char c) { return std::tolower(c); });
     if (!names.insert(name).second) {
       duplicates += (duplicates.empty() ? "" : ", ") + field.name;
     }
@@ -713,7 +709,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
 
 std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,
                                             const std::string& job_id) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
   if (it == jobs_.end()) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
@@ -722,7 +718,7 @@ std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,
 }
 
 std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& project_id) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   std::vector<std::shared_ptr<const Job>> result;
   for (const auto& entry : jobs_) {
     const auto& job = entry.second;
@@ -730,7 +726,7 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& pr
       result.push_back(job);
     }
   }
-  std::sort(result.begin(), result.end(), [](const auto& left, const auto& right) {
+  std::ranges::sort(result, [](const auto& left, const auto& right) {
     if (left->creation_time_ms != right->creation_time_ms) {
       return left->creation_time_ms > right->creation_time_ms;
     }
@@ -740,7 +736,7 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& pr
 }
 
 void Emulator::DeleteJob(const std::string& project_id, const std::string& job_id) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  std::scoped_lock lock(mutex_);
   if (jobs_.erase(JobKey(project_id, job_id)) == 0) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
   }
@@ -1007,9 +1003,8 @@ std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, 
       }
       const json& values = rows[i]["json"];
       for (auto it = values.begin(); it != values.end(); ++it) {
-        const bool known = std::any_of(schema.begin(), schema.end(), [&](const FieldSchema& field) {
-          return field.name == it.key();
-        });
+        const bool known = std::ranges::any_of(
+            schema, [&](const FieldSchema& field) { return field.name == it.key(); });
         if (!known && !ignore_unknown_values) {
           throw ApiError::Invalid("Unknown field: " + it.key());
         }
@@ -1049,8 +1044,8 @@ std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, 
   } catch (const BackendError& error) {
     throw ApiError::Invalid(error.what());
   }
-  std::sort(errors.begin(), errors.end(),
-            [](const InsertError& a, const InsertError& b) { return a.index < b.index; });
+  std::ranges::sort(errors,
+                    [](const InsertError& a, const InsertError& b) { return a.index < b.index; });
   return errors;
 }
 
