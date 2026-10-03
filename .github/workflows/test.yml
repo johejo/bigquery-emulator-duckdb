@@ -44,6 +44,8 @@ jobs:
           restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
       - name: Configure Bazel for CI
         run: echo 'common --config=ci' > .bazelrc.local
+      - name: Format check
+        run: nix develop --command just fmt-check
       - name: Bazel tests
         run: nix develop --command just test
       - name: Clang-tidy
