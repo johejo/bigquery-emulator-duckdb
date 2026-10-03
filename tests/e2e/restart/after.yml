@@ -1,0 +1,20 @@
+desc: data written with --data-dir survives a restart
+steps:
+  rows:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT a, b FROM persist.v'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"a":"1","b":["x","y"]}]'
+  view:
+    exec:
+      command: tests/e2e/bq.sh show --format=json persist.v
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"query":"SELECT a, b FROM persist.t"'
+  scoped_dataset:
+    exec:
+      command: BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh ls --format=json
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"datasetId":"scoped"'

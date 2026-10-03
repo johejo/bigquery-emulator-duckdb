@@ -1,0 +1,23 @@
+desc: writes data that restart/after.yml expects to survive an emulator restart
+steps:
+  mk_dataset:
+    exec:
+      command: tests/e2e/bq.sh mk --dataset persist
+    test: current.exit_code == 0
+  table:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE TABLE persist.t AS SELECT 1 AS a, ['x', 'y'] AS b"
+    test: current.exit_code == 0
+  view:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE VIEW persist.v AS SELECT a, b FROM persist.t"
+    test: current.exit_code == 0
+  # A domain-scoped project id is escaped into the file name.
+  scoped_dataset:
+    exec:
+      command: BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh mk --dataset scoped
+    test: current.exit_code == 0

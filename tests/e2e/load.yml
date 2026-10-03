@@ -81,7 +81,7 @@ steps:
     exec:
       command: >-
         tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
-        e2e_load.gzip "${E2E_LOAD_DIR}/people.csv.gz" id:INTEGER,name:STRING
+        e2e_load.gzip tests/e2e/gcs/load-fixtures/compressed/people.csv.gz id:INTEGER,name:STRING
     test: current.exit_code == 0
   load_gzip_gcs:
     exec:
