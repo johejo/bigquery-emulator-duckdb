@@ -65,10 +65,12 @@ Cover each of these that applies with a case in `tests/e2e/goclient/testdata/sca
   of `tests/e2e/goclient/testdata/scalars/`, which the Go client test loads in full. Check with
   `bq` only what depends on the command-line tool, such as its flags and output formats; the Go
   client checks the rest far faster. Runbooks run concurrently, so each uses datasets of its own,
-  and a project of its own where it checks a whole project's listing.
+  and a project of its own where it checks a whole project's listing. REST status codes, headers
+  and response fields that no client surfaces are checked with runn's HTTP runner in
+  `tests/e2e/rest_*.yml`.
 - C++ tests (`just test`) cover internal boundaries that clients cannot observe, such as
-  translation edge cases and raw HTTP details. Do not copy the same SQL and expected result
-  between layers.
+  translation edge cases, and what runn cannot drive, such as many concurrent connections. Do not
+  copy the same SQL and expected result between layers.
 
 ## Generated docs
 

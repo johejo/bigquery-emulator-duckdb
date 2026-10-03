@@ -1,0 +1,133 @@
+desc: the discovery document and the datasets, tables and tabledata REST methods return BigQuery's status codes and response fields
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  discovery:
+    req:
+      /$discovery/rest?version=v2:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.rootUrl == env.BQ_EMULATOR_API + "/" &&
+      current.res.body.baseUrl == env.BQ_EMULATOR_API + "/bigquery/v2/" &&
+      "jobs" in current.res.body.resources
+
+  dataset:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  duplicate_dataset:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 409 && current.res.body.error.status == "ALREADY_EXISTS"
+  list_datasets:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.datasets[0].id == "rest-resources:ds"
+  list_datasets_with_zero_page_size:
+    req:
+      /projects/rest-resources/datasets?maxResults=0:
+        get:
+          body: null
+    test: current.res.status == 400
+  missing_dataset:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/missing:
+        get:
+          body: null
+    test: current.res.status == 404
+
+  table:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+              schema:
+                fields:
+                  - {name: id, type: INTEGER, mode: REQUIRED}
+                  - {name: tags, type: STRING, mode: REPEATED}
+                  - name: profile
+                    type: RECORD
+                    fields:
+                      - {name: name, type: STRING}
+                      - {name: score, type: INTEGER}
+                  - {name: ts, type: TIMESTAMP}
+                  - {name: data, type: BYTES}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.id == "rest-resources:ds.t" &&
+      current.res.body.schema.fields[1].mode == "REPEATED"
+  list_tables:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds/tables:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.tables[0].id == "rest-resources:ds.t"
+  list_tables_with_invalid_page_size:
+    req:
+      /projects/rest-resources/datasets/ds/tables?maxResults=x:
+        get:
+          body: null
+    test: current.res.status == 400
+
+  insert_all:
+    req:
+      /projects/rest-resources/datasets/ds/tables/t/insertAll:
+        post:
+          body:
+            application/json:
+              rows:
+                - insertId: row-1
+                  json:
+                    id: "1"
+                    tags: [a, b]
+                    profile: {name: alice, score: "3"}
+                    ts: "2024-01-02T03:04:05Z"
+                    data: AP8=
+    test: |
+      current.res.status == 200 &&
+      current.res.body.kind == "bigquery#tableDataInsertAllResponse" &&
+      !("insertErrors" in current.res.body)
+  list_rows:
+    req:
+      /projects/rest-resources/datasets/ds/tables/t/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.rows[0].f[1].v == [{"v": "a"}, {"v": "b"}] &&
+      current.res.body.rows[0].f[2].v.f[0].v == "alice" &&
+      current.res.body.rows[0].f[3].v == "1704164645" &&
+      current.res.body.rows[0].f[4].v == "AP8="
+
+  delete_dataset_with_tables:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds:
+        delete:
+          body: null
+    test: current.res.status == 400
+  delete_table:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds/tables/t:
+        delete:
+          body: null
+    test: current.res.status == 204 && (current.res.headers["Content-Length"] ?? ["0"])[0] == "0"
+  delete_dataset:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds:
+        delete:
+          body: null
+    test: current.res.status == 204 && (current.res.headers["Content-Length"] ?? ["0"])[0] == "0"
