@@ -413,7 +413,8 @@ InsertAllRequest ParseInsertAll(const json& body) {
     throw ApiError::Invalid("Required parameter is missing: rows");
   }
   if (body.contains("templateSuffix") && !body["templateSuffix"].is_null() &&
-      body["templateSuffix"] != "") {
+      (!body["templateSuffix"].is_string() ||
+       !body["templateSuffix"].get_ref<const std::string&>().empty())) {
     throw ApiError::Invalid("The emulator does not support templateSuffix");
   }
   return InsertAllRequest{.rows = body["rows"],

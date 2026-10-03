@@ -82,7 +82,7 @@ std::optional<int64_t> Int64Member(const json& value, const char* key) {
     return it->get<int64_t>();
   }
   if (it->is_string()) {
-    const std::string& text = it->get_ref<const std::string&>();
+    const auto& text = it->get_ref<const std::string&>();
     int64_t parsed = 0;
     const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
     if (error == std::errc() && end == text.data() + text.size()) {

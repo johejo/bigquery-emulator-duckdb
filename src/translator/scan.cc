@@ -175,8 +175,7 @@ Relation WithRead(const WithQuery& query, const std::vector<googlesql::ResolvedC
 
 std::optional<Relation> WithRefScan(const googlesql::ResolvedWithRefScan& ref, const Scope& scope) {
   const auto with = scope.with.find(ref.with_query_name());
-  if (with == scope.with.end() ||
-      with->second.width != static_cast<size_t>(ref.column_list_size())) {
+  if (with == scope.with.end() || std::cmp_not_equal(with->second.width, ref.column_list_size())) {
     return std::nullopt;
   }
   return WithRead(with->second, ref.column_list());
@@ -184,7 +183,7 @@ std::optional<Relation> WithRefScan(const googlesql::ResolvedWithRefScan& ref, c
 
 std::optional<Relation> RecursiveRefScan(const googlesql::ResolvedRecursiveRefScan& ref,
                                          const Scope& scope) {
-  if (!scope.recursive || scope.recursive->width != static_cast<size_t>(ref.column_list_size())) {
+  if (!scope.recursive || std::cmp_not_equal(scope.recursive->width, ref.column_list_size())) {
     return std::nullopt;
   }
   return WithRead(*scope.recursive, ref.column_list());

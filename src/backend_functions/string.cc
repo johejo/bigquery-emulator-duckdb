@@ -77,7 +77,7 @@ void Apply(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector out
 template <bool kCasefold>
 void Normalize(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    googlesql::functions::NormalizeMode mode;
+    googlesql::functions::NormalizeMode mode{};
     if (!googlesql::functions::NormalizeMode_Parse(arguments.String(1), &mode)) {
       return absl::OutOfRangeError("Invalid normalize mode");
     }

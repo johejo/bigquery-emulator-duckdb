@@ -25,9 +25,8 @@ std::string InsertRecord(const json& value, const FieldSchema& field, bool ignor
     throw ApiError::Invalid("Expected an object for field " + field.name);
   }
   for (auto it = value.begin(); it != value.end(); ++it) {
-    const bool known =
-        std::any_of(field.fields.begin(), field.fields.end(),
-                    [&](const FieldSchema& child) { return child.name == it.key(); });
+    const bool known = std::ranges::any_of(
+        field.fields, [&](const FieldSchema& child) { return child.name == it.key(); });
     if (!known && !ignore_unknown_values) {
       throw ApiError::Invalid("Unknown field: " + it.key());
     }
@@ -78,7 +77,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
           std::format("{} Field {} has changed its type parameters", mismatch, name));
     }
     if (after.mode != before.mode &&
-        !(before.mode == FieldMode::kRequired && after.mode == FieldMode::kNullable)) {
+        (before.mode != FieldMode::kRequired || after.mode != FieldMode::kNullable)) {
       throw ApiError::Invalid(std::format("{} Field {} has changed mode from {} to {}", mismatch,
                                           name, FieldModeName(before.mode),
                                           FieldModeName(after.mode)));

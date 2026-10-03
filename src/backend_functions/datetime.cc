@@ -27,7 +27,7 @@ googlesql::TimeValue TimeFromMicros(int64_t micros) {
 }
 
 int64_t MicrosFromTime(const googlesql::TimeValue& time) {
-  return ((((int64_t{time.Hour()} * 60) + time.Minute()) * 60) + time.Second()) * 1000000 +
+  return (((((int64_t{time.Hour()} * 60) + time.Minute()) * 60) + time.Second()) * 1000000) +
          time.Microseconds();
 }
 

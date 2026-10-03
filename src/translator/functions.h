@@ -75,7 +75,8 @@ std::string_view Describe(Implementation implementation);
 
 // The argument counts a rule accepts.
 struct Arity {
-  // NOLINTNEXTLINE(google-explicit-constructor): a bare count reads best in the table.
+  // A bare count reads best in the table.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
   Arity(std::size_t count) : min(count), max(count) {}
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order reads as a range.
   Arity(std::size_t min, std::size_t max) : min(min), max(max) {}

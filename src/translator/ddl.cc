@@ -40,7 +40,7 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   // Reuse table path normalization so dots inside a domain-scoped project are handled
   // the same way for CREATE/DROP SCHEMA and table references.
   std::vector<std::string> table_path = path;
-  table_path.push_back("_dataset_path_placeholder");
+  table_path.emplace_back("_dataset_path_placeholder");
   const auto parts = NormalizeTablePath(table_path, scope.context.defaults.project,
                                         scope.context.defaults.dataset);
   if (path.empty() || parts.empty()) {
@@ -57,12 +57,8 @@ bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
   if (annotations->collation_name() != nullptr) {
     return true;
   }
-  for (const auto& child : annotations->child_list()) {
-    if (HasCollation(child.get())) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(annotations->child_list(),
+                             [](const auto& child) { return HasCollation(child.get()); });
 }
 
 std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
@@ -200,8 +196,8 @@ bool ApplyAnnotations(const googlesql::Type* type,
                             scope);
   }
   if (type->IsStruct()) {
-    for (int i = 0; i < annotations.child_list_size() &&
-                    i < static_cast<int>(field.fields.size()) && i < type->AsStruct()->num_fields();
+    for (int i = 0; i < annotations.child_list_size() && std::cmp_less(i, field.fields.size()) &&
+                    i < type->AsStruct()->num_fields();
          ++i) {
       if (!ApplyAnnotations(type->AsStruct()->field(i).type, *annotations.child_list(i),
                             field.fields[i], scope)) {
@@ -232,8 +228,8 @@ void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParam
   if (type->IsArray() && parameters.num_children() > 0) {
     ApplyTypeParameters(type->AsArray()->element_type(), parameters.child(0), field);
   } else if (type->IsStruct()) {
-    for (int i = 0; i < static_cast<int>(parameters.num_children()) &&
-                    i < static_cast<int>(field.fields.size()) && i < type->AsStruct()->num_fields();
+    for (int i = 0; std::cmp_less(i, parameters.num_children()) &&
+                    std::cmp_less(i, field.fields.size()) && i < type->AsStruct()->num_fields();
          ++i) {
       ApplyTypeParameters(type->AsStruct()->field(i).type, parameters.child(i), field.fields[i]);
     }

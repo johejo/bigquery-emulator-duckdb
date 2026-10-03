@@ -230,7 +230,7 @@ class BigQueryCatalogTest : public ::testing::Test {
 
 TEST_F(BigQueryCatalogTest, FindsTablesThroughTheSource) {
   const googlesql::Table* table = nullptr;
-  ASSERT_TRUE(catalog_.FindTable(Path{"ds", "t"}, &table).ok());
+  ASSERT_TRUE(catalog_.FindTable(Path{"ds", "t"}, &table, {}).ok());
   ASSERT_NE(table, nullptr);
   EXPECT_EQ(table->Name(), "t");
   EXPECT_EQ(table->FullName(), "p.ds.t");
@@ -243,16 +243,16 @@ TEST_F(BigQueryCatalogTest, FindsTablesThroughTheSource) {
 
   // The same table is served from the catalog on later lookups, however it is spelled.
   const googlesql::Table* again = nullptr;
-  ASSERT_TRUE(catalog_.FindTable(Path{"p.ds.t"}, &again).ok());
+  ASSERT_TRUE(catalog_.FindTable(Path{"p.ds.t"}, &again, {}).ok());
   EXPECT_EQ(again, table);
   EXPECT_EQ(source_.lookups, 1);
 }
 
 TEST_F(BigQueryCatalogTest, ReportsMissingTablesAsNotFound) {
   const googlesql::Table* table = nullptr;
-  EXPECT_TRUE(absl::IsNotFound(catalog_.FindTable(Path{"ds", "missing"}, &table)));
+  EXPECT_TRUE(absl::IsNotFound(catalog_.FindTable(Path{"ds", "missing"}, &table, {})));
   EXPECT_EQ(table, nullptr);
-  EXPECT_TRUE(absl::IsNotFound(catalog_.FindTable(Path{"a", "b", "c", "d"}, &table)));
+  EXPECT_TRUE(absl::IsNotFound(catalog_.FindTable(Path{"a", "b", "c", "d"}, &table, {})));
 }
 
 TEST_F(BigQueryCatalogTest, ResolvesColumnsAndTheirTypes) {

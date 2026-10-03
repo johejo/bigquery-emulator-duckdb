@@ -27,13 +27,13 @@ bool Holds(const Condition& condition, const std::vector<FunctionArgument>& argu
     return true;
   }
   const FunctionArgument& argument = arguments[condition.argument - 1];
-  if (!condition.types.empty() && std::find(condition.types.begin(), condition.types.end(),
-                                            argument.type) == condition.types.end()) {
+  if (!condition.types.empty() &&
+      std::ranges::find(condition.types, argument.type) == condition.types.end()) {
     return false;
   }
   if (!condition.date_parts.empty() &&
-      (!argument.date_part || std::find(condition.date_parts.begin(), condition.date_parts.end(),
-                                        *argument.date_part) == condition.date_parts.end())) {
+      (!argument.date_part || std::ranges::find(condition.date_parts, *argument.date_part) ==
+                                  condition.date_parts.end())) {
     return false;
   }
   return !condition.rounding_mode || argument.rounding_mode == *condition.rounding_mode;
@@ -50,8 +50,8 @@ bool Matches(const Rule& rule, const std::vector<FunctionArgument>& arguments) {
       return false;
     }
   }
-  return std::all_of(rule.conditions.begin(), rule.conditions.end(),
-                     [&](const Condition& condition) { return Holds(condition, arguments); });
+  return std::ranges::all_of(
+      rule.conditions, [&](const Condition& condition) { return Holds(condition, arguments); });
 }
 
 // SQL that is as cheap and as stable to repeat as a reference to it: a column, a number or a
@@ -70,7 +70,7 @@ bool Trivial(std::string_view sql) {
   if (sql.size() >= 2 && sql.front() == '\'' && sql.back() == '\'') {
     return sql.find('\'', 1) == sql.size() - 1;
   }
-  return !sql.empty() && std::all_of(sql.begin(), sql.end(), [](char c) {
+  return !sql.empty() && std::ranges::all_of(sql, [](char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
            c == '.' || c == '"';
   });

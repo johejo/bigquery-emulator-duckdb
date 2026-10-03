@@ -124,9 +124,9 @@ nlohmann::json JobCancelResponse(const Job& job);
 nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
 nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
 nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata);
-// `datasets` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
+// `entries` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
 nlohmann::json DatasetList(const std::string& project_id,
-                           const std::vector<DatasetListEntry>& datasets, const ListPage& page);
+                           const std::vector<DatasetListEntry>& entries, const ListPage& page);
 nlohmann::json TableResource(const TableInfo& info);
 nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
                          const ListPage& page);

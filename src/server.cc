@@ -90,7 +90,7 @@ class Server::Impl {
   }
 
   // Wraps a handler so that it returns JSON and maps ApiError to BigQuery's error format.
-  httplib::Server::Handler Json(Handler handler) {
+  static httplib::Server::Handler Json(Handler handler) {
     return [handler = std::move(handler)](const httplib::Request& request,
                                           httplib::Response& response) {
       try {
@@ -303,7 +303,7 @@ class Server::Impl {
     LoadRequest request = ParseLoadInsert(project, metadata);
     std::string id;
     {
-      std::lock_guard<std::mutex> lock(uploads_mutex_);
+      std::scoped_lock lock(uploads_mutex_);
       id = std::to_string(next_upload_id_++);
       uploads_.emplace(id, std::move(request));
     }
@@ -314,7 +314,7 @@ class Server::Impl {
 
   // Closes the resumable upload session `id` and returns the load job it was opened for.
   LoadRequest TakeResumableUpload(const std::string& id) {
-    std::lock_guard<std::mutex> lock(uploads_mutex_);
+    std::scoped_lock lock(uploads_mutex_);
     const auto it = uploads_.find(id);
     if (it == uploads_.end()) throw ApiError::NotFound("Upload session not found");
     LoadRequest request = std::move(it->second);

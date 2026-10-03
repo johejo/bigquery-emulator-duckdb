@@ -402,7 +402,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     std::vector<DatasetTables> datasets;
     const std::vector<std::string> names = DatasetsIn(source, project, qualifier);
     if (dataset.has_value()) {
-      if (std::find(names.begin(), names.end(), *dataset) == names.end()) {
+      if (std::ranges::find(names, *dataset) == names.end()) {
         return not_found();
       }
       datasets.push_back({project, *dataset, source.ListTables(project, *dataset)});

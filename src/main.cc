@@ -1,12 +1,13 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <charconv>
 #include <csignal>
-#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 
 #include "src/emulator.h"
@@ -26,7 +27,7 @@ void PrintUsage() {
 // Blocks SIGINT and SIGTERM in the calling thread and every thread it starts afterwards, so that
 // they are only ever received through sigwait() in WaitForShutdown().
 sigset_t BlockShutdownSignals() {
-  sigset_t signals;
+  sigset_t signals{};
   sigemptyset(&signals);
   sigaddset(&signals, SIGINT);
   sigaddset(&signals, SIGTERM);
@@ -51,7 +52,13 @@ int Run(int argc, char** argv) {
     if (arg == "--host" && has_value) {
       options.host = argv[++i];
     } else if (arg == "--port" && has_value) {
-      options.port = std::atoi(argv[++i]);
+      const std::string_view value = argv[++i];
+      const auto [end, error] =
+          std::from_chars(value.data(), value.data() + value.size(), options.port);
+      if (error != std::errc() || end != value.data() + value.size()) {
+        PrintUsage();
+        return 2;
+      }
     } else if (arg == "--data-dir" && has_value) {
       data_dir = argv[++i];
     } else if (arg == "--help" || arg == "-h") {
