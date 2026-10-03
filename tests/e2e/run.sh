@@ -81,8 +81,9 @@ done
 
 start_emulator
 
-# The exec runner is opt-in. runn also waits for stdin when it is not a TTY, so close it.
-runn run --scopes run:exec "$@" tests/e2e/*.yml < /dev/null
+# The exec runner is opt-in. Runbooks run concurrently, each on datasets of its own. runn also
+# waits for stdin when it is not a TTY, so close it.
+runn run --scopes run:exec --concurrent on "$@" tests/e2e/*.yml < /dev/null
 
 # Data written with --data-dir survives a restart, including in a domain-scoped project, whose
 # id is escaped into the file name.

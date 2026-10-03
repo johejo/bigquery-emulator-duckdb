@@ -1,0 +1,35 @@
+## Value tables
+
+SELECT COUNT(*) FROM (SELECT AS VALUE a FROM t)
+=> "4"
+
+## Subqueries
+
+SELECT (SELECT MAX(a) FROM t)
+=> "3"
+
+SELECT EXISTS(SELECT 1 FROM t WHERE a = 2)
+=> "true"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT b FROM t WHERE b IS NOT NULL ORDER BY a DESC), ',')
+=> "あ,yy,x"
+
+SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t WHERE FALSE))
+=> "0"
+
+## Unnest structs and arrays
+
+SELECT SUM(x) FROM UNNEST([1, 2, 3]) AS x
+=> "6"
+
+SELECT s.y FROM (SELECT STRUCT(1 AS x, 'z' AS y) AS s)
+=> "z"
+
+SELECT [10, 20, 30][OFFSET(1)]
+=> "20"
+
+SELECT [10, 20, 30][ORDINAL(1)]
+=> "10"
+
+SELECT [10, 20, 30][SAFE_OFFSET(3)]
+=> null

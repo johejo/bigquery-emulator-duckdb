@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
 
-// The table that the cases in testdata/scalars.txt read as `t` from their default dataset.
+// The table that the cases in testdata/scalars/*.txt read as `t` from their default dataset.
 var scalarFixture = []string{
 	"CREATE SCHEMA IF NOT EXISTS scalars",
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",
@@ -21,14 +22,15 @@ var scalarFixture = []string{
 }
 
 type scalarCase struct {
+	path string
 	line int
 	sql  string
 	want any
 }
 
 // readScalarCases reads cases written as one query, possibly over several lines, followed by
-// "=> " and the JSON value that jobs.query reports for its one cell. Blank lines and lines
-// starting with # between cases are ignored.
+// "=> " and the JSON of the cell's "v" as jobs.query returns it: a string, or null for NULL.
+// Blank lines and lines starting with # between cases are ignored.
 func readScalarCases(t *testing.T, path string) []scalarCase {
 	t.Helper()
 	file, err := os.Open(path)
@@ -52,7 +54,7 @@ func readScalarCases(t *testing.T, path string) []scalarCase {
 			if err := json.Unmarshal([]byte(text[len("=> "):]), &want); err != nil {
 				t.Fatalf("%s:%d: %v", path, line, err)
 			}
-			cases = append(cases, scalarCase{line: start, sql: strings.Join(sql, "\n"), want: want})
+			cases = append(cases, scalarCase{path: path, line: start, sql: strings.Join(sql, "\n"), want: want})
 			sql = nil
 		case len(sql) > 0:
 			sql = append(sql, text)
@@ -115,7 +117,7 @@ func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
 	return decoded, nil
 }
 
-// TestScalars runs each query of testdata/scalars.txt and compares its one cell. These are the
+// TestScalars runs each query of testdata/scalars/*.txt and compares its one cell. These are the
 // many small cases where a BigQuery function or operator must answer as BigQuery does.
 func TestScalars(t *testing.T) {
 	endpoint := os.Getenv("BQ_EMULATOR_API")
@@ -132,21 +134,26 @@ func TestScalars(t *testing.T) {
 		}
 	}
 
-	const path = "testdata/scalars.txt"
-	for _, c := range readScalarCases(t, path) {
-		t.Run(fmt.Sprintf("line%d", c.line), func(t *testing.T) {
-			t.Parallel()
-			response, err := runQuery(endpoint, project, "scalars", c.sql)
-			if err != nil {
-				t.Fatalf("%s:%d: %s: %v", path, c.line, c.sql, err)
-			}
-			if len(response.Rows) != 1 || len(response.Rows[0].F) != 1 {
-				t.Fatalf("%s:%d: %s: got %d rows, want one cell", path, c.line, c.sql,
-					len(response.Rows))
-			}
-			if got := response.Rows[0].F[0].V; !reflect.DeepEqual(got, c.want) {
-				t.Errorf("%s:%d: %s: got %#v, want %#v", path, c.line, c.sql, got, c.want)
-			}
-		})
+	paths, err := filepath.Glob("testdata/scalars/*.txt")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no cases in testdata/scalars: %v", err)
+	}
+	for _, path := range paths {
+		for _, c := range readScalarCases(t, path) {
+			t.Run(fmt.Sprintf("%s:%d", filepath.Base(c.path), c.line), func(t *testing.T) {
+				t.Parallel()
+				response, err := runQuery(endpoint, project, "scalars", c.sql)
+				if err != nil {
+					t.Fatalf("%s:%d: %s: %v", c.path, c.line, c.sql, err)
+				}
+				if len(response.Rows) != 1 || len(response.Rows[0].F) != 1 {
+					t.Fatalf("%s:%d: %s: got %d rows, want one cell", c.path, c.line, c.sql,
+						len(response.Rows))
+				}
+				if got := response.Rows[0].F[0].V; !reflect.DeepEqual(got, c.want) {
+					t.Errorf("%s:%d: %s: got %#v, want %#v", c.path, c.line, c.sql, got, c.want)
+				}
+			})
+		}
 	}
 }
