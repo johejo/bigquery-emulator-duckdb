@@ -1,0 +1,98 @@
+## Operators and array functions
+
+# BigQuery's shifts drop the bits shifted out and fill with zeros, even for negative values.
+SELECT 1 << 63
+=> "-9223372036854775808"
+
+SELECT 3 << 62
+=> "-4611686018427387904"
+
+SELECT -8 >> 1
+=> "9223372036854775804"
+
+SELECT 1 << 64
+=> "0"
+
+SELECT 8 >> 2
+=> "2"
+
+SELECT CAST(NULL AS INT64) << 1
+=> null
+
+SELECT 1 IS DISTINCT FROM NULL
+=> "true"
+
+SELECT NULL IS NOT DISTINCT FROM NULL
+=> "true"
+
+SELECT 2 IN UNNEST([1, 2])
+=> "true"
+
+SELECT 3 IN UNNEST([1, NULL])
+=> null
+
+SELECT NULL IN UNNEST([1])
+=> null
+
+SELECT 1 IN UNNEST(CAST([] AS ARRAY<INT64>))
+=> "false"
+
+SELECT 1 IN UNNEST(CAST(NULL AS ARRAY<INT64>))
+=> "false"
+
+SELECT ARRAY_TO_STRING(ARRAY_CONCAT(['a'], ['b'], ['c']), ',')
+=> "a,b,c"
+
+SELECT ARRAY_CONCAT(['a'], CAST(NULL AS ARRAY<STRING>)) IS NULL
+=> "true"
+
+SELECT ARRAY_TO_STRING(ARRAY_REVERSE(['a', 'b']), ',')
+=> "b,a"
+
+SELECT ARRAY_FIRST([4, 5])
+=> "4"
+
+SELECT ARRAY_LAST([4, 5])
+=> "5"
+
+SELECT IF(TRUE, 1, ERROR('boom'))
+=> "1"
+
+SELECT ROUND(1.25, 1)
+=> "1.3"
+
+SELECT ROUND(-2.5)
+=> "-3.0"
+
+SELECT ROUND(NUMERIC '2.5', 0, 'ROUND_HALF_EVEN') = NUMERIC '2'
+=> "true"
+
+SELECT ROUND(NUMERIC '-3.5', 0, 'ROUND_HALF_EVEN') = NUMERIC '-4'
+=> "true"
+
+SELECT ROUND(NUMERIC '1.25', 1, 'ROUND_HALF_EVEN') = NUMERIC '1.2'
+=> "true"
+
+SELECT ROUND(NUMERIC '1.251', 1, 'ROUND_HALF_EVEN') = NUMERIC '1.3'
+=> "true"
+
+SELECT ROUND(NUMERIC '150', -2, 'ROUND_HALF_EVEN') = NUMERIC '200'
+=> "true"
+
+SELECT ROUND(NUMERIC '12345678901234567890.25', 1, 'ROUND_HALF_EVEN') = NUMERIC '12345678901234567890.2'
+=> "true"
+
+SELECT ROUND(BIGNUMERIC '0.5', 0, 'ROUND_HALF_EVEN') = BIGNUMERIC '0'
+=> "true"
+
+SELECT ROUND(NUMERIC '2.5', 0, 'ROUND_HALF_AWAY_FROM_ZERO') = NUMERIC '3'
+=> "true"
+
+SELECT LPAD('a', 3)
+=> "  a"
+
+SELECT RPAD('a', 3, 'xy')
+=> "axy"
+
+SELECT LPAD('abc', 2)
+=> "ab"

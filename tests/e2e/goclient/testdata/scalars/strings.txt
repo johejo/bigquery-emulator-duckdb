@@ -1,0 +1,391 @@
+## String, bytes and math functions
+# Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
+
+SELECT CHR(0)
+=> ""
+
+SELECT CHR(12354)
+=> "あ"
+
+SELECT UNICODE('')
+=> "0"
+
+SELECT UNICODE('あ')
+=> "12354"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS('aあ😀\n')) AS x), ',')
+=> "97,12354,128512,10"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS(b'\x00a\xff')) AS x), ',')
+=> "0,97,255"
+
+SELECT ARRAY_LENGTH(TO_CODE_POINTS(''))
+=> "0"
+
+SELECT ARRAY_LENGTH(TO_CODE_POINTS(raw)) FROM t WHERE a = 3
+=> "2"
+
+SELECT CODE_POINTS_TO_STRING([97, 12354, 128512])
+=> "aあ😀"
+
+SELECT CODE_POINTS_TO_STRING(TO_CODE_POINTS(b)) FROM t WHERE a = 3
+=> "あ"
+
+SELECT CODE_POINTS_TO_STRING([])
+=> ""
+
+SELECT CODE_POINTS_TO_STRING([97, NULL])
+=> null
+
+SELECT SAFE.CODE_POINTS_TO_STRING([97, 55296])
+=> null
+
+SELECT SAFE.CODE_POINTS_TO_STRING([1114112])
+=> null
+
+SELECT TO_HEX(CODE_POINTS_TO_BYTES([0, 97, 255]))
+=> "0061ff"
+
+SELECT TO_HEX(CODE_POINTS_TO_BYTES(TO_CODE_POINTS(raw))) FROM t WHERE a = 3
+=> "00ff"
+
+SELECT CODE_POINTS_TO_BYTES([97, NULL])
+=> null
+
+SELECT SAFE.CODE_POINTS_TO_BYTES([256])
+=> null
+
+SELECT ASCII('A')
+=> "65"
+
+SELECT INSTR('abcb', 'b')
+=> "2"
+
+SELECT LEFT('abc', 2) || RIGHT('abc', 1)
+=> "abc"
+
+SELECT TRANSLATE('abc', 'ab', 'x')
+=> "xc"
+
+SELECT TO_HEX(TRANSLATE(b'\x00ab\xff', b'a\xff', b'\x01'))
+=> "000162"
+
+SELECT TO_HEX(b'\x00\xff')
+=> "00ff"
+
+SELECT TO_HEX(FROM_HEX('A'))
+=> "0a"
+
+SELECT TO_HEX(MD5('a'))
+=> "0cc175b9c0f1b6a831c399e269772661"
+
+SELECT BYTE_LENGTH(SHA256('a'))
+=> "32"
+
+SELECT TO_BASE64(FROM_BASE64('AP8='))
+=> "AP8="
+
+SELECT CAST(IEEE_DIVIDE(1, 0) AS STRING)
+=> "inf"
+
+SELECT BIT_COUNT(-1)
+=> "64"
+
+SELECT BIT_COUNT(b'\xff\x01')
+=> "9"
+
+SELECT BIT_COUNT(b'')
+=> "0"
+
+SELECT BIT_COUNT(raw) FROM t WHERE a = 2
+=> null
+
+SELECT CAST(CBRT(8) AS INT64)
+=> "2"
+
+SELECT CAST(ATAN2(1, 1) * 4 * 1000 AS INT64)
+=> "3142"
+
+SELECT SAFE_ADD(9223372036854775807, 1)
+=> null
+
+SELECT SAFE_MULTIPLY(a, 2) FROM t WHERE a = 3
+=> "6"
+
+SELECT SAFE_NEGATE(1)
+=> "-1"
+
+SELECT SAFE_SUBTRACT(1, 2)
+=> "-1"
+
+## SUBSTR at BigQuery positions
+
+SELECT SUBSTR('abc', 0, 2)
+=> "ab"
+
+SELECT SUBSTR('abc', -5, 2)
+=> "ab"
+
+SELECT SUBSTR('abc', -2)
+=> "bc"
+
+SELECT SUBSTRING('あいう', 2, 1)
+=> "い"
+
+SELECT SUBSTR('abc', 4)
+=> ""
+
+## String functions on bytes
+# A byte that is not valid UTF-8 must stay whole.
+
+SELECT TO_HEX(LEFT(b'\xffab', 2))
+=> "ff61"
+
+SELECT TO_HEX(RIGHT(b'\xffab', 1))
+=> "62"
+
+SELECT SAFE.LEFT(b'abc', -1)
+=> null
+
+SELECT TO_HEX(SUBSTR(b'\xffab', 2))
+=> "6162"
+
+SELECT TO_HEX(SUBSTR(b'\xffab', 0, 2))
+=> "ff61"
+
+SELECT TO_HEX(SUBSTRING(b'\xffab', -2, 1))
+=> "61"
+
+SELECT TO_HEX(REVERSE(b'\x01\xffa'))
+=> "61ff01"
+
+SELECT TO_HEX(LOWER(b'\\\xffAz'))
+=> "5cff617a"
+
+SELECT TO_HEX(UPPER(b'\\\xffAz'))
+=> "5cff415a"
+
+SELECT TO_HEX(LPAD(b'a', 4, b'\xff'))
+=> "ffffff61"
+
+SELECT TO_HEX(RPAD(b'a', 2))
+=> "6120"
+
+SELECT TO_HEX(LPAD(b'abc', 2))
+=> "6162"
+
+SELECT TO_HEX(TRIM(b'\xffa\xffb\xff', b'\xff'))
+=> "61ff62"
+
+SELECT TO_HEX(LTRIM(b'aab', b'a'))
+=> "62"
+
+SELECT TO_HEX(RTRIM(b'abb', b'ab'))
+=> ""
+
+SELECT TO_HEX(REPLACE(b'\x1f\xf1\xff', b'\xff', b'z'))
+=> "1ff17a"
+
+SELECT TO_HEX(REPLACE(b'abc', b'', b'z'))
+=> "616263"
+
+SELECT INSTR(b'abcb', b'b', 1, 2)
+=> "4"
+
+SELECT INSTR(b'abcb', b'b', -1)
+=> "4"
+
+SELECT ARRAY_LENGTH(SPLIT(b'', b','))
+=> "1"
+
+SELECT TO_HEX(ARRAY_TO_STRING([b'a', NULL, b'\xff'], b'-'))
+=> "612dff"
+
+SELECT TO_HEX(ARRAY_TO_STRING([b'a', NULL], b'-', b'\xff'))
+=> "612dff"
+
+SELECT STRPOS(b'\x1f\xf1\xff', b'\xff')
+=> "3"
+
+SELECT INSTR(b'abc', b'z')
+=> "0"
+
+SELECT STARTS_WITH(b'\xffa', b'\xff')
+=> "true"
+
+SELECT ENDS_WITH(b'\xffa', b'\xff')
+=> "false"
+
+SELECT ASCII(b'\xffa')
+=> "255"
+
+SELECT ASCII(b'')
+=> "0"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM UNNEST(SPLIT(b'a\x1f\xf1b', b'\xf1')) AS x), ',')
+=> "611f,62"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_HEX(x) FROM UNNEST(SPLIT(b'a\xff', b'')) AS x), ',')
+=> "61,ff"
+
+SELECT ARRAY_TO_STRING(['a', NULL, 'b'], '-', 'N')
+=> "a-N-b"
+
+SELECT TO_HEX(STRING_AGG(raw ORDER BY a)) FROM t
+=> "612c00ff"
+
+SELECT TO_HEX(STRING_AGG(raw, b'' ORDER BY a DESC LIMIT 1)) FROM t
+=> "00ff"
+
+## GoogleSQL functions
+# src/backend_functions.cc registers GoogleSQL's implementations of these.
+
+SELECT FARM_FINGERPRINT('')
+=> "-7286425919675154353"
+
+SELECT FARM_FINGERPRINT('あ') = FARM_FINGERPRINT(b'\xe3\x81\x82')
+=> "true"
+
+SELECT FARM_FINGERPRINT(CAST(NULL AS STRING))
+=> null
+
+SELECT COUNT(DISTINCT FARM_FINGERPRINT(raw)) FROM t
+=> "2"
+
+SELECT TO_HEX(SHA512('abc'))
+=> "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+
+SELECT SHA512(b'\xff') = SHA512(FROM_HEX('ff'))
+=> "true"
+
+SELECT INITCAP('hello WORLD-everyone!')
+=> "Hello World-Everyone!"
+
+## GoogleSQL string functions
+# Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
+
+SELECT UPPER('straße')
+=> "STRASSE"
+
+SELECT LOWER('ΑΣ')
+=> "ας"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS(REVERSE('a\u0301b'))) AS x), ',')
+=> "98,769,97"
+
+SELECT REVERSE(b) FROM t WHERE a IS NULL
+=> null
+
+SELECT TRIM(' \t\u3000a\n')
+=> "a"
+
+SELECT LTRIM('\u00a0a ') || RTRIM(' a\u2003')
+=> "a  a"
+
+SELECT TRIM('xax', 'x')
+=> "a"
+
+SELECT SAFE.TRANSLATE('abca', 'aa', 'xy')
+=> null
+
+SELECT SAFE.TRANSLATE(b'abca', b'aa', b'xy')
+=> null
+
+SELECT SAFE.TRANSLATE(REPEAT('a', 1048576), 'a', 'é') IS NULL
+=> "true"
+
+SELECT SAFE.REPLACE(REPEAT('a', 1048576), 'a', 'aa') IS NULL
+=> "true"
+
+SELECT ASCII('')
+=> "0"
+
+SELECT SAFE.ASCII('é')
+=> null
+
+SELECT SAFE.LEFT('abc', -1)
+=> null
+
+SELECT SAFE.RIGHT('abc', -1)
+=> null
+
+SELECT SAFE.LPAD('abc', 5, '')
+=> null
+
+SELECT SAFE.RPAD('abc', -1)
+=> null
+
+SELECT SAFE.LPAD('a', 1048577) IS NULL
+=> "true"
+
+SELECT RPAD('あ', 3, 'い')
+=> "あいい"
+
+SELECT INSTR('abcb', 'b', 1, 2)
+=> "4"
+
+SELECT INSTR('abcb', 'b', -1, 2)
+=> "2"
+
+SELECT SAFE.INSTR('abc', 'b', 0)
+=> null
+
+SELECT NORMALIZE('\uff21\u2460', NFKC)
+=> "A1"
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(TO_CODE_POINTS(NORMALIZE('\u00e9', NFD))) AS x), ',')
+=> "101,769"
+
+SELECT NORMALIZE_AND_CASEFOLD('Straße', NFKC)
+=> "strasse"
+
+SELECT CONTAINS_SUBSTR('the blue house', 'Blue')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('\uff21bc', 'a')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', '')
+=> "true"
+
+SELECT CONTAINS_SUBSTR('abc', 'd')
+=> "false"
+
+SELECT CONTAINS_SUBSTR(b, 'x') FROM t WHERE a IS NULL
+=> null
+
+SELECT INITCAP('apples1oranges2pears', '12')
+=> "Apples1Oranges2Pears"
+
+SELECT EDIT_DISTANCE('kitten', 'sitting')
+=> "3"
+
+SELECT EDIT_DISTANCE('あい', 'いあ')
+=> "2"
+
+SELECT EDIT_DISTANCE('kitten', 'sitting', max_distance => 2)
+=> "2"
+
+SELECT EDIT_DISTANCE(b'\xe3\x81\x82', b'\xe3\x81\x84')
+=> "1"
+
+SELECT REGEXP_INSTR('ab@cd-ef', '@[^-]*')
+=> "3"
+
+SELECT REGEXP_INSTR('あいう', 'う')
+=> "3"
+
+SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 0)
+=> "6"
+
+SELECT REGEXP_INSTR('-2020-jack-class1', '-[^.-]*', 2, 1, 1)
+=> "11"
+
+SELECT REGEXP_INSTR('abc', 'z')
+=> "0"
+
+SELECT REGEXP_INSTR(b'\xe3\x81\x82b', b'b')
+=> "4"
+
+SELECT REGEXP_INSTR('abc', 'b', NULL)
+=> null

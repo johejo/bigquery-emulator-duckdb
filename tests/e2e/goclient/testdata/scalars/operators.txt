@@ -1,0 +1,10 @@
+## Operators and conditions
+
+SELECT CAST(NULL AS FLOAT64) / 0
+=> null
+
+SELECT 1 / CAST(NULL AS FLOAT64)
+=> null
+
+SELECT LEFT('abc', CAST(RAND() * 0 AS INT64) + 2)
+=> "ab"

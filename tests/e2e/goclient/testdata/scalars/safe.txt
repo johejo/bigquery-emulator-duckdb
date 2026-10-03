@@ -1,0 +1,31 @@
+## Safe calls
+
+SELECT SAFE.LENGTH('abc')
+=> "3"
+
+SELECT SAFE.REGEXP_CONTAINS('abc', '(')
+=> null
+
+SELECT SAFE.REGEXP_CONTAINS(b, '(') FROM t WHERE a = 1
+=> null
+
+SELECT SAFE.REGEXP_CONTAINS(b, 'x') FROM t WHERE a = 1
+=> "true"
+
+SELECT SAFE.CONCAT(SAFE.UPPER(b), SAFE.LOWER('Z')) FROM t WHERE a = 1
+=> "Xz"
+
+SELECT SAFE.DATE_TRUNC(DATE '2024-05-06', MONTH)
+=> "2024-05-01"
+
+SELECT SAFE.SUBSTR('abcdef', 2, 3)
+=> "bcd"
+
+SELECT SAFE.SUBSTR('abcdef', 2, -1)
+=> null
+
+SELECT SAFE.SUBSTR(b'abc', 2, -1)
+=> null
+
+SELECT SAFE.DIV(1, 0)
+=> null
