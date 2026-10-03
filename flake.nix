@@ -31,6 +31,8 @@
                   bazelisk
                   buildifier
                   llvmPackages.clang-tools
+                  # tests/e2e/run.sh waits for the servers with curl.
+                  curlMinimal
                   (callPackage ./duckdb-bin.nix { })
                   fake-gcs-server
                   git
