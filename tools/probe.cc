@@ -69,14 +69,12 @@ std::string Status(std::map<Outcome, int> counts) {
   return counts[Outcome::kRuns] == 0 ? "Unsupported" : "Partial";
 }
 
-Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql,
-               const std::string& default_dataset) {
+Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql) {
   // Analyze separately so that a query the probe got wrong is not blamed on the emulator.
   try {
     googlesql::TypeFactory type_factory;
-    BigQueryCatalog catalog(tables, &type_factory, "test", default_dataset);
-    AnalyzeGoogleSql(sql, catalog, type_factory,
-                     {.default_project = "test", .default_dataset = default_dataset});
+    BigQueryCatalog catalog(tables, &type_factory, "test", "");
+    AnalyzeGoogleSql(sql, catalog, type_factory, {.default_project = "test"});
   } catch (const std::exception& error) {
     // A feature whose language option the emulator leaves off, such as COLLATE, is one it does
     // not support rather than a query the probe got wrong.
@@ -92,9 +90,6 @@ Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql,
   QueryRequest request;
   request.project_id = "test";
   request.query = sql;
-  if (!default_dataset.empty()) {
-    request.default_dataset = DatasetReference{"test", default_dataset};
-  }
   const std::shared_ptr<const Job> job = emulator.RunQuery(request);
   if (!job->error.has_value()) {
     return {Outcome::kRuns, ""};

@@ -419,7 +419,7 @@ cc_binary(
     ],
 )
 
-# Shared by the probes that print docs/functions.md, docs/sql.md and docs/api.md.
+# The pieces of //:function_probe that print docs/functions.md.
 cc_library(
     name = "probe",
     srcs = ["tools/probe.cc"],
@@ -463,64 +463,6 @@ diff_test(
     failure_message = "docs/functions.md is stale; run `just docs` to regenerate it.",
     file1 = ":functions_md",
     file2 = "docs/functions.md",
-)
-
-cc_binary(
-    name = "sql_probe",
-    srcs = ["tools/sql_probe.cc"],
-    copts = ["-std=c++20"],
-    deps = [
-        ":api_error",
-        ":catalog",
-        ":emulator",
-        ":probe",
-    ],
-)
-
-genrule(
-    name = "sql_md",
-    srcs = ["tools/sql_features.txt"],
-    outs = ["sql.md"],
-    cmd = "$(execpath :sql_probe) $(execpath tools/sql_features.txt) > $@",
-    tools = [":sql_probe"],
-)
-
-diff_test(
-    name = "sql_md_test",
-    failure_message = "docs/sql.md is stale; run `just docs` to regenerate it.",
-    file1 = ":sql_md",
-    file2 = "docs/sql.md",
-)
-
-cc_binary(
-    name = "api_probe",
-    srcs = ["tools/api_probe.cc"],
-    copts = ["-std=c++20"],
-    deps = [
-        ":emulator",
-        ":httplib",
-        ":probe",
-        ":server",
-        "@nlohmann_json//:json",
-    ],
-)
-
-genrule(
-    name = "api_md",
-    srcs = [
-        "//third_party/bigquery:discovery.json",
-        "tools/api_methods.txt",
-    ],
-    outs = ["api.md"],
-    cmd = "$(execpath :api_probe) $(execpath //third_party/bigquery:discovery.json) $(execpath tools/api_methods.txt) > $@",
-    tools = [":api_probe"],
-)
-
-diff_test(
-    name = "api_md_test",
-    failure_message = "docs/api.md is stale; run `just docs` to regenerate it.",
-    file1 = ":api_md",
-    file2 = "docs/api.md",
 )
 
 cc_test(

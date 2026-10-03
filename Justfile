@@ -43,12 +43,23 @@ e2e *args:
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- {{args}}
 
-check: lint test e2e
+check: lint test e2e docs-check
+
+# Generates docs/sql.md and docs/api.md: tools/restprobe probes emulators started from the binary.
+_restprobe := "go -C tools/restprobe run . -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
+_api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
 
 # Regenerates docs/functions.md, docs/sql.md and docs/api.md, the tables of which BigQuery
 # functions, SQL features and REST API methods the emulator supports.
 docs:
-    bazelisk build //:functions_md //:sql_md //:api_md
+    bazelisk build //:functions_md //:bigquery-emulator-duckdb
     install -m 644 bazel-bin/functions.md docs/functions.md
-    install -m 644 bazel-bin/sql.md docs/sql.md
-    install -m 644 bazel-bin/api.md docs/api.md
+    {{_sql_probe}} > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
+    {{_api_probe}} > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
+
+# Fails when docs/sql.md or docs/api.md is stale; `just test` checks docs/functions.md.
+docs-check:
+    bazelisk build //:bigquery-emulator-duckdb
+    {{_sql_probe}} | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
+    {{_api_probe}} | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }

@@ -1,4 +1,4 @@
-# The SQL features //:sql_probe checks, which generate docs/sql.md.
+# The SQL features tools/restprobe checks, which generate docs/sql.md.
 #
 #   setup SQL             A statement run on every fresh emulator before a query, in project `test`.
 #   section TITLE         Starts a table in the report.
