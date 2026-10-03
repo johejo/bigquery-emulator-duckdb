@@ -1,5 +1,11 @@
 desc: extract jobs write CSV, newline-delimited JSON and Parquet to GCS
 steps:
+  mk_bucket:
+    exec:
+      command: >-
+        curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test"
+        -H 'Content-Type: application/json' -d '{"name":"extract-output"}'
+    test: current.exit_code == 0
   mk_dataset:
     exec:
       command: tests/e2e/bq.sh mk --dataset e2e_extract
@@ -100,8 +106,8 @@ steps:
   parquet_content:
     exec:
       command: >-
-        curl -fsS -o "${E2E_EXTRACT_DIR}/nested.parquet" "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.parquet?alt=media" &&
-        duckdb -csv -noheader -c "SELECT r.x, r.t, r.ts, rs[1].y, ri FROM '${E2E_EXTRACT_DIR}/nested.parquet'"
+        curl -fsS -o "${E2E_TMP_DIR}/nested.parquet" "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.parquet?alt=media" &&
+        duckdb -csv -noheader -c "SELECT r.x, r.t, r.ts, rs[1].y, ri FROM '${E2E_TMP_DIR}/nested.parquet'"
     test: |
       current.exit_code == 0 &&
       current.stdout == '1,01:02:03+00,2020-01-02 03:04:05,z,"[3, 4]"\n'
@@ -109,7 +115,7 @@ steps:
     exec:
       command: >-
         duckdb -csv -noheader -c "SELECT name, logical_type FROM
-        parquet_schema('${E2E_EXTRACT_DIR}/nested.parquet') WHERE name IN ('t', 'ts')"
+        parquet_schema('${E2E_TMP_DIR}/nested.parquet') WHERE name IN ('t', 'ts')"
     test: |
       current.exit_code == 0 &&
       current.stdout contains 't,"TimeType(isAdjustedToUTC=1' &&

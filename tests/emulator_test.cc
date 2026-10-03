@@ -324,7 +324,7 @@ TEST_F(EmulatorTest, ReportsAFailedQueryAsAJobError) {
   EXPECT_EQ(ErrorStatus("SELECT 1"), 0);
 }
 
-// That data survives a restart is covered by tests/e2e/run.sh; this checks the file layout.
+// That data survives a restart is covered by tests/e2e/restart; this checks the file layout.
 TEST(EmulatorPersistenceTest, StoresEachProjectInItsOwnFile) {
   const std::filesystem::path data_dir =
       std::filesystem::path(::testing::TempDir()) / "emulator_persistence";
