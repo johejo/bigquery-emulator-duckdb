@@ -35,7 +35,8 @@ mkdir "${E2E_TMP_DIR}" "${tmp}/data"
 port="${BQ_EMULATOR_PORT:-$(free_port)}"
 export BQ_EMULATOR_API="http://127.0.0.1:${port}"
 gcs_port="$(free_port)"
-export STORAGE_EMULATOR_HOST="http://127.0.0.1:${gcs_port}"
+# A bare host:port, which the emulator, like the Google client libraries, reads as HTTP.
+export STORAGE_EMULATOR_HOST="127.0.0.1:${gcs_port}"
 
 # Each directory under tests/e2e/gcs becomes a bucket holding the files beneath it.
 fake-gcs-server --scheme http --host 127.0.0.1 --port "${gcs_port}" --backend memory \

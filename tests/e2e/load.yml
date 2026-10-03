@@ -1,4 +1,6 @@
 desc: load jobs support GCS wildcards and gzip CSV and JSON from uploads and GCS
+vars:
+  malformed: [gs://load-fixtures, gs://load-fixtures/, gs:///people.jsonl]
 steps:
   mk_dataset:
     exec:
@@ -77,6 +79,25 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"},{"id":"3","name":"carol"}]'
+  # Object names are escaped in requests, and listing prefixes in queries.
+  load_special_names:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.special 'gs://load-fixtures/special/a b+%1.jsonl' id:INTEGER,name:STRING
+    test: current.exit_code == 0
+  load_special_wildcard:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.special 'gs://load-fixtures/special/a b+%*'
+    test: current.exit_code == 0
+  special_rows:
+    exec:
+      command: tests/e2e/bq.sh query --format=json --nouse_legacy_sql 'SELECT * FROM e2e_load.special ORDER BY id'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"5","name":"eve"},{"id":"5","name":"eve"},{"id":"6","name":"frank"}]'
   load_gzip_upload:
     exec:
       command: >-
@@ -113,6 +134,33 @@ steps:
         tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
         e2e_load.wildcard 'gs://load-*/nested/people.jsonl'
     test: current.exit_code != 0
+  # bq wraps long messages, so newlines are folded back into spaces before matching.
+  missing_object:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard gs://load-fixtures/missing.jsonl
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Could not read GCS object: gs://load-fixtures/missing.jsonl'
+  missing_bucket:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard 'gs://missing-bucket/*.jsonl'
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Could not list GCS objects: gs://missing-bucket/*.jsonl'
+  malformed_uris:
+    loop:
+      count: len(vars.malformed)
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.wildcard '{{ vars.malformed[i] }}'
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Invalid GCS URI: ' + vars.malformed[i]
   corrupt_gzip:
     exec:
       command: >-
