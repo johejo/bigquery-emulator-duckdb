@@ -53,6 +53,13 @@ class Arguments {
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
   }
 
+  // A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
+  [[nodiscard]] __int128 Decimal(idx_t column) const {
+    const auto value = static_cast<duckdb_hugeint*>(
+        duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
+    return (static_cast<__int128>(value.upper) << 64) | value.lower;
+  }
+
   [[nodiscard]] bool Bool(idx_t column) const {
     return static_cast<bool*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
@@ -85,6 +92,12 @@ inline void SetResult(duckdb_vector output, idx_t row, bool value) {
 
 inline void SetResult(duckdb_vector output, idx_t row, double value) {
   static_cast<double*>(duckdb_vector_get_data(output))[row] = value;
+}
+
+// A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
+inline void SetResult(duckdb_vector output, idx_t row, __int128 value) {
+  static_cast<duckdb_hugeint*>(duckdb_vector_get_data(output))[row] = {
+      static_cast<uint64_t>(value), static_cast<int64_t>(value >> 64)};
 }
 
 inline void SetResult(duckdb_vector output, idx_t row, const std::string& value) {
@@ -168,6 +181,10 @@ absl::StatusOr<int64_t> MicrosFromDatetime(const googlesql::DatetimeValue& datet
 // is false, DuckDB makes the result NULL for a NULL argument without calling `function`.
 // Throws BackendError when DuckDB rejects it.
 void Register(duckdb_connection connection, const char* name,
+              const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
+              duckdb_scalar_function_t function, bool nulls = true,
+              std::optional<duckdb_type> varargs = std::nullopt);
+void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls = true,
               std::optional<duckdb_type> varargs = std::nullopt);
@@ -176,7 +193,7 @@ void Register(duckdb_connection connection, const char* name,
               duckdb_scalar_function_t function, bool nulls = true,
               std::optional<duckdb_type> varargs = std::nullopt);
 
-// math.cc: FLOAT64 functions, such as SQRT and POW.
+// math.cc: FLOAT64, NUMERIC and BIGNUMERIC functions, such as SQRT and POW.
 void RegisterMathFunctions(duckdb_connection connection);
 // string.cc: STRING and BYTES functions, including hashing and regular expressions.
 void RegisterStringFunctions(duckdb_connection connection);
