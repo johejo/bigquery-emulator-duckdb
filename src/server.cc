@@ -89,18 +89,34 @@ class Server::Impl {
     http_.Delete(path, std::move(handler));
   }
 
-  // Wraps a handler so that it returns JSON and maps ApiError to BigQuery's error format.
+  // Runs a handler and maps ApiError to BigQuery's error format.
+  static void Respond(httplib::Response& response, const std::function<void()>& handler) {
+    try {
+      handler();
+    } catch (const ApiError& error) {
+      response.status = error.http_status();
+      response.set_content(ErrorBody(error).dump(), "application/json");
+    }
+  }
+
+  // Wraps a handler so that it returns JSON.
   static httplib::Server::Handler Json(Handler handler) {
     return [handler = std::move(handler)](const httplib::Request& request,
                                           httplib::Response& response) {
-      try {
-        const json body = handler(request, response);
-        // A 204 response has no body; sending one corrupts the next response on the connection.
-        if (response.status != 204) response.set_content(body.dump(), "application/json");
-      } catch (const ApiError& error) {
-        response.status = error.http_status();
-        response.set_content(ErrorBody(error).dump(), "application/json");
-      }
+      Respond(response,
+              [&] { response.set_content(handler(request, response).dump(), "application/json"); });
+    };
+  }
+
+  // Wraps a handler that answers 204 No Content. A 204 response has no body; sending one corrupts
+  // the next response on the connection.
+  static httplib::Server::Handler NoContent(std::function<void(const httplib::Request&)> handler) {
+    return [handler = std::move(handler)](const httplib::Request& request,
+                                          httplib::Response& response) {
+      Respond(response, [&] {
+        handler(request);
+        response.status = 204;
+      });
     };
   }
 
@@ -168,10 +184,8 @@ class Server::Impl {
                *emulator_.GetJob(Param(request, "project"), Param(request, "job")));
          }));
     Delete("/projects/:project/jobs/:job/delete",
-           Json([this](const httplib::Request& request, httplib::Response& response) {
+           NoContent([this](const httplib::Request& request) {
              emulator_.DeleteJob(Param(request, "project"), Param(request, "job"));
-             response.status = 204;
-             return json::object();
            }));
 
     // datasets
@@ -215,11 +229,9 @@ class Server::Impl {
     Patch("/projects/:project/datasets/:dataset", update_dataset(/*patch=*/true));
     Put("/projects/:project/datasets/:dataset", update_dataset(/*patch=*/false));
     Delete("/projects/:project/datasets/:dataset",
-           Json([this](const httplib::Request& request, httplib::Response& response) {
+           NoContent([this](const httplib::Request& request) {
              emulator_.DeleteDataset(DatasetFromPath(request),
                                      QueryParamBool(request, "deleteContents"));
-             response.status = 204;
-             return json::object();
            }));
 
     // tables
@@ -259,10 +271,8 @@ class Server::Impl {
     Patch("/projects/:project/datasets/:dataset/tables/:table", update_table(/*patch=*/true));
     Put("/projects/:project/datasets/:dataset/tables/:table", update_table(/*patch=*/false));
     Delete("/projects/:project/datasets/:dataset/tables/:table",
-           Json([this](const httplib::Request& request, httplib::Response& response) {
+           NoContent([this](const httplib::Request& request) {
              emulator_.DeleteTable(TableFromPath(request));
-             response.status = 204;
-             return json::object();
            }));
     Get("/projects/:project/datasets/:dataset/tables/:table/data",
         Json([this](const httplib::Request& request, httplib::Response&) {
