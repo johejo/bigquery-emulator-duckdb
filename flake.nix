@@ -31,10 +31,7 @@
                   bazelisk
                   buildifier
                   llvmPackages.clang-tools
-                  # For trying a query against the engine the emulator embeds without building
-                  # anything. Worth keeping at the version MODULE.bazel pins, which nixpkgs
-                  # happens to carry today; nothing enforces that they stay in step.
-                  duckdb
+                  (callPackage ./duckdb-bin.nix { })
                   fake-gcs-server
                   git
                   go

@@ -80,22 +80,31 @@ http_archive(
     name = "duckdb_prebuilt_macos_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
     patch_cmds = [_LOCALIZE_UCASEMAP_MACOS],
-    sha256 = "d79ec66b8a4054b866faada82e9e31f859a713c555b3f1c4b71c4a43d3273e9c",
-    urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-osx-arm64.zip"],
+    sha256 = "e77c382fba15e3f5c0b3265d12e3a4de534699fdb91bcc9d10d4a857a58103d5",
+    urls = [
+        "https://install.duckdb.org/v1.5.6/static-libs-osx-arm64.zip",
+        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-osx-arm64.zip",
+    ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_amd64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
     patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
-    sha256 = "deb47c5300f3c99725e84cdb14d214c3b12bbd748b613b1698b938c894cb68eb",
-    urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-linux-amd64.zip"],
+    sha256 = "ab3d1d33951b8cb8bdcae740d8e06adf66bfb7ee880a3f7052d7a35088e16d2d",
+    urls = [
+        "https://install.duckdb.org/v1.5.6/static-libs-linux-amd64.zip",
+        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-linux-amd64.zip",
+    ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
     patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
-    sha256 = "ea6a34cb49ec2db5ed23d9e8311237c53c32abf9cdbf5dd608c4176c3dd8bfeb",
-    urls = ["https://github.com/duckdb/duckdb/releases/download/v1.5.5/static-libs-linux-arm64.zip"],
+    sha256 = "56249751117a4c04289764e06eb431352ce33fb3f8e2f30401122d4d0e184139",
+    urls = [
+        "https://install.duckdb.org/v1.5.6/static-libs-linux-arm64.zip",
+        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-linux-arm64.zip",
+    ],
 )
