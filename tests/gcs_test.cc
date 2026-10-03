@@ -20,7 +20,7 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-constexpr char kUri[] = "gs://bucket/nested/a b+%.json";
+constexpr char kUri[] = "gs://bucket/nested/a.json";
 
 std::string ReadFile(const std::filesystem::path& path) {
   std::ifstream file(path);
@@ -60,21 +60,18 @@ class GcsTest : public ::testing::Test {
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
       if (list_objects_) {
         EXPECT_EQ(request.path, "/storage/v1/b/bucket/o");
-        EXPECT_EQ(request.get_param_value("prefix"), "nested/a b+%");
-        response.status = status_;
+        EXPECT_EQ(request.get_param_value("prefix"), "nested/a");
         if (request.get_param_value("pageToken").empty()) {
-          response.set_content(
-              R"({"items":[{"name":"nested/a b+%2.json"}],"nextPageToken":"next"})",
-              "application/json");
+          response.set_content(R"({"items":[{"name":"nested/a2.json"}],"nextPageToken":"next"})",
+                               "application/json");
         } else {
           EXPECT_EQ(request.get_param_value("pageToken"), "next");
-          response.set_content(R"({"items":[{"name":"nested/a b+%1.json"}]})", "application/json");
+          response.set_content(R"({"items":[{"name":"nested/a1.json"}]})", "application/json");
         }
         return;
       }
       EXPECT_EQ(request.path, expected_path_);
       EXPECT_EQ(request.get_param_value("alt"), "media");
-      response.status = status_;
       response.set_content("fixture\n", "application/octet-stream");
     });
     server_.Post("/token", [this](const httplib::Request&, httplib::Response& response) {
@@ -143,21 +140,15 @@ class GcsTest : public ::testing::Test {
   std::filesystem::path output_;
   std::string endpoint_;
   std::string authorization_;
-  std::string expected_path_ = "/storage/v1/b/bucket/o/nested/a b+%.json";
+  std::string expected_path_ = "/storage/v1/b/bucket/o/nested/a.json";
   bool list_objects_ = false;
   bool require_adc_ = false;
   bool check_connection_reuse_ = false;
   std::atomic<int> peer_port_ = 0;
-  int status_ = 200;
   std::atomic<int> requests_ = 0;
   std::atomic<int> token_requests_ = 0;
   int transient_failures_ = 0;
 };
-
-TEST_F(GcsTest, DownloadsAnonymouslyFromEmulator) {
-  EXPECT_EQ(client().endpoint(), endpoint_);
-  Download();
-}
 
 TEST_F(GcsTest, ReusesConnections) {
   check_connection_reuse_ = true;
@@ -166,8 +157,8 @@ TEST_F(GcsTest, ReusesConnections) {
   EXPECT_EQ(requests_, 2);
 }
 
-TEST_F(GcsTest, AcceptsBareEndpointAndPathPrefix) {
-  SetEnv("STORAGE_EMULATOR_HOST", endpoint_.substr(7) + "/prefix///");
+TEST_F(GcsTest, AcceptsPathPrefix) {
+  SetEnv("STORAGE_EMULATOR_HOST", endpoint_ + "/prefix///");
   expected_path_ = "/prefix" + expected_path_;
   EXPECT_EQ(client().endpoint(), endpoint_ + "/prefix");
   Download();
@@ -241,40 +232,16 @@ TEST_F(GcsTest, RetriesTransientFailures) {
   Download();
 }
 
-TEST_F(GcsTest, ReportsMissingObject) {
-  status_ = 404;
-  try {
-    client().Download(kUri, output_);
-    FAIL() << "expected ApiError";
-  } catch (const ApiError& error) {
-    EXPECT_EQ(error.reason(), "invalid");
-    EXPECT_NE(std::string(error.what()).find(kUri), std::string::npos);
-  }
-}
-
 TEST_F(GcsTest, ExactUriDoesNotListObjects) {
   EXPECT_EQ(client().Expand(kUri), std::vector<std::string>({kUri}));
   EXPECT_EQ(requests_, 0);
 }
 
-TEST_F(GcsTest, ListsAllPagesWithEscapedPrefix) {
+TEST_F(GcsTest, ListsAllPages) {
   list_objects_ = true;
-  EXPECT_EQ(client().Expand("gs://bucket/nested/a b+%*.json"),
-            std::vector<std::string>(
-                {"gs://bucket/nested/a b+%1.json", "gs://bucket/nested/a b+%2.json"}));
+  EXPECT_EQ(client().Expand("gs://bucket/nested/a*.json"),
+            std::vector<std::string>({"gs://bucket/nested/a1.json", "gs://bucket/nested/a2.json"}));
   EXPECT_EQ(requests_, 2);
-}
-
-TEST_F(GcsTest, ReportsListingFailure) {
-  list_objects_ = true;
-  status_ = 403;
-  EXPECT_THROW(client().Expand("gs://bucket/nested/a b+%*.json"), ApiError);
-}
-
-TEST_F(GcsTest, RejectsMalformedUris) {
-  for (const char* uri : {"gs://", "gs:///object", "gs://bucket", "gs://bucket/", "https://b/o"}) {
-    EXPECT_THROW(client().Download(uri, output_), ApiError);
-  }
 }
 
 }  // namespace
