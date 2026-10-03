@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/numeric/int128.h"
 #include "absl/status/status.h"
@@ -141,9 +142,11 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
        }) {
     Register(connection, (name + suffix).c_str(), {type.get()}, type.get(), function);
   }
-  Register(connection, ("bq_pow" + suffix).c_str(), {type.get(), type.get()}, type.get(),
-           DecimalMath2<T, fn::Pow<T>>);
-  Register(connection, ("bq_log" + suffix).c_str(), {type.get(), type.get()}, type.get(),
+  // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
+  // constructor.
+  const std::vector<duckdb_logical_type> two = {type.get(), type.get()};
+  Register(connection, ("bq_pow" + suffix).c_str(), two, type.get(), DecimalMath2<T, fn::Pow<T>>);
+  Register(connection, ("bq_log" + suffix).c_str(), two, type.get(),
            DecimalMath2<T, fn::Logarithm<T>>);
 }
 
