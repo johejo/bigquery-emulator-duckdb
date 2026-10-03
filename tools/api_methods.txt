@@ -1,6 +1,6 @@
-# The REST API requests //:api_probe sends, which generate docs/api.md. The methods themselves come
-# from third_party/bigquery/discovery.json; a method without requests here is probed with one the
-# probe builds from its path.
+# The REST API requests tools/restprobe sends, which generate docs/api.md. The methods themselves
+# come from third_party/bigquery/discovery.json; a method without requests here is probed with one
+# the probe builds from its path.
 #
 #   file NAME | LINE          Writes LINE to the file NAME in the probe's scratch directory, $DIR.
 #   setup METHOD PATH [BODY]  A request sent to every fresh emulator before a probe.

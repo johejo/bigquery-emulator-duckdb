@@ -52,6 +52,8 @@ jobs:
         run: nix develop --command just tidy
       - name: End-to-end tests
         run: nix develop --command just e2e
+      - name: Generated docs check
+        run: nix develop --command just docs-check
 
       - name: Report Bazel disk cache size
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
