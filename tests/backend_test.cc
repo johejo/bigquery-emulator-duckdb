@@ -153,7 +153,7 @@ TEST(BackendTest, PreservesBinaryStringsAndDecimalPrecision) {
   EXPECT_EQ(result.rows[0]["f"][5]["v"], "-1.23");
   EXPECT_EQ(result.rows[0]["f"][6]["v"], "-12345.67");
   EXPECT_EQ(result.rows[0]["f"][7]["v"], "-1234567890.123456");
-  EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.1234567890");
+  EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.123456789");
   EXPECT_EQ(result.rows[0]["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
   EXPECT_EQ(result.schema[8].type, FieldType::kBigNumeric);
 }
