@@ -1,11 +1,14 @@
 desc: extract jobs write CSV, newline-delimited JSON and Parquet to GCS
+runners:
+  gcs: http://${STORAGE_EMULATOR_HOST}
 steps:
   mk_bucket:
-    exec:
-      command: >-
-        curl -fsS -X POST "${STORAGE_EMULATOR_HOST}/storage/v1/b?project=test"
-        -H 'Content-Type: application/json' -d '{"name":"extract-output"}'
-    test: current.exit_code == 0
+    gcs:
+      /storage/v1/b?project=test:
+        post:
+          body:
+            application/json: {name: extract-output}
+    test: current.res.status == 200
   mk_dataset:
     exec:
       command: tests/e2e/bq.sh mk --dataset e2e_extract
@@ -41,11 +44,12 @@ steps:
         gs://extract-output/scalars.csv
     test: current.exit_code == 0
   csv_content:
-    exec:
-      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/scalars.csv?alt=media"
+    gcs:
+      /storage/v1/b/extract-output/o/scalars.csv?alt=media:
+        get: {}
     test: |
-      current.exit_code == 0 &&
-      current.stdout == 'i,f,n,b,bt,ts,dt,d,j,nul,s\n1,2.5,1.5,true,YWI=,2020-01-02 03:04:05.12 UTC,2020-01-02T03:04:05.5,2020-01-02,"{""a"":[1,2],""b"":1}",,"x,""y""<&>"\n'
+      current.res.status == 200 &&
+      current.res.rawBody == 'i,f,n,b,bt,ts,dt,d,j,nul,s\n1,2.5,1.5,true,YWI=,2020-01-02 03:04:05.12 UTC,2020-01-02T03:04:05.5,2020-01-02,"{""a"":[1,2],""b"":1}",,"x,""y""<&>"\n'
   csv_job:
     exec:
       command: tests/e2e/bq.sh show --format=json -j e2e_extract_csv
@@ -59,9 +63,18 @@ steps:
         tests/e2e/bq.sh extract --compression=GZIP --field_delimiter='|' --noprint_header
         e2e_extract.scalars 'gs://extract-output/gzip/part-*.csv.gz'
     test: current.exit_code == 0
+  csv_options_download:
+    gcs:
+      /storage/v1/b/extract-output/o/gzip%2Fpart-000000000000.csv.gz?alt=media:
+        get: {}
+    test: current.res.status == 200
+    dump:
+      expr: current.res.rawBody
+      out: ${E2E_TMP_DIR}/part.csv.gz
+      disableTrailingNewline: true
   csv_options_content:
     exec:
-      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/gzip%2Fpart-000000000000.csv.gz?alt=media" | gzip -dc
+      command: gzip -dc "${E2E_TMP_DIR}/part.csv.gz"
     test: |
       current.exit_code == 0 &&
       current.stdout == '1|2.5|1.5|true|YWI=|2020-01-02 03:04:05.12 UTC|2020-01-02T03:04:05.5|2020-01-02|"{""a"":[1,2],""b"":1}"||"x,""y""<&>"\n'
@@ -79,11 +92,12 @@ steps:
         e2e_extract.scalars gs://extract-output/scalars.json
     test: current.exit_code == 0
   json_content:
-    exec:
-      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/scalars.json?alt=media"
+    gcs:
+      /storage/v1/b/extract-output/o/scalars.json?alt=media:
+        get: {}
     test: |
-      current.exit_code == 0 &&
-      current.stdout == '{"i":"1","f":2.5,"n":"1.5","b":true,"bt":"YWI=","ts":"2020-01-02 03:04:05.12 UTC","dt":"2020-01-02T03:04:05.5","d":"2020-01-02","j":{"a":[1,2],"b":1},"s":"x,\\"y\\"\\u003c\\u0026\\u003e"}\n'
+      current.res.status == 200 &&
+      current.res.rawBody == '{"i":"1","f":2.5,"n":"1.5","b":true,"bt":"YWI=","ts":"2020-01-02 03:04:05.12 UTC","dt":"2020-01-02T03:04:05.5","d":"2020-01-02","j":{"a":[1,2],"b":1},"s":"x,\\"y\\"\\u003c\\u0026\\u003e"}\n'
   json_nested:
     exec:
       command: >-
@@ -91,11 +105,12 @@ steps:
         e2e_extract.nested gs://extract-output/nested.json
     test: current.exit_code == 0
   json_nested_content:
-    exec:
-      command: curl -fsS "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.json?alt=media"
+    gcs:
+      /storage/v1/b/extract-output/o/nested.json?alt=media:
+        get: {}
     test: |
-      current.exit_code == 0 &&
-      current.stdout == '{"i":"1","r":{"x":"1","t":"01:02:03","ts":"2020-01-02 03:04:05 UTC"},"rs":[{"x":"2","y":"z"}],"ri":["3","4"]}\n'
+      current.res.status == 200 &&
+      current.res.rawBody == '{"i":"1","r":{"x":"1","t":"01:02:03","ts":"2020-01-02 03:04:05 UTC"},"rs":[{"x":"2","y":"z"}],"ri":["3","4"]}\n'
 
   parquet:
     exec:
@@ -103,10 +118,18 @@ steps:
         tests/e2e/bq.sh extract --destination_format=PARQUET --compression=SNAPPY
         e2e_extract.nested gs://extract-output/nested.parquet
     test: current.exit_code == 0
+  parquet_download:
+    gcs:
+      /storage/v1/b/extract-output/o/nested.parquet?alt=media:
+        get: {}
+    test: current.res.status == 200
+    dump:
+      expr: current.res.rawBody
+      out: ${E2E_TMP_DIR}/nested.parquet
+      disableTrailingNewline: true
   parquet_content:
     exec:
       command: >-
-        curl -fsS -o "${E2E_TMP_DIR}/nested.parquet" "${STORAGE_EMULATOR_HOST}/storage/v1/b/extract-output/o/nested.parquet?alt=media" &&
         duckdb -csv -noheader -c "SELECT r.x, r.t, r.ts, rs[1].y, ri FROM '${E2E_TMP_DIR}/nested.parquet'"
     test: |
       current.exit_code == 0 &&
