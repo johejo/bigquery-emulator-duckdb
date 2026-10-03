@@ -115,8 +115,9 @@ These differences are deliberate exceptions, kept for convenience:
 
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
   SQL. Legacy SQL itself is unsupported.
-- `BIGNUMERIC` is DuckDB's `DECIMAL(38, 19)`, not BigQuery's 76 digits with a scale of 38: values
-  with more than 19 integer digits fail, and fractional digits beyond 19 are rounded.
+- `BIGNUMERIC` is DuckDB's `DECIMAL(38, 19)`, not BigQuery's 76 digits with a scale of 38: values,
+  including function results, with more than 19 integer digits fail, or are NULL under `SAFE.` and
+  the `SAFE_` functions, and fractional digits beyond 19 are rounded.
 
 ## Development
 

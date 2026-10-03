@@ -142,8 +142,7 @@ std::vector<Rule> FormatDateTime() {
           {{2, 3}, "bq_format_timestamp($1, $2, $3)", {Is(2, {TYPE_TIMESTAMP})}, {"'UTC'"}}};
 }
 
-// A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers. The NUMERIC
-// and BIGNUMERIC overloads are left out: going through FLOAT64 would lose their precision.
+// A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers.
 std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
   return Same(function, arity, {Is(1, {TYPE_DOUBLE})});
 }
@@ -268,6 +267,15 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
 std::vector<Rule> Strings(std::string_view function, Arity arity) {
   return Concat({Same(function, arity, {Is(1, {TYPE_STRING})}),
                  Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})})});
+}
+
+// A function that src/backend_functions.cc registers as `function` for FLOAT64 and as
+// `function`_numeric and `function`_bignumeric for NUMERIC and BIGNUMERIC, which keep their
+// precision rather than going through FLOAT64.
+std::vector<Rule> Numbers(std::string_view function, std::size_t arity = 1) {
+  return Concat({Float64(function, arity),
+                 Same(std::string(function) + "_numeric", arity, {Is(1, {TYPE_NUMERIC})}),
+                 Same(std::string(function) + "_bignumeric", arity, {Is(1, {TYPE_BIGNUMERIC})})});
 }
 
 // TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
@@ -509,14 +517,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
       // infinities where BigQuery raises errors, such as EXP(1000).
-      {"SQRT", Float64("bq_sqrt")},
-      {"CBRT", Float64("bq_cbrt")},
-      {"POW", Float64("bq_pow", 2)},
-      {"POWER", Float64("bq_pow", 2)},
-      {"EXP", Float64("bq_exp")},
-      {"LN", Float64("bq_ln")},
-      {"LOG10", Float64("bq_log10")},
-      {"LOG", Concat({Float64("bq_ln"), Float64("bq_log", 2)})},
+      {"SQRT", Numbers("bq_sqrt")},
+      {"CBRT", Numbers("bq_cbrt")},
+      {"POW", Numbers("bq_pow", 2)},
+      {"POWER", Numbers("bq_pow", 2)},
+      {"EXP", Numbers("bq_exp")},
+      {"LN", Numbers("bq_ln")},
+      {"LOG10", Numbers("bq_log10")},
+      {"LOG", Concat({Numbers("bq_ln"), Numbers("bq_log", 2)})},
       {"SIN", Float64("bq_sin")},
       {"COS", Float64("bq_cos")},
       {"TAN", Float64("bq_tan")},

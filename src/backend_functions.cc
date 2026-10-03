@@ -13,14 +13,13 @@ namespace bigquery_emulator_duckdb {
 namespace backend_functions {
 
 void Register(duckdb_connection connection, const char* name,
-              const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
+              const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs) {
   Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), name);
-  for (const duckdb_type parameter : parameters) {
-    LogicalType type(duckdb_create_logical_type(parameter));
-    duckdb_scalar_function_add_parameter(scalar.get(), type.get());
+  for (duckdb_logical_type parameter : parameters) {
+    duckdb_scalar_function_add_parameter(scalar.get(), parameter);
   }
   if (varargs) {
     LogicalType type(duckdb_create_logical_type(*varargs));
@@ -34,6 +33,19 @@ void Register(duckdb_connection connection, const char* name,
   if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
     throw BackendError(std::string("DuckDB failed to register ") + name);
   }
+}
+
+void Register(duckdb_connection connection, const char* name,
+              const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
+              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs) {
+  std::vector<LogicalType> owned;
+  std::vector<duckdb_logical_type> types;
+  owned.reserve(parameters.size());
+  types.reserve(parameters.size());
+  for (const duckdb_type parameter : parameters) {
+    types.push_back(owned.emplace_back(duckdb_create_logical_type(parameter)).get());
+  }
+  Register(connection, name, types, result, function, nulls, varargs);
 }
 
 void Register(duckdb_connection connection, const char* name,
