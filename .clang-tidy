@@ -64,7 +64,7 @@ Checks:
   - -readability-avoid-nested-conditional-operator
   # '= {}' keeps designated initializers from warning about the members they leave out.
   - -readability-redundant-member-init
-HeaderFilterRegex: '^(src|tests)/'
+HeaderFilterRegex: '^(src|tests|tools)/'
 # The aspect runner only prints clang-tidy's log when it exits non-zero, so findings
 # have to be errors to be visible at all.
 WarningsAsErrors: '*'
