@@ -11,6 +11,28 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
+bool IsDecimal(const googlesql::Type* type) {
+  return type->IsNumericType() || type->IsBigNumericType();
+}
+
+// Whether a cast from `from` to `to` turns a NUMERIC or BIGNUMERIC into a STRING, at any depth.
+bool CastsDecimalToString(const googlesql::Type* from, const googlesql::Type* to) {
+  if (to->IsString()) {
+    return IsDecimal(from);
+  }
+  if (from->IsArray() && to->IsArray()) {
+    return CastsDecimalToString(from->AsArray()->element_type(), to->AsArray()->element_type());
+  }
+  if (from->IsStruct() && to->IsStruct()) {
+    for (int i = 0; i < from->AsStruct()->num_fields() && i < to->AsStruct()->num_fields(); ++i) {
+      if (CastsDecimalToString(from->AsStruct()->field(i).type, to->AsStruct()->field(i).type)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subquery,
                                     const std::string& type, const Scope& scope,
                                     const Columns& columns) {
@@ -121,6 +143,21 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     const auto argument = Expression(*cast->expr(), scope, columns);
     if (!argument) {
       return std::nullopt;
+    }
+    // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Such a cast
+    // nested deeper than an array's elements is unsupported.
+    const googlesql::Type* from = cast->expr()->type();
+    if (cast->type()->IsString() && IsDecimal(from)) {
+      return "bq_decimal_string(CAST(" + *argument + " AS VARCHAR))";
+    }
+    if (cast->type()->IsArray() && cast->type()->AsArray()->element_type()->IsString() &&
+        IsDecimal(from->AsArray()->element_type())) {
+      const std::string element = scope.context.FreshName("_e");
+      return "list_transform(" + *argument + ", " + element + " -> bq_decimal_string(CAST(" +
+             element + " AS VARCHAR)))";
+    }
+    if (CastsDecimalToString(from, cast->type())) {
+      return Unsupported(scope, "CAST of a nested NUMERIC or BIGNUMERIC to STRING");
     }
     return std::string(cast->return_null_on_error() ? "TRY_CAST(" : "CAST(") + *argument + " AS " +
            *type + ")";
