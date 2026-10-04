@@ -256,6 +256,7 @@ cc_library(
         "@googlesql//googlesql/public/functions:convert_string",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@googlesql//googlesql/public/functions:distance",
+        "@googlesql//googlesql/public/functions:generate_array",
         "@googlesql//googlesql/public/functions:hash",
         "@googlesql//googlesql/public/functions:json",
         "@googlesql//googlesql/public/functions:json_format",

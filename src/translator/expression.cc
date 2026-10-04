@@ -29,11 +29,38 @@ bool CastsNumericToString(const googlesql::Type* from, const googlesql::Type* to
   return false;
 }
 
-// A cast of `sql` from `from` to `to`, one of which is BIGNUMERIC, by GoogleSQL's conversions,
-// which make their errors NULL under SAFE_CAST. DuckDB would cast a BIGNUM through DOUBLE or
-// truncate a string. Nullopt for a cast of anything but a scalar.
+// A cast of `sql` from `from` to `to`, one of which holds a BIGNUMERIC, by GoogleSQL's
+// conversions, which make their errors NULL under SAFE_CAST. DuckDB would cast a BIGNUM through
+// DOUBLE or truncate a string. Arrays and structs are cast element by element and field by field,
+// and their other values as DuckDB casts them, except a NUMERIC to STRING.
 std::optional<std::string> BigNumericCast(const googlesql::Type* from, const googlesql::Type* to,
-                                          const std::string& sql, bool safe) {
+                                          const std::string& sql, bool safe, Context& context) {
+  if (from->Equals(to)) {
+    return sql;
+  }
+  if (from->IsArray() && to->IsArray()) {
+    const std::string element = context.FreshName("_e");
+    const auto cast = BigNumericCast(from->AsArray()->element_type(), to->AsArray()->element_type(),
+                                     element, safe, context);
+    return cast ? std::optional<std::string>("list_transform(" + sql + ", " + element + " -> " +
+                                             *cast + ")")
+                : std::nullopt;
+  }
+  if (from->IsStruct() && to->IsStruct()) {
+    const std::string value = context.FreshName("_s");
+    std::vector<std::string> fields;
+    for (int i = 0; i < to->AsStruct()->num_fields(); ++i) {
+      const auto cast = BigNumericCast(
+          from->AsStruct()->field(i).type, to->AsStruct()->field(i).type,
+          "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ")", safe, context);
+      if (!cast) {
+        return std::nullopt;
+      }
+      fields.push_back(QuoteIdentifier(to->AsStruct()->field(i).name) + " := " + *cast);
+    }
+    return "list_transform([" + sql + "], " + value + " -> CASE WHEN " + value +
+           " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+  }
   const std::string flag = safe ? "true" : "false";
   if (to->IsBigNumericType()) {
     if (from->IsString() || from->IsInt64() || from->IsNumericType()) {
@@ -46,7 +73,11 @@ std::optional<std::string> BigNumericCast(const googlesql::Type* from, const goo
     return std::nullopt;
   }
   if (!from->IsBigNumericType()) {
-    return std::nullopt;
+    if (to->IsString() && from->IsNumericType()) {
+      return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
+    }
+    const auto type = DuckDbType(to);
+    return type ? std::optional<std::string>("CAST(" + sql + " AS " + *type + ")") : std::nullopt;
   }
   const std::string units = "CAST(" + sql + " AS VARCHAR)";
   if (to->IsString()) {
@@ -177,8 +208,14 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     }
     const googlesql::Type* from = cast->expr()->type();
     if (!from->Equals(cast->type()) && (HasBigNumeric(from) || HasBigNumeric(cast->type()))) {
-      const auto sql = BigNumericCast(from, cast->type(), *argument, cast->return_null_on_error());
-      return sql ? sql : Unsupported(scope, "CAST of a nested BIGNUMERIC");
+      // SAFE_CAST makes a whole array or struct NULL when one of its values fails, which casting
+      // them one by one cannot tell from a NULL value.
+      if (cast->return_null_on_error() && (from->IsArray() || from->IsStruct())) {
+        return Unsupported(scope, "SAFE_CAST of a nested BIGNUMERIC");
+      }
+      const auto sql = BigNumericCast(from, cast->type(), *argument, cast->return_null_on_error(),
+                                      scope.context);
+      return sql ? sql : Unsupported(scope, "CAST of a BIGNUMERIC");
     }
     // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Such a cast
     // nested deeper than an array's elements is unsupported.

@@ -33,6 +33,7 @@
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_functions/internal.h"
+#include "src/bignumeric.h"
 #include "src/catalog.h"
 #include "src/duckdb_handle.h"
 
@@ -97,6 +98,8 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       return googlesql::types::DatetimeType();
     case DUCKDB_TYPE_TIMESTAMP_TZ:
       return googlesql::types::TimestampType();
+    case DUCKDB_TYPE_BIGNUM:
+      return googlesql::types::BigNumericType();
     case DUCKDB_TYPE_DECIMAL:
       if (duckdb_decimal_width(type) == 38 && duckdb_decimal_scale(type) == 9) {
         return googlesql::types::NumericType();
@@ -182,6 +185,12 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
       const auto numeric = googlesql::NumericValue::FromString(digits);
       return numeric.ok() ? absl::StatusOr<googlesql::Value>(googlesql::Value::Numeric(*numeric))
                           : numeric.status();
+    }
+    case googlesql::TYPE_BIGNUMERIC: {
+      const auto bignumeric = BigNumericFromBignum(VectorString(vector, row));
+      return bignumeric.ok()
+                 ? absl::StatusOr<googlesql::Value>(googlesql::Value::BigNumeric(*bignumeric))
+                 : bignumeric.status();
     }
     case googlesql::TYPE_JSON: {
       auto json = ParseJson(VectorString(vector, row));
