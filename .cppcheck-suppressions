@@ -1,0 +1,7 @@
+# Public aggregates are initialized by callers. Cppcheck cannot see every caller
+# or reliably recognize their default member initializers without dependency headers.
+uninitMemberVarNoCtor
+
+# Range-for extends the lifetime of QueryResult when iterating its rows member.
+# Cppcheck incorrectly treats the rows of the temporary result as dangling.
+danglingTempReference:src/emulator.cc

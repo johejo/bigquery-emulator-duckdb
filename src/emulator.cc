@@ -79,9 +79,8 @@ std::string JobKey(const std::string& project_id, const std::string& job_id) {
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
   values.reserve(result.rows.size());
-  for (const json& row : result.rows) {
-    values.push_back(row["f"][0]["v"].get<std::string>());
-  }
+  std::ranges::transform(result.rows, std::back_inserter(values),
+                         [](const json& row) { return row["f"][0]["v"].get<std::string>(); });
   return values;
 }
 
@@ -151,9 +150,9 @@ std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
   std::vector<FieldSchema> schema = backend.Prepare("SELECT * FROM " + QualifiedName(table)).schema;
   std::vector<json> comments;
-  for (const json& row : backend.Execute(ColumnCommentsQuery(table)).rows) {
-    comments.push_back(row["f"][0]["v"]);
-  }
+  std::ranges::transform(backend.Execute(ColumnCommentsQuery(table)).rows,
+                         std::back_inserter(comments),
+                         [](const json& row) { return row["f"][0]["v"]; });
   return ApplyColumnComments(std::move(schema), comments);
 }
 
@@ -682,9 +681,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // schema rather than as whatever DuckDB computed.
     if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
       statements.push_back(std::format("CREATE TABLE {} ({})", target, *columns));
-      for (std::string& comment : ColumnCommentStatements(destination, schema)) {
-        statements.push_back(std::move(comment));
-      }
+      std::ranges::move(ColumnCommentStatements(destination, schema),
+                        std::back_inserter(statements));
       std::ranges::move(RepeatedColumnDefaultStatements(destination, schema),
                         std::back_inserter(statements));
       statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
@@ -751,6 +749,8 @@ std::vector<DatasetListEntry> Emulator::ListDatasetEntries(const std::string& pr
   EnsureProject(project_id);
   std::vector<DatasetListEntry> entries;
   for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
+    // Keep the wire-field decoding beside the named result fields.
+    // cppcheck-suppress useStlAlgorithm
     entries.push_back({.dataset_id = row["f"][0]["v"].get<std::string>(),
                        .metadata = ParseDatasetMetadata(row["f"][1]["v"])});
   }
@@ -822,6 +822,8 @@ std::vector<TableListEntry> Emulator::ListTableEntries(const DatasetReference& d
                            " ORDER BY 1",
                            where, where))
            .rows) {
+    // Keep the wire-field decoding beside the named result fields.
+    // cppcheck-suppress useStlAlgorithm
     entries.push_back({.table_id = row["f"][0]["v"].get<std::string>(),
                        .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable,
                        .metadata = CommentMetadata(row["f"][2]["v"])});

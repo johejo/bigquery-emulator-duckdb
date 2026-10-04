@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <set>
@@ -227,20 +228,16 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
 std::string MainDoc(const std::string& name, const std::vector<std::string>& docs) {
   std::string anchor = absl::AsciiStrToLower(name);
   std::erase(anchor, '.');
-  for (const std::string& doc : docs) {
-    if (doc.ends_with("#" + anchor)) {
-      return doc;
-    }
-  }
-  return docs.front();
+  const auto doc = std::ranges::find_if(
+      docs, [&](const std::string& candidate) { return candidate.ends_with("#" + anchor); });
+  return doc == docs.end() ? docs.front() : *doc;
 }
 
 // The pages that document the function, which name the categories it belongs to.
 std::string Categories(const std::vector<std::string>& docs) {
   std::set<std::string> pages;
-  for (const std::string& doc : docs) {
-    pages.insert(doc.substr(0, doc.find('#')));
-  }
+  std::ranges::transform(docs, std::inserter(pages, pages.end()),
+                         [](const std::string& doc) { return doc.substr(0, doc.find('#')); });
   return absl::StrJoin(pages, ", ");
 }
 
@@ -299,6 +296,8 @@ int Main(int argc, char** argv) {
         entry == nullptr ? "" : std::string(translator::Describe(entry->implementation));
     if (const auto hinted = hints.find(name); hinted != hints.end()) {
       for (const std::string& sql : hinted->second) {
+        // Probes execute queries, so preserve their evaluation order explicitly.
+        // cppcheck-suppress useStlAlgorithm
         probes.push_back(RunProbe(emulator, tables, sql));
       }
     } else if (known) {

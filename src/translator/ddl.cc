@@ -336,6 +336,8 @@ template <typename CreateTable>
 bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadata,
                                const Scope& scope) {
   for (const auto& expression : create.partition_by_list()) {
+    // Validate and record partition metadata in order, stopping on the first error.
+    // cppcheck-suppress useStlAlgorithm
     if (create.partition_by_list_size() != 1 || !Partitioning(*expression, metadata)) {
       Unsupported(scope, "this PARTITION BY expression");
       return false;

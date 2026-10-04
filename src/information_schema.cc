@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -174,9 +175,8 @@ absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
   std::vector<std::string> values;
   for (const Row& row : rows) {
     std::vector<std::string> cells;
-    for (const Cell& cell : row) {
-      cells.push_back(cell.value_or("NULL"));
-    }
+    std::ranges::transform(row, std::back_inserter(cells),
+                           [](const Cell& cell) { return cell.value_or("NULL"); });
     values.push_back("(" + absl::StrJoin(cells, ", ") + ")");
   }
   if (rows.empty()) {
@@ -372,6 +372,8 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
         qualifier.empty() || IsRegion(qualifier[0]) ? default_project : qualifier[0];
     columns = SchemataColumns();
     for (const std::string& dataset : DatasetsIn(source, project, qualifier)) {
+      // The row layout reads directly as the information schema's column order.
+      // cppcheck-suppress useStlAlgorithm
       rows.push_back({String(project), String(dataset), kNull, kNull, kNull, String("US"),
                       String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
                                           "`\nOPTIONS(\n  location=\"us\"\n);")),
@@ -407,9 +409,9 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       }
       datasets.push_back({project, *dataset, source.ListTables(project, *dataset)});
     } else {
-      for (const std::string& name : names) {
-        datasets.push_back({project, name, source.ListTables(project, name)});
-      }
+      std::ranges::transform(names, std::back_inserter(datasets), [&](const std::string& name) {
+        return DatasetTables{project, name, source.ListTables(project, name)};
+      });
     }
     columns = view == "TABLES"    ? TablesColumns()
               : view == "COLUMNS" ? ColumnsColumns()

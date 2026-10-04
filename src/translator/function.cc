@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <set>
@@ -123,9 +124,7 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
 std::vector<std::string> Sqls(const ScalarCall& call) {
   std::vector<std::string> sqls;
   sqls.reserve(call.arguments.size());
-  for (const FunctionArgument& argument : call.arguments) {
-    sqls.push_back(argument.sql);
-  }
+  std::ranges::transform(call.arguments, std::back_inserter(sqls), &FunctionArgument::sql);
   return sqls;
 }
 

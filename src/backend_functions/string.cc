@@ -32,6 +32,8 @@ struct Signature;
 
 template <typename... Parameters>
 struct Signature<bool (*)(Parameters...)> {
+  // Used by Out and make_index_sequence; Cppcheck misses these template arguments.
+  // cppcheck-suppress unusedStructMember
   static constexpr std::size_t kArity = sizeof...(Parameters) - 2;
   template <std::size_t I>
   using Parameter = std::tuple_element_t<I, std::tuple<Parameters...>>;

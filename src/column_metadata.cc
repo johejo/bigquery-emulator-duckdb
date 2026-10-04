@@ -1,7 +1,9 @@
 #include "src/column_metadata.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <format>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -20,11 +22,10 @@ std::vector<std::string> ColumnCommentStatements(const TableReference& table,
                                                  const std::vector<FieldSchema>& schema) {
   std::vector<std::string> statements;
   statements.reserve(schema.size());
-  for (const FieldSchema& field : schema) {
-    statements.push_back(std::format("COMMENT ON COLUMN {}.{} IS {}", QualifiedName(table),
-                                     QuoteIdentifier(field.name),
-                                     QuoteLiteral(field.ToJson().dump())));
-  }
+  std::ranges::transform(schema, std::back_inserter(statements), [&](const FieldSchema& field) {
+    return std::format("COMMENT ON COLUMN {}.{} IS {}", QualifiedName(table),
+                       QuoteIdentifier(field.name), QuoteLiteral(field.ToJson().dump()));
+  });
   return statements;
 }
 

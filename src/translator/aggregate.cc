@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
@@ -45,14 +46,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   const googlesql::TypeKind first = call.argument_list().empty()
                                         ? googlesql::TYPE_UNKNOWN
                                         : call.argument_list(0)->type()->kind();
-  const AggregateRule* rule = nullptr;
-  for (const AggregateRule& candidate : entry->aggregates) {
-    if (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == first) {
-      rule = &candidate;
-      break;
-    }
-  }
-  if (rule == nullptr) {
+  const auto rule =
+      std::ranges::find_if(entry->aggregates, [first](const AggregateRule& candidate) {
+        return candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == first;
+      });
+  if (rule == entry->aggregates.end()) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
   std::vector<std::string> arguments;

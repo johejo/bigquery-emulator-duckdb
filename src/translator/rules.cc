@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -95,9 +96,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   const std::string spelling = WithErrors(rule, safe);
   std::vector<std::string> sql;
   sql.reserve(std::max<std::size_t>(arguments.size(), rule.arity.max));
-  for (const FunctionArgument& argument : arguments) {
-    sql.push_back(argument.sql);
-  }
+  std::ranges::transform(arguments, std::back_inserter(sql), &FunctionArgument::sql);
   // An optional argument without a default must not appear in the spelling.
   for (std::size_t i = arguments.size(); i - rule.arity.min < rule.defaults.size(); ++i) {
     sql.emplace_back(rule.defaults[i - rule.arity.min]);
@@ -183,10 +182,10 @@ std::optional<std::string> TranslateFunction(std::string_view upper_name,
     case Implementation::kBackend:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
-      for (const Rule& rule : entry->rules) {
-        if (Matches(rule, arguments)) {
-          return Expand(rule, arguments, safe);
-        }
+      if (const auto rule = std::ranges::find_if(
+              entry->rules, [&](const Rule& candidate) { return Matches(candidate, arguments); });
+          rule != entry->rules.end()) {
+        return Expand(*rule, arguments, safe);
       }
       return std::nullopt;
     default:
@@ -205,9 +204,8 @@ std::vector<std::string> AggregateArguments(const AggregateRule& rule,
   }
   std::vector<std::string> sql;
   sql.reserve(rule.arguments.size());
-  for (const std::string_view spelling : rule.arguments) {
-    sql.push_back(Substitute(spelling, given));
-  }
+  std::ranges::transform(rule.arguments, std::back_inserter(sql),
+                         [&](std::string_view spelling) { return Substitute(spelling, given); });
   return sql;
 }
 

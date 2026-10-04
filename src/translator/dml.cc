@@ -136,6 +136,8 @@ std::optional<std::string> UpdateItems(
     }
     UpdateNode* node = &nodes[id];
     for (const int field : path) {
+      // Descending also creates missing nodes; this is not a numeric reduction.
+      // cppcheck-suppress useStlAlgorithm
       node = &node->fields[field];
     }
     node->value = *value;

@@ -43,6 +43,8 @@ void Register(duckdb_connection connection, const char* name,
   owned.reserve(parameters.size());
   types.reserve(parameters.size());
   for (const duckdb_type parameter : parameters) {
+    // Keep ownership and the corresponding borrowed handle together.
+    // cppcheck-suppress useStlAlgorithm
     types.push_back(owned.emplace_back(duckdb_create_logical_type(parameter)).get());
   }
   Register(connection, name, types, result, function, nulls, varargs);

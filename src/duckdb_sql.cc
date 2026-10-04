@@ -1,5 +1,6 @@
 #include "src/duckdb_sql.h"
 
+#include <algorithm>
 #include <cctype>
 #include <string>
 #include <string_view>
@@ -7,17 +8,17 @@
 namespace bigquery_emulator_duckdb {
 std::string ToUpperAscii(std::string_view text) {
   std::string result(text);
-  for (char& c : result) {
-    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-  }
+  std::ranges::transform(result, result.begin(), [](char c) {
+    return static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  });
   return result;
 }
 
 std::string ToLowerAscii(std::string_view text) {
   std::string result(text);
-  for (char& c : result) {
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  }
+  std::ranges::transform(result, result.begin(), [](char c) {
+    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  });
   return result;
 }
 
