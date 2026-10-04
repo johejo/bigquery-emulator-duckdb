@@ -276,16 +276,41 @@ std::vector<Rule> Numbers(std::string_view function, std::size_t arity = 1) {
                  Same(std::string(function) + "_numeric", arity, {Is(1, {TYPE_NUMERIC})})});
 }
 
-// An operator on BIGNUMERIC that src/backend_functions/bignumeric.cc implements as `function`,
-// which takes and returns the units of a BIGNUM as text.
-Rule BigNumericOperator(std::string_view function, std::size_t arity) {
+// A call to `function`, a BIGNUMERIC function that src/backend_functions/bignumeric.cc
+// implements, which takes and returns the units of a BIGNUM as text. `bignumerics` arguments are
+// BIGNUMERIC, and the `others` after them, such as ROUND's digits, go as they are.
+std::string BigNumericCall(std::string_view function, std::size_t bignumerics,
+                           std::size_t others = 0) {
   std::string arguments;
-  for (std::size_t i = 1; i <= arity; ++i) {
-    arguments += (i == 1 ? "CAST($" : ", CAST($") + std::to_string(i) + " AS VARCHAR)";
+  for (std::size_t i = 1; i <= bignumerics + others; ++i) {
+    const std::string argument = "$" + std::to_string(i);
+    arguments +=
+        (i == 1 ? "" : ", ") + (i <= bignumerics ? "CAST(" + argument + " AS VARCHAR)" : argument);
   }
-  return {arity,
-          "CAST(" + std::string(function) + "(" + arguments + ") AS BIGNUM)",
-          {Is(1, {TYPE_BIGNUMERIC})}};
+  return "CAST(" + std::string(function) + "(" + arguments + ") AS BIGNUM)";
+}
+
+// An operator on BIGNUMERIC, all of whose `arity` arguments are BIGNUMERIC.
+Rule BigNumericOperator(std::string_view function, std::size_t arity) {
+  return {arity, BigNumericCall(function, arity), {Is(1, {TYPE_BIGNUMERIC})}};
+}
+
+// ROUND and TRUNC of a BIGNUMERIC, which take a number of digits, and with `modes` a rounding
+// mode.
+std::vector<Rule> BigNumericRounding(std::string_view function, bool modes) {
+  const std::string name(function);
+  std::vector<Rule> rules = {
+      BigNumericOperator(name, 1),
+      {2, BigNumericCall(name + "_digits", 1, 1), {Is(1, {TYPE_BIGNUMERIC})}}};
+  if (modes) {
+    rules.push_back({3,
+                     BigNumericCall(name + "_digits", 1, 1),
+                     {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}});
+    rules.push_back({3,
+                     BigNumericCall(name + "_half_even", 1, 1),
+                     {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_EVEN")}});
+  }
+  return rules;
 }
 
 // TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
@@ -309,9 +334,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
       {"$ADD", {BigNumericOperator("bq_bignumeric_add", 2), {2, "($1 + $2)"}}},
       {"$SUBTRACT", {BigNumericOperator("bq_bignumeric_subtract", 2), {2, "($1 - $2)"}}},
-      {"$MULTIPLY", {{2, "($1 * $2)"}}},
+      {"$MULTIPLY", {BigNumericOperator("bq_bignumeric_multiply", 2), {2, "($1 * $2)"}}},
       {"$DIVIDE",
-       {{2,
+       {BigNumericOperator("bq_bignumeric_divide", 2),
+        {2,
          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE $1 / $2 END",
          {},
          {},
@@ -346,12 +372,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
       // make the zero itself disappear.
-      {"SAFE_DIVIDE", {{2, "($1 / NULLIF($2, 0))"}}},
+      {"SAFE_DIVIDE",
+       {BigNumericOperator("bq_bignumeric_safe_divide", 2), {2, "($1 / NULLIF($2, 0))"}}},
       {"IEEE_DIVIDE", {{2, "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
       // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
       // in DuckDB where it is 0 in BigQuery.
       {"MOD",
-       {{2,
+       {BigNumericOperator("bq_bignumeric_mod", 2),
+        {2,
          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 WHEN $2 = -1 THEN 0 "
          "ELSE mod($1, $2) END",
          {Is(1, {TYPE_INT64})},
@@ -362,9 +390,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {},
          {},
          {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}}}},
-      // DuckDB's divide() of DECIMAL values returns a DOUBLE, so only INT64 is supported.
+      // DuckDB's divide() of DECIMAL values returns a DOUBLE, so NUMERIC is unsupported.
       {"DIV",
-       {{2,
+       {BigNumericOperator("bq_bignumeric_div", 2),
+        {2,
          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE divide($1, $2) "
          "END",
          {Is(1, {TYPE_INT64})},
@@ -372,18 +401,25 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {"'division by zero: ' || $1 || ' / ' || $2"}}}},
       // DuckDB's sign() is 0 for NaN.
       {"SIGN",
-       {{1, "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END", {Is(1, {TYPE_DOUBLE})}},
+       {BigNumericOperator("bq_bignumeric_sign", 1),
+        {1, "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END", {Is(1, {TYPE_DOUBLE})}},
         {1, "sign($1)"}}},
       // DuckDB takes the digits as an INTEGER.
       // DuckDB rounds halfway values away from zero, and its round_even() goes through
       // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
       // value is even. Only NUMERIC and BIGNUMERIC take a rounding mode.
       {"ROUND",
-       {{1, "round($1)"},
-        {2, "round($1, CAST($2 AS INTEGER))"},
-        {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
-        {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}}}},
-      {"TRUNC", {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}},
+       Concat({BigNumericRounding("bq_bignumeric_round", true),
+               {{1, "round($1)"},
+                {2, "round($1, CAST($2 AS INTEGER))"},
+                {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
+                {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}}}})},
+      {"TRUNC", Concat({BigNumericRounding("bq_bignumeric_trunc", false),
+                        {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}})},
+      {"ABS", {BigNumericOperator("bq_bignumeric_abs", 1), {1, "abs($1)"}}},
+      {"CEIL", {BigNumericOperator("bq_bignumeric_ceil", 1), {1, "ceil($1)"}}},
+      {"CEILING", {BigNumericOperator("bq_bignumeric_ceil", 1), {1, "ceil($1)"}}},
+      {"FLOOR", {BigNumericOperator("bq_bignumeric_floor", 1), {1, "floor($1)"}}},
       // DuckDB cannot cast an empty BLOB to BIT.
       {"BIT_COUNT",
        {{1, "bit_count($1)", {Is(1, {TYPE_INT64})}},
@@ -693,9 +729,8 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
 // with different semantics. Extend this list with execution coverage.
 const std::unordered_set<std::string_view>& PlainFunctions() {
   static const auto* const kPlain = new std::unordered_set<std::string_view>{
-      "ABS",          "CEIL",   "CEILING",  "FLOOR",       "IF",
-      "IFNULL",       "NULLIF", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH",
-      "ARRAY_LENGTH", "ATAN",   "ATAN2",    "TANH",        "ASINH"};
+      "IF",           "IFNULL", "NULLIF", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH",
+      "ARRAY_LENGTH", "ATAN",   "ATAN2",  "TANH",     "ASINH"};
   return *kPlain;
 }
 
@@ -887,6 +922,18 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "$ADD",
       "$SUBTRACT",
       "$UNARY_MINUS",
+      "$MULTIPLY",
+      "$DIVIDE",
+      "SAFE_DIVIDE",
+      "DIV",
+      "MOD",
+      "ABS",
+      "SIGN",
+      "ROUND",
+      "TRUNC",
+      "CEIL",
+      "CEILING",
+      "FLOOR",
       // Aggregate and analytic functions.
       "COUNT",
       "MIN",

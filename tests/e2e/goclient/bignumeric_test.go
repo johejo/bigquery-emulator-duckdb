@@ -123,6 +123,10 @@ func TestBigNumericErrors(t *testing.T) {
 			maxBigNumeric + " + 1",
 		"SELECT SUM(x) FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "', 1]) x": "BIGNUMERIC overflow: SUM",
 		"SELECT CAST(x AS BIGNUMERIC) FROM UNNEST(['x']) x":                    "Invalid BIGNUMERIC value: x",
+		"SELECT x * 2 FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "']) x": "BIGNUMERIC overflow: " +
+			maxBigNumeric + " * 2",
+		"SELECT x / 0 FROM UNNEST([BIGNUMERIC '1']) x":     "division by zero: 1 / 0",
+		"SELECT MOD(x, 0) FROM UNNEST([BIGNUMERIC '1']) x": "division by zero: MOD(1, 0)",
 		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x":           "int64 out of range: 100000000000000000000",
 	} {
 		job, err := client.Query(sql).Run(ctx)

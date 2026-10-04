@@ -10,6 +10,8 @@
 #include "googlesql/public/functions/arithmetics.h"
 #include "googlesql/public/functions/convert.h"
 #include "googlesql/public/functions/convert_string.h"
+#include "googlesql/public/functions/math.h"
+#include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
 
@@ -41,28 +43,31 @@ absl::StatusOr<BigNumericValue> Units(const Arguments& arguments, idx_t column) 
   return BigNumericFromUnits(arguments.String(column));
 }
 
-// A BIGNUMERIC operator of two arguments, such as +.
-template <bool (*kFunction)(BigNumericValue, BigNumericValue, BigNumericValue*, absl::Status*)>
+// A BIGNUMERIC function of two BIGNUMERIC arguments, such as *. Unless `kSafe`, its errors
+// fail the query rather than being NULL, as SAFE_DIVIDE's are.
+template <bool (*kFunction)(BigNumericValue, BigNumericValue, BigNumericValue*, absl::Status*),
+          bool kSafe = false>
 void Operator(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto in1 = Units(arguments, 0);
-    if (!in1.ok()) {
-      return in1.status();
-    }
-    const auto in2 = Units(arguments, 1);
-    if (!in2.ok()) {
-      return in2.status();
-    }
-    BigNumericValue out;
-    absl::Status error;
-    if (!kFunction(*in1, *in2, &out, &error)) {
-      return error;
-    }
-    return BigNumericUnits(out);
-  });
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+            const auto in1 = Units(arguments, 0);
+            if (!in1.ok()) {
+              return in1.status();
+            }
+            const auto in2 = Units(arguments, 1);
+            if (!in2.ok()) {
+              return in2.status();
+            }
+            BigNumericValue out;
+            absl::Status error;
+            const bool ok = kFunction(*in1, *in2, &out, &error);
+            return OrNull(ok, BigNumericUnits(out), error, kSafe);
+          });
 }
 
-void Negate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+// A BIGNUMERIC function of one BIGNUMERIC argument, such as ABS.
+template <bool (*kFunction)(BigNumericValue, BigNumericValue*, absl::Status*)>
+void Unary(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
     const auto in = Units(arguments, 0);
     if (!in.ok()) {
@@ -70,11 +75,34 @@ void Negate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
     }
     BigNumericValue out;
     absl::Status error;
-    if (!fn::UnaryMinus(*in, &out, &error)) {
+    if (!kFunction(*in, &out, &error)) {
       return error;
     }
     return BigNumericUnits(out);
   });
+}
+
+// A BIGNUMERIC function of a BIGNUMERIC and a number of digits, such as ROUND(x, 2).
+template <bool (*kFunction)(BigNumericValue, int64_t, BigNumericValue*, absl::Status*)>
+void WithDigits(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const auto in = Units(arguments, 0);
+    if (!in.ok()) {
+      return in.status();
+    }
+    BigNumericValue out;
+    absl::Status error;
+    if (!kFunction(*in, arguments.Int(1), &out, &error)) {
+      return error;
+    }
+    return BigNumericUnits(out);
+  });
+}
+
+// ROUND with a rounding mode.
+template <fn::RoundingMode kMode>
+bool RoundWithMode(BigNumericValue in, int64_t digits, BigNumericValue* out, absl::Status* error) {
+  return fn::RoundDecimalWithRoundingMode(in, digits, kMode, out, error);
 }
 
 // The units of a BIGNUM that DuckDB's sum() computed exactly, which fails as SUM does when they
@@ -161,7 +189,35 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
            Operator<fn::Add<BigNumericValue>>);
   Register(connection, "bq_bignumeric_subtract", {kVarchar, kVarchar}, kVarchar,
            Operator<fn::Subtract<BigNumericValue>>);
-  Register(connection, "bq_bignumeric_negate", {kVarchar}, kVarchar, Negate);
+  Register(connection, "bq_bignumeric_multiply", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Multiply<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_divide", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Divide<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_safe_divide", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Divide<BigNumericValue>, true>);
+  Register(connection, "bq_bignumeric_div", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::DivideToIntegralValue<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_mod", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Modulo<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_negate", {kVarchar}, kVarchar,
+           Unary<fn::UnaryMinus<BigNumericValue, BigNumericValue>>);
+  Register(connection, "bq_bignumeric_abs", {kVarchar}, kVarchar, Unary<fn::Abs<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_sign", {kVarchar}, kVarchar,
+           Unary<fn::Sign<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_round", {kVarchar}, kVarchar,
+           Unary<fn::Round<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_round_digits", {kVarchar, kBigint}, kVarchar,
+           WithDigits<fn::RoundDecimal<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_round_half_even", {kVarchar, kBigint}, kVarchar,
+           WithDigits<RoundWithMode<fn::ROUND_HALF_EVEN>>);
+  Register(connection, "bq_bignumeric_trunc", {kVarchar}, kVarchar,
+           Unary<fn::Trunc<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_trunc_digits", {kVarchar, kBigint}, kVarchar,
+           WithDigits<fn::TruncDecimal<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_ceil", {kVarchar}, kVarchar,
+           Unary<fn::Ceil<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_floor", {kVarchar}, kVarchar,
+           Unary<fn::Floor<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar, FromDouble);
