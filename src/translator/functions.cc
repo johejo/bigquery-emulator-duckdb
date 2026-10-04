@@ -951,6 +951,9 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "LOG",
       "LOG10",
       // Arrays, JSON and text.
+      "ARRAY_LENGTH",
+      "ARRAY_REVERSE",
+      "ARRAY_CONCAT",
       "GENERATE_ARRAY",
       "TO_JSON",
       "TO_JSON_STRING",

@@ -114,6 +114,47 @@ func mustInt(t *testing.T, s string) int64 {
 	return r.Num().Int64()
 }
 
+// Array functions keep the BIGNUMERIC schema and values exposed by the Go client.
+func TestBigNumericArrayFunctions(t *testing.T) {
+	rows, err := newClient(t).Query("SELECT ARRAY_LENGTH(a) AS n, ARRAY_REVERSE(a) AS r, " +
+		"ARRAY_CONCAT(a, a) AS c FROM (SELECT [BIGNUMERIC '" + maxBigNumeric +
+		"', BIGNUMERIC '" + minBigNumeric + "', BIGNUMERIC '" + tinyBigNumeric + "'] AS a)").Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows.Schema) != 3 || rows.Schema[0].Type != bigquery.IntegerFieldType || rows.Schema[0].Repeated {
+		t.Fatalf("unexpected schema: %v", rows.Schema)
+	}
+	if row[0] != int64(3) {
+		t.Errorf("ARRAY_LENGTH: got %v, want 3", row[0])
+	}
+	for column, want := range [][]string{
+		{tinyBigNumeric, minBigNumeric, maxBigNumeric},
+		{maxBigNumeric, minBigNumeric, tinyBigNumeric, maxBigNumeric, minBigNumeric, tinyBigNumeric},
+	} {
+		field := rows.Schema[column+1]
+		if field.Type != bigquery.BigNumericFieldType || !field.Repeated {
+			t.Fatalf("%s: got schema %v, want repeated BIGNUMERIC", field.Name, field)
+		}
+		got := row[column+1].([]bigquery.Value)
+		if len(got) != len(want) {
+			t.Fatalf("%s: got %d elements, want %d", field.Name, len(got), len(want))
+		}
+		for i, value := range want {
+			if got[i].(*big.Rat).Cmp(rat(t, value)) != 0 {
+				t.Errorf("%s[%d]: got %v, want %s", field.Name, i, got[i], value)
+			}
+		}
+	}
+	if err := rows.Next(new([]bigquery.Value)); err != iterator.Done {
+		t.Errorf("got another row (%v), want one", err)
+	}
+}
+
 // Out of range results fail with GoogleSQL's messages, as in BigQuery.
 func TestBigNumericErrors(t *testing.T) {
 	ctx := context.Background()
