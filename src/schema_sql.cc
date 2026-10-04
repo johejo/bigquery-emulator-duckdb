@@ -8,8 +8,10 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
@@ -157,6 +159,13 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   const std::string scalar = value.is_string() ? value.get<std::string>() : value.dump();
   if (field.type == FieldType::kBytes) {
     return "from_base64(" + QuoteLiteral(scalar) + ")";
+  }
+  if (field.type == FieldType::kBigNumeric) {
+    const auto number = googlesql::BigNumericValue::FromString(scalar);
+    if (!number.ok()) {
+      throw ApiError::Invalid("Invalid BIGNUMERIC value for field " + field.name + ": " + scalar);
+    }
+    return BigNumericSql(*number);
   }
   if (field.type == FieldType::kTimestamp && value.is_number()) {
     return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";

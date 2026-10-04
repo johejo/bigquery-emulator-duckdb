@@ -169,6 +169,11 @@ struct FunctionEntry {
 // emulator does not support it. The operators have their internal names, such as $ADD.
 const FunctionEntry* FindFunction(std::string_view upper_name);
 
+// Whether `upper_name` handles BIGNUMERIC arguments and results as BigQuery does. DuckDB's own
+// functions would compute a BIGNUM as a DOUBLE or truncate it, so any other call that involves
+// a BIGNUMERIC is unsupported.
+bool SupportsBigNumeric(std::string_view upper_name);
+
 // The DuckDB spelling of a call to `upper_name`, a function implemented by kSame, kRenamed,
 // kRules or kBackend, or nullopt when no rule matches.
 std::optional<std::string> TranslateFunction(std::string_view upper_name,

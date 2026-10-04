@@ -197,7 +197,15 @@ TEST_F(TranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(76, 38))"), "column type BIGNUMERIC");
   EXPECT_EQ(Unsupported(
                 "SELECT CAST(ARRAY(SELECT AS STRUCT NUMERIC '1' AS n) AS ARRAY<STRUCT<s STRING>>)"),
-            "CAST of a nested NUMERIC or BIGNUMERIC to STRING");
+            "CAST of a nested NUMERIC to STRING");
+  EXPECT_EQ(Unsupported("SELECT BIGNUMERIC '2' * 2"), "function $MULTIPLY with BIGNUMERIC");
+  EXPECT_EQ(Unsupported("SELECT SAFE_MULTIPLY(BIGNUMERIC '2', 2)"),
+            "function SAFE_MULTIPLY with BIGNUMERIC");
+  EXPECT_EQ(Unsupported("SELECT AVG(x) FROM UNNEST([BIGNUMERIC '1']) x"),
+            "function AVG with BIGNUMERIC");
+  EXPECT_EQ(Unsupported("SELECT CAST([a] AS ARRAY<BIGNUMERIC>) FROM t"),
+            "CAST of a nested BIGNUMERIC");
+  EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(10, 2))"), "column type BIGNUMERIC");
   EXPECT_EQ(Unsupported("CREATE TABLE ds.c (x INT64 NOT NULL) AS SELECT 1 AS x"),
             "NOT NULL in CREATE TABLE AS SELECT");
   EXPECT_EQ(Unsupported("CREATE OR REPLACE SCHEMA other"), "CREATE OR REPLACE SCHEMA");

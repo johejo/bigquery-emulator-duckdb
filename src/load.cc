@@ -1,5 +1,6 @@
 #include "src/load.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -71,6 +72,16 @@ std::vector<std::string> StageLoadSources(const json& config, const std::string&
   return paths;
 }
 
+namespace {
+
+bool HasBigNumeric(const std::vector<FieldSchema>& fields) {
+  return std::ranges::any_of(fields, [](const FieldSchema& field) {
+    return field.type == FieldType::kBigNumeric || HasBigNumeric(field.fields);
+  });
+}
+
+}  // namespace
+
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
                       const json& config, const std::vector<FieldSchema>& schema) {
   std::string files;
@@ -86,13 +97,25 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     if (!schema.empty()) {
       sql += ", auto_detect=false";
       std::string columns;
+      // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted.
+      std::string conversions;
       for (const FieldSchema& field : schema) {
+        const bool big = field.type == FieldType::kBigNumeric;
         columns += (columns.empty() ? "" : ", ") + QuoteLiteral(field.name) + ": " +
-                   QuoteLiteral(ToDuckDbType(field));
+                   QuoteLiteral(big ? "VARCHAR" : ToDuckDbType(field));
+        conversions +=
+            (conversions.empty() ? "" : ", ") +
+            (big ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}",
+                               QuoteIdentifier(field.name), ToDuckDbType(field))
+                 : QuoteIdentifier(field.name));
       }
-      sql += ", columns={" + columns + "}";
+      sql += ", columns={" + columns + "})";
+      return std::format("SELECT {} FROM ({}) AS source", conversions, sql);
     }
     sql += ")";
+  } else if (HasBigNumeric(schema)) {
+    // JSON numbers would be read as DOUBLE.
+    throw ApiError::Invalid("Loading BIGNUMERIC from " + format + " is not supported");
   } else if (format == "NEWLINE_DELIMITED_JSON") {
     sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
   } else {

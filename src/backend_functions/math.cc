@@ -6,10 +6,8 @@
 #include <utility>
 #include <vector>
 
-#include "absl/numeric/int128.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/numbers.h"
 #include "duckdb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
@@ -40,8 +38,7 @@ void Math2(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector out
   });
 }
 
-// DuckDB keeps NUMERIC as DECIMAL(38, 9), whose units are the packed integer of NumericValue,
-// and BIGNUMERIC as DECIMAL(38, 19).
+// DuckDB keeps NUMERIC as DECIMAL(38, 9), whose units are the packed integer of NumericValue.
 template <typename T>
 struct Decimal;
 
@@ -58,38 +55,7 @@ struct Decimal<googlesql::NumericValue> {
   }
 };
 
-template <>
-struct Decimal<googlesql::BigNumericValue> {
-  static constexpr uint8_t kScale = 19;
-  // 10^19, a unit of DECIMAL(38, 19) per BIGNUMERIC 1, and the bound of its integer part.
-  static constexpr __int128 kUnits = 10'000'000'000'000'000'000ULL;
-
-  static absl::StatusOr<googlesql::BigNumericValue> From(__int128 units) {
-    return googlesql::BigNumericValue(units).Divide(googlesql::BigNumericValue(kUnits));
-  }
-
-  // Rounds the fractional digits beyond 19 and fails for more than 19 integer digits, as the
-  // README's Compatibility section describes.
-  static absl::StatusOr<__int128> To(const googlesql::BigNumericValue& value) {
-    const auto rounded = value.Round(kScale);
-    if (!rounded.ok()) {
-      return rounded.status();
-    }
-    if (*rounded >= googlesql::BigNumericValue(kUnits) ||
-        *rounded <= googlesql::BigNumericValue(-kUnits)) {
-      return absl::OutOfRangeError("BIGNUMERIC overflow: " + rounded->ToString());
-    }
-    const auto units = rounded->Multiply(googlesql::BigNumericValue(kUnits));
-    absl::int128 out = 0;
-    if (!units.ok() || !absl::SimpleAtoi(units->ToString(), &out)) {
-      return absl::InternalError("BIGNUMERIC conversion failed: " + rounded->ToString());
-    }
-    return static_cast<__int128>(out);
-  }
-};
-
-// A NUMERIC or BIGNUMERIC function of one argument, such as SQRT, which fails where
-// GoogleSQL's does.
+// A NUMERIC function of one argument, such as SQRT, which fails where GoogleSQL's does.
 template <typename T, bool (*kFunction)(T, T*, absl::Status*)>
 void DecimalMath(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<__int128> {
@@ -106,7 +72,7 @@ void DecimalMath(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
   });
 }
 
-// A NUMERIC or BIGNUMERIC function of two arguments, such as POW.
+// A NUMERIC function of two arguments, such as POW.
 template <typename T, bool (*kFunction)(T, T, T*, absl::Status*)>
 void DecimalMath2(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<__int128> {
@@ -127,7 +93,7 @@ void DecimalMath2(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
-// Registers the NUMERIC or BIGNUMERIC functions, named as the FLOAT64 ones plus `suffix`.
+// Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix) {
   namespace fn = googlesql::functions;
@@ -182,7 +148,6 @@ void RegisterMathFunctions(duckdb_connection connection) {
   Register(connection, "bq_pow", {kDouble, kDouble}, kDouble, Math2<fn::Pow<double>>);
   Register(connection, "bq_log", {kDouble, kDouble}, kDouble, Math2<fn::Logarithm<double>>);
   RegisterDecimalMath<googlesql::NumericValue>(connection, "_numeric");
-  RegisterDecimalMath<googlesql::BigNumericValue>(connection, "_bignumeric");
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

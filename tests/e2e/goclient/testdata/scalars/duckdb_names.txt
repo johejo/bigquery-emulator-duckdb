@@ -13,9 +13,6 @@ SELECT IS_INF(CAST('inf' AS FLOAT64))
 SELECT IS_NAN(CAST('nan' AS FLOAT64))
 => "true"
 
-SELECT ABS(BIGNUMERIC '-1.5') = 1.5
-=> "true"
-
 SELECT JSON_EXTRACT_SCALAR('{"a": 1}', '$.a')
 => "1"
 
@@ -141,29 +138,20 @@ SELECT SAFE.POW(0, -1)
 SELECT POWER(2, 10)
 => "1024.0"
 
-# NUMERIC and BIGNUMERIC keep their precision rather than going through FLOAT64.
+# NUMERIC keeps its precision rather than going through FLOAT64.
 SELECT SQRT(NUMERIC '2') = NUMERIC '1.414213562'
 => "true"
 
 SELECT POW(NUMERIC '1.1', 2) = NUMERIC '1.21'
 => "true"
 
-SELECT POWER(BIGNUMERIC '0.001', 5) = BIGNUMERIC '0.000000000000001'
-=> "true"
-
 SELECT EXP(NUMERIC '1') = NUMERIC '2.718281828'
-=> "true"
-
-SELECT LN(BIGNUMERIC '1') = 0
 => "true"
 
 SELECT LOG(NUMERIC '1') = 0
 => "true"
 
 SELECT LOG(NUMERIC '8', 2) = 3
-=> "true"
-
-SELECT LOG10(BIGNUMERIC '0.001') = -3
 => "true"
 
 SELECT CBRT(NUMERIC '-27') = -3
@@ -173,9 +161,6 @@ SELECT SQRT(CAST(NULL AS NUMERIC))
 => null
 
 SELECT SAFE.SQRT(NUMERIC '-1')
-=> null
-
-SELECT SAFE.LN(BIGNUMERIC '0')
 => null
 
 SELECT SAFE.LOG(NUMERIC '8', 1)

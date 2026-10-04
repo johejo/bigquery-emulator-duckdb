@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
@@ -24,6 +25,26 @@ TEST(ColumnMetadataTest, KeepsTheDerivedFieldWithoutAFieldComment) {
   for (size_t i = 1; i < schema.size(); ++i) {
     EXPECT_EQ(schema[i].ToJson(), derived[i].ToJson()) << i;
   }
+}
+
+// An earlier emulator stored BIGNUMERIC as DECIMAL(38, 19), which reads back as NUMERIC and
+// cannot hold every BIGNUMERIC.
+TEST(ColumnMetadataTest, RejectsABigNumericStoredAsADecimal) {
+  EXPECT_THROW(ApplyColumnComments({{.name = "n", .type = FieldType::kNumeric}},
+                                   {json(R"({"name": "n", "type": "BIGNUMERIC"})")}),
+               ApiError);
+  EXPECT_THROW(
+      ApplyColumnComments(
+          {{.name = "s",
+            .type = FieldType::kRecord,
+            .fields = {{.name = "n", .type = FieldType::kNumeric}}}},
+          {json(
+              R"({"name": "s", "type": "RECORD", "fields": [{"name": "n", "type": "BIGNUMERIC"}]})")}),
+      ApiError);
+  EXPECT_EQ(ApplyColumnComments({{.name = "n", .type = FieldType::kBigNumeric}},
+                                {json(R"({"name": "n", "type": "BIGNUMERIC"})")})[0]
+                .type,
+            FieldType::kBigNumeric);
 }
 
 }  // namespace

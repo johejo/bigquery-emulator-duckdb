@@ -30,6 +30,7 @@ std::string ColumnCommentsQuery(const TableReference& table);
 // Replaces each field of `derived`, the schema read back from DuckDB's types, with the field its
 // column's comment records. A column without one, such as one added by a DuckDB statement the
 // emulator did not write, or one whose comment someone else wrote, keeps its derived field.
+// Throws ApiError for a BIGNUMERIC column that an earlier emulator stored as a DECIMAL.
 std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
                                              const std::vector<nlohmann::json>& comments);
 

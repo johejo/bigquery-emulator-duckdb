@@ -270,12 +270,22 @@ std::vector<Rule> Strings(std::string_view function, Arity arity) {
 }
 
 // A function that src/backend_functions.cc registers as `function` for FLOAT64 and as
-// `function`_numeric and `function`_bignumeric for NUMERIC and BIGNUMERIC, which keep their
-// precision rather than going through FLOAT64.
+// `function`_numeric for NUMERIC, which keeps its precision rather than going through FLOAT64.
 std::vector<Rule> Numbers(std::string_view function, std::size_t arity = 1) {
   return Concat({Float64(function, arity),
-                 Same(std::string(function) + "_numeric", arity, {Is(1, {TYPE_NUMERIC})}),
-                 Same(std::string(function) + "_bignumeric", arity, {Is(1, {TYPE_BIGNUMERIC})})});
+                 Same(std::string(function) + "_numeric", arity, {Is(1, {TYPE_NUMERIC})})});
+}
+
+// An operator on BIGNUMERIC that src/backend_functions/bignumeric.cc implements as `function`,
+// which takes and returns the units of a BIGNUM as text.
+Rule BigNumericOperator(std::string_view function, std::size_t arity) {
+  std::string arguments;
+  for (std::size_t i = 1; i <= arity; ++i) {
+    arguments += (i == 1 ? "CAST($" : ", CAST($") + std::to_string(i) + " AS VARCHAR)";
+  }
+  return {arity,
+          "CAST(" + std::string(function) + "(" + arguments + ") AS BIGNUM)",
+          {Is(1, {TYPE_BIGNUMERIC})}};
 }
 
 // TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
@@ -297,8 +307,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
-      {"$ADD", {{2, "($1 + $2)"}}},
-      {"$SUBTRACT", {{2, "($1 - $2)"}}},
+      {"$ADD", {BigNumericOperator("bq_bignumeric_add", 2), {2, "($1 + $2)"}}},
+      {"$SUBTRACT", {BigNumericOperator("bq_bignumeric_subtract", 2), {2, "($1 - $2)"}}},
       {"$MULTIPLY", {{2, "($1 * $2)"}}},
       {"$DIVIDE",
        {{2,
@@ -306,7 +316,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {},
          {},
          {"'division by zero'"}}}},
-      {"$UNARY_MINUS", {{1, "(-$1)"}}},
+      {"$UNARY_MINUS", {BigNumericOperator("bq_bignumeric_negate", 1), {1, "(-$1)"}}},
       {"$EQUAL", {{2, "($1 = $2)"}}},
       {"$NOT_EQUAL", {{2, "($1 <> $2)"}}},
       {"$LESS", {{2, "($1 < $2)"}}},
@@ -750,6 +760,12 @@ std::string Flatten(const std::string& sql, const std::vector<std::string>& /*ar
   return "flatten(" + sql + ")";
 }
 
+// DuckDB sums BIGNUM exactly, and the sum then has to fit a BIGNUMERIC.
+std::string BigNumericSum(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                          const std::string& /*tail*/) {
+  return "CAST(bq_bignumeric_sum(CAST(" + sql + " AS VARCHAR)) AS BIGNUM)";
+}
+
 // Aggregate functions, which also take a window.
 const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregates() {
   using enum AggregateRule::Nulls;
@@ -758,7 +774,9 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
       new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
           {"COUNT", {{.function = "count"}}},
           {"$COUNT_STAR", {{.function = "count", .arguments = {"*"}}}},
-          {"SUM", {{.function = "sum"}}},
+          {"SUM",
+           {{.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
+            {.function = "sum"}}},
           {"AVG", {{.function = "avg"}}},
           {"MIN", {{.function = "min"}}},
           {"MAX", {{.function = "max"}}},
@@ -834,6 +852,57 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
   return *kAnalytics;
 }
 
+// The functions that handle BIGNUMERIC, by carrying it as it is, by comparing BIGNUM, which
+// DuckDB does exactly, or by rules of their own.
+const std::unordered_set<std::string_view>& BigNumericFunctions() {
+  static const auto* const kFunctions = new std::unordered_set<std::string_view>{
+      // Comparisons.
+      "$EQUAL",
+      "$NOT_EQUAL",
+      "$LESS",
+      "$LESS_OR_EQUAL",
+      "$GREATER",
+      "$GREATER_OR_EQUAL",
+      "$BETWEEN",
+      "$IS_DISTINCT_FROM",
+      "$IS_NOT_DISTINCT_FROM",
+      "$IS_NULL",
+      "$IN",
+      "$IN_ARRAY",
+      "GREATEST",
+      "LEAST",
+      // Carrying values.
+      "$CASE_NO_VALUE",
+      "$CASE_WITH_VALUE",
+      "IF",
+      "IFNULL",
+      "COALESCE",
+      "NULLIF",
+      "$MAKE_ARRAY",
+      "$ARRAY_AT_OFFSET",
+      "$ARRAY_AT_ORDINAL",
+      "$SAFE_ARRAY_AT_OFFSET",
+      "$SAFE_ARRAY_AT_ORDINAL",
+      // Arithmetic.
+      "$ADD",
+      "$SUBTRACT",
+      "$UNARY_MINUS",
+      // Aggregate and analytic functions.
+      "COUNT",
+      "MIN",
+      "MAX",
+      "ANY_VALUE",
+      "ARRAY_AGG",
+      "SUM",
+      "LAG",
+      "LEAD",
+      "FIRST_VALUE",
+      "LAST_VALUE",
+      "NTH_VALUE",
+  };
+  return *kFunctions;
+}
+
 // Every function, from the tables above. A function is in one table only.
 const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
   static const auto* const kRegistry = [] {
@@ -895,6 +964,10 @@ std::string_view Describe(Implementation implementation) {
       return "DuckDB window function";
   }
   return "";
+}
+
+bool SupportsBigNumeric(std::string_view upper_name) {
+  return BigNumericFunctions().contains(upper_name);
 }
 
 const FunctionEntry* FindFunction(std::string_view upper_name) {

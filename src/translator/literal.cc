@@ -6,6 +6,7 @@
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "src/bignumeric.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/translator/internal.h"
@@ -16,6 +17,9 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   const auto type = DuckDbType(value.type());
   if (!type) {
     return std::nullopt;
+  }
+  if (value.type()->IsBigNumericType() && !value.is_null()) {
+    return BigNumericSql(value.bignumeric_value());
   }
   std::string literal;
   if (value.is_null()) {
@@ -51,8 +55,7 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   } else {
     literal = value.GetSQLLiteral(GoogleSqlLanguageOptions());
     if (value.type()->IsDate() || value.type()->IsTimestamp() || value.type()->IsDatetime() ||
-        value.type()->IsTime() || value.type()->IsNumericType() ||
-        value.type()->IsBigNumericType() || value.type()->IsJson()) {
+        value.type()->IsTime() || value.type()->IsNumericType() || value.type()->IsJson()) {
       std::string contents;
       if (!googlesql::ParseStringLiteral(literal.substr(literal.find(' ') + 1), &contents).ok()) {
         return std::nullopt;

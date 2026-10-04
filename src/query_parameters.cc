@@ -5,8 +5,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/type_mapping.h"
@@ -129,6 +131,13 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
     return "CAST(NULL AS " + ToDuckDbType(type) + ")";
   }
   const std::string text = ValueText(value["value"]);
+  if (ParseFieldType(name) == FieldType::kBigNumeric) {
+    const auto number = googlesql::BigNumericValue::FromString(text);
+    if (!number.ok()) {
+      throw ApiError::Invalid("Invalid BIGNUMERIC query parameter value: " + text);
+    }
+    return BigNumericSql(*number);
+  }
   if (name == "BYTES") {
     // BYTES parameters are base64 encoded, which DuckDB decodes back into a BLOB.
     return "from_base64(" + QuoteLiteral(text) + ")";

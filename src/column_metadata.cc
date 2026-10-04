@@ -47,6 +47,24 @@ std::string ColumnCommentsQuery(const TableReference& table) {
       QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), QuoteLiteral(table.table_id));
 }
 
+namespace {
+
+// Whether `recorded` is a BIGNUMERIC, at any depth, where `stored`, read back from DuckDB's types,
+// is not: a column of an earlier emulator, which kept BIGNUMERIC as DECIMAL(38, 19).
+bool StoresBigNumericAsDecimal(const FieldSchema& recorded, const FieldSchema& stored) {
+  if (recorded.type == FieldType::kBigNumeric) {
+    return stored.type != FieldType::kBigNumeric;
+  }
+  for (size_t i = 0; i < recorded.fields.size() && i < stored.fields.size(); ++i) {
+    if (StoresBigNumericAsDecimal(recorded.fields[i], stored.fields[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
                                              const std::vector<json>& comments) {
   for (size_t i = 0; i < derived.size() && i < comments.size(); ++i) {
@@ -66,6 +84,11 @@ std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
       continue;
     }
     if (ToLowerAscii(field.name) == ToLowerAscii(derived[i].name)) {
+      if (StoresBigNumericAsDecimal(field, derived[i])) {
+        throw ApiError::Invalid("Column " + field.name +
+                                " was created by an earlier version of the emulator, which "
+                                "stored BIGNUMERIC as DECIMAL(38, 19); recreate the table");
+      }
       derived[i] = std::move(field);
     }
   }

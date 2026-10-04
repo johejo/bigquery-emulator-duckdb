@@ -193,7 +193,9 @@ void Register(duckdb_connection connection, const char* name,
               duckdb_scalar_function_t function, bool nulls = true,
               std::optional<duckdb_type> varargs = std::nullopt);
 
-// math.cc: FLOAT64, NUMERIC and BIGNUMERIC functions, such as SQRT and POW.
+// bignumeric.cc: BIGNUMERIC arithmetic and conversions.
+void RegisterBigNumericFunctions(duckdb_connection connection);
+// math.cc: FLOAT64 and NUMERIC functions, such as SQRT and POW.
 void RegisterMathFunctions(duckdb_connection connection);
 // string.cc: STRING and BYTES functions, including hashing and regular expressions.
 void RegisterStringFunctions(duckdb_connection connection);

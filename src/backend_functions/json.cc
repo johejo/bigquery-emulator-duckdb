@@ -71,7 +71,7 @@ absl::StatusOr<googlesql::functions::WideNumberMode> WideNumberMode(const std::s
 }
 
 // The GoogleSQL type that the DuckDB type `type` stands for, the inverse of DuckDbType in
-// src/type_mapping.cc, with NUMERIC and BIGNUMERIC told apart by their scale.
+// src/type_mapping.cc.
 absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
                                                        googlesql::TypeFactory& factory) {
   const DuckString alias(duckdb_logical_type_get_alias(type));
@@ -100,9 +100,6 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
     case DUCKDB_TYPE_DECIMAL:
       if (duckdb_decimal_width(type) == 38 && duckdb_decimal_scale(type) == 9) {
         return googlesql::types::NumericType();
-      }
-      if (duckdb_decimal_width(type) == 38 && duckdb_decimal_scale(type) == 19) {
-        return googlesql::types::BigNumericType();
       }
       break;
     case DUCKDB_TYPE_LIST: {
@@ -171,9 +168,8 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
     }
     case googlesql::TYPE_TIMESTAMP:
       return googlesql::Value::Timestamp(absl::FromUnixMicros(VectorElement<int64_t>(vector, row)));
-    case googlesql::TYPE_NUMERIC:
-    case googlesql::TYPE_BIGNUMERIC: {
-      // Both are DECIMAL(38, s), stored as a 128-bit integer of units of 10^-s.
+    case googlesql::TYPE_NUMERIC: {
+      // A DECIMAL(38, 9), stored as a 128-bit integer of units of 10^-9.
       const auto value = VectorElement<duckdb_hugeint>(vector, row);
       const absl::int128 units = absl::MakeInt128(value.upper, value.lower);
       std::string digits = absl::StrCat(units < 0 ? -units : units);
@@ -183,13 +179,8 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
       if (units < 0) {
         digits.insert(0, "-");
       }
-      if (type->IsNumericType()) {
-        const auto numeric = googlesql::NumericValue::FromString(digits);
-        return numeric.ok() ? absl::StatusOr<googlesql::Value>(googlesql::Value::Numeric(*numeric))
-                            : numeric.status();
-      }
-      const auto numeric = googlesql::BigNumericValue::FromString(digits);
-      return numeric.ok() ? absl::StatusOr<googlesql::Value>(googlesql::Value::BigNumeric(*numeric))
+      const auto numeric = googlesql::NumericValue::FromString(digits);
+      return numeric.ok() ? absl::StatusOr<googlesql::Value>(googlesql::Value::Numeric(*numeric))
                           : numeric.status();
     }
     case googlesql::TYPE_JSON: {
