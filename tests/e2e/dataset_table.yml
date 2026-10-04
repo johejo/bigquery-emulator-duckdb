@@ -1,47 +1,52 @@
+# A project of its own keeps dataset listings independent of concurrent runbooks.
 desc: datasets and tables can be managed with bq mk/ls/show/head/rm and queried
 steps:
   mk_dataset:
     exec:
-      command: tests/e2e/bq.sh mk --dataset e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh mk --dataset e2e
     test: current.exit_code == 0
   ls_datasets:
     exec:
-      command: tests/e2e/bq.sh ls --format=json
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json
     test: |
       current.exit_code == 0 && current.stdout contains '"datasetId":"e2e"'
-  ls_datasets_with_filter:
-    exec:
-      command: tests/e2e/bq.sh ls --filter labels.env:test
-    test: |
-      current.exit_code != 0 && current.stdout contains 'The emulator does not support filter'
   update_dataset:
     exec:
-      command: tests/e2e/bq.sh update --dataset --description 'e2e data' --set_label env:test e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --dataset --description 'e2e data' --set_label env:test e2e
     test: current.exit_code == 0
   show_dataset:
     exec:
-      command: tests/e2e/bq.sh show --format=json e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh show --format=json e2e
     test: |
       current.exit_code == 0 &&
       current.stdout contains '"description":"e2e data"' &&
       current.stdout contains '"labels":{"env":"test"}'
   ls_datasets_with_labels:
     exec:
-      command: tests/e2e/bq.sh ls --format=json
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json
     test: |
       current.exit_code == 0 && current.stdout contains '"labels":{"env":"test"}'
+  ls_datasets_with_filter:
+    exec:
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json --filter labels.env:test
+    test: |
+      current.exit_code == 0 && current.stdout contains '"datasetId":"e2e"'
+  ls_datasets_with_unmatched_filter:
+    exec:
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json --filter labels.env:prod
+    test: current.exit_code == 0 && !(current.stdout contains '"datasetId":"e2e"')
   update_missing_dataset:
     exec:
-      command: tests/e2e/bq.sh update --dataset --description 'e2e data' missing
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --dataset --description 'e2e data' missing
     test: |
-      current.exit_code != 0 && current.stdout contains 'Not found: Dataset test:missing'
+      current.exit_code != 0 && current.stdout contains 'Not found: Dataset bq-dataset-table:missing'
   mk_table:
     exec:
-      command: tests/e2e/bq.sh mk --table e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh mk --table e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
     test: current.exit_code == 0
   show_table:
     exec:
-      command: tests/e2e/bq.sh show --format=json e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh show --format=json e2e.users
     test: |
       current.exit_code == 0 &&
       current.stdout contains '"name":"created"' &&
@@ -49,21 +54,21 @@ steps:
   mk_labeled_table:
     exec:
       command: >-
-        tests/e2e/bq.sh mk --table --description 'labeled users' --label env:test
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh mk --table --description 'labeled users' --label env:test
         e2e.labeled id:INTEGER
     test: current.exit_code == 0
   update_table_labels:
     exec:
-      command: tests/e2e/bq.sh update --set_label tier:1 --clear_label env e2e.labeled
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --set_label tier:1 --clear_label env e2e.labeled
     test: current.exit_code == 0
   ls_tables_with_labels:
     exec:
-      command: tests/e2e/bq.sh ls --format=json e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json e2e
     test: |
       current.exit_code == 0 && current.stdout contains '"labels":{"tier":"1"}'
   show_labeled_table:
     exec:
-      command: tests/e2e/bq.sh show --format=json e2e.labeled
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh show --format=json e2e.labeled
     test: |
       current.exit_code == 0 &&
       current.stdout contains '"description":"labeled users"' &&
@@ -71,52 +76,52 @@ steps:
   insert:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "INSERT INTO e2e.users VALUES (1, 'alice', TIMESTAMP '2024-01-01 00:00:00'), (2, 'bob', CURRENT_TIMESTAMP())"
     test: current.exit_code == 0
   select:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
-        'SELECT id, name FROM `test.e2e.users` ORDER BY id'
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT id, name FROM `bq-dataset-table.e2e.users` ORDER BY id'
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
   dry_run_dml_does_not_change_rows:
     exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'DELETE FROM e2e.users WHERE id = 1'
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --dry_run 'DELETE FROM e2e.users WHERE id = 1'
     test: current.exit_code == 0 && current.stdout contains "successfully validated"
   head:
     exec:
-      command: tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --format=json --max_rows=1 e2e.users
     test: |
       current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
   head_selected_fields:
     exec:
-      command: tests/e2e/bq.sh head --selected_fields=id e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --selected_fields=id e2e.users
     test: |
       current.exit_code != 0 && current.stdout contains 'The emulator does not support selectedFields'
   update_expiration:
     exec:
-      command: tests/e2e/bq.sh update --expiration 3600 e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --expiration 3600 e2e.users
     test: |
       current.exit_code != 0 && current.stdout contains 'does not support table'
   update:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "UPDATE e2e.users SET name = UPPER(name) WHERE id = 1"
     test: current.exit_code == 0
   delete:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "DELETE FROM e2e.users WHERE id = 2"
     test: current.exit_code == 0
   merge:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "MERGE e2e.users AS u USING (SELECT 1 AS id, 'ann' AS name UNION ALL SELECT 3, 'carol') AS s
         ON u.id = s.id
         WHEN MATCHED THEN UPDATE SET name = CONCAT(u.name, '/', s.name)
@@ -125,78 +130,78 @@ steps:
   select_after_dml:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
-        'SELECT id, name FROM `test.e2e.users` ORDER BY id'
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT id, name FROM `bq-dataset-table.e2e.users` ORDER BY id'
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"ALICE/ann"},{"id":"3","name":"carol"}]'
   update_schema_adds_column:
     exec:
-      command: tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP,email:STRING
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP,email:STRING
     test: current.exit_code == 0
   select_added_column:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
-        'SELECT id, email FROM `test.e2e.users` ORDER BY id'
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT id, email FROM `bq-dataset-table.e2e.users` ORDER BY id'
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"email":null,"id":"1"},{"email":null,"id":"3"}]'
   update_schema_cannot_drop_column:
     exec:
-      command: tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update e2e.users id:INTEGER,name:STRING,created:TIMESTAMP
     test: current.exit_code != 0 && current.stdout contains 'Field email is missing in new schema'
   create_table_with_nested_types:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "CREATE TABLE e2e.nested (id INT64, tags ARRAY<STRING>, point STRUCT<x INT64, y INT64>)"
     test: current.exit_code == 0
   insert_nested:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql
         "INSERT INTO e2e.nested VALUES (1, ['a', 'b'], STRUCT(2 AS x, 3 AS y))"
     test: current.exit_code == 0
   select_nested:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
-        'SELECT * FROM `test.e2e.nested`'
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        'SELECT * FROM `bq-dataset-table.e2e.nested`'
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","point":{"x":"2","y":"3"},"tags":["a","b"]}]'
   dry_run_does_not_create_a_table:
     exec:
       command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --dry_run
+        BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh query --nouse_legacy_sql --dry_run
         "CREATE TABLE e2e.dry_run (id INT64)"
     test: current.exit_code == 0 && current.stdout contains "successfully validated"
   show_table_from_dry_run:
     exec:
-      command: tests/e2e/bq.sh show e2e.dry_run
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh show e2e.dry_run
     test: current.exit_code != 0
   rm_nested_table:
     exec:
-      command: tests/e2e/bq.sh rm -f -t e2e.nested
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh rm -f -t e2e.nested
     test: current.exit_code == 0
   rm_labeled_table:
     exec:
-      command: tests/e2e/bq.sh rm -f -t e2e.labeled
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh rm -f -t e2e.labeled
     test: current.exit_code == 0
   rm_table:
     exec:
-      command: tests/e2e/bq.sh rm -f -t e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh rm -f -t e2e.users
     test: current.exit_code == 0
   ls_tables_after_rm:
     exec:
-      command: tests/e2e/bq.sh ls --format=json e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh ls --format=json e2e
     test: current.exit_code == 0 && !(current.stdout contains "users")
   rm_dataset:
     exec:
-      command: tests/e2e/bq.sh rm -f -d e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh rm -f -d e2e
     test: current.exit_code == 0
   show_missing_dataset:
     exec:
-      command: tests/e2e/bq.sh show e2e
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh show e2e
     test: current.exit_code != 0

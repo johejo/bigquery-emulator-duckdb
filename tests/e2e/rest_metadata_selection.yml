@@ -1,0 +1,163 @@
+desc: tables.get selects schema fields and omits storage statistics in the BASIC metadata view
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/rest-metadata-selection/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  table:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+              description: metadata
+              labels: {env: test}
+              schema:
+                fields:
+                  - {name: user_id, type: INTEGER, mode: REQUIRED, description: key}
+                  - name: profile
+                    type: RECORD
+                    description: person
+                    fields:
+                      - {name: name, type: STRING, description: display}
+                      - name: address
+                        type: RECORD
+                        fields:
+                          - {name: city, type: STRING}
+                          - {name: zip, type: STRING}
+                  - name: items
+                    type: RECORD
+                    mode: REPEATED
+                    fields:
+                      - {name: sku, type: STRING}
+                      - {name: count, type: INTEGER}
+    test: current.res.status == 200
+  basic:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?view=BASIC:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      !("numRows" in current.res.body) && !("numBytes" in current.res.body) &&
+      current.res.body.description == "metadata" && current.res.body.labels.env == "test"
+  selected:
+    req:
+      /bigquery/v2/projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=items.sku,profile.address.city,user_id&view=BASIC:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      !("numRows" in current.res.body) &&
+      current.res.body.schema.fields == [
+        {"name": "user_id", "type": "INTEGER", "mode": "REQUIRED", "description": "key"},
+        {"name": "profile", "type": "RECORD", "mode": "NULLABLE", "description": "person",
+         "fields": [{"name": "address", "type": "RECORD", "mode": "NULLABLE",
+                     "fields": [{"name": "city", "type": "STRING", "mode": "NULLABLE"}]}]},
+        {"name": "items", "type": "RECORD", "mode": "REPEATED",
+         "fields": [{"name": "sku", "type": "STRING", "mode": "NULLABLE"}]}
+      ] && current.res.body.description == "metadata"
+  duplicate_and_parent:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=profile.name,profile,profile.name,USER_ID:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && len(current.res.body.schema.fields) == 2 &&
+      current.res.body.schema.fields[0].name == "user_id" &&
+      len(current.res.body.schema.fields[1].fields) == 2 &&
+      current.res.body.schema.fields[1].fields[0].description == "display" &&
+      current.res.body.numRows == "0"
+  full:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?view=FULL&selectedFields=user_id:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.numRows == "0" &&
+      current.res.body.numBytes == "0" && len(current.res.body.schema.fields) == 1
+  sibling_fields:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=profile.address.zip,profile.name,profile.address.city:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && len(current.res.body.schema.fields) == 1 &&
+      current.res.body.schema.fields[0].fields[0].name == "name" &&
+      current.res.body.schema.fields[0].fields[1].fields == [
+        {"name": "city", "type": "STRING", "mode": "NULLABLE"},
+        {"name": "zip", "type": "STRING", "mode": "NULLABLE"}
+      ]
+  empty_selection:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=:
+        get:
+          body: null
+    test: current.res.status == 200 && len(current.res.body.schema.fields) == 3
+  unknown_field:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=missing:
+        get:
+          body: null
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  unknown_nested_field:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=profile.missing:
+        get:
+          body: null
+    test: current.res.status == 400
+  scalar_subfield:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=user_id.child:
+        get:
+          body: null
+    test: current.res.status == 400
+  empty_component:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=profile.:
+        get:
+          body: null
+    test: current.res.status == 400
+  trailing_comma:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t?selectedFields=user_id,:
+        get:
+          body: null
+    test: current.res.status == 400
+  view:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: v}
+              view: {query: 'SELECT 1 AS id, "name" AS name', useLegacySql: false}
+    test: current.res.status == 200
+  view_selection:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/v?selectedFields=name&view=BASIC:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && len(current.res.body.schema.fields) == 1 &&
+      current.res.body.schema.fields[0].name == "name" &&
+      current.res.body.view.useLegacySql == false && !("numRows" in current.res.body)
+  selection_does_not_mutate:
+    req:
+      /projects/rest-metadata-selection/datasets/ds/tables/t:
+        get:
+          body: null
+    test: current.res.status == 200 && len(current.res.body.schema.fields) == 3
+  cleanup:
+    req:
+      /projects/rest-metadata-selection/datasets/ds?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

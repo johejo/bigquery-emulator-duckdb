@@ -22,8 +22,8 @@ rejected as unsupported.
 
 | Status | Methods |
 | --- | --- |
-| Partial | 11 |
-| Supported | 10 |
+| Partial | 10 |
+| Supported | 11 |
 | Unsupported | 26 |
 
 ## datasets
@@ -33,7 +33,7 @@ rejected as unsupported.
 | [`datasets.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}` | Supported |  |
 | [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name and labels, and location `US`. |
 | [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | Keeps `datasetReference`, `description`, `friendlyName` and `labels`. Every dataset is in the US; other fields are unsupported. Rejected as unsupported: dataset field access, dataset field defaultTableExpirationMs, dataset location EU. |
-| [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Partial | Rejected as unsupported: filter. |
+| [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Supported | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination. |
 | [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Partial | Changes `description`, `friendlyName` and `labels`, as `datasets.insert` keeps them. Ignores the etag. Rejected as unsupported: dataset field defaultTableExpirationMs. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
 | [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Partial | Behaves like `datasets.patch`, except that it replaces the description, friendly name and labels. Rejected as unsupported: dataset field defaultTableExpirationMs. |
@@ -104,7 +104,7 @@ rejected as unsupported.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`tables.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported |  |
-| [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Ignores `selectedFields` and `view`. Returns the reference, schema, description, friendly name, labels, partitioning and clustering, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0. |
+| [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Supports `selectedFields` schema projection, including nested fields, and `view`; `BASIC` omits storage statistics. Returns the reference, schema, description, friendly name, labels, partitioning and clustering, plus the GoogleSQL definition for views. Storage-statistics views include the row count; `numBytes` is always 0. |
 | [`tables.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
 | [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | Keeps `tableReference`, `schema`, GoogleSQL view definitions, `description`, `friendlyName`, `labels`, `timePartitioning` on a column, `rangePartitioning` and `clustering`. Partitions do not expire. Rejected as unsupported: ingestion-time partitioning, table expiration. |
 | [`tables.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported |  |
