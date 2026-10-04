@@ -1,8 +1,10 @@
 #include "src/field_schema.h"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstdint>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -95,37 +97,35 @@ std::optional<int64_t> Int64Member(const json& value, const char* key) {
 }  // namespace
 
 std::optional<FieldType> ParseFieldType(std::string_view name) {
-  for (const TypeName& entry : kTypeNames) {
-    if (EqualsIgnoringCase(entry.name, name)) {
-      return entry.type;
-    }
+  const auto* it = std::ranges::find_if(
+      kTypeNames, [name](const TypeName& entry) { return EqualsIgnoringCase(entry.name, name); });
+  if (it != kTypeNames.end()) {
+    return it->type;
   }
   return std::nullopt;
 }
 
 std::string_view FieldTypeName(FieldType type) {
-  for (const TypeName& entry : kTypeNames) {
-    if (entry.type == type) {
-      return entry.name;
-    }
+  const auto* it = std::ranges::find(kTypeNames, type, &TypeName::type);
+  if (it != kTypeNames.end()) {
+    return it->name;
   }
   return "";
 }
 
 std::optional<FieldMode> ParseFieldMode(std::string_view name) {
-  for (const ModeName& entry : kModeNames) {
-    if (EqualsIgnoringCase(entry.name, name)) {
-      return entry.mode;
-    }
+  const auto* it = std::ranges::find_if(
+      kModeNames, [name](const ModeName& entry) { return EqualsIgnoringCase(entry.name, name); });
+  if (it != kModeNames.end()) {
+    return it->mode;
   }
   return std::nullopt;
 }
 
 std::string_view FieldModeName(FieldMode mode) {
-  for (const ModeName& entry : kModeNames) {
-    if (entry.mode == mode) {
-      return entry.name;
-    }
+  const auto* it = std::ranges::find(kModeNames, mode, &ModeName::mode);
+  if (it != kModeNames.end()) {
+    return it->name;
   }
   return "";
 }
@@ -226,9 +226,7 @@ std::vector<FieldSchema> SchemaFromJson(const json& schema) {
   if (!it->is_array()) {
     throw ApiError::Invalid("Schema fields must be an array");
   }
-  for (const json& field : *it) {
-    fields.push_back(FieldSchemaFromJson(field));
-  }
+  std::ranges::transform(*it, std::back_inserter(fields), FieldSchemaFromJson);
   return fields;
 }
 

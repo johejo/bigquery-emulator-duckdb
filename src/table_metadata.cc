@@ -64,11 +64,8 @@ void MergeLabels(const json& labels, std::map<std::string, std::string>& into) {
 
 // The characters of UTF-8 `text`: its bytes other than continuation bytes.
 size_t CharacterCount(const std::string& text) {
-  size_t count = 0;
-  for (const char c : text) {
-    count += (static_cast<unsigned char>(c) & 0xC0) != 0x80 ? 1 : 0;
-  }
-  return count;
+  return std::ranges::count_if(
+      text, [](char c) { return (static_cast<unsigned char>(c) & 0xC0) != 0x80; });
 }
 
 bool LabelCharacter(char c) {
@@ -81,10 +78,8 @@ std::string LabelTextProblem(const std::string& text) {
   if (CharacterCount(text) > kMaxLabelLength) {
     return "is longer than 63 characters";
   }
-  for (const char c : text) {
-    if (!LabelCharacter(c)) {
-      return "can contain only lowercase letters, numeric characters, underscores and dashes";
-    }
+  if (!std::ranges::all_of(text, LabelCharacter)) {
+    return "can contain only lowercase letters, numeric characters, underscores and dashes";
   }
   return "";
 }
@@ -154,9 +149,8 @@ std::vector<std::string> ParseClustering(const json& value) {
     throw ApiError::Invalid("Field clustering must be an object with an array of fields");
   }
   std::vector<std::string> fields;
-  for (const json& field : value.value("fields", json::array())) {
-    fields.push_back(StringValue(field, "clustering.fields"));
-  }
+  std::ranges::transform(value.value("fields", json::array()), std::back_inserter(fields),
+                         [](const json& field) { return StringValue(field, "clustering.fields"); });
   return fields;
 }
 

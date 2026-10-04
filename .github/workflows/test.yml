@@ -42,10 +42,21 @@ jobs:
           path: ~/.cache/bazel-disk
           key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+      # Cppcheck validates cached analysis against the current inputs; reuse earlier main runs
+      # only when the development shell dependencies match.
+      - name: Restore Cppcheck cache
+        id: cppcheck-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cppcheck
+          key: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-${{ github.sha }}
+          restore-keys: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
       - name: Configure Bazel for CI
         run: echo 'common --config=ci' > .bazelrc.local
       - name: Format check
         run: nix develop --command just fmt-check
+      - name: Cppcheck
+        run: nix develop --command just cppcheck
       - name: Clang-tidy
         run: nix develop --command just tidy
       - name: Bazel tests
@@ -74,3 +85,11 @@ jobs:
             ~/.cache/bazel-repo
             ~/.cache/bazelisk
           key: ${{ steps.repo-cache.outputs.cache-primary-key }}
+      - name: Save Cppcheck cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.cppcheck-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cppcheck
+          key: ${{ steps.cppcheck-cache.outputs.cache-primary-key }}

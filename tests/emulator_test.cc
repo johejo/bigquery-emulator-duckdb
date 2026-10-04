@@ -1,6 +1,8 @@
 #include "src/emulator.h"
 
+#include <algorithm>
 #include <filesystem>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -247,10 +249,10 @@ TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   };
   const auto values = [&] {
     std::vector<std::string> cells;
-    for (const nlohmann::json& row : emulator_.ListTableData(destination, 0, 100).rows) {
-      cells.push_back(row["f"][0]["v"].get<std::string>() + "/" +
-                      row["f"][1]["v"].get<std::string>());
-    }
+    const auto data = emulator_.ListTableData(destination, 0, 100);
+    std::ranges::transform(data.rows, std::back_inserter(cells), [](const nlohmann::json& row) {
+      return row["f"][0]["v"].get<std::string>() + "/" + row["f"][1]["v"].get<std::string>();
+    });
     return cells;
   };
 

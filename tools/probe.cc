@@ -100,7 +100,9 @@ Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql) 
     return {Outcome::kUnsupported, message.substr(kUnsupported.size())};
   }
   // DuckDB's hint to add casts is noise in a report.
-  message = message.substr(0, message.find(". You might need"));
+  if (const auto hint = message.find(". You might need"); hint != std::string::npos) {
+    message.resize(hint);
+  }
   return {Outcome::kFailsOnDuckDb, "`" + sql + "`: " + message};
 }
 

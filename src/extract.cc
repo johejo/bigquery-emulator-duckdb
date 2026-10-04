@@ -1,5 +1,6 @@
 #include "src/extract.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <format>
@@ -226,11 +227,12 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
       contents += EscapeHtml(line) + "\n";
     }
   } else {
-    for (const FieldSchema& field : schema) {
-      if (field.type == FieldType::kRecord || field.mode == FieldMode::kRepeated) {
-        throw ApiError::Invalid("Operation cannot be performed on a nested schema. Field: " +
-                                field.name);
-      }
+    const auto nested = std::ranges::find_if(schema, [](const FieldSchema& field) {
+      return field.type == FieldType::kRecord || field.mode == FieldMode::kRepeated;
+    });
+    if (nested != schema.end()) {
+      throw ApiError::Invalid("Operation cannot be performed on a nested schema. Field: " +
+                              nested->name);
     }
     const std::string& delimiter = options.field_delimiter;
     if (options.print_header) {

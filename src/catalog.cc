@@ -1,5 +1,6 @@
 #include "src/catalog.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -90,22 +91,20 @@ std::vector<std::string> SplitTablePath(absl::Span<const std::string> path) {
   std::vector<std::string> parts;
   for (const std::string& element : path) {
     for (const absl::string_view part : absl::StrSplit(element, '.')) {
+      // Each element expands into several owned strings, rather than a direct copy.
+      // cppcheck-suppress useStlAlgorithm
       parts.emplace_back(part);
     }
   }
   // Domain-scoped project IDs contain dots before the colon. Those dots belong to the
   // project, even when GoogleSQL passes the entire backtick-quoted path as one element.
-  for (size_t i = 0; i < parts.size(); ++i) {
-    if (parts[i].find(':') != std::string::npos) {
-      if (i > 0) {
-        const auto project_end =
-            std::next(parts.begin(), static_cast<std::vector<std::string>::difference_type>(i + 1));
-        const std::string project = absl::StrJoin(parts.begin(), project_end, ".");
-        parts.erase(parts.begin(), project_end);
-        parts.insert(parts.begin(), project);
-      }
-      break;
-    }
+  const auto project_part = std::ranges::find_if(
+      parts, [](const std::string& part) { return part.find(':') != std::string::npos; });
+  if (project_part != parts.end() && project_part != parts.begin()) {
+    const auto project_end = std::next(project_part);
+    const std::string project = absl::StrJoin(parts.begin(), project_end, ".");
+    parts.erase(parts.begin(), project_end);
+    parts.insert(parts.begin(), project);
   }
   return parts;
 }
@@ -122,10 +121,8 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
   if (parts.size() != 3) {
     return {};
   }
-  for (const std::string& part : parts) {
-    if (part.empty()) {
-      return {};
-    }
+  if (std::ranges::any_of(parts, [](const std::string& part) { return part.empty(); })) {
+    return {};
   }
   return parts;
 }

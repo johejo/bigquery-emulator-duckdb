@@ -1,7 +1,9 @@
 #include "googlesql/public/functions/json.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -553,9 +555,9 @@ void JsonExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
                   return std::nullopt;
                 }
                 std::vector<std::string> texts;
-                for (const googlesql::JSONValueConstRef element : *elements) {
-                  texts.push_back(element.ToString());
-                }
+                std::ranges::transform(
+                    *elements, std::back_inserter(texts),
+                    [](googlesql::JSONValueConstRef element) { return element.ToString(); });
                 return texts;
               } else {
                 return (*evaluator)->ExtractStringArray(json);

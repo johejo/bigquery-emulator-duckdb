@@ -1,5 +1,6 @@
 #include "src/backend.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -326,9 +327,8 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
       const bool negative = (static_cast<unsigned char>(bytes[0]) & 0x80) == 0;
       bytes.erase(0, 3);
       if (negative) {
-        for (char& byte : bytes) {
-          byte = static_cast<char>(~byte);
-        }
+        std::ranges::transform(bytes, bytes.begin(),
+                               [](char byte) { return static_cast<char>(~byte); });
       }
       return Value(
           duckdb_create_bignum({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size(), negative}));

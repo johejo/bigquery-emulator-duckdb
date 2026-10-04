@@ -1,5 +1,7 @@
 #include "src/catalog.h"
 
+#include <algorithm>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <stdexcept>
@@ -216,10 +218,11 @@ class BigQueryCatalogTest : public ::testing::Test {
     const AnalyzerResult result = Analyze(sql, settings);
     const auto* query = result.statement().GetAs<googlesql::ResolvedQueryStmt>();
     std::vector<std::string> columns;
-    for (const auto& column : query->output_column_list()) {
-      columns.push_back(column->name() + " " +
-                        column->column().type()->ShortTypeName(googlesql::PRODUCT_EXTERNAL));
-    }
+    std::ranges::transform(
+        query->output_column_list(), std::back_inserter(columns), [](const auto& column) {
+          return column->name() + " " +
+                 column->column().type()->ShortTypeName(googlesql::PRODUCT_EXTERNAL);
+        });
     return columns;
   }
 

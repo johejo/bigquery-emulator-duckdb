@@ -4,7 +4,8 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # Bazel output symlinks and worktrees under .claude.
 _git_files := "git ls-files -z --cached --others --exclude-standard --"
 _bazel_files := _git_files + " ':(glob)**/BUILD' ':(glob)**/BUILD.bazel' ':(glob)**/*.bzl' ':(glob)**/MODULE.bazel'"
-_cpp_files := _git_files + " ':(glob)src/**/*.cc' ':(glob)src/**/*.h' ':(glob)tests/**/*.cc' ':(glob)tests/**/*.h' ':(glob)tools/**/*.cc' ':(glob)tools/**/*.h'"
+_cpp_sources := _git_files + " ':(glob)src/**/*.cc' ':(glob)tests/**/*.cc' ':(glob)tools/**/*.cc'"
+_cpp_files := _cpp_sources + " ':(glob)src/**/*.h' ':(glob)tests/**/*.h' ':(glob)tools/**/*.h'"
 
 fmt:
     {{_bazel_files}} | xargs -0 buildifier
@@ -21,6 +22,17 @@ refresh-compile-commands:
 tidy:
     bazelisk build --config=clang-tidy //...
 
+# Supplement clang-tidy with local checks. Dependency headers are deliberately
+# omitted: Cppcheck cannot reliably parse all of them, so whole-program unused
+# function checks would produce false positives.
+cppcheck *args:
+    mkdir -p .cache/cppcheck
+    {{_cpp_sources}} | tr '\0' '\n' | \
+        cppcheck --quiet -j "$(nproc)" --file-list=- --cppcheck-build-dir=.cache/cppcheck \
+            --std=c++20 -I . --enable=warning,style,performance,portability \
+            --library=googletest --inline-suppr --error-exitcode=1 \
+            --suppressions-list=.cppcheck-suppressions {{args}}
+
 # The DuckDB CLI in the dev shell and the libraries linked into the binary come from the same
 # release.
 duckdb-version-check:
@@ -31,7 +43,7 @@ duckdb-version-check:
         exit 1; \
     fi
 
-lint: fmt-check duckdb-version-check tidy
+lint: fmt-check duckdb-version-check cppcheck tidy
 
 test:
     bazelisk test //...

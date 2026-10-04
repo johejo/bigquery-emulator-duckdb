@@ -43,6 +43,7 @@
                   # the rules_python interpreter.
                   python3
                   runn
+                  cppcheck
                 ]
                 # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.
                 ++ lib.optionals stdenv.hostPlatform.isLinux [
