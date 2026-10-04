@@ -497,9 +497,10 @@ json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPa
                    {"totalRows", std::to_string(total_rows)},
                    {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)}};
   if (!selection.all) {
-    for (auto& row : response["rows"]) {
-      row = ProjectRow(result.schema, selection, row);
-    }
+    json& rows = response["rows"];
+    std::ranges::transform(rows, rows.begin(), [&](const json& row) {
+      return ProjectRow(result.schema, selection, row);
+    });
   }
   if (page.start_index + size < total_rows) {
     response["pageToken"] = std::to_string(page.start_index + size);

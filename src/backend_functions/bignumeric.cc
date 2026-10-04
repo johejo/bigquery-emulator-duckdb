@@ -1,5 +1,6 @@
 #include "src/bignumeric.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -145,11 +146,9 @@ void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
             !status.ok()) {
           return status;
         }
-        std::vector<std::optional<std::string>> units;
-        units.reserve(values.size());
-        for (const BigNumericValue& value : values) {
-          units.emplace_back(BigNumericUnits(value));
-        }
+        std::vector<std::optional<std::string>> units(values.size());
+        std::ranges::transform(values, units.begin(),
+                               [](const BigNumericValue& value) { return BigNumericUnits(value); });
         return units;
       });
 }
