@@ -11,7 +11,37 @@ steps:
           body:
             application/json: {query: SELECT * FROM nope}
     test: |
-      current.res.status == 200 && current.res.body.errors[0].reason == "invalidQuery"
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalidQuery" &&
+      current.res.body.error.status == "INVALID_ARGUMENT"
+  # A query that fails while it runs fails jobs.query and jobs.getQueryResults too; its job
+  # records the error.
+  runtime_error_query:
+    req:
+      /bigquery/v2/projects/rest-query/queries:
+        post:
+          body:
+            application/json: {query: "SELECT ERROR('boom')"}
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalidQuery" &&
+      current.res.body.error.message contains 'boom'
+  runtime_error_job:
+    req:
+      /bigquery/v2/projects/rest-query/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: boom}
+              configuration: {query: {query: "SELECT ERROR('boom')"}}
+    test: |
+      current.res.status == 200 && current.res.body.status.errorResult.reason == "invalidQuery"
+  runtime_error_results:
+    req:
+      /bigquery/v2/projects/rest-query/queries/boom:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalidQuery" &&
+      current.res.body.error.message contains 'boom'
   legacy_sql_query:
     req:
       /bigquery/v2/projects/rest-query/queries:

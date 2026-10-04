@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -541,5 +542,23 @@ func TestViewLifecycle(t *testing.T) {
 	}
 	if _, err := view.Metadata(ctx); err == nil {
 		t.Fatal("deleted view still exists")
+	}
+}
+
+// A query that fails while it runs is an error from Read, whether the client gets its results
+// from jobs.query or from jobs.getQueryResults, rather than an empty result.
+func TestQueryRuntimeError(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	query := client.Query("SELECT ERROR('boom')")
+	if _, err := query.Read(ctx); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("Query.Read: got error %v, want boom", err)
+	}
+	job, err := query.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, err := job.Read(ctx); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("Job.Read: got error %v, want boom", err)
 	}
 }

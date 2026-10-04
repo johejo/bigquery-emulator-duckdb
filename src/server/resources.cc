@@ -197,16 +197,17 @@ json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool
   return rows;
 }
 
-// Fills the result fields shared by jobs.query and jobs.getQueryResults responses.
+// Fills the result fields shared by jobs.query and jobs.getQueryResults responses. A failed job
+// fails the request with its error, as BigQuery does; a response's `errors` would go unnoticed
+// by clients that only read its rows.
 void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
+  if (job.error.has_value()) {
+    throw ApiError(*job.error);
+  }
   response["jobReference"] = JobReference(job);
   response["jobComplete"] = true;
   response["totalBytesProcessed"] = "0";
   response["cacheHit"] = false;
-  if (job.error.has_value()) {
-    response["errors"] = json::array({ErrorProto(*job.error)});
-    return;
-  }
   // Job sets exactly one of `result` and `error`, but nothing in the type system says so.
   if (!job.result.has_value()) {
     throw ApiError::Internal("Job has neither a result nor an error");
