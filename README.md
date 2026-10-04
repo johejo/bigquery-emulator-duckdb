@@ -115,6 +115,12 @@ These differences are deliberate exceptions, kept for convenience:
 
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
   SQL. Legacy SQL itself is unsupported.
+- `formatOptions.timestampOutputFormat` of `jobs.getQueryResults` and `tabledata.list` is ignored;
+  timestamps are encoded as above.
+- The `fields` query parameter is ignored, so responses carry every field rather than the
+  partial response asked for. Clients such as the Go client send it on every `jobs.get`.
+- `updateMode` of `datasets.patch` and `datasets.update` is ignored; they change the metadata
+  that the emulator keeps, since it keeps no access controls.
 
 ## Development
 

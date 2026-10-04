@@ -3,6 +3,7 @@
 // Shared by the server's sources; not part of its interface, which is src/server.h.
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -20,6 +21,37 @@
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {
+
+// routes.cc: the methods of the discovery document, which the server routes requests by.
+
+// A query parameter of a method, as the discovery document describes it.
+struct QueryParameter {
+  std::string type;    // "string", "integer" or "boolean"
+  std::string format;  // such as "int32", "uint32" or "uint64"; empty for any value of the type
+  std::vector<std::string> values;  // the values an enum takes; empty for any value
+};
+
+struct ApiMethod {
+  std::string http_method;
+  // The cpp-httplib patterns of the method's path below the API prefix, such as
+  // "/projects/:projectId/jobs", and of its media upload paths below the root.
+  std::string path;
+  std::vector<std::string> upload_paths;
+  // The query parameters it takes, the API-wide ones such as prettyPrint included.
+  std::map<std::string, QueryParameter, std::less<>> parameters;
+};
+
+// The parsed discovery document.
+const nlohmann::json& Discovery();
+// The discovery document's method `id`, such as "bigquery.tables.get". Throws std::logic_error
+// when the document lacks it or cpp-httplib cannot match its path.
+ApiMethod FindApiMethod(std::string_view id);
+// Rejects a request with a query parameter `method` does not take or a value its type does not
+// allow, as BigQuery does, and with a non-empty one the emulator does not handle as unsupported.
+// The handler of `method` handles the parameters `accepted`, reading or deliberately ignoring
+// them; every method handles some of the API-wide ones.
+void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string>& accepted,
+                          const httplib::Request& request);
 
 // requests.cc: HTTP requests to the emulator's request structs. Every malformed request is
 // rejected with ApiError::Invalid.
@@ -96,8 +128,6 @@ using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractR
 
 std::string Param(const httplib::Request& request, const char* name);
 bool QueryParamBool(const httplib::Request& request, const char* name);
-// Rejects a non-empty query parameter `name` that would change the response but is not emulated.
-void RejectQueryParam(const httplib::Request& request, const char* name);
 DatasetReference DatasetFromPath(const httplib::Request& request);
 TableReference TableFromPath(const httplib::Request& request);
 

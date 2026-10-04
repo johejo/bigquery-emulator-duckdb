@@ -82,6 +82,47 @@ steps:
         get:
           body: null
     test: current.res.status == 400
+  # Query parameters are checked against the discovery document.
+  list_tables_with_unknown_parameter:
+    req:
+      /projects/rest-resources/datasets/ds/tables?maxResult=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains "Unknown name \"maxResult\""
+  list_tables_with_page_size_beyond_uint32:
+    req:
+      /projects/rest-resources/datasets/ds/tables?maxResults=4294967296:
+        get:
+          body: null
+    test: current.res.status == 400
+  list_tables_with_api_wide_parameters:
+    req:
+      /projects/rest-resources/datasets/ds/tables?alt=json&prettyPrint=false&fields=tables:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.tables[0].id == "rest-resources:ds.t"
+  list_tables_as_media:
+    req:
+      /projects/rest-resources/datasets/ds/tables?alt=media:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "The emulator does not support alt=media"
+  get_table_with_invalid_view:
+    req:
+      /projects/rest-resources/datasets/ds/tables/t?view=NONE:
+        get:
+          body: null
+    test: current.res.status == 400
+  list_datasets_with_invalid_boolean:
+    req:
+      /projects/rest-resources/datasets?all=yes:
+        get:
+          body: null
+    test: current.res.status == 400
 
   insert_all:
     req:

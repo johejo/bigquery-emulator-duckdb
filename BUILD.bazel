@@ -414,6 +414,7 @@ cc_library(
         "src/server/internal.h",
         "src/server/requests.cc",
         "src/server/resources.cc",
+        "src/server/routes.cc",
     ],
     hdrs = ["src/server.h"],
     copts = ["-std=c++20"],
