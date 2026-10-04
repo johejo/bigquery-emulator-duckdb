@@ -15,7 +15,7 @@ namespace bigquery_emulator_duckdb {
 // metadata must both be skipped, which is how IF NOT EXISTS and IF EXISTS keep what is there.
 struct DdlWrite {
   std::vector<std::string> metadata_statements;
-  std::string skip_query;
+  std::string skip_query = {};
 };
 
 // DuckDB cannot comment on a schema, so the emulator records each dataset's DatasetMetadata as

@@ -21,10 +21,10 @@ namespace bigquery_emulator_duckdb {
 struct AnalyzerSettings {
   // Used to complete table paths that name no project or dataset.
   std::string default_project;
-  std::string default_dataset;
+  std::string default_dataset = {};
   // The types of the query parameters; a statement uses either named or positional ones.
-  std::vector<std::pair<std::string, const googlesql::Type*>> named_parameters;
-  std::vector<const googlesql::Type*> positional_parameters;
+  std::vector<std::pair<std::string, const googlesql::Type*>> named_parameters = {};
+  std::vector<const googlesql::Type*> positional_parameters = {};
 };
 
 // The result column for field `index` (0-based) of a query returning a value table of structs,

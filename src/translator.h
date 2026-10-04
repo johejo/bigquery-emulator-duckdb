@@ -27,7 +27,7 @@ struct DefaultDataset {
 struct ViewDefinition {
   TableReference table;
   std::string query;
-  std::vector<FieldSchema> schema;
+  std::vector<FieldSchema> schema = {};
   TableMetadata metadata;
   bool if_not_exists = false;
 };
@@ -37,7 +37,7 @@ struct ViewDefinition {
 // the description, friendly name and labels its OPTIONS give.
 struct TableDefinition {
   TableReference table;
-  std::vector<FieldSchema> schema;
+  std::vector<FieldSchema> schema = {};
   TableMetadata metadata;
   bool if_not_exists = false;
 };

@@ -30,7 +30,7 @@ constexpr char kEtag[] = "";
 // Indexes refer to the original schema, so projecting keeps its order and spelling.
 struct SchemaSelection {
   bool all = false;
-  std::map<size_t, SchemaSelection> fields;
+  std::map<size_t, SchemaSelection> fields = {};
 };
 
 void SelectSchemaField(const std::vector<FieldSchema>& schema, std::string_view path,

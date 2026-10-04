@@ -43,16 +43,16 @@ std::string_view FieldModeName(FieldMode mode);
 
 // A column described with BigQuery's TableFieldSchema vocabulary.
 struct FieldSchema {
-  std::string name;
+  std::string name = {};
   FieldType type = FieldType::kString;
   FieldMode mode = FieldMode::kNullable;
-  std::vector<FieldSchema> fields;  // Populated for RECORD.
-  std::string description;
-  std::optional<int64_t> max_length;  // STRING and BYTES.
-  std::optional<int64_t> precision;   // NUMERIC and BIGNUMERIC.
-  std::optional<int64_t> scale;       // NUMERIC and BIGNUMERIC.
-  std::string default_value_expression;
-  std::vector<std::string> policy_tags;  // policyTags.names.
+  std::vector<FieldSchema> fields = {};  // Populated for RECORD.
+  std::string description = {};
+  std::optional<int64_t> max_length = {};  // STRING and BYTES.
+  std::optional<int64_t> precision = {};   // NUMERIC and BIGNUMERIC.
+  std::optional<int64_t> scale = {};       // NUMERIC and BIGNUMERIC.
+  std::string default_value_expression = {};
+  std::vector<std::string> policy_tags = {};  // policyTags.names.
 
   nlohmann::json ToJson() const;
 };

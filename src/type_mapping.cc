@@ -111,7 +111,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     const int children = type->IsArray()    ? 1
                          : type->IsStruct() ? type->AsStruct()->num_fields()
                                             : -1;
-    if (!parameters->IsTopLevelEmpty() || parameters->num_children() != children) {
+    if (!parameters->IsTopLevelEmpty() ||
+        std::cmp_not_equal(parameters->num_children(), children)) {
       return std::nullopt;
     }
   }

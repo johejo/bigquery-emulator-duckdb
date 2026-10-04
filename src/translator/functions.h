@@ -24,9 +24,9 @@ struct FunctionArgument {
   std::string sql;
   googlesql::TypeKind type = googlesql::TYPE_UNKNOWN;
   // The date part, such as "day", when the argument is one.
-  std::optional<std::string> date_part;
+  std::optional<std::string> date_part = {};
   // The rounding mode, such as "ROUND_HALF_EVEN", when the argument is one.
-  std::optional<std::string> rounding_mode;
+  std::optional<std::string> rounding_mode = {};
 };
 
 // The SQL that raises the error whose message is the DuckDB string expression `message`, or NULL
@@ -40,7 +40,7 @@ struct ScalarCall {
   const googlesql::ResolvedFunctionCall& resolved;
   // The function name in upper case, as the registry has it.
   std::string_view name;
-  std::vector<FunctionArgument> arguments;
+  std::vector<FunctionArgument> arguments = {};
   bool safe = false;
 
   std::string Raise(std::string_view message) const { return translator::Raise(message, safe); }
@@ -91,11 +91,11 @@ struct Arity {
 struct Condition {
   std::size_t argument;
   // Any of these types; empty accepts any type.
-  std::vector<googlesql::TypeKind> types;
+  std::vector<googlesql::TypeKind> types = {};
   // Any of these date parts; empty accepts any argument.
-  std::vector<std::string_view> date_parts;
+  std::vector<std::string_view> date_parts = {};
   // This rounding mode.
-  std::optional<std::string_view> rounding_mode;
+  std::optional<std::string_view> rounding_mode = {};
 };
 
 // A DuckDB spelling of a BigQuery function. In the spelling, $n is argument n, #n argument n,
