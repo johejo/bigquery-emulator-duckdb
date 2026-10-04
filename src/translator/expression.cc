@@ -11,26 +11,57 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-bool IsDecimal(const googlesql::Type* type) {
-  return type->IsNumericType() || type->IsBigNumericType();
-}
-
-// Whether a cast from `from` to `to` turns a NUMERIC or BIGNUMERIC into a STRING, at any depth.
-bool CastsDecimalToString(const googlesql::Type* from, const googlesql::Type* to) {
+// Whether a cast from `from` to `to` turns a NUMERIC into a STRING, at any depth.
+bool CastsNumericToString(const googlesql::Type* from, const googlesql::Type* to) {
   if (to->IsString()) {
-    return IsDecimal(from);
+    return from->IsNumericType();
   }
   if (from->IsArray() && to->IsArray()) {
-    return CastsDecimalToString(from->AsArray()->element_type(), to->AsArray()->element_type());
+    return CastsNumericToString(from->AsArray()->element_type(), to->AsArray()->element_type());
   }
   if (from->IsStruct() && to->IsStruct()) {
     for (int i = 0; i < from->AsStruct()->num_fields() && i < to->AsStruct()->num_fields(); ++i) {
-      if (CastsDecimalToString(from->AsStruct()->field(i).type, to->AsStruct()->field(i).type)) {
+      if (CastsNumericToString(from->AsStruct()->field(i).type, to->AsStruct()->field(i).type)) {
         return true;
       }
     }
   }
   return false;
+}
+
+// A cast of `sql` from `from` to `to`, one of which is BIGNUMERIC, by GoogleSQL's conversions,
+// which make their errors NULL under SAFE_CAST. DuckDB would cast a BIGNUM through DOUBLE or
+// truncate a string. Nullopt for a cast of anything but a scalar.
+std::optional<std::string> BigNumericCast(const googlesql::Type* from, const googlesql::Type* to,
+                                          const std::string& sql, bool safe) {
+  const std::string flag = safe ? "true" : "false";
+  if (to->IsBigNumericType()) {
+    if (from->IsString() || from->IsInt64() || from->IsNumericType()) {
+      return "CAST(bq_bignumeric_from_string(CAST(" + sql + " AS VARCHAR), " + flag +
+             ") AS BIGNUM)";
+    }
+    if (from->IsDouble()) {
+      return "CAST(bq_bignumeric_from_double(" + sql + ", " + flag + ") AS BIGNUM)";
+    }
+    return std::nullopt;
+  }
+  if (!from->IsBigNumericType()) {
+    return std::nullopt;
+  }
+  const std::string units = "CAST(" + sql + " AS VARCHAR)";
+  if (to->IsString()) {
+    return "bq_bignumeric_to_string(" + units + ")";
+  }
+  if (to->IsNumericType()) {
+    return "CAST(bq_bignumeric_to_numeric(" + units + ", " + flag + ") AS DECIMAL(38,9))";
+  }
+  if (to->IsInt64()) {
+    return "bq_bignumeric_to_int64(" + units + ", " + flag + ")";
+  }
+  if (to->IsDouble()) {
+    return "bq_bignumeric_to_double(" + units + ", " + flag + ")";
+  }
+  return std::nullopt;
 }
 
 std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subquery,
@@ -144,20 +175,24 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     if (!argument) {
       return std::nullopt;
     }
+    const googlesql::Type* from = cast->expr()->type();
+    if (!from->Equals(cast->type()) && (HasBigNumeric(from) || HasBigNumeric(cast->type()))) {
+      const auto sql = BigNumericCast(from, cast->type(), *argument, cast->return_null_on_error());
+      return sql ? sql : Unsupported(scope, "CAST of a nested BIGNUMERIC");
+    }
     // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Such a cast
     // nested deeper than an array's elements is unsupported.
-    const googlesql::Type* from = cast->expr()->type();
-    if (cast->type()->IsString() && IsDecimal(from)) {
+    if (cast->type()->IsString() && from->IsNumericType()) {
       return "bq_decimal_string(CAST(" + *argument + " AS VARCHAR))";
     }
     if (cast->type()->IsArray() && cast->type()->AsArray()->element_type()->IsString() &&
-        IsDecimal(from->AsArray()->element_type())) {
+        from->IsArray() && from->AsArray()->element_type()->IsNumericType()) {
       const std::string element = scope.context.FreshName("_e");
       return "list_transform(" + *argument + ", " + element + " -> bq_decimal_string(CAST(" +
              element + " AS VARCHAR)))";
     }
-    if (CastsDecimalToString(from, cast->type())) {
-      return Unsupported(scope, "CAST of a nested NUMERIC or BIGNUMERIC to STRING");
+    if (CastsNumericToString(from, cast->type())) {
+      return Unsupported(scope, "CAST of a nested NUMERIC to STRING");
     }
     return std::string(cast->return_null_on_error() ? "TRY_CAST(" : "CAST(") + *argument + " AS " +
            *type + ")";

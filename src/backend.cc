@@ -11,6 +11,7 @@
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_functions.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 
 namespace bigquery_emulator_duckdb {
@@ -50,12 +51,13 @@ FieldType ToBigQueryType(duckdb_logical_type type) {
       return FieldType::kInteger;
     case DUCKDB_TYPE_HUGEINT:
     case DUCKDB_TYPE_UHUGEINT:
+    case DUCKDB_TYPE_BIGNUM:
       return FieldType::kBigNumeric;
     case DUCKDB_TYPE_FLOAT:
     case DUCKDB_TYPE_DOUBLE:
       return FieldType::kFloat;
     case DUCKDB_TYPE_DECIMAL:
-      return duckdb_decimal_scale(type) <= 9 ? FieldType::kNumeric : FieldType::kBigNumeric;
+      return FieldType::kNumeric;
     case DUCKDB_TYPE_VARCHAR:
     case DUCKDB_TYPE_UUID:
       return FieldType::kString;
@@ -313,6 +315,24 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
           VectorValue(duckdb_struct_vector_get_child(vector, tag + 1), member_type.get(), row);
       return Value(duckdb_create_union_value(type, tag, member.get()));
     }
+    case DUCKDB_TYPE_BIGNUM: {
+      // The C API has no BIGNUM vector accessor. DuckDB stores a BIGNUM as a three byte header,
+      // whose top bit is set for a value that is not negative, then the big endian bytes of its
+      // absolute value, with every bit inverted for a negative value.
+      std::string bytes = VectorString(vector, row);
+      if (bytes.size() < 3) {
+        throw BackendError("DuckDB returned an invalid BIGNUM");
+      }
+      const bool negative = (static_cast<unsigned char>(bytes[0]) & 0x80) == 0;
+      bytes.erase(0, 3);
+      if (negative) {
+        for (char& byte : bytes) {
+          byte = static_cast<char>(~byte);
+        }
+      }
+      return Value(
+          duckdb_create_bignum({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size(), negative}));
+    }
     case DUCKDB_TYPE_BIT: {
       std::string bytes = VectorString(vector, row);
       return Value(duckdb_create_bit({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size()}));
@@ -385,6 +405,15 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
         text[10] = 'T';
       }
       value = std::move(text);
+      break;
+    }
+    case DUCKDB_TYPE_BIGNUM: {
+      const auto number = BigNumericFromUnits(ValueString(VectorValue(vector, type, row).get()));
+      if (!number.ok()) {
+        throw BackendError("DuckDB returned an invalid BIGNUMERIC: " +
+                           std::string(number.status().message()));
+      }
+      value = number->ToString();
       break;
     }
     case DUCKDB_TYPE_DECIMAL: {

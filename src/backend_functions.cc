@@ -62,6 +62,7 @@ void RegisterBackendFunctions(duckdb_database database) {
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
   }
+  backend_functions::RegisterBigNumericFunctions(connection.get());
   backend_functions::RegisterMathFunctions(connection.get());
   backend_functions::RegisterStringFunctions(connection.get());
   backend_functions::RegisterDatetimeFunctions(connection.get());

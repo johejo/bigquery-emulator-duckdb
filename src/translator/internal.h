@@ -28,6 +28,7 @@ class ResolvedAggregateScan;
 class ResolvedAnalyticScan;
 class ResolvedExpr;
 class ResolvedFunctionCall;
+class ResolvedFunctionCallBase;
 class ResolvedOrderByItem;
 class ResolvedInsertStmt;
 class ResolvedMergeStmt;
@@ -131,6 +132,12 @@ std::optional<std::string> OrderItems(
     const Scope& scope, const Columns& columns);
 
 // Scalar functions and operators, in function.cc.
+
+// Whether `type` is BIGNUMERIC or holds one, at any depth.
+bool HasBigNumeric(const googlesql::Type* type);
+
+// Whether the result or an argument of `call` has a BIGNUMERIC, at any depth.
+bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call);
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns);

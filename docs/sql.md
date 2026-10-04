@@ -84,7 +84,7 @@ the probe's own notes name what it rejected.
 | --- | --- | --- |
 | `CREATE TABLE` | Supported |  |
 | Column types with parameters | Supported | `STRING(L)` and `BYTES(L)` lose their length |
-| `BIGNUMERIC` columns | Partial | `BIGNUMERIC` is `DECIMAL(38, 19)`; column type BIGNUMERIC |
+| `BIGNUMERIC` columns | Partial | `BIGNUMERIC(P, S)` is unsupported; column type BIGNUMERIC |
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported | NOT NULL in CREATE TABLE AS SELECT |

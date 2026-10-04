@@ -18,6 +18,28 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
+  # A BIGNUMERIC keeps its 38 fractional digits, which reading it as a DuckDB number would lose.
+  load_bignumeric:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=CSV
+        e2e_load.bignumeric tests/e2e/data/bignumeric.csv id:INTEGER,n:BIGNUMERIC
+    test: current.exit_code == 0
+  bignumeric_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.bignumeric
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","n":"578960446186580977117854925043439539266.34992332820282019728792003956564819967"},{"id":"2","n":"-0.00000000000000000000000000000000000001"},{"id":"3","n":null}]'
+  # JSON numbers would be read as FLOAT64.
+  load_bignumeric_json:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.bignumeric_json gs://load-fixtures/nested/people.jsonl id:BIGNUMERIC,name:STRING
+    test: |
+      current.exit_code != 0 && current.stdout contains 'BIGNUMERIC' &&
+      current.stdout contains 'not supported'
   load_gcs:
     exec:
       command: >-

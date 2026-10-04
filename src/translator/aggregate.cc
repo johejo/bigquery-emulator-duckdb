@@ -39,6 +39,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       (entry->implementation == Implementation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
+  if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
+    return Unsupported(scope, "function " + name + " with BIGNUMERIC");
+  }
   const googlesql::TypeKind first = call.argument_list().empty()
                                         ? googlesql::TYPE_UNKNOWN
                                         : call.argument_list(0)->type()->kind();

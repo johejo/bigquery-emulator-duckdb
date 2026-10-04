@@ -1,6 +1,8 @@
 #include "src/backend.h"
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -155,7 +157,37 @@ TEST(BackendTest, PreservesBinaryStringsAndDecimalPrecision) {
   EXPECT_EQ(result.rows[0]["f"][7]["v"], "-1234567890.123456");
   EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.123456789");
   EXPECT_EQ(result.rows[0]["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
-  EXPECT_EQ(result.schema[8].type, FieldType::kBigNumeric);
+  EXPECT_EQ(result.schema[8].type, FieldType::kNumeric);
+}
+
+// A BIGNUM is the integer number of units of 10^-38 of a BIGNUMERIC, over its whole range. Its
+// bytes are decoded by hand, so the boundaries of a byte and negative values matter.
+TEST(BackendTest, ReadsBigNumAsBigNumeric) {
+  Backend backend;
+  const QueryResult result = backend.Execute(R"(
+      SELECT x::BIGNUM AS n FROM (VALUES ('0'), ('1'), ('-1'), ('255'), ('-256'),
+          ('100000000000000000000000000000000000000'),
+          ('57896044618658097711785492504343953926634992332820282019728792003956564819967'),
+          ('-57896044618658097711785492504343953926634992332820282019728792003956564819968'))
+      AS t(x))");
+  EXPECT_EQ(result.schema[0].type, FieldType::kBigNumeric);
+  ASSERT_EQ(result.rows.size(), 8);
+  const std::vector<std::string> expected = {
+      "0",
+      "0.00000000000000000000000000000000000001",
+      "-0.00000000000000000000000000000000000001",
+      "0.00000000000000000000000000000000000255",
+      "-0.00000000000000000000000000000000000256",
+      "1",
+      "578960446186580977117854925043439539266.34992332820282019728792003956564819967",
+      "-578960446186580977117854925043439539266.34992332820282019728792003956564819968"};
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(result.rows[i]["f"][0]["v"], expected[i]) << i;
+  }
+  EXPECT_THROW(backend.Execute("SELECT "
+                               "'578960446186580977117854925043439539266349923328202820197287920039"
+                               "56564819968'::BIGNUM"),
+               BackendError);
 }
 
 TEST(BackendTest, FormatsOtherDuckDBScalarTypes) {

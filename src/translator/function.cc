@@ -1,5 +1,6 @@
 #include "googlesql/public/function.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -404,6 +405,24 @@ std::optional<std::string> Extremum(const ScalarCall& call) {
   return "list_transform([[" + Join(Sqls(call), ", ") + "]], _ext -> " + body + ")[1]";
 }
 
+bool HasBigNumeric(const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return HasBigNumeric(type->AsArray()->element_type());
+  }
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(), [](const googlesql::StructField& field) {
+      return HasBigNumeric(field.type);
+    });
+  }
+  return type->IsBigNumericType();
+}
+
+bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
+  return HasBigNumeric(call.type()) ||
+         std::ranges::any_of(call.argument_list(),
+                             [](const auto& argument) { return HasBigNumeric(argument->type()); });
+}
+
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns) {
   const std::string name = ToUpperAscii(call.function()->Name());
@@ -425,6 +444,9 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE || alias;
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
     return Unsupported(scope, "function " + name + " error mode");
+  }
+  if (!SupportsBigNumeric(function) && InvolvesBigNumeric(call)) {
+    return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
   const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;

@@ -101,7 +101,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
   if (parameters != nullptr) {
     if (parameters->IsNumericTypeParameters()) {
       const auto& numeric = parameters->numeric_type_parameters();
-      if (numeric.is_max_precision() || numeric.precision() > 38) {
+      // A BIGNUM keeps no precision or scale to round to.
+      if (type->IsBigNumericType() || numeric.is_max_precision() || numeric.precision() > 38) {
         return std::nullopt;
       }
       return "DECIMAL(" + std::to_string(numeric.precision()) + "," +
@@ -139,8 +140,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     case googlesql::TYPE_NUMERIC:
       return "DECIMAL(38,9)";
     case googlesql::TYPE_BIGNUMERIC:
-      // Narrower than BIGNUMERIC, but the widest DuckDB decimal; out of range values fail.
-      return "DECIMAL(38,19)";
+      // The integer number of units of 10^-38; see src/bignumeric.h.
+      return "BIGNUM";
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_GEOGRAPHY:

@@ -53,9 +53,11 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":bignumeric",
         ":duckdb_sql",
         ":field_schema",
         ":type_mapping",
+        "@googlesql//googlesql/public:numeric_value",
         "@nlohmann_json//:json",
     ],
 )
@@ -95,6 +97,16 @@ cc_library(
         ":field_schema",
         ":references",
         "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "bignumeric",
+    srcs = ["src/bignumeric.cc"],
+    hdrs = ["src/bignumeric.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "@googlesql//googlesql/public:numeric_value",
     ],
 )
 
@@ -194,6 +206,7 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
+        ":bignumeric",
         ":catalog",
         ":duckdb_sql",
         ":field_schema",
@@ -217,6 +230,7 @@ cc_library(
         "src/backend.cc",
         "src/backend_functions.cc",
         "src/backend_functions.h",
+        "src/backend_functions/bignumeric.cc",
         "src/backend_functions/datetime.cc",
         "src/backend_functions/internal.h",
         "src/backend_functions/json.cc",
@@ -227,6 +241,7 @@ cc_library(
     hdrs = ["src/backend.h"],
     copts = ["-std=c++20"],
     deps = [
+        ":bignumeric",
         ":catalog",
         ":field_schema",
         "//third_party/duckdb",
@@ -236,6 +251,9 @@ cc_library(
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/functions:arithmetics",
+        "@googlesql//googlesql/public/functions:convert",
+        "@googlesql//googlesql/public/functions:convert_string",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@googlesql//googlesql/public/functions:distance",
         "@googlesql//googlesql/public/functions:hash",
@@ -275,10 +293,12 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":bignumeric",
         ":duckdb_sql",
         ":field_schema",
         ":references",
         ":type_mapping",
+        "@googlesql//googlesql/public:numeric_value",
         "@nlohmann_json//:json",
     ],
 )
@@ -427,6 +447,7 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
+        ":bignumeric",
         ":catalog",
         ":emulator",
         "@googlesql//googlesql/public:type",
@@ -471,6 +492,7 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
+        ":bignumeric",
         ":catalog",
         ":field_schema",
         ":type_mapping",
@@ -510,6 +532,7 @@ cc_test(
     srcs = ["tests/column_metadata_test.cc"],
     copts = ["-std=c++20"],
     deps = [
+        ":api_error",
         ":column_metadata",
         ":field_schema",
         "@com_google_googletest//:gtest_main",
