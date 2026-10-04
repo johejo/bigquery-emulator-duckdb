@@ -198,9 +198,7 @@ TEST_F(TranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported(
                 "SELECT CAST(ARRAY(SELECT AS STRUCT NUMERIC '1' AS n) AS ARRAY<STRUCT<s STRING>>)"),
             "CAST of a nested NUMERIC to STRING");
-  EXPECT_EQ(Unsupported("SELECT BIGNUMERIC '2' * 2"), "function $MULTIPLY with BIGNUMERIC");
-  EXPECT_EQ(Unsupported("SELECT SAFE_MULTIPLY(BIGNUMERIC '2', 2)"),
-            "function SAFE_MULTIPLY with BIGNUMERIC");
+  EXPECT_EQ(Unsupported("SELECT SQRT(BIGNUMERIC '2')"), "function SQRT with BIGNUMERIC");
   EXPECT_EQ(Unsupported("SELECT AVG(x) FROM UNNEST([BIGNUMERIC '1']) x"),
             "function AVG with BIGNUMERIC");
   EXPECT_EQ(Unsupported("SELECT CAST([a] AS ARRAY<BIGNUMERIC>) FROM t"),

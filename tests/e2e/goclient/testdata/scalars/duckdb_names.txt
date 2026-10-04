@@ -13,6 +13,9 @@ SELECT IS_INF(CAST('inf' AS FLOAT64))
 SELECT IS_NAN(CAST('nan' AS FLOAT64))
 => "true"
 
+SELECT ABS(BIGNUMERIC '-1.5') = 1.5
+=> "true"
+
 SELECT JSON_EXTRACT_SCALAR('{"a": 1}', '$.a')
 => "1"
 
