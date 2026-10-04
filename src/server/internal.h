@@ -3,6 +3,7 @@
 // Shared by the server's sources; not part of its interface, which is src/server.h.
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -49,6 +50,14 @@ struct JobListRequest {
 struct ListPage {
   int64_t max_results = INT64_MAX;
   std::string page_token;
+};
+
+// A missing value matches any value of the label, including the empty string.
+using DatasetFilter = std::map<std::string, std::optional<std::string>>;
+
+struct TableGetRequest {
+  bool storage_stats = true;
+  std::string selected_fields;
 };
 
 struct DatasetInsertRequest {
@@ -108,6 +117,8 @@ LoadRequest ParseLoadInsert(const std::string& project_id, const nlohmann::json&
 JobListRequest ParseJobList(const httplib::Request& request);
 // datasets.list and tables.list.
 ListPage ParseListPage(const httplib::Request& request);
+DatasetFilter ParseDatasetFilter(const httplib::Request& request);
+TableGetRequest ParseTableGet(const httplib::Request& request);
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
 TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
@@ -128,6 +139,8 @@ nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMet
 nlohmann::json DatasetList(const std::string& project_id,
                            const std::vector<DatasetListEntry>& entries, const ListPage& page);
 nlohmann::json TableResource(const TableInfo& info);
+// Applies tables.get's schema selection and metadata view to the resource.
+nlohmann::json TableGetResource(const TableInfo& info, const TableGetRequest& request);
 nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
                          const ListPage& page);
 // `result` holds the rows from `page.start_index` on; the table has `total_rows`.

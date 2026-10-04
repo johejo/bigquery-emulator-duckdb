@@ -1,9 +1,12 @@
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -23,6 +26,48 @@ using nlohmann::json;
 
 // The emulator does not version resources, so every resource and list has the same etag.
 constexpr char kEtag[] = "";
+
+// Indexes refer to the original schema, so projecting keeps its order and spelling.
+struct SchemaSelection {
+  bool all = false;
+  std::map<size_t, SchemaSelection> fields;
+};
+
+void SelectSchemaField(const std::vector<FieldSchema>& schema, std::string_view path,
+                       SchemaSelection& selection) {
+  const auto dot = path.find('.');
+  const std::string_view name = path.substr(0, dot);
+  const auto field = std::ranges::find_if(schema, [name](const FieldSchema& candidate) {
+    return std::ranges::equal(candidate.name, name, [](unsigned char a, unsigned char b) {
+      return std::tolower(a) == std::tolower(b);
+    });
+  });
+  if (name.empty() || field == schema.end()) {
+    throw ApiError::Invalid("Unknown field in selectedFields: " + std::string(path));
+  }
+  auto& child = selection.fields[static_cast<size_t>(field - schema.begin())];
+  if (dot == std::string_view::npos) {
+    child.all = true;
+  } else {
+    if (field->type != FieldType::kRecord) {
+      throw ApiError::Invalid("Not a RECORD field in selectedFields: " + std::string(name));
+    }
+    SelectSchemaField(field->fields, path.substr(dot + 1), child);
+  }
+}
+
+std::vector<FieldSchema> ProjectSchema(const std::vector<FieldSchema>& schema,
+                                       const SchemaSelection& selection) {
+  std::vector<FieldSchema> projected;
+  for (const auto& [index, child] : selection.fields) {
+    FieldSchema field = schema[index];
+    if (!child.all) {
+      field.fields = ProjectSchema(field.fields, child);
+    }
+    projected.push_back(std::move(field));
+  }
+  return projected;
+}
 
 json ErrorProto(const ApiError& error) {
   return json{{"reason", error.reason()}, {"location", "query"}, {"message", error.what()}};
@@ -368,6 +413,26 @@ json TableResource(const TableInfo& info) {
     resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
     resource.erase("numRows");
     resource.erase("numBytes");
+  }
+  return resource;
+}
+
+json TableGetResource(const TableInfo& info, const TableGetRequest& request) {
+  json resource = TableResource(info);
+  if (!request.storage_stats) {
+    resource.erase("numRows");
+    resource.erase("numBytes");
+  }
+  if (!request.selected_fields.empty()) {
+    SchemaSelection selection;
+    std::string_view remaining = request.selected_fields;
+    while (true) {
+      const auto comma = remaining.find(',');
+      SelectSchemaField(info.schema, remaining.substr(0, comma), selection);
+      if (comma == std::string_view::npos) break;
+      remaining.remove_prefix(comma + 1);
+    }
+    resource["schema"] = SchemaToJson(ProjectSchema(info.schema, selection));
   }
   return resource;
 }

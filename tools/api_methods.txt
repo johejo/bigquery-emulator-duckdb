@@ -14,9 +14,10 @@
 
 file people.csv | 1
 
-setup POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "d"}}
+setup POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "d"}, "labels": {"env": "test", "active": ""}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}]}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "w"}, "view": {"query": "SELECT 1 AS id", "useLegacySql": false}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "r"}, "schema": {"fields": [{"name": "record", "type": "RECORD", "mode": "REPEATED", "fields": [{"name": "id", "type": "INTEGER"}]}]}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
@@ -29,6 +30,8 @@ request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"da
 note bigquery.datasets.insert | Keeps `datasetReference`, `description`, `friendlyName` and `labels`. Every dataset is in the US; other fields are unsupported.
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:test
+request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:*%20labels.active&maxResults=1
+note bigquery.datasets.list | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination.
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
 note bigquery.datasets.patch | Changes `description`, `friendlyName` and `labels`, as `datasets.insert` keeps them. Ignores the etag.
@@ -68,7 +71,10 @@ note bigquery.tabledata.list | Ignores `formatOptions.timestampOutputFormat`.
 
 request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
 request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
-note bigquery.tables.get | Ignores `selectedFields` and `view`. Returns the reference, schema, description, friendly name, labels, partitioning and clustering, plus the GoogleSQL definition for views. Tables include the row count; `numBytes` is always 0.
+request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t?selectedFields=id&view=BASIC
+request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/w?selectedFields=id&view=FULL
+request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/r?selectedFields=record.id&view=STORAGE_STATS
+note bigquery.tables.get | Supports `selectedFields` schema projection, including nested fields, and `view`; `BASIC` omits storage statistics. Returns the reference, schema, description, friendly name, labels, partitioning and clustering, plus the GoogleSQL definition for views. Storage-statistics views include the row count; `numBytes` is always 0.
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"v"},"view":{"query":"SELECT id FROM test.d.t","useLegacySql":false}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING", "mode": "REQUIRED"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "p"}, "schema": {"fields": [{"name": "d", "type": "DATE"}, {"name": "a", "type": "STRING"}]}, "timePartitioning": {"type": "DAY", "field": "d"}, "clustering": {"fields": ["a"]}}

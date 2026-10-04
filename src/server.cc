@@ -1,5 +1,6 @@
 #include "src/server.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <functional>
@@ -191,7 +192,7 @@ class Server::Impl {
     // datasets
     Get("/projects/:project/datasets",
         Json([this](const httplib::Request& request, httplib::Response&) {
-          RejectQueryParam(request, "filter");
+          const DatasetFilter filters = ParseDatasetFilter(request);
           const std::string project = Param(request, "project");
           std::vector<DatasetListEntry> datasets = emulator_.ListDatasetEntries(project);
           // Datasets whose names start with an underscore are hidden unless `all` asks for them.
@@ -200,6 +201,13 @@ class Server::Impl {
               return entry.dataset_id.starts_with('_');
             });
           }
+          std::erase_if(datasets, [&filters](const DatasetListEntry& entry) {
+            return std::ranges::any_of(filters, [&entry](const auto& filter) {
+              const auto& [key, value] = filter;
+              const auto label = entry.metadata.labels.find(key);
+              return label == entry.metadata.labels.end() || (value && label->second != *value);
+            });
+          });
           return DatasetList(project, datasets, ParseListPage(request));
         }));
     Post("/projects/:project/datasets",
@@ -253,7 +261,9 @@ class Server::Impl {
          }));
     Get("/projects/:project/datasets/:dataset/tables/:table",
         Json([this](const httplib::Request& request, httplib::Response&) {
-          return TableResource(emulator_.GetTable(TableFromPath(request)));
+          const TableGetRequest get = ParseTableGet(request);
+          return TableGetResource(emulator_.GetTable(TableFromPath(request), get.storage_stats),
+                                  get);
         }));
     // tables.patch and tables.update differ in which fields BigQuery keeps when the request leaves
     // them out; see UpdateTableMetadata. The emulator keeps the schema and view for both.

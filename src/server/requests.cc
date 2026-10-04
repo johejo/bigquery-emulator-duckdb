@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <exception>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -365,6 +366,44 @@ ListPage ParseListPage(const httplib::Request& request) {
                   .page_token = request.get_param_value("pageToken")};
   if (result.max_results <= 0) throw ApiError::Invalid("Invalid value for maxResults");
   return result;
+}
+
+DatasetFilter ParseDatasetFilter(const httplib::Request& request) {
+  DatasetFilter filters;
+  std::istringstream input(request.get_param_value("filter"));
+  std::string expression;
+  while (input >> expression) {
+    if (!expression.starts_with("labels.")) {
+      throw ApiError::Invalid("Invalid dataset filter: expected labels.key[:value]");
+    }
+    const auto colon = expression.find(':');
+    const std::string key = expression.substr(7, colon == std::string::npos ? colon : colon - 7);
+    if (key.empty() || key.find_first_of(".:*") != std::string::npos ||
+        (colon != std::string::npos && expression.find(':', colon + 1) != std::string::npos)) {
+      throw ApiError::Invalid("Invalid dataset filter: " + expression);
+    }
+    std::optional<std::string> value;
+    if (colon != std::string::npos && expression.substr(colon + 1) != "*") {
+      value = expression.substr(colon + 1);
+    }
+    if (!filters.emplace(key, std::move(value)).second) {
+      throw ApiError::Invalid("Dataset filter label keys must be unique");
+    }
+    if (filters.size() > 10) {
+      throw ApiError::Invalid("Dataset filter supports at most 10 expressions");
+    }
+  }
+  return filters;
+}
+
+TableGetRequest ParseTableGet(const httplib::Request& request) {
+  const std::string view = request.get_param_value("view");
+  if (!view.empty() && view != "TABLE_METADATA_VIEW_UNSPECIFIED" && view != "BASIC" &&
+      view != "STORAGE_STATS" && view != "FULL") {
+    throw ApiError::Invalid("Invalid value for view: " + view);
+  }
+  return {.storage_stats = view != "BASIC",
+          .selected_fields = request.get_param_value("selectedFields")};
 }
 
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& body) {
