@@ -549,9 +549,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), hex($2)))",
          {Is(2, {TYPE_BYTES})}}}},
       // generate_series() has no floating point overload, and returns an empty list for a zero
-      // step, which BigQuery rejects.
+      // step, which BigQuery rejects. BIGNUMERIC goes to GoogleSQL's implementation.
       {"GENERATE_ARRAY",
        {{{2, 3},
+         "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR), "
+         "CAST($3 AS VARCHAR)), _e -> CAST(_e AS BIGNUM))",
+         {Is(1, {TYPE_BIGNUMERIC})},
+         {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"}},
+        {{2, 3},
          "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
          {Is(1, {TYPE_INT64}), Is(2, {TYPE_INT64}), Is(3, {TYPE_INT64})},
          {"1"},
@@ -945,6 +950,14 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "LN",
       "LOG",
       "LOG10",
+      // Arrays, JSON and text.
+      "GENERATE_ARRAY",
+      "TO_JSON",
+      "TO_JSON_STRING",
+      "JSON_ARRAY",
+      "JSON_OBJECT",
+      "JSON_SET",
+      "FORMAT",
       // Aggregate and analytic functions.
       "COUNT",
       "MIN",

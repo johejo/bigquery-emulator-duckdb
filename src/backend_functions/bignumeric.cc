@@ -1,8 +1,10 @@
 #include "src/bignumeric.h"
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -10,10 +12,12 @@
 #include "googlesql/public/functions/arithmetics.h"
 #include "googlesql/public/functions/convert.h"
 #include "googlesql/public/functions/convert_string.h"
+#include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/math.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
+#include "src/duckdb_handle.h"
 
 // BIGNUMERIC arithmetic and conversions. The translator passes a BIGNUM to these functions, and
 // takes one back, as the VARCHAR of its units; see src/bignumeric.h. A conversion's last argument
@@ -114,6 +118,40 @@ void Sum(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector outpu
     }
     return arguments.String(0);
   });
+}
+
+// GoogleSQL limits GENERATE_ARRAY to 16000 elements, where BigQuery generates far longer arrays,
+// as DuckDB's generate_series() does for INT64.
+constexpr int kMaxGeneratedArraySize = std::numeric_limits<int>::max();
+
+// GENERATE_ARRAY(start, end, step), as the units of its elements.
+void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(
+      info, input, output,
+      [](const Arguments& arguments) -> absl::StatusOr<std::vector<std::optional<std::string>>> {
+        std::vector<BigNumericValue> bounds;
+        for (idx_t column = 0; column < 3; ++column) {
+          const auto bound = Units(arguments, column);
+          if (!bound.ok()) {
+            return bound.status();
+          }
+          bounds.push_back(*bound);
+        }
+        std::vector<BigNumericValue> values;
+        if (absl::Status status =
+                fn::GenerateArrayHelper<fn::ArrayGenTrait<BigNumericValue, BigNumericValue>,
+                                        kMaxGeneratedArraySize>(bounds[0], bounds[1], bounds[2],
+                                                                &values);
+            !status.ok()) {
+          return status;
+        }
+        std::vector<std::optional<std::string>> units;
+        units.reserve(values.size());
+        for (const BigNumericValue& value : values) {
+          units.emplace_back(BigNumericUnits(value));
+        }
+        return units;
+      });
 }
 
 void FromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -232,6 +270,10 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
   Register(connection, "bq_bignumeric_log", {kVarchar, kVarchar}, kVarchar,
            Operator<fn::Logarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
+  LogicalType varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType list(duckdb_create_list_type(varchar.get()));
+  Register(connection, "bq_bignumeric_generate_array", {kVarchar, kVarchar, kVarchar}, list.get(),
+           GenerateArray);
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar, FromDouble);
   Register(connection, "bq_bignumeric_to_string", {kVarchar}, kVarchar, ToString);

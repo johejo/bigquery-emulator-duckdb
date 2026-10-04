@@ -378,7 +378,8 @@ std::optional<std::string> Format(const ScalarCall& call) {
       {googlesql::TYPE_DATE, "DATE"},
       {googlesql::TYPE_TIME, "TIME"},
       {googlesql::TYPE_DATETIME, "TIMESTAMP"},
-      {googlesql::TYPE_TIMESTAMP, "TIMESTAMPTZ"}};
+      {googlesql::TYPE_TIMESTAMP, "TIMESTAMPTZ"},
+      {googlesql::TYPE_BIGNUMERIC, "BIGNUM"}};
   std::vector<std::string> arguments;
   for (const FunctionArgument& argument : call.arguments) {
     const auto type = types.find(argument.type);

@@ -131,6 +131,9 @@ func TestBigNumericErrors(t *testing.T) {
 		"SELECT POW(x, -1) FROM UNNEST([BIGNUMERIC '0']) x":          "division by zero: POW(0, -1)",
 		"SELECT SQRT(x) FROM UNNEST([BIGNUMERIC '-1']) x":            "SQRT is undefined for negative value: SQRT(-1)",
 		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x": "int64 out of range: 100000000000000000000",
+		"SELECT CAST([x] AS ARRAY<INT64>) FROM UNNEST([BIGNUMERIC '1e20']) x": "int64 out of range: " +
+			"100000000000000000000",
+		"SELECT GENERATE_ARRAY(x, 3, 0) FROM UNNEST([BIGNUMERIC '1']) x": "Sequence step cannot be 0.",
 	} {
 		job, err := client.Query(sql).Run(ctx)
 		if err == nil {

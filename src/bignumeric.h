@@ -20,6 +20,10 @@ std::string BigNumericUnits(const googlesql::BigNumericValue& value);
 // text, such as a DECIMAL with a decimal point, and for a value out of range.
 absl::StatusOr<googlesql::BigNumericValue> BigNumericFromUnits(std::string_view units);
 
+// The BIGNUMERIC of a BIGNUM as DuckDB stores it in a vector, which the C API has no accessor
+// for. Fails for a value out of range.
+absl::StatusOr<googlesql::BigNumericValue> BigNumericFromBignum(std::string_view stored);
+
 // The DuckDB SQL of `value` as a BIGNUM.
 std::string BigNumericSql(const googlesql::BigNumericValue& value);
 

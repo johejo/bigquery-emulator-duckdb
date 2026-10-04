@@ -14,6 +14,7 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/value.h"
 #include "src/backend_functions/internal.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
@@ -189,6 +190,16 @@ absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_
     case DUCKDB_TYPE_TIMESTAMP_TZ:
       return null ? googlesql::Value::NullTimestamp()
                   : googlesql::Value::Timestamp(absl::FromUnixMicros(arguments.Int(column)));
+    case DUCKDB_TYPE_BIGNUM: {
+      if (null) {
+        return googlesql::Value::NullBigNumeric();
+      }
+      const auto bignumeric = BigNumericFromBignum(arguments.String(column));
+      if (!bignumeric.ok()) {
+        return bignumeric.status();
+      }
+      return googlesql::Value::BigNumeric(*bignumeric);
+    }
     default:
       return absl::UnimplementedError("Unsupported argument type for FORMAT");
   }

@@ -12,6 +12,8 @@ namespace bigquery_emulator_duckdb {
 namespace {
 
 constexpr size_t kScale = googlesql::BigNumericValue::kMaxFractionalDigits;
+// A BIGNUMERIC is a 256-bit integer of units.
+constexpr size_t kBytes = 32;
 
 }  // namespace
 
@@ -47,6 +49,33 @@ absl::StatusOr<googlesql::BigNumericValue> BigNumericFromUnits(std::string_view 
   }
   digits.insert(digits.size() - kScale, ".");
   return googlesql::BigNumericValue::FromStringStrict((negative ? "-" : "") + digits);
+}
+
+absl::StatusOr<googlesql::BigNumericValue> BigNumericFromBignum(std::string_view stored) {
+  // A three byte header, whose top bit is set for a value that is not negative, then the big
+  // endian bytes of its absolute value, with every bit inverted for a negative value. GoogleSQL
+  // reads the little endian two's complement of the units.
+  if (stored.size() < 4) {
+    return absl::InvalidArgumentError("Invalid BIGNUM");
+  }
+  const bool negative = (static_cast<unsigned char>(stored[0]) & 0x80) == 0;
+  std::string bytes(stored.rbegin(), stored.rend() - 3);
+  if (negative) {
+    // The bytes hold the absolute value inverted, which plus one is its negation.
+    for (char& byte : bytes) {
+      byte = static_cast<char>(byte + 1);
+      if (byte != 0) {
+        break;
+      }
+    }
+  }
+  if (((static_cast<unsigned char>(bytes.back()) & 0x80) != 0) != negative) {
+    bytes.push_back(negative ? '\xff' : '\0');
+  }
+  if (bytes.size() > kBytes) {
+    return absl::OutOfRangeError("BIGNUMERIC overflow");
+  }
+  return googlesql::BigNumericValue::DeserializeFromProtoBytes(bytes);
 }
 
 std::string BigNumericSql(const googlesql::BigNumericValue& value) {
