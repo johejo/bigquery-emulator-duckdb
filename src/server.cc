@@ -286,12 +286,12 @@ class Server::Impl {
            }));
     Get("/projects/:project/datasets/:dataset/tables/:table/data",
         Json([this](const httplib::Request& request, httplib::Response&) {
-          RejectQueryParam(request, "selectedFields");
           const TableReference table = TableFromPath(request);
           const ResultPage page = ParseResultPage(request);
           const QueryResult result =
               emulator_.ListTableData(table, page.start_index, page.max_results);
-          return TableDataList(result, emulator_.GetTable(table).num_rows, page);
+          return TableDataList(result, emulator_.GetTable(table).num_rows, page,
+                               request.get_param_value("selectedFields"));
         }));
     Post("/projects/:project/datasets/:dataset/tables/:table/insertAll",
          Json([this](const httplib::Request& request, httplib::Response&) {

@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -144,7 +145,8 @@ nlohmann::json TableGetResource(const TableInfo& info, const TableGetRequest& re
 nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
                          const ListPage& page);
 // `result` holds the rows from `page.start_index` on; the table has `total_rows`.
-nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page);
+nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
+                             std::string_view selected_fields);
 nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
 
 }  // namespace bigquery_emulator_duckdb::server

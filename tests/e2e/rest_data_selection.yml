@@ -1,0 +1,150 @@
+desc: tabledata.list projects selected fields while preserving wire encoding and pagination
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/rest-data-selection/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  table:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+              description: metadata
+              labels: {env: test}
+              schema:
+                fields:
+                  - {name: user_id, type: INTEGER, mode: REQUIRED, description: key}
+                  - name: profile
+                    type: RECORD
+                    description: person
+                    fields:
+                      - {name: name, type: STRING, description: display}
+                      - name: address
+                        type: RECORD
+                        fields:
+                          - {name: city, type: STRING}
+                          - {name: zip, type: STRING}
+                  - name: items
+                    type: RECORD
+                    mode: REPEATED
+                    fields:
+                      - {name: sku, type: STRING}
+                      - {name: count, type: INTEGER}
+                      - {name: created, type: TIMESTAMP}
+    test: current.res.status == 200
+  insert:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/insertAll:
+        post:
+          body:
+            application/json:
+              rows:
+                - json:
+                    user_id: 1
+                    profile: {name: Alice, address: {city: Tokyo, zip: '100'}}
+                    items: [{sku: a, count: 2, created: '1970-01-01T00:00:01.234567Z'}, {sku: b, count: 3}]
+                - json: {user_id: 2, profile: null, items: []}
+    test: current.res.status == 200 && !("insertErrors" in current.res.body)
+  selected:
+    req:
+      /bigquery/v2/projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=items.sku,profile.address.city,USER_ID&maxResults=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalRows == "2" &&
+      current.res.body.pageToken == "1" && current.res.body.rows == [
+        {"f": [{"v": "1"}, {"v": {"f": [{"v": {"f": [{"v": "Tokyo"}]}}]}},
+               {"v": [{"v": {"f": [{"v": "a"}]}}, {"v": {"f": [{"v": "b"}]}}]}]}
+      ]
+  next_page:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=items.sku,profile.address.city,user_id&pageToken=1&maxResults=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalRows == "2" &&
+      !("pageToken" in current.res.body) &&
+      current.res.body.rows == [{"f": [{"v": "2"}, {"v": null}, {"v": []}]}]
+  duplicate_and_parent:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=profile.address.city,profile,profile.name,profile&maxResults=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == [
+        {"f": [{"v": {"f": [{"v": "Alice"}, {"v": {"f": [{"v": "Tokyo"}, {"v": "100"}]}}]}}]}
+      ]
+  siblings:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=profile.address.zip,profile.name,profile.address.city&maxResults=1:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.rows == steps.duplicate_and_parent.res.body.rows
+  timestamp_seconds:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=items.created&maxResults=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == [
+        {"f": [{"v": [{"v": {"f": [{"v": "1.234567"}]}}, {"v": {"f": [{"v": null}]}}]}]}
+      ]
+  timestamp_microseconds:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=items.created&maxResults=1&formatOptions.useInt64Timestamp=true:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == [
+        {"f": [{"v": [{"v": {"f": [{"v": "1234567"}]}}, {"v": {"f": [{"v": null}]}}]}]}
+      ]
+  empty_selection:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=&startIndex=1:
+        get:
+          body: null
+    test: current.res.status == 200 && len(current.res.body.rows[0].f) == 3
+  unknown_field:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=missing&startIndex=10:
+        get:
+          body: null
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  unknown_nested_field:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=profile.missing:
+        get:
+          body: null
+    test: current.res.status == 400
+  scalar_subfield:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=user_id.child:
+        get:
+          body: null
+    test: current.res.status == 400
+  empty_component:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=profile.:
+        get:
+          body: null
+    test: current.res.status == 400
+  trailing_comma:
+    req:
+      /projects/rest-data-selection/datasets/ds/tables/t/data?selectedFields=user_id,:
+        get:
+          body: null
+    test: current.res.status == 400
+  cleanup:
+    req:
+      /projects/rest-data-selection/datasets/ds?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204
