@@ -46,14 +46,14 @@ jobs:
         run: echo 'common --config=ci' > .bazelrc.local
       - name: Format check
         run: nix develop --command just fmt-check
-      - name: Bazel tests
-        run: nix develop --command just test
       - name: Clang-tidy
         run: nix develop --command just tidy
-      - name: End-to-end tests
-        run: nix develop --command just e2e
+      - name: Bazel tests
+        run: nix develop --command just test
       - name: Generated docs check
         run: nix develop --command just docs-check
+      - name: End-to-end tests
+        run: nix develop --command just e2e
 
       - name: Report Bazel disk cache size
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
