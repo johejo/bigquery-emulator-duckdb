@@ -125,9 +125,12 @@ func TestBigNumericErrors(t *testing.T) {
 		"SELECT CAST(x AS BIGNUMERIC) FROM UNNEST(['x']) x":                    "Invalid BIGNUMERIC value: x",
 		"SELECT x * 2 FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "']) x": "BIGNUMERIC overflow: " +
 			maxBigNumeric + " * 2",
-		"SELECT x / 0 FROM UNNEST([BIGNUMERIC '1']) x":     "division by zero: 1 / 0",
-		"SELECT MOD(x, 0) FROM UNNEST([BIGNUMERIC '1']) x": "division by zero: MOD(1, 0)",
-		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x":           "int64 out of range: 100000000000000000000",
+		"SELECT x / 0 FROM UNNEST([BIGNUMERIC '1']) x":               "division by zero: 1 / 0",
+		"SELECT MOD(x, 0) FROM UNNEST([BIGNUMERIC '1']) x":           "division by zero: MOD(1, 0)",
+		"SELECT EXP(x) FROM UNNEST([BIGNUMERIC '100']) x":            "BIGNUMERIC overflow: EXP(100)",
+		"SELECT POW(x, -1) FROM UNNEST([BIGNUMERIC '0']) x":          "division by zero: POW(0, -1)",
+		"SELECT SQRT(x) FROM UNNEST([BIGNUMERIC '-1']) x":            "SQRT is undefined for negative value: SQRT(-1)",
+		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x": "int64 out of range: 100000000000000000000",
 	} {
 		job, err := client.Query(sql).Run(ctx)
 		if err == nil {
