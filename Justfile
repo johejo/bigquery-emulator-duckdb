@@ -52,6 +52,11 @@ test:
 e2e *args:
     tests/e2e/run.sh {{args}}
 
+# GoogleSQL's compliance tests against the emulator; not part of `check` while most cases fail.
+# Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
+compliance *args:
+    bazelisk test //:compliance_test {{args}}
+
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- {{args}}
 

@@ -616,3 +616,48 @@ cc_test(
         "@nlohmann_json//:json",
     ],
 )
+
+# GoogleSQL's compliance tests run against the emulator, compared with GoogleSQL's reference
+# implementation. Not part of `bazelisk test //...` while most cases fail; run `just compliance`.
+cc_test(
+    name = "compliance_test",
+    timeout = "eternal",
+    srcs = ["tests/compliance/test_driver.cc"],
+    args = [
+        "--googlesql_reference_impl_validate_timestamp_precision",
+        "--known_error_files=$(rootpath tests/compliance/known_errors.textproto)",
+        # Known errors are coarse; one that covers a passing statement is not a failure.
+        "--googlesql_compliance_allow_removable_known_errors",
+        # GoogleSQL 2026.9.2 builds ill-typed INT64 cases for these vector functions and aborts.
+        # The depth limit detector only logs how deep the engine can nest, which takes hours
+        # through DuckDB.
+        "--gtest_filter=-Test*DotProduct/*:TestsManhattanDistance/*:TestsL1Norm/*:TestsL2Norm/*:" +
+        "TestDepthLimitDetectorTestCases/*",
+    ],
+    copts = ["-std=c++20"],
+    data = ["tests/compliance/known_errors.textproto"],
+    shard_count = 32,
+    tags = ["manual"],
+    deps = [
+        ":api_error",
+        ":catalog",
+        ":emulator",
+        ":field_schema",
+        ":query_parameters",
+        ":references",
+        ":type_mapping",
+        "@googlesql//googlesql/base/testing:googlesql_gtest_main",
+        "@googlesql//googlesql/common:internal_value",
+        "@googlesql//googlesql/compliance:compliance_test_cases",
+        "@googlesql//googlesql/compliance:test_driver",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:interval_value",
+        "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@nlohmann_json//:json",
+    ],
+)

@@ -71,6 +71,12 @@ Cover each of these that applies with a case in `tests/e2e/goclient/testdata/sca
 - C++ tests (`just test`) cover internal boundaries that clients cannot observe, such as
   translation edge cases, and what runn cannot drive, such as many concurrent connections. Do not
   copy the same SQL and expected result between layers.
+- GoogleSQL's compliance tests (`just compliance`) run in process against GoogleSQL's reference
+  implementation, which is not BigQuery: they check semantics broadly but not the wire format,
+  error messages or anything outside a query's result, so they never replace an e2e case for
+  client-visible behavior. Failures are listed in `tests/compliance/known_errors.textproto`.
+  The bugs they found are cases of `tests/e2e/goclient/testdata/scalars/known_bugs.txt`, written
+  with `!>` and BigQuery's answer; each is to be fixed and moved to a `=>` case.
 
 ## Generated docs
 
