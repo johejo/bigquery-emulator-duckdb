@@ -22,8 +22,8 @@ rejected as unsupported.
 
 | Status | Methods |
 | --- | --- |
-| Partial | 10 |
-| Supported | 11 |
+| Partial | 9 |
+| Supported | 12 |
 | Unsupported | 26 |
 
 ## datasets
@@ -97,7 +97,7 @@ rejected as unsupported.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`tabledata.insertAll`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/insertAll` | Partial | Ignores `insertId`, so retried rows are not deduplicated. Rejected as unsupported: templateSuffix. |
-| [`tabledata.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/data` | Partial | Ignores `formatOptions.timestampOutputFormat`. Rejected as unsupported: selectedFields. |
+| [`tabledata.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/data` | Supported | Supports `selectedFields` row projection, including nested fields. Ignores `formatOptions.timestampOutputFormat`. |
 
 ## tables
 

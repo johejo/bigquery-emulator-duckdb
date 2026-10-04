@@ -56,6 +56,41 @@ void SelectSchemaField(const std::vector<FieldSchema>& schema, std::string_view 
   }
 }
 
+SchemaSelection ParseSchemaSelection(const std::vector<FieldSchema>& schema,
+                                     std::string_view remaining) {
+  SchemaSelection selection;
+  while (true) {
+    const auto comma = remaining.find(',');
+    SelectSchemaField(schema, remaining.substr(0, comma), selection);
+    if (comma == std::string_view::npos) break;
+    remaining.remove_prefix(comma + 1);
+  }
+  return selection;
+}
+
+// Project BigQuery's positional wire cells using the same indexes as the schema projection.
+json ProjectRow(const std::vector<FieldSchema>& schema, const SchemaSelection& selection,
+                const json& row) {
+  json cells = json::array();
+  for (const auto& [index, child] : selection.fields) {
+    json cell = row.at("f").at(index);
+    if (!child.all && !cell.at("v").is_null()) {
+      const FieldSchema& field = schema[index];
+      if (field.mode == FieldMode::kRepeated) {
+        for (auto& element : cell["v"]) {
+          if (!element.at("v").is_null()) {
+            element["v"] = ProjectRow(field.fields, child, element.at("v"));
+          }
+        }
+      } else {
+        cell["v"] = ProjectRow(field.fields, child, cell.at("v"));
+      }
+    }
+    cells.push_back(std::move(cell));
+  }
+  return json{{"f", std::move(cells)}};
+}
+
 std::vector<FieldSchema> ProjectSchema(const std::vector<FieldSchema>& schema,
                                        const SchemaSelection& selection) {
   std::vector<FieldSchema> projected;
@@ -425,14 +460,7 @@ json TableGetResource(const TableInfo& info, const TableGetRequest& request) {
     resource.erase("numBytes");
   }
   if (!request.selected_fields.empty()) {
-    SchemaSelection selection;
-    std::string_view remaining = request.selected_fields;
-    while (true) {
-      const auto comma = remaining.find(',');
-      SelectSchemaField(info.schema, remaining.substr(0, comma), selection);
-      if (comma == std::string_view::npos) break;
-      remaining.remove_prefix(comma + 1);
-    }
+    const SchemaSelection selection = ParseSchemaSelection(info.schema, request.selected_fields);
     resource["schema"] = SchemaToJson(ProjectSchema(info.schema, selection));
   }
   return resource;
@@ -458,12 +486,21 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   return response;
 }
 
-json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page) {
+json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
+                   std::string_view selected_fields) {
+  const SchemaSelection selection = selected_fields.empty()
+                                        ? SchemaSelection{.all = true}
+                                        : ParseSchemaSelection(result.schema, selected_fields);
   const auto size = static_cast<int64_t>(result.rows.size());
   json response = {{"kind", "bigquery#tableDataList"},
                    {"etag", kEtag},
                    {"totalRows", std::to_string(total_rows)},
                    {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)}};
+  if (!selection.all) {
+    for (auto& row : response["rows"]) {
+      row = ProjectRow(result.schema, selection, row);
+    }
+  }
   if (page.start_index + size < total_rows) {
     response["pageToken"] = std::to_string(page.start_index + size);
   }

@@ -98,9 +98,9 @@ steps:
       current.exit_code == 0 && trim(current.stdout) == '[{"created":"2024-01-01 00:00:00","id":"1","name":"alice"}]'
   head_selected_fields:
     exec:
-      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --selected_fields=id e2e.users
+      command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh head --format=json --selected_fields=id --max_rows=1 e2e.users
     test: |
-      current.exit_code != 0 && current.stdout contains 'The emulator does not support selectedFields'
+      current.exit_code == 0 && trim(current.stdout) == '[{"id":"1"}]'
   update_expiration:
     exec:
       command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --expiration 3600 e2e.users

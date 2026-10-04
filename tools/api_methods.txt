@@ -67,7 +67,8 @@ request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/
 note bigquery.tabledata.insertAll | Ignores `insertId`, so retried rows are not deduplicated.
 request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?maxResults=1&startIndex=0
 request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?selectedFields=id
-note bigquery.tabledata.list | Ignores `formatOptions.timestampOutputFormat`.
+request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/r/data?selectedFields=record.id
+note bigquery.tabledata.list | Supports `selectedFields` row projection, including nested fields. Ignores `formatOptions.timestampOutputFormat`.
 
 request bigquery.tables.delete | DELETE /bigquery/v2/projects/test/datasets/d/tables/t
 request bigquery.tables.get | GET /bigquery/v2/projects/test/datasets/d/tables/t
