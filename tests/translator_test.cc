@@ -198,7 +198,8 @@ TEST_F(TranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported(
                 "SELECT CAST(ARRAY(SELECT AS STRUCT NUMERIC '1' AS n) AS ARRAY<STRUCT<s STRING>>)"),
             "CAST of a nested NUMERIC to STRING");
-  EXPECT_EQ(Unsupported("SELECT SQRT(BIGNUMERIC '2')"), "function SQRT with BIGNUMERIC");
+  EXPECT_EQ(Unsupported("SELECT GENERATE_ARRAY(BIGNUMERIC '1', 3)"),
+            "function GENERATE_ARRAY with BIGNUMERIC");
   EXPECT_EQ(Unsupported("SELECT AVG(x) FROM UNNEST([BIGNUMERIC '1']) x"),
             "function AVG with BIGNUMERIC");
   EXPECT_EQ(Unsupported("SELECT CAST([a] AS ARRAY<BIGNUMERIC>) FROM t"),

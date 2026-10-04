@@ -269,13 +269,6 @@ std::vector<Rule> Strings(std::string_view function, Arity arity) {
                  Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})})});
 }
 
-// A function that src/backend_functions.cc registers as `function` for FLOAT64 and as
-// `function`_numeric for NUMERIC, which keeps its precision rather than going through FLOAT64.
-std::vector<Rule> Numbers(std::string_view function, std::size_t arity = 1) {
-  return Concat({Float64(function, arity),
-                 Same(std::string(function) + "_numeric", arity, {Is(1, {TYPE_NUMERIC})})});
-}
-
 // A call to `function`, a BIGNUMERIC function that src/backend_functions/bignumeric.cc
 // implements, which takes and returns the units of a BIGNUM as text. `bignumerics` arguments are
 // BIGNUMERIC, and the `others` after them, such as ROUND's digits, go as they are.
@@ -293,6 +286,16 @@ std::string BigNumericCall(std::string_view function, std::size_t bignumerics,
 // An operator on BIGNUMERIC, all of whose `arity` arguments are BIGNUMERIC.
 Rule BigNumericOperator(std::string_view function, std::size_t arity) {
   return {arity, BigNumericCall(function, arity), {Is(1, {TYPE_BIGNUMERIC})}};
+}
+
+// A function that src/backend_functions.cc registers as bq_`name` for FLOAT64, as
+// bq_`name`_numeric for NUMERIC and as bq_bignumeric_`name` for BIGNUMERIC, the last two of which
+// keep their precision rather than going through FLOAT64.
+std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
+  const std::string function = "bq_" + std::string(name);
+  return Concat({{BigNumericOperator("bq_bignumeric_" + std::string(name), arity)},
+                 Float64(function, arity),
+                 Same(function + "_numeric", arity, {Is(1, {TYPE_NUMERIC})})});
 }
 
 // ROUND and TRUNC of a BIGNUMERIC, which take a number of digits, and with `modes` a rounding
@@ -563,14 +566,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
       // infinities where BigQuery raises errors, such as EXP(1000).
-      {"SQRT", Numbers("bq_sqrt")},
-      {"CBRT", Numbers("bq_cbrt")},
-      {"POW", Numbers("bq_pow", 2)},
-      {"POWER", Numbers("bq_pow", 2)},
-      {"EXP", Numbers("bq_exp")},
-      {"LN", Numbers("bq_ln")},
-      {"LOG10", Numbers("bq_log10")},
-      {"LOG", Concat({Numbers("bq_ln"), Numbers("bq_log", 2)})},
+      {"SQRT", Numbers("sqrt")},
+      {"CBRT", Numbers("cbrt")},
+      {"POW", Numbers("pow", 2)},
+      {"POWER", Numbers("pow", 2)},
+      {"EXP", Numbers("exp")},
+      {"LN", Numbers("ln")},
+      {"LOG10", Numbers("log10")},
+      {"LOG", Concat({Numbers("ln"), Numbers("log", 2)})},
       {"SIN", Float64("bq_sin")},
       {"COS", Float64("bq_cos")},
       {"TAN", Float64("bq_tan")},
@@ -934,6 +937,14 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "CEIL",
       "CEILING",
       "FLOOR",
+      "SQRT",
+      "CBRT",
+      "POW",
+      "POWER",
+      "EXP",
+      "LN",
+      "LOG",
+      "LOG10",
       // Aggregate and analytic functions.
       "COUNT",
       "MIN",

@@ -218,6 +218,19 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
            Unary<fn::Ceil<BigNumericValue>>);
   Register(connection, "bq_bignumeric_floor", {kVarchar}, kVarchar,
            Unary<fn::Floor<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_sqrt", {kVarchar}, kVarchar,
+           Unary<fn::Sqrt<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_cbrt", {kVarchar}, kVarchar,
+           Unary<fn::Cbrt<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_exp", {kVarchar}, kVarchar, Unary<fn::Exp<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_ln", {kVarchar}, kVarchar,
+           Unary<fn::NaturalLogarithm<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_log10", {kVarchar}, kVarchar,
+           Unary<fn::DecimalLogarithm<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_pow", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Pow<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_log", {kVarchar, kVarchar}, kVarchar,
+           Operator<fn::Logarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar, FromDouble);
