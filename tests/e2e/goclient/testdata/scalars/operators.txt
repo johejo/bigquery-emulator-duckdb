@@ -8,3 +8,50 @@ SELECT 1 / CAST(NULL AS FLOAT64)
 
 SELECT LEFT('abc', CAST(RAND() * 0 AS INT64) + 2)
 => "ab"
+
+## NaN compares unequal to everything, itself included
+# Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant.
+
+SELECT x = x FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x != x FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT x >= 0 FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x > CAST('-inf' AS FLOAT64) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x < CAST('inf' AS FLOAT64) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x BETWEEN CAST('-inf' AS FLOAT64) AND CAST('inf' AS FLOAT64) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> "false"
+
+SELECT x = CAST(NULL AS FLOAT64) FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> null
+
+SELECT x <= 1 FROM UNNEST([1.0]) AS x
+=> "true"
+
+## LIKE escapes with a backslash
+
+SELECT x LIKE 'ab\\%' FROM UNNEST(['ab\\xx']) AS x
+=> "false"
+
+SELECT x LIKE 'ab\\%' FROM UNNEST(['ab%']) AS x
+=> "true"
+
+SELECT x LIKE 'ab\\_' FROM UNNEST(['ab\\_']) AS x
+=> "false"
+
+SELECT x LIKE 'a\\\\%c' FROM UNNEST(['a\\c']) AS x
+=> "true"
+
+SELECT x LIKE '\\a' FROM UNNEST(['a']) AS x
+=> "true"
+
+SELECT x LIKE CAST(NULL AS STRING) FROM UNNEST(['a']) AS x
+=> null

@@ -3,3 +3,27 @@
 # followed by an empty "?>" line. A maintainer fills those in with BigQuery's answers through
 # `just bigquery-answers PROJECT`; each answered case then moves to scalars/, written with "=>",
 # or with "!>" to known_bugs.txt where the emulator answers otherwise.
+
+SELECT CAST(x AS STRING) FROM UNNEST([CAST('-0' AS FLOAT64)]) AS x
+?>
+
+SELECT CAST(x AS STRING) FROM UNNEST([CAST(1e20 AS FLOAT64)]) AS x
+?>
+
+SELECT CAST(x AS STRING) FROM UNNEST([CAST(0.1 AS FLOAT64)]) AS x
+?>
+
+SELECT CAST(x AS STRING) FROM UNNEST([TIME '01:02:03.12']) AS x
+?>
+
+SELECT CAST(x AS STRING) FROM UNNEST([DATETIME '2006-01-02 12:34:56.12345']) AS x
+?>
+
+SELECT CAST(x AS STRING) FROM UNNEST([TIMESTAMP '2006-01-02 12:34:56.12345+00']) AS x
+?>
+
+SELECT CAST(CAST(x AS TIMESTAMP) AS STRING) FROM UNNEST(['2014-01-31 12:12:34 America/Los_Angeles']) AS x
+?>
+
+SELECT ARRAY_TO_STRING(CAST(x AS ARRAY<STRING>), ',') FROM (SELECT [CAST(1.5 AS FLOAT64), 2] AS x)
+?>

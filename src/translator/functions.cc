@@ -330,6 +330,20 @@ std::vector<Rule> Pad(const std::string& function) {
           {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}}};
 }
 
+// `left` `op` `right`, where a NaN FLOAT64 compares unequal to everything, itself included, and
+// neither less nor greater. DuckDB takes NaN as equal to itself and greater than every number.
+std::string FloatCompare(const std::string& left, std::string_view op, const std::string& right) {
+  return "CASE WHEN " + left + " IS NULL OR " + right + " IS NULL THEN NULL WHEN isnan(" + left +
+         ") OR isnan(" + right + ") THEN " + (op == "<>" ? "true" : "false") + " ELSE (" + left +
+         " " + std::string(op) + " " + right + ") END";
+}
+
+// A comparison `op`, with FloatCompare's NaN for FLOAT64.
+std::vector<Rule> Compare(std::string_view op) {
+  return {{2, FloatCompare("$1", op, "$2"), {Is(1, {TYPE_DOUBLE})}},
+          {2, "($1 " + std::string(op) + " $2)"}};
+}
+
 // Functions implemented by DuckDB SQL templates.
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
@@ -346,14 +360,26 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {},
          {"'division by zero'"}}}},
       {"$UNARY_MINUS", {BigNumericOperator("bq_bignumeric_negate", 1), {1, "(-$1)"}}},
-      {"$EQUAL", {{2, "($1 = $2)"}}},
-      {"$NOT_EQUAL", {{2, "($1 <> $2)"}}},
-      {"$LESS", {{2, "($1 < $2)"}}},
-      {"$LESS_OR_EQUAL", {{2, "($1 <= $2)"}}},
-      {"$GREATER", {{2, "($1 > $2)"}}},
-      {"$GREATER_OR_EQUAL", {{2, "($1 >= $2)"}}},
-      {"$BETWEEN", {{3, "($1 BETWEEN $2 AND $3)"}}},
-      {"$LIKE", {{2, "($1 LIKE $2)"}}},
+      {"$EQUAL", Compare("=")},
+      {"$NOT_EQUAL", Compare("<>")},
+      {"$LESS", Compare("<")},
+      {"$LESS_OR_EQUAL", Compare("<=")},
+      {"$GREATER", Compare(">")},
+      {"$GREATER_OR_EQUAL", Compare(">=")},
+      {"$BETWEEN",
+       {{3,
+         "(" + FloatCompare("$1", ">=", "$2") + " AND " + FloatCompare("$1", "<=", "$3") + ")",
+         {Is(1, {TYPE_DOUBLE})}},
+        {3, "($1 BETWEEN $2 AND $3)"}}},
+      // A backslash escapes the character after it, and must not end the pattern. BYTES are
+      // unsupported, since DuckDB's LIKE takes only VARCHAR.
+      {"$LIKE",
+       {{2,
+         "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') THEN !1 ELSE "
+         "($1 LIKE $2 ESCAPE '\\') END",
+         {Is(1, {TYPE_STRING})},
+         {},
+         {"'LIKE pattern ends with a backslash'"}}}},
       {"$IS_DISTINCT_FROM", {{2, "($1 IS DISTINCT FROM $2)"}}},
       {"$IS_NOT_DISTINCT_FROM", {{2, "($1 IS NOT DISTINCT FROM $2)"}}},
       {"$IS_NULL", {{1, "($1 IS NULL)"}}},
