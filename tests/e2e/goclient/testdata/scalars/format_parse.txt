@@ -159,3 +159,31 @@ SELECT CAST(x AS STRING) FROM UNNEST([TIME '01:02:03.12345']) AS x
 
 SELECT CAST(x AS STRING) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
 => null
+
+## Arrays and structs are cast value by value
+
+# A struct is cast field by field in order, taking the field names of the target type.
+SELECT TO_JSON_STRING(CAST(s AS STRUCT<b INT64, c STRING>)) FROM UNNEST([STRUCT('1' AS a, 2 AS b)]) s
+=> "{\"b\":1,\"c\":\"2\"}"
+
+SELECT TO_JSON_STRING(CAST(x AS ARRAY<STRUCT<s STRING>>))
+FROM UNNEST([STRUCT([STRUCT(NUMERIC '1.50' AS n)] AS x)])
+=> "[{\"s\":\"1.5\"}]"
+
+# SAFE_CAST makes a whole array or struct NULL when one of its values fails, at any depth; a NULL
+# value does not fail.
+SELECT TO_JSON_STRING(SAFE_CAST(x AS ARRAY<INT64>)) FROM UNNEST([STRUCT(['1', NULL] AS x)])
+=> "[1,null]"
+
+SELECT SAFE_CAST(x AS ARRAY<INT64>) IS NULL FROM UNNEST([STRUCT(['1', 'x'] AS x)])
+=> "true"
+
+SELECT SAFE_CAST(x AS ARRAY<DATE>) IS NULL FROM UNNEST([STRUCT(['2024-01-01', '2024/01/01'] AS x)])
+=> "true"
+
+SELECT SAFE_CAST(s AS STRUCT<a INT64, b STRING>) IS NULL FROM UNNEST([STRUCT('x' AS a, 1 AS b)]) s
+=> "true"
+
+SELECT SAFE_CAST(x AS ARRAY<STRUCT<a INT64>>) IS NULL
+FROM UNNEST([STRUCT([STRUCT('1' AS a), STRUCT('x' AS a)] AS x)])
+=> "true"
