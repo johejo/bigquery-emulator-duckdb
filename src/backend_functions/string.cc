@@ -14,6 +14,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "duckdb.h"
+#include "googlesql/public/functions/convert_string.h"
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/hash.h"
 #include "googlesql/public/functions/normalize_mode.pb.h"
@@ -257,6 +258,18 @@ void DecimalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
   });
 }
 
+// The text of a FLOAT64 as BigQuery writes it, the shortest that reads back as the same value,
+// without DuckDB's ".0" for a whole number.
+void DoubleString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    std::string out;
+    absl::Status error;
+    const bool ok = googlesql::functions::NumericToString(arguments.Double(0), &out, &error,
+                                                          /*canonicalize_zero=*/true);
+    return ToStatusOr(ok, out, error);
+  });
+}
+
 }  // namespace
 
 void RegisterStringFunctions(duckdb_connection connection) {
@@ -325,6 +338,7 @@ void RegisterStringFunctions(duckdb_connection connection) {
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);
   Register(connection, "bq_initcap", {kVarchar}, kVarchar, InitCap);
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, DecimalString);
+  Register(connection, "bq_double_string", {kDouble}, kVarchar, DoubleString);
   Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, InitCap);
   Register(connection, "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,
            EditDistance<false>);

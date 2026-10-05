@@ -12,17 +12,60 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-// Whether a cast from `from` to `to` turns a NUMERIC into a STRING, at any depth.
-bool CastsNumericToString(const googlesql::Type* from, const googlesql::Type* to) {
+// A cast of `sql` between scalar types `from` and `to` by GoogleSQL's conversion, where DuckDB's
+// cast differs: DuckDB writes numbers and times in other formats, such as a DECIMAL padded with
+// zeros to its scale, and reads dates and times in more formats than BigQuery. `safe` makes a
+// conversion's errors NULL.
+std::optional<std::string> ConvertedCast(const googlesql::Type* from, const googlesql::Type* to,
+                                         const std::string& sql, bool safe) {
   if (to->IsString()) {
-    return from->IsNumericType();
+    if (from->IsNumericType()) {
+      return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
+    }
+    if (from->IsDouble()) {
+      return "bq_double_string(" + sql + ")";
+    }
+    if (from->IsDatetime()) {
+      return "bq_datetime_string(" + sql + ")";
+    }
+    if (from->IsTime()) {
+      return "bq_time_string(" + sql + ")";
+    }
+    if (from->IsTimestamp()) {
+      return "bq_timestamp_string(" + sql + ")";
+    }
   }
+  if (from->IsString()) {
+    const std::string arguments = "(" + sql + ", " + (safe ? "true" : "false") + ")";
+    if (to->IsDate()) {
+      return "bq_string_to_date" + arguments;
+    }
+    if (to->IsDatetime()) {
+      return "bq_string_to_datetime" + arguments;
+    }
+    if (to->IsTime()) {
+      return "bq_string_to_time" + arguments;
+    }
+    if (to->IsTimestamp()) {
+      return "bq_string_to_timestamp" + arguments;
+    }
+  }
+  return std::nullopt;
+}
+
+// Whether a cast from `from` to `to` makes a ConvertedCast of a value inside an array or struct.
+bool ConvertsNested(const googlesql::Type* from, const googlesql::Type* to) {
   if (from->IsArray() && to->IsArray()) {
-    return CastsNumericToString(from->AsArray()->element_type(), to->AsArray()->element_type());
+    const googlesql::Type* from_element = from->AsArray()->element_type();
+    const googlesql::Type* to_element = to->AsArray()->element_type();
+    return ConvertedCast(from_element, to_element, "", false) ||
+           ConvertsNested(from_element, to_element);
   }
   if (from->IsStruct() && to->IsStruct()) {
     for (int i = 0; i < from->AsStruct()->num_fields() && i < to->AsStruct()->num_fields(); ++i) {
-      if (CastsNumericToString(from->AsStruct()->field(i).type, to->AsStruct()->field(i).type)) {
+      const googlesql::Type* from_field = from->AsStruct()->field(i).type;
+      const googlesql::Type* to_field = to->AsStruct()->field(i).type;
+      if (ConvertedCast(from_field, to_field, "", false) || ConvertsNested(from_field, to_field)) {
         return true;
       }
     }
@@ -33,8 +76,9 @@ bool CastsNumericToString(const googlesql::Type* from, const googlesql::Type* to
 // A cast of `sql` from `from` to `to`, one of which holds a BIGNUMERIC, by GoogleSQL's
 // conversions, which make their errors NULL under SAFE_CAST. DuckDB would cast a BIGNUM through
 // DOUBLE or truncate a string. Arrays and structs are cast element by element and field by field,
-// and their other values as DuckDB casts them, except a NUMERIC to STRING. Under SAFE_CAST, a
-// value that fails makes its whole array or struct NULL, which its parent then counts as failed.
+// and their other values as DuckDB casts them, except where ConvertedCast applies. Under
+// SAFE_CAST, a value that fails makes its whole array or struct NULL, which its parent then counts
+// as failed.
 std::optional<std::string> BigNumericCast(const googlesql::Type* from, const googlesql::Type* to,
                                           const std::string& sql, bool safe, Context& context) {
   if (from->Equals(to)) {
@@ -95,8 +139,8 @@ std::optional<std::string> BigNumericCast(const googlesql::Type* from, const goo
     return std::nullopt;
   }
   if (!from->IsBigNumericType()) {
-    if (to->IsString() && from->IsNumericType()) {
-      return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
+    if (const auto converted = ConvertedCast(from, to, sql, safe)) {
+      return converted;
     }
     const auto type = DuckDbType(to);
     return type ? std::optional<std::string>(std::string(safe ? "TRY_CAST(" : "CAST(") + sql +
@@ -236,19 +280,24 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
                                       scope.context);
       return sql ? sql : Unsupported(scope, "CAST of a BIGNUMERIC");
     }
-    // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out. Such a cast
-    // nested deeper than an array's elements is unsupported.
-    if (cast->type()->IsString() && from->IsNumericType()) {
-      return "bq_decimal_string(CAST(" + *argument + " AS VARCHAR))";
+    if (const auto converted =
+            ConvertedCast(from, cast->type(), *argument, cast->return_null_on_error())) {
+      return converted;
     }
-    if (cast->type()->IsArray() && cast->type()->AsArray()->element_type()->IsString() &&
-        from->IsArray() && from->AsArray()->element_type()->IsNumericType()) {
+    // An array is converted element by element, unless SAFE_CAST would have to make the whole
+    // array NULL for an element that fails; conversions to STRING never fail. Such a cast nested
+    // deeper is unsupported.
+    if (from->IsArray() && cast->type()->IsArray() &&
+        (!cast->return_null_on_error() || cast->type()->AsArray()->element_type()->IsString())) {
       const std::string element = scope.context.FreshName("_e");
-      return "list_transform(" + *argument + ", " + element + " -> bq_decimal_string(CAST(" +
-             element + " AS VARCHAR)))";
+      if (const auto converted =
+              ConvertedCast(from->AsArray()->element_type(),
+                            cast->type()->AsArray()->element_type(), element, false)) {
+        return "list_transform(" + *argument + ", " + element + " -> " + *converted + ")";
+      }
     }
-    if (CastsNumericToString(from, cast->type())) {
-      return Unsupported(scope, "CAST of a nested NUMERIC to STRING");
+    if (ConvertsNested(from, cast->type())) {
+      return Unsupported(scope, "CAST of a nested value that DuckDB converts differently");
     }
     return std::string(cast->return_null_on_error() ? "TRY_CAST(" : "CAST(") + *argument + " AS " +
            *type + ")";
