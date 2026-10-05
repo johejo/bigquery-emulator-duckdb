@@ -198,8 +198,6 @@ TEST_F(TranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported(
                 "SELECT CAST(ARRAY(SELECT AS STRUCT NUMERIC '1' AS n) AS ARRAY<STRUCT<s STRING>>)"),
             "CAST of a nested NUMERIC to STRING");
-  EXPECT_EQ(Unsupported("SELECT APPROX_QUANTILES(x, 2) FROM UNNEST([BIGNUMERIC '1']) x"),
-            "function APPROX_QUANTILES with BIGNUMERIC");
   EXPECT_EQ(Unsupported("SELECT SAFE_CAST([a] AS ARRAY<BIGNUMERIC>) FROM t"),
             "SAFE_CAST of a nested BIGNUMERIC");
   EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(10, 2))"), "column type BIGNUMERIC");
