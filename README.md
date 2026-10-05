@@ -17,7 +17,8 @@ bazelisk build //:bigquery-emulator-duckdb
 Run the server:
 
 ```bash
-bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050
+bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050 \
+  --project='{"projectId":"test"}'
 ```
 
 ### Connect with `bq`
@@ -50,12 +51,40 @@ query.Parameters = []bigquery.QueryParameter{{Name: "name", Value: "alice"}}
 rows, err := query.Read(ctx)
 ```
 
+## Projects
+
+Register projects before using them. `--project` is repeatable and accepts either a JSON object
+or `@FILE` to read that object from a local file. Relative paths are resolved from the working
+directory; bare file paths, `file://` URIs and `@-` are not accepted.
+
+```bash
+just run --project='{"projectId":"test","numericId":"123456789012","friendlyName":"Local test"}' \
+  --project=@./another-project.json
+```
+
+Each object has a required, nonempty `projectId` without `/`, and optional `numericId` and
+`friendlyName` strings. Domain-scoped project IDs are accepted. `numericId` must be a positive
+uint64 in decimal, without leading zeros. `friendlyName` may be empty. Unknown fields, invalid
+values, duplicate project IDs, duplicate numbers and numbers that identify a different project
+are startup errors.
+
+`projects.list` returns registered projects, including those with no datasets. Unconfigured
+numbers and friendly names are omitted. REST project references accept the configured number
+as an alias of the project ID; response references use the project ID. Unregistered projects
+return 404 rather than being created by an API request. `projects.getServiceAccount` remains
+unsupported.
+
+With `--data-dir`, registrations are stored in `projects.json` and restored at startup without
+`--project`. Explicit registrations replace the same project's saved metadata, clearing optional
+fields omitted from the supplied object. Other saved projects remain registered. Existing DuckDB
+files from before explicit registration must be registered once with `--project` to use them.
+
 ## Persistence
 
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
 each project is stored in `DIR/<project>.duckdb` (characters outside `[A-Za-z0-9_-]` are
-percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its datasets
-and tables come back after a restart. Logical views, including their GoogleSQL definitions and
+percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its registration,
+datasets and tables come back after a restart. Logical views, including their GoogleSQL definitions and
 schemas, are persisted too. Jobs are kept in memory only.
 
 On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project file. A
@@ -113,6 +142,8 @@ Behavior that applies across them:
 The emulator rejects what it cannot emulate rather than accepting it and behaving differently.
 These differences are deliberate exceptions, kept for convenience:
 
+- Authentication and IAM are not checked. Every registered project is visible and accessible to
+  every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
   SQL. Legacy SQL itself is unsupported.
 - `formatOptions.timestampOutputFormat` of `jobs.getQueryResults` and `tabledata.list` is ignored;

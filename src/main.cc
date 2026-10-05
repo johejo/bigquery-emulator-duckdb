@@ -9,15 +9,19 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <vector>
 
 #include "src/emulator.h"
+#include "src/project.h"
 #include "src/server.h"
 
 namespace {
 
 void PrintUsage() {
   std::cerr
-      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--data-dir DIR]\n"
+      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--data-dir DIR] [--project "
+         "JSON|@FILE]...\n"
+         "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --host HOST     Address to listen on (default: 0.0.0.0)\n"
          "  --port PORT     Port to listen on (default: 9050)\n"
          "  --data-dir DIR  Store each project in DIR/<project>.duckdb so that data survives\n"
@@ -46,10 +50,15 @@ void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& 
 int Run(int argc, char** argv) {
   bigquery_emulator_duckdb::ServerOptions options;
   std::string data_dir;
+  std::vector<bigquery_emulator_duckdb::Project> projects;
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
     const bool has_value = i + 1 < argc;
-    if (arg == "--host" && has_value) {
+    if (arg == "--project" && has_value) {
+      projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(argv[++i]));
+    } else if (arg.starts_with("--project=")) {
+      projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(arg.substr(10)));
+    } else if (arg == "--host" && has_value) {
       options.host = argv[++i];
     } else if (arg == "--port" && has_value) {
       const std::string_view value = argv[++i];
@@ -71,7 +80,7 @@ int Run(int argc, char** argv) {
   }
 
   const sigset_t signals = BlockShutdownSignals();
-  bigquery_emulator_duckdb::Emulator emulator(data_dir);
+  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Bind()) {
     std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';

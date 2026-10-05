@@ -116,7 +116,7 @@ type emulator struct {
 }
 
 func startEmulator(binary string) (*emulator, error) {
-	cmd := exec.Command(binary, "--host", "127.0.0.1", "--port", "0")
+	cmd := exec.Command(binary, "--host", "127.0.0.1", "--port", "0", "--project", `{"projectId":"test"}`)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return nil, err

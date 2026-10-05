@@ -1,0 +1,58 @@
+desc: unregistered project requests do not create projects
+runners:
+  req: ${PROJECTS_API}
+steps:
+  empty:
+    req:
+      /projects:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 0 && current.res.body.etag != ""
+  missing_datasets:
+    req:
+      /projects/missing/datasets:
+        get:
+          body: null
+    test: |
+      current.res.status == 404 && current.res.body.error.status == "NOT_FOUND"
+  missing_jobs:
+    req:
+      /projects/missing/jobs:
+        get:
+          body: null
+    test: |
+      current.res.status == 404 && current.res.body.error.status == "NOT_FOUND"
+  missing_query:
+    req:
+      /projects/missing/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT 1
+              useLegacySql: false
+    test: |
+      current.res.status == 404 && current.res.body.error.status == "NOT_FOUND"
+  missing_create:
+    req:
+      /projects/missing/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: |
+      current.res.status == 404 && current.res.body.error.status == "NOT_FOUND"
+  missing_upload:
+    req:
+      /resumable/upload/bigquery/v2/projects/missing/jobs/1:
+        put:
+          body: null
+    test: |
+      current.res.status == 404 && current.res.body.error.status == "NOT_FOUND"
+  still_empty:
+    req:
+      /projects:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.empty.res.body

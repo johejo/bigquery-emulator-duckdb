@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <map>
 #include <memory>
@@ -15,6 +16,7 @@
 #include "src/api_error.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/project.h"
 #include "src/references.h"
 #include "src/server/internal.h"
 #include "src/table_metadata.h"
@@ -399,6 +401,26 @@ json QueryResponse(const Job& job, const ResultPage& page) {
 json GetQueryResultsResponse(const Job& job, const ResultPage& page) {
   json response = {{"kind", "bigquery#getQueryResultsResponse"}, {"etag", kEtag}};
   AddQueryResults(job, page, response);
+  return response;
+}
+
+json ProjectList(const std::vector<Project>& projects, const ListPage& page) {
+  // Tokens are opaque to clients and identify the last project returned.
+  json response = {{"kind", "bigquery#projectList"}};
+  const auto entries = ListPageItems(projects, page, &Project::project_id, response);
+  response["totalItems"] = entries.size();
+  if (!entries.empty()) {
+    response["projects"] = json::array();
+    for (const Project& project : entries) {
+      json entry = {{"kind", "bigquery#project"},
+                    {"id", project.project_id},
+                    {"projectReference", {{"projectId", project.project_id}}}};
+      if (project.numeric_id) entry["numericId"] = *project.numeric_id;
+      if (project.friendly_name) entry["friendlyName"] = *project.friendly_name;
+      response["projects"].push_back(std::move(entry));
+    }
+  }
+  response["etag"] = std::format("{:x}", std::hash<std::string>{}(response.dump()));
   return response;
 }
 

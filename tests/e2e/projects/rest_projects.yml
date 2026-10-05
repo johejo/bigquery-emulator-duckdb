@@ -1,0 +1,118 @@
+desc: registered project metadata, paging and numeric references
+runners:
+  req: ${PROJECTS_API}
+steps:
+  first:
+    req:
+      /bigquery/v2/projects:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.kind == "bigquery#projectList" && current.res.body.totalItems == 50 && len(current.res.body.projects) == 50 && current.res.body.etag != ""
+  root:
+    req:
+      /projects:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.first.res.body
+  last:
+    req:
+      /projects?pageToken={{ steps.first.res.body.nextPageToken }}:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 2 && len(current.res.body.projects) == 2 && !("nextPageToken" in current.res.body) && current.res.body.etag != steps.first.res.body.etag
+  configured:
+    req:
+      /projects?pageToken=p50:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 1 && current.res.body.projects[0].kind == "bigquery#project" && current.res.body.projects[0].id == "z-configured" && current.res.body.projects[0].projectReference.projectId == "z-configured" && current.res.body.projects[0].numericId == "123456789012" && current.res.body.projects[0].friendlyName == ""
+  one:
+    req:
+      /projects?maxResults=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 1 && !("numericId" in current.res.body.projects[0]) && !("friendlyName" in current.res.body.projects[0])
+  all:
+    req:
+      /projects?maxResults=100:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 52 && !("nextPageToken" in current.res.body)
+  zero:
+    req:
+      /projects?maxResults=0:
+        get:
+          body: null
+    test: |
+      current.res.status == 400
+  negative:
+    req:
+      /projects?maxResults=-1:
+        get:
+          body: null
+    test: |
+      current.res.status == 400
+  text:
+    req:
+      /projects?maxResults=x:
+        get:
+          body: null
+    test: |
+      current.res.status == 400
+  overflow:
+    req:
+      /projects?maxResults=4294967296:
+        get:
+          body: null
+    test: |
+      current.res.status == 400
+  unknown_parameter:
+    req:
+      /projects?maxResult=1:
+        get:
+          body: null
+    test: |
+      current.res.status == 400
+  dataset:
+    req:
+      /projects/123456789012/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: |
+      current.res.status == 200 && current.res.body.datasetReference.projectId == "z-configured"
+  by_id:
+    req:
+      /projects/z-configured/datasets/ds:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.dataset.res.body
+  by_number:
+    req:
+      /projects/123456789012/datasets/ds:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.dataset.res.body
+  delete_dataset:
+    req:
+      /projects/123456789012/datasets/ds:
+        delete:
+          body: null
+    test: |
+      current.res.status == 204
+  still_registered:
+    req:
+      /projects?pageToken=p50:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.configured.res.body

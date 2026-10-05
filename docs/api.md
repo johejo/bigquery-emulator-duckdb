@@ -23,8 +23,8 @@ rejected as unsupported.
 | Status | Methods |
 | --- | --- |
 | Partial | 9 |
-| Supported | 12 |
-| Unsupported | 26 |
+| Supported | 13 |
+| Unsupported | 25 |
 
 ## datasets
 
@@ -64,7 +64,7 @@ rejected as unsupported.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`projects.getServiceAccount`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/getServiceAccount) | `GET projects/{projectsId}/serviceAccount` | Unsupported |  |
-| [`projects.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/list) | `GET projects` | Unsupported |  |
+| [`projects.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/list) | `GET projects` | Supported | Lists explicitly registered projects without checking authentication or IAM. Defaults to 50 entries per page. Project numbers and friendly names are returned when configured. |
 
 ## routines
 

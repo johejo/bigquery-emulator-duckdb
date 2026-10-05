@@ -1,0 +1,25 @@
+desc: startup registrations replace saved metadata and retain other projects
+runners:
+  req: ${PROJECTS_API}
+steps:
+  configured:
+    req:
+      /projects?pageToken=p50:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.projects[0].friendlyName == "Updated" && !("numericId" in current.res.body.projects[0])
+  old_alias:
+    req:
+      /projects/123456789012/datasets:
+        get:
+          body: null
+    test: |
+      current.res.status == 404
+  all:
+    req:
+      /projects?maxResults=100:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 52

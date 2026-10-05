@@ -17,6 +17,7 @@
 #include "src/api_error.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/project.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 
@@ -78,7 +79,7 @@ struct JobListRequest {
   int64_t max_creation_time = INT64_MAX;
 };
 
-// A page of datasets.list or tables.list. Both list by id, so the page token is the id of the
+// A page of projects.list, datasets.list or tables.list, ordered by ID. The token is the ID of the
 // last entry of the previous page; pages stay consistent when entries are added or removed.
 struct ListPage {
   int64_t max_results = INT64_MAX;
@@ -165,6 +166,8 @@ nlohmann::json JobList(const std::vector<std::shared_ptr<const Job>>& jobs,
 nlohmann::json JobCancelResponse(const Job& job);
 nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
 nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
+nlohmann::json ProjectList(const std::vector<Project>& projects, const ListPage& page);
+
 nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata);
 // `entries` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
 nlohmann::json DatasetList(const std::string& project_id,
