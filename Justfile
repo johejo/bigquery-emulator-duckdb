@@ -57,6 +57,16 @@ e2e *args:
 compliance *args:
     bazelisk test //:compliance_test {{args}}
 
+# Evaluates a query on GoogleSQL's reference implementation, which is not BigQuery: a lead for
+# what to check on BigQuery, never an expected value.
+reference sql:
+    bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{quote(sql)}}
+
+# Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified.txt; for maintainers only,
+# since queries on BigQuery are billed.
+bigquery-answers project:
+    go -C tools/bqanswers run . {{quote(project)}} {{justfile_directory()}}/tests/e2e/goclient/testdata/unverified.txt
+
 [positional-arguments]
 run *args:
     bazelisk run //:bigquery-emulator-duckdb -- "$@"
