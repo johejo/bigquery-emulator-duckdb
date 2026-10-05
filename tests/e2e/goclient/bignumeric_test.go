@@ -155,6 +155,29 @@ func TestBigNumericArrayFunctions(t *testing.T) {
 	}
 }
 
+// A parsed value reaches the client as BIGNUMERIC, with its full precision.
+func TestParseBigNumeric(t *testing.T) {
+	query := newClient(t).Query("SELECT PARSE_BIGNUMERIC(@s) AS n")
+	query.Parameters = []bigquery.QueryParameter{{Name: "s", Value: maxBigNumeric}}
+	rows, err := query.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows.Schema) != 1 || rows.Schema[0].Type != bigquery.BigNumericFieldType || rows.Schema[0].Repeated {
+		t.Fatalf("unexpected schema: %v", rows.Schema)
+	}
+	if got := row[0].(*big.Rat); got.Cmp(rat(t, maxBigNumeric)) != 0 {
+		t.Errorf("got %v, want %s", got, maxBigNumeric)
+	}
+	if err := rows.Next(new([]bigquery.Value)); err != iterator.Done {
+		t.Errorf("got another row (%v), want one", err)
+	}
+}
+
 // Out of range results fail with GoogleSQL's messages, as in BigQuery.
 func TestBigNumericErrors(t *testing.T) {
 	ctx := context.Background()
@@ -174,6 +197,8 @@ func TestBigNumericErrors(t *testing.T) {
 		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x": "int64 out of range: 100000000000000000000",
 		"SELECT CAST([x] AS ARRAY<INT64>) FROM UNNEST([BIGNUMERIC '1e20']) x": "int64 out of range: " +
 			"100000000000000000000",
+		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1 2']) x":              `Invalid input to PARSE_BIGNUMERIC: "1 2"`,
+		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1e39']) x":             `Invalid input to PARSE_BIGNUMERIC: "1e39"`,
 		"SELECT GENERATE_ARRAY(x, 3, 0) FROM UNNEST([BIGNUMERIC '1']) x": "Sequence step cannot be 0.",
 	} {
 		job, err := client.Query(sql).Run(ctx)

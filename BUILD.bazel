@@ -263,6 +263,7 @@ cc_library(
         "@googlesql//googlesql/public/functions:json_internal",
         "@googlesql//googlesql/public/functions:math",
         "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
+        "@googlesql//googlesql/public/functions:numeric",
         "@googlesql//googlesql/public/functions:parse_date_time",
         "@googlesql//googlesql/public/functions:regexp",
         "@googlesql//googlesql/public/functions:rounding_mode_cc_proto",
