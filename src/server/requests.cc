@@ -223,19 +223,13 @@ bool QueryParamBool(const httplib::Request& request, const char* name) {
   return request.has_param(name) && request.get_param_value(name) == "true";
 }
 
-void RejectQueryParam(const httplib::Request& request, const char* name) {
-  if (!request.get_param_value(name).empty()) {
-    throw ApiError::Invalid(std::string("The emulator does not support ") + name);
-  }
-}
-
 DatasetReference DatasetFromPath(const httplib::Request& request) {
-  return DatasetReference{Param(request, "project"), Param(request, "dataset")};
+  return DatasetReference{Param(request, "projectId"), Param(request, "datasetId")};
 }
 
 TableReference TableFromPath(const httplib::Request& request) {
-  return TableReference{Param(request, "project"), Param(request, "dataset"),
-                        Param(request, "table")};
+  return TableReference{Param(request, "projectId"), Param(request, "datasetId"),
+                        Param(request, "tableId")};
 }
 
 json ParseBody(const httplib::Request& request) {
@@ -337,18 +331,11 @@ LoadRequest ParseLoadInsert(const std::string& project_id, const json& body) {
 
 JobListRequest ParseJobList(const httplib::Request& request) {
   JobListRequest result;
-  const std::string projection =
-      request.has_param("projection") ? request.get_param_value("projection") : "full";
-  if (projection != "full" && projection != "minimal") {
-    throw ApiError::Invalid("Invalid value for projection");
-  }
-  result.full_projection = projection == "full";
-  result.state_filter =
-      request.has_param("stateFilter") ? request.get_param_value("stateFilter") : "";
-  if (!result.state_filter.empty() && result.state_filter != "done" &&
-      result.state_filter != "pending" && result.state_filter != "running") {
-    throw ApiError::Invalid("Invalid value for stateFilter");
-  }
+  // CheckQueryParameters has checked the values of projection and stateFilter.
+  result.full_projection = request.get_param_value("projection") != "minimal";
+  // TODO(johejo): stateFilter is repeated, so a request may ask for several states; only the first
+  // is read.
+  result.state_filter = request.get_param_value("stateFilter");
   result.parent_filter = request.has_param("parentJobId");
   result.max_results = QueryParamInt(request, "maxResults", result.max_results);
   result.offset = QueryParamInt(request, "pageToken", result.offset);
@@ -397,12 +384,8 @@ DatasetFilter ParseDatasetFilter(const httplib::Request& request) {
 }
 
 TableGetRequest ParseTableGet(const httplib::Request& request) {
-  const std::string view = request.get_param_value("view");
-  if (!view.empty() && view != "TABLE_METADATA_VIEW_UNSPECIFIED" && view != "BASIC" &&
-      view != "STORAGE_STATS" && view != "FULL") {
-    throw ApiError::Invalid("Invalid value for view: " + view);
-  }
-  return {.storage_stats = view != "BASIC",
+  // CheckQueryParameters has checked the value of view.
+  return {.storage_stats = request.get_param_value("view") != "BASIC",
           .selected_fields = request.get_param_value("selectedFields")};
 }
 

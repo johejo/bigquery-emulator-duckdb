@@ -7,8 +7,11 @@ A request passes through the server, frontend, translator and backend in turn.
 The HTTP server handles BigQuery REST requests and returns BigQuery-compatible responses. It is
 built on [cpp-httplib](https://github.com/yhirose/cpp-httplib) with
 [nlohmann/json](https://github.com/nlohmann/json). It serves the v2 discovery document in
-`third_party/bigquery/discovery.json`, the one bundled with `bq`, and resource routes accept both
-`/bigquery/v2` and root paths.
+`third_party/bigquery/discovery.json`, the one bundled with `bq`, and routes requests by it:
+[src/server/routes.cc](../src/server/routes.cc) reads each served method's paths, which accept both
+`/bigquery/v2` and root paths, and its query parameters. A request with a query parameter the
+method does not take, or a value its type does not allow, fails as in BigQuery, and one with a
+parameter the method's handler does not handle is rejected as unsupported.
 
 ## Frontend
 
