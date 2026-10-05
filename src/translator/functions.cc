@@ -951,6 +951,9 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "IFNULL",
       "COALESCE",
       "NULLIF",
+      // ERROR returns no value; GoogleSQL calls it with the BIGNUMERIC type of ARRAY_FIRST and
+      // ARRAY_LAST.
+      "ERROR",
       "$MAKE_ARRAY",
       "$ARRAY_AT_OFFSET",
       "$ARRAY_AT_ORDINAL",
