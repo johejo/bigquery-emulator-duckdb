@@ -2,7 +2,7 @@ desc: project registration, listing and persistence on isolated emulator instanc
 steps:
   projects:
     exec:
-      command: python3 tests/e2e/projects_test.py
+      command: go test -count=1 ./tests/e2e/projects
     test: current.exit_code == 0
   bq_projects:
     exec:

@@ -30,7 +30,7 @@ func newClientForProject(t *testing.T, project string) *bigquery.Client {
 	t.Helper()
 	endpoint := os.Getenv("BQ_EMULATOR_API")
 	if endpoint == "" {
-		t.Skip("BQ_EMULATOR_API is not set; start the emulator with tests/e2e/run.sh")
+		t.Skip("BQ_EMULATOR_API is not set; run just e2e")
 	}
 	client, err := bigquery.NewClient(context.Background(), project,
 		option.WithEndpoint(endpoint), option.WithoutAuthentication())
