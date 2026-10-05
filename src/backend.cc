@@ -343,10 +343,10 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   }
 }
 
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
   const bool is_null = validity != nullptr && !duckdb_validity_row_is_valid(validity, row);
-  if (IsListLike(type)) {
+  if (IsListLike(type) && !(is_null && null_arrays)) {
     json elements = json::array();
     if (!is_null) {
       LogicalType child_type = ElementType(type);
@@ -357,7 +357,7 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
       duckdb_vector child =
           array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
       for (idx_t i = 0; i < entry.length; ++i) {
-        elements.push_back(ToCell(child, child_type.get(), entry.offset + i));
+        elements.push_back(ToCell(child, child_type.get(), entry.offset + i, null_arrays));
       }
     }
     return json{{"v", std::move(elements)}};
@@ -371,7 +371,8 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
       json fields = json::array();
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
         LogicalType child_type(duckdb_struct_type_child_type(type, i));
-        fields.push_back(ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row));
+        fields.push_back(
+            ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row, null_arrays));
       }
       value = json{{"f", std::move(fields)}};
       break;
@@ -540,13 +541,14 @@ Backend::Backend() : db_(std::make_unique<Database>()) {}
 
 Backend::~Backend() = default;
 
-QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup) {
-  return ExecuteAll({sql}, setup);
+QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup,
+                             bool null_arrays) {
+  return ExecuteAll({sql}, setup, null_arrays);
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): setup runs before the statements.
 QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
-                                const std::vector<std::string>& setup) {
+                                const std::vector<std::string>& setup, bool null_arrays) {
   if (statements.empty()) {
     throw BackendError("No statement to execute");
   }
@@ -581,7 +583,7 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
       for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(chunk.get()); ++column) {
         duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), column);
         LogicalType type(duckdb_vector_get_column_type(vector));
-        cells.push_back(ToCell(vector, type.get(), row));
+        cells.push_back(ToCell(vector, type.get(), row, null_arrays));
       }
       query_result.rows.push_back(json{{"f", std::move(cells)}});
     }

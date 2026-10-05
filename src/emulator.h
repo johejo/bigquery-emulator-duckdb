@@ -16,6 +16,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/catalog.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/project.h"
@@ -24,7 +25,14 @@
 #include "src/table_metadata.h"
 #include "src/translator.h"
 
+namespace googlesql {
+class ParserOutput;
+}
+
 namespace bigquery_emulator_duckdb {
+
+// JobStatistics2.statementType of a multi-statement query.
+inline constexpr char kScriptStatementType[] = "SCRIPT";
 
 // The location of every dataset, table and job. The emulator does not model locations.
 inline constexpr char kLocation[] = "US";
@@ -214,13 +222,32 @@ class Emulator {
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 
  private:
+  // Evaluates the statements and expressions of a multi-statement query; in emulator_script.cc.
+  friend class ScriptEvaluator;
+
   // The registered project's DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
   // Keeps the catalog, types and resolved AST alive until translation finishes.
   TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
                                 const std::string& default_project,
                                 const std::string& default_dataset);
-  QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
+  QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
+                      bool null_arrays = false);
+  // Runs `translation` as a query job without a destination table does, recording the metadata
+  // of a DDL statement, and returns its result with the schema the translation gives it.
+  QueryResult RunStatement(const TranslatedStatement& translation,
+                           const std::vector<std::string>& setup, bool null_arrays = false);
+  // A catalog source for the tables, views and datasets the emulator holds.
+  std::unique_ptr<TableSource> NewTableSource();
+  // The script that `query` is, or null when it is a single statement or does not parse, which
+  // RunQuery then reports as it does for a single statement.
+  static std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query);
+  // Runs the multi-statement query `script`, the text of `request.query`, with `setup` selecting
+  // the default dataset `default_project`.`default_dataset`, and returns the result of the last
+  // statement it ran. Rejects a request a multi-statement query cannot be.
+  QueryResult RunScript(const QueryRequest& request, const googlesql::ParserOutput& script,
+                        const std::string& default_project, const std::string& default_dataset,
+                        const std::vector<std::string>& setup);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set.

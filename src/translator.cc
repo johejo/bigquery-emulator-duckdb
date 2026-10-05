@@ -135,11 +135,12 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
 
 namespace bigquery_emulator_duckdb {
 
-std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedStatement& statement,
-                                                      const QueryParameters& parameters,
-                                                      const DefaultDataset& defaults,
-                                                      std::string* unsupported) {
-  translator::Context context{.parameters = parameters, .defaults = defaults};
+std::optional<TranslatedStatement> TranslateStatement(
+    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
+    const DefaultDataset& defaults, std::string* unsupported,
+    const googlesql::SystemVariableValuesMap* system_variables) {
+  translator::Context context{
+      .parameters = parameters, .defaults = defaults, .system_variables = system_variables};
   auto sql = translator::Statement(statement, translator::Scope{.context = context});
   if (!sql) {
     if (unsupported != nullptr) {
@@ -156,6 +157,22 @@ std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedS
                              .added_column = std::move(context.added_column),
                              .view = std::move(context.view),
                              .dataset = std::move(context.dataset)};
+}
+
+std::optional<std::string> TranslateExpression(
+    const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
+    const DefaultDataset& defaults, std::string* unsupported,
+    const googlesql::SystemVariableValuesMap* system_variables) {
+  translator::Context context{
+      .parameters = parameters, .defaults = defaults, .system_variables = system_variables};
+  auto sql = translator::Expression(expression, translator::Scope{.context = context}, {});
+  if (!sql) {
+    if (unsupported != nullptr) {
+      *unsupported = context.unsupported.empty() ? "unsupported construct" : context.unsupported;
+    }
+    return std::nullopt;
+  }
+  return "SELECT " + *sql;
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -72,7 +72,7 @@ struct ResultPage {
 struct JobListRequest {
   bool full_projection = true;
   std::string state_filter;
-  bool parent_filter = false;
+  std::optional<std::string> parent_job_id;
   int64_t max_results = 50;
   int64_t offset = 0;
   int64_t min_creation_time = 0;

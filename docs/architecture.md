@@ -32,6 +32,13 @@ translator reads such a table from the DuckDB query that carries its rows.
 parser; a statement that fails analysis is reported as `invalidQuery`. For a query, the resolved
 output columns supply the result schema.
 
+A request with more than one statement, or with a procedural statement such as `DECLARE` or
+`IF`, is a multi-statement query. GoogleSQL's `ScriptExecutor` runs its control flow and keeps
+its variables, and [src/emulator_script.cc](../src/emulator_script.cc) evaluates each statement
+and expression the executor reaches: it analyzes them against a catalog that holds the variables
+as constants ahead of the tables, translates them like any other statement, and decodes the
+value of an expression from the row DuckDB returns.
+
 ## Translator
 
 [src/translator.cc](../src/translator.cc) translates the resolved AST into DuckDB SQL. Each scan

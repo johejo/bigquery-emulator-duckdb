@@ -4,7 +4,10 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
+#include "googlesql/public/constant.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
 #include "src/translator/internal.h"
@@ -243,6 +246,24 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     const auto* parameter = expr.GetAs<googlesql::ResolvedParameter>();
     return parameter->name().empty() ? scope.context.parameters.ByPosition(parameter->position())
                                      : scope.context.parameters.ByName(parameter->name());
+  }
+  // A script's variables are catalog constants, and its system variables have values only while
+  // it runs; both are read as literals of their current values.
+  if (expr.Is<googlesql::ResolvedConstant>()) {
+    const absl::StatusOr<googlesql::Value> value =
+        expr.GetAs<googlesql::ResolvedConstant>()->constant()->GetValue();
+    const auto literal = value.ok() ? Literal(*value) : std::nullopt;
+    return literal ? literal : Unsupported(scope, "constant of type " + expr.type()->DebugString());
+  }
+  if (expr.Is<googlesql::ResolvedSystemVariable>()) {
+    const auto& path = expr.GetAs<googlesql::ResolvedSystemVariable>()->name_path();
+    const auto* variables = scope.context.system_variables;
+    if (variables == nullptr || !variables->contains(path)) {
+      return Unsupported(scope, "system variable @@" + Join(path, "."));
+    }
+    const auto literal = Literal(variables->at(path));
+    return literal ? literal
+                   : Unsupported(scope, "system variable of type " + expr.type()->DebugString());
   }
   if (expr.Is<googlesql::ResolvedCast>()) {
     const auto* cast = expr.GetAs<googlesql::ResolvedCast>();

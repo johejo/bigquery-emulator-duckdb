@@ -46,13 +46,16 @@ class Backend {
   Backend& operator=(const Backend&) = delete;
 
   // Runs a single statement and materializes its result. `setup` statements run first on the
-  // same connection and are used to select the default catalog and schema.
-  QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {});
+  // same connection and are used to select the default catalog and schema. A NULL array is
+  // encoded as an empty one, as BigQuery returns it, unless `null_arrays` is set, which encodes
+  // it as null for the emulator's own use of the value.
+  QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
+                      bool null_arrays = false);
 
   // Runs `statements` in order on one connection and materializes the result of the last one.
   // Statements before the last may open a transaction; it is rolled back if a later one fails.
   QueryResult ExecuteAll(const std::vector<std::string>& statements,
-                         const std::vector<std::string>& setup = {});
+                         const std::vector<std::string>& setup = {}, bool null_arrays = false);
 
   // Runs the DDL statement `sql` and then the statements that record its metadata, in one
   // transaction, so that neither is kept without the other. When skip_query is not empty and

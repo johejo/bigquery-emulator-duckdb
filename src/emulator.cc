@@ -215,6 +215,19 @@ class DuckDbTableSource : public TableSource {
   Backend& backend_;
 };
 
+// Rejects DDL whose target is in one of DuckDB's own schemas: DDL names its target by path, so
+// such a path reaches past the datasets.
+void CheckDdlTarget(const TranslatedStatement& translation) {
+  if (const auto& target = translation.ddl_target_table;
+      target.has_value() && IsDuckDbSchema(target->dataset_id)) {
+    throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
+  }
+  if (const auto& target = translation.ddl_target_dataset;
+      target.has_value() && IsDuckDbSchema(target->dataset_id)) {
+    throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
+  }
+}
+
 const googlesql::Type* ParameterType(const FieldSchema& field,
                                      googlesql::TypeFactory& type_factory) {
   absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
@@ -384,9 +397,10 @@ std::string Emulator::ProjectDatabase(const std::string& project_id) const {
   return (std::filesystem::path(data_dir_) / ProjectFileName(project_id)).string();
 }
 
-QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup) {
+QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
+                              bool null_arrays) {
   try {
-    return backend_.Execute(sql, setup);
+    return backend_.Execute(sql, setup, null_arrays);
   } catch (const BackendError& error) {
     throw ApiError::InvalidQuery(error.what());
   }
@@ -496,44 +510,55 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
 
     std::get<QueryJob>(job.configuration).destination_table = request.destination_table;
 
+    if (const auto script = ParseScript(request.query)) {
+      std::get<QueryJob>(job.configuration).statement_type = kScriptStatementType;
+      job.result =
+          RunScript(request, *script, settings.default_project, settings.default_dataset, setup);
+      return;
+    }
     const TranslatedStatement translation = Translate(
         request.query, request.parameters, settings.default_project, settings.default_dataset);
     auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
-    // DDL names its target by path, so a path into DuckDB's own schemas reaches past the
-    // datasets.
-    if (const auto& target = translation.ddl_target_table;
-        target.has_value() && IsDuckDbSchema(target->dataset_id)) {
-      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
-                               target->dataset_id);
+    if (!request.dry_run && !request.destination_table.has_value()) {
+      job.result = RunStatement(translation, setup);
+      return;
     }
-    if (const auto& target = translation.ddl_target_dataset;
-        target.has_value() && IsDuckDbSchema(target->dataset_id)) {
-      throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" +
-                               target->dataset_id);
-    }
+    CheckDdlTarget(translation);
     if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
-    QueryResult result;
-    if (request.dry_run) {
-      result = Prepare(translation.sql, setup);
-    } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
-      backend_.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
-    } else if (request.destination_table.has_value()) {
-      result = WriteDestination(request.project_id, *request.destination_table,
-                                request.create_disposition, request.write_disposition,
-                                translation.sql, *translation.result_schema, setup);
-    } else {
-      result = Execute(translation.sql, setup);
-    }
+    QueryResult result =
+        request.dry_run ? Prepare(translation.sql, setup)
+                        : WriteDestination(request.project_id, *request.destination_table,
+                                           request.create_disposition, request.write_disposition,
+                                           translation.sql, *translation.result_schema, setup);
     if (translation.result_schema.has_value()) {
       result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
     }
     job.result = std::move(result);
   });
+}
+
+QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
+                                   const std::vector<std::string>& setup, bool null_arrays) {
+  CheckDdlTarget(translation);
+  QueryResult result;
+  if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
+    backend_.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
+  } else {
+    result = Execute(translation.sql, setup, null_arrays);
+  }
+  if (translation.result_schema.has_value()) {
+    result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
+  }
+  return result;
+}
+
+std::unique_ptr<TableSource> Emulator::NewTableSource() {
+  return std::make_unique<DuckDbTableSource>(backend_);
 }
 
 std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
