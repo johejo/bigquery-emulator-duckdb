@@ -1,9 +1,13 @@
 #include "src/type_mapping.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <format>
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -11,6 +15,9 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/collation.h"
+#include "googlesql/public/types/type_modifiers.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -174,6 +181,60 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
   }
 }
 
+// The type parameters of a column that `field` describes: the precision and scale of NUMERIC and
+// BIGNUMERIC, at any depth, within the ranges DDL allows and failing with GoogleSQL's messages
+// outside them. Lengths are left out, as DuckDbType drops them.
+absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema& field) {
+  googlesql::TypeParameters parameters;
+  if (field.type == FieldType::kRecord) {
+    std::vector<googlesql::TypeParameters> children;
+    for (const FieldSchema& child : field.fields) {
+      absl::StatusOr<googlesql::TypeParameters> child_parameters = FieldTypeParameters(child);
+      if (!child_parameters.ok()) {
+        return child_parameters.status();
+      }
+      children.push_back(*std::move(child_parameters));
+    }
+    parameters = googlesql::TypeParameters::MakeTypeParametersWithChildList(std::move(children));
+  } else if (field.precision.has_value() || field.scale.has_value()) {
+    const bool numeric = field.type == FieldType::kNumeric;
+    if (!numeric && field.type != FieldType::kBigNumeric) {
+      return absl::InvalidArgumentError(
+          std::format("Field {} of type {} cannot have a precision or scale", field.name,
+                      ScalarType(field.type)->TypeName(googlesql::PRODUCT_EXTERNAL)));
+    }
+    if (!field.precision.has_value()) {
+      return absl::InvalidArgumentError("Field " + field.name + " has a scale but no precision");
+    }
+    const std::string_view name = numeric ? "NUMERIC" : "BIGNUMERIC";
+    const int64_t scale = field.scale.value_or(0);
+    const int64_t max_scale = numeric ? 9 : 38;
+    if (scale < 0 || scale > max_scale) {
+      return absl::InvalidArgumentError(
+          std::format("In {}(P, S), S must be between 0 and {}", name, max_scale));
+    }
+    const int64_t max_precision = (numeric ? 29 : 38) + scale;
+    if (*field.precision < std::max<int64_t>(1, scale) || *field.precision > max_precision) {
+      return absl::InvalidArgumentError(std::format("In {}(P, {}), P must be between {} and {}",
+                                                    name, scale, std::max<int64_t>(1, scale),
+                                                    max_precision));
+    }
+    googlesql::NumericTypeParametersProto proto;
+    proto.set_precision(*field.precision);
+    proto.set_scale(scale);
+    absl::StatusOr<googlesql::TypeParameters> numeric_parameters =
+        googlesql::TypeParameters::MakeNumericTypeParameters(proto);
+    if (!numeric_parameters.ok()) {
+      return numeric_parameters.status();
+    }
+    parameters = *std::move(numeric_parameters);
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    return googlesql::TypeParameters::MakeTypeParametersWithChildList({std::move(parameters)});
+  }
+  return parameters;
+}
+
 }  // namespace
 
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
@@ -250,12 +311,27 @@ absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
   if (!type.ok()) {
     return type.status();
   }
-  std::optional<std::string> duckdb_type = MapToDuckDb(*type, nullptr, /*geography_as_text=*/true);
-  if (!duckdb_type.has_value()) {
-    return absl::InvalidArgumentError("Unsupported field type: " +
-                                      (*type)->TypeName(googlesql::PRODUCT_EXTERNAL));
+  absl::StatusOr<googlesql::TypeParameters> parameters = FieldTypeParameters(field);
+  if (!parameters.ok()) {
+    return parameters.status();
   }
-  return *std::move(duckdb_type);
+  std::optional<std::string> duckdb_type =
+      MapToDuckDb(*type, &*parameters, /*geography_as_text=*/true);
+  if (duckdb_type.has_value()) {
+    return *std::move(duckdb_type);
+  }
+  // A type the emulator stores only without its parameters, such as BIGNUMERIC(P, S).
+  if (MapToDuckDb(*type, nullptr, /*geography_as_text=*/true).has_value()) {
+    absl::StatusOr<std::string> name = (*type)->TypeNameWithModifiers(
+        googlesql::TypeModifiers::MakeTypeModifiers(*std::move(parameters), googlesql::Collation()),
+        googlesql::PRODUCT_EXTERNAL);
+    if (!name.ok()) {
+      return name.status();
+    }
+    return absl::InvalidArgumentError("The emulator does not support field type " + *name);
+  }
+  return absl::InvalidArgumentError("Unsupported field type: " +
+                                    (*type)->TypeName(googlesql::PRODUCT_EXTERNAL));
 }
 
 }  // namespace bigquery_emulator_duckdb

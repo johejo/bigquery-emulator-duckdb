@@ -36,7 +36,8 @@ std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 
 // The DuckDB type of a column described by a BigQuery TableFieldSchema, as DuckDbType maps its
-// GoogleSQL type, except that GEOGRAPHY is stored as its text.
+// GoogleSQL type and the precision and scale the schema gives, except that GEOGRAPHY is stored as
+// its text.
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
 }  // namespace bigquery_emulator_duckdb
