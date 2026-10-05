@@ -5,4 +5,4 @@ steps:
       # Its own module, so it is built and run from its own directory. BQ_EMULATOR_API comes
       # from tests/e2e/run.sh and tells the test where the emulator listens.
       command: cd tests/e2e/goclient && { go test ./... > /tmp/go_test.out 2>&1; s=$?; grep -E '_test.go:[0-9]+:' /tmp/go_test.out; exit $s; }
-    test: current.exit_code == 0 && current.stdout == ''
+    test: current.stdout == '' && current.exit_code == 0
