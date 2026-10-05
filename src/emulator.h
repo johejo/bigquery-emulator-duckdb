@@ -80,9 +80,9 @@ struct QueryJob {
   WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
   // What the query's statement is, once it has been translated: JobStatistics2.statementType and
   // the target of a DDL statement.
-  std::string statement_type;
-  std::optional<TableReference> ddl_target_table;
-  std::optional<DatasetReference> ddl_target_dataset;
+  std::string statement_type = {};
+  std::optional<TableReference> ddl_target_table = {};
+  std::optional<DatasetReference> ddl_target_dataset = {};
 };
 
 struct LoadJob {

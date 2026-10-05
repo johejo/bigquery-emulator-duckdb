@@ -67,14 +67,14 @@ struct Context {
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
   // The first construct found unsupported, reported in the error the statement fails with.
-  std::string unsupported;
+  std::string unsupported = {};
   // What DDL records about its target as it is translated.
-  std::optional<TableReference> ddl_target_table;
-  std::optional<DatasetReference> ddl_target_dataset;
-  std::optional<TableDefinition> table;
-  std::optional<AddedColumn> added_column;
-  std::optional<ViewDefinition> view;
-  std::optional<DatasetDefinition> dataset;
+  std::optional<TableReference> ddl_target_table = {};
+  std::optional<DatasetReference> ddl_target_dataset = {};
+  std::optional<TableDefinition> table = {};
+  std::optional<AddedColumn> added_column = {};
+  std::optional<ViewDefinition> view = {};
+  std::optional<DatasetDefinition> dataset = {};
   int next_name = 0;
 
   // A name no other call returns, for WITH queries and lambda parameters.
@@ -88,10 +88,10 @@ struct Context {
 // Nested scopes copy it; they all share one Context.
 struct Scope {
   Context& context;
-  Columns outer;
-  std::map<std::string, WithQuery> with;
+  Columns outer = {};
+  std::map<std::string, WithQuery> with = {};
   // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
-  std::optional<WithQuery> recursive;
+  std::optional<WithQuery> recursive = {};
 };
 
 // Records why the statement is unsupported. The innermost failure is recorded first, and the
@@ -108,7 +108,7 @@ struct Relation {
   Columns columns;
   // Sort keys may be absent from the visible projection. Carry them until the query boundary
   // and emit ORDER BY there too, rather than relying on order surviving a subquery.
-  std::vector<std::string> ordering;
+  std::vector<std::string> ordering = {};
 
   std::string From() const { return " FROM (" + sql + ") AS q"; }
   std::string Order() const { return ordering.empty() ? "" : " ORDER BY " + Join(ordering, ", "); }
