@@ -6,14 +6,17 @@ _git_files := "git ls-files -z --cached --others --exclude-standard --"
 _bazel_files := _git_files + " ':(glob)**/BUILD' ':(glob)**/BUILD.bazel' ':(glob)**/*.bzl' ':(glob)**/MODULE.bazel'"
 _cpp_sources := _git_files + " ':(glob)src/**/*.cc' ':(glob)tests/**/*.cc' ':(glob)tools/**/*.cc'"
 _cpp_files := _cpp_sources + " ':(glob)src/**/*.h' ':(glob)tests/**/*.h' ':(glob)tools/**/*.h'"
+_go_files := _git_files + " ':(glob)**/*.go'"
 
 fmt:
     {{_bazel_files}} | xargs -0 buildifier
     {{_cpp_files}} | xargs -0 clang-format -i
+    {{_go_files}} | xargs -0 gofmt -w
 
 fmt-check:
     {{_bazel_files}} | xargs -0 buildifier -mode=check
     {{_cpp_files}} | xargs -0 clang-format --dry-run --Werror
+    {{_go_files}} | xargs -0 gofmt -l | { errors=$(cat); if [[ -n "$errors" ]]; then echo "$errors" >&2; exit 1; fi; }
 
 # compile_commands.json is for clangd; clang-tidy no longer needs it.
 refresh-compile-commands:
@@ -43,14 +46,28 @@ duckdb-version-check:
         exit 1; \
     fi
 
-lint: fmt-check duckdb-version-check cppcheck tidy
+go-vet:
+    go vet ./...
 
-test:
+# Tool and subprocess tests; client-visible tests run through just e2e.
+[positional-arguments]
+go-test *args:
+    go test "$@" ./internal/... ./tools/...
+
+go-tidy:
+    go mod tidy
+
+lint: fmt-check duckdb-version-check go-vet cppcheck tidy
+
+test: go-test
     bazelisk test //...
 
-# End-to-end tests: start the emulator and drive it with the bq command-line tool via runn.
+# Build the emulator, then manage E2E servers and run the runn CLI scenarios.
+# Extra arguments go to the main runn invocation.
+[positional-arguments]
 e2e *args:
-    tests/e2e/run.sh {{args}}
+    bazelisk build //:bigquery-emulator-duckdb
+    go run ./tools/e2e "$@"
 
 # GoogleSQL's compliance tests against the emulator; not part of `check` while most cases fail.
 # Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
@@ -65,7 +82,7 @@ reference sql:
 # Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified.txt; for maintainers only,
 # since queries on BigQuery are billed.
 bigquery-answers project:
-    go -C tools/bqanswers run . {{quote(project)}} {{justfile_directory()}}/tests/e2e/goclient/testdata/unverified.txt
+    go run ./tools/bqanswers {{quote(project)}} {{justfile_directory()}}/tests/e2e/goclient/testdata/unverified.txt
 
 [positional-arguments]
 run *args:
@@ -74,7 +91,7 @@ run *args:
 check: lint test e2e docs-check
 
 # Generates docs/sql.md and docs/api.md: tools/restprobe probes emulators started from the binary.
-_restprobe := "go -C tools/restprobe run . -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_restprobe := "go run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
 

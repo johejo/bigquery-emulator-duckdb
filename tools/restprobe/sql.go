@@ -58,9 +58,9 @@ func probeQuery(binary string, setup []string, sql string) (probe, error) {
 	if err != nil {
 		return probe{}, err
 	}
-	defer emulator.stop()
+	defer emulator.Stop()
 	for _, statement := range setup {
-		message, failed, err := query(emulator.url, statement, "")
+		message, failed, err := query(emulator.URL, statement, "")
 		if err != nil {
 			return probe{}, err
 		}
@@ -68,7 +68,7 @@ func probeQuery(binary string, setup []string, sql string) (probe, error) {
 			return probe{}, fmt.Errorf("setup failed: %s: %s", statement, message)
 		}
 	}
-	message, failed, err := query(emulator.url, sql, sqlDataset)
+	message, failed, err := query(emulator.URL, sql, sqlDataset)
 	if err != nil || !failed {
 		return probe{runs, ""}, err
 	}

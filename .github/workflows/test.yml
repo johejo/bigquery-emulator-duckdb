@@ -57,9 +57,11 @@ jobs:
         run: nix develop --command just fmt-check
       - name: Cppcheck
         run: nix develop --command just cppcheck
+      - name: Go vet
+        run: nix develop --command just go-vet
       - name: Clang-tidy
         run: nix develop --command just tidy
-      - name: Bazel tests
+      - name: Unit tests
         run: nix develop --command just test
       - name: Generated docs check
         run: nix develop --command just docs-check

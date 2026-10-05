@@ -31,7 +31,7 @@
                   bazelisk
                   buildifier
                   llvmPackages.clang-tools
-                  # tests/e2e/run.sh waits for the servers with curl.
+                  # tools/update_bigquery_functions.sh fetches upstream documentation.
                   curlMinimal
                   (callPackage ./duckdb-bin.nix { })
                   fake-gcs-server

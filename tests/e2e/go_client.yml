@@ -2,7 +2,6 @@ desc: the Go BigQuery client library drives the emulator through its REST API
 steps:
   go_test:
     exec:
-      # Its own module, so it is built and run from its own directory. BQ_EMULATOR_API comes
-      # from tests/e2e/run.sh and tells the test where the emulator listens.
-      command: cd tests/e2e/goclient && go test ./...
+      # just e2e supplies BQ_EMULATOR_API. Never cache results against a live server.
+      command: go test -count=1 ./tests/e2e/goclient
     test: current.exit_code == 0

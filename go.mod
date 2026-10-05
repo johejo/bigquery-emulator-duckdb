@@ -1,4 +1,4 @@
-module github.com/johejo/bigquery-emulator-duckdb/tests/e2e/goclient
+module github.com/johejo/bigquery-emulator-duckdb
 
 go 1.26.0
 

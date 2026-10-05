@@ -127,7 +127,7 @@ func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
 func TestScalars(t *testing.T) {
 	endpoint := os.Getenv("BQ_EMULATOR_API")
 	if endpoint == "" {
-		t.Skip("BQ_EMULATOR_API is not set; start the emulator with tests/e2e/run.sh")
+		t.Skip("BQ_EMULATOR_API is not set; run just e2e")
 	}
 	project := os.Getenv("BQ_EMULATOR_PROJECT")
 	if project == "" {

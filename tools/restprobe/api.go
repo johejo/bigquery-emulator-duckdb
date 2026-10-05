@@ -143,10 +143,10 @@ func probeRequest(binary string, files map[string]string, setup []apiRequest,
 	if err != nil {
 		return probe{}, err
 	}
-	defer emulator.stop()
+	defer emulator.Stop()
 	for _, step := range setup {
 		step = step.in(dir)
-		p, err := sendProbe(emulator.url, step)
+		p, err := sendProbe(emulator.URL, step)
 		if err != nil {
 			return probe{}, err
 		}
@@ -154,7 +154,7 @@ func probeRequest(binary string, files map[string]string, setup []apiRequest,
 			return probe{}, fmt.Errorf("setup failed: %s %s: %s", step.method, step.path, p.detail)
 		}
 	}
-	return sendProbe(emulator.url, request.in(dir))
+	return sendProbe(emulator.URL, request.in(dir))
 }
 
 func readDiscovery(path string) ([]*apiResource, map[string]*apiMethod, error) {

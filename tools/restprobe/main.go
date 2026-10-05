@@ -7,16 +7,18 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 )
 
 type outcome int
@@ -109,38 +111,11 @@ func sortedNames[V any](entries map[string]V) []string {
 	return names
 }
 
-// emulator is a running emulator process that listens on a port of its own.
-type emulator struct {
-	cmd *exec.Cmd
-	url string
-}
-
-func startEmulator(binary string) (*emulator, error) {
-	cmd := exec.Command(binary, "--host", "127.0.0.1", "--port", "0", "--project", `{"projectId":"test"}`)
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	const listening = "bigquery-emulator-duckdb listening on "
-	scanner := bufio.NewScanner(stderr)
-	for scanner.Scan() {
-		if url, ok := strings.CutPrefix(scanner.Text(), listening); ok {
-			// Keep draining stderr so that the emulator never blocks on it.
-			go io.Copy(io.Discard, stderr)
-			return &emulator{cmd, url}, nil
-		}
-	}
-	cmd.Process.Kill()
-	cmd.Wait()
-	return nil, fmt.Errorf("%s exited before listening", binary)
-}
-
-func (e *emulator) stop() {
-	e.cmd.Process.Kill()
-	e.cmd.Wait()
+func startEmulator(binary string) (*emulatorprocess.Process, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--port", "0",
+		"--project", `{"projectId":"test"}`)
 }
 
 // parallel calls run(i) for each i below n, as many at a time as there are CPUs, and returns the
