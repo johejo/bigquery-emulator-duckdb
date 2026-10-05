@@ -330,6 +330,22 @@ std::vector<Rule> Pad(const std::string& function) {
           {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}}};
 }
 
+// A comparison of FLOAT64 values `left` and `right`, where NaN compares unequal to everything,
+// itself included. DuckDB orders NaN above every other value and equal to itself.
+std::string CompareFloat64(std::string_view left, std::string_view op, std::string_view right) {
+  const std::string l(left);
+  const std::string r(right);
+  return "CASE WHEN " + l + " IS NULL OR " + r + " IS NULL THEN NULL WHEN isnan(" + l +
+         ") OR isnan(" + r + ") THEN " + (op == "<>" ? "true" : "false") + " ELSE " + l + " " +
+         std::string(op) + " " + r + " END";
+}
+
+// A comparison operator `op`.
+std::vector<Rule> Comparison(std::string_view op) {
+  return {{2, CompareFloat64("$1", op, "$2"), {Is(1, {TYPE_DOUBLE})}},
+          {2, "($1 " + std::string(op) + " $2)"}};
+}
+
 // Functions implemented by DuckDB SQL templates.
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
@@ -346,14 +362,25 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {},
          {"'division by zero'"}}}},
       {"$UNARY_MINUS", {BigNumericOperator("bq_bignumeric_negate", 1), {1, "(-$1)"}}},
-      {"$EQUAL", {{2, "($1 = $2)"}}},
-      {"$NOT_EQUAL", {{2, "($1 <> $2)"}}},
-      {"$LESS", {{2, "($1 < $2)"}}},
-      {"$LESS_OR_EQUAL", {{2, "($1 <= $2)"}}},
-      {"$GREATER", {{2, "($1 > $2)"}}},
-      {"$GREATER_OR_EQUAL", {{2, "($1 >= $2)"}}},
-      {"$BETWEEN", {{3, "($1 BETWEEN $2 AND $3)"}}},
-      {"$LIKE", {{2, "($1 LIKE $2)"}}},
+      {"$EQUAL", Comparison("=")},
+      {"$NOT_EQUAL", Comparison("<>")},
+      {"$LESS", Comparison("<")},
+      {"$LESS_OR_EQUAL", Comparison("<=")},
+      {"$GREATER", Comparison(">")},
+      {"$GREATER_OR_EQUAL", Comparison(">=")},
+      {"$BETWEEN",
+       {{3,
+         "(" + CompareFloat64("$1", ">=", "$2") + " AND " + CompareFloat64("$1", "<=", "$3") + ")",
+         {Is(1, {TYPE_DOUBLE})}},
+        {3, "($1 BETWEEN $2 AND $3)"}}},
+      // BigQuery escapes with a backslash, and fails on one at the end of the pattern.
+      {"$LIKE",
+       {{2,
+         "CASE WHEN (length($2) - length(rtrim($2, '\\'))) % 2 = 1 THEN !1 ELSE ($1 LIKE $2 "
+         "ESCAPE '\\') END",
+         {Is(1, {TYPE_STRING})},
+         {},
+         {"'LIKE pattern ends with a backslash'"}}}},
       {"$IS_DISTINCT_FROM", {{2, "($1 IS DISTINCT FROM $2)"}}},
       {"$IS_NOT_DISTINCT_FROM", {{2, "($1 IS NOT DISTINCT FROM $2)"}}},
       {"$IS_NULL", {{1, "($1 IS NULL)"}}},

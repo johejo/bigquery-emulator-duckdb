@@ -183,6 +183,19 @@ absl::StatusOr<T> ToStatusOr(bool ok, T value, const absl::Status& error) {
   return value;
 }
 
+// Turns a GoogleSQL function's out parameter and error into a StatusOr, with an error as NULL
+// when `safe` is true.
+template <typename T>
+absl::StatusOr<std::optional<T>> OrNull(bool ok, T value, const absl::Status& error, bool safe) {
+  if (ok) {
+    return value;
+  }
+  if (safe) {
+    return std::nullopt;
+  }
+  return error;
+}
+
 // DuckDB keeps a TIME, DATETIME or TIMESTAMP as microseconds since midnight or the epoch, a
 // DATETIME as the civil time in UTC.
 googlesql::TimeValue TimeFromMicros(int64_t micros);
@@ -216,5 +229,7 @@ void RegisterStringFunctions(duckdb_connection connection);
 void RegisterDatetimeFunctions(duckdb_connection connection);
 // json.cc: JSON functions.
 void RegisterJsonFunctions(duckdb_connection connection);
+// cast.cc: casts that DuckDB performs differently, such as STRING to DATE.
+void RegisterCastFunctions(duckdb_connection connection);
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

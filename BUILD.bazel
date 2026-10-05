@@ -231,6 +231,7 @@ cc_library(
         "src/backend_functions.cc",
         "src/backend_functions.h",
         "src/backend_functions/bignumeric.cc",
+        "src/backend_functions/cast.cc",
         "src/backend_functions/datetime.cc",
         "src/backend_functions/internal.h",
         "src/backend_functions/json.cc",
