@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 21 |
-| Supported | 215 |
-| Unsupported | 157 |
+| Supported | 216 |
+| Unsupported | 156 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -267,7 +267,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | objectref_functions | Unsupported |  | the analyzer does not know this function |
 | [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | objectref_functions | Unsupported |  | the analyzer does not know this function |
 | [`OCTET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#octet_length) | string_functions | Supported | DuckDB SQL |  |
-| [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Unsupported |  | function PARSE_BIGNUMERIC |
+| [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | conversion_functions | Supported | GoogleSQL function |  |
 | [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | GoogleSQL function |  |
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Supported | GoogleSQL function |  |

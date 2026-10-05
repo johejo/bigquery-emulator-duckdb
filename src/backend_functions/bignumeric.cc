@@ -15,6 +15,7 @@
 #include "googlesql/public/functions/convert_string.h"
 #include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/math.h"
+#include "googlesql/public/functions/numeric.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
@@ -153,6 +154,17 @@ void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
       });
 }
 
+void Parse(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    BigNumericValue out;
+    absl::Status error;
+    if (!fn::ParseBigNumeric(arguments.String(0), &out, &error)) {
+      return error;
+    }
+    return BigNumericUnits(out);
+  });
+}
+
 void FromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) {
     BigNumericValue out;
@@ -222,6 +234,7 @@ void ToNumeric(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector
 }  // namespace
 
 void RegisterBigNumericFunctions(duckdb_connection connection) {
+  Register(connection, "bq_parse_bignumeric", {kVarchar}, kVarchar, Parse);
   Register(connection, "bq_bignumeric_add", {kVarchar, kVarchar}, kVarchar,
            Operator<fn::Add<BigNumericValue>>);
   Register(connection, "bq_bignumeric_subtract", {kVarchar, kVarchar}, kVarchar,

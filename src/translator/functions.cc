@@ -579,6 +579,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"LN", Numbers("ln")},
       {"LOG10", Numbers("log10")},
       {"LOG", Concat({Numbers("ln"), Numbers("log", 2)})},
+      {"PARSE_BIGNUMERIC", {{1, "CAST(bq_parse_bignumeric($1) AS BIGNUM)"}}},
       {"SIN", Float64("bq_sin")},
       {"COS", Float64("bq_cos")},
       {"TAN", Float64("bq_tan")},
@@ -961,6 +962,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "JSON_OBJECT",
       "JSON_SET",
       "FORMAT",
+      "PARSE_BIGNUMERIC",
       // Aggregate and analytic functions.
       "COUNT",
       "MIN",

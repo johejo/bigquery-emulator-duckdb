@@ -54,6 +54,7 @@ query STRING SELECT STRING(JSON '"abc"')
 query FROM_BASE64 SELECT FROM_BASE64('YWJj')
 query PARSE_JSON SELECT PARSE_JSON('{"a": 1}')
 query PARSE_JSON SELECT PARSE_JSON('1.5', wide_number_mode => 'round')
+query PARSE_BIGNUMERIC SELECT PARSE_BIGNUMERIC('1,234.5')
 # Generated string arguments are not valid JSONPaths.
 query JSON_QUERY SELECT JSON_QUERY('{"a": [1, 2]}', '$.a')
 query JSON_QUERY SELECT JSON_QUERY(JSON '{"a": [1, 2]}', '$.a')
