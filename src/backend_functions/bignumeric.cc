@@ -1,10 +1,14 @@
 #include "src/bignumeric.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -120,6 +124,116 @@ void Sum(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector outpu
     }
     return arguments.String(0);
   });
+}
+
+// An aggregate function of BIGNUMERIC takes the units of its non-NULL values, which the translator
+// collects with list(). CORR and the COVAR functions take the units of each pair joined by a comma.
+using Pair = std::pair<BigNumericValue, BigNumericValue>;
+
+absl::StatusOr<std::vector<BigNumericValue>> Collected(const Arguments& arguments) {
+  std::vector<BigNumericValue> values;
+  for (const std::string& units : arguments.Strings(0)) {
+    const auto value = BigNumericFromUnits(units);
+    if (!value.ok()) {
+      return value.status();
+    }
+    values.push_back(*value);
+  }
+  return values;
+}
+
+absl::StatusOr<std::vector<Pair>> CollectedPairs(const Arguments& arguments) {
+  std::vector<Pair> pairs;
+  for (const std::string& units : arguments.Strings(0)) {
+    const std::size_t comma = units.find(',');
+    if (comma == std::string::npos) {
+      return absl::InternalError("Invalid BIGNUMERIC pair: " + units);
+    }
+    const auto x = BigNumericFromUnits(std::string_view(units).substr(0, comma));
+    if (!x.ok()) {
+      return x.status();
+    }
+    const auto y = BigNumericFromUnits(std::string_view(units).substr(comma + 1));
+    if (!y.ok()) {
+      return y.status();
+    }
+    pairs.emplace_back(*x, *y);
+  }
+  return pairs;
+}
+
+// AVG, rounded half away from zero, which is in range even where SUM overflows.
+void Average(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+            const auto values = Collected(arguments);
+            if (!values.ok()) {
+              return values.status();
+            }
+            if (values->empty()) {
+              return std::nullopt;
+            }
+            BigNumericValue::SumAggregator sum;
+            for (const BigNumericValue& value : *values) {
+              sum.Add(value);
+            }
+            const auto average = sum.GetAverage(values->size());
+            if (!average.ok()) {
+              return average.status();
+            }
+            return BigNumericUnits(*average);
+          });
+}
+
+// VAR_POP and VAR_SAMP, or with `kStdDev` STDDEV_POP and STDDEV_SAMP, as FLOAT64.
+template <bool kStdDev, bool kSampling>
+void Variance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<double>> {
+            const auto values = Collected(arguments);
+            if (!values.ok()) {
+              return values.status();
+            }
+            BigNumericValue::VarianceAggregator variance;
+            for (const BigNumericValue& value : *values) {
+              variance.Add(value);
+            }
+            return kStdDev ? variance.GetStdDev(values->size(), kSampling)
+                           : variance.GetVariance(values->size(), kSampling);
+          });
+}
+
+// COVAR_POP and COVAR_SAMP, as FLOAT64.
+template <bool kSampling>
+void Covariance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<double>> {
+            const auto pairs = CollectedPairs(arguments);
+            if (!pairs.ok()) {
+              return pairs.status();
+            }
+            BigNumericValue::CovarianceAggregator covariance;
+            for (const auto& [x, y] : *pairs) {
+              covariance.Add(x, y);
+            }
+            return covariance.GetCovariance(pairs->size(), kSampling);
+          });
+}
+
+// CORR, as FLOAT64.
+void Correlation(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<double>> {
+            const auto pairs = CollectedPairs(arguments);
+            if (!pairs.ok()) {
+              return pairs.status();
+            }
+            BigNumericValue::CorrelationAggregator correlation;
+            for (const auto& [x, y] : *pairs) {
+              correlation.Add(x, y);
+            }
+            return correlation.GetCorrelation(pairs->size());
+          });
 }
 
 // GoogleSQL limits GENERATE_ARRAY to 16000 elements, where BigQuery generates far longer arrays,
@@ -284,6 +398,20 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
   LogicalType varchar(duckdb_create_logical_type(kVarchar));
   LogicalType list(duckdb_create_list_type(varchar.get()));
+  LogicalType float64(duckdb_create_logical_type(kDouble));
+  Register(connection, "bq_bignumeric_avg", {list.get()}, varchar.get(), Average);
+  for (const auto& [name, function] :
+       std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
+           {"bq_bignumeric_var_pop", Variance<false, false>},
+           {"bq_bignumeric_var_samp", Variance<false, true>},
+           {"bq_bignumeric_stddev_pop", Variance<true, false>},
+           {"bq_bignumeric_stddev_samp", Variance<true, true>},
+           {"bq_bignumeric_covar_pop", Covariance<false>},
+           {"bq_bignumeric_covar_samp", Covariance<true>},
+           {"bq_bignumeric_corr", Correlation},
+       }) {
+    Register(connection, name, {list.get()}, float64.get(), function);
+  }
   Register(connection, "bq_bignumeric_generate_array", {kVarchar, kVarchar, kVarchar}, list.get(),
            GenerateArray);
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
