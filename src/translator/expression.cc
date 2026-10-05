@@ -1,6 +1,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.h"
@@ -32,7 +33,8 @@ bool CastsNumericToString(const googlesql::Type* from, const googlesql::Type* to
 // A cast of `sql` from `from` to `to`, one of which holds a BIGNUMERIC, by GoogleSQL's
 // conversions, which make their errors NULL under SAFE_CAST. DuckDB would cast a BIGNUM through
 // DOUBLE or truncate a string. Arrays and structs are cast element by element and field by field,
-// and their other values as DuckDB casts them, except a NUMERIC to STRING.
+// and their other values as DuckDB casts them, except a NUMERIC to STRING. Under SAFE_CAST, a
+// value that fails makes its whole array or struct NULL, which its parent then counts as failed.
 std::optional<std::string> BigNumericCast(const googlesql::Type* from, const googlesql::Type* to,
                                           const std::string& sql, bool safe, Context& context) {
   if (from->Equals(to)) {
@@ -42,13 +44,24 @@ std::optional<std::string> BigNumericCast(const googlesql::Type* from, const goo
     const std::string element = context.FreshName("_e");
     const auto cast = BigNumericCast(from->AsArray()->element_type(), to->AsArray()->element_type(),
                                      element, safe, context);
-    return cast ? std::optional<std::string>("list_transform(" + sql + ", " + element + " -> " +
-                                             *cast + ")")
-                : std::nullopt;
+    if (!cast) {
+      return std::nullopt;
+    }
+    if (!safe) {
+      return "list_transform(" + sql + ", " + element + " -> " + *cast + ")";
+    }
+    // A value cast to NULL from a value that is not NULL failed.
+    const std::string array = context.FreshName("_a");
+    const std::string casts = context.FreshName("_c");
+    return "list_transform([" + sql + "], " + array + " -> list_transform([list_transform(" +
+           array + ", " + element + " -> " + *cast + ")], " + casts + " -> CASE WHEN list_count(" +
+           casts + ") < list_count(" + array + ") THEN NULL ELSE " + casts + " END)[1])[1]";
   }
   if (from->IsStruct() && to->IsStruct()) {
     const std::string value = context.FreshName("_s");
+    const std::string casts = context.FreshName("_c");
     std::vector<std::string> fields;
+    std::vector<std::string> failures;
     for (int i = 0; i < to->AsStruct()->num_fields(); ++i) {
       const auto cast = BigNumericCast(
           from->AsStruct()->field(i).type, to->AsStruct()->field(i).type,
@@ -57,9 +70,18 @@ std::optional<std::string> BigNumericCast(const googlesql::Type* from, const goo
         return std::nullopt;
       }
       fields.push_back(QuoteIdentifier(to->AsStruct()->field(i).name) + " := " + *cast);
+      std::string failure =
+          "(struct_extract_at(" + casts + ", " + std::to_string(i + 1) + ") IS NULL AND ";
+      failure += "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ") IS NOT NULL)";
+      failures.push_back(std::move(failure));
     }
+    const std::string fields_sql = "struct_pack(" + Join(fields, ", ") + ")";
+    const std::string cast_sql = safe ? "list_transform([" + fields_sql + "], " + casts +
+                                            " -> CASE WHEN " + Join(failures, " OR ") +
+                                            " THEN NULL ELSE " + casts + " END)[1]"
+                                      : fields_sql;
     return "list_transform([" + sql + "], " + value + " -> CASE WHEN " + value +
-           " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+           " IS NULL THEN NULL ELSE " + cast_sql + " END)[1]";
   }
   const std::string flag = safe ? "true" : "false";
   if (to->IsBigNumericType()) {
@@ -77,7 +99,9 @@ std::optional<std::string> BigNumericCast(const googlesql::Type* from, const goo
       return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
     }
     const auto type = DuckDbType(to);
-    return type ? std::optional<std::string>("CAST(" + sql + " AS " + *type + ")") : std::nullopt;
+    return type ? std::optional<std::string>(std::string(safe ? "TRY_CAST(" : "CAST(") + sql +
+                                             " AS " + *type + ")")
+                : std::nullopt;
   }
   const std::string units = "CAST(" + sql + " AS VARCHAR)";
   if (to->IsString()) {
@@ -208,11 +232,6 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     }
     const googlesql::Type* from = cast->expr()->type();
     if (!from->Equals(cast->type()) && (HasBigNumeric(from) || HasBigNumeric(cast->type()))) {
-      // SAFE_CAST makes a whole array or struct NULL when one of its values fails, which casting
-      // them one by one cannot tell from a NULL value.
-      if (cast->return_null_on_error() && (from->IsArray() || from->IsStruct())) {
-        return Unsupported(scope, "SAFE_CAST of a nested BIGNUMERIC");
-      }
       const auto sql = BigNumericCast(from, cast->type(), *argument, cast->return_null_on_error(),
                                       scope.context);
       return sql ? sql : Unsupported(scope, "CAST of a BIGNUMERIC");

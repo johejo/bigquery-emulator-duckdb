@@ -227,6 +227,8 @@ func TestBigNumericErrors(t *testing.T) {
 		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1 2']) x":              `Invalid input to PARSE_BIGNUMERIC: "1 2"`,
 		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1e39']) x":             `Invalid input to PARSE_BIGNUMERIC: "1e39"`,
 		"SELECT GENERATE_ARRAY(x, 3, 0) FROM UNNEST([BIGNUMERIC '1']) x": "Sequence step cannot be 0.",
+		"SELECT ARRAY_FIRST(x) FROM UNNEST([STRUCT(ARRAY<BIGNUMERIC>[] AS x)])": "ARRAY_FIRST cannot get " +
+			"the first element of an empty array",
 	} {
 		job, err := client.Query(sql).Run(ctx)
 		if err == nil {
