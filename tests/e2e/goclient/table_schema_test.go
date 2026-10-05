@@ -3,6 +3,7 @@ package goclient
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -151,6 +152,76 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 	}
 	if got := schemaOf("written"); len(got) != 1 || got[0].Type != bigquery.JSONFieldType {
 		t.Errorf("destination table: got schema %v, want a JSON column", fields(got))
+	}
+}
+
+// A table created through the API rounds values to the scale its schema gives and rejects those
+// beyond its precision, as one created by DDL does, nested fields included. The values are
+// BigQuery's documented examples for NUMERIC(5, 2).
+func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_table_precision")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) error {
+		t.Helper()
+		query := client.Query(sql)
+		query.DefaultDatasetID = dataset.DatasetID
+		job, err := query.Run(ctx)
+		if err != nil {
+			return err
+		}
+		status, err := job.Wait(ctx)
+		if err != nil {
+			return err
+		}
+		return status.Err()
+	}
+
+	schema := bigquery.Schema{
+		{Name: "price", Type: bigquery.NumericFieldType, Precision: 5, Scale: 2},
+		{Name: "items", Type: bigquery.RecordFieldType, Repeated: true, Schema: bigquery.Schema{
+			{Name: "price", Type: bigquery.NumericFieldType, Precision: 5, Scale: 2},
+		}},
+	}
+	if err := dataset.Table("t").Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
+		t.Fatal(err)
+	}
+	if err := run("INSERT t VALUES (1.125, [STRUCT(NUMERIC '1.125')])"); err != nil {
+		t.Fatal(err)
+	}
+	query := client.Query("SELECT CAST(price AS STRING), CAST(items[0].price AS STRING) FROM t")
+	query.DefaultDatasetID = dataset.DatasetID
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if row[0] != "1.13" || row[1] != "1.13" {
+		t.Errorf("got %v, want 1.125 rounded to 1.13", row)
+	}
+	for _, sql := range []string{"INSERT t (price) VALUES (1111)", "INSERT t (items) VALUES ([STRUCT(NUMERIC '1111')])"} {
+		if err := run(sql); err == nil {
+			t.Errorf("%s: got no error, want 1111 out of range of NUMERIC(5, 2)", sql)
+		}
+	}
+
+	// BIGNUMERIC(P, S) is unsupported, as in DDL, and parameters outside their range are invalid.
+	for want, field := range map[string]*bigquery.FieldSchema{
+		"The emulator does not support field type BIGNUMERIC(40, 2)": {Name: "n", Type: bigquery.BigNumericFieldType, Precision: 40, Scale: 2},
+		"In NUMERIC(P, 2), P must be between 2 and 31":               {Name: "n", Type: bigquery.NumericFieldType, Precision: 40, Scale: 2},
+	} {
+		err := dataset.Table("invalid").Create(ctx, &bigquery.TableMetadata{Schema: bigquery.Schema{field}})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("got %v, want %q", err, want)
+		}
 	}
 }
 
