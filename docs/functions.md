@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 21 |
-| Supported | 216 |
+| Partial | 12 |
+| Supported | 225 |
 | Unsupported | 156 |
 | Untested | 13 |
 
@@ -70,7 +70,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | function AVG with BIGNUMERIC; unsupported construct |
+| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
 | [`BIT_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions#bit_count) | bit_functions | Supported | DuckDB SQL |  |
@@ -93,7 +93,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | string_functions | Unsupported |  | the analyzer does not know this function |
 | [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | string_functions | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | string_functions | Supported | GoogleSQL function | compares NFKC normal forms, case folded; takes STRING only |
-| [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Partial | DuckDB aggregate | function CORR with BIGNUMERIC |
+| [`CORR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#corr) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`COS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cos) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`COSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`COSINE_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#cosine_distance) | mathematical_functions | Unsupported |  | function COSINE_DISTANCE |
@@ -101,8 +101,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`COTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#coth) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | aggregate-dp-functions, aggregate_functions | Supported | DuckDB aggregate |  |
 | [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | aggregate_functions | Supported | DuckDB aggregate |  |
-| [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Partial | DuckDB aggregate | function COVAR_POP with BIGNUMERIC |
-| [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Partial | DuckDB aggregate | function COVAR_SAMP with BIGNUMERIC |
+| [`COVAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`COVAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#covar_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`CSC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csc) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`CSCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#csch) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`CUME_DIST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#cume_dist) | numbering_functions | Supported | DuckDB window function |  |
@@ -330,9 +330,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported | GoogleSQL function |  |
 | [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | string_functions | Supported | GoogleSQL function |  |
-| [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Partial | DuckDB aggregate | function STDDEV_SAMP with BIGNUMERIC |
-| [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Partial | DuckDB aggregate | function STDDEV_POP with BIGNUMERIC |
-| [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Partial | DuckDB aggregate | function STDDEV_SAMP with BIGNUMERIC |
+| [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | GoogleSQL function | from JSON, fails when the value has another JSON type; function STRING |
 | [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported | GoogleSQL function |  |
@@ -442,8 +442,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | string_functions | Supported | GoogleSQL function |  |
-| [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Partial | DuckDB aggregate | function VAR_SAMP with BIGNUMERIC |
-| [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Partial | DuckDB aggregate | function VAR_POP with BIGNUMERIC |
-| [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Partial | DuckDB aggregate | function VAR_SAMP with BIGNUMERIC |
+| [`VARIANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#variance) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`VAR_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
+| [`VAR_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#var_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`VECTOR_INDEX.STATISTICS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/vectorindex_functions#vector_indexstatistics) | vectorindex_functions | Unsupported |  | the analyzer does not know this function |
 | [`VECTOR_SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#vector_search) | search_functions | Unsupported |  | the analyzer does not know this function |

@@ -60,6 +60,19 @@ class Arguments {
     return (static_cast<__int128>(value.upper) << 64) | value.lower;
   }
 
+  // A list of VARCHAR without NULL elements.
+  [[nodiscard]] std::vector<std::string> Strings(idx_t column) const {
+    duckdb_vector vector = duckdb_data_chunk_get_vector(input_, column);
+    const auto entry = VectorElement<duckdb_list_entry>(vector, row_);
+    duckdb_vector child = duckdb_list_vector_get_child(vector);
+    std::vector<std::string> strings;
+    strings.reserve(entry.length);
+    for (idx_t i = 0; i < entry.length; ++i) {
+      strings.push_back(VectorString(child, entry.offset + i));
+    }
+    return strings;
+  }
+
   [[nodiscard]] bool Bool(idx_t column) const {
     return static_cast<bool*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];

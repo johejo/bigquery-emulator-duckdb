@@ -155,6 +155,33 @@ func TestBigNumericArrayFunctions(t *testing.T) {
 	}
 }
 
+// AVG of BIGNUMERIC is BIGNUMERIC, and the statistical aggregates are FLOAT64, as in BigQuery.
+func TestBigNumericAggregates(t *testing.T) {
+	rows, err := newClient(t).Query("SELECT AVG(x) AS a, STDDEV_POP(x) AS s, CORR(x, x) AS c " +
+		"FROM UNNEST([BIGNUMERIC '" + tinyBigNumeric + "', BIGNUMERIC '" + maxBigNumeric + "']) x").Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows.Schema) != 3 || rows.Schema[0].Type != bigquery.BigNumericFieldType ||
+		rows.Schema[1].Type != bigquery.FloatFieldType || rows.Schema[2].Type != bigquery.FloatFieldType {
+		t.Fatalf("unexpected schema: %v", rows.Schema)
+	}
+	// The sum overflows BIGNUMERIC, but the average fits.
+	if want := "289480223093290488558927462521719769633.17496166410141009864396001978282409984"; row[0].(*big.Rat).Cmp(rat(t, want)) != 0 {
+		t.Errorf("AVG: got %v, want %s", row[0], want)
+	}
+	if _, ok := row[1].(float64); !ok {
+		t.Errorf("STDDEV_POP: got %T, want float64", row[1])
+	}
+	if _, ok := row[2].(float64); !ok {
+		t.Errorf("CORR: got %T, want float64", row[2])
+	}
+}
+
 // A parsed value reaches the client as BIGNUMERIC, with its full precision.
 func TestParseBigNumeric(t *testing.T) {
 	query := newClient(t).Query("SELECT PARSE_BIGNUMERIC(@s) AS n")

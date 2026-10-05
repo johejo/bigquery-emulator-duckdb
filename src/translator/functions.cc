@@ -810,6 +810,32 @@ std::string BigNumericSum(const std::string& sql, const std::vector<std::string>
   return "CAST(bq_bignumeric_sum(CAST(" + sql + " AS VARCHAR)) AS BIGNUM)";
 }
 
+// A BIGNUMERIC aggregate that `kFunction`, of src/backend_functions/bignumeric.cc, computes as
+// GoogleSQL does from the units of the non-NULL values that list() collects. A pair of arguments
+// is collected as the units of both joined by a comma, which is NULL where either is NULL.
+template <const char* kFunction>
+AggregateRule BigNumericAggregate(std::size_t arity) {
+  return {
+      .function = "list",
+      .type = googlesql::TYPE_BIGNUMERIC,
+      .arguments = {arity == 1 ? "CAST($1 AS VARCHAR)"
+                               : "CAST($1 AS VARCHAR) || ',' || CAST($2 AS VARCHAR)"},
+      .skip_nulls = true,
+      .finish =
+          [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
+             const std::string& /*tail*/) { return std::string(kFunction) + "(" + sql + ")"; },
+  };
+}
+
+constexpr char kBigNumericAvg[] = "bq_bignumeric_avg";
+constexpr char kBigNumericStdDevSamp[] = "bq_bignumeric_stddev_samp";
+constexpr char kBigNumericStdDevPop[] = "bq_bignumeric_stddev_pop";
+constexpr char kBigNumericVarSamp[] = "bq_bignumeric_var_samp";
+constexpr char kBigNumericVarPop[] = "bq_bignumeric_var_pop";
+constexpr char kBigNumericCorr[] = "bq_bignumeric_corr";
+constexpr char kBigNumericCovarPop[] = "bq_bignumeric_covar_pop";
+constexpr char kBigNumericCovarSamp[] = "bq_bignumeric_covar_samp";
+
 // Aggregate functions, which also take a window.
 const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregates() {
   using enum AggregateRule::Nulls;
@@ -821,7 +847,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           {"SUM",
            {{.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
             {.function = "sum"}}},
-          {"AVG", {{.function = "avg"}}},
+          {"AVG", {BigNumericAggregate<kBigNumericAvg>(1), {.function = "avg"}}},
           {"MIN", {{.function = "min"}}},
           {"MAX", {{.function = "max"}}},
           {"ANY_VALUE", {{.function = "any_value"}}},
@@ -863,15 +889,18 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           {"BIT_AND", {{.function = "bit_and"}}},
           {"BIT_OR", {{.function = "bit_or"}}},
           {"BIT_XOR", {{.function = "bit_xor"}}},
-          {"STDDEV", {{.function = "stddev_samp"}}},
-          {"STDDEV_SAMP", {{.function = "stddev_samp"}}},
-          {"STDDEV_POP", {{.function = "stddev_pop"}}},
-          {"VARIANCE", {{.function = "var_samp"}}},
-          {"VAR_SAMP", {{.function = "var_samp"}}},
-          {"VAR_POP", {{.function = "var_pop"}}},
-          {"CORR", {{.function = "corr"}}},
-          {"COVAR_POP", {{.function = "covar_pop"}}},
-          {"COVAR_SAMP", {{.function = "covar_samp"}}},
+          {"STDDEV", {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}}},
+          {"STDDEV_SAMP",
+           {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}}},
+          {"STDDEV_POP",
+           {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}}},
+          {"VARIANCE", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
+          {"VAR_SAMP", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
+          {"VAR_POP", {BigNumericAggregate<kBigNumericVarPop>(1), {.function = "var_pop"}}},
+          {"CORR", {BigNumericAggregate<kBigNumericCorr>(2), {.function = "corr"}}},
+          {"COVAR_POP", {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}}},
+          {"COVAR_SAMP",
+           {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}}},
       };
   return *kAggregates;
 }
@@ -970,6 +999,16 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "ANY_VALUE",
       "ARRAY_AGG",
       "SUM",
+      "AVG",
+      "STDDEV",
+      "STDDEV_SAMP",
+      "STDDEV_POP",
+      "VARIANCE",
+      "VAR_SAMP",
+      "VAR_POP",
+      "CORR",
+      "COVAR_POP",
+      "COVAR_SAMP",
       "LAG",
       "LEAD",
       "FIRST_VALUE",
