@@ -683,7 +683,7 @@
     },
     "@@googlesql+//bazel:http_archive_deps.bzl%googlesql_http_archive_deps": {
       "general": {
-        "bzlTransitiveDigest": "mMNs9fW0pkxbfNX7wSKnvM8g2/2jL1ZsMaA/FHcCU/U=",
+        "bzlTransitiveDigest": "AGePAe65QFZmh0xvOj3Ywb17ygjaLI9/C+o2og9WBm0=",
         "usagesDigest": "hxYsBVSOMGmEn8/DG2fFfSAt3bGljUq2fxW1osgezKc=",
         "recordedInputs": [
           "REPO_MAPPING:googlesql+,bazel_tools bazel_tools"
@@ -728,6 +728,9 @@
           "com_google_file_based_test_driver": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
+              "patch_cmds": [
+                "perl -pi -e 's/stat\\(filespec\\.data\\(\\)/stat(filespec_str.c_str()/; s/stat\\(filename\\.data\\(\\)/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h"
+              ],
               "sha256": "b564acb6f083ce6e91fc2734bdad259cc4edf1a95766f93750a16784ff86218a",
               "strip_prefix": "file-based-test-driver-fd7661b168f640f68da39f97dad26e426eb6c339",
               "url": "https://github.com/google/file-based-test-driver/archive/fd7661b168f640f68da39f97dad26e426eb6c339.tar.gz"

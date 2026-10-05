@@ -26,10 +26,14 @@ type scalarCase struct {
 	line int
 	sql  string
 	want any
+	// A known bug: want is BigQuery's answer, which the emulator does not give yet.
+	knownBug bool
 }
 
 // readScalarCases reads cases written as one query, possibly over several lines, followed by
 // "=> " and the JSON of the cell's "v" as jobs.query returns it: a string, or null for NULL.
+// A known bug is written with "!> " instead, followed by BigQuery's answer; the case passes while
+// the emulator answers otherwise, and fails once it is fixed, to be turned into a "=> " case.
 // Blank lines and lines starting with # between cases are ignored.
 func readScalarCases(t *testing.T, path string) []scalarCase {
 	t.Helper()
@@ -46,7 +50,7 @@ func readScalarCases(t *testing.T, path string) []scalarCase {
 	for line := 1; scanner.Scan(); line++ {
 		text := scanner.Text()
 		switch {
-		case strings.HasPrefix(text, "=> "):
+		case strings.HasPrefix(text, "=> "), strings.HasPrefix(text, "!> "):
 			if len(sql) == 0 {
 				t.Fatalf("%s:%d: expected value without a query", path, line)
 			}
@@ -54,7 +58,8 @@ func readScalarCases(t *testing.T, path string) []scalarCase {
 			if err := json.Unmarshal([]byte(text[len("=> "):]), &want); err != nil {
 				t.Fatalf("%s:%d: %v", path, line, err)
 			}
-			cases = append(cases, scalarCase{path: path, line: start, sql: strings.Join(sql, "\n"), want: want})
+			cases = append(cases, scalarCase{path: path, line: start, sql: strings.Join(sql, "\n"),
+				want: want, knownBug: strings.HasPrefix(text, "!> ")})
 			sql = nil
 		case len(sql) > 0:
 			sql = append(sql, text)
@@ -143,6 +148,14 @@ func TestScalars(t *testing.T) {
 			t.Run(fmt.Sprintf("%s:%d", filepath.Base(c.path), c.line), func(t *testing.T) {
 				t.Parallel()
 				response, err := runQuery(endpoint, project, "scalars", c.sql)
+				if c.knownBug {
+					if err == nil && len(response.Rows) == 1 && len(response.Rows[0].F) == 1 &&
+						reflect.DeepEqual(response.Rows[0].F[0].V, c.want) {
+						t.Errorf("%s:%d: %s: known bug is fixed; write the case with => instead of !>",
+							c.path, c.line, c.sql)
+					}
+					return
+				}
 				if err != nil {
 					t.Fatalf("%s:%d: %s: %v", c.path, c.line, c.sql, err)
 				}

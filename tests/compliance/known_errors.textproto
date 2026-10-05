@@ -1,0 +1,13 @@
+# proto-file: googlesql/compliance/known_error.proto
+# proto-message: KnownErrorFile
+#
+# Compliance tests the emulator is known to fail. Remove an entry once its tests pass.
+
+# The emulator rejects what it does not support as unsupported, which clients can tell apart from
+# BigQuery's behavior: any statement may fail as UNIMPLEMENTED. A wrong result, or an error where
+# BigQuery succeeds, still fails the test.
+known_errors {
+  mode: ALLOW_UNIMPLEMENTED
+  reason: "The emulator rejects what it does not support"
+  label: ".*"
+}
