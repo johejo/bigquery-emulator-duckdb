@@ -332,6 +332,7 @@ std::vector<Rule> Pad(const std::string& function) {
 
 // A comparison of FLOAT64 values `left` and `right`, where NaN compares unequal to everything,
 // itself included. DuckDB orders NaN above every other value and equal to itself.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): read as written, `left op right`.
 std::string CompareFloat64(std::string_view left, std::string_view op, std::string_view right) {
   const std::string l(left);
   const std::string r(right);

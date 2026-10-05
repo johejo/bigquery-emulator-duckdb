@@ -26,10 +26,7 @@ enum class CastKind : std::uint8_t {
 
 // The function of src/backend_functions/cast.cc that casts a STRING to `to`, a date or time
 // type, in BigQuery's formats only.
-const char* ParseCast(const googlesql::Type* from, const googlesql::Type* to) {
-  if (!from->IsString()) {
-    return nullptr;
-  }
+const char* ParseCast(const googlesql::Type* to) {
   return to->IsDate()        ? "bq_cast_date"
          : to->IsTime()      ? "bq_cast_time"
          : to->IsDatetime()  ? "bq_cast_datetime"
@@ -39,10 +36,7 @@ const char* ParseCast(const googlesql::Type* from, const googlesql::Type* to) {
 
 // The function of src/backend_functions/cast.cc that formats `from` as a STRING as BigQuery
 // does.
-const char* FormatCast(const googlesql::Type* from, const googlesql::Type* to) {
-  if (!to->IsString()) {
-    return nullptr;
-  }
+const char* FormatCast(const googlesql::Type* from) {
   return from->IsDouble()      ? "bq_double_string"
          : from->IsTime()      ? "bq_time_string"
          : from->IsDatetime()  ? "bq_datetime_string"
@@ -68,10 +62,10 @@ CastKind Kind(const googlesql::Type* from, const googlesql::Type* to) {
   if (from->IsBigNumericType() || to->IsBigNumericType()) {
     return to->IsString() ? CastKind::kGoogleSql : CastKind::kFallible;
   }
-  if (ParseCast(from, to) != nullptr) {
+  if (from->IsString() && ParseCast(to) != nullptr) {
     return CastKind::kFallible;
   }
-  if ((to->IsString() && from->IsNumericType()) || FormatCast(from, to) != nullptr) {
+  if (to->IsString() && (from->IsNumericType() || FormatCast(from) != nullptr)) {
     return CastKind::kGoogleSql;
   }
   return CastKind::kDuckDb;
@@ -137,14 +131,14 @@ std::optional<std::string> GoogleSqlCast(const googlesql::Type* from, const goog
     }
     return std::nullopt;
   }
-  if (const char* function = ParseCast(from, to)) {
+  if (const char* function = from->IsString() ? ParseCast(to) : nullptr) {
     return std::string(function) + "(" + sql + ", " + flag + ")";
   }
   // DuckDB pads a DECIMAL with zeros to its scale, which BigQuery leaves out.
   if (to->IsString() && from->IsNumericType()) {
     return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
   }
-  if (const char* function = FormatCast(from, to)) {
+  if (const char* function = to->IsString() ? FormatCast(from) : nullptr) {
     return std::string(function) + "(" + sql + ")";
   }
   const auto type = DuckDbType(to);
