@@ -18,6 +18,7 @@
 #include "src/backend.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -164,57 +165,56 @@ struct ExtractRequest {
 // schemas and tables to tables. Jobs are kept in memory.
 class Emulator {
  public:
-  // With an empty `data_dir` every project is an in-memory database and nothing survives the
-  // process. Otherwise each project is stored in its own DuckDB file under `data_dir`, which is
-  // created when missing, and a project's data comes back the next time it is used.
-  explicit Emulator(std::string data_dir = "");
+  // Restores persisted registrations and replaces those explicitly supplied at startup.
+  // With no data directory, registrations and data live in memory only.
+  explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {});
+  const std::vector<Project>& ListProjects() const;
+  std::string ResolveProject(const std::string& project_id) const;
 
   // The Storage API endpoint that load jobs read gs:// objects from and extract jobs write to.
   const std::string& storage_endpoint() const { return gcs_client_.endpoint(); }
 
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
-  std::shared_ptr<const Job> RunQuery(const QueryRequest& request);
-  std::shared_ptr<const Job> RunLoad(const LoadRequest& request);
-  std::shared_ptr<const Job> RunCopy(const CopyRequest& request);
-  std::shared_ptr<const Job> RunExtract(const ExtractRequest& request);
-  std::shared_ptr<const Job> GetJob(const std::string& project_id, const std::string& job_id);
-  std::vector<std::shared_ptr<const Job>> ListJobs(const std::string& project_id);
-  void DeleteJob(const std::string& project_id, const std::string& job_id);
+  std::shared_ptr<const Job> RunQuery(QueryRequest request);
+  std::shared_ptr<const Job> RunLoad(LoadRequest request);
+  std::shared_ptr<const Job> RunCopy(CopyRequest request);
+  std::shared_ptr<const Job> RunExtract(ExtractRequest request);
+  std::shared_ptr<const Job> GetJob(std::string project_id, const std::string& job_id);
+  std::vector<std::shared_ptr<const Job>> ListJobs(std::string project_id);
+  void DeleteJob(std::string project_id, const std::string& job_id);
 
-  std::vector<std::string> ListDatasets(const std::string& project_id);
+  std::vector<std::string> ListDatasets(std::string project_id);
   // The datasets of ListDatasets, each with its metadata.
-  std::vector<DatasetListEntry> ListDatasetEntries(const std::string& project_id);
+  std::vector<DatasetListEntry> ListDatasetEntries(std::string project_id);
   // The metadata of `dataset`. Throws when the dataset is missing.
-  DatasetMetadata GetDataset(const DatasetReference& dataset);
-  void CreateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata = {});
+  DatasetMetadata GetDataset(DatasetReference dataset);
+  void CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata = {});
   // datasets.patch and datasets.update: gives `dataset` the metadata `metadata`.
-  void UpdateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata);
-  void DeleteDataset(const DatasetReference& dataset, bool delete_contents);
+  void UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata);
+  void DeleteDataset(DatasetReference dataset, bool delete_contents);
 
-  std::vector<std::string> ListTables(const DatasetReference& dataset);
+  std::vector<std::string> ListTables(DatasetReference dataset);
   // The tables of ListTables, each with its type.
-  std::vector<TableListEntry> ListTableEntries(const DatasetReference& dataset);
-  TableInfo GetTable(const TableReference& table, bool include_row_count = true);
-  void CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema,
+  std::vector<TableListEntry> ListTableEntries(DatasetReference dataset);
+  TableInfo GetTable(TableReference table, bool include_row_count = true);
+  void CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
                    const TableMetadata& metadata = {});
-  void CreateView(const TableReference& table, const nlohmann::json& definition,
+  void CreateView(TableReference table, const nlohmann::json& definition,
                   const TableMetadata& metadata = {});
   // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
   // `view`, and either the metadata `metadata`. What is left out is kept, including the fields
   // of `view` it omits.
-  void UpdateTable(const TableReference& table,
-                   const std::optional<std::vector<FieldSchema>>& schema,
+  void UpdateTable(TableReference table, const std::optional<std::vector<FieldSchema>>& schema,
                    const std::optional<nlohmann::json>& view,
                    const std::optional<TableMetadata>& metadata = std::nullopt);
-  void DeleteTable(const TableReference& table);
-  QueryResult ListTableData(const TableReference& table, int64_t start_index, int64_t max_results);
-  std::vector<InsertError> InsertTableData(const TableReference& table, const nlohmann::json& rows,
+  void DeleteTable(TableReference table);
+  QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
+  std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 
  private:
-  void EnsureProject(const std::string& project_id);
-  // What EnsureProject attaches for `project_id`: a DuckDB file path, or ":memory:".
+  // The registered project's DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
   // Keeps the catalog, types and resolved AST alive until translation finishes.
   TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
@@ -224,7 +224,7 @@ class Emulator {
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set.
-  void WriteView(const TableReference& table, const nlohmann::json& definition,
+  void WriteView(TableReference table, const nlohmann::json& definition,
                  const TableMetadata& metadata, bool replace);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
   // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
@@ -241,7 +241,8 @@ class Emulator {
   GcsClient gcs_client_;
   std::string data_dir_;
   std::mutex mutex_;
-  std::unordered_set<std::string> projects_;
+  std::vector<Project> projects_;
+  std::unordered_map<std::string, std::string> project_ids_;
   std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;
   std::unordered_set<std::string> running_jobs_;
   int64_t next_job_number_ = 1;

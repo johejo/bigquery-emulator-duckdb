@@ -45,7 +45,13 @@ pids+=($!)
 wait_for "${STORAGE_EMULATOR_HOST}/storage/v1/b"
 
 start_emulator() {
-  ./bazel-bin/bigquery-emulator-duckdb --host 127.0.0.1 --port "${port}" --data-dir "${tmp}/data" &
+  project_args=()
+  if [[ "${restore_only:-false}" != true ]]; then
+    while IFS= read -r project; do
+      project_args+=("--project=${project}")
+    done < tests/e2e/projects.jsonl
+  fi
+  ./bazel-bin/bigquery-emulator-duckdb "${project_args[@]}" --host 127.0.0.1 --port "${port}" --data-dir "${tmp}/data" &
   emulator_pid=$!
   pids+=("${emulator_pid}")
   wait_for "${BQ_EMULATOR_API}/\$discovery/rest?version=v2"
@@ -57,5 +63,6 @@ runn_run --concurrent on "$@" tests/e2e/*.yml
 runn_run tests/e2e/restart/before.yml
 kill "${emulator_pid}"
 wait "${emulator_pid}"
+restore_only=true
 start_emulator
 runn_run tests/e2e/restart/after.yml

@@ -63,7 +63,7 @@ class EmulatorTest : public ::testing::Test {
     return value.get<std::string>();
   }
 
-  Emulator emulator_;
+  Emulator emulator_{"", {{.project_id = "test"}}};
 };
 
 TEST_F(EmulatorTest, RunsRenamedAggregates) {
@@ -332,7 +332,8 @@ TEST(EmulatorPersistenceTest, StoresEachProjectInItsOwnFile) {
       std::filesystem::path(::testing::TempDir()) / "emulator_persistence";
   std::filesystem::remove_all(data_dir);
   {
-    Emulator emulator(data_dir.string());
+    Emulator emulator(data_dir.string(),
+                      {{.project_id = "proj"}, {.project_id = "example.com:proj"}});
     emulator.CreateDataset({"proj", "ds"});
     // A domain-scoped id checks that ':' and '.' are encoded into a single file name.
     emulator.CreateDataset({"example.com:proj", "scoped"});
@@ -353,7 +354,7 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
     backend.Execute("CREATE SCHEMA proj.ds");
     backend.Execute("CREATE VIEW proj.ds.v AS SELECT 1 AS x");
   }
-  Emulator emulator(data_dir.string());
+  Emulator emulator(data_dir.string(), {{.project_id = "proj"}});
   const std::vector<TableListEntry> entries = emulator.ListTableEntries({"proj", "ds"});
   ASSERT_EQ(entries.size(), 1);
   EXPECT_EQ(entries[0].table_id, "v");

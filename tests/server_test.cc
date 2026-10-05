@@ -31,7 +31,7 @@ class ServerTest : public ::testing::Test {
     thread_.join();
   }
 
-  Emulator emulator_;
+  Emulator emulator_{"", {{.project_id = "p"}}};
   std::unique_ptr<Server> server_;
   std::thread thread_;
 };

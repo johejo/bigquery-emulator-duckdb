@@ -108,15 +108,22 @@ class Server::Impl {
     };
     const auto route = std::make_shared<const CheckedRoute>(
         CheckedRoute{std::move(method), std::move(accepted), handler});
-    const httplib::Server::Handler checked = [route](const httplib::Request& request,
-                                                     httplib::Response& response) {
+    const httplib::Server::Handler checked = [route, this](const httplib::Request& request,
+                                                           httplib::Response& response) {
       try {
         CheckQueryParameters(route->method, route->accepted, request);
+        if (request.path_params.contains("projectId")) {
+          httplib::Request normalized = request;
+          normalized.path_params["projectId"] =
+              emulator_.ResolveProject(Param(request, "projectId"));
+          route->handler(normalized, response);
+        } else {
+          route->handler(request, response);
+        }
       } catch (const ApiError& error) {
         WriteError(response, error);
         return;
       }
-      route->handler(request, response);
     };
     for (const std::string& pattern : patterns) {
       (http_.*serve)(pattern, checked);
@@ -170,6 +177,15 @@ class Server::Impl {
       response.set_content(document.dump(), "application/json");
     });
 
+    Route("bigquery.projects.list", {"maxResults", "pageToken"},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            ListPage page = ParseListPage(request);
+            if (!request.has_param("maxResults") || request.get_param_value("maxResults").empty()) {
+              page.max_results = 50;
+            }
+            return ProjectList(emulator_.ListProjects(), page);
+          }));
+
     // jobs
     Route("bigquery.jobs.query", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
@@ -203,7 +219,7 @@ class Server::Impl {
     Route("bigquery.jobs.insert", {}, insert_job);
     http_.Put(std::string(kResumablePath) + ":projectId/jobs/:upload",
               Json([this](const httplib::Request& request, httplib::Response&) {
-                return RunUploadedLoad(TakeResumableUpload(Param(request, "upload")), request.body);
+                return RunUploadedLoad(TakeResumableUpload(request), request.body);
               }));
     // Ignores allUsers: every job is the caller's.
     Route("bigquery.jobs.list",
@@ -379,14 +395,18 @@ class Server::Impl {
     return json::object();
   }
 
-  // Closes the resumable upload session `id` and returns the load job it was opened for.
-  LoadRequest TakeResumableUpload(const std::string& id) {
+  // Closes the request's upload session and returns the load job it was opened for.
+  LoadRequest TakeResumableUpload(const httplib::Request& request) {
+    const std::string project = emulator_.ResolveProject(Param(request, "projectId"));
+    const std::string id = Param(request, "upload");
     std::scoped_lock lock(uploads_mutex_);
     const auto it = uploads_.find(id);
-    if (it == uploads_.end()) throw ApiError::NotFound("Upload session not found");
-    LoadRequest request = std::move(it->second);
+    if (it == uploads_.end() || it->second.project_id != project) {
+      throw ApiError::NotFound("Upload session not found");
+    }
+    LoadRequest load = std::move(it->second);
     uploads_.erase(it);
-    return request;
+    return load;
   }
 
   Emulator& emulator_;

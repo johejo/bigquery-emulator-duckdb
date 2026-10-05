@@ -57,8 +57,9 @@ e2e *args:
 compliance *args:
     bazelisk test //:compliance_test {{args}}
 
+[positional-arguments]
 run *args:
-    bazelisk run //:bigquery-emulator-duckdb -- {{args}}
+    bazelisk run //:bigquery-emulator-duckdb -- "$@"
 
 check: lint test e2e docs-check
 

@@ -1,0 +1,13 @@
+desc: project registration, listing and persistence on isolated emulator instances
+steps:
+  projects:
+    exec:
+      command: python3 tests/e2e/projects_test.py
+    test: current.exit_code == 0
+  bq_projects:
+    exec:
+      command: tests/e2e/bq.sh ls --projects --format=json
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"numericId":"123456789012"' &&
+      current.stdout contains '"friendlyName":"Local test"'

@@ -1,0 +1,21 @@
+{"projectId": "bq-dataset-table"}
+{"projectId": "example.com:proj"}
+{"projectId": "go-dataset-filter"}
+{"projectId": "go-list-pages"}
+{"projectId": "infoschema"}
+{"projectId": "rest-cancel"}
+{"projectId": "rest-config"}
+{"projectId": "rest-copy"}
+{"projectId": "rest-data-selection"}
+{"projectId": "rest-delete"}
+{"projectId": "rest-dry-run"}
+{"projectId": "rest-duplicate"}
+{"projectId": "rest-list"}
+{"projectId": "rest-list-other"}
+{"projectId": "rest-malformed"}
+{"projectId": "rest-metadata-selection"}
+{"projectId": "rest-query"}
+{"projectId": "rest-resources"}
+{"projectId": "rest-timestamps"}
+{"projectId": "rest-upload"}
+{"projectId": "test", "numericId": "123456789012", "friendlyName": "Local test"}

@@ -91,3 +91,6 @@ request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/table
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "expirationTime": "1893456000000"}
 note bigquery.tables.update | Behaves like `tables.patch`, except that it replaces the description, friendly name, labels and clustering; `schema` and view definitions the request leaves out are kept rather than cleared.
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
+
+request bigquery.projects.list | GET /bigquery/v2/projects?maxResults=1
+note bigquery.projects.list | Lists explicitly registered projects without checking authentication or IAM. Defaults to 50 entries per page. Project numbers and friendly names are returned when configured.

@@ -7,12 +7,15 @@
 #include <cstdlib>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -304,37 +307,81 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
   return std::nullopt;
 }
 
-Emulator::Emulator(std::string data_dir) : data_dir_(std::move(data_dir)) {
+Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects)
+    : data_dir_(std::move(data_dir)) {
+  const auto registry = std::filesystem::path(data_dir_) / "projects.json";
+  std::map<std::string, Project> registered;
   if (!data_dir_.empty()) {
     std::filesystem::create_directories(data_dir_);
+    if (std::filesystem::exists(registry)) {
+      std::ifstream input(registry);
+      if (!input) throw std::runtime_error("Cannot read " + registry.string());
+      const json saved = json::parse(input);
+      if (!saved.is_array()) throw std::invalid_argument("Project registry must be an array");
+      for (const auto& value : saved) {
+        Project project = ParseProject(value);
+        if (!registered.emplace(project.project_id, project).second) {
+          throw std::invalid_argument("Duplicate saved projectId: " + project.project_id);
+        }
+      }
+    }
   }
+  std::set<std::string> supplied;
+  for (const Project& project : projects) {
+    // Validate callers of the C++ boundary as well as CLI JSON.
+    ParseProject(ProjectJson(project));
+    if (!supplied.insert(project.project_id).second) {
+      throw std::invalid_argument("Duplicate projectId: " + project.project_id);
+    }
+    registered.insert_or_assign(project.project_id, project);
+  }
+  for (const auto& [id, project] : registered) {
+    project_ids_.emplace(id, id);
+    projects_.push_back(project);
+  }
+  for (const Project& project : projects_) {
+    if (!project.numeric_id) continue;
+    const auto alias = project_ids_.emplace(*project.numeric_id, project.project_id).first;
+    if (alias->second != project.project_id) {
+      throw std::invalid_argument("Conflicting numericId: " + *project.numeric_id);
+    }
+  }
+  for (const Project& project : projects_) {
+    const std::string database = ProjectDatabase(project.project_id);
+    try {
+      backend_.Execute("ATTACH " + QuoteLiteral(database) + " AS " +
+                       QuoteIdentifier(project.project_id));
+      backend_.Execute("CREATE TABLE IF NOT EXISTS " + DatasetMetadataTable(project.project_id) +
+                       " (dataset_id VARCHAR, metadata VARCHAR)");
+    } catch (const BackendError& error) {
+      throw ApiError::Internal("Failed to open " + database + ": " + error.what());
+    }
+  }
+  if (!data_dir_.empty()) {
+    json saved = json::array();
+    for (const Project& project : projects_) saved.push_back(ProjectJson(project));
+    const auto temporary = registry.string() + ".tmp";
+    {
+      std::ofstream output(temporary);
+      output.exceptions(std::ios::failbit | std::ios::badbit);
+      output << saved.dump(2) << '\n';
+      output.close();
+    }
+    std::filesystem::rename(temporary, registry);
+  }
+}
+
+const std::vector<Project>& Emulator::ListProjects() const { return projects_; }
+
+std::string Emulator::ResolveProject(const std::string& project_id) const {
+  const auto found = project_ids_.find(project_id);
+  if (found == project_ids_.end()) throw ApiError::NotFound("Not found: Project " + project_id);
+  return found->second;
 }
 
 std::string Emulator::ProjectDatabase(const std::string& project_id) const {
-  if (data_dir_.empty()) {
-    return ":memory:";
-  }
+  if (data_dir_.empty()) return ":memory:";
   return (std::filesystem::path(data_dir_) / ProjectFileName(project_id)).string();
-}
-
-void Emulator::EnsureProject(const std::string& project_id) {
-  if (project_id.empty()) {
-    throw ApiError::Invalid("Project id is required");
-  }
-  std::scoped_lock lock(mutex_);
-  if (projects_.contains(project_id)) {
-    return;
-  }
-  const std::string database = ProjectDatabase(project_id);
-  try {
-    backend_.Execute("ATTACH " + QuoteLiteral(database) + " AS " + QuoteIdentifier(project_id));
-    backend_.Execute("CREATE TABLE IF NOT EXISTS " + DatasetMetadataTable(project_id) +
-                     " (dataset_id VARCHAR, metadata VARCHAR)");
-  } catch (const BackendError& error) {
-    // Most likely another process holds the file's lock.
-    throw ApiError::Internal("Failed to open " + database + ": " + error.what());
-  }
-  projects_.insert(project_id);
 }
 
 QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup) {
@@ -418,23 +465,8 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
   return job;
 }
 
-std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
-  EnsureProject(request.project_id);
-  std::vector<std::string> setup;
-  AnalyzerSettings settings{.default_project = request.project_id};
-  if (request.default_dataset.has_value()) {
-    const std::string dataset_project = request.default_dataset->project_id.empty()
-                                            ? request.project_id
-                                            : request.default_dataset->project_id;
-    EnsureProject(dataset_project);
-    setup.push_back("USE " + QualifiedName(DatasetReference{dataset_project,
-                                                            request.default_dataset->dataset_id}));
-    settings.default_project = dataset_project;
-    settings.default_dataset = request.default_dataset->dataset_id;
-  } else {
-    setup.push_back("USE " + QuoteIdentifier(request.project_id));
-  }
-
+std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
+  request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
@@ -444,6 +476,26 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
                                 .create_disposition = request.create_disposition,
                                 .write_disposition = request.write_disposition};
   return RunJob(std::move(job), [&](Job& job) {
+    if (request.destination_table) {
+      auto& project = request.destination_table->project_id;
+      project = ResolveProject(project.empty() ? request.project_id : project);
+    }
+    std::vector<std::string> setup;
+    AnalyzerSettings settings{.default_project = request.project_id};
+    if (request.default_dataset.has_value()) {
+      const std::string dataset_project = ResolveProject(request.default_dataset->project_id.empty()
+                                                             ? request.project_id
+                                                             : request.default_dataset->project_id);
+      setup.push_back("USE " + QualifiedName(DatasetReference{
+                                   dataset_project, request.default_dataset->dataset_id}));
+      settings.default_project = dataset_project;
+      settings.default_dataset = request.default_dataset->dataset_id;
+    } else {
+      setup.push_back("USE " + QuoteIdentifier(request.project_id));
+    }
+
+    std::get<QueryJob>(job.configuration).destination_table = request.destination_table;
+
     const TranslatedStatement translation = Translate(
         request.query, request.parameters, settings.default_project, settings.default_dataset);
     auto& query = std::get<QueryJob>(job.configuration);
@@ -484,14 +536,19 @@ std::shared_ptr<const Job> Emulator::RunQuery(const QueryRequest& request) {
   });
 }
 
-std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
-  EnsureProject(request.project_id);
+std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
+  request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.load;
   return RunJob(std::move(job), [&](Job& job) {
-    const LoadJob& load = request.load;
+    auto& load = std::get<LoadJob>(job.configuration);
+    load.destination_table.project_id = ResolveProject(load.destination_table.project_id.empty()
+                                                           ? request.project_id
+                                                           : load.destination_table.project_id);
+    load.configuration["destinationTable"]["projectId"] = load.destination_table.project_id;
+
     const json& config = load.configuration;
     const std::string format = config.value("sourceFormat", "CSV");
     if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
@@ -519,20 +576,37 @@ std::shared_ptr<const Job> Emulator::RunLoad(const LoadRequest& request) {
   });
 }
 
-std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
-  EnsureProject(request.project_id);
+std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
+  request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.copy;
   return RunJob(std::move(job), [&](Job& job) {
-    const CopyJob& copy = request.copy;
+    auto& copy = std::get<CopyJob>(job.configuration);
+    for (TableReference& source : copy.source_tables) {
+      source.project_id =
+          ResolveProject(source.project_id.empty() ? request.project_id : source.project_id);
+    }
+    copy.destination_table.project_id = ResolveProject(copy.destination_table.project_id.empty()
+                                                           ? request.project_id
+                                                           : copy.destination_table.project_id);
+    copy.configuration["destinationTable"]["projectId"] = copy.destination_table.project_id;
+    if (!copy.source_tables.empty() && copy.configuration.contains("sourceTable")) {
+      copy.configuration["sourceTable"]["projectId"] = copy.source_tables.front().project_id;
+    }
+    if (copy.configuration.contains("sourceTables")) {
+      for (size_t i = 0; i < copy.source_tables.size(); ++i) {
+        copy.configuration["sourceTables"][i]["projectId"] = copy.source_tables[i].project_id;
+      }
+    }
+
     if (copy.source_tables.empty()) throw ApiError::Invalid("Source table is required");
     std::vector<FieldSchema> schema;
     std::string sql;
     for (TableReference source : copy.source_tables) {
       if (source.project_id.empty()) source.project_id = job.project_id;
-      EnsureProject(source.project_id);
+      source.project_id = ResolveProject(source.project_id);
       const TableInfo table = GetTable(source);
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
@@ -553,14 +627,19 @@ std::shared_ptr<const Job> Emulator::RunCopy(const CopyRequest& request) {
   });
 }
 
-std::shared_ptr<const Job> Emulator::RunExtract(const ExtractRequest& request) {
-  EnsureProject(request.project_id);
+std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
+  request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.extract;
   return RunJob(std::move(job), [&](Job& job) {
-    const ExtractJob& extract = request.extract;
+    auto& extract = std::get<ExtractJob>(job.configuration);
+    extract.source_table.project_id =
+        ResolveProject(extract.source_table.project_id.empty() ? request.project_id
+                                                               : extract.source_table.project_id);
+    extract.configuration["sourceTable"]["projectId"] = extract.source_table.project_id;
+
     const json& config = extract.configuration;
     const std::string format = config.value("destinationFormat", "CSV");
     const std::string compression = config.value("compression", "NONE");
@@ -595,7 +674,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(const ExtractRequest& request) {
 
     TableReference source = extract.source_table;
     if (source.project_id.empty()) source.project_id = job.project_id;
-    EnsureProject(source.project_id);
+    source.project_id = ResolveProject(source.project_id);
     const TableInfo table = GetTable(source);
     if (table.view_query) throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
     if (parquet) {
@@ -639,7 +718,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   if (destination.project_id.empty()) {
     destination.project_id = project_id;
   }
-  EnsureProject(destination.project_id);
+  destination.project_id = ResolveProject(destination.project_id);
   GetDataset(DatasetReference{destination.project_id, destination.dataset_id});
   std::optional<TableInfo> existing;
   try {
@@ -705,8 +784,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
 }
 
-std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,
-                                            const std::string& job_id) {
+std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id) {
+  project_id = ResolveProject(project_id);
   std::scoped_lock lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
   if (it == jobs_.end()) {
@@ -715,7 +794,8 @@ std::shared_ptr<const Job> Emulator::GetJob(const std::string& project_id,
   return it->second;
 }
 
-std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& project_id) {
+std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_id) {
+  project_id = ResolveProject(project_id);
   std::scoped_lock lock(mutex_);
   std::vector<std::shared_ptr<const Job>> result;
   for (const auto& entry : jobs_) {
@@ -733,20 +813,21 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(const std::string& pr
   return result;
 }
 
-void Emulator::DeleteJob(const std::string& project_id, const std::string& job_id) {
+void Emulator::DeleteJob(std::string project_id, const std::string& job_id) {
+  project_id = ResolveProject(project_id);
   std::scoped_lock lock(mutex_);
   if (jobs_.erase(JobKey(project_id, job_id)) == 0) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
   }
 }
 
-std::vector<std::string> Emulator::ListDatasets(const std::string& project_id) {
-  EnsureProject(project_id);
+std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
+  project_id = ResolveProject(project_id);
   return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
-std::vector<DatasetListEntry> Emulator::ListDatasetEntries(const std::string& project_id) {
-  EnsureProject(project_id);
+std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_id) {
+  project_id = ResolveProject(project_id);
   std::vector<DatasetListEntry> entries;
   for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
     // Keep the wire-field decoding beside the named result fields.
@@ -757,8 +838,8 @@ std::vector<DatasetListEntry> Emulator::ListDatasetEntries(const std::string& pr
   return entries;
 }
 
-DatasetMetadata Emulator::GetDataset(const DatasetReference& dataset) {
-  EnsureProject(dataset.project_id);
+DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
@@ -766,8 +847,8 @@ DatasetMetadata Emulator::GetDataset(const DatasetReference& dataset) {
   return ParseDatasetMetadata(result.rows[0]["f"][1]["v"]);
 }
 
-void Emulator::CreateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata) {
-  EnsureProject(dataset.project_id);
+void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
   try {
     backend_.ExecuteDdl("CREATE SCHEMA " + QualifiedName(dataset), statements, "");
@@ -780,7 +861,8 @@ void Emulator::CreateDataset(const DatasetReference& dataset, const DatasetMetad
   }
 }
 
-void Emulator::UpdateDataset(const DatasetReference& dataset, const DatasetMetadata& metadata) {
+void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
   try {
@@ -790,7 +872,8 @@ void Emulator::UpdateDataset(const DatasetReference& dataset, const DatasetMetad
   }
 }
 
-void Emulator::DeleteDataset(const DatasetReference& dataset, bool delete_contents) {
+void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   if (!delete_contents && !ListTables(dataset).empty()) {
     throw ApiError::Invalid("Dataset " + dataset.project_id + ":" + dataset.dataset_id +
@@ -805,12 +888,14 @@ void Emulator::DeleteDataset(const DatasetReference& dataset, bool delete_conten
   }
 }
 
-std::vector<std::string> Emulator::ListTables(const DatasetReference& dataset) {
+std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
-std::vector<TableListEntry> Emulator::ListTableEntries(const DatasetReference& dataset) {
+std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
+  dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   const std::string where =
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
@@ -831,7 +916,8 @@ std::vector<TableListEntry> Emulator::ListTableEntries(const DatasetReference& d
   return entries;
 }
 
-TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count) {
+TableInfo Emulator::GetTable(TableReference table, bool include_row_count) {
+  table.project_id = ResolveProject(table.project_id);
   const DatasetReference dataset{table.project_id, table.dataset_id};
   GetDataset(dataset);
   TableInfo info;
@@ -862,8 +948,9 @@ TableInfo Emulator::GetTable(const TableReference& table, bool include_row_count
   return info;
 }
 
-void Emulator::CreateTable(const TableReference& table, const std::vector<FieldSchema>& schema,
+void Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
                            const TableMetadata& metadata) {
+  table.project_id = ResolveProject(table.project_id);
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
@@ -883,15 +970,17 @@ void Emulator::CreateTable(const TableReference& table, const std::vector<FieldS
   }
 }
 
-void Emulator::CreateView(const TableReference& table, const json& definition,
+void Emulator::CreateView(TableReference table, const json& definition,
                           const TableMetadata& metadata) {
+  table.project_id = ResolveProject(table.project_id);
   WriteView(table, definition, metadata, /*replace=*/false);
 }
 
-void Emulator::UpdateTable(const TableReference& table,
+void Emulator::UpdateTable(TableReference table,
                            const std::optional<std::vector<FieldSchema>>& schema,
                            const std::optional<json>& view,
                            const std::optional<TableMetadata>& metadata) {
+  table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
     if (schema.has_value()) {
@@ -929,8 +1018,9 @@ void Emulator::UpdateTable(const TableReference& table,
   }
 }
 
-void Emulator::WriteView(const TableReference& table, const json& definition,
+void Emulator::WriteView(TableReference table, const json& definition,
                          const TableMetadata& metadata, bool replace) {
+  table.project_id = ResolveProject(table.project_id);
   GetDataset(DatasetReference{table.project_id, table.dataset_id});
   if (definition.value("useLegacySql", true)) {
     throw ApiError::Invalid("The emulator does not support legacy SQL views");
@@ -965,7 +1055,8 @@ void Emulator::WriteView(const TableReference& table, const json& definition,
   }
 }
 
-void Emulator::DeleteTable(const TableReference& table) {
+void Emulator::DeleteTable(TableReference table) {
+  table.project_id = ResolveProject(table.project_id);
   // Views the emulator did not create have no metadata for GetTable, but can still be dropped.
   if (ViewComment(backend_, table).has_value()) {
     Execute("DROP VIEW " + QualifiedName(table));
@@ -975,8 +1066,9 @@ void Emulator::DeleteTable(const TableReference& table) {
   Execute("DROP TABLE " + QualifiedName(table));
 }
 
-QueryResult Emulator::ListTableData(const TableReference& table, int64_t start_index,
+QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
                                     int64_t max_results) {
+  table.project_id = ResolveProject(table.project_id);
   if (GetTable(table).view_query) {
     throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
   }
@@ -984,9 +1076,10 @@ QueryResult Emulator::ListTableData(const TableReference& table, int64_t start_i
                  " OFFSET " + std::to_string(start_index));
 }
 
-std::vector<InsertError> Emulator::InsertTableData(const TableReference& table, const json& rows,
+std::vector<InsertError> Emulator::InsertTableData(TableReference table, const json& rows,
                                                    bool skip_invalid_rows,
                                                    bool ignore_unknown_values) {
+  table.project_id = ResolveProject(table.project_id);
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");
   }

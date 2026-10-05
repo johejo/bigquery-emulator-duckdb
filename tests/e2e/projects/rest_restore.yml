@@ -1,0 +1,25 @@
+desc: empty project registrations and metadata survive a restart
+runners:
+  req: ${PROJECTS_API}
+steps:
+  all:
+    req:
+      /projects?maxResults=100:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 52
+  configured:
+    req:
+      /projects?pageToken=p50:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.projects[0].numericId == "123456789012" && current.res.body.projects[0].friendlyName == ""
+  empty_dataset:
+    req:
+      /projects/123456789012/datasets:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && !("datasets" in current.res.body)

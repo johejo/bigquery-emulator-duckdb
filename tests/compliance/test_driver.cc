@@ -425,7 +425,7 @@ class EmulatorTestDriver : public googlesql::TestDriver {
   }
 
   void Reset() {
-    emulator_ = std::make_unique<Emulator>();
+    emulator_ = std::make_unique<Emulator>("", std::vector<Project>{{.project_id = kProject}});
     emulator_->CreateDataset(DatasetReference{kProject, kDataset});
   }
 
