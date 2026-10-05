@@ -555,7 +555,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       throw ApiError::Invalid("Unsupported source format: " + format);
     }
     TemporaryFiles downloads;
-    const std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
+    std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty()) {
       TableReference destination = load.destination_table;
@@ -565,6 +565,9 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       } catch (const ApiError& error) {
         if (error.http_status() != 404) throw;
       }
+    }
+    if (format == "NEWLINE_DELIMITED_JSON") {
+      paths = StageJsonNumerics(paths, requested_schema, downloads);
     }
     const std::string sql = LoadQuery(format, paths, config, requested_schema);
     const QueryResult prepared = Prepare(sql);

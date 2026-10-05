@@ -1,0 +1,6 @@
+[
+  {"name": "id", "type": "INTEGER"},
+  {"name": "n", "type": "BIGNUMERIC"},
+  {"name": "r", "type": "RECORD", "fields": [{"name": "ns", "type": "BIGNUMERIC", "mode": "REPEATED"}]},
+  {"name": "m", "type": "NUMERIC"}
+]
