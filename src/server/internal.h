@@ -71,7 +71,8 @@ struct ResultPage {
 
 struct JobListRequest {
   bool full_projection = true;
-  std::string state_filter;
+  // The states asked for; empty asks for every state.
+  std::vector<std::string> state_filters;
   std::optional<std::string> parent_job_id;
   int64_t max_results = 50;
   int64_t offset = 0;
