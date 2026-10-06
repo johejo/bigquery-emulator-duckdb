@@ -17,6 +17,11 @@ class ApiError : public std::runtime_error {
   static ApiError Duplicate(const std::string& message) { return {409, "duplicate", message}; }
   static ApiError Internal(const std::string& message) { return {500, "internalError", message}; }
 
+  // This error with `message` in place of its own.
+  ApiError WithMessage(const std::string& message) const {
+    return {http_status_, reason_, message};
+  }
+
   int http_status() const { return http_status_; }
   std::string_view reason() const { return reason_; }
 

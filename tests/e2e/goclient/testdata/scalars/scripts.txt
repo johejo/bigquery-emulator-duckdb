@@ -1,0 +1,200 @@
+# Multi-statement queries, whose result is that of the last statement to run. Expected values
+# follow the procedural language reference:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language
+
+## DECLARE and SET
+
+# A variable without DEFAULT is NULL.
+DECLARE x INT64;
+SELECT x
+=> null
+
+DECLARE x ARRAY<INT64>;
+SELECT x IS NULL
+=> "true"
+
+DECLARE x, y, z INT64 DEFAULT 0;
+SELECT z
+=> "0"
+
+# Variable names are case-insensitive.
+DECLARE Foo INT64 DEFAULT 1;
+SELECT foo
+=> "1"
+
+# A DEFAULT may reference variables declared before it.
+DECLARE x INT64 DEFAULT 2;
+DECLARE y INT64 DEFAULT x * 3;
+SELECT y
+=> "6"
+
+# A column takes precedence over a variable of the same name.
+DECLARE a INT64 DEFAULT 100;
+SELECT MAX(a) FROM t
+=> "3"
+
+DECLARE item DEFAULT (SELECT b FROM t WHERE a = 1);
+SELECT item
+=> "x"
+
+DECLARE x INT64;
+SET x = 5;
+SELECT x
+=> "5"
+
+DECLARE a INT64;
+DECLARE b STRING;
+DECLARE c BOOL;
+SET (a, b, c) = (1 + 3, 'foo', false);
+SELECT a
+=> "4"
+
+DECLARE a INT64;
+DECLARE b STRING;
+DECLARE c BOOL;
+SET (a, b, c) = (1 + 3, 'foo', false);
+SELECT b
+=> "foo"
+
+DECLARE a INT64;
+DECLARE b STRING;
+DECLARE c BOOL;
+SET (a, b, c) = (1 + 3, 'foo', false);
+SELECT c
+=> "false"
+
+# The query's first column goes to the first variable, and its second to the second.
+DECLARE lo, hi INT64;
+SET (lo, hi) = (SELECT AS STRUCT MIN(a) AS smallest, MAX(a) AS largest FROM t);
+SELECT hi
+=> "3"
+
+## BEGIN...END
+
+DECLARE x INT64 DEFAULT 10;
+BEGIN
+  DECLARE y INT64;
+  SET y = x;
+  SELECT y;
+END;
+SELECT x;
+=> "10"
+
+## BEGIN...EXCEPTION...END
+
+BEGIN
+  SELECT 1/0;
+EXCEPTION WHEN ERROR THEN
+  SELECT @@error.statement_text;
+END;
+=> "SELECT 1/0"
+
+# @@error.message matches the message RAISE gives.
+BEGIN
+  RAISE USING MESSAGE = 'oops';
+EXCEPTION WHEN ERROR THEN
+  SELECT @@error.message;
+END;
+=> "oops"
+
+## CASE
+
+DECLARE product_id INT64 DEFAULT 1;
+CASE product_id
+  WHEN 1 THEN
+    SELECT CONCAT('Product one');
+  WHEN 2 THEN
+    SELECT CONCAT('Product two');
+  ELSE
+    SELECT CONCAT('Invalid product');
+END CASE;
+=> "Product one"
+
+DECLARE target_product_id INT64 DEFAULT 2;
+CASE
+  WHEN EXISTS(SELECT 1 FROM t WHERE a = target_product_id) THEN SELECT 'found';
+  ELSE SELECT 'did not find';
+END CASE;
+=> "found"
+
+## IF
+
+DECLARE target_product_id INT64 DEFAULT 103;
+IF target_product_id IS NULL THEN
+  -- Do nothing.
+ELSE
+  SELECT CONCAT('Product ID: ', CAST(target_product_id AS STRING));
+END IF;
+=> "Product ID: 103"
+
+DECLARE target_product_id INT64 DEFAULT 103;
+IF EXISTS(SELECT 1 FROM t WHERE a = target_product_id) THEN
+  SELECT CONCAT('found product ', CAST(target_product_id AS STRING));
+ELSE
+  SELECT CONCAT('did not find product ', CAST(target_product_id AS STRING));
+END IF;
+=> "did not find product 103"
+
+## Labels
+
+label_1: BEGIN
+  SELECT 1;
+  BREAK label_1;
+  SELECT 2; -- Unreached
+END;
+=> "1"
+
+## Loops
+
+DECLARE x INT64 DEFAULT 0;
+LOOP
+  SET x = x + 1;
+  IF x >= 10 THEN
+    LEAVE;
+  END IF;
+END LOOP;
+SELECT x;
+=> "10"
+
+DECLARE x INT64 DEFAULT 0;
+REPEAT
+  SET x = x + 1;
+  SELECT x;
+  UNTIL x >= 3
+END REPEAT;
+=> "3"
+
+DECLARE x INT64 DEFAULT 0;
+WHILE x < 3 DO
+  SET x = x + 1;
+END WHILE;
+SELECT x;
+=> "3"
+
+# CONTINUE returns to the start of the loop.
+DECLARE x INT64 DEFAULT 0;
+DECLARE n INT64 DEFAULT 0;
+WHILE x < 4 DO
+  SET x = x + 1;
+  IF MOD(x, 2) = 0 THEN
+    CONTINUE;
+  END IF;
+  SET n = n + 1;
+END WHILE;
+SELECT n;
+=> "2"
+
+# Each row is a STRUCT of the query's columns.
+DECLARE total INT64 DEFAULT 0;
+FOR record IN (SELECT a, b FROM t WHERE a IS NOT NULL) DO
+  SET total = total + record.a;
+END FOR;
+SELECT total;
+=> "6"
+
+## RETURN
+
+SELECT 1;
+RETURN;
+SELECT 2;
+=> "1"

@@ -4,14 +4,16 @@
 #include <string>
 #include <vector>
 
+#include "googlesql/public/analyzer.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
+class ResolvedExpr;
 class ResolvedStatement;
-}
+}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 
@@ -81,10 +83,18 @@ struct TranslatedStatement {
 // CREATE VIEW and DROP TABLE/VIEW/SCHEMA. Columns are bound by resolved ID across scan scopes.
 // nullopt means an unsupported construct, which `unsupported`, when given, then names. Errors are
 // not caught, so that a failed translation is not reported as an unsupported one. The statement's
-// catalog and TypeFactory must remain alive for this call.
-std::optional<TranslatedStatement> TranslateStatement(const googlesql::ResolvedStatement& statement,
-                                                      const QueryParameters& parameters = {},
-                                                      const DefaultDataset& defaults = {},
-                                                      std::string* unsupported = nullptr);
+// catalog and TypeFactory must remain alive for this call. A statement of a script reads the
+// script's variables as catalog constants and its system variables from `system_variables`.
+std::optional<TranslatedStatement> TranslateStatement(
+    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},
+    const DefaultDataset& defaults = {}, std::string* unsupported = nullptr,
+    const googlesql::SystemVariableValuesMap* system_variables = nullptr);
+
+// Translates the expression of a script, such as a variable's DEFAULT or an IF condition, into a
+// DuckDB query returning its value as one row of one column, like TranslateStatement does.
+std::optional<std::string> TranslateExpression(
+    const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
+    const DefaultDataset& defaults, std::string* unsupported,
+    const googlesql::SystemVariableValuesMap* system_variables);
 
 }  // namespace bigquery_emulator_duckdb

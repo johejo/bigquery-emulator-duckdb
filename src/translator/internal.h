@@ -66,6 +66,8 @@ struct WithQuery {
 struct Context {
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
+  // The values of the system variables of the script that the statement belongs to, if any.
+  const googlesql::SystemVariableValuesMap* system_variables = nullptr;
   // The first construct found unsupported, reported in the error the statement fails with.
   std::string unsupported = {};
   // What DDL records about its target as it is translated.

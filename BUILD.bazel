@@ -142,6 +142,25 @@ cc_library(
 )
 
 cc_library(
+    name = "cell_value",
+    srcs = ["src/cell_value.cc"],
+    hdrs = ["src/cell_value.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/common:internal_value",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:interval_value",
+        "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "catalog",
     srcs = [
         "src/catalog.cc",
@@ -174,13 +193,19 @@ cc_library(
     deps = [
         ":catalog",
         ":field_schema",
+        "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:error_helpers",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:strings",
+        "@googlesql//googlesql/public/types",
         "@googlesql//googlesql/resolved_ast",
+        "@googlesql//googlesql/scripting:error_helpers",
+        "@googlesql//googlesql/scripting:script_executor",
+        "@googlesql//googlesql/scripting:script_segment",
+        "@googlesql//googlesql/scripting:type_aliases",
     ],
 )
 
@@ -214,7 +239,9 @@ cc_library(
         ":references",
         ":table_metadata",
         ":type_mapping",
+        "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:constant",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
@@ -352,7 +379,10 @@ cc_library(
 
 cc_library(
     name = "emulator",
-    srcs = ["src/emulator.cc"],
+    srcs = [
+        "src/emulator.cc",
+        "src/emulator_script.cc",
+    ],
     hdrs = ["src/emulator.h"],
     copts = ["-std=c++20"],
     deps = [
@@ -360,6 +390,7 @@ cc_library(
         ":api_error",
         ":backend",
         ":catalog",
+        ":cell_value",
         ":column_metadata",
         ":ddl_write",
         ":duckdb_sql",
@@ -376,9 +407,22 @@ cc_library(
         ":temporary_files",
         ":translator",
         ":type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/parser",
+        "@googlesql//googlesql/proto:script_exception_cc_proto",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:evaluator_table_iterator",
+        "@googlesql//googlesql/public:multi_catalog",
+        "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
+        "@googlesql//googlesql/scripting:error_helpers",
+        "@googlesql//googlesql/scripting:script_executor",
+        "@googlesql//googlesql/scripting:script_segment",
+        "@googlesql//googlesql/scripting:type_aliases",
         "@nlohmann_json//:json",
     ],
 )
@@ -658,6 +702,7 @@ cc_test(
     deps = [
         ":api_error",
         ":catalog",
+        ":cell_value",
         ":emulator",
         ":field_schema",
         ":query_parameters",

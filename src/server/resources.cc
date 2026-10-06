@@ -362,9 +362,16 @@ json JobList(const std::vector<std::shared_ptr<const Job>>& jobs, const JobListR
   json response = {{"kind", "bigquery#jobList"}, {"etag", kEtag}};
   json entries = json::array();
   int64_t index = 0;
-  // Every job is done and none has a parent, so those filters match nothing.
-  const bool none =
-      request.parent_filter || (!request.state_filter.empty() && request.state_filter != "done");
+  // Every job is done and none has a parent, so those filters match nothing. A multi-statement
+  // query has children in BigQuery, which the emulator does not create.
+  if (request.parent_job_id.has_value() && std::ranges::any_of(jobs, [&](const auto& job) {
+        return job->job_id == *request.parent_job_id && job->query() != nullptr &&
+               job->query()->statement_type == kScriptStatementType;
+      })) {
+    throw ApiError::Invalid("The emulator does not support child jobs of multi-statement queries");
+  }
+  const bool none = request.parent_job_id.has_value() ||
+                    (!request.state_filter.empty() && request.state_filter != "done");
   for (const auto& job : jobs) {
     if (none || job->creation_time_ms < request.min_creation_time ||
         job->creation_time_ms > request.max_creation_time) {

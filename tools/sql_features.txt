@@ -180,6 +180,36 @@ query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
 
+section Multi-statement queries
+
+query Statement lists | SELECT 1; SELECT id FROM t
+query Statement lists | INSERT u (id, v) VALUES (5, 50); DELETE FROM u WHERE id = 5
+note Statement lists | Returns the result of the last statement that ran. Creates no child jobs, so `jobs.list` rejects `parentJobId` of a multi-statement query.
+query `DECLARE`, `SET` | DECLARE x INT64 DEFAULT 1; SET x = x + 1; SELECT x
+query `DECLARE`, `SET` | DECLARE x DEFAULT (SELECT MAX(id) FROM t); SELECT x
+query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (1, 'x'); SELECT a, b
+query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT id, name FROM t ORDER BY id LIMIT 1); SELECT a, b
+query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT 1, 'x'); SELECT a, b
+query `DECLARE`, `SET` | DECLARE s STRING(3) DEFAULT 'a'; SELECT s
+query `BEGIN ... END` | BEGIN DECLARE x INT64 DEFAULT 1; SELECT x; END
+query `BEGIN ... EXCEPTION ... END` | BEGIN SELECT 1 / 0; EXCEPTION WHEN ERROR THEN SELECT @@error.message, @@error.statement_text; END
+note `BEGIN ... EXCEPTION ... END` | An error the emulator reports as unsupported is never handled.
+query `IF` | DECLARE x INT64 DEFAULT 1; IF x > 0 THEN SELECT 'p'; ELSEIF x < 0 THEN SELECT 'n'; ELSE SELECT 'z'; END IF
+query `CASE` | DECLARE x INT64 DEFAULT 1; CASE x WHEN 1 THEN SELECT 'a'; ELSE SELECT 'b'; END CASE
+query `CASE` | CASE WHEN EXISTS(SELECT 1 FROM t) THEN SELECT 'a'; END CASE
+query Loops | DECLARE x INT64 DEFAULT 0; LOOP SET x = x + 1; IF x >= 3 THEN LEAVE; END IF; END LOOP; SELECT x
+query Loops | DECLARE x INT64 DEFAULT 0; WHILE x < 3 DO SET x = x + 1; IF x = 1 THEN CONTINUE; END IF; END WHILE; SELECT x
+query Loops | DECLARE x INT64 DEFAULT 0; REPEAT SET x = x + 1; UNTIL x >= 3 END REPEAT; SELECT x
+query Loops | l: LOOP BREAK l; END LOOP l; SELECT 1
+query `FOR ... IN` | FOR r IN (SELECT id, name FROM t) DO SELECT r.id, r.name; END FOR
+query `RAISE`, `RETURN` | BEGIN RAISE USING MESSAGE = 'm'; EXCEPTION WHEN ERROR THEN SELECT @@error.message; END
+query `RAISE`, `RETURN` | SELECT 1; RETURN; SELECT 2
+query System variables | SELECT @@time_zone; SELECT 1
+query System variables | SET @@time_zone = 'Asia/Tokyo'; SELECT 1
+query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE 'SELECT 1'; SELECT 2
+query Transactions | BEGIN TRANSACTION; INSERT u (id, v) VALUES (6, 60); COMMIT TRANSACTION
+query `CALL` | CALL d.p(); SELECT 1
+
 section INFORMATION_SCHEMA
 
 query `SCHEMATA` | SELECT schema_name, ddl FROM INFORMATION_SCHEMA.SCHEMATA

@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 7 |
-| Supported | 49 |
-| Unsupported | 22 |
+| Partial | 9 |
+| Supported | 57 |
+| Unsupported | 25 |
 
 ## Queries
 
@@ -111,6 +111,24 @@ the probe's own notes name what it rejected.
 | `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |
 | `CREATE TABLE FUNCTION` | Unsupported | statement CreateTableFunctionStmt |
 | `CREATE PROCEDURE` | Unsupported | statement CreateProcedureStmt |
+
+## Multi-statement queries
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| Statement lists | Supported | Returns the result of the last statement that ran. Creates no child jobs, so `jobs.list` rejects `parentJobId` of a multi-statement query. |
+| `DECLARE`, `SET` | Partial | type STRUCT<INT64, STRING>; variables of parameterized types |
+| `BEGIN ... END` | Supported |  |
+| `BEGIN ... EXCEPTION ... END` | Supported | An error the emulator reports as unsupported is never handled. |
+| `IF` | Supported |  |
+| `CASE` | Supported |  |
+| Loops | Supported |  |
+| `FOR ... IN` | Supported |  |
+| `RAISE`, `RETURN` | Supported |  |
+| System variables | Partial | assignment to system variables |
+| `EXECUTE IMMEDIATE` | Unsupported | EXECUTE IMMEDIATE |
+| Transactions | Unsupported | statement BeginStmt |
+| `CALL` | Unsupported | CALL |
 
 ## INFORMATION_SCHEMA
 

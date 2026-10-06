@@ -77,6 +77,16 @@ TEST(BackendTest, EncodesArraysAndStructs) {
                            {"v": []}])"));
 }
 
+// The emulator keeps NULL arrays apart from empty ones where it holds the values itself, such as
+// in the variables of a multi-statement query.
+TEST(BackendTest, KeepsNullArraysWhenAsked) {
+  Backend backend;
+  const QueryResult result = backend.Execute(
+      "SELECT NULL::INTEGER[] AS e, {'y': NULL::VARCHAR[]} AS s, []::INTEGER[] AS a", {}, true);
+  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([{"v": null}, {"v": {"f": [{"v": null}]}},
+                           {"v": []}])"));
+}
+
 TEST(BackendTest, ReportsStatementsWithoutRows) {
   Backend backend;
   EXPECT_FALSE(backend.Execute("CREATE TABLE t (id INTEGER)").has_rows);

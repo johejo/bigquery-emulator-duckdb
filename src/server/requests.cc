@@ -336,7 +336,9 @@ JobListRequest ParseJobList(const httplib::Request& request) {
   // TODO(johejo): stateFilter is repeated, so a request may ask for several states; only the first
   // is read.
   result.state_filter = request.get_param_value("stateFilter");
-  result.parent_filter = request.has_param("parentJobId");
+  if (request.has_param("parentJobId")) {
+    result.parent_job_id = request.get_param_value("parentJobId");
+  }
   result.max_results = QueryParamInt(request, "maxResults", result.max_results);
   result.offset = QueryParamInt(request, "pageToken", result.offset);
   result.min_creation_time = QueryParamInt(request, "minCreationTime", result.min_creation_time);
