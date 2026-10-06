@@ -211,18 +211,10 @@ class EmulatorTestDriver : public googlesql::TestDriver {
  public:
   EmulatorTestDriver() { Reset(); }
 
-  // The emulator's options, without the types and precision BigQuery lacks, so that the reference
-  // implementation evaluates what BigQuery would and tests that need them are skipped.
-  // TODO(johejo): Drop these features from GoogleSqlLanguageOptions() itself, then use it as is.
+  // The emulator's options, so that the reference implementation evaluates what BigQuery would and
+  // tests that need types or precision BigQuery lacks are skipped.
   googlesql::LanguageOptions GetSupportedLanguageOptions() override {
-    googlesql::LanguageOptions options = GoogleSqlLanguageOptions();
-    for (const googlesql::LanguageFeature feature :
-         {googlesql::FEATURE_TIMESTAMP_NANOS, googlesql::FEATURE_MAP_TYPE,
-          googlesql::FEATURE_UUID_TYPE}) {
-      options.DisableLanguageFeature(feature);
-    }
-    options.EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
-    return options;
+    return GoogleSqlLanguageOptions();
   }
 
   // Queries run in UTC, BigQuery's default time zone, unless they name another.
