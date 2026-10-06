@@ -34,3 +34,128 @@ SELECT SAFE.NET.IPV4_TO_INT64(b'\x01\x02\x03')
 
 SELECT NET.IPV4_TO_INT64(CAST(NULL AS BYTES))
 => null
+
+SELECT TO_HEX(NET.IP_FROM_STRING('48.49.50.51'))
+=> "30313233"
+
+SELECT TO_HEX(NET.IP_FROM_STRING('::1'))
+=> "00000000000000000000000000000001"
+
+SELECT TO_HEX(NET.IP_FROM_STRING('::ffff:192.0.2.128'))
+=> "00000000000000000000ffffc0000280"
+
+SELECT SAFE.NET.IP_FROM_STRING('10.1.2.3/32')
+=> null
+
+SELECT NET.IP_FROM_STRING(CAST(NULL AS STRING))
+=> null
+
+SELECT TO_HEX(NET.SAFE_IP_FROM_STRING('48.49.50.51'))
+=> "30313233"
+
+SELECT NET.SAFE_IP_FROM_STRING('10.1.2.3/32')
+=> null
+
+SELECT NET.IP_TO_STRING(b'0123')
+=> "48.49.50.51"
+
+SELECT NET.IP_TO_STRING(b'0123456789@ABCDE')
+=> "3031:3233:3435:3637:3839:4041:4243:4445"
+
+SELECT NET.IP_TO_STRING(b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xc0\x00\x02\x80')
+=> "::ffff:192.0.2.128"
+
+SELECT SAFE.NET.IP_TO_STRING(b'\x01\x02\x03')
+=> null
+
+SELECT NET.IP_TO_STRING(CAST(NULL AS BYTES))
+=> null
+
+SELECT TO_HEX(NET.IP_NET_MASK(4, 0))
+=> "00000000"
+
+SELECT TO_HEX(NET.IP_NET_MASK(4, 20))
+=> "fffff000"
+
+SELECT TO_HEX(NET.IP_NET_MASK(16, 1))
+=> "80000000000000000000000000000000"
+
+SELECT TO_HEX(NET.IP_NET_MASK(16, 128))
+=> "ffffffffffffffffffffffffffffffff"
+
+SELECT SAFE.NET.IP_NET_MASK(8, 0)
+=> null
+
+SELECT SAFE.NET.IP_NET_MASK(4, 33)
+=> null
+
+SELECT SAFE.NET.IP_NET_MASK(4, -1)
+=> null
+
+SELECT TO_HEX(NET.IP_TRUNC(b'\xAA\xBB\xCC\xDD', 11))
+=> "aaa00000"
+
+SELECT TO_HEX(NET.IP_TRUNC(b'\xAA\xBB\xCC\xDD', 12))
+=> "aab00000"
+
+SELECT TO_HEX(NET.IP_TRUNC(b'0123456789@ABCDE', 80))
+=> "30313233343536373839000000000000"
+
+SELECT SAFE.NET.IP_TRUNC(b'\xAA\xBB\xCC\xDD', 33)
+=> null
+
+SELECT SAFE.NET.IP_TRUNC(b'\xAA\xBB\xCC', 0)
+=> null
+
+## Hosts and domains of URLs
+
+SELECT NET.HOST('')
+=> null
+
+SELECT NET.HOST('http://abc.xyz')
+=> "abc.xyz"
+
+SELECT NET.PUBLIC_SUFFIX('http://abc.xyz')
+=> "xyz"
+
+SELECT NET.REG_DOMAIN('http://abc.xyz')
+=> "abc.xyz"
+
+SELECT NET.HOST('//user:password@a.b:80/path?query')
+=> "a.b"
+
+SELECT NET.PUBLIC_SUFFIX('//user:password@a.b:80/path?query')
+=> null
+
+SELECT NET.REG_DOMAIN('//user:password@a.b:80/path?query')
+=> null
+
+SELECT NET.HOST('https://[::1]:80')
+=> "[::1]"
+
+SELECT NET.HOST('http://例子.卷筒纸.中国')
+=> "例子.卷筒纸.中国"
+
+SELECT NET.PUBLIC_SUFFIX('http://例子.卷筒纸.中国')
+=> "中国"
+
+SELECT NET.REG_DOMAIN('http://例子.卷筒纸.中国')
+=> "卷筒纸.中国"
+
+SELECT NET.HOST('    www.Example.Co.UK    ')
+=> "www.Example.Co.UK"
+
+SELECT NET.PUBLIC_SUFFIX('    www.Example.Co.UK    ')
+=> "Co.UK"
+
+SELECT NET.REG_DOMAIN('    www.Example.Co.UK    ')
+=> "Example.Co.UK"
+
+SELECT NET.HOST('mailto:?to=&subject=&body=')
+=> "mailto"
+
+SELECT NET.REG_DOMAIN('mailto:?to=&subject=&body=')
+=> null
+
+SELECT NET.HOST(CAST(NULL AS STRING))
+=> null

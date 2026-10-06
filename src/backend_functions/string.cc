@@ -17,6 +17,7 @@
 #include "googlesql/public/functions/convert_string.h"
 #include "googlesql/public/functions/distance.h"
 #include "googlesql/public/functions/hash.h"
+#include "googlesql/public/functions/net.h"
 #include "googlesql/public/functions/normalize_mode.pb.h"
 #include "googlesql/public/functions/regexp.h"
 #include "googlesql/public/numeric_value.h"
@@ -270,6 +271,42 @@ void DoubleString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
+// NET.HOST, NET.REG_DOMAIN and NET.PUBLIC_SUFFIX, which are NULL for a URL without the part.
+template <absl::Status (*kFunction)(absl::string_view, absl::string_view*, bool*)>
+void UrlPart(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+            const std::string url = arguments.String(0);
+            absl::string_view out;
+            bool is_null = true;
+            if (absl::Status status = kFunction(url, &out, &is_null); !status.ok()) {
+              return status;
+            }
+            if (is_null) {
+              return std::nullopt;
+            }
+            return std::string(out);
+          });
+}
+
+// NET.SAFE_IP_FROM_STRING, which is NULL for an invalid address.
+void SafeIpFromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+            std::string out;
+            bool is_null = true;
+            if (absl::Status status = googlesql::functions::net::SafeIPFromString(
+                    arguments.String(0), &out, &is_null);
+                !status.ok()) {
+              return status;
+            }
+            if (is_null) {
+              return std::nullopt;
+            }
+            return out;
+          });
+}
+
 }  // namespace
 
 void RegisterStringFunctions(duckdb_connection connection) {
@@ -323,6 +360,17 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_rtrim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::RightTrimBytes>},
            {"bq_normalize", {kVarchar, kVarchar}, kVarchar, Normalize<false>},
            {"bq_normalize_and_casefold", {kVarchar, kVarchar}, kVarchar, Normalize<true>},
+           {"bq_soundex", {kVarchar}, kVarchar, Apply<fn::Soundex>},
+           {"bq_safe_convert_bytes_to_string", {kBlob}, kVarchar, Apply<fn::SafeConvertBytes>},
+           // NET functions. IP addresses are BYTES in network byte order.
+           {"bq_net_ip_from_string", {kVarchar}, kBlob, Apply<fn::net::IPFromString>},
+           {"bq_net_safe_ip_from_string", {kVarchar}, kBlob, SafeIpFromString},
+           {"bq_net_ip_to_string", {kBlob}, kVarchar, Apply<fn::net::IPToString>},
+           {"bq_net_ip_net_mask", {kBigint, kBigint}, kBlob, Apply<fn::net::IPNetMask>},
+           {"bq_net_ip_trunc", {kBlob, kBigint}, kBlob, Apply<fn::net::IPTrunc>},
+           {"bq_net_host", {kVarchar}, kVarchar, UrlPart<fn::net::Host>},
+           {"bq_net_reg_domain", {kVarchar}, kVarchar, UrlPart<fn::net::RegDomain>},
+           {"bq_net_public_suffix", {kVarchar}, kVarchar, UrlPart<fn::net::PublicSuffix>},
        }) {
     Register(connection, name, parameters, result, function);
   }
