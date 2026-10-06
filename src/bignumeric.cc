@@ -1,7 +1,9 @@
 #include "src/bignumeric.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -78,6 +80,44 @@ absl::StatusOr<googlesql::BigNumericValue> BigNumericFromBignum(std::string_view
     return absl::OutOfRangeError("BIGNUMERIC overflow");
   }
   return googlesql::BigNumericValue::DeserializeFromProtoBytes(bytes);
+}
+
+std::string BigNumericBignum(const googlesql::BigNumericValue& value) {
+  // The little endian two's complement of the units, made their absolute value.
+  std::string bytes = value.SerializeAsProtoBytes();
+  const bool negative = (static_cast<unsigned char>(bytes.back()) & 0x80) != 0;
+  if (negative) {
+    // Extended by a byte of the sign, so that negating the most negative value cannot overflow,
+    // then inverted and incremented.
+    bytes.push_back(static_cast<char>(0xff));
+    std::ranges::transform(bytes, bytes.begin(),
+                           [](char byte) { return static_cast<char>(~byte); });
+    for (char& byte : bytes) {
+      byte = static_cast<char>(byte + 1);
+      if (byte != 0) {
+        break;
+      }
+    }
+  }
+  while (bytes.size() > 1 && bytes.back() == 0) {
+    bytes.pop_back();
+  }
+  // The header holds the number of bytes, with its top bit set, all inverted for a negative
+  // value, as are the big endian bytes of the absolute value that follow it.
+  uint32_t header = static_cast<uint32_t>(bytes.size()) | 0x800000;
+  if (negative) {
+    header = ~header;
+  }
+  std::string stored = {static_cast<char>(header >> 16), static_cast<char>(header >> 8),
+                        static_cast<char>(header)};
+  for (const char byte : std::views::reverse(bytes)) {
+    stored += negative ? static_cast<char>(~byte) : byte;
+  }
+  return stored;
+}
+
+std::string BigNumericTypeName(int64_t precision, int64_t scale) {
+  return "bq_bignumeric_" + std::to_string(precision) + "_" + std::to_string(scale);
 }
 
 absl::StatusOr<googlesql::BigNumericValue> BigNumericFromDecimalBytes(std::string_view bytes,

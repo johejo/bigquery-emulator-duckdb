@@ -61,14 +61,31 @@ bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
                              [](const auto& child) { return HasCollation(child.get()); });
 }
 
+// The type parameters of `column`, its nested fields' included, which its annotations keep
+// apart.
+std::optional<googlesql::TypeParameters> ColumnTypeParameters(
+    const googlesql::ResolvedColumnDefinition& column, const Scope& scope) {
+  if (column.annotations() == nullptr) {
+    return googlesql::TypeParameters();
+  }
+  absl::StatusOr<googlesql::TypeParameters> parameters =
+      column.annotations()->GetFullTypeParameters(column.type());
+  if (!parameters.ok()) {
+    return Unsupported(scope, std::string(parameters.status().message()));
+  }
+  return *std::move(parameters);
+}
+
 std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
                                                 const Scope& scope) {
   if (HasCollation(column.annotations())) {
     return Unsupported(scope, "column collation");
   }
-  auto type = DuckDbType(column.type(), column.annotations() == nullptr
-                                            ? nullptr
-                                            : &column.annotations()->type_parameters());
+  const auto parameters = ColumnTypeParameters(column, scope);
+  if (!parameters) {
+    return std::nullopt;
+  }
+  auto type = DuckDbType(column.type(), &*parameters);
   if (!type) {
     return Unsupported(scope, "column type " + column.type()->DebugString());
   }
@@ -247,7 +264,11 @@ std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition
     if (!ApplyAnnotations(column.type(), *column.annotations(), *field, scope)) {
       return std::nullopt;
     }
-    ApplyTypeParameters(column.type(), column.annotations()->type_parameters(), *field);
+    const auto parameters = ColumnTypeParameters(column, scope);
+    if (!parameters) {
+      return std::nullopt;
+    }
+    ApplyTypeParameters(column.type(), *parameters, *field);
   }
   if (column.default_value() != nullptr) {
     field->default_value_expression = column.default_value()->sql();

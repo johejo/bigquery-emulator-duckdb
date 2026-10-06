@@ -16,9 +16,8 @@
 #include "absl/strings/str_join.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/type_parameters.pb.h"
-#include "googlesql/public/types/collation.h"
-#include "googlesql/public/types/type_modifiers.h"
 #include "googlesql/public/types/type_parameters.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 
@@ -108,9 +107,11 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
   if (parameters != nullptr) {
     if (parameters->IsNumericTypeParameters()) {
       const auto& numeric = parameters->numeric_type_parameters();
-      // A BIGNUM keeps no precision or scale to round to.
-      if (type->IsBigNumericType() || numeric.is_max_precision() || numeric.precision() > 38) {
+      if (numeric.is_max_precision()) {
         return std::nullopt;
+      }
+      if (type->IsBigNumericType()) {
+        return BigNumericTypeName(numeric.precision(), numeric.scale());
       }
       return "DECIMAL(" + std::to_string(numeric.precision()) + "," +
              std::to_string(numeric.scale()) + ")";
@@ -319,16 +320,6 @@ absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
       MapToDuckDb(*type, &*parameters, /*geography_as_text=*/true);
   if (duckdb_type.has_value()) {
     return *std::move(duckdb_type);
-  }
-  // A type the emulator stores only without its parameters, such as BIGNUMERIC(P, S).
-  if (MapToDuckDb(*type, nullptr, /*geography_as_text=*/true).has_value()) {
-    absl::StatusOr<std::string> name = (*type)->TypeNameWithModifiers(
-        googlesql::TypeModifiers::MakeTypeModifiers(*std::move(parameters), googlesql::Collation()),
-        googlesql::PRODUCT_EXTERNAL);
-    if (!name.ok()) {
-      return name.status();
-    }
-    return absl::InvalidArgumentError("The emulator does not support field type " + *name);
   }
   return absl::InvalidArgumentError("Unsupported field type: " +
                                     (*type)->TypeName(googlesql::PRODUCT_EXTERNAL));

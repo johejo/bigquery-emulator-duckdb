@@ -43,7 +43,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
     const std::string name =
         QuoteIdentifier(table.table()->GetColumn(table.column_index_list(i))->Name());
     target.names.emplace(column.column_id(), name);
-    target.columns.emplace(column.column_id(), "_t." + name);
+    target.columns.emplace(column.column_id(), StoredColumn("_t." + name, column.type()));
     target.column_types.emplace(column.column_id(), column.type());
   }
   return target;
