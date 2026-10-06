@@ -140,6 +140,10 @@ query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM 
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t; SELECT id FROM t
 note `CREATE TEMP TABLE` | In multi-statement queries, whose end drops their temporary tables.
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
+query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 10, 1)) CLUSTER BY name OPTIONS (description = 'x')
+query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t; INSERT n (id) VALUES (1); SELECT id FROM n
+query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t AS SELECT id, name, tags, s FROM t
+note `CREATE TABLE LIKE` | Copies the schema, partitioning, clustering, description, friendly name and labels of a table. Copying a view or a table with column defaults is unsupported
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t
 query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t
 query `CREATE SNAPSHOT TABLE` | CREATE SNAPSHOT TABLE n CLONE t

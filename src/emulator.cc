@@ -191,6 +191,26 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  std::optional<TableDescription> DescribeTable(const std::string& project,
+                                                const std::string& dataset,
+                                                const std::string& table) override {
+    const TableReference reference{project, dataset, table};
+    if (IsDuckDbSchema(dataset)) {
+      return std::nullopt;
+    }
+    try {
+      const std::optional<json> comment =
+          RelationComment(backend_, "duckdb_tables()", "table_name", reference);
+      if (!comment.has_value()) {
+        return std::nullopt;
+      }
+      return TableDescription{.schema = TableSchema(backend_, reference),
+                              .metadata = CommentMetadata(*comment)};
+    } catch (const BackendError&) {
+      return std::nullopt;
+    }
+  }
+
   std::vector<std::string> ListDatasets(const std::string& project) override {
     return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
   }

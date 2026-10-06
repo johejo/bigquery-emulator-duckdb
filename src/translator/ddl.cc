@@ -178,12 +178,11 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
   return true;
 }
 
-// The description, friendly name and labels the OPTIONS of a CREATE TABLE or CREATE VIEW set.
-// The other options change how BigQuery stores, expires or reads the table, which the emulator
-// does not emulate, so they are unsupported.
+// The description, friendly name and labels the OPTIONS of a CREATE TABLE or CREATE VIEW set on
+// `metadata`. The other options change how BigQuery stores, expires or reads the table, which the
+// emulator does not emulate, so they are unsupported.
 std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
-                                             const Scope& scope) {
-  TableMetadata metadata;
+                                             const Scope& scope, TableMetadata metadata = {}) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
     const googlesql::Value* value = OptionLiteral(*option);
@@ -410,9 +409,6 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
 // BigQuery's primary and foreign keys are never enforced, so they are dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
-  if (create.like_table() != nullptr) {
-    return Unsupported(scope, "CREATE TABLE LIKE");
-  }
   if (create.is_value_table() || !create.pseudo_column_list().empty() ||
       create.collation_name() != nullptr || create.connection() != nullptr ||
       !create.check_constraint_list().empty()) {
@@ -432,6 +428,54 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
     default:
       return "CREATE TABLE " + *path;
   }
+}
+
+// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
+// labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
+// SET OPTIONS does.
+std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableStmt& create,
+                                           const Scope& scope) {
+  const auto* source = dynamic_cast<const BigQueryTable*>(create.like_table());
+  std::optional<TableDescription> description =
+      source == nullptr ? std::nullopt : source->Describe();
+  if (!description) {
+    return Unsupported(scope, "CREATE TABLE LIKE a view");
+  }
+  // A default is stored as GoogleSQL, which would have to be translated again.
+  if (std::ranges::any_of(description->schema, [](const FieldSchema& field) {
+        return !field.default_value_expression.empty();
+      })) {
+    return Unsupported(scope, "CREATE TABLE LIKE a table with column defaults");
+  }
+  TableMetadata& inherited = description->metadata;
+  if (create.partition_by_list_size() > 0) {
+    inherited.time_partitioning.reset();
+    inherited.range_partitioning.reset();
+  }
+  if (create.cluster_by_list_size() > 0) {
+    inherited.clustering.clear();
+  }
+  const auto head = CreateTableHead(create, scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  auto metadata =
+      OptionsMetadata(create.option_list(), "CREATE TABLE", scope, std::move(inherited));
+  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+    return std::nullopt;
+  }
+  std::vector<std::string> columns;
+  for (const FieldSchema& field : description->schema) {
+    const absl::StatusOr<std::string> type = DuckDbColumnType(field);
+    if (!type.ok()) {
+      return Unsupported(scope, type.status().message());
+    }
+    columns.push_back(QuoteIdentifier(field.name) + " " + *type +
+                      (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
+  }
+  scope.context.table = TableDefinition{.table = *target,
+                                        .schema = std::move(description->schema),
+                                        .metadata = *std::move(metadata),
+                                        .if_not_exists = IfNotExists(create)};
+  return *head + " (" + Join(columns, ", ") + ")";
 }
 
 }  // namespace
@@ -477,6 +521,9 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
                                        const Scope& scope) {
   if (create.clone_from() != nullptr || create.copy_from() != nullptr) {
     return Unsupported(scope, "CREATE TABLE CLONE or COPY");
+  }
+  if (create.like_table() != nullptr) {
+    return CreateTableLike(create, scope);
   }
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
@@ -532,6 +579,9 @@ std::optional<std::string> CreateTableAsSelect(
     const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope) {
   if (create.output_column_list_size() != create.column_definition_list_size()) {
     return Unsupported(scope, "CREATE TABLE AS SELECT columns");
+  }
+  if (create.like_table() != nullptr) {
+    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT");
   }
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;

@@ -184,6 +184,7 @@ cc_library(
     deps = [
         ":duckdb_sql",
         ":field_schema",
+        ":table_metadata",
         ":type_mapping",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:catalog",
