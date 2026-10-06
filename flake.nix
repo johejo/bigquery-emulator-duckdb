@@ -46,7 +46,10 @@
                   cppcheck
                 ]
                 # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.
+                # Bazel's toolchain detection links with lld when clang finds ld.lld, and with
+                # gold otherwise; bintools wraps ld.lld so Nix's runtime paths are set.
                 ++ lib.optionals stdenv.hostPlatform.isLinux [
+                  llvmPackages.bintools
                   llvmPackages.clang
                   llvmPackages.llvm
                 ];
