@@ -1,7 +1,8 @@
 # AGENTS.md
 
 C++20 built with Bazel; prefer the standard library. `nix develop` provides the toolchain,
-including `bq`. Run `just` recipes (see the `Justfile`) rather than raw commands.
+including `bq`. Use `just` recipes (see the `Justfile`) for building, testing, formatting and
+generating docs.
 
 ## Partial support
 
@@ -24,23 +25,50 @@ Deliberate exceptions, kept for convenience, are listed in the README's Compatib
 
 Compatibility comes first; prefer implementations with less code and fewer special cases. Leave
 out an overload, argument type or form whose semantics would cost too much rather than approximate
-it; a call no rule or handler matches stays unsupported. `src/translator/functions.cc` registers
-each function under one implementation; pick the first that fits. Existing registrations are not
-evidence of compatibility.
+it; a call no rule or handler matches stays unsupported. Existing registrations are not evidence
+of compatibility, and a successful probe alone does not establish it; revisit one only when the
+current task requires it. Keep conditional expressions such as IF and COALESCE as SQL expressions
+so they can short-circuit.
 
-1. **DuckDB as is** (`PlainFunctions`, `FunctionNames`): only when DuckDB agrees on every input,
-   including NULL, NaN and infinities, overflow and errors. Names can match while semantics do
-   not: DuckDB's `concat` skips NULL where BigQuery's `CONCAT` returns NULL.
-2. **GoogleSQL's implementation** (`BackendRules`, registered in `src/backend_functions/`): the
-   default for regular expressions, STRING and BYTES handling, JSON, and parsing or formatting
-   text, where engines differ in edge cases. If a DuckDB spelling needs tricks such as walking
-   BYTES as hex digits, use this instead.
-3. **A template** (`TemplateRules`): a DuckDB function plus a small fixed difference, such as
-   argument order, a default, a date part, or an error DuckDB lacks.
-4. **A handler** (`Handlers`, `src/translator/function.cc`): when the spelling depends on more of
-   the resolved AST than a template sees, such as a variable number of arguments or a literal
-   pattern or path. A handler that reimplements the function's semantics belongs in GoogleSQL's
-   implementation instead.
+For other scalar functions, choose the backend by what the function does, not by which one to try
+first:
+
+- **DuckDB**: what the optimizer must see, such as operators, comparisons and date and time
+  arithmetic, truncation and extraction, which filters, joins and partition pruning depend on;
+  functions whose result the types' arithmetic or a specification fixes, such as ABS, ROUND,
+  hashes and hex or base64 encoding; what depends on the engine, such as RAND and
+  CURRENT_TIMESTAMP; and ARRAY and STRUCT operations. Check each overload against BigQuery at
+  boundaries such as overflow, ranges, NaN or negative arguments. Names can match while semantics
+  do not: DuckDB's `concat` skips NULL where BigQuery's CONCAT returns NULL.
+- **GoogleSQL's implementation**: semantics engines interpret differently, such as Unicode case
+  mapping, normalization and whitespace, regular expressions, formatting and parsing text, JSON,
+  and transcendental functions such as SIN and EXP. Use it for the function's semantics, including
+  input validation, result ranges and errors, rather than reproducing them in DuckDB SQL.
+  GoogleSQL can differ from BigQuery too; check its behavior, and adapt a known difference in the
+  backend function or the rule that calls it, with a case that shows BigQuery's answer. Prefer
+  speeding up a slow backend function; a move to DuckDB requires evidence of compatibility for
+  the affected overloads, not speed alone.
+
+Choose the backend by these categories; then, for an overload assigned to DuckDB, close gaps
+with guards and errors, such as for a negative argument or an out-of-range result; if compatibility
+requires rewriting the computation, use GoogleSQL. A guardable boundary difference alone does not
+override the GoogleSQL category, including for SIN and EXP. When an overload fits both categories,
+or neither clearly, use GoogleSQL.
+
+`src/translator/functions.cc` registers each function under one of these spellings; its rules may
+still spell overloads with different backends, such as a DuckDB function for STRING and
+GoogleSQL's for BYTES:
+
+- **As is** (`PlainFunctions`) or **renamed** (`FunctionNames`): a DuckDB function with the same
+  semantics.
+- **A template** (`TemplateRules`): a DuckDB function plus guards and errors, or a small fixed
+  difference such as argument order, a default or a date part.
+- **A backend rule** (`BackendRules`, registered in `src/backend_functions/`): a call to
+  GoogleSQL's implementation.
+- **A handler** (`Handlers`, `src/translator/function.cc`): when the spelling depends on more of
+  the resolved AST than a rule sees, such as a variable number of arguments or a literal pattern
+  or path. The handler builds the call and leaves the semantics to the backend chosen above; do
+  not reimplement them in generated SQL, such as by walking BYTES as hex digits.
 
 Aggregate and window functions map to DuckDB ones through `AggregateRule`. A function its fields
 cannot express stays unsupported unless it is common enough to justify a custom aggregate.
@@ -51,9 +79,11 @@ Check each overload against BigQuery's documentation for:
 - **Types**: the DuckDB result type matches the type GoogleSQL resolves, for every argument type
   the function accepts (STRING or BYTES; INT64, NUMERIC, BIGNUMERIC or FLOAT64).
 - **Errors**: where BigQuery fails, the emulator fails too, rather than returning NULL, an infinity
-  or a clamped value; raise it with `!n` or `Raise()` so `SAFE.` turns it into NULL. Use
-  BigQuery's message where it is known.
-- **Evaluation**: a handler that uses an argument more than once binds it once, as templates do.
+  or a clamped value. Propagate GoogleSQL's errors; in generated SQL, use `!n` or `Raise()` so
+  `SAFE.` turns the function's errors into NULL. Where BigQuery's message is known, use it, even
+  over GoogleSQL's.
+- **Evaluation**: preserve short-circuit evaluation in conditional expressions. A handler that
+  uses an argument more than once binds it once, as templates do.
 
 Cover each of these that applies with a case in `tests/e2e/goclient/testdata/scalars/`.
 
@@ -87,6 +117,10 @@ emulator's output. Agents do not run queries on BigQuery: a case no source settl
 `tests/e2e/goclient/testdata/unverified.txt`, whose answers maintainers fill in with
 `just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
 lead for what to check, never as an expected value.
+
+Until an independent source settles a case, do not rely on a guessed answer to support the
+behavior that case covers; the rest of the function can still be supported. An unverified case
+alone does not require removing existing support.
 
 ## Before committing
 
