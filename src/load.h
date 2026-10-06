@@ -18,6 +18,14 @@ namespace bigquery_emulator_duckdb {
 std::vector<std::string> StageLoadSources(const nlohmann::json& config, const std::string& format,
                                           GcsClient& gcs, TemporaryFiles& downloads);
 
+// Stages the NEWLINE_DELIMITED_JSON files `paths` for LoadQuery with `schema`. DuckDB reads a
+// JSON number as a DOUBLE, so the NUMERIC and BIGNUMERIC values of `schema` are rewritten into
+// `downloads` as strings that LoadQuery casts exactly. Returns `paths` when `schema` has neither
+// type. Throws ApiError::Invalid for malformed JSON or an invalid BIGNUMERIC.
+std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths,
+                                           const std::vector<FieldSchema>& schema,
+                                           TemporaryFiles& downloads);
+
 // The query that reads the files `paths` in `format`, CSV, NEWLINE_DELIMITED_JSON or PARQUET,
 // with the options of `config`, as the columns of `schema`, or as DuckDB detects them when
 // `schema` is empty.

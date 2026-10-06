@@ -31,15 +31,30 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","n":"578960446186580977117854925043439539266.34992332820282019728792003956564819967"},{"id":"2","n":"-0.00000000000000000000000000000000000001"},{"id":"3","n":null}]'
-  # JSON numbers would be read as FLOAT64.
+  # JSON numbers keep every digit, which reading them as FLOAT64 would lose, at any depth. The
+  # values are the bounds of BIGNUMERIC and NUMERIC that BigQuery documents.
   load_bignumeric_json:
     exec:
       command: >-
         tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.bignumeric_json gs://load-fixtures/nested/people.jsonl id:BIGNUMERIC,name:STRING
+        e2e_load.bignumeric_json tests/e2e/data/bignumeric.jsonl
+        tests/e2e/data/bignumeric_schema.json
+    test: current.exit_code == 0
+  bignumeric_json_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.bignumeric_json
     test: |
-      current.exit_code != 0 && current.stdout contains 'BIGNUMERIC' &&
-      current.stdout contains 'not supported'
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"id":"1","m":"99999999999999999999999999999.999999999","n":"578960446186580977117854925043439539266.34992332820282019728792003956564819967","r":{"ns":["-578960446186580977117854925043439539266.34992332820282019728792003956564819968","0.00000000000000000000000000000000000001"]}},{"id":"2","m":"-99999999999999999999999999999.999999999","n":"-0.00000000000000000000000000000000000001","r":{"ns":[]}},{"id":"3","m":null,"n":null,"r":null}]'
+  # One unit of 10^-38 beyond the largest BIGNUMERIC.
+  bignumeric_json_overflow:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
+        e2e_load.bignumeric_overflow tests/e2e/data/bignumeric_overflow.jsonl n:BIGNUMERIC
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Invalid BIGNUMERIC value'
   load_gcs:
     exec:
       command: >-

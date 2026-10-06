@@ -329,12 +329,16 @@ cc_library(
     copts = ["-std=c++20"],
     deps = [
         ":api_error",
+        ":bignumeric",
         ":duckdb_sql",
         ":field_schema",
         ":gcs",
         ":schema_sql",
         ":temporary_files",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:convert_string",
         "@nlohmann_json//:json",
+        "@zlib",
     ],
 )
 
