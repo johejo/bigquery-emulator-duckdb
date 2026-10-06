@@ -164,10 +164,6 @@ absl::StatusOr<QueryParameters> ToQueryParameters(const std::map<std::string, Va
 }
 
 // The rows of a query result as the ARRAY<STRUCT> the compliance tests compare.
-//
-// TODO(johejo): Results carry a NULL array as an empty one, as BigQuery's do, so a case that
-// expects a NULL array fails although no client can tell the two apart; about 500 cases fail only
-// for that. Compare such arrays as equal instead.
 absl::StatusOr<Value> ResultValue(const QueryResult& result, googlesql::TypeFactory* type_factory) {
   std::vector<googlesql::StructType::StructField> columns;
   for (const FieldSchema& field : result.schema) {
@@ -271,7 +267,10 @@ class EmulatorTestDriver : public googlesql::TestDriver {
         emulator_->RunQuery(QueryRequest{.project_id = kProject,
                                          .query = sql,
                                          .default_dataset = DatasetReference{kProject, kDataset},
-                                         .parameters = std::move(query_parameters)});
+                                         .parameters = std::move(query_parameters),
+                                         // BigQuery returns a NULL array as an empty one, which
+                                         // would fail every case that expects a NULL array.
+                                         .null_arrays = true});
     if (job->error.has_value()) {
       return JobStatus(*job->error);
     }

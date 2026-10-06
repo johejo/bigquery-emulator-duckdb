@@ -149,6 +149,9 @@ struct QueryRequest {
   std::optional<TableReference> destination_table;
   CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
   WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
+  // Keeps a NULL array in the result of a single statement null rather than empty, as BigQuery
+  // returns it. No API sets it: GoogleSQL's compliance tests compare results with it set.
+  bool null_arrays = false;
 };
 
 struct LoadRequest {

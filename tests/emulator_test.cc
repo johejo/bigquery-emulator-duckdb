@@ -116,6 +116,22 @@ TEST_F(EmulatorTest, RunsAndPreparesResolvedParameters) {
   EXPECT_TRUE(emulator_.RunQuery(request)->error.has_value());
 }
 
+TEST_F(EmulatorTest, KeepsNullArraysOnRequest) {
+  QueryRequest request;
+  request.project_id = "test";
+  request.query = "SELECT CAST(NULL AS ARRAY<INT64>), ARRAY<INT64>[]";
+  for (const bool null_arrays : {false, true}) {
+    request.null_arrays = null_arrays;
+    const auto job = emulator_.RunQuery(request);
+    if (!job->result.has_value()) {
+      FAIL() << ErrorMessage(*job);
+    }
+    const nlohmann::json& row = job->result->rows.at(0)["f"];
+    EXPECT_EQ(row[0]["v"].is_null(), null_arrays);
+    EXPECT_EQ(row[1]["v"], nlohmann::json::array());
+  }
+}
+
 TEST_F(EmulatorTest, RunsCallsWithTheSafePrefix) {
   EXPECT_EQ(Scalar("SELECT SAFE.REGEXP_CONTAINS('abc', 'b')"), "true");
 }
