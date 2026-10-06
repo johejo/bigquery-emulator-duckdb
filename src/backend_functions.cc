@@ -14,7 +14,8 @@ namespace backend_functions {
 
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
-              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs) {
+              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
+              bool volatile_result) {
   Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), name);
@@ -30,6 +31,9 @@ void Register(duckdb_connection connection, const char* name,
   if (!nulls) {
     duckdb_scalar_function_set_special_handling(scalar.get());
   }
+  if (volatile_result) {
+    duckdb_scalar_function_set_volatile(scalar.get());
+  }
   if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
     throw BackendError(std::string("DuckDB failed to register ") + name);
   }
@@ -37,7 +41,8 @@ void Register(duckdb_connection connection, const char* name,
 
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_logical_type result,
-              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs) {
+              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
+              bool volatile_result) {
   std::vector<LogicalType> owned;
   std::vector<duckdb_logical_type> types;
   owned.reserve(parameters.size());
@@ -47,14 +52,15 @@ void Register(duckdb_connection connection, const char* name,
     // cppcheck-suppress useStlAlgorithm
     types.push_back(owned.emplace_back(duckdb_create_logical_type(parameter)).get());
   }
-  Register(connection, name, types, result, function, nulls, varargs);
+  Register(connection, name, types, result, function, nulls, varargs, volatile_result);
 }
 
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_type result,
-              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs) {
+              duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
+              bool volatile_result) {
   LogicalType type(duckdb_create_logical_type(result));
-  Register(connection, name, parameters, type.get(), function, nulls, varargs);
+  Register(connection, name, parameters, type.get(), function, nulls, varargs, volatile_result);
 }
 
 }  // namespace backend_functions
@@ -69,6 +75,7 @@ void RegisterBackendFunctions(duckdb_database database) {
   backend_functions::RegisterStringFunctions(connection.get());
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());
+  backend_functions::RegisterAeadFunctions(connection.get());
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -34,9 +34,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 13 |
+| Partial | 16 |
 | Supported | 234 |
-| Unsupported | 146 |
+| Unsupported | 143 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -44,9 +44,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ABS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#abs) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`ACOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acos) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`ACOSH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#acosh) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Unsupported |  | function DECRYPT_BYTES |
-| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Unsupported |  | function DECRYPT_STRING |
-| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Unsupported |  | function ENCRYPT |
+| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | aead_encryption_functions | Partial | GoogleSQL function | function KEYSET_CHAIN |
+| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | aead_encryption_functions | Partial | GoogleSQL function | function KEYSET_CHAIN |
+| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | aead_encryption_functions | Partial | GoogleSQL function | function KEYSET_CHAIN |
 | [`AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#agg) | aggregate_functions | Untested |  | no sample for <measure<T1>> |
 | [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`APPENDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#appends) | time-series-functions | Unsupported |  | the analyzer does not know this function |

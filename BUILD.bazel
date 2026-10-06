@@ -267,6 +267,7 @@ cc_library(
         "src/backend.cc",
         "src/backend_functions.cc",
         "src/backend_functions.h",
+        "src/backend_functions/aead.cc",
         "src/backend_functions/bignumeric.cc",
         "src/backend_functions/datetime.cc",
         "src/backend_functions/internal.h",
@@ -282,6 +283,7 @@ cc_library(
         ":catalog",
         ":field_schema",
         "//third_party/duckdb",
+        "@boringssl//:crypto",
         "@googlesql//googlesql/public:civil_time",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:language_options",
@@ -309,6 +311,7 @@ cc_library(
         "@googlesql//googlesql/public/functions:string_format",
         "@googlesql//googlesql/public/functions:to_json",
         "@nlohmann_json//:json",
+        "@protobuf//third_party/utf8_range:utf8_validity",
     ],
 )
 
