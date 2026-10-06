@@ -247,8 +247,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Supported | GoogleSQL function |  |
-| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported | DuckDB SQL |  |
-| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported | DuckDB SQL |  |
+| [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported | GoogleSQL function |  |
 | [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Supported | GoogleSQL function |  |
 | [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Supported | GoogleSQL function |  |
 | [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Supported | GoogleSQL function |  |

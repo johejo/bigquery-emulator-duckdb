@@ -94,11 +94,11 @@ TEST(FunctionsTest, RaisesErrorsOrNullUnderSafe) {
       TranslateFunction("SUBSTR", {Sql("s", googlesql::TYPE_STRING), Sql("p"), Sql("n")}, true),
       "CASE WHEN n < 0 THEN NULL ELSE substr(s, CASE WHEN p > 0 THEN p WHEN p = 0 OR p < "
       "-length(s) THEN 1 ELSE length(s) + p + 1 END, n) END");
-  // An error message can use the arguments, which count towards binding them once.
-  EXPECT_EQ(TranslateFunction("IPV4_FROM_INT64", {Sql("(q.a + 1)", googlesql::TYPE_INT64)}, true),
-            "list_transform([struct_pack(a1 := (q.a + 1))], _fn -> CASE WHEN _fn.a1 < -2147483648 "
-            "OR _fn.a1 > 4294967295 THEN NULL ELSE unhex(lpad(hex(_fn.a1 & 4294967295), 8, '0')) "
-            "END)[1]");
+  // An error message can use the arguments, which it reads from where they are bound.
+  EXPECT_EQ(TranslateFunction("DIV", {Sql("(q.a + 1)", googlesql::TYPE_INT64), Sql("(q.b + 1)")}),
+            "list_transform([struct_pack(a1 := (q.a + 1), a2 := (q.b + 1))], _fn -> CASE WHEN "
+            "_fn.a1 IS NULL OR _fn.a2 IS NULL THEN NULL WHEN _fn.a2 = 0 THEN error('division by "
+            "zero: ' || _fn.a1 || ' / ' || _fn.a2) ELSE divide(_fn.a1, _fn.a2) END)[1]");
   EXPECT_EQ(TranslateFunction("ERROR", {Sql("m")}), "error(m)");
   EXPECT_EQ(TranslateFunction("ERROR", {Sql("m")}, true), "NULL");
 }
