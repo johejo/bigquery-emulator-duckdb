@@ -591,10 +591,19 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         if (error.http_status() != 404) throw;
       }
     }
+    ParquetColumn parquet;
     if (format == "NEWLINE_DELIMITED_JSON") {
       paths = StageJsonNumerics(paths, requested_schema, downloads);
+    } else if (format == "PARQUET") {
+      ParquetSources sources = StageParquetDecimals(paths, downloads);
+      paths = std::move(sources.paths);
+      parquet = std::move(sources.columns);
+      if (requested_schema.empty() && parquet.HasWideDecimal()) {
+        requested_schema = Prepare(LoadQuery(format, paths, config, {})).schema;
+        DetectParquetDecimals(requested_schema, parquet, config);
+      }
     }
-    const std::string sql = LoadQuery(format, paths, config, requested_schema);
+    const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
     const QueryResult prepared = Prepare(sql);
     const QueryResult result = WriteDestination(
         job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
@@ -710,6 +719,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
                           ParquetExtractColumns(table.schema), QualifiedName(source),
                           QuoteLiteral(path),
                           compression == "NONE" ? "uncompressed" : ToLowerAscii(compression)));
+      AnnotateParquetBigNumerics(path, table.schema);
     } else {
       WriteTextExtract(table.schema, Execute("SELECT * FROM " + QualifiedName(source)).rows,
                        {.json = format == "NEWLINE_DELIMITED_JSON",

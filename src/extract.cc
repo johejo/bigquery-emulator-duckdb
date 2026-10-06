@@ -19,6 +19,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/parquet_metadata.h"
 #include "src/type_mapping.h"
 #include "zlib.h"
 
@@ -171,10 +172,10 @@ void WriteFile(const std::string& path, std::string_view contents, bool gzip) {
   if (gzclose(output) != Z_OK || !written) throw ApiError::Invalid("Could not write " + path);
 }
 
-// A copy of `field` whose DuckDB type is the one Parquet export writes it as.
+// A copy of `field` whose DuckDB type is the one Parquet export writes it as, except that a
+// BIGNUMERIC stays one; see ParquetValue.
 FieldSchema ParquetField(FieldSchema field) {
   switch (field.type) {
-    case FieldType::kBigNumeric:
     case FieldType::kInterval:
     case FieldType::kGeography:
       throw ApiError::Invalid(std::string(kUnsupported) + "extracting " +
@@ -212,6 +213,64 @@ std::string ParquetType(const FieldSchema& field) {
     type = Checked(DuckDbColumnType(scalar));
   }
   return field.mode == FieldMode::kRepeated ? type + "[]" : type;
+}
+
+bool HasBigNumeric(const FieldSchema& field) {
+  return field.type == FieldType::kBigNumeric || std::ranges::any_of(field.fields, HasBigNumeric);
+}
+
+// The DuckDB value `sql` of `field`, a ParquetField, as Parquet export writes it. DuckDB cannot
+// write a DECIMAL wider than 38 digits, so a BIGNUMERIC is written as the bytes of a
+// DECIMAL(76, 38), which AnnotateParquetBigNumerics then declares in the footer. A lambda takes
+// the name _e and its `depth`.
+std::string ParquetValue(const std::string& sql, const FieldSchema& field, int depth) {
+  if (!HasBigNumeric(field)) return std::format("CAST({} AS {})", sql, ParquetType(field));
+  if (field.mode == FieldMode::kRepeated) {
+    FieldSchema element = field;
+    element.mode = FieldMode::kNullable;
+    const std::string name = "_e" + std::to_string(depth);
+    return std::format("list_transform({}, {} -> {})", sql, name,
+                       ParquetValue(name, element, depth + 1));
+  }
+  if (field.type == FieldType::kBigNumeric) {
+    return std::format("bq_bignumeric_to_decimal_bytes(CAST({} AS VARCHAR))", sql);
+  }
+  std::string fields;
+  for (const FieldSchema& child : field.fields) {
+    fields += std::format(
+        "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
+        ParquetValue(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child,
+                     depth));
+  }
+  return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
+}
+
+// Declares the leaves of `column` that hold the BIGNUMERICs of `field` as DECIMAL(76, 38) in
+// `schema`, FileMetaData's schema elements, adding their indexes to `leaves`.
+void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
+                         std::vector<ThriftValue>& schema, std::vector<size_t>& leaves) {
+  if (field.mode == FieldMode::kRepeated) {
+    FieldSchema element = field;
+    element.mode = FieldMode::kNullable;
+    AnnotateBigNumerics(element, column.children.at(0), schema, leaves);
+  } else if (field.type == FieldType::kRecord) {
+    for (size_t i = 0; i < field.fields.size(); ++i) {
+      AnnotateBigNumerics(field.fields[i], column.children.at(i), schema, leaves);
+    }
+  } else if (field.type == FieldType::kBigNumeric) {
+    namespace pq = parquet;
+    ThriftValue& element = schema.at(column.element);
+    element.SetField(pq::kElementConvertedType, ThriftValue::Int32(pq::kConvertedDecimal));
+    element.SetField(pq::kElementScale, ThriftValue::Int32(38));
+    element.SetField(pq::kElementPrecision, ThriftValue::Int32(76));
+    element.SetField(pq::kElementLogicalType,
+                     ThriftValue::Struct(
+                         {{pq::kLogicalDecimal, ThriftValue::Struct({
+                                                    {pq::kDecimalScale, ThriftValue::Int32(38)},
+                                                    {pq::kDecimalPrecision, ThriftValue::Int32(76)},
+                                                })}}));
+    leaves.push_back(column.element);
+  }
 }
 
 }  // namespace
@@ -262,9 +321,47 @@ std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema) {
   for (const FieldSchema& field : schema) {
     const std::string name = QuoteIdentifier(field.name);
     if (!columns.empty()) columns += ", ";
-    columns += std::format("CAST({0} AS {1}) AS {0}", name, ParquetType(ParquetField(field)));
+    columns += std::format("{} AS {}", ParquetValue(name, ParquetField(field), 0), name);
   }
   return columns;
+}
+
+void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema) {
+  if (std::ranges::none_of(schema, HasBigNumeric)) return;
+  ThriftValue metadata = ReadParquetMetadata(path);
+  const ParquetColumn columns = ParquetColumns(metadata);
+  std::vector<ThriftValue>& elements = metadata.Field(parquet::kSchema)->elements;
+  std::vector<size_t> leaves;
+  for (size_t i = 0; i < schema.size(); ++i) {
+    AnnotateBigNumerics(schema[i], columns.children.at(i), elements, leaves);
+  }
+  // A row group has a column chunk for each leaf, in the schema's order. The statistics, column
+  // index and bloom filter DuckDB wrote compare and hash the bytes as BYTES, which readers of a
+  // DECIMAL would misread, so they go.
+  std::vector<size_t> chunks;
+  size_t leaf = 0;
+  for (size_t i = 0; i < elements.size(); ++i) {
+    const ThriftValue* children = elements[i].Field(parquet::kElementChildren);
+    if (children != nullptr && children->integer > 0) continue;
+    if (std::ranges::find(leaves, i) != leaves.end()) chunks.push_back(leaf);
+    ++leaf;
+  }
+  if (ThriftValue* groups = metadata.Field(parquet::kRowGroups)) {
+    for (ThriftValue& group : groups->elements) {
+      std::vector<ThriftValue>& group_chunks = group.Field(parquet::kRowGroupColumns)->elements;
+      for (const size_t chunk : chunks) {
+        ThriftValue& column = group_chunks.at(chunk);
+        column.RemoveField(parquet::kChunkColumnIndexOffset);
+        column.RemoveField(parquet::kChunkColumnIndexLength);
+        if (ThriftValue* meta = column.Field(parquet::kChunkMetadata)) {
+          meta->RemoveField(parquet::kColumnStatistics);
+          meta->RemoveField(parquet::kColumnBloomFilterOffset);
+          meta->RemoveField(parquet::kColumnBloomFilterLength);
+        }
+      }
+    }
+  }
+  RewriteParquetMetadata(path, metadata);
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -21,6 +21,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/parquet_metadata.h"
 #include "src/schema_sql.h"
 #include "src/temporary_files.h"
 #include "zlib.h"
@@ -82,6 +83,8 @@ std::vector<std::string> StageLoadSources(const json& config, const std::string&
 }
 
 namespace {
+
+constexpr int64_t kBigNumericScale = googlesql::BigNumericValue::kMaxFractionalDigits;
 
 bool HasType(const std::vector<FieldSchema>& fields, FieldType type) {
   return std::ranges::any_of(fields, [type](const FieldSchema& field) {
@@ -240,7 +243,140 @@ std::string ReadMaybeGzip(const std::string& path) {
   return contents;
 }
 
+constexpr std::string_view kUnsupported = "The emulator does not support ";
+
+// The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
+// most columns itself, but StageParquetDecimals makes it read a wide DECIMAL as its bytes, and
+// it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A
+// lambda takes the name _e and its `depth`.
+std::string ParquetValue(const std::string& sql, const FieldSchema& field,
+                         const ParquetColumn* column, int depth) {
+  std::string cast = std::format("CAST({} AS {})", sql, ToDuckDbType(field));
+  if (column == nullptr ||
+      (field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
+       !column->HasWideDecimal())) {
+    return cast;
+  }
+  // Where the shapes differ, DuckDB's cast reports it.
+  if (field.mode == FieldMode::kRepeated) {
+    if (column->kind != ParquetColumn::Kind::kList) return cast;
+    FieldSchema element = field;
+    element.mode = FieldMode::kNullable;
+    const std::string name = "_e" + std::to_string(depth);
+    return std::format("list_transform({}, {} -> {})", sql, name,
+                       ParquetValue(name, element, &column->children.front(), depth + 1));
+  }
+  if (field.type == FieldType::kRecord) {
+    if (column->kind != ParquetColumn::Kind::kStruct) return cast;
+    std::string fields;
+    for (const FieldSchema& child : field.fields) {
+      fields += std::format(
+          "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
+          ParquetValue(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child,
+                       column->Child(child.name), depth));
+    }
+    return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
+  }
+  if (column->IsWideDecimal() &&
+      (field.type != FieldType::kBigNumeric || column->scale > kBigNumericScale)) {
+    throw ApiError::Invalid(
+        std::format("{}loading a Parquet DECIMAL({}, {}) column into {} field {}", kUnsupported,
+                    column->precision, column->scale, FieldTypeName(field.type), field.name));
+  }
+  if (field.type != FieldType::kBigNumeric) return cast;
+  if (column->IsWideDecimal()) {
+    return std::format("CAST(bq_bignumeric_from_decimal_bytes({}, {}) AS BIGNUM)", sql,
+                       column->scale);
+  }
+  if (column->IsDecimal() || column->IsInteger()) {
+    return std::format("CAST(bq_bignumeric_from_string(CAST({} AS VARCHAR), false) AS BIGNUM)",
+                       sql);
+  }
+  throw ApiError::Invalid(std::format(
+      "{}loading BIGNUMERIC field {} from a Parquet column that is not a DECIMAL or an integer",
+      kUnsupported, field.name));
+}
+
+// The schema elements of the wide DECIMAL leaves of `column`.
+void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
+  if (column.IsWideDecimal()) elements.push_back(column.element);
+  for (const ParquetColumn& child : column.children) WideDecimals(child, elements);
+}
+
+// Gives `field` the type BigQuery detects for `column` when it is a wide DECIMAL. Of the
+// `targets`, decimalTargetTypes, NUMERIC cannot hold one, and BIGNUMERIC is picked unless it
+// cannot either and STRING is listed. Converting to NUMERIC, which is picked when it is the only
+// one, or to STRING is unsupported.
+void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json& targets) {
+  if (column == nullptr) return;
+  if (field.mode == FieldMode::kRepeated) {
+    if (column->kind != ParquetColumn::Kind::kList) return;
+    column = &column->children.front();
+  }
+  if (field.type == FieldType::kRecord) {
+    for (FieldSchema& child : field.fields) {
+      DetectDecimals(child, column->Child(child.name), targets);
+    }
+    return;
+  }
+  if (!column->IsWideDecimal()) return;
+  const auto listed = [&targets](std::string_view type) {
+    return std::ranges::find(targets, json(type)) != targets.end();
+  };
+  const bool fits = column->precision <= 76 && column->scale <= kBigNumericScale;
+  if (!listed("BIGNUMERIC") || (!fits && listed("STRING"))) {
+    throw ApiError::Invalid(std::format(
+        "{}detecting the type of a Parquet DECIMAL({}, {}) column unless decimalTargetTypes picks "
+        "BIGNUMERIC",
+        kUnsupported, column->precision, column->scale));
+  }
+  field.type = FieldType::kBigNumeric;
+}
+
 }  // namespace
+
+ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
+                                    TemporaryFiles& downloads) {
+  ParquetSources sources;
+  for (const std::string& path : paths) {
+    ThriftValue metadata = ReadParquetMetadata(path);
+    const ParquetColumn columns = ParquetColumns(metadata);
+    if (sources.paths.empty()) {
+      sources.columns = columns;
+    } else if (columns != sources.columns &&
+               (columns.HasWideDecimal() || sources.columns.HasWideDecimal())) {
+      throw ApiError::Invalid(std::string(kUnsupported) +
+                              "loading Parquet files whose schemas differ when one has a DECIMAL "
+                              "wider than 38 digits");
+    }
+    std::vector<size_t> wide;
+    WideDecimals(columns, wide);
+    if (wide.empty()) {
+      sources.paths.push_back(path);
+      continue;
+    }
+    for (const size_t index : wide) {
+      ThriftValue& element = metadata.Field(parquet::kSchema)->elements.at(index);
+      for (const int16_t id : {parquet::kElementConvertedType, parquet::kElementScale,
+                               parquet::kElementPrecision, parquet::kElementLogicalType}) {
+        element.RemoveField(id);
+      }
+    }
+    const std::string staged = downloads.Create();
+    std::filesystem::copy_file(path, staged, std::filesystem::copy_options::overwrite_existing);
+    RewriteParquetMetadata(staged, metadata);
+    sources.paths.push_back(staged);
+  }
+  return sources;
+}
+
+void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
+                           const json& config) {
+  json targets = config.value("decimalTargetTypes", json::array());
+  if (!targets.is_array()) throw ApiError::Invalid("Invalid decimalTargetTypes");
+  if (targets.empty()) targets.push_back("NUMERIC");
+  for (FieldSchema& field : schema) DetectDecimals(field, columns.Child(field.name), targets);
+}
 
 std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths,
                                            const std::vector<FieldSchema>& schema,
@@ -272,7 +408,8 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
 }
 
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
-                      const json& config, const std::vector<FieldSchema>& schema) {
+                      const json& config, const std::vector<FieldSchema>& schema,
+                      const ParquetColumn& parquet) {
   std::string files;
   for (const std::string& path : paths) {
     files += (files.empty() ? "" : ", ") + QuoteLiteral(path);
@@ -304,9 +441,6 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     sql += ")";
   } else if (format == "NEWLINE_DELIMITED_JSON") {
     sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
-  } else if (HasType(schema, FieldType::kBigNumeric)) {
-    // read_parquet() reads a DECIMAL wider than 38 digits as a DOUBLE.
-    throw ApiError::Invalid("Loading BIGNUMERIC from " + format + " is not supported");
   } else {
     sql = std::format("SELECT * FROM read_parquet({})", files);
   }
@@ -314,8 +448,12 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     std::string columns;
     for (const FieldSchema& field : schema) {
       if (!columns.empty()) columns += ", ";
-      columns +=
-          std::format("CAST({0} AS {1}) AS {0}", QuoteIdentifier(field.name), ToDuckDbType(field));
+      const std::string name = QuoteIdentifier(field.name);
+      columns += std::format("{} AS {}",
+                             format == "PARQUET"
+                                 ? ParquetValue(name, field, parquet.Child(field.name), 0)
+                                 : std::format("CAST({} AS {})", name, ToDuckDbType(field)),
+                             name);
     }
     sql = std::format("SELECT {} FROM ({}) AS source", columns, sql);
   }

@@ -27,4 +27,8 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema,
 // BigQuery's Parquet export writes. Throws ApiError for a type the emulator does not export.
 std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema);
 
+// Declares the BIGNUMERIC columns of `schema` in the Parquet file `path`, which DuckDB wrote from
+// ParquetExtractColumns, as DECIMAL(76, 38), the type BigQuery's Parquet export writes.
+void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema);
+
 }  // namespace bigquery_emulator_duckdb

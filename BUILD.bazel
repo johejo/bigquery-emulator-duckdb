@@ -123,6 +123,14 @@ cc_library(
 )
 
 cc_library(
+    name = "parquet_metadata",
+    srcs = ["src/parquet_metadata.cc"],
+    hdrs = ["src/parquet_metadata.h"],
+    copts = ["-std=c++20"],
+    deps = [":api_error"],
+)
+
+cc_library(
     name = "extract",
     srcs = ["src/extract.cc"],
     hdrs = ["src/extract.h"],
@@ -131,6 +139,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
+        ":parquet_metadata",
         ":type_mapping",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:numeric_value",
@@ -360,6 +369,7 @@ cc_library(
         ":duckdb_sql",
         ":field_schema",
         ":gcs",
+        ":parquet_metadata",
         ":schema_sql",
         ":temporary_files",
         "@googlesql//googlesql/public:numeric_value",
@@ -586,6 +596,17 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":translator",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "parquet_metadata_test",
+    srcs = ["tests/parquet_metadata_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":api_error",
+        ":parquet_metadata",
         "@com_google_googletest//:gtest_main",
     ],
 )
