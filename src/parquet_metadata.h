@@ -8,10 +8,11 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
+
+struct ThriftField;
 
 // A value of Thrift's compact protocol, kept with its type so that it is written back as read.
 struct ThriftValue {
@@ -41,10 +42,10 @@ struct ThriftValue {
   Type value_type = Type::kStruct;
   std::vector<ThriftValue> elements;
   // kStruct: the fields in order of their ids.
-  std::vector<std::pair<int16_t, ThriftValue>> fields;
+  std::vector<ThriftField> fields;
 
   static ThriftValue Int32(int32_t value);
-  static ThriftValue Struct(std::vector<std::pair<int16_t, ThriftValue>> fields);
+  static ThriftValue Struct(std::vector<ThriftField> fields);
 
   // The struct field `id`, or null when it is absent.
   [[nodiscard]] const ThriftValue* Field(int16_t id) const;
@@ -52,6 +53,12 @@ struct ThriftValue {
   // Sets the struct field `id`, adding it in order when it is absent.
   void SetField(int16_t id, ThriftValue value);
   void RemoveField(int16_t id);
+};
+
+// A field of a struct. std::pair would need ThriftValue complete within its own definition.
+struct ThriftField {
+  int16_t id = 0;
+  ThriftValue value;
 };
 
 // The FileMetaData of the Parquet file `path`. Throws ApiError::Invalid for a file that is not

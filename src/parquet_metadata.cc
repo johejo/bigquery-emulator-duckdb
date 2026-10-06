@@ -116,7 +116,8 @@ class Reader {
         for (uint8_t header = Byte(); header != 0; header = Byte()) {
           const uint8_t delta = header >> 4;
           id = static_cast<int16_t>(delta != 0 ? id + delta : ZigZag());
-          value.fields.emplace_back(id, Value(ElementType(header & 0x0f), false, depth + 1));
+          value.fields.push_back(
+              {.id = id, .value = Value(ElementType(header & 0x0f), false, depth + 1)});
         }
         break;
       }
@@ -283,7 +284,7 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
     column.converted = IntField(element, parquet::kElementConvertedType).value_or(-1);
     if (const ThriftValue* logical = element.Field(parquet::kElementLogicalType);
         logical != nullptr && !logical->fields.empty()) {
-      column.logical = logical->fields.front().first;
+      column.logical = logical->fields.front().id;
     }
     column.precision = IntField(element, parquet::kElementPrecision).value_or(0);
     column.scale = IntField(element, parquet::kElementScale).value_or(0);
@@ -335,33 +336,33 @@ ThriftValue ThriftValue::Int32(int32_t value) {
   return result;
 }
 
-ThriftValue ThriftValue::Struct(std::vector<std::pair<int16_t, ThriftValue>> fields) {
+ThriftValue ThriftValue::Struct(std::vector<ThriftField> fields) {
   ThriftValue result;
   result.fields = std::move(fields);
   return result;
 }
 
 const ThriftValue* ThriftValue::Field(int16_t id) const {
-  const auto found = std::ranges::find(fields, id, &std::pair<int16_t, ThriftValue>::first);
-  return found == fields.end() ? nullptr : &found->second;
+  const auto found = std::ranges::find(fields, id, &ThriftField::id);
+  return found == fields.end() ? nullptr : &found->value;
 }
 
 ThriftValue* ThriftValue::Field(int16_t id) {
-  const auto found = std::ranges::find(fields, id, &std::pair<int16_t, ThriftValue>::first);
-  return found == fields.end() ? nullptr : &found->second;
+  const auto found = std::ranges::find(fields, id, &ThriftField::id);
+  return found == fields.end() ? nullptr : &found->value;
 }
 
 void ThriftValue::SetField(int16_t id, ThriftValue value) {
-  const auto at = std::ranges::lower_bound(fields, id, {}, &std::pair<int16_t, ThriftValue>::first);
-  if (at != fields.end() && at->first == id) {
-    at->second = std::move(value);
+  const auto at = std::ranges::lower_bound(fields, id, {}, &ThriftField::id);
+  if (at != fields.end() && at->id == id) {
+    at->value = std::move(value);
   } else {
-    fields.emplace(at, id, std::move(value));
+    fields.insert(at, {.id = id, .value = std::move(value)});
   }
 }
 
 void ThriftValue::RemoveField(int16_t id) {
-  std::erase_if(fields, [id](const auto& field) { return field.first == id; });
+  std::erase_if(fields, [id](const auto& field) { return field.id == id; });
 }
 
 bool ParquetColumn::IsDecimal() const {
