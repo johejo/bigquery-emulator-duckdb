@@ -28,10 +28,13 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/evaluator_table_iterator.h"
 #include "googlesql/public/multi_catalog.h"
+#include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
+#include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
+#include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
@@ -203,23 +206,19 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     std::unique_ptr<TableSource> source = emulator_.NewTableSource();
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset);
-    GOOGLESQL_ASSIGN_OR_RETURN(googlesql::TypeWithParameters type,
-                               AnalyzeScriptType(segment, catalog, type_factory_, settings));
-    // A STRING(L) or NUMERIC(P, S) variable constrains what it holds.
-    if (!type.type_params.IsEmpty()) {
-      return Unsupported("variables of parameterized types");
-    }
-    return type;
+    return AnalyzeScriptType(segment, catalog, type_factory_, settings);
   }
 
-  bool IsSupportedVariableType(const googlesql::TypeWithParameters& type) override {
-    return type.type_params.IsEmpty();
+  bool IsSupportedVariableType(const googlesql::TypeWithParameters& /*type*/) override {
+    return true;
   }
 
+  // A STRING(L) or BYTES(L) variable fails to take a longer value, and a NUMERIC(P, S) or
+  // BIGNUMERIC(P, S) one rounds a value to S digits and fails to take one of more than P, as
+  // GoogleSQL's reference implementation does.
   absl::Status ApplyTypeParameterConstraints(const googlesql::TypeParameters& type_params,
-                                             googlesql::Value* /*value*/) override {
-    return type_params.IsEmpty() ? absl::OkStatus()
-                                 : Unsupported("variables of parameterized types");
+                                             googlesql::Value* value) override {
+    return googlesql::ApplyConstraints(type_params, googlesql::PRODUCT_EXTERNAL, *value);
   }
 
   absl::StatusOr<int64_t> GetIteratorMemoryUsage(
