@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -82,15 +83,40 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
                                             const std::string& default_dataset);
 
+// The dataset qualifier that names a temporary table explicitly, as `_SESSION.name`.
+inline constexpr char kSessionDataset[] = "_SESSION";
+
+// The temporary tables of a multi-statement query, which live in the DuckDB catalog `project`
+// and its schema `dataset`: those named `names` when a statement is analyzed and translated.
+struct TemporaryTables {
+  std::string project;
+  std::string dataset;
+  std::set<std::string> names = {};
+};
+
+// The name of the temporary table that CREATE TEMP TABLE `path` creates, which is either `name`
+// or `_SESSION.name`, or nothing for any other path.
+std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path);
+
+// Normalizes a table path as NormalizeTablePath does, in a multi-statement query whose temporary
+// tables are `temporary` when it is not null: `_SESSION.name` names a temporary table, and so
+// does an unqualified name when a temporary table has it.
+std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
+                                          const std::string& default_project,
+                                          const std::string& default_dataset,
+                                          const TemporaryTables* temporary);
+
 // A catalog whose tables come from a TableSource and whose functions and types are the
 // GoogleSQL built-ins. Tables are looked up lazily, when the analyzer first refers to them,
 // and are kept for the lifetime of the catalog, so use one catalog per statement: a table
 // changed by a later DDL statement would otherwise still be served with its old schema.
 class BigQueryCatalog : public googlesql::CatalogWrapper {
  public:
-  // `source` and `type_factory` must outlive the catalog.
+  // `source`, `type_factory` and `temporary`, the temporary tables of the multi-statement query
+  // that the catalog analyzes a statement of, if any, must outlive the catalog.
   BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
-                  std::string default_project, std::string default_dataset);
+                  std::string default_project, std::string default_dataset,
+                  const TemporaryTables* temporary = nullptr);
   ~BigQueryCatalog() override;
 
   std::string FullName() const override { return "bigquery"; }
@@ -103,6 +129,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   googlesql::TypeFactory* type_factory_;
   std::string default_project_;
   std::string default_dataset_;
+  const TemporaryTables* temporary_;
   // Keyed by the normalized path. The analyzer holds on to the Table pointers it is handed,
   // so they must stay valid for as long as the catalog does.
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleTable>> tables_;

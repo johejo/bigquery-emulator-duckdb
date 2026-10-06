@@ -141,3 +141,88 @@ func TestChildJobsOfAMultiStatementQueryAreUnsupported(t *testing.T) {
 		t.Errorf("got %v, want child jobs to be unsupported", err)
 	}
 }
+
+// Temporary tables follow
+// https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables.
+func TestTemporaryTablesLastForTheirMultiStatementQuery(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_temporary_tables")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	if _, _, err := runScript(t, client, dataset.DatasetID,
+		"CREATE TABLE t AS SELECT 1 AS a"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Once the temporary table is dropped, its name refers to the default dataset's table again.
+	job, _, err := runScript(t, client, dataset.DatasetID, `
+CREATE TEMP TABLE t AS SELECT 2 AS a;
+DROP TABLE t;
+SELECT a FROM t;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := job.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row struct{ A int64 }
+	if err := rows.Next(&row); err != nil || row.A != 1 {
+		t.Errorf("got %d and %v, want the default dataset's row 1", row.A, err)
+	}
+
+	// _SESSION names only temporary tables.
+	if _, _, err := runScript(t, client, dataset.DatasetID,
+		"SELECT 1; SELECT a FROM _SESSION.t"); err == nil {
+		t.Error("_SESSION.t read a table that is not temporary")
+	}
+
+	// A temporary table is gone once the multi-statement query that created it ends, and the
+	// default dataset never lists it.
+	if _, _, err := runScript(t, client, dataset.DatasetID,
+		"CREATE TEMP TABLE n AS SELECT 1 AS x; SELECT x FROM n"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := runScript(t, client, dataset.DatasetID, "SELECT 1; SELECT x FROM n"); err == nil {
+		t.Error("a temporary table outlived its multi-statement query")
+	}
+	tables := dataset.Tables(ctx)
+	var names []string
+	for {
+		table, err := tables.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, table.TableID)
+	}
+	if len(names) != 1 || names[0] != "t" {
+		t.Errorf("got tables %v, want only t", names)
+	}
+}
+
+func TestTemporaryTablesRejectedForms(t *testing.T) {
+	client := newClient(t)
+	for _, sql := range []string{
+		// Only a multi-statement query creates temporary tables.
+		"CREATE TEMP TABLE n (x INT64)",
+		// A temporary table takes no project or dataset qualifier.
+		"CREATE TEMP TABLE d.n (x INT64); SELECT 1",
+	} {
+		if _, _, err := runScript(t, client, "", sql); err == nil {
+			t.Errorf("%s: succeeded, want an error", sql)
+		}
+	}
+	// A view would outlive the temporary table it reads.
+	sql := "CREATE TEMP TABLE n AS SELECT 1 AS x; CREATE VIEW go_scripts_temporary_view.v AS SELECT x FROM n"
+	_, _, err := runScript(t, client, "", sql)
+	if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
+		t.Errorf("%s: got %v, want an unsupported error", sql, err)
+	}
+}

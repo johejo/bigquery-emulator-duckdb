@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -25,15 +26,46 @@ namespace {
 
 // DDL names tables and datasets by path rather than through the catalog, so the defaults the
 // catalog resolves queries with are applied here. The table or dataset named is the statement's
-// DDL target, which is recorded in the context.
-std::optional<std::string> TargetTable(const std::vector<std::string>& path, const Scope& scope) {
-  const auto parts =
-      NormalizeTablePath(path, scope.context.defaults.project, scope.context.defaults.dataset);
+// DDL target, which is recorded in the context. The table a CREATE statement creates is
+// temporary only with TEMP, so `create` leaves temporary tables out.
+std::optional<std::string> TargetTable(const std::vector<std::string>& path, const Scope& scope,
+                                       bool create = false) {
+  const DefaultDataset& defaults = scope.context.defaults;
+  const auto parts = ResolveTablePath(path, defaults.project, defaults.dataset,
+                                      create ? nullptr : defaults.temporary);
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
   scope.context.ddl_target_table = TableReference{parts[0], parts[1], parts[2]};
   return QualifiedName(*scope.context.ddl_target_table);
+}
+
+// The temporary table CREATE TEMP TABLE `path` creates. The analyzer rejects one outside a
+// multi-statement query, and one with a qualified name.
+std::optional<std::string> TemporaryTargetTable(const std::vector<std::string>& path,
+                                                const Scope& scope) {
+  const TemporaryTables* temporary = scope.context.defaults.temporary;
+  const std::optional<std::string> name = TemporaryTableName(path);
+  if (temporary == nullptr || !name) {
+    return Unsupported(scope, "temporary table " + Join(path, "."));
+  }
+  scope.context.ddl_target_table = TableReference{temporary->project, temporary->dataset, *name};
+  return QualifiedName(*scope.context.ddl_target_table);
+}
+
+// Whether `query` reads a temporary table, which a view could no longer read once the
+// multi-statement query that created it ends.
+bool ReadsTemporaryTable(const googlesql::ResolvedScan& query, const Scope& scope) {
+  const TemporaryTables* temporary = scope.context.defaults.temporary;
+  if (temporary == nullptr) {
+    return false;
+  }
+  std::vector<const googlesql::ResolvedNode*> scans;
+  query.GetDescendantsWithKinds({googlesql::RESOLVED_TABLE_SCAN}, &scans);
+  return std::ranges::any_of(scans, [&](const googlesql::ResolvedNode* scan) {
+    return scan->GetAs<googlesql::ResolvedTableScan>()->table()->FullName().starts_with(
+        temporary->project + ".");
+  });
 }
 
 std::optional<std::string> TargetDataset(const std::vector<std::string>& path, const Scope& scope) {
@@ -378,9 +410,6 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
 // BigQuery's primary and foreign keys are never enforced, so they are dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
-  if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
-    return Unsupported(scope, "temporary tables");
-  }
   if (create.like_table() != nullptr) {
     return Unsupported(scope, "CREATE TABLE LIKE");
   }
@@ -389,7 +418,9 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
       !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }
-  const auto path = TargetTable(create.name_path(), scope);
+  const auto path = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP
+                        ? TemporaryTargetTable(create.name_path(), scope)
+                        : TargetTable(create.name_path(), scope, true);
   if (!path) {
     return std::nullopt;
   }
@@ -541,7 +572,10 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
       create.recursive() || create.is_value_table()) {
     return Unsupported(scope, "temporary, recursive or value-table views");
   }
-  const auto path = TargetTable(create.name_path(), scope);
+  if (ReadsTemporaryTable(*create.query(), scope)) {
+    return Unsupported(scope, "views that read temporary tables");
+  }
+  const auto path = TargetTable(create.name_path(), scope, true);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
   const auto relation = Scan(*create.query(), scope);
   auto metadata = OptionsMetadata(create.option_list(), "CREATE VIEW", scope);

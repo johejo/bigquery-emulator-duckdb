@@ -111,6 +111,23 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   return options;
 }
 
+// BigQuery creates a temporary table only in a multi-statement query, the statements of
+// `script`, and names it without a qualifier other than _SESSION.
+absl::Status CheckTemporaryTable(const googlesql::ResolvedStatement& statement, bool script) {
+  const auto* create = dynamic_cast<const googlesql::ResolvedCreateTableStmtBase*>(&statement);
+  if (create == nullptr ||
+      create->create_scope() != googlesql::ResolvedCreateStatement::CREATE_TEMP) {
+    return absl::OkStatus();
+  }
+  if (!script) {
+    return absl::InvalidArgumentError("Use of CREATE TEMPORARY TABLE requires a script or session");
+  }
+  if (!TemporaryTableName(create->name_path()).has_value()) {
+    return absl::InvalidArgumentError("Temporary tables may not be qualified");
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
@@ -137,6 +154,11 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     };
     throw std::runtime_error(
         googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status).ToString());
+  }
+  if (const absl::Status temporary =
+          CheckTemporaryTable(*analyzer_output->resolved_statement(), settings.script != nullptr);
+      !temporary.ok()) {
+    throw std::runtime_error(std::string(temporary.message()));
   }
   return AnalyzerResult(std::move(analyzer_output));
 }
@@ -169,6 +191,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
                                                         &type_factory, &analyzer_output))
       .With(googlesql::ConvertLocalErrorToScriptError(segment));
+  GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
   return AnalyzerResult(std::move(analyzer_output));
 }
 

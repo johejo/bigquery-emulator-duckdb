@@ -135,7 +135,10 @@ query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT E
 note Primary and foreign keys | Accepted and dropped; BigQuery does not enforce them either
 query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
 query Generated columns | CREATE TABLE n (a INT64, b INT64 AS (a + 1))
-query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64)
+query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n
+query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM t; SELECT id FROM _SESSION.n
+query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t; SELECT id FROM t
+note `CREATE TEMP TABLE` | In multi-statement queries, whose end drops their temporary tables.
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t
 query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t
@@ -172,7 +175,7 @@ query `CREATE VIEW` | CREATE VIEW n (renamed) AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (description = 'x', labels = [('k', 'v')]) AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC') AS SELECT id FROM t
 query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
-note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views are unsupported.
+note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
