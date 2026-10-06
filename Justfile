@@ -74,6 +74,11 @@ e2e *args:
 compliance *args:
     bazelisk test //:compliance_test {{args}}
 
+# Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish.
+# Extra arguments go to tools/compliancesummary, such as -results FILE for each statement's outcome.
+compliance-summary *args:
+    go run ./tools/compliancesummary {{args}} bazel-testlogs/compliance_test
+
 # Evaluates a query on GoogleSQL's reference implementation, which is not BigQuery: a lead for
 # what to check on BigQuery, never an expected value.
 reference sql:

@@ -1,0 +1,69 @@
+name: Compliance
+
+# GoogleSQL's compliance tests, for measuring how long they take on CI and whether their results
+# are stable before they gate anything. The job succeeds while every shard finishes, whatever the
+# statements' results; the summary reports them.
+on:
+  push:
+    branches: [main]
+  # A pull request runs it only when it changes how the tests run or are summarized.
+  pull_request:
+    paths:
+      - .github/workflows/compliance.yml
+      - tools/compliancesummary/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compliance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compliance:
+    name: Compliance
+    # Jobs tend to finish sooner on the ARM runner.
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      # Only the Test workflow saves caches, so this job does not fill the repository's cache
+      # quota; what only the compliance test builds is rebuilt each run.
+      - name: Restore Bazel repository cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/bazel-repo
+            ~/.cache/bazelisk
+          key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
+      - name: Restore Bazel disk cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+      - name: Configure Bazel for CI
+        run: echo 'common --config=ci' > .bazelrc.local
+
+      - name: Build
+        run: nix develop --command bazelisk build //:compliance_test
+      # Bazel exits with 3 when tests fail, which most statements still do; any other failure,
+      # such as a crash, fails the step. The logs of failing statements would flood the output.
+      - name: Compliance tests
+        id: tests
+        run: nix develop --command just compliance --test_output=summary || [ $? -eq 3 ]
+      # A shard that did not finish, such as one that timed out, fails this step.
+      - name: Summary
+        if: (success() || failure()) && steps.tests.outcome != 'skipped'
+        run: nix develop --command just compliance-summary -results compliance-results.tsv >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload results
+        if: (success() || failure()) && steps.tests.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compliance-results
+          path: compliance-results.tsv
+          if-no-files-found: ignore
