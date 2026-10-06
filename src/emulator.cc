@@ -523,7 +523,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
     if (!request.dry_run && !request.destination_table.has_value()) {
-      job.result = RunStatement(translation, setup);
+      job.result = RunStatement(translation, setup, request.null_arrays);
       return;
     }
     CheckDdlTarget(translation);

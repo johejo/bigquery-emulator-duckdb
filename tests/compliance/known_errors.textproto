@@ -11,3 +11,13 @@ known_errors {
   reason: "The emulator rejects what it does not support"
   label: ".*"
 }
+
+# BigQuery generates arrays far longer than GoogleSQL's 16000 elements, so the emulator lifts the
+# limit, and these ranges of about 1e38 BIGNUMERIC elements run for most of an hour each before
+# they fail, as the tests expect, with or without SAFE. They are not run.
+known_errors {
+  mode: CRASHES_DO_NOT_RUN
+  reason: "GENERATE_ARRAY over a BIGNUMERIC range too long to generate"
+  label: "code:(safe_error_mode__safe_)?generate_array_BIGNUMERIC_0_BIGNUMERIC_1_BIGNUMERIC_0.00000000000000000000000000000000000001"
+  label: "code:(safe_error_mode__safe_)?generate_array_BIGNUMERIC_-578960446186580977117854925043439539266.34992332820282019728792003956564819968_BIGNUMERIC_578960446186580977117854925043439539266.34992332820282019728792003956564819967_BIGNUMERIC_1"
+}
