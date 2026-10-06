@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 13 |
-| Supported | 224 |
-| Unsupported | 156 |
+| Supported | 234 |
+| Unsupported | 146 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -246,16 +246,16 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MOD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#mod) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Unsupported |  | function HOST |
+| [`NET.HOST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#nethost) | net_functions | Supported | GoogleSQL function |  |
 | [`NET.IPV4_FROM_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_from_int64) | net_functions | Supported | DuckDB SQL |  |
 | [`NET.IPV4_TO_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netipv4_to_int64) | net_functions | Supported | DuckDB SQL |  |
-| [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Unsupported |  | function IP_FROM_STRING |
-| [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Unsupported |  | function IP_NET_MASK |
-| [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Unsupported |  | function IP_TO_STRING |
-| [`NET.IP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_trunc) | net_functions | Unsupported |  | function IP_TRUNC |
-| [`NET.PUBLIC_SUFFIX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netpublic_suffix) | net_functions | Unsupported |  | function PUBLIC_SUFFIX |
-| [`NET.REG_DOMAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netreg_domain) | net_functions | Unsupported |  | function REG_DOMAIN |
-| [`NET.SAFE_IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netsafe_ip_from_string) | net_functions | Unsupported |  | function SAFE_IP_FROM_STRING |
+| [`NET.IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_from_string) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.IP_NET_MASK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_net_mask) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.IP_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_to_string) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.IP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netip_trunc) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.PUBLIC_SUFFIX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netpublic_suffix) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.REG_DOMAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netreg_domain) | net_functions | Supported | GoogleSQL function |  |
+| [`NET.SAFE_IP_FROM_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/net_functions#netsafe_ip_from_string) | net_functions | Supported | GoogleSQL function |  |
 | [`NODES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#nodes) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`NORMALIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize) | string_functions | Supported | GoogleSQL function |  |
 | [`NORMALIZE_AND_CASEFOLD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize_and_casefold) | string_functions | Supported | GoogleSQL function |  |
@@ -310,7 +310,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported |  | function S2_COVERINGCELLIDS |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported | SAFE. operator |  |
 | [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | conversion_functions | Partial |  | CAST with FORMAT, time zone or type parameters |
-| [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | string_functions | Unsupported |  | function SAFE_CONVERT_BYTES_TO_STRING |
+| [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | string_functions | Supported | GoogleSQL function |  |
 | [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`SAFE_MULTIPLY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_multiply) | mathematical_functions | Supported | SAFE. operator |  |
 | [`SAFE_NEGATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_negate) | mathematical_functions | Supported | SAFE. operator |  |
@@ -325,7 +325,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SIGN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sign) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`SIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sin) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`SINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sinh) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Unsupported |  | function SOUNDEX |
+| [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | string_functions | Supported | GoogleSQL function |  |
 | [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | graph-sql-functions | Untested |  | no sample for <graph_edge> |
 | [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | string_functions | Supported | GoogleSQL function |  |
 | [`SQRT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sqrt) | mathematical_functions | Supported | GoogleSQL function |  |

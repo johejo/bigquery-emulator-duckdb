@@ -685,6 +685,18 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
        {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
         {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}}}},
       {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
+      {"SOUNDEX", {{1, "bq_soundex($1)"}}},
+      {"SAFE_CONVERT_BYTES_TO_STRING", {{1, "bq_safe_convert_bytes_to_string($1)"}}},
+      // NET functions, other than IPV4_FROM_INT64 and IPV4_TO_INT64. HOST, REG_DOMAIN and
+      // PUBLIC_SUFFIX follow GoogleSQL's copy of the public suffix list.
+      {"IP_FROM_STRING", {{1, "bq_net_ip_from_string($1)"}}},
+      {"SAFE_IP_FROM_STRING", {{1, "bq_net_safe_ip_from_string($1)"}}},
+      {"IP_TO_STRING", {{1, "bq_net_ip_to_string($1)"}}},
+      {"IP_NET_MASK", {{2, "bq_net_ip_net_mask($1, $2)"}}},
+      {"IP_TRUNC", {{2, "bq_net_ip_trunc($1, $2)"}}},
+      {"HOST", {{1, "bq_net_host($1)"}}},
+      {"REG_DOMAIN", {{1, "bq_net_reg_domain($1)"}}},
+      {"PUBLIC_SUFFIX", {{1, "bq_net_public_suffix($1)"}}},
       // Without max_distance, the distance is not capped.
       {"EDIT_DISTANCE",
        {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"9223372036854775807"}},

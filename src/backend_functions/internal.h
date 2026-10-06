@@ -210,7 +210,7 @@ void Register(duckdb_connection connection, const char* name,
 void RegisterBigNumericFunctions(duckdb_connection connection);
 // math.cc: FLOAT64 and NUMERIC functions, such as SQRT and POW.
 void RegisterMathFunctions(duckdb_connection connection);
-// string.cc: STRING and BYTES functions, including hashing and regular expressions.
+// string.cc: STRING and BYTES functions, including hashing, regular expressions and NET.
 void RegisterStringFunctions(duckdb_connection connection);
 // datetime.cc: formatting and parsing dates and times, and FORMAT.
 void RegisterDatetimeFunctions(duckdb_connection connection);
