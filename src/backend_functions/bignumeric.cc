@@ -312,6 +312,28 @@ void ToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
   });
 }
 
+// A Parquet DECIMAL, its bytes and scale, as the units of a BIGNUMERIC; see src/load.cc.
+void FromDecimalBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const auto value = BigNumericFromDecimalBytes(arguments.String(0), arguments.Int(1));
+    if (!value.ok()) {
+      return value.status();
+    }
+    return BigNumericUnits(*value);
+  });
+}
+
+// A BIGNUMERIC as the bytes of a Parquet DECIMAL(76, 38); see src/extract.cc.
+void ToDecimalBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const auto in = Units(arguments, 0);
+    if (!in.ok()) {
+      return in.status();
+    }
+    return BigNumericDecimalBytes(*in);
+  });
+}
+
 // The conversion of argument 0, a BIGNUMERIC, to `T`.
 template <typename T>
 absl::StatusOr<std::optional<T>> Convert(const Arguments& arguments) {
@@ -417,6 +439,9 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
   Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
   Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar, FromDouble);
   Register(connection, "bq_bignumeric_to_string", {kVarchar}, kVarchar, ToString);
+  Register(connection, "bq_bignumeric_from_decimal_bytes", {kBlob, kBigint}, kVarchar,
+           FromDecimalBytes);
+  Register(connection, "bq_bignumeric_to_decimal_bytes", {kVarchar}, kBlob, ToDecimalBytes);
   Register(connection, "bq_bignumeric_to_numeric", {kVarchar, kBoolean}, kVarchar, ToNumeric);
   Register(connection, "bq_bignumeric_to_int64", {kVarchar, kBoolean}, kBigint, ToNumber<int64_t>);
   Register(connection, "bq_bignumeric_to_double", {kVarchar, kBoolean}, kDouble, ToNumber<double>);

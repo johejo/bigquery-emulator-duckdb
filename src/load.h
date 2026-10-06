@@ -6,6 +6,7 @@
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/parquet_metadata.h"
 #include "src/temporary_files.h"
 
 namespace bigquery_emulator_duckdb {
@@ -26,10 +27,33 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
                                            const std::vector<FieldSchema>& schema,
                                            TemporaryFiles& downloads);
 
+// Parquet files staged for LoadQuery, and the columns they have.
+struct ParquetSources {
+  std::vector<std::string> paths;
+  ParquetColumn columns;
+};
+
+// Stages the PARQUET files `paths` for LoadQuery. DuckDB reads a DECIMAL wider than 38 digits as
+// a DOUBLE, so a file with one is copied into `downloads` with the DECIMAL annotations of those
+// columns removed from its footer, for DuckDB to read their bytes and LoadQuery to convert them
+// exactly. Throws ApiError::Invalid for a file that is not Parquet, and for files whose schemas
+// differ when one has such a column.
+ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
+                                    TemporaryFiles& downloads);
+
+// Gives the fields of `schema`, as DuckDB detects it from staged Parquet files with `columns`,
+// that hold a DECIMAL wider than 38 digits the type that BigQuery detects for them under the
+// decimalTargetTypes of `config`, a load job's configuration.load. Throws ApiError::Invalid when
+// that type is not BIGNUMERIC, which the emulator does not support.
+void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
+                           const nlohmann::json& config);
+
 // The query that reads the files `paths` in `format`, CSV, NEWLINE_DELIMITED_JSON or PARQUET,
 // with the options of `config`, as the columns of `schema`, or as DuckDB detects them when
-// `schema` is empty.
+// `schema` is empty. PARQUET files take the `parquet` columns StageParquetDecimals found. Throws
+// ApiError::Invalid for a Parquet column the emulator cannot load into its field.
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
-                      const nlohmann::json& config, const std::vector<FieldSchema>& schema);
+                      const nlohmann::json& config, const std::vector<FieldSchema>& schema,
+                      const ParquetColumn& parquet = {});
 
 }  // namespace bigquery_emulator_duckdb

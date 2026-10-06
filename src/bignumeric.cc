@@ -1,8 +1,10 @@
 #include "src/bignumeric.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -76,6 +78,45 @@ absl::StatusOr<googlesql::BigNumericValue> BigNumericFromBignum(std::string_view
     return absl::OutOfRangeError("BIGNUMERIC overflow");
   }
   return googlesql::BigNumericValue::DeserializeFromProtoBytes(bytes);
+}
+
+absl::StatusOr<googlesql::BigNumericValue> BigNumericFromDecimalBytes(std::string_view bytes,
+                                                                      int64_t scale) {
+  if (bytes.empty() || scale < 0 || std::cmp_greater(scale, kScale)) {
+    return absl::InvalidArgumentError("Invalid Parquet DECIMAL");
+  }
+  // GoogleSQL reads the little endian two's complement of an integer, without the bytes that
+  // only extend the sign. The integer then reads as units, whose digits give the decimal text.
+  std::string little(bytes.rbegin(), bytes.rend());
+  const auto sign = [](char byte) { return (static_cast<unsigned char>(byte) & 0x80) != 0; };
+  while (little.size() > 1 && little.back() == (sign(little.back()) ? '\xff' : '\0') &&
+         sign(little[little.size() - 2]) == sign(little.back())) {
+    little.pop_back();
+  }
+  if (little.size() > kBytes) {
+    return absl::OutOfRangeError("BIGNUMERIC overflow");
+  }
+  auto integer = googlesql::BigNumericValue::DeserializeFromProtoBytes(little);
+  if (!integer.ok() || std::cmp_equal(scale, kScale)) {
+    return integer;
+  }
+  std::string digits = BigNumericUnits(*integer);
+  const bool negative = digits.starts_with('-');
+  if (negative) {
+    digits.erase(0, 1);
+  }
+  const auto point = static_cast<size_t>(scale);
+  if (digits.size() <= point) {
+    digits.insert(0, point + 1 - digits.size(), '0');
+  }
+  digits.insert(digits.size() - point, ".");
+  return googlesql::BigNumericValue::FromStringStrict((negative ? "-" : "") + digits);
+}
+
+std::string BigNumericDecimalBytes(const googlesql::BigNumericValue& value) {
+  std::string little = value.SerializeAsProtoBytes();
+  little.resize(kBytes, (static_cast<unsigned char>(little.back()) & 0x80) != 0 ? '\xff' : '\0');
+  return {little.rbegin(), little.rend()};
 }
 
 std::string BigNumericSql(const googlesql::BigNumericValue& value) {
