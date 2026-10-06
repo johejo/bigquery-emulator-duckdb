@@ -76,6 +76,14 @@ func TestMultiStatementQueryFailsWithTheFailedStatement(t *testing.T) {
 	}
 }
 
+func TestMultiStatementQueryFailsWhenAVariableBreaksItsTypeParameters(t *testing.T) {
+	client := newClient(t)
+	_, _, err := runScript(t, client, "", "DECLARE x STRING(3) DEFAULT 'abcd'; SELECT x")
+	if err == nil {
+		t.Error("got no error, want STRING(3) to fail to take 'abcd'")
+	}
+}
+
 // The emulator rejects what it does not run, even inside an exception handler, which would
 // otherwise handle the rejection as an error of the script.
 func TestMultiStatementQueryRejectsUnsupportedForms(t *testing.T) {
@@ -84,7 +92,6 @@ func TestMultiStatementQueryRejectsUnsupportedForms(t *testing.T) {
 		"EXECUTE IMMEDIATE 'SELECT 1'; SELECT 2",
 		"CALL d.p(); SELECT 1",
 		"SET @@time_zone = 'Asia/Tokyo'; SELECT CURRENT_DATE()",
-		"DECLARE s STRING(3); SELECT s",
 		"BEGIN BEGIN TRANSACTION; COMMIT TRANSACTION; EXCEPTION WHEN ERROR THEN SELECT 1; END",
 	} {
 		_, _, err := runScript(t, client, "", sql)

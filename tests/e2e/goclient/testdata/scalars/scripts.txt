@@ -69,6 +69,79 @@ SET (lo, hi) = (SELECT AS STRUCT MIN(a) AS smallest, MAX(a) AS largest FROM t);
 SELECT hi
 => "3"
 
+## Parameterized types
+
+# Type parameters constrain what a variable takes, and a value that breaks them fails the
+# assignment with an error the script may handle. Expected values follow the data types reference:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
+
+DECLARE x STRING(10);
+SET x = "hello";
+SELECT x
+=> "hello"
+
+DECLARE x STRING(10);
+BEGIN
+  SET x = "this string is too long";
+EXCEPTION WHEN ERROR THEN
+  SELECT 'failed';
+END;
+=> "failed"
+
+# L counts Unicode characters in a STRING and bytes in BYTES.
+DECLARE x STRING(2) DEFAULT 'あい';
+SELECT x
+=> "あい"
+
+DECLARE x BYTES(2);
+BEGIN
+  SET x = CAST('あ' AS BYTES);
+EXCEPTION WHEN ERROR THEN
+  SELECT 'failed';
+END;
+=> "failed"
+
+# A variable reads as a NUMERIC without type parameters.
+DECLARE x NUMERIC(10) DEFAULT 12345;
+DECLARE y NUMERIC(5, 2) DEFAULT 123.45;
+SELECT x + y
+=> "12468.45"
+
+# A value with more than S decimal digits is rounded half up to S of them.
+DECLARE x NUMERIC(5, 2) DEFAULT 1.125;
+SELECT x
+=> "1.13"
+
+DECLARE x BIGNUMERIC(5, 2) DEFAULT 1.125;
+SELECT x
+=> "1.13"
+
+# A value with more than P digits fails.
+DECLARE x NUMERIC(5, 2);
+BEGIN
+  SET x = 1111;
+EXCEPTION WHEN ERROR THEN
+  SELECT 'failed';
+END;
+=> "failed"
+
+# The type parameters of a field or an element constrain it too.
+DECLARE x STRUCT<s STRING(1)>;
+BEGIN
+  SET x = STRUCT('ab');
+EXCEPTION WHEN ERROR THEN
+  SELECT 'failed';
+END;
+=> "failed"
+
+DECLARE x ARRAY<BYTES(1)>;
+BEGIN
+  SET x = [b'a', b'ab'];
+EXCEPTION WHEN ERROR THEN
+  SELECT 'failed';
+END;
+=> "failed"
+
 ## BEGIN...END
 
 DECLARE x INT64 DEFAULT 10;

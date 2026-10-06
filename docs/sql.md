@@ -117,7 +117,7 @@ the probe's own notes name what it rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Statement lists | Supported | Returns the result of the last statement that ran. Creates no child jobs, so `jobs.list` rejects `parentJobId` of a multi-statement query. |
-| `DECLARE`, `SET` | Partial | type STRUCT<INT64, STRING>; variables of parameterized types |
+| `DECLARE`, `SET` | Partial | type STRUCT<INT64, STRING> |
 | `BEGIN ... END` | Supported |  |
 | `BEGIN ... EXCEPTION ... END` | Supported | An error the emulator reports as unsupported is never handled. |
 | `IF` | Supported |  |
