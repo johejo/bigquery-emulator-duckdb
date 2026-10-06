@@ -697,6 +697,16 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"HOST", {{1, "bq_net_host($1)"}}},
       {"REG_DOMAIN", {{1, "bq_net_reg_domain($1)"}}},
       {"PUBLIC_SUFFIX", {{1, "bq_net_public_suffix($1)"}}},
+      // AEAD with Tink keysets of AES-GCM keys, where a STRING is its UTF-8 bytes. The keyset
+      // chain of KEYS.KEYSET_CHAIN needs Cloud KMS.
+      {"ENCRYPT",
+       {{3,
+         "bq_aead_encrypt($1, encode($2), encode($3))",
+         {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})}},
+        {3, "bq_aead_encrypt($1, $2, $3)", {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})}}}},
+      {"DECRYPT_BYTES", {{3, "bq_aead_decrypt_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}}}},
+      {"DECRYPT_STRING",
+       {{3, "bq_aead_decrypt_string($1, $2, encode($3))", {Is(1, {TYPE_BYTES})}}}},
       // Without max_distance, the distance is not capped.
       {"EDIT_DISTANCE",
        {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"9223372036854775807"}},
