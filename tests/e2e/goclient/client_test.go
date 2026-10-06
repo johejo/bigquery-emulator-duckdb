@@ -545,6 +545,21 @@ func TestViewLifecycle(t *testing.T) {
 	}
 }
 
+// TIMESTAMP and TIME hold microseconds, so a literal with more than six fractional digits is
+// invalid, as in BigQuery, rather than truncated.
+func TestSubmicrosecondLiterals(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	for sql, want := range map[string]string{
+		"SELECT TIMESTAMP '2020-01-01 00:00:00.123456789'": "Invalid TIMESTAMP literal",
+		"SELECT TIME '01:02:03.123456789'":                 "Invalid TIME literal",
+	} {
+		if _, err := client.Query(sql).Read(ctx); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: got error %v, want %q", sql, err, want)
+		}
+	}
+}
+
 // A query that fails while it runs is an error from Read, whether the client gets its results
 // from jobs.query or from jobs.getQueryResults, rather than an empty result.
 func TestQueryRuntimeError(t *testing.T) {
