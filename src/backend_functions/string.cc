@@ -363,6 +363,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_soundex", {kVarchar}, kVarchar, Apply<fn::Soundex>},
            {"bq_safe_convert_bytes_to_string", {kBlob}, kVarchar, Apply<fn::SafeConvertBytes>},
            // NET functions. IP addresses are BYTES in network byte order.
+           {"bq_net_ipv4_from_int64", {kBigint}, kBlob, Apply<fn::net::IPv4FromInt64>},
+           {"bq_net_ipv4_to_int64", {kBlob}, kBigint, Apply<fn::net::IPv4ToInt64>},
            {"bq_net_ip_from_string", {kVarchar}, kBlob, Apply<fn::net::IPFromString>},
            {"bq_net_safe_ip_from_string", {kVarchar}, kBlob, SafeIpFromString},
            {"bq_net_ip_to_string", {kBlob}, kVarchar, Apply<fn::net::IPToString>},

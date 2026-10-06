@@ -538,23 +538,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"MD5", {{1, "unhex(md5($1))"}}},
       {"SHA1", {{1, "unhex(sha1($1))"}}},
       {"SHA256", {{1, "unhex(sha256($1))"}}},
-      // IPv4 addresses are 4 bytes in network byte order. A negative integer stands for its
-      // 32-bit two's complement, which the mask makes non-negative for hex() to print.
-      {"IPV4_FROM_INT64",
-       {{1,
-         "CASE WHEN $1 < -2147483648 OR $1 > 4294967295 THEN !1 ELSE unhex(lpad(hex($1 & "
-         "4294967295), 8, '0')) END",
-         {Is(1, {TYPE_INT64})},
-         {},
-         {"'NET.IPV4_FROM_INT64() encountered an invalid integer IP. Expected range: "
-          "[-0x80000000, 0xFFFFFFFF]; got ' || $1"}}}},
-      {"IPV4_TO_INT64",
-       {{1,
-         "CASE WHEN octet_length($1) <> 4 THEN !1 ELSE CAST('0x' || hex($1) AS BIGINT) END",
-         {Is(1, {TYPE_BYTES})},
-         {},
-         {"'NET.IPV4_TO_INT64() encountered a non-IPv4 address. Expected 4 bytes but got ' || "
-          "octet_length($1)"}}}},
       {"TO_HEX", {{1, "lower(hex($1))"}}},
       {"FROM_HEX", {{1, "unhex($1)", {Is(1, {TYPE_STRING})}}}},
       {"TO_BASE64", {{1, "to_base64($1)"}}},
@@ -687,8 +670,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
       {"SOUNDEX", {{1, "bq_soundex($1)"}}},
       {"SAFE_CONVERT_BYTES_TO_STRING", {{1, "bq_safe_convert_bytes_to_string($1)"}}},
-      // NET functions, other than IPV4_FROM_INT64 and IPV4_TO_INT64. HOST, REG_DOMAIN and
-      // PUBLIC_SUFFIX follow GoogleSQL's copy of the public suffix list.
+      // NET functions. HOST, REG_DOMAIN and PUBLIC_SUFFIX follow GoogleSQL's copy of the public
+      // suffix list.
+      {"IPV4_FROM_INT64", {{1, "bq_net_ipv4_from_int64($1)"}}},
+      {"IPV4_TO_INT64", {{1, "bq_net_ipv4_to_int64($1)"}}},
       {"IP_FROM_STRING", {{1, "bq_net_ip_from_string($1)"}}},
       {"SAFE_IP_FROM_STRING", {{1, "bq_net_safe_ip_from_string($1)"}}},
       {"IP_TO_STRING", {{1, "bq_net_ip_to_string($1)"}}},
