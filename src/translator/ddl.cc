@@ -9,6 +9,8 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
@@ -430,22 +432,51 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
   }
 }
 
-// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
-// labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
-// SET OPTIONS does.
-std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableStmt& create,
-                                           const Scope& scope) {
-  const auto* source = dynamic_cast<const BigQueryTable*>(create.like_table());
+// The schema and metadata of `table`, the source of `statement`, which is a CREATE TABLE LIKE,
+// COPY or CLONE. A clone's cloneDefinition is its own, which no copy inherits.
+std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
+                                                  std::string_view statement, const Scope& scope) {
+  const auto* source = dynamic_cast<const BigQueryTable*>(table);
   std::optional<TableDescription> description =
       source == nullptr ? std::nullopt : source->Describe();
   if (!description) {
-    return Unsupported(scope, "CREATE TABLE LIKE a view");
+    Unsupported(scope, std::string(statement) + " a view");
+    return std::nullopt;
   }
   // A default is stored as GoogleSQL, which would have to be translated again.
   if (std::ranges::any_of(description->schema, [](const FieldSchema& field) {
         return !field.default_value_expression.empty();
       })) {
-    return Unsupported(scope, "CREATE TABLE LIKE a table with column defaults");
+    Unsupported(scope, std::string(statement) + " a table with column defaults");
+    return std::nullopt;
+  }
+  description->metadata.clone.reset();
+  return description;
+}
+
+// The columns of CREATE TABLE for `schema`.
+std::optional<std::string> ColumnsSql(const std::vector<FieldSchema>& schema, const Scope& scope) {
+  std::vector<std::string> columns;
+  for (const FieldSchema& field : schema) {
+    const absl::StatusOr<std::string> type = DuckDbColumnType(field);
+    if (!type.ok()) {
+      return Unsupported(scope, type.status().message());
+    }
+    columns.push_back(QuoteIdentifier(field.name) + " " + *type +
+                      (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
+  }
+  return Join(columns, ", ");
+}
+
+// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
+// labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
+// SET OPTIONS does.
+std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableStmt& create,
+                                           const Scope& scope) {
+  std::optional<TableDescription> description =
+      SourceDescription(create.like_table(), "CREATE TABLE LIKE", scope);
+  if (!description) {
+    return std::nullopt;
   }
   TableMetadata& inherited = description->metadata;
   if (create.partition_by_list_size() > 0) {
@@ -462,20 +493,75 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
   }
-  std::vector<std::string> columns;
-  for (const FieldSchema& field : description->schema) {
-    const absl::StatusOr<std::string> type = DuckDbColumnType(field);
-    if (!type.ok()) {
-      return Unsupported(scope, type.status().message());
-    }
-    columns.push_back(QuoteIdentifier(field.name) + " " + *type +
-                      (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
+  const auto columns = ColumnsSql(description->schema, scope);
+  if (!columns) {
+    return std::nullopt;
   }
   scope.context.table = TableDefinition{.table = *target,
                                         .schema = std::move(description->schema),
                                         .metadata = *std::move(metadata),
                                         .if_not_exists = IfNotExists(create)};
-  return *head + " (" + Join(columns, ", ") + ")";
+  return *head + " (" + *columns + ")";
+}
+
+// The time now in RFC 3339, as tables.get reports a cloneTime.
+std::string Rfc3339Now() {
+  return absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::Now(), absl::UTCTimeZone());
+}
+
+// CREATE TABLE COPY and CLONE copy the rows of the source table besides what CREATE TABLE LIKE
+// copies, which OPTIONS replace; the analyzer rejects PARTITION BY and CLUSTER BY with them. A
+// clone also records the table it was cloned from and when, which tables.get reports as its
+// cloneDefinition. The emulator keeps no table's history, so FOR SYSTEM_TIME AS OF is
+// unsupported, and so are a temporary copy or clone and CREATE OR REPLACE of a clone, which
+// BigQuery does not document.
+std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableStmt& create,
+                                           const Scope& scope) {
+  const bool clone = create.clone_from() != nullptr;
+  const std::string kind = clone ? "CLONE" : "COPY";
+  const std::string statement = "CREATE TABLE " + kind;
+  const googlesql::ResolvedScan& from = clone ? *create.clone_from() : *create.copy_from();
+  if (!from.Is<googlesql::ResolvedTableScan>()) {
+    return Unsupported(scope, statement + " with WHERE");
+  }
+  const auto& scan = *from.GetAs<googlesql::ResolvedTableScan>();
+  if (scan.for_system_time_expr() != nullptr) {
+    return Unsupported(scope, statement + " with FOR SYSTEM_TIME AS OF");
+  }
+  if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
+    return Unsupported(scope, "CREATE TEMP TABLE " + kind);
+  }
+  const bool replace =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
+  if (clone && replace) {
+    return Unsupported(scope, "CREATE OR REPLACE TABLE CLONE");
+  }
+  std::optional<TableDescription> description = SourceDescription(scan.table(), statement, scope);
+  if (!description) {
+    return std::nullopt;
+  }
+  const TableReference source = dynamic_cast<const BigQueryTable*>(scan.table())->reference();
+  const auto head = CreateTableHead(create, scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  if (clone) {
+    description->metadata.clone = CloneDefinition{.base_table = source, .clone_time = Rfc3339Now()};
+  }
+  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope,
+                                  std::move(description->metadata));
+  const auto columns = ColumnsSql(description->schema, scope);
+  if (!head || !target || !metadata || !columns) {
+    return std::nullopt;
+  }
+  // The new table would replace the source before its rows are copied.
+  if (replace && ToLowerAscii(QualifiedName(*target)) == ToLowerAscii(QualifiedName(source))) {
+    return Unsupported(scope, "CREATE OR REPLACE TABLE COPY of itself");
+  }
+  scope.context.table = TableDefinition{.table = *target,
+                                        .schema = std::move(description->schema),
+                                        .metadata = *std::move(metadata),
+                                        .if_not_exists = IfNotExists(create),
+                                        .rows_from = source};
+  return *head + " (" + *columns + ")";
 }
 
 }  // namespace
@@ -520,7 +606,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
                                        const Scope& scope) {
   if (create.clone_from() != nullptr || create.copy_from() != nullptr) {
-    return Unsupported(scope, "CREATE TABLE CLONE or COPY");
+    return CreateTableCopy(create, scope);
   }
   if (create.like_table() != nullptr) {
     return CreateTableLike(create, scope);

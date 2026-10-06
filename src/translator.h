@@ -39,12 +39,14 @@ struct ViewDefinition {
 
 // The table a CREATE TABLE [AS SELECT] defines, whose BigQuery schema the emulator records with
 // it: the declared types, NOT NULL as REQUIRED, type parameters, defaults and descriptions, and
-// the description, friendly name and labels its OPTIONS give.
+// the description, friendly name and labels its OPTIONS give. CREATE TABLE COPY and CLONE also
+// fill it with the rows of `rows_from`.
 struct TableDefinition {
   TableReference table;
   std::vector<FieldSchema> schema = {};
   TableMetadata metadata;
   bool if_not_exists = false;
+  std::optional<TableReference> rows_from = {};
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS

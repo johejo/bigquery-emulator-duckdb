@@ -11,8 +11,9 @@
 namespace bigquery_emulator_duckdb {
 
 // What a DDL statement runs besides itself, in the same transaction: the statements that
-// record its BigQuery metadata, and a query that returns a row when the statement and its
-// metadata must both be skipped, which is how IF NOT EXISTS and IF EXISTS keep what is there.
+// record its BigQuery metadata or copy rows into the table it creates, and a query that returns a
+// row when the statement and its metadata must both be skipped, which is how IF NOT EXISTS and IF
+// EXISTS keep what is there.
 struct DdlWrite {
   std::vector<std::string> metadata_statements;
   std::string skip_query = {};

@@ -258,7 +258,13 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         const std::optional<std::string> view_query =
             source.FindViewQuery(dataset.project, dataset.dataset, table);
         Cell ddl = kNull;
+        // A clone names its base table and the time it was cloned, as snapshot_time_ms.
+        std::optional<CloneDefinition> clone;
         if (!view_query.has_value()) {
+          if (std::optional<TableDescription> description =
+                  source.DescribeTable(dataset.project, dataset.dataset, table)) {
+            clone = std::move(description->metadata.clone);
+          }
           absl::StatusOr<std::string> table_ddl =
               TableDdl(dataset.project, dataset.dataset, table, *schema, type_factory);
           if (!table_ddl.ok()) {
@@ -271,17 +277,19 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         rows.push_back({String(dataset.project),
                         String(dataset.dataset),
                         String(table),
-                        String(view_query.has_value() ? "VIEW" : "BASE TABLE"),
+                        String(view_query.has_value() ? "VIEW"
+                               : clone.has_value()    ? "CLONE"
+                                                      : "BASE TABLE"),
                         view_query.has_value() ? kNull : String("NATIVE"),
                         String(view_query.has_value() ? "NO" : "YES"),
                         String("NO"),
                         String("NO"),
                         String("NO"),
                         kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
+                        clone ? String(clone->base_table.project_id) : kNull,
+                        clone ? String(clone->base_table.dataset_id) : kNull,
+                        clone ? String(clone->base_table.table_id) : kNull,
+                        clone ? String(clone->clone_time) : kNull,
                         kNull,
                         kNull,
                         kNull,

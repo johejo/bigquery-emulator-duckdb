@@ -109,6 +109,10 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
     write.metadata_statements.push_back(
         TableCommentStatement(definition.table, definition.metadata, definition.schema));
   }
+  if (definition.rows_from.has_value()) {
+    write.metadata_statements.push_back("INSERT INTO " + QualifiedName(definition.table) +
+                                        " SELECT * FROM " + QualifiedName(*definition.rows_from));
+  }
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);
   }

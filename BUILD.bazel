@@ -82,6 +82,7 @@ cc_library(
         ":api_error",
         ":duckdb_sql",
         ":field_schema",
+        ":references",
         "@nlohmann_json//:json",
     ],
 )
@@ -184,6 +185,7 @@ cc_library(
     deps = [
         ":duckdb_sql",
         ":field_schema",
+        ":references",
         ":table_metadata",
         ":type_mapping",
         "@googlesql//googlesql/public:builtin_function_options",

@@ -337,6 +337,13 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
+  if (clone.has_value()) {
+    fields["cloneDefinition"] = {{"baseTableReference",
+                                  {{"projectId", clone->base_table.project_id},
+                                   {"datasetId", clone->base_table.dataset_id},
+                                   {"tableId", clone->base_table.table_id}}},
+                                 {"cloneTime", clone->clone_time}};
+  }
   return fields;
 }
 
