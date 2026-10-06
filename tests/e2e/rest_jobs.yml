@@ -120,6 +120,19 @@ steps:
         get:
           body: null
     test: current.res.status == 200 && !("jobs" in current.res.body)
+  # stateFilter is repeated: a job in any of the states is listed.
+  list_running_or_done:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?stateFilter=running&stateFilter=done:
+        get:
+          body: null
+    test: current.res.status == 200 && len(current.res.body.jobs) == 2
+  list_invalid_second_state:
+    req:
+      /bigquery/v2/projects/rest-list/jobs?stateFilter=done&stateFilter=finished:
+        get:
+          body: null
+    test: current.res.status == 400
   list_children:
     req:
       /bigquery/v2/projects/rest-list/jobs?parentJobId=parent:

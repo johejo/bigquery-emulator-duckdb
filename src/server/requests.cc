@@ -333,9 +333,9 @@ JobListRequest ParseJobList(const httplib::Request& request) {
   JobListRequest result;
   // CheckQueryParameters has checked the values of projection and stateFilter.
   result.full_projection = request.get_param_value("projection") != "minimal";
-  // TODO(johejo): stateFilter is repeated, so a request may ask for several states; only the first
-  // is read.
-  result.state_filter = request.get_param_value("stateFilter");
+  for (auto [it, end] = request.params.equal_range("stateFilter"); it != end; ++it) {
+    result.state_filters.push_back(it->second);
+  }
   if (request.has_param("parentJobId")) {
     result.parent_job_id = request.get_param_value("parentJobId");
   }

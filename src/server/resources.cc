@@ -370,8 +370,10 @@ json JobList(const std::vector<std::shared_ptr<const Job>>& jobs, const JobListR
       })) {
     throw ApiError::Invalid("The emulator does not support child jobs of multi-statement queries");
   }
-  const bool none = request.parent_job_id.has_value() ||
-                    (!request.state_filter.empty() && request.state_filter != "done");
+  const bool none =
+      request.parent_job_id.has_value() ||
+      (!request.state_filters.empty() &&
+       std::ranges::find(request.state_filters, "done") == request.state_filters.end());
   for (const auto& job : jobs) {
     if (none || job->creation_time_ms < request.min_creation_time ||
         job->creation_time_ms > request.max_creation_time) {
