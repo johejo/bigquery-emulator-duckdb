@@ -9,14 +9,14 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/apache/arrow/go/v15/arrow"
-	"github.com/apache/arrow/go/v15/arrow/array"
-	"github.com/apache/arrow/go/v15/arrow/decimal128"
-	"github.com/apache/arrow/go/v15/arrow/decimal256"
-	"github.com/apache/arrow/go/v15/arrow/memory"
-	"github.com/apache/arrow/go/v15/parquet/file"
-	"github.com/apache/arrow/go/v15/parquet/pqarrow"
-	"github.com/apache/arrow/go/v15/parquet/schema"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/decimal128"
+	"github.com/apache/arrow-go/v18/arrow/decimal256"
+	"github.com/apache/arrow-go/v18/arrow/memory"
+	"github.com/apache/arrow-go/v18/parquet/file"
+	"github.com/apache/arrow-go/v18/parquet/pqarrow"
+	"github.com/apache/arrow-go/v18/parquet/schema"
 	"google.golang.org/api/iterator"
 )
 
@@ -259,7 +259,7 @@ func TestBigNumericParquet(t *testing.T) {
 		if column.Name() == "id" {
 			continue
 		}
-		decimal, ok := column.LogicalType().(*schema.DecimalLogicalType)
+		decimal, ok := column.LogicalType().(schema.DecimalLogicalType)
 		if !ok || decimal.Precision() != 76 || decimal.Scale() != 38 {
 			t.Errorf("%s: got %v, want DECIMAL(76, 38)", column.Path(), column.LogicalType())
 		}
