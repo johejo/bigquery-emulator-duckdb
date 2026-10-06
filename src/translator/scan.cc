@@ -345,8 +345,10 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
       }
       const std::string alias = ColumnName(column.column_id());
       projections.push_back(
-          QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()) + " AS " +
-          alias);
+          StoredColumn(
+              QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()),
+              column.type()) +
+          " AS " + alias);
       result.columns.emplace(column.column_id(), "q." + alias);
     }
     // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
@@ -463,6 +465,13 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
     result->ordering.clear();
   }
   return result;
+}
+
+std::string StoredColumn(const std::string& column, const googlesql::Type* type) {
+  if (!HasBigNumeric(type)) {
+    return column;
+  }
+  return "CAST(" + column + " AS " + DuckDbType(type).value_or("") + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

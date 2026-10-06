@@ -19,8 +19,8 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 9 |
-| Supported | 57 |
+| Partial | 8 |
+| Supported | 58 |
 | Unsupported | 25 |
 
 ## Queries
@@ -84,7 +84,7 @@ the probe's own notes name what it rejected.
 | --- | --- | --- |
 | `CREATE TABLE` | Supported |  |
 | Column types with parameters | Supported | `STRING(L)` and `BYTES(L)` lose their length |
-| `BIGNUMERIC` columns | Partial | `BIGNUMERIC(P, S)` is unsupported; column type BIGNUMERIC |
+| `BIGNUMERIC` columns | Supported |  |
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported | NOT NULL in CREATE TABLE AS SELECT |

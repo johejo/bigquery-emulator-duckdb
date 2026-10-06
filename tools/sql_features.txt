@@ -117,7 +117,6 @@ query Column types with parameters | CREATE TABLE n (a STRING(10), b BYTES(5), c
 note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC)
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC(40, 10))
-note `BIGNUMERIC` columns | `BIGNUMERIC(P, S)` is unsupported
 query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
 query `CREATE TABLE AS SELECT` | CREATE TABLE n AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELECT id, name FROM t

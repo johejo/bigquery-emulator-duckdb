@@ -194,8 +194,6 @@ TEST_F(TranslatorTest, NamesTheUnsupportedConstruct) {
   EXPECT_EQ(Unsupported("CREATE TEMP VIEW tmp AS SELECT a FROM t"),
             "temporary, recursive or value-table views");
   EXPECT_EQ(Unsupported("CREATE TABLE ds.g (x INT64, y INT64 AS (x + 1))"), "generated columns");
-  EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(76, 38))"), "column type BIGNUMERIC");
-  EXPECT_EQ(Unsupported("CREATE TABLE ds.n (x BIGNUMERIC(10, 2))"), "column type BIGNUMERIC");
   EXPECT_EQ(Unsupported("CREATE TABLE ds.c (x INT64 NOT NULL) AS SELECT 1 AS x"),
             "NOT NULL in CREATE TABLE AS SELECT");
   EXPECT_EQ(Unsupported("CREATE OR REPLACE SCHEMA other"), "CREATE OR REPLACE SCHEMA");

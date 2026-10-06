@@ -25,6 +25,13 @@ absl::StatusOr<googlesql::BigNumericValue> BigNumericFromUnits(std::string_view 
 // for. Fails for a value out of range.
 absl::StatusOr<googlesql::BigNumericValue> BigNumericFromBignum(std::string_view stored);
 
+// The inverse of BigNumericFromBignum: the BIGNUM of the units of `value` as DuckDB stores it.
+std::string BigNumericBignum(const googlesql::BigNumericValue& value);
+
+// The DuckDB type of a BIGNUMERIC(precision, scale) column, a BIGNUM under an alias whose casts
+// round and check the values written to it; see RegisterBigNumericTypes.
+std::string BigNumericTypeName(int64_t precision, int64_t scale);
+
 // The BIGNUMERIC of a Parquet DECIMAL of `scale`, the big-endian two's complement of its
 // integer number of units of 10^-scale. Fails for a scale greater than BIGNUMERIC's and for a
 // value out of range.

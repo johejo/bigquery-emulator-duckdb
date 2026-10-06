@@ -29,9 +29,9 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
 
 // The DuckDB type of `type`, narrowed by `parameters` when a column definition gives some, or
 // nullopt for a type the translator does not support. DuckDB ignores lengths, so STRING(L) and
-// BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S),
-// which a BIGNUM cannot round, is unsupported. DuckDB structs need distinct field names, which
-// anonymous BigQuery fields lack.
+// BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S) as
+// the type BigNumericTypeName names. DuckDB structs need distinct field names, which anonymous
+// BigQuery fields lack.
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 
