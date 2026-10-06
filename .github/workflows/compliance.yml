@@ -31,8 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
-      # Only the Test workflow saves caches, so this job does not fill the repository's cache
-      # quota; what only the compliance test builds is rebuilt each run.
+      # Repository downloads are shared with the Test workflow, which saves this cache.
       - name: Restore Bazel repository cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -41,16 +40,29 @@ jobs:
             ~/.cache/bazelisk
           key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
       - name: Restore Bazel disk cache
+        id: disk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/bazel-disk
-          key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+          key: bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-
+            bazel-disk-${{ runner.os }}-${{ runner.arch }}-
       - name: Configure Bazel for CI
         run: echo 'common --config=ci' > .bazelrc.local
 
       - name: Build
         run: nix develop --command bazelisk build //:compliance_test
+      # Save after the build so test failures do not discard compiled dependencies. Only main
+      # pushes save caches; pull requests and manual runs reuse them.
+      - name: Save Bazel disk cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.disk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: ${{ steps.disk-cache.outputs.cache-primary-key }}
       # Bazel exits with 3 when tests fail, which most statements still do; any other failure,
       # such as a crash, fails the step. The logs of failing statements would flood the output.
       - name: Compliance tests
