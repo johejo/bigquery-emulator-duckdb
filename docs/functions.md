@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 12 |
-| Supported | 225 |
+| Partial | 13 |
+| Supported | 224 |
 | Unsupported | 156 |
 | Untested | 13 |
 
@@ -309,7 +309,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | geography_functions | Unsupported |  | function S2_CELLIDFROMPOINT |
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | geography_functions | Unsupported |  | function S2_COVERINGCELLIDS |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | mathematical_functions | Supported | SAFE. operator |  |
-| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | conversion_functions | Supported |  |  |
+| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | conversion_functions | Partial |  | CAST with FORMAT, time zone or type parameters |
 | [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | string_functions | Unsupported |  | function SAFE_CONVERT_BYTES_TO_STRING |
 | [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`SAFE_MULTIPLY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_multiply) | mathematical_functions | Supported | SAFE. operator |  |
