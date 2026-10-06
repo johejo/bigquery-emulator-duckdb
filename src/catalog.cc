@@ -136,13 +136,40 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
   return parts;
 }
 
+std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path) {
+  const std::vector<std::string> parts = SplitTablePath(path);
+  if (parts.size() == 1 && !parts[0].empty()) {
+    return parts[0];
+  }
+  if (parts.size() == 2 && parts[0] == kSessionDataset && !parts[1].empty()) {
+    return parts[1];
+  }
+  return std::nullopt;
+}
+
+std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
+                                          const std::string& default_project,
+                                          const std::string& default_dataset,
+                                          const TemporaryTables* temporary) {
+  if (temporary != nullptr) {
+    const std::vector<std::string> parts = SplitTablePath(path);
+    const bool session = parts.size() == 2 && parts[0] == kSessionDataset;
+    if (session || (parts.size() == 1 && temporary->names.contains(parts[0]))) {
+      return {temporary->project, temporary->dataset, parts.back()};
+    }
+  }
+  return NormalizeTablePath(path, default_project, default_dataset);
+}
+
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
-                                 std::string default_project, std::string default_dataset)
+                                 std::string default_project, std::string default_dataset,
+                                 const TemporaryTables* temporary)
     : googlesql::CatalogWrapper(BuiltinCatalog()),
       source_(source),
       type_factory_(type_factory),
       default_project_(std::move(default_project)),
-      default_dataset_(std::move(default_dataset)) {}
+      default_dataset_(std::move(default_dataset)),
+      temporary_(temporary) {}
 
 BigQueryCatalog::~BigQueryCatalog() = default;
 
@@ -168,7 +195,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
     return absl::OkStatus();
   }
   const std::vector<std::string> normalized =
-      NormalizeTablePath(path, default_project_, default_dataset_);
+      ResolveTablePath(path, default_project_, default_dataset_, temporary_);
   if (normalized.empty()) {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(path, "."));
   }

@@ -125,11 +125,13 @@ Behavior that applies across them:
   `invalidQuery`, naming the construct.
 - Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
   and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
-  cannot read them. Temporary, recursive and value-table views are unsupported.
+  cannot read them. Temporary, recursive and value-table views, and views that read temporary
+  tables, are unsupported.
 - Multi-statement queries return the result of the last statement that ran. They create no
-  child jobs and cannot be dry runs. Temporary tables, transactions, `EXECUTE IMMEDIATE`,
-  `CALL` and assignments to system variables are unsupported, and an error the emulator reports
-  as unsupported is never handled by an `EXCEPTION` clause.
+  child jobs and cannot be dry runs. Their temporary tables are dropped when they end, and no
+  dataset holds them. Transactions, `EXECUTE IMMEDIATE`, `CALL` and assignments to system
+  variables are unsupported, and an error the emulator reports as unsupported is never handled
+  by an `EXCEPTION` clause.
 - `UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
   has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
 - Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,

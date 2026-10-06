@@ -198,3 +198,36 @@ SELECT 1;
 RETURN;
 SELECT 2;
 => "1"
+
+## Temporary tables
+# Expected values follow
+# https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables
+
+CREATE TEMP TABLE n AS SELECT 5 AS x;
+SELECT x FROM n
+=> "5"
+
+CREATE TEMPORARY TABLE n (x INT64);
+INSERT n (x) VALUES (1), (2);
+UPDATE n SET x = x * 10 WHERE x = 2;
+DELETE FROM n WHERE x = 1;
+SELECT SUM(x) FROM n
+=> "20"
+
+# _SESSION names a temporary table explicitly.
+CREATE TEMP TABLE _SESSION.n AS SELECT 6 AS x;
+SELECT x FROM n
+=> "6"
+
+CREATE TEMP TABLE n AS SELECT 7 AS x;
+SELECT x FROM _SESSION.n
+=> "7"
+
+# An unqualified name refers to a temporary table before a table of the default dataset.
+CREATE TEMP TABLE t AS SELECT 10 AS a;
+SELECT MAX(a) FROM t
+=> "10"
+
+CREATE TEMP TABLE t AS SELECT 10 AS a;
+SELECT MAX(a) FROM scalars.t
+=> "3"

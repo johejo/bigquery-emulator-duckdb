@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -276,6 +277,8 @@ class Emulator {
   std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;
   std::unordered_set<std::string> running_jobs_;
   int64_t next_job_number_ = 1;
+  // Names the database of each multi-statement query's temporary tables.
+  std::atomic<int64_t> next_script_number_ = 1;
 };
 
 }  // namespace bigquery_emulator_duckdb

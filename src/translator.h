@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "googlesql/public/analyzer.h"
+#include "src/catalog.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
@@ -17,11 +18,13 @@ class ResolvedStatement;
 
 namespace bigquery_emulator_duckdb {
 
-// The project and dataset that unqualified table and dataset names in DDL belong to, matching
-// the defaults the catalog resolves queries with. `dataset` may be empty.
+// The project and dataset that unqualified table and dataset names in DDL belong to, and the
+// temporary tables of a multi-statement query that take precedence over them, matching the
+// defaults the catalog resolves queries with. `dataset` may be empty.
 struct DefaultDataset {
   std::string project;
   std::string dataset;
+  const TemporaryTables* temporary = nullptr;
 };
 
 // The view a CREATE VIEW defines, which the emulator records next to the DuckDB view: DuckDB

@@ -20,8 +20,8 @@ the probe's own notes name what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 8 |
-| Supported | 58 |
-| Unsupported | 25 |
+| Supported | 59 |
+| Unsupported | 24 |
 
 ## Queries
 
@@ -93,7 +93,7 @@ the probe's own notes name what it rejected.
 | Primary and foreign keys | Supported | Accepted and dropped; BigQuery does not enforce them either |
 | Collation | Unsupported | COLLATE |
 | Generated columns | Unsupported | generated columns |
-| `CREATE TEMP TABLE` | Unsupported | temporary tables |
+| `CREATE TEMP TABLE` | Supported | In multi-statement queries, whose end drops their temporary tables. |
 | `CREATE TABLE LIKE` | Unsupported | CREATE TABLE LIKE |
 | `CREATE TABLE COPY` | Unsupported | CREATE TABLE CLONE or COPY |
 | `CREATE TABLE CLONE` | Unsupported | CREATE TABLE CLONE |
@@ -105,7 +105,7 @@ the probe's own notes name what it rejected.
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Unsupported | statement AlterSchemaStmt |
-| `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views are unsupported.; CREATE VIEW option expiration_timestamp |
+| `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.; CREATE VIEW option expiration_timestamp |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |
 | `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |
