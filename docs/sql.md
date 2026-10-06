@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 8 |
+| Partial | 9 |
 | Supported | 59 |
-| Unsupported | 24 |
+| Unsupported | 23 |
 
 ## Queries
 
@@ -94,7 +94,7 @@ the probe's own notes name what it rejected.
 | Collation | Unsupported | COLLATE |
 | Generated columns | Unsupported | generated columns |
 | `CREATE TEMP TABLE` | Supported | In multi-statement queries, whose end drops their temporary tables. |
-| `CREATE TABLE LIKE` | Unsupported | CREATE TABLE LIKE |
+| `CREATE TABLE LIKE` | Partial | Copies the schema, partitioning, clustering, description, friendly name and labels of a table. Copying a view or a table with column defaults is unsupported; CREATE TABLE LIKE AS SELECT |
 | `CREATE TABLE COPY` | Unsupported | CREATE TABLE CLONE or COPY |
 | `CREATE TABLE CLONE` | Unsupported | CREATE TABLE CLONE |
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |

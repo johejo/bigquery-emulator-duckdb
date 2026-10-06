@@ -15,6 +15,7 @@
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
+#include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
 namespace googlesql {
@@ -29,6 +30,12 @@ namespace bigquery_emulator_duckdb {
 // statement is not rejected for a feature one of them was not told about.
 const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
 
+// The schema and metadata of a table as tables.get reports them.
+struct TableDescription {
+  std::vector<FieldSchema> schema;
+  TableMetadata metadata;
+};
+
 // Resolves a BigQuery table reference to its schema. The emulator implements it on top of the
 // metadata it keeps in DuckDB.
 class TableSource {
@@ -39,6 +46,14 @@ class TableSource {
   virtual std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                             const std::string& dataset,
                                                             const std::string& table) = 0;
+
+  // The schema and metadata of the table `project`.`dataset`.`table`, or nothing if there is no
+  // such table or it is a view. For CREATE TABLE LIKE; none by default.
+  virtual std::optional<TableDescription> DescribeTable(const std::string& /*project*/,
+                                                        const std::string& /*dataset*/,
+                                                        const std::string& /*table*/) {
+    return std::nullopt;
+  }
 
   // The datasets of `project`, sorted by name, for INFORMATION_SCHEMA. None by default.
   virtual std::vector<std::string> ListDatasets(const std::string& /*project*/) { return {}; }
@@ -70,6 +85,23 @@ class SqlTable : public googlesql::SimpleTable {
 
  private:
   std::string sql_;
+};
+
+// A table the emulator keeps, which describes itself on demand: its columns are what queries
+// see, while CREATE TABLE LIKE copies the schema and metadata tables.get reports.
+class BigQueryTable : public googlesql::SimpleTable {
+ public:
+  // `source` must outlive the table.
+  BigQueryTable(TableSource& source, std::vector<std::string> path)
+      : googlesql::SimpleTable(path.back()), source_(source), path_(std::move(path)) {}
+
+  std::optional<TableDescription> Describe() const {
+    return source_.DescribeTable(path_[0], path_[1], path_[2]);
+  }
+
+ private:
+  TableSource& source_;
+  std::vector<std::string> path_;
 };
 
 // Splits a table path into its dot-separated parts. An element with dots in it, which is how
