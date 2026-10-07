@@ -23,9 +23,26 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Configure Go cache paths
+        run: |
+          echo "GOCACHE=$RUNNER_TEMP/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod" >> "$GITHUB_ENV"
 
       # Caches are saved only from main; pull requests read main's caches, so they do not fill
       # the repository's cache quota with per-branch copies.
+      # Go validates cached builds against their inputs; versioned modules are reusable even
+      # when dependencies change. The SHA lets each main commit save newly built packages.
+      - name: Restore Go cache
+        id: go-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-
+            go-v1-${{ runner.os }}-${{ runner.arch }}-
       - name: Restore Bazel repository cache
         id: repo-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -68,6 +85,16 @@ jobs:
       - name: End-to-end tests
         run: nix develop --command just e2e
 
+      - name: Save Go cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Report Bazel disk cache size
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: du -sh ~/.cache/bazel-disk
