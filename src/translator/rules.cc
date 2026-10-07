@@ -209,4 +209,8 @@ std::vector<std::string> AggregateArguments(const AggregateRule& rule,
   return sql;
 }
 
+std::string AggregateOrder(const AggregateRule& rule, const std::vector<std::string>& arguments) {
+  return rule.order.empty() ? "" : Substitute(rule.order, arguments);
+}
+
 }  // namespace bigquery_emulator_duckdb::translator

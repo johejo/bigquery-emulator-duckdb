@@ -43,13 +43,17 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
-  const googlesql::TypeKind first = call.argument_list().empty()
-                                        ? googlesql::TYPE_UNKNOWN
-                                        : call.argument_list(0)->type()->kind();
-  const auto rule =
-      std::ranges::find_if(entry->aggregates, [first](const AggregateRule& candidate) {
-        return candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == first;
-      });
+  const auto type_of = [&](std::size_t argument) {
+    return argument < call.argument_list().size() ? call.argument_list()[argument]->type()->kind()
+                                                  : googlesql::TYPE_UNKNOWN;
+  };
+  const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
+    return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
+           std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
+             return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
+                    condition.types.end();
+           });
+  });
   if (rule == entry->aggregates.end()) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
@@ -78,7 +82,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   }
   switch (call.null_handling_modifier()) {
     case googlesql::ResolvedNonScalarFunctionCallBase::IGNORE_NULLS:
-      if (rule->nulls == AggregateRule::Nulls::kFilter) {
+      if (rule->nulls == AggregateRule::Nulls::kFilter ||
+          rule->nulls == AggregateRule::Nulls::kFilterUnlessRespected) {
         conditions.push_back(args.at(0) + " IS NOT NULL");
       } else if (rule->nulls == AggregateRule::Nulls::kModifier) {
         inner += " IGNORE NULLS";
@@ -92,6 +97,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       }
       break;
     default:
+      if (rule->nulls == AggregateRule::Nulls::kFilterUnlessRespected) {
+        conditions.push_back(args.at(0) + " IS NOT NULL");
+      }
       break;
   }
   if (rule->skip_nulls) {
@@ -104,6 +112,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       return std::nullopt;
     }
     order = " ORDER BY " + *items;
+  } else if (const std::string items = AggregateOrder(*rule, arguments); !items.empty()) {
+    order = " ORDER BY " + items;
   }
   // LIMIT keeps the first elements of the list the aggregate would build; STRING_AGG builds it
   // from its non-NULL values and joins them afterwards.

@@ -76,6 +76,7 @@ void RegisterBackendFunctions(duckdb_database database) {
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterAeadFunctions(connection.get());
+  backend_functions::RegisterPercentileFunctions(connection.get());
 }
 
 }  // namespace bigquery_emulator_duckdb
