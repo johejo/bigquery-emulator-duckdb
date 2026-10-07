@@ -211,7 +211,6 @@ cc_library(
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:error_helpers",
-        "@googlesql//googlesql/public:error_location_cc_proto",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:sql_function",
         "@googlesql//googlesql/public:strings",

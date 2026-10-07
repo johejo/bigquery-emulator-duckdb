@@ -2104,6 +2104,13 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "Casting FLOAT64 negative zero to STRING gives '-0', as BigQuery does, where the reference implementation gives '0'"
+  label: "code:CastTo_STRING_FLOAT64_-0"
+  label: "code:SafeCastTo_STRING_FLOAT64_-0"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "DATETIME_DIFF counts the unit boundaries crossed rather than the whole units elapsed"
   label: "code:datetime_diff_DATETIME_1969-07-21 02:56:13.456789_DATETIME_2016-04-08 14:49:32.123456_STRING_<HOUR>"
   label: "code:datetime_diff_DATETIME_1969-07-21 02:56:13.456789_DATETIME_2016-04-08 14:49:32.123456_STRING_<MILLISECOND>"
@@ -2334,12 +2341,6 @@ known_errors {
   label: "aggregation_having_modifier_queries_test:aggregate_max_id_having_double_include_nan_inf"
   label: "any_value_aggregation_test:aggregate_any_value_having_nan_having_modifier"
   label: "any_value_aggregation_test:aggregate_any_value_having_with_group_by"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "IEEE_DIVIDE by negative zero returns positive infinity"
-  label: "math_functions_test:math_abs_zero"
 }
 
 known_errors {
