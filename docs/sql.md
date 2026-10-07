@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 12 |
+| Partial | 13 |
 | Supported | 59 |
-| Unsupported | 20 |
+| Unsupported | 19 |
 
 ## Queries
 
@@ -108,7 +108,7 @@ the probe's own notes name what it rejected.
 | `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.; CREATE VIEW option expiration_timestamp |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |
-| `CREATE FUNCTION` | Unsupported | statement CreateFunctionStmt |
+| `CREATE FUNCTION` | Partial | Typed temporary SQL UDFs are inlined within their query; persistent, templated (ANY TYPE), JavaScript and aggregate UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` calls, UDF options, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; non-SQL UDFs; statement CreateFunctionStmt; templated SQL UDFs (ANY TYPE); volatile SQL UDF arguments with subquery bodies |
 | `CREATE TABLE FUNCTION` | Unsupported | statement CreateTableFunctionStmt |
 | `CREATE PROCEDURE` | Unsupported | statement CreateProcedureStmt |
 

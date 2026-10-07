@@ -251,6 +251,9 @@ class Emulator {
   // The script that `query` is, or null when it is a single statement or does not parse, which
   // RunQuery then reports as it does for a single statement.
   static std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query);
+
+  // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
+  static std::string ScriptStatementType(const googlesql::ParserOutput& script);
   // Runs the multi-statement query `script`, the text of `request.query`, with `setup` selecting
   // the default dataset `default_project`.`default_dataset`, and returns the result of the last
   // statement it ran. Rejects a request a multi-statement query cannot be.

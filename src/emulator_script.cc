@@ -27,9 +27,11 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/evaluator_table_iterator.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/multi_catalog.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/sql_function.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
@@ -139,7 +141,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         settings_(settings),
         setup_(setup),
         temporary_(temporary),
-        type_factory_(type_factory) {}
+        type_factory_(type_factory),
+        functions_("temporary functions", &type_factory) {}
 
   // The result of the last statement that ran, which is the script's result.
   const std::optional<QueryResult>& last_result() const { return last_result_; }
@@ -321,8 +324,59 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       catalog.variables->AddOwnedConstant(std::move(constant));
     }
     GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
-        "script", {catalog.variables.get(), catalog.tables.get()}, &catalog.catalog));
+        "script", {catalog.variables.get(), &functions_, catalog.tables.get()}, &catalog.catalog));
     return catalog;
+  }
+
+  // SQLFunction borrows its body; keep both the analysis and its catalog alive until the
+  // script ends. Bodies may also reference tables and previously defined functions.
+  struct FunctionDefinition {
+    ScriptCatalog catalog;
+    AnalyzerResult analyzed;
+  };
+
+  absl::Status CreateFunction(ScriptCatalog catalog, AnalyzerResult analyzed) {
+    const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateFunctionStmt>();
+    if (!create.hint_list().empty()) {
+      return Unsupported("statement hints");
+    }
+    if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_TEMP) {
+      return Unsupported("persistent UDFs");
+    }
+    if (create.language() != "SQL" || create.is_remote()) {
+      return Unsupported("non-SQL UDFs");
+    }
+    if (create.function_expression() == nullptr) {
+      return Unsupported("templated SQL UDFs (ANY TYPE)");
+    }
+    if (create.is_aggregate() || !create.aggregate_expression_list().empty() ||
+        !create.option_list().empty() || create.connection() != nullptr ||
+        create.sql_security() != googlesql::ResolvedCreateStatement::SQL_SECURITY_UNSPECIFIED ||
+        create.determinism_level() !=
+            googlesql::ResolvedCreateFunctionStmt::DETERMINISM_UNSPECIFIED) {
+      return Unsupported("SQL UDF options, security, determinism or aggregates");
+    }
+    if (create.name_path().size() != 1 ||
+        create.name_path().front().find('.') != std::string::npos) {
+      return absl::InvalidArgumentError("Temporary function names must not be qualified");
+    }
+    if (create.create_mode() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT) {
+      return Unsupported("OR REPLACE and IF NOT EXISTS for temporary SQL UDFs");
+    }
+    const std::string& name = create.name_path().front();
+    const googlesql::Function* existing = nullptr;
+    GOOGLESQL_RETURN_IF_ERROR(functions_.GetFunction(name, &existing));
+    if (existing != nullptr) {
+      return absl::InvalidArgumentError("Already Exists: Function " + name);
+    }
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        auto function,
+        googlesql::SQLFunction::Create(create.name_path(), googlesql::Function::SCALAR,
+                                       create.signature(), googlesql::FunctionOptions(),
+                                       create.function_expression(), create.argument_name_list()));
+    functions_.AddOwnedFunction(std::move(function));
+    definitions_.push_back({std::move(catalog), std::move(analyzed)});
+    return absl::OkStatus();
   }
 
   // Runs the statement `segment` as the statement of a query job, after `check` accepts its
@@ -334,11 +388,21 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
+    // A function body resolves against tables and previously defined functions, never the
+    // script's variables (which would otherwise be captured as constants).
+    if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+      GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+          "function body", {&functions_, catalog.tables.get()}, &catalog.catalog));
+    }
     GOOGLESQL_ASSIGN_OR_RETURN(
         AnalyzerResult analyzed,
         AnalyzeScriptStatement(segment, *catalog.catalog, type_factory_, settings));
     if (check) {
       GOOGLESQL_RETURN_IF_ERROR(check(analyzed.statement()));
+    }
+    if (analyzed.statement().Is<googlesql::ResolvedCreateFunctionStmt>()) {
+      GOOGLESQL_RETURN_IF_ERROR(CreateFunction(std::move(catalog), std::move(analyzed)));
+      return QueryResult{};
     }
     std::string unsupported;
     const std::optional<TranslatedStatement> translation = TranslateStatement(
@@ -428,6 +492,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   const std::vector<std::string>& setup_;
   const TemporaryTables& temporary_;
   googlesql::TypeFactory& type_factory_;
+  std::vector<FunctionDefinition> definitions_;
+  googlesql::SimpleCatalog functions_;
   std::optional<QueryResult> last_result_;
   std::optional<ApiError> error_;
 };
@@ -439,12 +505,33 @@ std::unique_ptr<googlesql::ParserOutput> Emulator::ParseScript(const std::string
            .ok()) {
     return nullptr;
   }
-  // BigQuery runs one statement on its own; anything else is a multi-statement query.
+  // A TEMP function needs a job-local catalog even when it is the only statement.
   const auto& statements = output->script()->statement_list();
   if (statements.size() == 1 && statements[0]->IsSqlStatement()) {
-    return nullptr;
+    const auto* create = statements[0]->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
+    if (create == nullptr || !create->is_temp()) {
+      return nullptr;
+    }
   }
   return statements.empty() ? nullptr : std::move(output);
+}
+
+std::string Emulator::ScriptStatementType(const googlesql::ParserOutput& script) {
+  const auto& statements = script.script()->statement_list();
+  if (statements.size() == 1 &&
+      statements[0]->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+    return "CREATE_FUNCTION";
+  }
+  if (statements.empty() || statements.back()->node_kind() != googlesql::AST_QUERY_STATEMENT) {
+    return kScriptStatementType;
+  }
+  const bool query =
+      std::all_of(statements.begin(), statements.end() - 1, [](const auto* statement) {
+        const auto* create =
+            statement->template GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
+        return create != nullptr && create->is_temp();
+      });
+  return query ? "SELECT" : kScriptStatementType;
 }
 
 QueryResult Emulator::RunScript(const QueryRequest& request, const googlesql::ParserOutput& script,
