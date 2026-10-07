@@ -198,7 +198,8 @@ bool IsBigQuerySignature(const googlesql::FunctionSignature& signature) {
 // The generated query for a signature, or why there is none.
 std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                                 const googlesql::Function& function,
-                                                const googlesql::FunctionSignature& signature) {
+                                                const googlesql::FunctionSignature& signature,
+                                                const std::string& element = "") {
   std::vector<std::string> arguments;
   for (const googlesql::FunctionArgumentType& argument : signature.arguments()) {
     if (argument.optional() && !argument.has_argument_name()) {
@@ -207,7 +208,12 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
     if (argument.optional()) {
       continue;
     }
-    const auto sample = Sample(argument);
+    const auto sample =
+        !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1
+            ? std::optional(element)
+        : !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1
+            ? std::optional("[" + element + "]")
+            : Sample(argument);
     if (!sample) {
       return Probe{Outcome::kUntested, "no sample for " + argument.DebugString()};
     }
@@ -305,17 +311,40 @@ int Main(int argc, char** argv) {
         if (!IsBigQuerySignature(signature)) {
           continue;
         }
-        const auto query = GeneratedQuery(name, *function, signature);
-        if (list_signatures) {
-          std::cout << signature.DebugString(name) << "\n  "
-                    << (std::holds_alternative<std::string>(query) ? std::get<std::string>(query)
-                                                                   : std::get<Probe>(query).detail)
-                    << "\n";
-          continue;
+        std::vector<std::string> elements = {""};
+        // Probe a point and same-typed boundaries across orderable scalar types,
+        // rather than declaring the generic signature supported from INT64 alone.
+        if (signature.arguments().size() == 2 &&
+            signature.arguments()[0].kind() == googlesql::ARG_KIND_EXPR_ANY_1 &&
+            signature.arguments()[1].kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1) {
+          elements = {"2",
+                      "2.0",
+                      "NUMERIC '2'",
+                      "BIGNUMERIC '2'",
+                      "TRUE",
+                      "'abc'",
+                      "b'abc'",
+                      "DATE '2024-01-15'",
+                      "TIME '10:20:30'",
+                      "DATETIME '2024-01-15 10:20:30'",
+                      "TIMESTAMP '2024-01-15 10:20:30+00'",
+                      "INTERVAL 1 DAY",
+                      "RANGE<DATE> '[2024-01-01, 2024-02-01)'"};
         }
-        probes.push_back(std::holds_alternative<std::string>(query)
-                             ? RunProbe(emulator, tables, std::get<std::string>(query))
-                             : std::get<Probe>(query));
+        for (const std::string& element : elements) {
+          const auto query = GeneratedQuery(name, *function, signature, element);
+          if (list_signatures) {
+            std::cout << signature.DebugString(name) << "\n  "
+                      << (std::holds_alternative<std::string>(query)
+                              ? std::get<std::string>(query)
+                              : std::get<Probe>(query).detail)
+                      << "\n";
+            continue;
+          }
+          probes.push_back(std::holds_alternative<std::string>(query)
+                               ? RunProbe(emulator, tables, std::get<std::string>(query))
+                               : std::get<Probe>(query));
+        }
       }
     } else {
       probes.push_back({Outcome::kUnsupported, "the analyzer does not know this function"});

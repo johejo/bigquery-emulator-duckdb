@@ -34,9 +34,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 14 |
+| Partial | 15 |
 | Supported | 238 |
-| Unsupported | 141 |
+| Unsupported | 140 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -284,7 +284,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported | DuckDB function, renamed |  |
 | [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported |  | type RANGE<DATE> |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Unsupported |  | function RANGE_BUCKET |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Partial | DuckDB SQL | type INTERVAL; type RANGE<DATE> |
 | [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Unsupported |  | `SELECT RANGE_CONTAINS(RANGE<DATE> '[2024-01-01, 2024-02-01)', 2)`: INVALID_ARGUMENT: No matching signature for function RANGE_CONTAINS; function RANGE_CONTAINS |
 | [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Unsupported |  | function RANGE_END |
 | [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Unsupported |  | type RANGE<DATE> |

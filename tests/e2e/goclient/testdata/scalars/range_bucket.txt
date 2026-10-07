@@ -1,0 +1,152 @@
+## RANGE_BUCKET
+
+# BigQuery mathematical_functions#range_bucket documents upper bounds, duplicates,
+# empty arrays, NULL/NaN points and invalid boundaries. Additional scalar-type
+# and extreme-value answers come from GoogleSQL functions_testlib_1.cc,
+# GetFunctionTestsRangeBucket, whose comparisons agree with BigQuery.
+SELECT RANGE_BUCKET(20, [0, 10, 20, 30, 40])
+=> "3"
+
+SELECT RANGE_BUCKET(20, [0, 10, 20, 20, 40, 40])
+=> "4"
+
+SELECT RANGE_BUCKET(25, [0, 10, 20, 30, 40])
+=> "3"
+
+SELECT RANGE_BUCKET(-10, [5, 10, 20, 30, 40])
+=> "0"
+
+SELECT RANGE_BUCKET(80, [0, 10, 20, 30, 40])
+=> "5"
+
+SELECT RANGE_BUCKET(40, [0, 10, 20, 30, 40])
+=> "5"
+
+SELECT RANGE_BUCKET(80, [])
+=> "0"
+
+SELECT RANGE_BUCKET(1, [1, 1, 1])
+=> "3"
+
+SELECT RANGE_BUCKET(NULL, [0, 10, 20, 30, 40])
+=> null
+
+SELECT RANGE_BUCKET(1, CAST(NULL AS ARRAY<INT64>))
+=> null
+
+SELECT RANGE_BUCKET(CAST('NaN' AS FLOAT64), [10.0, 20.0, 30.0])
+=> null
+
+SELECT RANGE_BUCKET('a', ['a', 'b', 'c', 'd'])
+=> "1"
+
+SELECT RANGE_BUCKET(1.2, [1, 1.2, 1.4, 1.6])
+=> "2"
+
+SELECT RANGE_BUCKET(FALSE, [FALSE, TRUE])
+=> "1"
+
+SELECT RANGE_BUCKET(TRUE, [FALSE, TRUE])
+=> "2"
+
+SELECT RANGE_BUCKET(b'b', [b'a', b'c'])
+=> "1"
+
+SELECT RANGE_BUCKET(-9223372036854775808, [-9223372036854775808, 10, 9223372036854775807])
+=> "1"
+
+SELECT RANGE_BUCKET(9223372036854775807, [-9223372036854775808, 10, 9223372036854775807])
+=> "3"
+
+SELECT RANGE_BUCKET(NUMERIC '1', [NUMERIC '-99999999999999999999999999999.999999999', 0, NUMERIC '99999999999999999999999999999.999999999'])
+=> "2"
+
+SELECT RANGE_BUCKET(BIGNUMERIC '1', [BIGNUMERIC '0', BIGNUMERIC '1.00000000000000000000000000000000000001', BIGNUMERIC '578960446186580977117854925043439539266.34992332820282019728792003956564819967'])
+=> "1"
+
+SELECT RANGE_BUCKET(DATE '0001-01-01', [DATE '0001-01-01', DATE '1970-01-02', DATE '9999-12-31'])
+=> "1"
+
+SELECT RANGE_BUCKET(TIMESTAMP '9999-12-31 23:59:59.999999+00', [TIMESTAMP '0001-01-01 00:00:00+00', TIMESTAMP '1970-01-01 00:00:00.000010+00', TIMESTAMP '9999-12-31 23:59:59.999999+00'])
+=> "3"
+
+SELECT RANGE_BUCKET(CAST('-inf' AS FLOAT64), [CAST('-inf' AS FLOAT64), 10.0, CAST('+inf' AS FLOAT64)])
+=> "1"
+
+SELECT RANGE_BUCKET(CAST('+inf' AS FLOAT64), [CAST('-inf' AS FLOAT64), 10.0, CAST('+inf' AS FLOAT64)])
+=> "3"
+
+# Invalid elements must fail even when they follow the point's upper bound.
+SELECT SAFE.RANGE_BUCKET(80, [NULL, 10, 20, 30, 40])
+=> null
+
+SELECT SAFE.RANGE_BUCKET(5, [0, 10, NULL])
+=> null
+
+SELECT SAFE.RANGE_BUCKET(30, [10, 30, 20, 40, 50])
+=> null
+
+SELECT SAFE.RANGE_BUCKET(15.0, [10.0, 20.0, 30.0, 25.0])
+=> null
+
+SELECT SAFE.RANGE_BUCKET(1.0, [0.0, 2.0, CAST('NaN' AS FLOAT64)])
+=> null
+
+BEGIN
+  SELECT RANGE_BUCKET(80, [NULL, 10, 20, 30, 40]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT RANGE_BUCKET(30, [10, 30, 20, 40, 50]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT RANGE_BUCKET(1.0, [CAST('NaN' AS FLOAT64), 20.0, 30.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+# BigQuery's documented histogram example, with boundaries produced dynamically.
+WITH students AS (SELECT age FROM UNNEST([9, 20, 25, 31, 32, 33]) age), buckets AS (SELECT RANGE_BUCKET(age, GENERATE_ARRAY(10, 30, 10)) age_group, COUNT(*) n FROM students GROUP BY 1) SELECT LOGICAL_AND(n = CASE age_group WHEN 0 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END) AND COUNT(*) = 3 FROM buckets
+=> "true"
+
+# The documented upper-bound rule applies to TIME and DATETIME too.
+SELECT RANGE_BUCKET(TIME '12:00:00', [TIME '12:00:00'])
+=> "1"
+
+SELECT RANGE_BUCKET(DATETIME '2024-01-01 12:00:00', [DATETIME '2024-01-01 12:00:00'])
+=> "1"
+
+# Empty STRING/BYTES and signed zero are ordinary equal boundary values.
+SELECT RANGE_BUCKET('', ['', 'a'])
+=> "1"
+
+SELECT RANGE_BUCKET(b'', [b'', b'a'])
+=> "1"
+
+SELECT RANGE_BUCKET(-0.0, [-0.0, 0.0])
+=> "2"
+
+SELECT SAFE.RANGE_BUCKET('b', ['a', NULL, 'c'])
+=> null
+
+SELECT SAFE.RANGE_BUCKET(NUMERIC '1', [NUMERIC '2', 0])
+=> null
+
+SELECT IF(TRUE, 1, RANGE_BUCKET(30, [10, 30, 20, 40, 50]))
+=> "1"
+
+# BigQuery answers supplied by the maintainer: NULL/NaN points take precedence
+# over invalid boundaries.
+SELECT RANGE_BUCKET(CAST(NULL AS INT64), [2, NULL, 1])
+=> null
+
+SELECT RANGE_BUCKET(CAST('NaN' AS FLOAT64), [2.0, CAST('NaN' AS FLOAT64), 1.0])
+=> null
