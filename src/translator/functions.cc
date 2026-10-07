@@ -1012,7 +1012,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           {"COVAR_POP", {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}}},
           {"COVAR_SAMP",
            {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}}},
-      };
+  };
   return *kAggregates;
 }
 
@@ -1089,7 +1089,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
             PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_NUMERIC),
             PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_DOUBLE),
             PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_NUMERIC)}},
-      };
+  };
   return *kAnalytics;
 }
 
