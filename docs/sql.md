@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 13 |
+| Partial | 14 |
 | Supported | 59 |
-| Unsupported | 19 |
+| Unsupported | 18 |
 
 ## Queries
 
@@ -127,7 +127,7 @@ the probe's own notes name what it rejected.
 | `RAISE`, `RETURN` | Supported |  |
 | System variables | Partial | assignment to system variables |
 | `EXECUTE IMMEDIATE` | Unsupported | EXECUTE IMMEDIATE |
-| Transactions | Unsupported | statement BeginStmt |
+| Transactions | Partial | Multi-statement queries only. Transaction modes, SQL UDF declarations inside transactions, writes to multiple DuckDB databases, and committing after a handled error are unsupported.; committing a transaction after a handled error; roll it back instead |
 | `CALL` | Unsupported | CALL |
 
 ## INFORMATION_SCHEMA

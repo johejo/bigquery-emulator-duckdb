@@ -304,3 +304,63 @@ SELECT MAX(a) FROM t
 CREATE TEMP TABLE t AS SELECT 10 AS a;
 SELECT MAX(a) FROM scalars.t
 => "3"
+
+## Transactions
+# Expected behavior follows https://cloud.google.com/bigquery/docs/transactions:
+# DML changes commit or roll back together; temporary-table DDL is permitted.
+
+CREATE TEMP TABLE tx (x INT64);
+BEGIN TRANSACTION;
+INSERT tx VALUES (1);
+COMMIT TRANSACTION;
+SELECT SUM(x) FROM tx
+=> "1"
+
+CREATE TEMP TABLE tx AS SELECT 1 AS x;
+BEGIN TRANSACTION;
+UPDATE tx SET x = 2 WHERE TRUE;
+ROLLBACK TRANSACTION;
+SELECT SUM(x) FROM tx
+=> "1"
+
+# Scalar expressions in the script see its uncommitted writes.
+DECLARE n INT64;
+CREATE TEMP TABLE tx (x INT64);
+BEGIN TRANSACTION;
+INSERT tx VALUES (7);
+SET n = (SELECT SUM(x) FROM tx);
+ROLLBACK TRANSACTION;
+SELECT n
+=> "7"
+
+BEGIN TRANSACTION;
+CREATE TEMP TABLE tx AS SELECT 3 AS x;
+SELECT x FROM tx;
+DROP TABLE tx;
+COMMIT TRANSACTION;
+SELECT 1
+=> "1"
+
+# The handler can roll back even when DuckDB aborted the transaction on a runtime error.
+CREATE TEMP TABLE tx AS SELECT 1 AS x;
+BEGIN
+  BEGIN TRANSACTION;
+  UPDATE tx SET x = 2 WHERE TRUE;
+  SELECT 1 / 0;
+EXCEPTION WHEN ERROR THEN
+  ROLLBACK TRANSACTION;
+END;
+SELECT SUM(x) FROM tx
+=> "1"
+
+# A temporary SQL UDF declared before a transaction can read its uncommitted rows.
+# UDF calls follow https://cloud.google.com/bigquery/docs/user-defined-functions.
+DECLARE n INT64;
+CREATE TEMP TABLE tx (x INT64);
+CREATE TEMP FUNCTION total() AS ((SELECT SUM(x) FROM tx));
+BEGIN TRANSACTION;
+INSERT tx VALUES (5);
+SET n = total();
+ROLLBACK TRANSACTION;
+SELECT n
+=> "5"

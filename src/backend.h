@@ -36,7 +36,7 @@ class BackendError : public std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
-// Owns a DuckDB database instance. Thread-safe: every call uses its own connection.
+// Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {
  public:
   Backend();
@@ -44,6 +44,12 @@ class Backend {
 
   Backend(const Backend&) = delete;
   Backend& operator=(const Backend&) = delete;
+
+  // A single-threaded connection to the same database. Its open transaction rolls back when
+  // the session is destroyed; catalog reads and statements share its uncommitted changes.
+  std::unique_ptr<Backend> NewSession();
+  // Runs BEGIN TRANSACTION, COMMIT or ROLLBACK on a session.
+  void Transaction(const std::string& statement);
 
   // Runs a single statement and materializes its result. `setup` statements run first on the
   // same connection and are used to select the default catalog and schema. A NULL array is
@@ -53,7 +59,8 @@ class Backend {
                       bool null_arrays = false);
 
   // Runs `statements` in order on one connection and materializes the result of the last one.
-  // Statements before the last may open a transaction; it is rolled back if a later one fails.
+  // Statements before the last may open a transaction. Outside a session, a failure rolls it
+  // back; in a session, it stays open until ROLLBACK or the session is destroyed.
   QueryResult ExecuteAll(const std::vector<std::string>& statements,
                          const std::vector<std::string>& setup = {}, bool null_arrays = false);
 
@@ -75,7 +82,10 @@ class Backend {
 
  private:
   struct Database;
-  std::unique_ptr<Database> db_;
+  struct Session;
+  explicit Backend(std::shared_ptr<Database> database);
+  std::shared_ptr<Database> db_;
+  std::unique_ptr<Session> session_;
 };
 
 // Executes `sql` against a throwaway in-memory database and returns the first cell as text.

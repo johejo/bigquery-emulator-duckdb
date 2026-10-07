@@ -237,6 +237,9 @@ query System variables | SELECT @@time_zone; SELECT 1
 query System variables | SET @@time_zone = 'Asia/Tokyo'; SELECT 1
 query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE 'SELECT 1'; SELECT 2
 query Transactions | BEGIN TRANSACTION; INSERT u (id, v) VALUES (6, 60); COMMIT TRANSACTION
+query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; ROLLBACK TRANSACTION
+query Transactions | BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
+note Transactions | Multi-statement queries only. Transaction modes, SQL UDF declarations inside transactions, writes to multiple DuckDB databases, and committing after a handled error are unsupported.
 query `CALL` | CALL d.p(); SELECT 1
 
 section INFORMATION_SCHEMA

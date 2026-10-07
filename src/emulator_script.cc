@@ -142,7 +142,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         setup_(setup),
         temporary_(temporary),
         type_factory_(type_factory),
-        functions_("temporary functions", &type_factory) {}
+        functions_("temporary functions", &type_factory),
+        backend_(emulator.backend_.NewSession()) {}
 
   // The result of the last statement that ran, which is the script's result.
   const std::optional<QueryResult>& last_result() const { return last_result_; }
@@ -231,7 +232,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
-    std::unique_ptr<TableSource> source = emulator_.NewTableSource();
+    std::unique_ptr<TableSource> source = emulator_.NewTableSource(backend_.get());
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset);
     return AnalyzeScriptType(segment, catalog, type_factory_, settings);
@@ -282,15 +283,24 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       if (std::string_view(error.what()).starts_with(kUnsupported)) {
         return absl::UnimplementedError(error.what());
       }
+      transaction_failed_ = in_transaction_;
       error_ = error;
       return googlesql::MakeScriptException() << error.what();
     } catch (const std::exception& error) {
+      if (in_transaction_ &&
+          std::string_view(error.what())
+                  .find("a single transaction can only write to a single attached database") !=
+              std::string_view::npos) {
+        return Unsupported("transactions that write to multiple databases");
+      }
+      transaction_failed_ = in_transaction_;
       error_ = ApiError::InvalidQuery(error.what());
       return googlesql::MakeScriptException() << error.what();
     }
     if (status.ok() || absl::IsUnimplemented(status) || absl::IsInternal(status)) {
       return status;
     }
+    transaction_failed_ = in_transaction_;
     error_ = ApiError::InvalidQuery(std::string(status.message()));
     return googlesql_base::StatusBuilder(status).AttachPayload(googlesql::ScriptException());
   }
@@ -306,12 +316,15 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     std::unique_ptr<googlesql::MultiCatalog> catalog;
   };
 
-  absl::StatusOr<ScriptCatalog> Catalog(const googlesql::ScriptExecutor& executor) {
+  absl::StatusOr<ScriptCatalog> Catalog(const googlesql::ScriptExecutor& executor,
+                                        bool list_temporary = true) {
     ScriptCatalog catalog;
-    catalog.source = emulator_.NewTableSource();
+    catalog.source = emulator_.NewTableSource(backend_.get());
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
-    for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {
-      catalog.temporary->names.insert(std::move(name));
+    if (list_temporary) {
+      for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {
+        catalog.temporary->names.insert(std::move(name));
+      }
     }
     catalog.tables = std::make_unique<BigQueryCatalog>(
         *catalog.source, &type_factory_, settings_.default_project, settings_.default_dataset,
@@ -387,7 +400,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const std::function<absl::Status(const googlesql::ResolvedStatement&)>& check = nullptr) {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
-    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
+    // Transaction control needs no tables, and ROLLBACK must work on an aborted connection.
+    const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
+                         segment.node()->Is<googlesql::ASTCommitStatement>() ||
+                         segment.node()->Is<googlesql::ASTRollbackStatement>();
+    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, !control));
     // A function body resolves against tables and previously defined functions, never the
     // script's variables (which would otherwise be captured as constants).
     if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
@@ -397,6 +414,60 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     GOOGLESQL_ASSIGN_OR_RETURN(
         AnalyzerResult analyzed,
         AnalyzeScriptStatement(segment, *catalog.catalog, type_factory_, settings));
+    const auto& statement = analyzed.statement();
+    if (statement.Is<googlesql::ResolvedBeginStmt>()) {
+      const auto* begin = statement.GetAs<googlesql::ResolvedBeginStmt>();
+      if (begin->read_write_mode() != googlesql::ResolvedBeginStmt::MODE_UNSPECIFIED ||
+          !begin->isolation_level_list().empty()) {
+        return Unsupported("transaction modes");
+      }
+      backend_->Transaction("BEGIN TRANSACTION");
+      in_transaction_ = true;
+      transaction_failed_ = false;
+      return QueryResult{};
+    }
+    if (statement.Is<googlesql::ResolvedCommitStmt>() ||
+        statement.Is<googlesql::ResolvedRollbackStmt>()) {
+      const bool commit = statement.Is<googlesql::ResolvedCommitStmt>();
+      if (commit && transaction_failed_) {
+        return Unsupported("committing a transaction after a handled error; roll it back instead");
+      }
+      backend_->Transaction(commit ? "COMMIT" : "ROLLBACK");
+      in_transaction_ = false;
+      transaction_failed_ = false;
+      return QueryResult{};
+    }
+    // BigQuery permits only queries, DML and DDL on temporary tables in a transaction.
+    if (in_transaction_) {
+      if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
+        return Unsupported("SQL UDF declarations in transactions");
+      }
+      const bool temporary_create =
+          (statement.Is<googlesql::ResolvedCreateTableStmt>() &&
+           statement.GetAs<googlesql::ResolvedCreateTableStmt>()->create_scope() ==
+               googlesql::ResolvedCreateStatement::CREATE_TEMP) ||
+          (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>() &&
+           statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>()->create_scope() ==
+               googlesql::ResolvedCreateStatement::CREATE_TEMP);
+      bool temporary_drop = false;
+      if (statement.Is<googlesql::ResolvedDropStmt>()) {
+        const auto* drop = statement.GetAs<googlesql::ResolvedDropStmt>();
+        const auto& path = drop->name_path();
+        temporary_drop = drop->object_type() == "TABLE" && !path.empty() &&
+                         (path.size() == 1 || (path.size() == 2 && path[0] == kSessionDataset)) &&
+                         catalog.temporary->names.contains(path.back());
+      }
+      if (!statement.Is<googlesql::ResolvedQueryStmt>() &&
+          !statement.Is<googlesql::ResolvedInsertStmt>() &&
+          !statement.Is<googlesql::ResolvedUpdateStmt>() &&
+          !statement.Is<googlesql::ResolvedDeleteStmt>() &&
+          !statement.Is<googlesql::ResolvedMergeStmt>() &&
+          !statement.Is<googlesql::ResolvedTruncateStmt>() && !temporary_create &&
+          !temporary_drop) {
+        throw ApiError::InvalidQuery(
+            "DDL statements on permanent objects are not allowed in a transaction");
+      }
+    }
     if (check) {
       GOOGLESQL_RETURN_IF_ERROR(check(analyzed.statement()));
     }
@@ -412,7 +483,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
-    return emulator_.RunStatement(*translation, setup_, null_arrays);
+    return emulator_.RunStatement(*translation, setup_, null_arrays, backend_.get());
   }
 
   // Evaluates the expression `sql`, the text of `segment` when it is given, coerced to
@@ -472,7 +543,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (!query.has_value()) {
       return Unsupported(unsupported);
     }
-    const QueryResult result = emulator_.Execute(*query, setup_, true);
+    const QueryResult result = backend_->Execute(*query, setup_, true);
     return Decode(analyzed.expression().type(), result.rows.at(0).at("f").at(0).at("v"));
   }
 
@@ -494,6 +565,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   googlesql::TypeFactory& type_factory_;
   std::vector<FunctionDefinition> definitions_;
   googlesql::SimpleCatalog functions_;
+  std::unique_ptr<Backend> backend_;
+  bool in_transaction_ = false;
+  bool transaction_failed_ = false;
   std::optional<QueryResult> last_result_;
   std::optional<ApiError> error_;
 };

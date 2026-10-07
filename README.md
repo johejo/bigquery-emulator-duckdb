@@ -134,9 +134,13 @@ Behavior that applies across them:
   destination tables or positional parameters.
 - Multi-statement queries return the result of the last statement that ran. They create no
   child jobs and cannot be dry runs. Their temporary tables are dropped when they end, and no
-  dataset holds them. Transactions, `EXECUTE IMMEDIATE`, `CALL` and assignments to system
+  dataset holds them. `EXECUTE IMMEDIATE`, `CALL` and assignments to system
   variables are unsupported, and an error the emulator reports as unsupported is never handled
   by an `EXCEPTION` clause.
+- Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION`
+  within a multi-statement query. Unfinished transactions roll back when the script ends.
+  Transaction modes, SQL UDF declarations inside transactions, writes to multiple projects (or both permanent and temporary tables),
+  and committing after a handled error are unsupported; roll back a failed transaction.
 - `UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
   has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
 - Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,

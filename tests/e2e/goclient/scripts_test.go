@@ -91,8 +91,9 @@ func TestMultiStatementQueryRejectsUnsupportedForms(t *testing.T) {
 	for _, sql := range []string{
 		"EXECUTE IMMEDIATE 'SELECT 1'; SELECT 2",
 		"CALL d.p(); SELECT 1",
+		"BEGIN TRANSACTION; CREATE TEMP FUNCTION f(x INT64) AS (x); ROLLBACK TRANSACTION",
+		"BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END",
 		"SET @@time_zone = 'Asia/Tokyo'; SELECT CURRENT_DATE()",
-		"BEGIN BEGIN TRANSACTION; COMMIT TRANSACTION; EXCEPTION WHEN ERROR THEN SELECT 1; END",
 	} {
 		_, _, err := runScript(t, client, "", sql)
 		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
@@ -325,5 +326,56 @@ SELECT StringIdentity(@value) AS answer`)
 	// StringIdentity('a') is recorded in GoogleSQL's call_sql_udf.test.
 	if row.Answer != "a" {
 		t.Errorf("got %q, want a", row.Answer)
+	}
+}
+
+// Transaction changes persist only on commit, including when a script exits or fails.
+// https://cloud.google.com/bigquery/docs/transactions
+func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_transactions")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE t AS SELECT 1 AS x"); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, sql string
+		fails     bool
+		want      int64
+	}{
+		{"commit", "BEGIN TRANSACTION; UPDATE t SET x = 2 WHERE TRUE; COMMIT TRANSACTION", false, 2},
+		{"multiple databases", "CREATE TEMP TABLE tmp (x INT64); BEGIN TRANSACTION; INSERT t VALUES (3); INSERT tmp VALUES (4); COMMIT TRANSACTION", true, 2},
+		{"rollback", "BEGIN TRANSACTION; DELETE t WHERE TRUE; ROLLBACK TRANSACTION", false, 2},
+		{"unfinished", "BEGIN TRANSACTION; UPDATE t SET x = 3 WHERE TRUE; SELECT x FROM t", false, 2},
+		{"return", "BEGIN TRANSACTION; UPDATE t SET x = 3 WHERE TRUE; RETURN", false, 2},
+		{"failed", "BEGIN TRANSACTION; UPDATE t SET x = 3 WHERE TRUE; SELECT 1 / 0", true, 2},
+		{"permanent DDL", "BEGIN TRANSACTION; CREATE TABLE forbidden (x INT64); COMMIT TRANSACTION", true, 2},
+		{"nested", "BEGIN TRANSACTION; BEGIN TRANSACTION; COMMIT TRANSACTION", true, 2},
+		{"commit without begin", "SELECT 1; COMMIT TRANSACTION", true, 2},
+		{"rollback without begin", "SELECT 1; ROLLBACK TRANSACTION", true, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := runScript(t, client, dataset.DatasetID, tc.sql)
+			if (err != nil) != tc.fails {
+				t.Fatalf("got %v, want failure %v", err, tc.fails)
+			}
+			job, _, err := runScript(t, client, dataset.DatasetID, "SELECT SUM(x) AS x FROM t")
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows, err := job.Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var row struct{ X int64 }
+			if err := rows.Next(&row); err != nil || row.X != tc.want {
+				t.Fatalf("got %d and %v, want %d", row.X, err, tc.want)
+			}
+		})
 	}
 }
