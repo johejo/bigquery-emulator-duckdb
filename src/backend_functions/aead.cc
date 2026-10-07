@@ -37,7 +37,7 @@ constexpr uint64_t kCrunchy = 4;
 struct Field {
   uint64_t number = 0;
   uint64_t varint = 0;
-  std::string_view bytes;
+  std::string_view bytes = {};
 };
 
 bool ReadVarint(std::string_view& data, uint64_t& value) {
