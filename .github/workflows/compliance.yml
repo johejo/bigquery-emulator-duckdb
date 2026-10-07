@@ -67,7 +67,7 @@ jobs:
 
       - name: Build
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/build.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/build.bep.json --profile=$RUNNER_TEMP/bazel-reports/build.profile.json.gz" >> .bazelrc.local
           nix develop --command bazelisk build //:compliance_test
       # Save after the build so test failures do not discard compiled dependencies. Only main
       # pushes save caches; pull requests and manual runs reuse them.
@@ -83,12 +83,17 @@ jobs:
       - name: Compliance tests
         id: tests
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/compliance.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/compliance.bep.json --profile=$RUNNER_TEMP/bazel-reports/compliance.profile.json.gz" >> .bazelrc.local
           nix develop --command just compliance --test_output=summary
-      - name: Bazel summary
+      - name: Upload Bazel reports
         if: success() || failure()
         continue-on-error: true
-        run: nix develop --command just bazel-summary "$RUNNER_TEMP/bazel-reports" >> "$GITHUB_STEP_SUMMARY"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bazel-reports-compliance-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/bazel-reports/
+          retention-days: 7
+          if-no-files-found: ignore
       # A shard that did not finish, such as one that timed out, fails this step.
       - name: Summary
         if: (success() || failure()) && steps.tests.outcome != 'skipped'
