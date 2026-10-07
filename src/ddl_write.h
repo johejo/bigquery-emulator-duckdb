@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/translator.h"
@@ -38,6 +39,18 @@ DdlWrite CreateTableWrite(const TableDefinition& definition);
 
 // What CREATE VIEW of `view` runs besides itself.
 DdlWrite CreateViewWrite(const ViewDefinition& view);
+
+// The statements that apply `alteration` to its table, whose BigQuery schema and metadata are
+// `schema` and `metadata` when it runs, or none when its actions all have nothing to do. Throws
+// ApiError::Invalid for an action BigQuery rejects.
+std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
+                                              std::vector<FieldSchema> schema,
+                                              TableMetadata metadata);
+
+// The statements that apply `alteration` to its dataset, whose metadata is `metadata` when it
+// runs. Throws ApiError::Invalid for labels BigQuery rejects.
+std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alteration,
+                                                DatasetMetadata metadata);
 
 // What a translated statement runs besides itself, if it records metadata.
 std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement);

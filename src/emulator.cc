@@ -550,11 +550,15 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
-    QueryResult result =
-        request.dry_run ? Prepare(translation.sql, setup)
-                        : WriteDestination(request.project_id, *request.destination_table,
-                                           request.create_disposition, request.write_disposition,
-                                           translation.sql, *translation.result_schema, setup);
+    QueryResult result;
+    if (!request.dry_run) {
+      result = WriteDestination(request.project_id, *request.destination_table,
+                                request.create_disposition, request.write_disposition,
+                                translation.sql, *translation.result_schema, setup);
+    } else if (!AlterationStatements(translation).has_value()) {
+      // A dry run checks an alteration against the table or dataset without running it.
+      result = Prepare(translation.sql, setup);
+    }
     if (translation.result_schema.has_value()) {
       result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
     }
@@ -566,7 +570,13 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    const std::vector<std::string>& setup, bool null_arrays) {
   CheckDdlTarget(translation);
   QueryResult result;
-  if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
+  if (const std::optional<std::vector<std::string>> statements =
+          AlterationStatements(translation)) {
+    if (!statements->empty()) {
+      backend_.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
+                          setup);
+    }
+  } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
     backend_.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
   } else {
     result = Execute(translation.sql, setup, null_arrays);
@@ -575,6 +585,39 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
     result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
   }
   return result;
+}
+
+std::optional<std::vector<std::string>> Emulator::AlterationStatements(
+    const TranslatedStatement& translation) {
+  if (const auto& alteration = translation.altered_table) {
+    const TableReference& table = alteration->table;
+    if (ViewComment(backend_, table).has_value()) {
+      throw ApiError::Invalid("ALTER TABLE cannot alter view " + TableName(table));
+    }
+    const std::optional<json> comment =
+        RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    if (!comment.has_value()) {
+      if (alteration->if_exists) {
+        return std::vector<std::string>{};
+      }
+      throw ApiError::NotFound("Not found: Table " + TableName(table));
+    }
+    return AlterTableStatements(*alteration, TableSchema(backend_, table),
+                                CommentMetadata(*comment));
+  }
+  if (const auto& alteration = translation.altered_dataset) {
+    const DatasetReference& dataset = alteration->dataset;
+    const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
+    if (result.rows.empty()) {
+      if (alteration->if_exists) {
+        return std::vector<std::string>{};
+      }
+      throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" +
+                               dataset.dataset_id);
+    }
+    return AlterDatasetStatements(*alteration, ParseDatasetMetadata(result.rows[0]["f"][1]["v"]));
+  }
+  return std::nullopt;
 }
 
 std::unique_ptr<TableSource> Emulator::NewTableSource() {

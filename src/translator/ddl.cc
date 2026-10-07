@@ -223,6 +223,27 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
   return metadata;
 }
 
+// The description, friendly name and labels SET OPTIONS of `statement` sets on `updates`. The
+// other options change how BigQuery stores, expires or reads the table or dataset, which the
+// emulator does not emulate, so they are unsupported, and so are += and -=.
+bool SetOptions(const Options& options, std::string_view statement, const Scope& scope,
+                OptionUpdates& updates) {
+  for (const auto& option : options) {
+    const std::string name = ToLowerAscii(option->name());
+    const googlesql::Value* value = OptionLiteral(*option);
+    const bool applied =
+        value != nullptr &&
+        ((name == "description" && StringOption(*value, updates.description.emplace())) ||
+         (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
+         (name == "labels" && LabelsOption(*value, updates.labels.emplace())));
+    if (!applied) {
+      Unsupported(scope, std::string(statement) + " option " + option->name());
+      return false;
+    }
+  }
+  return true;
+}
+
 // Records NOT NULL as REQUIRED and the description in OPTIONS on `field`, and the same for the
 // fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
@@ -566,41 +587,73 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 
 }  // namespace
 
+// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO and SET OPTIONS, which the emulator applies to the
+// table as it is when the statement runs.
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
-  // DuckDB accepts only one action per ALTER. Reject the whole statement rather than
-  // applying only some of its actions.
-  if (alter.alter_action_list_size() != 1) {
-    return Unsupported(scope, "ALTER TABLE with multiple actions");
-  }
-  const auto& action = *alter.alter_action_list(0);
-  if (!action.Is<googlesql::ResolvedAddColumnAction>()) {
-    return Unsupported(scope, "ALTER TABLE action " + action.node_kind_string());
-  }
-  const auto& add = *action.GetAs<googlesql::ResolvedAddColumnAction>();
-  const auto& column = *add.column_definition();
-  if (column.is_hidden() || column.generated_column_info() != nullptr ||
-      column.default_value() != nullptr ||
-      (column.annotations() != nullptr && column.annotations()->not_null())) {
-    return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
-  }
   const auto path = TargetTable(alter.name_path(), scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
-  const auto type = ColumnDefinitionType(column, scope);
-  auto field = ColumnField(column, scope);
-  if (!path || !target || !type || !field) {
+  if (!path || !target) {
     return std::nullopt;
   }
-  scope.context.added_column = AddedColumn{.table = *target,
-                                           .field = *std::move(field),
-                                           .if_table_exists = alter.is_if_exists(),
-                                           .if_column_not_exists = add.is_if_not_exists()};
-  // Existing rows read an added ARRAY column as empty, as rows that leave it out later do; see
-  // RepeatedColumnDefaultStatements.
-  return std::string("ALTER TABLE ") + (alter.is_if_exists() ? "IF EXISTS " : "") + *path +
-         " ADD COLUMN " + (add.is_if_not_exists() ? "IF NOT EXISTS " : "") +
-         QuoteIdentifier(column.name()) + " " + *type +
-         (column.type()->IsArray() ? " DEFAULT []" : "");
+  TableAlteration alteration{.table = *target, .if_exists = alter.is_if_exists()};
+  for (const auto& action : alter.alter_action_list()) {
+    // BigQuery documents a list of ADD COLUMN or of DROP COLUMN actions, but not a mix of kinds.
+    if (action->node_kind() != alter.alter_action_list(0)->node_kind()) {
+      return Unsupported(scope, "ALTER TABLE with different kinds of actions");
+    }
+    if (action->Is<googlesql::ResolvedAddColumnAction>()) {
+      const auto& add = *action->GetAs<googlesql::ResolvedAddColumnAction>();
+      const auto& column = *add.column_definition();
+      if (column.is_hidden() || column.generated_column_info() != nullptr ||
+          column.default_value() != nullptr ||
+          (column.annotations() != nullptr && column.annotations()->not_null())) {
+        return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
+      }
+      auto field = ColumnField(column, scope);
+      if (!ColumnDefinitionType(column, scope) || !field) {
+        return std::nullopt;
+      }
+      alteration.actions.emplace_back(
+          AddColumnAction{.field = *std::move(field), .if_not_exists = add.is_if_not_exists()});
+    } else if (action->Is<googlesql::ResolvedDropColumnAction>()) {
+      const auto& drop = *action->GetAs<googlesql::ResolvedDropColumnAction>();
+      alteration.actions.emplace_back(
+          DropColumnAction{.name = drop.name(), .if_exists = drop.is_if_exists()});
+    } else if (action->Is<googlesql::ResolvedRenameToAction>()) {
+      // BigQuery takes only the new name of the table, which stays in its dataset.
+      const auto& new_path = action->GetAs<googlesql::ResolvedRenameToAction>()->new_path();
+      if (new_path.size() != 1 || new_path[0].find('.') != std::string::npos) {
+        return Unsupported(scope, "RENAME TO a table path");
+      }
+      alteration.actions.emplace_back(RenameTableAction{.table_id = new_path[0]});
+    } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
+      OptionUpdates updates;
+      if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
+                      "ALTER TABLE", scope, updates)) {
+        return std::nullopt;
+      }
+      alteration.actions.emplace_back(std::move(updates));
+    } else {
+      return Unsupported(scope, "ALTER TABLE action " + action->node_kind_string());
+    }
+  }
+  scope.context.altered_table = std::move(alteration);
+  return "";
+}
+
+// The analyzer gives an ALTER TABLE with only SET OPTIONS actions as this statement.
+std::optional<std::string> AlterTableSetOptions(
+    const googlesql::ResolvedAlterTableSetOptionsStmt& alter, const Scope& scope) {
+  const auto path = TargetTable(alter.name_path(), scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  OptionUpdates updates;
+  if (!path || !target || !SetOptions(alter.option_list(), "ALTER TABLE", scope, updates)) {
+    return std::nullopt;
+  }
+  scope.context.altered_table = TableAlteration{
+      .table = *target, .actions = {std::move(updates)}, .if_exists = alter.is_if_exists()};
+  return "";
 }
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
@@ -775,6 +828,29 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
     default:
       return "CREATE SCHEMA " + *path;
   }
+}
+
+// ALTER SCHEMA SET OPTIONS, which the emulator applies to the dataset as it is when the statement
+// runs.
+std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt& alter,
+                                       const Scope& scope) {
+  const auto path = TargetDataset(alter.name_path(), scope);
+  const std::optional<DatasetReference>& dataset = scope.context.ddl_target_dataset;
+  if (!path || !dataset) {
+    return std::nullopt;
+  }
+  DatasetAlteration alteration{.dataset = *dataset, .if_exists = alter.is_if_exists()};
+  for (const auto& action : alter.alter_action_list()) {
+    if (!action->Is<googlesql::ResolvedSetOptionsAction>()) {
+      return Unsupported(scope, "ALTER SCHEMA action " + action->node_kind_string());
+    }
+    if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
+                    "ALTER SCHEMA", scope, alteration.options)) {
+      return std::nullopt;
+    }
+  }
+  scope.context.altered_dataset = std::move(alteration);
+  return "";
 }
 
 std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope) {

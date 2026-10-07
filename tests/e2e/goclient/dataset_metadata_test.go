@@ -77,6 +77,18 @@ func TestDatasetMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(ddl, metadata{"from DDL", "DDL", map[string]string{"env": "prod"}})
+	// ALTER SCHEMA SET OPTIONS replaces the options it sets, labels included, and leaves the others.
+	if err := run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (description = 'altered', labels = [('tier', '1')])"); err != nil {
+		t.Fatal(err)
+	}
+	check(ddl, metadata{"altered", "DDL", map[string]string{"tier": "1"}})
+	if err := run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (friendly_name = NULL)"); err != nil {
+		t.Fatal(err)
+	}
+	check(ddl, metadata{"altered", "", map[string]string{"tier": "1"}})
+	if err := run("ALTER SCHEMA IF EXISTS go_dataset_metadata_missing SET OPTIONS (description = 'x')"); err != nil {
+		t.Fatal(err)
+	}
 	// A dataset created again after a drop starts without metadata.
 	if err := run("DROP SCHEMA go_dataset_metadata_ddl"); err != nil {
 		t.Fatal(err)
@@ -94,7 +106,9 @@ func TestDatasetMetadata(t *testing.T) {
 		"must start with a lowercase letter": client.Dataset("go_dataset_metadata_labeled").Create(ctx, &bigquery.DatasetMetadata{
 			Labels: map[string]string{"Env": "prod"},
 		}),
-		"CREATE SCHEMA option default_table_expiration_days": run("CREATE SCHEMA go_dataset_metadata_expiring OPTIONS (default_table_expiration_days = 1)"),
+		"CREATE SCHEMA option default_table_expiration_days":  run("CREATE SCHEMA go_dataset_metadata_expiring OPTIONS (default_table_expiration_days = 1)"),
+		"ALTER SCHEMA option default_table_expiration_days":   run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (default_table_expiration_days = 1)"),
+		"Not found: Dataset test:go_dataset_metadata_missing": run("ALTER SCHEMA go_dataset_metadata_missing SET OPTIONS (description = 'x')"),
 		// DuckDB's own schemas, where the emulator keeps dataset metadata, are not datasets.
 		"Table not found: main.emulator_datasets": run("SELECT * FROM main.emulator_datasets"),
 		"Not found: Dataset test:main":            run("DROP TABLE main.emulator_datasets"),

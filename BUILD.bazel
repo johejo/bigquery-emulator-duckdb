@@ -356,9 +356,12 @@ cc_library(
     hdrs = ["src/ddl_write.h"],
     copts = ["-std=c++20"],
     deps = [
+        ":api_error",
         ":column_metadata",
         ":duckdb_sql",
+        ":field_schema",
         ":references",
+        ":schema_sql",
         ":table_comments",
         ":table_metadata",
         ":translator",

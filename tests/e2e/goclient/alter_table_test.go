@@ -3,6 +3,7 @@ package goclient
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -38,6 +39,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 		"ALTER TABLE IF EXISTS missing ADD COLUMN x INT64",
 		"ALTER TABLE users ADD COLUMN tags ARRAY<STRING>",
 		"ALTER TABLE users ADD COLUMN details STRUCT<score INT64>",
+		"ALTER TABLE users ADD COLUMN IF NOT EXISTS name STRING, ADD COLUMN score FLOAT64",
 	} {
 		if err := run(sql); err != nil {
 			t.Fatalf("%s: %v", sql, err)
@@ -55,6 +57,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 		{Name: "details", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
 			{Name: "score", Type: bigquery.IntegerFieldType},
 		}},
+		{Name: "score", Type: bigquery.FloatFieldType},
 	}
 	if !reflect.DeepEqual(metadata.Schema, wantSchema) {
 		t.Fatalf("schema = %#v, want %#v", metadata.Schema, wantSchema)
@@ -63,7 +66,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 	if err := table.Read(ctx).Next(&row); err != nil {
 		t.Fatal(err)
 	}
-	if len(row) != 4 || row[0] != int64(1) || row[1] != nil || row[3] != nil {
+	if len(row) != 5 || row[0] != int64(1) || row[1] != nil || row[3] != nil || row[4] != nil {
 		t.Fatalf("existing row = %#v; added nullable columns must be NULL", row)
 	}
 	if tags, ok := row[2].([]bigquery.Value); !ok || len(tags) != 0 {
@@ -71,7 +74,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 	}
 	for _, sql := range []string{
 		"ALTER TABLE users ADD COLUMN name INT64",
-		"ALTER TABLE users ADD COLUMN partial INT64, ADD COLUMN other STRING",
+		"ALTER TABLE users ADD COLUMN partial INT64, ADD COLUMN name INT64",
 		"ALTER TABLE users ADD COLUMN partial INT64, DROP COLUMN name",
 		"ALTER TABLE users ADD COLUMN defaulted INT64 DEFAULT 5",
 		"ALTER TABLE users ADD COLUMN required INT64 NOT NULL",
@@ -111,4 +114,159 @@ func TestAlterTableAddColumn(t *testing.T) {
 	if err := rows.Next(&row); err != iterator.Done {
 		t.Fatalf("end of rows: %v", err)
 	}
+}
+
+func TestAlterTableDropColumnAndRename(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_alter_drop")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) error {
+		query := client.Query(sql)
+		query.DefaultDatasetID = dataset.DatasetID
+		job, err := query.Run(ctx)
+		if err != nil {
+			return err
+		}
+		status, err := job.Wait(ctx)
+		if err != nil {
+			return err
+		}
+		return status.Err()
+	}
+	for _, sql := range []string{
+		`CREATE TABLE events (id INT64, day DATE, name STRING, note STRING, extra STRING)
+		 PARTITION BY day CLUSTER BY name OPTIONS (description = 'events')`,
+		"INSERT events (id, day, name, note, extra) VALUES (1, DATE '2024-01-01', 'a', 'n', 'x')",
+		"ALTER TABLE events DROP COLUMN note, DROP COLUMN IF EXISTS missing, DROP COLUMN IF EXISTS EXTRA",
+		"ALTER TABLE IF EXISTS missing DROP COLUMN id",
+		"ALTER TABLE events RENAME TO renamed",
+		"ALTER TABLE IF EXISTS missing RENAME TO other",
+		"CREATE TABLE taken (id INT64)",
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	if _, err := dataset.Table("events").Metadata(ctx); err == nil {
+		t.Fatal("the renamed table is still there under its old name")
+	}
+	wantSchema := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		{Name: "day", Type: bigquery.DateFieldType},
+		{Name: "name", Type: bigquery.StringFieldType},
+	}
+	check := func() {
+		t.Helper()
+		metadata, err := dataset.Table("renamed").Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(metadata.Schema, wantSchema) {
+			t.Fatalf("schema = %#v, want %#v", metadata.Schema, wantSchema)
+		}
+		if metadata.Description != "events" ||
+			!reflect.DeepEqual(metadata.TimePartitioning, &bigquery.TimePartitioning{Type: bigquery.DayPartitioningType, Field: "day"}) ||
+			!reflect.DeepEqual(metadata.Clustering, &bigquery.Clustering{Fields: []string{"name"}}) {
+			t.Fatalf("description = %q, partitioning = %+v, clustering = %+v", metadata.Description,
+				metadata.TimePartitioning, metadata.Clustering)
+		}
+	}
+	check()
+	rows, err := client.Query("SELECT id, name FROM go_alter_drop.renamed").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil || !reflect.DeepEqual(row, []bigquery.Value{int64(1), "a"}) {
+		t.Fatalf("row = %#v, error = %v", row, err)
+	}
+
+	for _, sql := range []string{
+		"ALTER TABLE renamed DROP COLUMN day",
+		"ALTER TABLE renamed DROP COLUMN name",
+		"ALTER TABLE renamed DROP COLUMN id, DROP COLUMN name",
+		"ALTER TABLE renamed DROP COLUMN missing",
+		"ALTER TABLE renamed RENAME TO taken",
+		"ALTER TABLE renamed RENAME TO go_alter_drop.other",
+		"ALTER TABLE missing DROP COLUMN id",
+	} {
+		if err := run(sql); err == nil {
+			t.Fatalf("%s unexpectedly succeeded", sql)
+		}
+	}
+	check()
+}
+
+func TestAlterTableSetOptions(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_alter_options")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) error {
+		query := client.Query(sql)
+		query.DefaultDatasetID = dataset.DatasetID
+		job, err := query.Run(ctx)
+		if err != nil {
+			return err
+		}
+		status, err := job.Wait(ctx)
+		if err != nil {
+			return err
+		}
+		return status.Err()
+	}
+	type metadata struct {
+		Description, Name string
+		Labels            map[string]string
+	}
+	check := func(want metadata) {
+		t.Helper()
+		got, err := dataset.Table("t").Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if g := (metadata{got.Description, got.Name, got.Labels}); !reflect.DeepEqual(g, want) {
+			t.Fatalf("got %+v, want %+v", g, want)
+		}
+		if !reflect.DeepEqual(got.TimePartitioning, &bigquery.TimePartitioning{Type: bigquery.DayPartitioningType, Field: "day"}) {
+			t.Fatalf("partitioning = %+v", got.TimePartitioning)
+		}
+	}
+	if err := run(`CREATE TABLE t (id INT64, day DATE) PARTITION BY day
+		OPTIONS (description = 'old', friendly_name = 'Old', labels = [('env', 'dev'), ('team', 'data')])`); err != nil {
+		t.Fatal(err)
+	}
+	// Each option set replaces the table's value, labels included, and leaves the others.
+	if err := run("ALTER TABLE t SET OPTIONS (description = 'new', labels = [('env', 'prod')])"); err != nil {
+		t.Fatal(err)
+	}
+	check(metadata{"new", "Old", map[string]string{"env": "prod"}})
+	// NULL clears an option.
+	if err := run("ALTER TABLE t SET OPTIONS (description = NULL, friendly_name = NULL)"); err != nil {
+		t.Fatal(err)
+	}
+	check(metadata{"", "", map[string]string{"env": "prod"}})
+	if err := run("ALTER TABLE IF EXISTS missing SET OPTIONS (description = 'x')"); err != nil {
+		t.Fatal(err)
+	}
+
+	for sql, want := range map[string]string{
+		"ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "ALTER TABLE option expiration_timestamp",
+		"ALTER TABLE t SET OPTIONS (require_partition_filter = TRUE)":                            "ALTER TABLE option require_partition_filter",
+		"ALTER TABLE t SET OPTIONS (labels = [('Env', 'prod')])":                                 "must start with a lowercase letter",
+	} {
+		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
+		}
+	}
+	check(metadata{"", "", map[string]string{"env": "prod"}})
 }

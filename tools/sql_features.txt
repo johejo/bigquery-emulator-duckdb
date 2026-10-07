@@ -165,10 +165,12 @@ query `ALTER TABLE` | ALTER TABLE t ADD COLUMN IF NOT EXISTS name STRING
 query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ADD COLUMN x INT64
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, ADD COLUMN y STRING
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64 DEFAULT 5
-note `ALTER TABLE` | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported.
-query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name
+query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name, DROP COLUMN IF EXISTS missing
 query `ALTER TABLE` | ALTER TABLE t RENAME TO n
-query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x')
+query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x', friendly_name = 'T', labels = [('k', 'v')])
+query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
+query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, DROP COLUMN name
+note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN or DROP COLUMN actions. SET OPTIONS stores the description, friendly name and labels; other options are unsupported. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
@@ -179,7 +181,10 @@ note `CREATE SCHEMA` | Stores the description, friendly name and labels; every d
 query `CREATE OR REPLACE SCHEMA` | CREATE OR REPLACE SCHEMA e
 query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
 query `DROP SCHEMA` | DROP SCHEMA d CASCADE
-query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x')
+query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x', friendly_name = 'D', labels = [('k', 'v')])
+query `ALTER SCHEMA` | ALTER SCHEMA IF EXISTS missing SET OPTIONS (description = 'x')
+query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (default_table_expiration_days = 1)
+note `ALTER SCHEMA` | Supports SET OPTIONS, which stores the description, friendly name and labels; other options and actions are unsupported.
 query `CREATE VIEW` | CREATE VIEW n AS SELECT id FROM t
 query `CREATE VIEW` | CREATE OR REPLACE VIEW n AS SELECT name FROM t
 query `CREATE VIEW` | CREATE VIEW IF NOT EXISTS n AS SELECT id FROM t
