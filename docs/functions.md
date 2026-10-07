@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 14 |
-| Supported | 236 |
+| Partial | 12 |
+| Supported | 238 |
 | Unsupported | 143 |
 | Untested | 13 |
 
@@ -128,7 +128,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_BYTES |
 | [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_STRING |
 | [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_ENCRYPT |
-| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Partial | DuckDB SQL | function DIV |
+| [`DIV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div) | mathematical_functions | Supported | DuckDB SQL |  |
 | [`DLP_DETERMINISTIC_DECRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_decrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
 | [`DLP_DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_deterministic_encrypt) | dlp_functions | Unsupported |  | the analyzer does not know this function |
 | [`DLP_KEY_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/dlp_functions#dlp_key_chain) | dlp_functions | Unsupported |  | the analyzer does not know this function |
@@ -155,7 +155,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported | DuckDB SQL |  |
 | [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported |  | the analyzer does not know this function |
-| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Partial | DuckDB SQL | function GENERATE_ARRAY |
+| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Supported | DuckDB SQL |  |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | DuckDB SQL | takes only a DAY or WEEK step |
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported | DuckDB SQL |  |

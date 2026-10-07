@@ -419,9 +419,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          {},
          {},
          {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}}}},
-      // DuckDB's divide() of DECIMAL values returns a DOUBLE, so NUMERIC is unsupported.
+      // DuckDB's divide() of DECIMAL values returns a DOUBLE; GoogleSQL computes the exact
+      // NUMERIC quotient and checks overflow.
       {"DIV",
        {BigNumericOperator("bq_bignumeric_div", 2),
+        {2, "bq_div_numeric($1, $2)", {Is(1, {TYPE_NUMERIC})}},
         {2,
          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE divide($1, $2) "
          "END",
@@ -561,9 +563,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
          "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), hex($2)))",
          {Is(2, {TYPE_BYTES})}}}},
       // generate_series() has no floating point overload, and returns an empty list for a zero
-      // step, which BigQuery rejects. BIGNUMERIC goes to GoogleSQL's implementation.
+      // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
       {"GENERATE_ARRAY",
-       {{{2, 3},
+       {{{2, 3}, "bq_generate_array_numeric($1, $2, $3)", {Is(1, {TYPE_NUMERIC})}, {"1"}},
+        {{2, 3}, "bq_generate_array($1, $2, $3)", {Is(1, {TYPE_DOUBLE})}, {"1"}},
+        {{2, 3},
          "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR), "
          "CAST($3 AS VARCHAR)), _e -> CAST(_e AS BIGNUM))",
          {Is(1, {TYPE_BIGNUMERIC})},

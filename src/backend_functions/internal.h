@@ -117,21 +117,18 @@ inline void SetResult(duckdb_vector output, idx_t row, const std::string& value)
   duckdb_vector_assign_string_element_len(output, row, value.data(), value.size());
 }
 
-// An ARRAY<STRING> or ARRAY<BYTES>, appended to the list's child vector, where a null element
-// is NULL.
+template <typename T>
+void SetResult(duckdb_vector output, idx_t row, const std::optional<T>& value);
+
+// An array appended to the list's child vector, where a null element is NULL.
 template <typename Element>
 void SetResult(duckdb_vector output, idx_t row, const std::vector<Element>& values) {
   const idx_t offset = duckdb_list_vector_get_size(output);
   duckdb_list_vector_reserve(output, offset + values.size());
   duckdb_vector child = duckdb_list_vector_get_child(output);
+  duckdb_vector_ensure_validity_writable(child);
   for (idx_t i = 0; i < values.size(); ++i) {
-    const std::optional<std::string>& value = values[i];
-    if (value) {
-      duckdb_vector_assign_string_element_len(child, offset + i, value->data(), value->size());
-    } else {
-      duckdb_vector_ensure_validity_writable(child);
-      duckdb_validity_set_row_invalid(duckdb_vector_get_validity(child), offset + i);
-    }
+    SetResult(child, offset + i, values[i]);
   }
   duckdb_list_vector_set_size(output, offset + values.size());
   static_cast<duckdb_list_entry*>(duckdb_vector_get_data(output))[row] = {offset, values.size()};

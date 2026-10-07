@@ -1,0 +1,187 @@
+## NUMERIC integer division and NUMERIC / FLOAT64 sequences
+
+# BigQuery mathematical_functions#div: integer division truncates toward zero and
+# returns NUMERIC for NUMERIC arguments, including fractional operands and
+# maximum values whose integral quotient stays in range.
+SELECT DIV(NUMERIC '20', 3)
+=> "6"
+
+SELECT DIV(12, NUMERIC '-7')
+=> "-1"
+
+SELECT DIV(NUMERIC '5', NUMERIC '2.3')
+=> "2"
+
+SELECT DIV(NUMERIC '-5.2', NUMERIC '-2')
+=> "2"
+
+SELECT DIV(NUMERIC '1', 3)
+=> "0"
+
+SELECT DIV(NUMERIC '99999999999999999999999999999.999999999', 3)
+=> "33333333333333333333333333333"
+
+SELECT DIV(NUMERIC '-99999999999999999999999999999.999999999', -1)
+=> "99999999999999999999999999999"
+
+SELECT SAFE.DIV(NUMERIC '1', 0)
+=> null
+
+SELECT SAFE.DIV(NUMERIC '1e20', NUMERIC '1e-9')
+=> null
+
+SELECT DIV(CAST(NULL AS NUMERIC), 0)
+=> null
+
+SELECT DIV(NUMERIC '1', NULL)
+=> null
+
+# BigQuery array_functions#generate_array: inclusive bounds, default step 1,
+# empty ranges, NULL arguments and zero/NaN errors. Fractional and boundary
+# cases come from GoogleSQL's functions_testlib_generate_array.cc.
+SELECT GENERATE_ARRAY(NUMERIC '0', 3) = [NUMERIC '0', 1, 2, 3]
+=> "true"
+
+SELECT GENERATE_ARRAY(1, NUMERIC '11', 3) = [NUMERIC '1', 4, 7, 10]
+=> "true"
+
+SELECT GENERATE_ARRAY(NUMERIC '11', 1, -4) = [NUMERIC '11', 7, 3]
+=> "true"
+
+SELECT GENERATE_ARRAY(NUMERIC '0', NUMERIC '0.000000001', NUMERIC '0.000000001') = [NUMERIC '0', NUMERIC '0.000000001']
+=> "true"
+
+SELECT GENERATE_ARRAY(NUMERIC '-1.618033988', 3) = [NUMERIC '-1.618033988', NUMERIC '-0.618033988', NUMERIC '0.381966012', NUMERIC '1.381966012', NUMERIC '2.381966012']
+=> "true"
+
+SELECT GENERATE_ARRAY(x, x, 1) = [x] FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999']) x
+=> "true"
+
+SELECT ARRAY_LENGTH(GENERATE_ARRAY(NUMERIC '3', 0, 3))
+=> "0"
+
+SELECT GENERATE_ARRAY(NUMERIC '0', NULL) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(CAST(NULL AS NUMERIC), 3, 0) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(NUMERIC '0', 3, NULL) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(NUMERIC '1', 2, 0) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(1.0, 3) = [1.0, 2.0, 3.0]
+=> "true"
+
+SELECT GENERATE_ARRAY(10.0, 19, 5) = [10.0, 15.0]
+=> "true"
+
+SELECT GENERATE_ARRAY(8.0, 4, -2) = [8.0, 6.0, 4.0]
+=> "true"
+
+SELECT GENERATE_ARRAY(2.0, 2) = [2.0]
+=> "true"
+
+SELECT ABS(a[OFFSET(1)] - 13.33) < 1e-12 AND ABS(a[OFFSET(3)] - 19.99) < 1e-12 AND ARRAY_LENGTH(a) = 4 FROM (SELECT GENERATE_ARRAY(10.0, 20, 3.33) a)
+=> "true"
+
+SELECT ABS(a[OFFSET(5)] - 0.1) < 1e-15 AND ARRAY_LENGTH(a) = 6 FROM (SELECT GENERATE_ARRAY(0.05, 0.1, 0.01) a)
+=> "true"
+
+SELECT ARRAY_LENGTH(GENERATE_ARRAY(3.0, 1))
+=> "0"
+
+SELECT GENERATE_ARRAY(CAST(NULL AS FLOAT64), 3, 0) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(0.0, NULL) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(0.0, 3, NULL) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(1.0, 2, -0.0) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(CAST('NaN' AS FLOAT64), 2) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(1.0, CAST('NaN' AS FLOAT64)) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(1.0, 2, CAST('NaN' AS FLOAT64)) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(0.0, 10, CAST('+inf' AS FLOAT64)) IS NULL
+=> "true"
+
+SELECT GENERATE_ARRAY(CAST('+inf' AS FLOAT64), CAST('+inf' AS FLOAT64))[OFFSET(0)] = CAST('+inf' AS FLOAT64)
+=> "true"
+
+SELECT GENERATE_ARRAY(CAST('-inf' AS FLOAT64), CAST('-inf' AS FLOAT64))[OFFSET(0)] = CAST('-inf' AS FLOAT64)
+=> "true"
+
+# Multiple rows exercise appending numeric elements to DuckDB's list vectors.
+SELECT LOGICAL_AND(a = [x, x + 1, x + 2]) FROM (SELECT x, GENERATE_ARRAY(x, x + 2) a FROM UNNEST([NUMERIC '1', NUMERIC '4', NUMERIC '7']) x)
+=> "true"
+
+SELECT LOGICAL_AND(a = [x, x + 1, x + 2]) FROM (SELECT x, GENERATE_ARRAY(x, x + 2) a FROM UNNEST([1.0, 4.0, 7.0]) x)
+=> "true"
+
+SELECT COUNT(*) FROM UNNEST(GENERATE_ARRAY(NUMERIC '1', 1048576))
+=> "1048576"
+
+SELECT COUNT(*) FROM UNNEST(GENERATE_ARRAY(1.0, 1048576))
+=> "1048576"
+
+# Ordinary calls raise errors; SAFE. converts the same failures to NULL.
+BEGIN
+  SELECT DIV(NUMERIC '1', 0) IS NULL;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT DIV(NUMERIC '1e20', NUMERIC '1e-9') IS NULL;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT GENERATE_ARRAY(NUMERIC '1', 2, 0) IS NULL;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT GENERATE_ARRAY(1.0, 2, CAST('NaN' AS FLOAT64)) IS NULL;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+# A FLOAT64 step selects the FLOAT64 overload even with integral bounds.
+SELECT GENERATE_ARRAY(0, 1, 0.5) = [0.0, 0.5, 1.0]
+=> "true"
+
+SELECT SAFE.DIV(NUMERIC '-1e20', NUMERIC '1e-9')
+=> null
+
+SELECT GENERATE_ARRAY(CAST(NULL AS FLOAT64), 3, CAST('NaN' AS FLOAT64)) IS NULL
+=> "true"
+
+# The next value can overflow after the inclusive end has already been emitted.
+SELECT GENERATE_ARRAY(x - 1, x, 1) = [x - 1, x] FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999']) x
+=> "true"
+
+# BigQuery documents a hard limit of 1,048,576 elements for GENERATE_ARRAY.
+SELECT SAFE.GENERATE_ARRAY(NUMERIC '1', 1048577) IS NULL
+=> "true"
+
+SELECT SAFE.GENERATE_ARRAY(1.0, 1048577) IS NULL
+=> "true"
