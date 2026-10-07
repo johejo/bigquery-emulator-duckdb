@@ -124,6 +124,36 @@ std::vector<Rule> Substr() {
           {{2, 3}, "bq_substr_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"9223372036854775807"}}};
 }
 
+// RANGE_BUCKET counts boundaries <= the point, including duplicates. GoogleSQL implements it
+// only in the reference evaluator; DuckDB comparisons suffice for these scalar types once NULL,
+// NaN and descending boundaries have been rejected. Templates bind both arguments once.
+std::vector<Rule> RangeBucket() {
+  std::vector<Rule> rules;
+  for (const bool floating : {true, false}) {
+    const std::string nan_point = floating ? " OR isnan($1)" : "";
+    const std::string nan_elements =
+        floating ? " WHEN len(list_filter($2, _e -> isnan(_e))) > 0 THEN !2" : "";
+    std::string spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL";
+    spelling += nan_point;
+    spelling += " THEN NULL WHEN list_count($2) <> len($2) THEN !1";
+    spelling += nan_elements;
+    spelling +=
+        " WHEN len(list_filter($2, (_e, _i) -> _e < $2[_i - 1])) > 0 THEN !3 "
+        "ELSE len(list_filter($2, _e -> _e <= $1)) END";
+    rules.push_back(
+        {2,
+         std::move(spelling),
+         {floating ? Is(1, {TYPE_DOUBLE})
+                   : Is(1, {TYPE_INT64, TYPE_NUMERIC, TYPE_BIGNUMERIC, TYPE_BOOL, TYPE_STRING,
+                            TYPE_BYTES, TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})},
+         {},
+         {"'Elements in input array to RANGE_BUCKET cannot be null.'",
+          "'Elements in input array to RANGE_BUCKET cannot be NaN.'",
+          "'Elements in input array to RANGE_BUCKET must be in ascending order.'"}});
+  }
+  return rules;
+}
+
 // ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
 // its rounding away from zero, and the two then differ by one unit of the last digit.
 std::string RoundHalfEven() {
@@ -550,6 +580,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       {"ERROR", {{1, "!1", {}, {}, {"$1"}}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
+      {"RANGE_BUCKET", RangeBucket()},
       // DuckDB's array_to_string() skips NULL elements and has no NULL text.
       {"ARRAY_TO_STRING",
        {{2, "array_to_string($1, $2)", {Is(2, {TYPE_STRING})}},
@@ -1043,6 +1074,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "$IN_ARRAY",
       "GREATEST",
       "LEAST",
+      "RANGE_BUCKET",
       // Carrying values.
       "$CASE_NO_VALUE",
       "$CASE_WITH_VALUE",
