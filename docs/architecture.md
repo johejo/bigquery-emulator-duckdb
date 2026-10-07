@@ -47,6 +47,16 @@ are applied only at the output boundary, so duplicate or shadowed aliases never 
 DuckDB differs from BigQuery, the translator spells out BigQuery's semantics, such as default
 NULL ordering and result types.
 
+Nonempty STRUCT query values keep their GoogleSQL field names in the resolved type. DuckDB
+preserves distinct nonempty names and uses positional internal names for structs with anonymous
+or duplicate names, through `DuckDbStructFieldNames`. Construction and casts use the same mapping;
+field access and casts address fields by position. JSON functions receive the value together with
+its original field names, including names in nested arrays and structs, so internal names do not
+change JSON keys. Stored table columns continue to require distinct nonempty field names. Comparisons involving
+anonymous or duplicate fields remain unsupported because DuckDB's composite equality has
+different NULL semantics. Casts of these values to JSON and correlated aggregate subqueries
+returning them also remain unsupported; use the JSON functions for JSON conversion.
+
 The translator's sources in [src/translator/](../src/translator) share
 [internal.h](../src/translator/internal.h): a `Context` for the whole statement, and the `Scope`
 of what a scan can see besides its input. Expressions, scalar functions, scans, aggregation, DML,

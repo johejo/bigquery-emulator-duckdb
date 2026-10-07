@@ -1,0 +1,114 @@
+# STRUCT construction, positional casts and field access follow:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#struct_type
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_struct
+# Raw field values also follow GoogleSQL compliance testdata/struct_queries.test.
+
+SELECT STRUCT('abc', 3)
+=> {"f":[{"v":"abc"},{"v":"3"}]}
+
+SELECT STRUCT('abc' AS a, 3 AS a)
+=> {"f":[{"v":"abc"},{"v":"3"}]}
+
+# Names that collide with positional internal names remain accessible by their logical names.
+SELECT s._field_2 FROM (SELECT STRUCT('kept' AS _field_2, a + 0) AS s FROM t WHERE a = 1)
+=> "kept"
+
+SELECT CAST(s AS STRUCT<x INT64, y STRING>).y FROM (SELECT STRUCT(a + 0, CONCAT(b, '')) AS s FROM t WHERE a = 1)
+=> "x"
+
+SELECT CAST(s AS STRUCT<INT64, STRING>) FROM (SELECT STRUCT(a AS x, b AS y) AS s FROM t WHERE a = 1)
+=> {"f":[{"v":"1"},{"v":"x"}]}
+
+SELECT CAST(s AS STRUCT<x INT64, y STRING>).y FROM (SELECT STRUCT(a AS same, b AS same) AS s FROM t WHERE a = 1)
+=> "x"
+
+SELECT CAST(s AS STRUCT<x INT64, y STRING>) IS NULL FROM (SELECT CAST(NULL AS STRUCT<INT64, STRING>) AS s)
+=> "true"
+
+# SAFE_CAST fails the entire STRUCT when a field cannot be converted.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting
+SELECT SAFE_CAST(s AS STRUCT<INT64, INT64>) IS NULL FROM (SELECT STRUCT(b, a) AS s FROM t WHERE a = 1)
+=> "true"
+
+SELECT CAST(items AS ARRAY<STRUCT<x INT64, y STRING>>)[OFFSET(0)].y FROM (SELECT [STRUCT(a + 0, CONCAT(b, ''))] AS items FROM t WHERE a = 1)
+=> "x"
+
+# JSON names follow the JSON encodings reference and GoogleSQL functions_testlib_tojson.cc.
+# TO_JSON_STRING retains duplicate names and writes anonymous names as the empty string.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_encodings
+SELECT TO_JSON_STRING(STRUCT(a + 4 AS x, TRUE, 'bar' AS foo, DATE '2017-03-28' AS x)) FROM t WHERE a = 1
+=> "{\"x\":5,\"\":true,\"foo\":\"bar\",\"x\":\"2017-03-28\"}"
+
+SELECT TO_JSON_STRING([STRUCT(a + 0, CONCAT(b, ''))]) FROM t WHERE a = 1
+=> "[{\"\":1,\"\":\"x\"}]"
+
+SELECT JSON_VALUE(TO_JSON(STRUCT(a + 0, b AS label)), '$.label') FROM t WHERE a = 1
+=> "x"
+
+SELECT JSON_VALUE(JSON_ARRAY(STRUCT(a + 0, b AS label)), '$[0].label') FROM t WHERE a = 1
+=> "x"
+
+SELECT JSON_VALUE(JSON_OBJECT('item', STRUCT(a + 0, b AS label)), '$.item.label') FROM t WHERE a = 1
+=> "x"
+
+SELECT JSON_VALUE(JSON_OBJECT(['item'], [STRUCT(a + 0, b AS label)]), '$.item.label') FROM t WHERE a = 1
+=> "x"
+
+SELECT JSON_VALUE(JSON_SET(JSON '{}', '$.item', STRUCT(a + 0, b AS label)), '$.item.label') FROM t WHERE a = 1
+=> "x"
+
+# Script variables hold the logical type, including unnamed fields, across assignments.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#declare
+DECLARE s STRUCT<INT64, STRING> DEFAULT (1, 'x');
+SET s = (2, 'y');
+SELECT CAST(s AS STRUCT<a INT64, b STRING>).b
+=> "y"
+
+DECLARE items ARRAY<STRUCT<INT64, STRING>> DEFAULT [(1, 'x')];
+SELECT CAST(items AS ARRAY<STRUCT<a INT64, b STRING>>)[OFFSET(0)].b
+=> "x"
+
+DECLARE s DEFAULT STRUCT(1 AS a, 'x' AS a);
+SELECT CAST(s AS STRUCT<x INT64, y STRING>).y
+=> "x"
+
+DECLARE s STRUCT<inner_value STRUCT<INT64, STRING>> DEFAULT STRUCT(STRUCT(1, 'x'));
+SELECT CAST(s.inner_value AS STRUCT<a INT64, b STRING>).b
+=> "x"
+
+# A typed UDF receives and returns the same unnamed physical representation.
+# https://cloud.google.com/bigquery/docs/user-defined-functions
+CREATE TEMP FUNCTION identity(s STRUCT<INT64, STRING>) AS (s);
+SELECT CAST(identity(STRUCT(a + 0, CONCAT(b, ''))) AS STRUCT<x INT64, y STRING>).y FROM t WHERE a = 1
+=> "x"
+
+# Nested casts also match fields by position when the inner names differ.
+SELECT CAST(s AS STRUCT<inner_value STRUCT<x INT64, y STRING>>).inner_value.y FROM (SELECT STRUCT(STRUCT(a + 0, CONCAT(b, ''))) AS s FROM t WHERE a = 1)
+=> "x"
+
+SELECT SAFE_CAST(items AS ARRAY<STRUCT<INT64, INT64>>) IS NULL FROM (SELECT [STRUCT(a + 0, CONCAT(b, ''))] AS items FROM t WHERE a = 1)
+=> "true"
+
+SELECT TO_JSON_STRING(STRUCT(STRUCT(a + 0, CONCAT(b, '')) AS nested)) FROM t WHERE a = 1
+=> "{\"nested\":{\"\":1,\"\":\"x\"}}"
+
+SELECT STRUCT('abc' AS a, 3 AS A)
+=> {"f":[{"v":"abc"},{"v":"3"}]}
+
+SELECT COUNT(TO_JSON_STRING(STRUCT(a + 0, CONCAT(b, '')))) FROM t WHERE FALSE
+=> "0"
+
+SELECT CAST(s AS STRUCT<x INT64, y STRING>).x FROM (SELECT STRUCT(CAST(NULL AS INT64), b) AS s FROM t WHERE a = 1)
+=> null
+
+SELECT CAST(CAST(s AS STRUCT<INT64, STRING>) AS STRUCT<x INT64, y STRING>).y FROM (SELECT STRUCT(a AS x, b AS y) AS s FROM t WHERE a = 1)
+=> "x"
+
+# CASE compares its scalar operand and can still return an anonymous STRUCT.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case_expr
+SELECT TO_JSON_STRING(CASE a WHEN 1 THEN STRUCT(1, 2) ELSE STRUCT(3, 4) END) FROM t WHERE a = 1
+=> "{\"\":1,\"\":2}"
+
+# Metadata is constant across a chunk, while field values vary by row or remain constant.
+SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_JSON_STRING(STRUCT(x + 0, 'fixed')) FROM UNNEST([1, 2, 3]) AS x ORDER BY x), '|')
+=> "{\"\":1,\"\":\"fixed\"}|{\"\":2,\"\":\"fixed\"}|{\"\":3,\"\":\"fixed\"}"

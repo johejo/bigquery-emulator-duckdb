@@ -262,6 +262,7 @@ cc_library(
         "@googlesql//googlesql/public:type_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
+        "@nlohmann_json//:json",
     ],
 )
 

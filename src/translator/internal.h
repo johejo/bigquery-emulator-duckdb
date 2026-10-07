@@ -42,6 +42,9 @@ class Value;
 
 namespace bigquery_emulator_duckdb::translator {
 
+// Whether a value, including its nested fields, uses positional internal struct names.
+bool HasInternalStructNames(const googlesql::Type* type);
+
 // Each scan exposes synthetic names keyed by resolved column ID. User aliases only
 // appear at the query boundary, so duplicate names and nested scopes cannot collide.
 using Columns = std::map<int, std::string>;

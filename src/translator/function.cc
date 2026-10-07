@@ -1,6 +1,7 @@
 #include "googlesql/public/function.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -15,6 +16,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/translator/internal.h"
 
@@ -239,14 +241,30 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
 
 namespace {
 
-// An argument cast to the DuckDB type that stands for its GoogleSQL type, which the JSON
-// functions in src/backend_functions.cc read as a GoogleSQL value.
+// Original struct names in depth-first order. JSON semantics depend on names, including empty
+// and duplicate ones, while DuckDB may hold these fields under positional internal names.
+void JsonFieldNames(const googlesql::Type* type, std::vector<std::string>& names) {
+  if (type->IsArray()) {
+    JsonFieldNames(type->AsArray()->element_type(), names);
+  } else if (type->IsStruct()) {
+    for (const auto& field : type->AsStruct()->fields()) {
+      names.push_back(field.name);
+      JsonFieldNames(field.type, names);
+    }
+  }
+}
+
+// Pair each value with its original struct names, without evaluating the value twice. The
+// JSON backend reconstructs the GoogleSQL type from these names and the physical value type.
 std::optional<std::string> JsonArgument(const ScalarCall& call, size_t i) {
   const auto type = DuckDbType(TypeOf(call, i));
   if (!type) {
     return std::nullopt;
   }
-  return "CAST(" + call.arguments[i].sql + " AS " + *type + ")";
+  std::vector<std::string> names;
+  JsonFieldNames(TypeOf(call, i), names);
+  return "struct_pack(value := CAST(" + call.arguments[i].sql + " AS " + *type +
+         "), names := " + QuoteLiteral(nlohmann::json(names).dump()) + ")";
 }
 
 // The JSON arguments of a call, or nullopt when one has a type DuckDB cannot hold.
@@ -447,6 +465,31 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   if (!SupportsBigNumeric(function) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
+  }
+  // Supporting a new physical STRUCT shape does not make DuckDB's composite comparisons
+  // compatible: its equality treats NULL fields as values instead of propagating NULL. Keep
+  // these newly representable forms unsupported, including the implicit comparisons in CASE,
+  // NULLIF and IN, until their semantics are implemented.
+  static constexpr std::array<std::string_view, 12> comparisons = {
+      "$EQUAL",         "$NOT_EQUAL",        "$LESS",
+      "$LESS_OR_EQUAL", "$GREATER",          "$GREATER_OR_EQUAL",
+      "$BETWEEN",       "$IS_DISTINCT_FROM", "$IN",
+      "$IN_ARRAY",      "$CASE_WITH_VALUE",  "NULLIF"};
+  const auto compares_internal_struct = [&] {
+    for (int i = 0; i < call.argument_list_size(); ++i) {
+      // CASE's THEN and ELSE values are results, not operands of its comparison.
+      if (function == "$CASE_WITH_VALUE" &&
+          (i == call.argument_list_size() - 1 || (i > 0 && i % 2 == 0))) {
+        continue;
+      }
+      if (HasInternalStructNames(call.argument_list(i)->type())) {
+        return true;
+      }
+    }
+    return false;
+  };
+  if (std::ranges::find(comparisons, function) != comparisons.end() && compares_internal_struct()) {
+    return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
   }
   const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;

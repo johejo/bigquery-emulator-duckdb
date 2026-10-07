@@ -7,10 +7,8 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
-#include <iterator>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -495,43 +493,6 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
-    // SET (a, b) = ... assigns the fields of a STRUCT without field names, which DuckDB cannot
-    // hold; the fields are named for DuckDB, and the value then takes the unnamed type. They take
-    // the names the expression gives them, if it does, since DuckDB casts a STRUCT by field name
-    // where GoogleSQL casts it by position.
-    if (target_type != nullptr && target_type->IsStruct()) {
-      std::vector<googlesql::StructField> fields = target_type->AsStruct()->fields();
-      if (std::ranges::any_of(fields, [](const auto& field) { return field.name.empty(); })) {
-        const absl::StatusOr<AnalyzerResult> own = AnalyzeScriptExpression(
-            sql, segment, nullptr, *catalog.catalog, type_factory_, settings);
-        const googlesql::StructType* own_type = own.ok() && own->expression().type()->IsStruct()
-                                                    ? own->expression().type()->AsStruct()
-                                                    : nullptr;
-        std::set<std::string> names;
-        if (own_type != nullptr && own_type->num_fields() == static_cast<int>(fields.size())) {
-          std::ranges::transform(own_type->fields(), std::inserter(names, names.end()),
-                                 [](const auto& field) { return ToLowerAscii(field.name); });
-        }
-        const bool own_names = names.size() == fields.size() && !names.contains("");
-        for (size_t i = 0; i < fields.size(); ++i) {
-          fields[i].name = own_names ? own_type->field(static_cast<int>(i)).name
-                                     : absl::StrCat("_field_", i + 1);
-        }
-        const googlesql::StructType* named = nullptr;
-        GOOGLESQL_RETURN_IF_ERROR(type_factory_.MakeStructType(fields, &named));
-        GOOGLESQL_ASSIGN_OR_RETURN(googlesql::Value value,
-                                   EvaluateExpression(executor, sql, segment, named));
-        if (value.is_null()) {
-          return googlesql::Value::Null(target_type);
-        }
-        std::vector<googlesql::Value> values;
-        values.reserve(value.num_fields());
-        for (int i = 0; i < value.num_fields(); ++i) {
-          values.push_back(value.field(i));
-        }
-        return googlesql::Value::MakeStruct(target_type->AsStruct(), std::move(values));
-      }
-    }
     GOOGLESQL_ASSIGN_OR_RETURN(AnalyzerResult analyzed,
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));

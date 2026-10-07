@@ -39,13 +39,14 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
     }
     literal = "[" + Join(elements, ", ") + "]";
   } else if (value.type()->IsStruct()) {
+    const auto names = DuckDbStructFieldNames(value.type()->AsStruct());
     std::vector<std::string> fields;
     for (int i = 0; i < value.num_fields(); ++i) {
       const auto sql = Literal(value.field(i));
       if (!sql) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(value.type()->AsStruct()->field(i).name) + " := " + *sql);
+      fields.push_back(QuoteIdentifier(names[i]) + " := " + *sql);
     }
     literal = "struct_pack(" + Join(fields, ", ") + ")";
   } else if (value.type()->IsDouble() && !std::isfinite(value.double_value())) {

@@ -100,7 +100,7 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
 
 std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                                        const googlesql::TypeParameters* parameters,
-                                       bool geography_as_text) {
+                                       bool column_type) {
   if (parameters != nullptr && (parameters->IsEmpty() || parameters->IsStringTypeParameters())) {
     parameters = nullptr;
   }
@@ -155,23 +155,22 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       return "JSON";
     case googlesql::TYPE_GEOGRAPHY:
       // Stored as text; queries over it are not translated.
-      return geography_as_text ? std::optional<std::string>("VARCHAR") : std::nullopt;
+      return column_type ? std::optional<std::string>("VARCHAR") : std::nullopt;
     case googlesql::TYPE_ARRAY: {
-      const auto element =
-          MapToDuckDb(type->AsArray()->element_type(), child(0), geography_as_text);
+      const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), column_type);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
     }
     case googlesql::TYPE_STRUCT: {
-      // DuckDB structs need distinct field names, which anonymous BigQuery fields lack.
-      std::set<std::string> names;
+      const auto names = DuckDbStructFieldNames(type->AsStruct());
       std::vector<std::string> fields;
       for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
         const auto& field = type->AsStruct()->field(i);
-        const auto field_type = MapToDuckDb(field.type, child(i), geography_as_text);
-        if (!field_type || field.name.empty() || !names.insert(ToLowerAscii(field.name)).second) {
+        const auto field_type = MapToDuckDb(field.type, child(i), column_type);
+        // Stored columns keep their declared names; only query values use internal names.
+        if (!field_type || (column_type && names[i] != field.name)) {
           return std::nullopt;
         }
-        fields.push_back(QuoteIdentifier(field.name) + " " + *field_type);
+        fields.push_back(QuoteIdentifier(names[i]) + " " + *field_type);
       }
       return fields.empty()
                  ? std::nullopt
@@ -238,6 +237,22 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 
 }  // namespace
 
+std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* type) {
+  std::set<std::string> seen;
+  std::vector<std::string> names;
+  bool positional = false;
+  for (const auto& field : type->fields()) {
+    positional = positional || field.name.empty() || !seen.insert(ToLowerAscii(field.name)).second;
+    names.push_back(field.name);
+  }
+  if (positional) {
+    for (size_t i = 0; i < names.size(); ++i) {
+      names[i] = "_field_" + std::to_string(i + 1);
+    }
+  }
+  return names;
+}
+
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory) {
   const googlesql::Type* type = nullptr;
@@ -303,7 +318,7 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
 
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters) {
-  return MapToDuckDb(type, parameters, /*geography_as_text=*/false);
+  return MapToDuckDb(type, parameters, /*column_type=*/false);
 }
 
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
@@ -316,8 +331,7 @@ absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
   if (!parameters.ok()) {
     return parameters.status();
   }
-  std::optional<std::string> duckdb_type =
-      MapToDuckDb(*type, &*parameters, /*geography_as_text=*/true);
+  std::optional<std::string> duckdb_type = MapToDuckDb(*type, &*parameters, /*column_type=*/true);
   if (duckdb_type.has_value()) {
     return *std::move(duckdb_type);
   }

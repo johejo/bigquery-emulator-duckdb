@@ -38,6 +38,8 @@ query Subqueries | SELECT id FROM t WHERE id IN (SELECT id FROM u)
 query Subqueries | SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t.id)
 query Subqueries | SELECT ARRAY(SELECT v FROM u ORDER BY v) AS a
 query Subqueries | SELECT id FROM (SELECT id FROM t) AS sub
+query Correlated subqueries | SELECT (SELECT AS STRUCT k, SUM(id) FROM (SELECT 1 AS k) GROUP BY k) FROM t
+note Correlated subqueries | Aggregate subqueries returning anonymous or duplicate STRUCT fields are unsupported when correlated.
 query Correlated subqueries | SELECT id, (SELECT COUNT(*) FROM UNNEST(tags)) AS n FROM t
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*), SUM(id) FROM t GROUP BY name
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*) FROM t GROUP BY 1 HAVING COUNT(*) > 0
@@ -71,6 +73,12 @@ query `SELECT AS STRUCT`, `SELECT AS VALUE` | SELECT ARRAY(SELECT AS STRUCT id, 
 query `* EXCEPT`, `* REPLACE` | SELECT * EXCEPT (tags, s) FROM t
 query `* EXCEPT`, `* REPLACE` | SELECT * REPLACE (id + 1 AS id) FROM u
 query `.*` of a struct | SELECT s.* FROM t
+query STRUCT constructors and casts | SELECT STRUCT(1, 'x'), STRUCT(1 AS a, 'x' AS a)
+query STRUCT constructors and casts | SELECT CAST(STRUCT(1 AS x, 'y' AS y) AS STRUCT<INT64, STRING>)
+query STRUCT constructors and casts | SELECT STRUCT()
+query STRUCT constructors and casts | SELECT STRUCT(NULL) = STRUCT(1)
+query STRUCT constructors and casts | SELECT CAST(STRUCT(1, 2) AS JSON)
+note STRUCT constructors and casts | Nonempty structs may have anonymous or duplicate field names; casts match fields by position. Empty structs, comparisons and casts to JSON involving anonymous or duplicate fields are unsupported.
 query Struct field and array element access | SELECT s.a, tags[SAFE_OFFSET(0)], tags[SAFE_ORDINAL(1)] FROM t
 query Struct field and array element access | SELECT [1, 2][OFFSET(0)], [1, 2][ORDINAL(1)], [1, 2][0]
 query `PIVOT` | SELECT * FROM (SELECT id, name FROM t) PIVOT (COUNT(*) FOR name IN ('a', 'b'))
@@ -219,6 +227,9 @@ query `DECLARE`, `SET` | DECLARE x DEFAULT (SELECT MAX(id) FROM t); SELECT x
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (1, 'x'); SELECT a, b
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT id, name FROM t ORDER BY id LIMIT 1); SELECT a, b
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT 1, 'x'); SELECT a, b
+query `DECLARE`, `SET` | DECLARE s STRUCT<INT64, STRING> DEFAULT (1, 'x'); SET s = (2, 'y'); SELECT s
+query `DECLARE`, `SET` | DECLARE s STRUCT<> DEFAULT STRUCT(); SELECT s
+note `DECLARE`, `SET` | Empty structs are unsupported.
 query `DECLARE`, `SET` | DECLARE s STRING(3) DEFAULT 'a'; SELECT s
 query `BEGIN ... END` | BEGIN DECLARE x INT64 DEFAULT 1; SELECT x; END
 query `BEGIN ... EXCEPTION ... END` | BEGIN SELECT 1 / 0; EXCEPTION WHEN ERROR THEN SELECT @@error.message, @@error.statement_text; END
