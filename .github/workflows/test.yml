@@ -69,7 +69,9 @@ jobs:
           key: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-${{ github.sha }}
           restore-keys: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
       - name: Configure Bazel for CI
-        run: echo 'common --config=ci' > .bazelrc.local
+        run: |
+          echo 'common --config=ci' > .bazelrc.local
+          mkdir -p "$RUNNER_TEMP/bazel-reports"
       - name: Format check
         run: nix develop --command just fmt-check
       - name: Cppcheck
@@ -77,13 +79,26 @@ jobs:
       - name: Go vet
         run: nix develop --command just go-vet
       - name: Clang-tidy
-        run: nix develop --command just tidy
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.json" >> .bazelrc.local
+          nix develop --command just tidy
       - name: Unit tests
-        run: nix develop --command just test
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/unit-tests.json" >> .bazelrc.local
+          nix develop --command just test
       - name: Generated docs check
-        run: nix develop --command just docs-check
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/docs-check.json" >> .bazelrc.local
+          nix develop --command just docs-check
       - name: End-to-end tests
-        run: nix develop --command just e2e
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/e2e.json" >> .bazelrc.local
+          nix develop --command just e2e
+
+      - name: Bazel summary
+        if: success() || failure()
+        continue-on-error: true
+        run: nix develop --command just bazel-summary "$RUNNER_TEMP/bazel-reports" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save Go cache
         if: >-
