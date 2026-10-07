@@ -76,8 +76,10 @@ query TIMESTAMP SELECT TIMESTAMP(DATETIME '2024-01-15 10:20:30', 'Asia/Tokyo')
 query STRING SELECT STRING(TIMESTAMP '2024-01-15 10:20:30+00', 'Asia/Tokyo')
 query STRING SELECT STRING(JSON '"abc"')
 query FROM_BASE64 SELECT FROM_BASE64('YWJj')
+query FROM_BASE32 SELECT FROM_BASE32('MFRGG===')
 query PARSE_JSON SELECT PARSE_JSON('{"a": 1}')
 query PARSE_JSON SELECT PARSE_JSON('1.5', wide_number_mode => 'round')
+query PARSE_NUMERIC SELECT PARSE_NUMERIC('1,234.5')
 query PARSE_BIGNUMERIC SELECT PARSE_BIGNUMERIC('1,234.5')
 # Generated string arguments are not valid JSONPaths.
 query JSON_QUERY SELECT JSON_QUERY('{"a": [1, 2]}', '$.a')
@@ -145,6 +147,8 @@ note SUBSTRING starts at the first character for a position of 0 or before the s
 note LPAD pads with spaces by default
 note CONTAINS_SUBSTR compares NFKC normal forms, case folded; takes STRING only
 note RPAD pads with spaces by default
+note TO_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open source
+note FROM_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open source; accepts either case, padded or not
 note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
 note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
 note DATE_TRUNC WEEK starts on Sunday and ISOWEEK on Monday

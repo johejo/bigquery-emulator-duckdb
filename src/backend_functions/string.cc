@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -12,6 +13,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
 #include "duckdb.h"
 #include "googlesql/public/functions/convert_string.h"
@@ -106,6 +108,61 @@ void Sha512(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
           [&hasher](const Arguments& arguments) -> absl::StatusOr<std::string> {
             return hasher->Hash(arguments.String(0));
           });
+}
+
+// RFC 4648's base32, which BigQuery's TO_BASE32 and FROM_BASE32 implement and GoogleSQL leaves
+// out of its open source.
+constexpr std::string_view kBase32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+void ToBase32(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const std::string bytes = arguments.String(0);
+    std::string out;
+    uint32_t buffer = 0;
+    int bits = 0;
+    for (const char byte : bytes) {
+      buffer = (buffer << 8) | static_cast<uint8_t>(byte);
+      for (bits += 8; bits >= 5; bits -= 5) {
+        out += kBase32Alphabet[(buffer >> (bits - 5)) & 31];
+      }
+    }
+    if (bits > 0) {
+      out += kBase32Alphabet[(buffer << (5 - bits)) & 31];
+    }
+    out.resize((out.size() + 7) / 8 * 8, '=');
+    return out;
+  });
+}
+
+// Accepts either case, and text either padded to groups of 8 characters or not padded at all.
+void FromBase32(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
+    const std::string text = arguments.String(0);
+    const std::string_view data(text.data(), text.find_last_not_of('=') + 1);
+    // A final group of 1 to 4 bytes has 2, 4, 5 or 7 characters before its padding.
+    const std::size_t tail = data.size() % 8;
+    const bool padded = text.size() != data.size();
+    if ((padded && (text.size() % 8 != 0 || text.size() - data.size() >= 8)) || tail == 1 ||
+        tail == 3 || tail == 6) {
+      return absl::OutOfRangeError("Failed to decode invalid base32 string");
+    }
+    std::string out;
+    uint32_t buffer = 0;
+    int bits = 0;
+    for (const char c : data) {
+      const std::size_t value = kBase32Alphabet.find(absl::ascii_toupper(c));
+      if (value == std::string_view::npos) {
+        return absl::OutOfRangeError("Failed to decode invalid base32 string");
+      }
+      buffer = (buffer << 5) | value;
+      bits += 5;
+      if (bits >= 8) {
+        bits -= 8;
+        out += static_cast<char>(buffer >> bits);
+      }
+    }
+    return out;
+  });
 }
 
 void InitCap(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -386,6 +443,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
   }
   Register(connection, "bq_farm_fingerprint", {kBlob}, kBigint, FarmFingerprint);
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);
+  Register(connection, "bq_to_base32", {kBlob}, kVarchar, ToBase32);
+  Register(connection, "bq_from_base32", {kVarchar}, kBlob, FromBase32);
   Register(connection, "bq_initcap", {kVarchar}, kVarchar, InitCap);
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, DecimalString);
   Register(connection, "bq_double_string", {kDouble}, kVarchar, DoubleString);

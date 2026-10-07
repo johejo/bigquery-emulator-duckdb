@@ -97,6 +97,47 @@ SELECT FORMAT(CAST(NULL AS STRING), 1)
 SELECT SAFE.FORMAT(CONCAT('%', 'd'), 'a')
 => null
 
+# PARSE_NUMERIC accepts its own string grammar, rounds to nine fractional digits half away from
+# zero, and fails on malformed or out-of-range input; GoogleSQL's compliance test data.
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' - 12.34  ']) x
+=> "-12.34"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' 12.34e-1 - ']) x
+=> "-1.234"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' 1,2,3,.45e+10 + ']) x
+=> "1234500000000"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' 1,2.3e-10 + ']) x
+=> "0.000000001"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' ,1,2,34. + ']) x
+=> "1234"
+
+SELECT PARSE_NUMERIC(' + \t\v .1 \r\n\f ')
+=> "0.1"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' 1E+28 ']) x
+=> "10000000000000000000000000000"
+
+SELECT PARSE_NUMERIC(x) FROM UNNEST([' 1e-30 ']) x
+=> "0"
+
+SELECT PARSE_NUMERIC(CAST(NULL AS STRING))
+=> null
+
+SELECT SAFE.PARSE_NUMERIC(x) FROM UNNEST([' 1e+29 ']) x
+=> null
+
+SELECT SAFE.PARSE_NUMERIC(x) FROM UNNEST([' ,,,.123 ']) x
+=> null
+
+SELECT SAFE.PARSE_NUMERIC(x) FROM UNNEST([' + 12 + ']) x
+=> null
+
+SELECT SAFE.PARSE_NUMERIC(x) FROM UNNEST([' . ']) x
+=> null
+
 # NUMERIC and BIGNUMERIC are written without trailing fractional zeros, in results and as STRING.
 SELECT NUMERIC '1.210'
 => "1.21"

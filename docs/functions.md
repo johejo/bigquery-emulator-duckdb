@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 15 |
-| Supported | 238 |
-| Unsupported | 140 |
+| Supported | 241 |
+| Unsupported | 137 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -151,7 +151,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | timestamp_functions | Supported | GoogleSQL function |  |
-| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Unsupported |  | function FROM_BASE32 |
+| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | string_functions | Supported | GoogleSQL function | implements RFC 4648 in C++, since GoogleSQL's base32 is not open source; accepts either case, padded or not |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | string_functions | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported | DuckDB SQL |  |
 | [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported |  | the analyzer does not know this function |
@@ -271,7 +271,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | date_functions | Supported | GoogleSQL function |  |
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | json_functions | Supported | GoogleSQL function |  |
-| [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Unsupported |  | function PARSE_NUMERIC |
+| [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | conversion_functions | Supported | GoogleSQL function |  |
 | [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | time_functions | Supported | GoogleSQL function |  |
 | [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | timestamp_functions | Supported | GoogleSQL function | `SELECT PARSE_TIMESTAMP('abc', 'abc', 2)`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP; `SELECT PARSE_TIMESTAMP('abc', 'abc', 2, 'abc')`: INVALID_ARGUMENT: No matching signature for function PARSE_TIMESTAMP |
 | [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested |  | no sample for <graph_path> |
@@ -426,7 +426,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | time_functions | Supported | DuckDB SQL | counts whole units rather than boundaries |
 | [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | time_functions | Supported | DuckDB SQL |  |
 | [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | time_functions | Supported | DuckDB SQL |  |
-| [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Unsupported |  | function TO_BASE32 |
+| [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | string_functions | Supported | GoogleSQL function | implements RFC 4648 in C++, since GoogleSQL's base32 is not open source |
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | string_functions | Supported | DuckDB SQL |  |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | string_functions | Supported | DuckDB SQL |  |
