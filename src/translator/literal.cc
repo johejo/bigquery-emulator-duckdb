@@ -48,6 +48,11 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
       fields.push_back(QuoteIdentifier(value.type()->AsStruct()->field(i).name) + " := " + *sql);
     }
     literal = "struct_pack(" + Join(fields, ", ") + ")";
+  } else if (value.type()->IsDouble() && value.double_value() == 0 &&
+             std::signbit(value.double_value())) {
+    // GoogleSQL's SQL literal canonicalizes negative zero; DuckDB preserves its sign when
+    // reading a string instead.
+    literal = QuoteLiteral("-0");
   } else if (value.type()->IsDouble() && !std::isfinite(value.double_value())) {
     literal = QuoteLiteral(std::isnan(value.double_value()) ? "nan"
                            : value.double_value() < 0       ? "-inf"

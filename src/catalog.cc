@@ -72,16 +72,17 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
   static const googlesql::LanguageOptions* const kLanguageOptions = [] {
     auto* options = new googlesql::LanguageOptions();
     // Some syntax BigQuery accepts is gated behind a language feature that the default options
-    // leave off, QUALIFY among it, so every released feature is turned on. Accepting a little
-    // more than BigQuery does is the lesser problem for an emulator: a query the parser rejects
-    // cannot run at all.
+    // leave off, QUALIFY among it, so every released feature is turned on and known differences
+    // from BigQuery are turned off below.
     options->EnableMaximumLanguageFeatures();
     // Some of those features add types and precision that BigQuery lacks rather than syntax, so
     // they are turned off again: BigQuery has no MAP, UUID or FLOAT32, and its timestamps hold
-    // microseconds, not nanoseconds or picoseconds.
+    // microseconds, not nanoseconds or picoseconds. BigQuery also rejects explicit casts between
+    // arrays with different element types, including SAFE_CAST and arrays inside structs.
     for (const googlesql::LanguageFeature feature :
          {googlesql::FEATURE_MAP_TYPE, googlesql::FEATURE_UUID_TYPE,
-          googlesql::FEATURE_TIMESTAMP_NANOS, googlesql::FEATURE_TIMESTAMP_PICOS}) {
+          googlesql::FEATURE_TIMESTAMP_NANOS, googlesql::FEATURE_TIMESTAMP_PICOS,
+          googlesql::FEATURE_CAST_DIFFERENT_ARRAY_TYPES}) {
       options->DisableLanguageFeature(feature);
     }
     options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);

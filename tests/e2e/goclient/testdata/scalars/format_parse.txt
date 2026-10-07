@@ -118,7 +118,7 @@ SELECT SAFE_CAST(x AS STRING) FROM UNNEST([BIGNUMERIC '0.000']) x
 
 SELECT ARRAY_TO_STRING(CAST(ARRAY_AGG(x ORDER BY x) AS ARRAY<STRING>), ',')
 FROM UNNEST([NUMERIC '1.50', NUMERIC '20']) x
-=> "1.5,20"
+=> error:
 
 ## Casts from STRING accept only BigQuery's canonical formats
 
@@ -160,7 +160,15 @@ SELECT CAST(x AS STRING) FROM UNNEST([TIME '01:02:03.12345']) AS x
 SELECT CAST(x AS STRING) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
 => null
 
-## Arrays and structs are cast value by value
+## Array casts require identical element types; structs cast fields by position
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_array
+
+SELECT ARRAY_LENGTH(CAST(x AS ARRAY<INT64>)) FROM (SELECT [1, 2] AS x)
+=> "2"
+
+SELECT SAFE_CAST(x AS ARRAY<INT64>) IS NULL FROM (SELECT CAST(NULL AS ARRAY<INT64>) AS x)
+=> "true"
 
 # A struct is cast field by field in order, taking the field names of the target type.
 SELECT TO_JSON_STRING(CAST(s AS STRUCT<b INT64, c STRING>)) FROM UNNEST([STRUCT('1' AS a, 2 AS b)]) s
@@ -168,22 +176,53 @@ SELECT TO_JSON_STRING(CAST(s AS STRUCT<b INT64, c STRING>)) FROM UNNEST([STRUCT(
 
 SELECT TO_JSON_STRING(CAST(x AS ARRAY<STRUCT<s STRING>>))
 FROM UNNEST([STRUCT([STRUCT(NUMERIC '1.50' AS n)] AS x)])
-=> "[{\"s\":\"1.5\"}]"
+=> error:
 
-# SAFE_CAST makes a whole array or struct NULL when one of its values fails, at any depth; a NULL
-# value does not fail.
+# SAFE_CAST still rejects incompatible array types during analysis. For supported struct casts,
+# a failing field makes the whole struct NULL; a NULL field does not fail.
 SELECT TO_JSON_STRING(SAFE_CAST(x AS ARRAY<INT64>)) FROM UNNEST([STRUCT(['1', NULL] AS x)])
-=> "[1,null]"
+=> error:
 
 SELECT SAFE_CAST(x AS ARRAY<INT64>) IS NULL FROM UNNEST([STRUCT(['1', 'x'] AS x)])
-=> "true"
+=> error:
 
 SELECT SAFE_CAST(x AS ARRAY<DATE>) IS NULL FROM UNNEST([STRUCT(['2024-01-01', '2024/01/01'] AS x)])
-=> "true"
+=> error:
 
 SELECT SAFE_CAST(s AS STRUCT<a INT64, b STRING>) IS NULL FROM UNNEST([STRUCT('x' AS a, 1 AS b)]) s
 => "true"
 
 SELECT SAFE_CAST(x AS ARRAY<STRUCT<a INT64>>) IS NULL
 FROM UNNEST([STRUCT([STRUCT('1' AS a), STRUCT('x' AS a)] AS x)])
+=> error:
+
+# Answers collected from BigQuery with bqanswers.
+SELECT CAST(x AS STRING) FROM UNNEST([CAST('-0' AS FLOAT64)]) AS x
+=> "-0"
+
+SELECT CAST(x AS STRING) FROM UNNEST([CAST(1e20 AS FLOAT64)]) AS x
+=> "1e+20"
+
+SELECT CAST(x AS STRING) FROM UNNEST([CAST(0.1 AS FLOAT64)]) AS x
+=> "0.1"
+
+SELECT CAST(x AS STRING) FROM UNNEST([TIME '01:02:03.12']) AS x
+=> "01:02:03.120"
+
+SELECT CAST(x AS STRING) FROM UNNEST([DATETIME '2006-01-02 12:34:56.12345']) AS x
+=> "2006-01-02 12:34:56.123450"
+
+SELECT CAST(x AS STRING) FROM UNNEST([TIMESTAMP '2006-01-02 12:34:56.12345+00']) AS x
+=> "2006-01-02 12:34:56.123450+00"
+
+SELECT CAST(CAST(x AS TIMESTAMP) AS STRING) FROM UNNEST(['2014-01-31 12:12:34 America/Los_Angeles']) AS x
+=> "2014-01-31 20:12:34+00"
+
+SELECT ARRAY_TO_STRING(CAST(x AS ARRAY<STRING>), ',') FROM (SELECT [CAST(1.5 AS FLOAT64), 2] AS x)
+=> error: Casting between arrays with incompatible element types is not supported: Invalid cast from ARRAY<FLOAT64> to ARRAY<STRING> at [1:29]
+
+SELECT SAFE.TIMESTAMP(x, 'UTC') IS NULL FROM UNNEST(['2008-12-25 15:30:00+00']) AS x
+=> "true"
+
+SELECT SAFE.TIMESTAMP(x) IS NULL FROM UNNEST(['2008/12/25 15:30:00']) AS x
 => "true"

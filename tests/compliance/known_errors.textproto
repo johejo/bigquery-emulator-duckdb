@@ -928,7 +928,6 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR
   reason: "A STRING or BYTES value with a NUL character ends the literal the emulator writes it as"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BYTES>_ARRAY<STRING>_<@@@@x00@@>"
   label: "code:CastTo_BYTES_STRING_<@x00>"
   label: "code:Like_STRING_<a>_STRING_<a@x00@x63>"
   label: "code:Like_STRING_<a@x00@x63>_STRING_<a>"
@@ -2069,24 +2068,6 @@ known_errors {
   reason: "Casting BYTES that are not valid UTF-8 to STRING succeeds instead of failing"
   label: "cast_function_test:cast_invalid_utf8_bytes_to_string_1"
   label: "cast_function_test:cast_invalid_utf8_bytes_to_string_2"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "Casting FLOAT64 to INT64 rounds halves to even rather than away from zero, and large FLOAT64 values fail to cast to NUMERIC"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<NUMERIC>_ARRAY<FLOAT64>_<1e@29>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casting FLOAT64 to INT64 rounds halves to even rather than away from zero, and large FLOAT64 values fail to cast to NUMERIC"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BOOL>_ARRAY<STRING>_<@@0@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BOOL>_ARRAY<STRING>_<@@1@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<INT64>_ARRAY<FLOAT64>_<-2@5>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<INT64>_ARRAY<FLOAT64>_<2@5>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<NUMERIC>_ARRAY<FLOAT64>_<1@844674_QsMAUYNjEbE_0955e@19>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<STRING>_ARRAY<BYTES>_<b@@@@x00@@x0a@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<STRING>_ARRAY<BYTES>_<b@@@@xd7@@>"
 }
 
 known_errors {

@@ -17,6 +17,7 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/error_helpers.h"
+#include "googlesql/public/error_location.pb.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/strings.h"
@@ -164,7 +165,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     throw std::invalid_argument("A statement cannot use both named and positional parameters");
   }
   absl::StatusOr<googlesql::AnalyzerOptions> options =
-      AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET);
+      AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD);
   if (!options.ok()) {
     throw std::invalid_argument(options.status().ToString());
   }
@@ -173,8 +174,13 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);
   if (!status.ok()) {
-    // In the caret mode the analyzer has already folded the location into the message; this
-    // only matters for the few errors that still carry it as a payload.
+    // This array-cast error has been checked against BigQuery, including its location format.
+    googlesql::ErrorLocation location;
+    if (status.message().starts_with("Casting between arrays with incompatible element types") &&
+        googlesql::GetErrorLocation(status, &location)) {
+      throw std::runtime_error(std::string(status.message()) + " at [" +
+                               googlesql::FormatErrorLocation(location) + "]");
+    }
     const googlesql::ErrorMessageOptions error_message_options = {
         .mode = googlesql::ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET,
         .attach_error_location_payload = false,
