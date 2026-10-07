@@ -213,6 +213,17 @@ void StringToTimestamp(duckdb_function_info info, duckdb_data_chunk input, duckd
   });
 }
 
+// TIMESTAMP(string, time_zone), whose string may not have a time zone of its own.
+void StringToTimestampIn(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) {
+    int64_t out = 0;
+    const absl::Status status = googlesql::functions::ConvertStringToTimestamp(
+        arguments.String(0), arguments.String(1), googlesql::functions::kMicroseconds,
+        /*allow_tz_in_str=*/false, &out);
+    return ToStatusOr(status.ok(), out, status);
+  });
+}
+
 // CAST(datetime AS STRING), whose fractional seconds have three or six digits, where DuckDB
 // leaves out trailing zeros.
 void DatetimeToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -238,13 +249,13 @@ void TimeToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
-// CAST(timestamp AS STRING), in UTC.
+// CAST(timestamp AS STRING) and STRING(timestamp, time_zone), in the given time zone.
 void TimestampToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) {
     std::string out;
     const absl::Status status = googlesql::functions::ConvertTimestampToString(
         absl::FromUnixMicros(arguments.Int(0)), googlesql::functions::kMicroseconds,
-        absl::UTCTimeZone(), &out);
+        arguments.String(1), &out);
     return ToStatusOr(status.ok(), out, status);
   });
 }
@@ -349,9 +360,11 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
   Register(connection, "bq_string_to_time", {kVarchar, kBoolean}, kTime, StringToTime);
   Register(connection, "bq_string_to_timestamp", {kVarchar, kBoolean}, kTimestamp,
            StringToTimestamp);
+  Register(connection, "bq_string_to_timestamp_in", {kVarchar, kVarchar}, kTimestamp,
+           StringToTimestampIn);
   Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, DatetimeToString);
   Register(connection, "bq_time_string", {kTime}, kVarchar, TimeToString);
-  Register(connection, "bq_timestamp_string", {kTimestamp}, kVarchar, TimestampToString);
+  Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar, TimestampToString);
   Register(connection, "bq_format", {kVarchar}, kVarchar, Format, /*nulls=*/false, DUCKDB_TYPE_ANY);
 }
 

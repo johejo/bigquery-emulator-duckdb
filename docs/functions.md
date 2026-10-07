@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 16 |
-| Supported | 234 |
+| Partial | 14 |
+| Supported | 236 |
 | Unsupported | 143 |
 | Untested | 13 |
 
@@ -333,7 +333,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`STDDEV`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STDDEV_POP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_pop) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STDDEV_SAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/statistical_aggregate_functions#stddev_samp) | statistical_aggregate_functions | Supported | DuckDB aggregate |  |
-| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Partial | GoogleSQL function | from JSON, fails when the value has another JSON type; function STRING |
+| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | json_functions, timestamp_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | string_functions | Supported | GoogleSQL function |  |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | geography_functions | Unsupported |  | function ST_ANGLE |
@@ -413,7 +413,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported | DuckDB SQL |  |
-| [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Partial | DuckDB SQL | function TIMESTAMP |
+| [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#timestamp_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
 | [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | timestamp_functions | Supported | DuckDB SQL | counts whole units rather than boundaries |
