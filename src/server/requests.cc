@@ -163,6 +163,13 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
   if (!copy.is_object() || !copy.contains("destinationTable")) {
     throw ApiError::Invalid("Invalid destination table");
   }
+  // A snapshot, a restore and a clone record where they came from, which a copy does not.
+  if (const json operation = copy.value("operationType", json());
+      !operation.is_null() && operation != "COPY" && operation != "OPERATION_TYPE_UNSPECIFIED") {
+    throw ApiError::Invalid(
+        "The emulator does not support copy operationType " +
+        (operation.is_string() ? operation.get<std::string>() : operation.dump()));
+  }
   CopyRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);

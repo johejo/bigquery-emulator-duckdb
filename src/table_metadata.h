@@ -8,6 +8,7 @@
 
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
+#include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -30,9 +31,16 @@ struct RangePartitioning {
   bool operator==(const RangePartitioning&) const = default;
 };
 
+// Table.cloneDefinition: the table a CREATE TABLE CLONE cloned, and when.
+struct CloneDefinition {
+  TableReference base_table;
+  std::string clone_time;  // RFC 3339, as tables.get reports it.
+};
+
 // What a table or view carries besides its schema: Table.description, friendlyName and labels,
-// and a table's partitioning and clustering, which only shape how BigQuery stores it. An empty
-// description or friendly name is unset, as BigQuery reports it.
+// and a table's partitioning and clustering, which only shape how BigQuery stores it, and the
+// cloneDefinition of a clone. An empty description or friendly name is unset, as BigQuery
+// reports it.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -40,10 +48,11 @@ struct TableMetadata {
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
   std::vector<std::string> clustering;  // Clustering.fields.
+  std::optional<CloneDefinition> clone;
 
   bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           clustering.empty();
+           clustering.empty() && !clone.has_value();
   }
   bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -66,16 +75,17 @@ struct DatasetMetadata {
   nlohmann::json ToJson() const;
 };
 
-// The metadata of the Table resource `table`; a field it leaves out or sets to null is unset.
-// Throws ApiError::Invalid for a field of the wrong type, a label BigQuery rejects, or an
-// expiration or partitioning the emulator does not support.
+// The metadata of the Table resource `table`; a field it leaves out or sets to null is unset,
+// and cloneDefinition, which is output only, is ignored. Throws ApiError::Invalid for a field of
+// the wrong type, a label BigQuery rejects, or an expiration or partitioning the emulator does not
+// support.
 TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
 // `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
 // tables.update replaces the description, friendly name, labels and clustering. Partitioning
-// cannot change, so both keep it and reject a different one. Throws as TableMetadataFromJson
-// does.
+// cannot change, so both keep it and reject a different one, and both keep the cloneDefinition.
+// Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // The metadata of the Dataset resource `dataset`. Every dataset is in the US, so a location

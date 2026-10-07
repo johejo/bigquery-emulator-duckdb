@@ -508,9 +508,10 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
               {"id", TableId(table)},
               {"tableReference", TableReferenceJson(table)},
               {"type", TableTypeName(entry.type)}};
-    // A list entry carries the metadata but the description.
+    // A list entry carries the metadata but the description and cloneDefinition.
     item.update(entry.metadata.ToJson());
     item.erase("description");
+    item.erase("cloneDefinition");
     entries.push_back(std::move(item));
   }
   response["tables"] = std::move(entries);

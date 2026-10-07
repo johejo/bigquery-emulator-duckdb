@@ -15,6 +15,7 @@
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
+#include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
@@ -48,7 +49,8 @@ class TableSource {
                                                             const std::string& table) = 0;
 
   // The schema and metadata of the table `project`.`dataset`.`table`, or nothing if there is no
-  // such table or it is a view. For CREATE TABLE LIKE; none by default.
+  // such table or it is a view. For CREATE TABLE LIKE, COPY and CLONE and INFORMATION_SCHEMA;
+  // none by default.
   virtual std::optional<TableDescription> DescribeTable(const std::string& /*project*/,
                                                         const std::string& /*dataset*/,
                                                         const std::string& /*table*/) {
@@ -88,7 +90,7 @@ class SqlTable : public googlesql::SimpleTable {
 };
 
 // A table the emulator keeps, which describes itself on demand: its columns are what queries
-// see, while CREATE TABLE LIKE copies the schema and metadata tables.get reports.
+// see, while CREATE TABLE LIKE, COPY and CLONE copy the schema and metadata tables.get reports.
 class BigQueryTable : public googlesql::SimpleTable {
  public:
   // `source` must outlive the table.
@@ -98,6 +100,7 @@ class BigQueryTable : public googlesql::SimpleTable {
   std::optional<TableDescription> Describe() const {
     return source_.DescribeTable(path_[0], path_[1], path_[2]);
   }
+  TableReference reference() const { return {path_[0], path_[1], path_[2]}; }
 
  private:
   TableSource& source_;

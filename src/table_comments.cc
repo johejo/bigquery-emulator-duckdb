@@ -26,6 +26,20 @@ json ParseComment(const json& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
+// The cloneDefinition the emulator recorded in a table comment, which TableMetadataFromJson
+// ignores since clients cannot set it.
+std::optional<CloneDefinition> ParseCloneDefinition(const json& comment) {
+  const json clone = comment.value("cloneDefinition", json());
+  if (!clone.is_object()) {
+    return std::nullopt;
+  }
+  const json base = clone.value("baseTableReference", json::object());
+  return CloneDefinition{.base_table = {.project_id = base.value("projectId", ""),
+                                        .dataset_id = base.value("datasetId", ""),
+                                        .table_id = base.value("tableId", "")},
+                         .clone_time = clone.value("cloneTime", "")};
+}
+
 }  // namespace
 
 TableMetadata CommentMetadata(const json& comment) {
@@ -34,7 +48,9 @@ TableMetadata CommentMetadata(const json& comment) {
     return {};
   }
   try {
-    return TableMetadataFromJson(object);
+    TableMetadata metadata = TableMetadataFromJson(object);
+    metadata.clone = ParseCloneDefinition(object);
+    return metadata;
   } catch (const ApiError&) {
     return {};
   }
