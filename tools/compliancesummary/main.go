@@ -1,7 +1,9 @@
 // Command compliancesummary summarizes the test logs of `just compliance` as Markdown: how many
-// statements pass, fail, or are rejected as unsupported, and which tests fail most. With -results,
-// it also writes each statement's outcome, one "NAME<TAB>OUTCOME" line per statement. It fails when
-// a shard did not finish, such as one that timed out, since its statements are then missing.
+// statements pass, fail, fail as known errors, or are rejected as unsupported, and which tests fail
+// most. With -results, it also writes each statement's outcome, one "NAME<TAB>OUTCOME" line per
+// statement. It fails when a shard did not finish, such as one that timed out, since its
+// statements are then missing, and when a statement that a known error lists as failing passes,
+// since the entry would then hide the statement failing again.
 //
 //	compliancesummary [-results FILE] LOGDIR
 //
@@ -26,6 +28,7 @@ import (
 const (
 	pass        = "pass"
 	fail        = "fail"
+	known       = "known"
 	unsupported = "unsupported"
 )
 
@@ -34,7 +37,10 @@ var (
 	// GoogleSQL logs every statement it runs as CSV: target, prefix, name, passed, known error,
 	// known error mode. A statement that a known error allows, such as one the emulator rejects
 	// as unsupported, does not pass.
-	csvLine = regexp.MustCompile(`CSV: "","[^"]*","(.*)",(true|false),(?:true|false),[A-Z_]+$`)
+	csvLine = regexp.MustCompile(`CSV: "","[^"]*","(.*)",(true|false),(?:true|false),([A-Z_]+)$`)
+	// The known error modes that allow an error or a wrong result, which list the statements known
+	// to fail, rather than the one that allows any statement to be rejected as unsupported.
+	failureModes = []string{"ALLOW_ERROR", "ALLOW_ERROR_OR_WRONG_ANSWER"}
 	// A failure that no known error allows, listed in the failures summary at the end of a shard.
 	failureName = regexp.MustCompile(`^\s*Name: (.*)$`)
 	// A code-based statement's name: its function, possibly under SAFE, then its argument types.
@@ -49,13 +55,14 @@ const (
 
 // shard holds what one shard's log says.
 type shard struct {
-	passed   map[string]bool // Every statement that ran, and whether it passed.
+	passed   map[string]bool   // Every statement that ran, and whether it passed.
+	modes    map[string]string // Every statement's known error mode.
 	failed   []string
 	finished bool
 }
 
 func readShard(r io.Reader) (shard, error) {
-	s := shard{passed: map[string]bool{}}
+	s := shard{passed: map[string]bool{}, modes: map[string]string{}}
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(nil, 64<<20)
 	inFailure := false
@@ -75,6 +82,7 @@ func readShard(r io.Reader) (shard, error) {
 		default:
 			if m := csvLine.FindStringSubmatch(line); m != nil {
 				s.passed[m[1]] = s.passed[m[1]] || m[2] == "true"
+				s.modes[m[1]] = m[3]
 			}
 		}
 	}
@@ -128,7 +136,9 @@ func group(name string) string {
 }
 
 type summary struct {
-	outcomes   map[string]string
+	outcomes map[string]string
+	// Statements that pass although a known error lists them as failing.
+	removable  []string
 	unfinished []int // Shard numbers, from 1.
 	shards     int
 }
@@ -153,9 +163,17 @@ func summarize(paths []string) (summary, error) {
 			s.unfinished = append(s.unfinished, i+1)
 		}
 		for name, passed := range result.passed {
-			if passed {
+			listed := slices.Contains(failureModes, result.modes[name])
+			switch {
+			case passed:
 				s.outcomes[name] = pass
-			} else if _, ok := s.outcomes[name]; !ok {
+				if listed {
+					s.removable = append(s.removable, name)
+				}
+			case s.outcomes[name] != "":
+			case listed:
+				s.outcomes[name] = known
+			default:
 				s.outcomes[name] = unsupported
 			}
 		}
@@ -163,6 +181,7 @@ func summarize(paths []string) (summary, error) {
 			s.outcomes[name] = fail
 		}
 	}
+	slices.Sort(s.removable)
 	return s, nil
 }
 
@@ -171,7 +190,7 @@ func (s summary) writeMarkdown(w io.Writer) {
 	groups := map[string]int{}
 	for name, outcome := range s.outcomes {
 		counts[outcome]++
-		if outcome == fail {
+		if outcome == fail || outcome == known {
 			groups[group(name)]++
 		}
 	}
@@ -185,8 +204,13 @@ func (s summary) writeMarkdown(w io.Writer) {
 	fmt.Fprintln(w, "|---|---:|")
 	fmt.Fprintf(w, "| Pass | %d |\n", counts[pass])
 	fmt.Fprintf(w, "| Fail | %d |\n", counts[fail])
+	fmt.Fprintf(w, "| Known failure | %d |\n", counts[known])
 	fmt.Fprintf(w, "| Unsupported | %d |\n", counts[unsupported])
 	fmt.Fprintf(w, "| Total | %d |\n", len(s.outcomes))
+	writeNames(w, "Failures", "Fix them, or list them in tests/compliance/known_errors.textproto with "+
+		"the reason", s.names(fail))
+	writeNames(w, "Known failures that pass", "Remove them from "+
+		"tests/compliance/known_errors.textproto", s.removable)
 	if len(groups) == 0 {
 		return
 	}
@@ -204,6 +228,35 @@ func (s summary) writeMarkdown(w io.Writer) {
 	fmt.Fprintln(w, "|---|---:|")
 	for _, name := range names[:min(top, len(names))] {
 		fmt.Fprintf(w, "| `%s` | %d |\n", name, groups[name])
+	}
+}
+
+// names returns the statements with an outcome, sorted.
+func (s summary) names(outcome string) []string {
+	var names []string
+	for name, o := range s.outcomes {
+		if o == outcome {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
+// writeNames lists statements under a heading, up to a limit that keeps the summary readable.
+func writeNames(w io.Writer, heading, action string, names []string) {
+	if len(names) == 0 {
+		return
+	}
+	const limit = 100
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "**%s:** %d. %s", heading, len(names), action)
+	if len(names) > limit {
+		fmt.Fprintf(w, "; the first %d", limit)
+	}
+	fmt.Fprint(w, ":\n\n")
+	for _, name := range names[:min(limit, len(names))] {
+		fmt.Fprintf(w, "- `%s`\n", name)
 	}
 }
 
@@ -251,7 +304,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if len(s.unfinished) > 0 {
+	if len(s.unfinished) > 0 || len(s.removable) > 0 {
 		os.Exit(1)
 	}
 }

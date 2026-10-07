@@ -13,6 +13,8 @@ import (
 const finishedLog = `I1006 sql_test_base.cc:906] CSV: "","code:LE","code:LE_INT64_<1>_INT64_<2>",true,true,ALLOW_UNIMPLEMENTED
 I1006 sql_test_base.cc:906] CSV: "","code:Least","code:Least_ARRAY<INT64>_<1, NULL>",false,true,ALLOW_UNIMPLEMENTED
 I1006 sql_test_base.cc:906] CSV: "","graph_test","graph_test:match",false,true,ALLOW_UNIMPLEMENTED
+I1006 sql_test_base.cc:906] CSV: "","code:GE","code:GE_INT64_<1>_INT64_<2>",false,true,ALLOW_ERROR_OR_WRONG_ANSWER
+I1006 sql_test_base.cc:906] CSV: "","code:GT","code:GT_INT64_<1>_INT64_<2>",true,true,ALLOW_ERROR_OR_WRONG_ANSWER
   Location: FILE-compliance_test_cases.cc-LINE-875
       Name: code:Least_ARRAY<INT64>_<1, NULL>
 ==== GOOGLESQL COMPLIANCE REPORT
@@ -63,10 +65,15 @@ func TestSummarize(t *testing.T) {
 		"code:LE_INT64_<1>_INT64_<2>":                         pass,
 		"code:Least_ARRAY<INT64>_<1, NULL>":                   fail,
 		"graph_test:match":                                    unsupported,
+		"code:GE_INT64_<1>_INT64_<2>":                         known,
+		"code:GT_INT64_<1>_INT64_<2>":                         pass,
 		"code:safe_error_mode__safe_generate_array_INT64_<1>": pass,
 	}
 	if !reflect.DeepEqual(s.outcomes, want) {
 		t.Errorf("outcomes = %v, want %v", s.outcomes, want)
+	}
+	if want := []string{"code:GT_INT64_<1>_INT64_<2>"}; !reflect.DeepEqual(s.removable, want) {
+		t.Errorf("removable = %v, want %v", s.removable, want)
 	}
 	// Shard 2 has no report, and shard 3 left no log.
 	if want := []int{2, 3}; !reflect.DeepEqual(s.unfinished, want) {
@@ -77,8 +84,10 @@ func TestSummarize(t *testing.T) {
 	s.writeMarkdown(&markdown)
 	for _, line := range []string{
 		"**Shards that did not finish:** [2 3] of 3.",
-		"| Pass | 2 |", "| Fail | 1 |", "| Unsupported | 1 |", "| Total | 4 |",
-		"| `code:Least` | 1 |",
+		"| Pass | 3 |", "| Fail | 1 |", "| Known failure | 1 |", "| Unsupported | 1 |",
+		"| Total | 6 |", "| `code:Least` | 1 |", "| `code:GE` | 1 |",
+		"**Failures:** 1. Fix them", "- `code:Least_ARRAY<INT64>_<1, NULL>`",
+		"**Known failures that pass:** 1. Remove them", "- `code:GT_INT64_<1>_INT64_<2>`",
 	} {
 		if !strings.Contains(markdown.String(), line) {
 			t.Errorf("Markdown lacks %q:\n%s", line, markdown.String())
@@ -89,7 +98,9 @@ func TestSummarize(t *testing.T) {
 	if err := s.writeResults(&results); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := results.String(), "code:LE_INT64_<1>_INT64_<2>\tpass\n"+
+	if got, want := results.String(), "code:GE_INT64_<1>_INT64_<2>\tknown\n"+
+		"code:GT_INT64_<1>_INT64_<2>\tpass\n"+
+		"code:LE_INT64_<1>_INT64_<2>\tpass\n"+
 		"code:Least_ARRAY<INT64>_<1, NULL>\tfail\n"+
 		"code:safe_error_mode__safe_generate_array_INT64_<1>\tpass\n"+
 		"graph_test:match\tunsupported\n"; got != want {

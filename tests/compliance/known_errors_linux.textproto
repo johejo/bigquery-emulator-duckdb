@@ -1,0 +1,20 @@
+# proto-file: googlesql/compliance/known_error.proto
+# proto-message: KnownErrorFile
+#
+# Compliance tests the emulator fails on Linux only, in addition to known_errors.textproto. CI runs
+# them on aarch64; the reference implementation's long double differs on x86-64, so its results
+# there may differ too.
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, whose precision differs by platform, and the emulator's results match it on some platforms only"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params_2"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_stddev_samp_double_extreme"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_var_pop_double_extreme_inf"
+  label: "stat_aggregation_test:corr_double_extreme_negative_slope"
+  label: "stat_aggregation_test:stddev_pop_double_extreme"
+  label: "stat_aggregation_test:stddev_samp_double_extreme"
+  label: "stat_aggregation_test:var_pop_double_extreme_inf"
+  label: "stat_aggregation_test:var_samp_double_extreme_inf"
+}

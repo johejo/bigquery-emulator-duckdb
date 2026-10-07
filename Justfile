@@ -69,12 +69,13 @@ e2e *args:
     bazelisk build //:bigquery-emulator-duckdb
     go run ./tools/e2e "$@"
 
-# GoogleSQL's compliance tests against the emulator; not part of `check` while most cases fail.
+# GoogleSQL's compliance tests against the emulator; not part of `check`, since they take long.
 # Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
 compliance *args:
     bazelisk test //:compliance_test {{args}}
 
-# Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish.
+# Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish or a
+# known failure passes.
 # Extra arguments go to tools/compliancesummary, such as -results FILE for each statement's outcome.
 compliance-summary *args:
     go run ./tools/compliancesummary {{args}} bazel-testlogs/compliance_test

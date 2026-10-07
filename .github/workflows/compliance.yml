@@ -1,16 +1,13 @@
 name: Compliance
 
-# GoogleSQL's compliance tests, for measuring how long they take on CI and whether their results
-# are stable before they gate anything. The job succeeds while every shard finishes, whatever the
-# statements' results; the summary reports them.
+# GoogleSQL's compliance tests. A statement fails the job unless it passes or a known error in
+# tests/compliance/known_errors.textproto allows its outcome.
 on:
   push:
     branches: [main]
-  # A pull request runs it only when it changes how the tests run or are summarized.
+  # Every pull request runs it, since a workflow skipped by a path filter leaves a required check
+  # pending.
   pull_request:
-    paths:
-      - .github/workflows/compliance.yml
-      - tools/compliancesummary/**
   workflow_dispatch:
 
 permissions:
@@ -78,11 +75,10 @@ jobs:
         with:
           path: ~/.cache/bazel-disk
           key: ${{ steps.disk-cache.outputs.cache-primary-key }}
-      # Bazel exits with 3 when tests fail, which most statements still do; any other failure,
-      # such as a crash, fails the step. The logs of failing statements would flood the output.
+      # The logs of failing statements would flood the output; the summary lists them.
       - name: Compliance tests
         id: tests
-        run: nix develop --command just compliance --test_output=summary || [ $? -eq 3 ]
+        run: nix develop --command just compliance --test_output=summary
       # A shard that did not finish, such as one that timed out, fails this step.
       - name: Summary
         if: (success() || failure()) && steps.tests.outcome != 'skipped'
