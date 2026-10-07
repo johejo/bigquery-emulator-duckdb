@@ -103,9 +103,12 @@ expected result from one layer to another.
   regenerated. `//:function_probe` builds calls from GoogleSQL's signatures: write a hint only for
   a form it cannot build, and extend it rather than writing hints for a whole class of forms.
 - **GoogleSQL's compliance tests** (`just compliance`) check query results broadly against
-  GoogleSQL's reference implementation, which is not BigQuery. Failures are listed in
-  `tests/compliance/known_errors.textproto`; the bugs they found are `!>` cases of
-  `scalars/known_bugs.txt`, each to be fixed and turned into a `=>` case.
+  GoogleSQL's reference implementation, which is not BigQuery. CI fails on a statement that
+  fails unless `tests/compliance/known_errors.textproto`, or the file for a platform it fails on
+  only, lists it by name, and on a listed one that passes, so a change that fixes a statement
+  removes it from the list and one that newly fails a statement, such as by supporting a function,
+  lists it with the reason; `just compliance-summary` names both. The bugs they found are `!>`
+  cases of `scalars/known_bugs.txt`, each to be fixed and turned into a `=>` case.
 - **C++ tests** (`just test`) check what clients cannot observe, such as translation edge cases,
   or runn cannot drive, such as many concurrent connections.
 

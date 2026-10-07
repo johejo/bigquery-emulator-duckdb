@@ -216,8 +216,14 @@ class EmulatorTestDriver : public googlesql::TestDriver {
   // Queries run in UTC, BigQuery's default time zone, unless they name another.
   const absl::TimeZone GetDefaultTimeZone() const override { return absl::UTCTimeZone(); }
 
+  // Only a time zone that is UTC under another name, such as Etc/UTC or +00, which never moves
+  // away from UTC's offset.
   absl::Status SetDefaultTimeZone(const std::string& default_time_zone) override {
-    if (default_time_zone != "UTC") {
+    absl::TimeZone zone;
+    absl::TimeZone::CivilTransition transition;
+    if (!googlesql::functions::MakeTimeZone(default_time_zone, &zone).ok() ||
+        zone.At(absl::UnixEpoch()).offset != 0 ||
+        zone.NextTransition(absl::InfinitePast(), &transition)) {
       return absl::UnimplementedError("Default time zone " + default_time_zone);
     }
     return absl::OkStatus();

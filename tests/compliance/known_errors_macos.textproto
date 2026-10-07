@@ -1,0 +1,17 @@
+# proto-file: googlesql/compliance/known_error.proto
+# proto-message: KnownErrorFile
+#
+# Compliance tests the emulator fails on macOS only, in addition to known_errors.textproto.
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, whose precision differs by platform, and the emulator's results match it on some platforms only"
+  label: "analytic_stat_aggregation_test:analytic_stats_double_column_covar_pop_double_extreme_inf"
+  label: "analytic_stat_aggregation_test:analytic_stats_double_column_covar_samp_double_extreme_inf"
+  label: "analytic_stat_aggregation_test:analytic_stats_double_column_rows_unbounded_current_row_params"
+  label: "analytic_stat_aggregation_test:analytic_stats_double_column_rows_unbounded_current_row_params_2"
+  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_KDjrF6nUHds_157e@308>"
+  label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_Z2n3zEGqg0Q_08, NULL>"
+  label: "stat_aggregation_test:covar_pop_double_extreme_negative_slope"
+  label: "stat_aggregation_test:covar_samp_double_extreme_negative_slope"
+}

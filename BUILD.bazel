@@ -708,25 +708,59 @@ cc_test(
     ],
 )
 
+# The compliance tests the emulator fails, including those it fails on this platform only, since
+# the reference implementation's results depend on its long double.
+_COMPLIANCE_KNOWN_ERRORS = select({
+    "@platforms//os:macos": [
+        "tests/compliance/known_errors.textproto",
+        "tests/compliance/known_errors_macos.textproto",
+    ],
+    "//conditions:default": [
+        "tests/compliance/known_errors.textproto",
+        "tests/compliance/known_errors_linux.textproto",
+    ],
+})
+
 # GoogleSQL's compliance tests run against the emulator, compared with GoogleSQL's reference
-# implementation. Not part of `bazelisk test //...` while most cases fail; run `just compliance`.
+# implementation. Not part of `bazelisk test //...`, since it takes long; run `just compliance`.
 cc_test(
     name = "compliance_test",
     timeout = "eternal",
     srcs = ["tests/compliance/test_driver.cc"],
-    args = [
+    args = select({
+        "@platforms//os:macos": [
+            "--known_error_files=$(rootpath tests/compliance/known_errors.textproto)," +
+            "$(rootpath tests/compliance/known_errors_macos.textproto)",
+        ],
+        "//conditions:default": [
+            "--known_error_files=$(rootpath tests/compliance/known_errors.textproto)," +
+            "$(rootpath tests/compliance/known_errors_linux.textproto)",
+        ],
+    }) + [
         "--googlesql_reference_impl_validate_timestamp_precision",
-        "--known_error_files=$(rootpath tests/compliance/known_errors.textproto)",
         # Known errors are coarse; one that covers a passing statement is not a failure.
         "--googlesql_compliance_allow_removable_known_errors",
+        # The tables of prepare_database are checked against output recorded in the test files,
+        # some of it with America/Los_Angeles as the default time zone where the reference
+        # implementation runs in UTC, as BigQuery does. Their TIMESTAMPs are left out of the
+        # comparison, which checks the reference implementation rather than the emulator.
+        "'--file_based_test_driver_ignore_regex=[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:.]+[+]00'",
         # GoogleSQL 2026.9.2 builds ill-typed INT64 cases for these vector functions and aborts.
         # The depth limit detector only logs how deep the engine can nest, which takes hours
-        # through DuckDB.
+        # through DuckDB. The files that set a default time zone other than UTC fail to set it under
+        # no statement name, which no known error can list, and run the rest in UTC instead.
+        # match_recognize_in_sql_functions fails to prepare a function that uses MATCH_RECOGNIZE,
+        # which the emulator's language options leave out.
         "--gtest_filter=-Test*DotProduct/*:TestsManhattanDistance/*:TestsL1Norm/*:TestsL2Norm/*:" +
-        "TestDepthLimitDetectorTestCases/*",
+        "TestDepthLimitDetectorTestCases/*:" +
+        "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/cast_timestamp_with_timezone_test:" +
+        "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/default_timezone_ist_test:" +
+        "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/default_timezone_pst_test:" +
+        "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/match_recognize_in_sql_functions_test:" +
+        "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/timestamp_with_default_time_zone_2_test",
     ],
     copts = ["-std=c++20"],
-    data = ["tests/compliance/known_errors.textproto"],
+    data = _COMPLIANCE_KNOWN_ERRORS,
     shard_count = 32,
     tags = ["manual"],
     deps = [
