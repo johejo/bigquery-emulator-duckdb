@@ -196,6 +196,16 @@ note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, frien
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1); SELECT f(1)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) RETURNS INT64 AS (x + 1); SELECT f(id) FROM t
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS ((SELECT x)); SELECT f(id) FROM t
+query `CREATE FUNCTION` | CREATE OR REPLACE TEMP FUNCTION f(x INT64) AS (x); SELECT f(1)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) AS (x = x); SELECT f(RAND())
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) AS ((SELECT x)); SELECT f(RAND())
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) AS (1 / x); SELECT SAFE.f(0)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT f(1)
+query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'; SELECT f(1)
+note `CREATE FUNCTION` | Typed temporary SQL UDFs are inlined within their query; persistent, templated (ANY TYPE), JavaScript and aggregate UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` calls, UDF options, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
 

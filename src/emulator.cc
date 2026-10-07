@@ -531,7 +531,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     std::get<QueryJob>(job.configuration).destination_table = request.destination_table;
 
     if (const auto script = ParseScript(request.query)) {
-      std::get<QueryJob>(job.configuration).statement_type = kScriptStatementType;
+      std::get<QueryJob>(job.configuration).statement_type = ScriptStatementType(*script);
       job.result =
           RunScript(request, *script, settings.default_project, settings.default_dataset, setup);
       return;

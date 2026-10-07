@@ -1,0 +1,67 @@
+# Typed SQL UDF cases from GoogleSQL's compliance/testdata/call_sql_udf.test.
+# Each expected value is from that data, where the reference agrees with BigQuery.
+
+CREATE TEMP FUNCTION Thousand() AS (1000);
+SELECT Thousand() + Thousand()
+=> "2000"
+
+CREATE TEMP FUNCTION Thousand() AS (1000);
+CREATE TEMP FUNCTION TimesThousand(value INT64) AS (value * Thousand());
+SELECT TimesThousand(2)
+=> "2000"
+
+CREATE TEMP FUNCTION StringIdentity(value STRING) AS (value);
+SELECT StringIdentity('a')
+=> "a"
+
+CREATE TEMP FUNCTION MyStringIsNull(value STRING) AS (value IS NULL);
+SELECT MyStringIsNull(NULL)
+=> "true"
+
+CREATE TEMP FUNCTION MyStringIsNull(value STRING) AS (value IS NULL);
+SELECT MyStringIsNull('a')
+=> "false"
+
+CREATE TEMP FUNCTION IntegerToDouble(value INT64) RETURNS FLOAT64 AS (value);
+SELECT TYPEOF(IntegerToDouble(1))
+=> "FLOAT64"
+
+CREATE TEMP FUNCTION IntegerEquals(a INT64, b INT64) AS (a = b);
+SELECT IntegerEquals(1, 2)
+=> "false"
+
+# Volatile arguments evaluate once even when the body references them twice.
+CREATE TEMP FUNCTION FloatReflexiveEquals(a FLOAT64) AS (a = a);
+SELECT FloatReflexiveEquals(RAND())
+=> "true"
+
+CREATE TEMP FUNCTION StringIdentityCorrelated(value STRING) AS ((SELECT value));
+SELECT StringIdentityCorrelated('a')
+=> "a"
+
+CREATE TEMP FUNCTION AggregateArray(value ARRAY<INT64>) AS
+  (ARRAY(SELECT elem + 1 FROM UNNEST(value) elem WITH OFFSET ORDER BY OFFSET));
+SELECT TO_JSON_STRING(AggregateArray([1, 2, 3]))
+=> "[2,3,4]"
+
+# BigQuery's SQL UDF documentation:
+# https://cloud.google.com/bigquery/docs/user-defined-functions#sql_udfs
+CREATE TEMP FUNCTION AddFourAndDivide(x INT64, y INT64) RETURNS FLOAT64 AS ((x + 4) / y);
+SELECT AddFourAndDivide(3, 2)
+=> "3.5"
+
+# https://cloud.google.com/bigquery/docs/user-defined-functions#scalar_subqueries
+CREATE TEMP TABLE users AS
+  (SELECT 1 AS id, 10 AS age UNION ALL SELECT 2 AS id, 30 AS age UNION ALL SELECT 3 AS id, 10 AS age);
+CREATE TEMP FUNCTION countUserByAge(userAge INT64) AS
+  ((SELECT COUNT(1) FROM users WHERE age = userAge));
+SELECT countUserByAge(10)
+=> "2"
+
+# The same documented scalar subquery with a column passed as its argument.
+CREATE TEMP TABLE users AS
+  (SELECT 1 AS id, 10 AS age UNION ALL SELECT 2 AS id, 30 AS age UNION ALL SELECT 3 AS id, 10 AS age);
+CREATE TEMP FUNCTION countUserByAge(userAge INT64) AS
+  ((SELECT COUNT(1) FROM users WHERE age = userAge));
+SELECT countUserByAge(age) FROM UNNEST([10]) AS age
+=> "2"

@@ -1,11 +1,13 @@
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "googlesql/public/constant.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -241,6 +243,71 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return std::nullopt;
     }
     return column->second;
+  }
+  if (expr.Is<googlesql::ResolvedWithExpr>()) {
+    const auto& with = *expr.GetAs<googlesql::ResolvedWithExpr>();
+    std::vector<const googlesql::ResolvedNode*> subqueries;
+    with.expr()->GetDescendantsWithKinds({googlesql::RESOLVED_SUBQUERY_EXPR}, &subqueries);
+    bool has_subquery = !subqueries.empty();
+    for (int i = 1; i < with.assignment_list_size(); ++i) {
+      with.assignment_list(i)->expr()->GetDescendantsWithKinds({googlesql::RESOLVED_SUBQUERY_EXPR},
+                                                               &subqueries);
+      has_subquery = has_subquery || !subqueries.empty();
+    }
+    Scope body_scope = has_subquery ? Nested(scope, columns) : scope;
+    Columns bound = has_subquery ? body_scope.outer : columns;
+    if (has_subquery) {
+      // DuckDB forbids subqueries in lambdas. Deterministic bindings can instead be columns
+      // of a scalar subquery; reject volatile bindings, whose per-row evaluation it loses.
+      std::string query = "SELECT 1";
+      for (const auto& assignment : with.assignment_list()) {
+        std::vector<const googlesql::ResolvedNode*> calls;
+        assignment->expr()->GetDescendantsSatisfying(
+            &googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCall>, &calls);
+        for (const auto* node : calls) {
+          const auto* call = node->GetAs<googlesql::ResolvedFunctionCall>();
+          if (call->function()->function_options().volatility ==
+              googlesql::FunctionEnums::VOLATILE) {
+            return Unsupported(scope, "volatile SQL UDF arguments with subquery bodies");
+          }
+        }
+        const auto value = Expression(*assignment->expr(), body_scope, bound);
+        if (!value) {
+          return std::nullopt;
+        }
+        const std::string name = ColumnName(assignment->column().column_id());
+        query.insert(0, "SELECT q.*, " + *value + " AS " + name + " FROM (");
+        query += ") AS q";
+        bound[assignment->column().column_id()] = name;
+        body_scope.outer[assignment->column().column_id()] = name;
+      }
+      const auto body = Expression(*with.expr(), body_scope, bound);
+      return body ? std::optional("(SELECT " + *body + " FROM (" + query + ") AS q)")
+                  : std::nullopt;
+    }
+    // A one-element list binds each argument outside the lambda, exactly once per row and
+    // within the surrounding conditional branch. Later bindings may reference earlier ones.
+    std::vector<std::string> wrappers;
+    for (const auto& assignment : with.assignment_list()) {
+      const auto value = Expression(*assignment->expr(), body_scope, bound);
+      if (!value) {
+        return std::nullopt;
+      }
+      const std::string name = scope.context.FreshName("_udf");
+      wrappers.push_back("list_transform([struct_pack(value := " + *value + ")], " + name + " -> ");
+      const std::string reference = name + ".value";
+      bound[assignment->column().column_id()] = reference;
+      body_scope.outer[assignment->column().column_id()] = reference;
+    }
+    auto body = Expression(*with.expr(), body_scope, bound);
+    if (!body) {
+      return std::nullopt;
+    }
+    for (const auto& wrapper : std::views::reverse(wrappers)) {
+      body->insert(0, wrapper);
+      *body += ")[1]";
+    }
+    return body;
   }
   if (expr.Is<googlesql::ResolvedParameter>()) {
     const auto* parameter = expr.GetAs<googlesql::ResolvedParameter>();

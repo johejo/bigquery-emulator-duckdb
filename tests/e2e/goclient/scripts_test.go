@@ -226,3 +226,104 @@ func TestTemporaryTablesRejectedForms(t *testing.T) {
 		t.Errorf("%s: got %v, want an unsupported error", sql, err)
 	}
 }
+
+// Temporary functions have query scope, and declarations and calls are case-insensitive.
+// https://cloud.google.com/bigquery/docs/user-defined-functions
+func TestTemporaryFunctionsHaveQueryScope(t *testing.T) {
+	client := newClient(t)
+	for _, name := range []string{"Foo", "foo"} {
+		if _, _, err := runScript(t, client, "", "CREATE TEMP FUNCTION "+name+"(x INT64) AS (x); SELECT FOO(1)"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err := runScript(t, client, "", "SELECT foo(1)"); err == nil {
+		t.Error("a temporary function outlived its query")
+	}
+	_, _, err := runScript(t, client, "", "CREATE TEMP FUNCTION f() AS (1); CREATE TEMP FUNCTION F() AS (2); SELECT f()")
+	if err == nil {
+		t.Error("duplicate function declarations succeeded")
+	}
+}
+
+func TestTemporaryFunctionsRejectUnsupportedForms(t *testing.T) {
+	client := newClient(t)
+	for _, sql := range []string{
+		"CREATE FUNCTION d.f(x INT64) AS (x); SELECT 1",
+		"@{test_hint = 1} CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
+		"CREATE OR REPLACE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION IF NOT EXISTS f(x INT64) AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'; SELECT 1",
+		"BEGIN CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); EXCEPTION WHEN ERROR THEN SELECT 1; END",
+		"CREATE TEMP FUNCTION f(x FLOAT64) AS ((SELECT SUM(v) FROM UNNEST([x]) AS v)); SELECT f(RAND())",
+		"CREATE TEMP FUNCTION parse_number(x STRING) AS (CAST(x AS INT64)); SELECT SAFE.parse_number('invalid')",
+		"CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION f(x INT64) AS (x); CREATE VIEW go_udf_views.v AS SELECT ABS(f(1)) AS x",
+	} {
+		_, _, err := runScript(t, client, "", sql)
+		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
+			t.Errorf("%s: got %v, want an unsupported error", sql, err)
+		}
+	}
+	for _, sql := range []string{
+		"CREATE TEMP FUNCTION d.f(x INT64) AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION `d.f`(x INT64) AS (x); SELECT 1",
+		"CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f('wrong type')",
+		"CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f(1, 2)",
+		"DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f() AS (x); SELECT f()",
+		"CREATE TEMP FUNCTION f(x FLOAT64) AS (1 / x); SELECT f(0)",
+		"CREATE TEMP FUNCTION f(x FLOAT64) AS (x); SELECT f(1 / 0)",
+	} {
+		if _, _, err := runScript(t, client, "", sql); err == nil {
+			t.Errorf("%s: succeeded, want an error", sql)
+		}
+	}
+}
+
+// https://cloud.google.com/bigquery/docs/multi-statement-queries#write_a_multi-statement_query
+// excludes TEMP function declarations followed by one SELECT from multi-statement queries.
+func TestTemporaryFunctionQueryReportsSelectAndResolvedTypes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	job, status, err := runScript(t, client, "", `
+CREATE TEMP FUNCTION AddFourAndDivide(x INT64, y INT64) RETURNS FLOAT64 AS ((x + 4) / y);
+SELECT AddFourAndDivide(3, 2) AS answer;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statistics := status.Statistics.Details.(*bigquery.QueryStatistics)
+	if statistics.StatementType != "SELECT" {
+		t.Errorf("got statement type %q, want SELECT", statistics.StatementType)
+	}
+	rows, err := job.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row struct{ Answer float64 }
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows.Schema) != 1 || rows.Schema[0].Type != bigquery.FloatFieldType {
+		t.Errorf("got schema %v, want one FLOAT column", rows.Schema)
+	}
+}
+
+func TestTemporaryFunctionsAcceptNamedQueryParameters(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	query := client.Query(`CREATE TEMP FUNCTION StringIdentity(value STRING) AS (value);
+SELECT StringIdentity(@value) AS answer`)
+	query.Parameters = []bigquery.QueryParameter{{Name: "value", Value: "a"}}
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row struct{ Answer string }
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	// StringIdentity('a') is recorded in GoogleSQL's call_sql_udf.test.
+	if row.Answer != "a" {
+		t.Errorf("got %q, want a", row.Answer)
+	}
+}

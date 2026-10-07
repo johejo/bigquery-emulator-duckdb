@@ -1,5 +1,6 @@
 #include "src/analyzer.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -17,6 +18,7 @@
 #include "googlesql/public/analyzer_output.h"
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/sql_function.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
@@ -92,6 +94,31 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
   options.set_language(GoogleSqlLanguageOptions());
+  options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
+  // Keep the inliner's argument bindings as expressions. Turning them into uncorrelated
+  // scalar subqueries would let DuckDB evaluate RAND() just once for an entire input table.
+  if (settings.script != nullptr) {
+    options.disable_rewrite(googlesql::REWRITE_WITH_EXPR);
+  }
+  // A view keeps its original GoogleSQL text, which cannot call a job-local function once
+  // that job ends. Check before inlining erases the function calls.
+  options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) {
+    const auto* statement = output.resolved_statement();
+    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateViewStmt>()) {
+      std::vector<const googlesql::ResolvedNode*> calls;
+      statement->GetDescendantsSatisfying(
+          &googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCall>, &calls);
+      if (std::ranges::any_of(calls, [](const auto* node) {
+            return node->template GetAs<googlesql::ResolvedFunctionCall>()
+                ->function()
+                ->template Is<googlesql::SQLFunction>();
+          })) {
+        return absl::UnimplementedError(
+            "The emulator does not support views that call temporary UDFs");
+      }
+    }
+    return absl::OkStatus();
+  });
   // BigQuery interprets civil times without an explicit zone as UTC.
   options.set_default_time_zone(absl::UTCTimeZone());
   options.set_error_message_mode(mode);

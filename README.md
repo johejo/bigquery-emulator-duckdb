@@ -127,6 +127,11 @@ Behavior that applies across them:
   and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
   cannot read them. Temporary, recursive and value-table views, and views that read temporary
   tables, are unsupported.
+- Typed SQL UDFs created with `CREATE TEMP FUNCTION` are available within their query and
+  are expanded by GoogleSQL before translation. `ANY TYPE`, JavaScript, persistent and aggregate
+  UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` UDF calls, UDF options, and views that call temporary
+  UDFs are unsupported. Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do not support dry runs,
+  destination tables or positional parameters.
 - Multi-statement queries return the result of the last statement that ran. They create no
   child jobs and cannot be dry runs. Their temporary tables are dropped when they end, and no
   dataset holds them. Transactions, `EXECUTE IMMEDIATE`, `CALL` and assignments to system
