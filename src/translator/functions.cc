@@ -947,6 +947,45 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
   return *kAggregates;
 }
 
+// PERCENTILE_CONT and PERCENTILE_DISC read their result off the partition's values, which
+// list() sorts as GoogleSQL does: NULLs first, then NaNs, then the other values.
+constexpr std::string_view kPercentileOrder = "$1 NULLS FIRST";
+constexpr std::string_view kFloatPercentileOrder = "NOT isnan($1) NULLS FIRST, $1 NULLS FIRST";
+
+// GoogleSQL's PERCENTILE_CONT over the sorted list `sql`, of FLOAT64 or, with `kNumeric`, of
+// NUMERIC values.
+template <bool kNumeric>
+std::string PercentileCont(const std::string& sql, const std::vector<std::string>& arguments,
+                           const std::string& /*tail*/) {
+  return std::string(kNumeric ? "bq_percentile_cont_numeric(" : "bq_percentile_cont(") + sql +
+         ", " + arguments.at(1) + ")";
+}
+
+// The element of the sorted list `sql` at the position GoogleSQL's PERCENTILE_DISC takes, for a
+// FLOAT64 or, with `kNumeric`, a NUMERIC percentile.
+template <bool kNumeric>
+std::string PercentileDisc(const std::string& sql, const std::vector<std::string>& arguments,
+                           const std::string& /*tail*/) {
+  return "list_extract(" + sql + ", " +
+         (kNumeric ? "bq_percentile_disc_position_numeric(len("
+                   : "bq_percentile_disc_position(len(") +
+         sql + "), " + arguments.at(1) + "))";
+}
+
+// PERCENTILE_DISC of values of `type`, for a percentile of `percentile`.
+AggregateRule PercentileDiscRule(googlesql::TypeKind type, googlesql::TypeKind percentile) {
+  const bool numeric = percentile == googlesql::TYPE_NUMERIC;
+  return {
+      .function = "list",
+      .type = type,
+      .conditions = {{.argument = 2, .types = {percentile}}},
+      .arguments = {"$1"},
+      .order = type == googlesql::TYPE_DOUBLE ? kFloatPercentileOrder : kPercentileOrder,
+      .nulls = AggregateRule::Nulls::kFilterUnlessRespected,
+      .finish = numeric ? PercentileDisc<true> : PercentileDisc<false>,
+  };
+}
+
 // Functions that only take a window.
 const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytics() {
   using enum AggregateRule::Nulls;
@@ -963,6 +1002,24 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
           {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier}}},
           {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier}}},
           {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier}}},
+          {"PERCENTILE_CONT",
+           {{.function = "list",
+             .type = googlesql::TYPE_DOUBLE,
+             .arguments = {"$1"},
+             .order = kFloatPercentileOrder,
+             .nulls = kFilterUnlessRespected,
+             .finish = PercentileCont<false>},
+            {.function = "list",
+             .type = googlesql::TYPE_NUMERIC,
+             .arguments = {"$1"},
+             .order = kPercentileOrder,
+             .nulls = kFilterUnlessRespected,
+             .finish = PercentileCont<true>}}},
+          {"PERCENTILE_DISC",
+           {PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_DOUBLE),
+            PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_NUMERIC),
+            PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_DOUBLE),
+            PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_NUMERIC)}},
       };
   return *kAnalytics;
 }

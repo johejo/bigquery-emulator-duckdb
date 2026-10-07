@@ -78,6 +78,10 @@ class Arguments {
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
   }
 
+  [[nodiscard]] duckdb_vector Vector(idx_t column) const {
+    return duckdb_data_chunk_get_vector(input_, column);
+  }
+
   [[nodiscard]] idx_t Row() const { return row_; }
 
   [[nodiscard]] bool IsNull(idx_t column) const {
@@ -216,5 +220,7 @@ void RegisterDatetimeFunctions(duckdb_connection connection);
 void RegisterJsonFunctions(duckdb_connection connection);
 // aead.cc: AEAD encryption with Tink keysets.
 void RegisterAeadFunctions(duckdb_connection connection);
+// percentile.cc: PERCENTILE_CONT and PERCENTILE_DISC over the sorted values of a partition.
+void RegisterPercentileFunctions(duckdb_connection connection);
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

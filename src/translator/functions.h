@@ -124,6 +124,8 @@ struct AggregateRule {
     kModifier,
     // It always ignores NULLs, and RESPECT NULLS is unsupported.
     kIgnore,
+    // It leaves out the rows whose first argument is NULL unless the call has RESPECT NULLS.
+    kFilterUnlessRespected,
   };
   enum class Distinct : std::uint8_t { kAllowed, kAlways, kUnsupported };
   // How the function takes LIMIT.
@@ -138,8 +140,12 @@ struct AggregateRule {
   std::string_view function;
   // The type the first argument has to have; TYPE_UNKNOWN accepts any.
   googlesql::TypeKind type = googlesql::TYPE_UNKNOWN;
+  // What the other arguments have to be; only their types count.
+  std::vector<Condition> conditions = {};
   // The DuckDB arguments, with $n for argument n, when they differ from the BigQuery ones.
   std::vector<std::string_view> arguments = {};
+  // The order of the DuckDB call, with $n for argument n, when the BigQuery call has none.
+  std::string_view order = {};
   // The spellings of the arguments a call leaves out, by position; empty for none.
   std::vector<std::string_view> defaults = {};
   Nulls nulls = Nulls::kRespect;
@@ -184,5 +190,9 @@ std::optional<std::string> TranslateFunction(std::string_view upper_name,
 // The DuckDB arguments of a call to an aggregate rule, given the translated BigQuery ones.
 std::vector<std::string> AggregateArguments(const AggregateRule& rule,
                                             const std::vector<std::string>& arguments);
+
+// The DuckDB ORDER BY items of a call to an aggregate rule without an order of its own, given
+// the translated BigQuery arguments; empty when the rule has no order.
+std::string AggregateOrder(const AggregateRule& rule, const std::vector<std::string>& arguments);
 
 }  // namespace bigquery_emulator_duckdb::translator
