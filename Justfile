@@ -80,11 +80,6 @@ compliance *args:
 compliance-summary *args:
     go run ./tools/compliancesummary {{args}} bazel-testlogs/compliance_test
 
-# Formats Bazel Build Event Protocol JSON files for the GitHub Actions job summary.
-[positional-arguments]
-bazel-summary *args:
-    go run ./tools/bazelsummary "$@"
-
 # Evaluates a query on GoogleSQL's reference implementation, which is not BigQuery: a lead for
 # what to check on BigQuery, never an expected value.
 reference sql:
