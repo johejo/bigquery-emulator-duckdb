@@ -92,14 +92,14 @@ using TableAlterAction =
 // has when the statement runs.
 struct TableAlteration {
   TableReference table;
-  std::vector<TableAlterAction> actions;
+  std::vector<TableAlterAction> actions = {};
   bool if_exists = false;
 };
 
 // ALTER SCHEMA SET OPTIONS, which the emulator applies to what the dataset has when it runs.
 struct DatasetAlteration {
   DatasetReference dataset;
-  OptionUpdates options;
+  OptionUpdates options = {};
   bool if_exists = false;
 };
 

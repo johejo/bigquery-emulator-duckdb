@@ -13,10 +13,10 @@ build --host_action_env=PATH
 build --action_env=TZDIR
 build --test_env=TZDIR
 
-# Enable warnings for this repository's sources, including build tools, without changing
-# dependency compilation flags.
-build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow
-build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow
+# Enable warnings for this repository's sources, including build tools, and fail on them, without
+# changing dependency compilation flags.
+build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Werror
+build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Werror
 
 # Silence warnings from dependencies, which this repository cannot fix, while keeping warnings
 # from its own C++ sources. -w covers dependency sources. Dependency headers are found through
