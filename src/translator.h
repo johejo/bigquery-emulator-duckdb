@@ -1,7 +1,9 @@
 #pragma once
 
+#include <map>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "googlesql/public/analyzer.h"
@@ -57,16 +59,54 @@ struct DatasetDefinition {
   bool if_not_exists = false;
 };
 
-// The column an ALTER TABLE ADD COLUMN adds.
-struct AddedColumn {
-  TableReference table;
+// What SET OPTIONS sets on a table or dataset: each option it names replaces the value there,
+// and NULL clears it.
+struct OptionUpdates {
+  std::optional<std::string> description = {};
+  std::optional<std::string> friendly_name = {};
+  std::optional<std::map<std::string, std::string>> labels = {};
+};
+
+// ALTER TABLE ADD COLUMN [IF NOT EXISTS].
+struct AddColumnAction {
   FieldSchema field;
-  bool if_table_exists = false;
-  bool if_column_not_exists = false;
+  bool if_not_exists = false;
+};
+
+// ALTER TABLE DROP COLUMN [IF EXISTS].
+struct DropColumnAction {
+  std::string name;
+  bool if_exists = false;
+};
+
+// ALTER TABLE RENAME TO, which keeps the table in its dataset.
+struct RenameTableAction {
+  std::string table_id;
+};
+
+using TableAlterAction =
+    std::variant<AddColumnAction, DropColumnAction, RenameTableAction, OptionUpdates>;
+
+// The actions of an ALTER TABLE, in order. DuckDB takes one action per ALTER and keeps neither
+// the BigQuery schema nor the metadata they change, so the emulator applies them to what the table
+// has when the statement runs.
+struct TableAlteration {
+  TableReference table;
+  std::vector<TableAlterAction> actions;
+  bool if_exists = false;
+};
+
+// ALTER SCHEMA SET OPTIONS, which the emulator applies to what the dataset has when it runs.
+struct DatasetAlteration {
+  DatasetReference dataset;
+  OptionUpdates options;
+  bool if_exists = false;
 };
 
 // A statement translated to DuckDB, with what the emulator needs to know about it besides its SQL.
 struct TranslatedStatement {
+  // Empty for ALTER TABLE and ALTER SCHEMA, whose DuckDB statements depend on what the table or
+  // dataset has when they run.
   std::string sql;
   // JobStatistics2.statementType: SELECT, INSERT, CREATE_TABLE_AS_SELECT, DROP_VIEW, ...
   std::string statement_type;
@@ -77,19 +117,21 @@ struct TranslatedStatement {
   std::optional<DatasetReference> ddl_target_dataset;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.
   std::optional<TableDefinition> table;
-  std::optional<AddedColumn> added_column;
+  std::optional<TableAlteration> altered_table;
   std::optional<ViewDefinition> view;
   std::optional<DatasetDefinition> dataset;
+  std::optional<DatasetAlteration> altered_dataset;
 };
 
 // Translates queries: projections, table reads, filters, ordering, limits, joins, CTEs,
 // aggregation, analytic functions, set operations, UNNEST and subqueries, with supported
-// expressions, INSERT, UPDATE, DELETE and MERGE, and CREATE TABLE [AS SELECT], CREATE SCHEMA
-// CREATE VIEW and DROP TABLE/VIEW/SCHEMA. Columns are bound by resolved ID across scan scopes.
-// nullopt means an unsupported construct, which `unsupported`, when given, then names. Errors are
-// not caught, so that a failed translation is not reported as an unsupported one. The statement's
-// catalog and TypeFactory must remain alive for this call. A statement of a script reads the
-// script's variables as catalog constants and its system variables from `system_variables`.
+// expressions, INSERT, UPDATE, DELETE and MERGE, and CREATE TABLE [AS SELECT], CREATE SCHEMA,
+// CREATE VIEW, ALTER TABLE, ALTER SCHEMA and DROP TABLE/VIEW/SCHEMA. Columns are bound by resolved
+// ID across scan scopes. nullopt means an unsupported construct, which `unsupported`, when given,
+// then names. Errors are not caught, so that a failed translation is not reported as an unsupported
+// one. The statement's catalog and TypeFactory must remain alive for this call. A statement of a
+// script reads the script's variables as catalog constants and its system variables from
+// `system_variables`.
 std::optional<TranslatedStatement> TranslateStatement(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},
     const DefaultDataset& defaults = {}, std::string* unsupported = nullptr,

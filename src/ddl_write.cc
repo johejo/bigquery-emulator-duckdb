@@ -5,13 +5,16 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
-#include "absl/strings/str_join.h"
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
 #include "src/column_metadata.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/references.h"
+#include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/translator.h"
@@ -42,23 +45,26 @@ DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
   return write;
 }
 
-DdlWrite AddColumnWrite(const AddedColumn& column) {
-  DdlWrite write{.metadata_statements = ColumnCommentStatements(column.table, {column.field})};
-  std::vector<std::string> skip;
-  if (column.if_table_exists) {
-    skip.push_back("NOT " + TableExists(column.table));
+// The options `updates` sets on the table's or dataset's `metadata`.
+template <typename Metadata>
+void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
+  if (updates.description.has_value()) {
+    metadata.description = *updates.description;
   }
-  if (column.if_column_not_exists) {
-    skip.push_back(std::format(
-        "EXISTS (SELECT 1 FROM duckdb_columns() WHERE database_name = {} AND schema_name = {}"
-        " AND table_name = {} AND lower(column_name) = {})",
-        QuoteLiteral(column.table.project_id), QuoteLiteral(column.table.dataset_id),
-        QuoteLiteral(column.table.table_id), QuoteLiteral(ToLowerAscii(column.field.name))));
+  if (updates.friendly_name.has_value()) {
+    metadata.friendly_name = *updates.friendly_name;
   }
-  if (!skip.empty()) {
-    write.skip_query = "SELECT 1 WHERE " + absl::StrJoin(skip, " OR ");
+  if (updates.labels.has_value()) {
+    metadata.labels = *updates.labels;
   }
-  return write;
+}
+
+// The column of `schema` named `name`; BigQuery's column names ignore case, as DuckDB's do.
+std::vector<FieldSchema>::iterator FindColumn(std::vector<FieldSchema>& schema,
+                                              const std::string& name) {
+  return std::ranges::find_if(schema, [&](const FieldSchema& field) {
+    return ToLowerAscii(field.name) == ToLowerAscii(name);
+  });
 }
 
 }  // namespace
@@ -119,12 +125,78 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
   return write;
 }
 
+std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
+                                              std::vector<FieldSchema> schema,
+                                              TableMetadata metadata) {
+  TableReference table = alteration.table;
+  std::vector<std::string> statements;
+  std::vector<std::string> added;
+  bool set_options = false;
+  for (const TableAlterAction& action : alteration.actions) {
+    if (const auto* add = std::get_if<AddColumnAction>(&action)) {
+      if (FindColumn(schema, add->field.name) != schema.end()) {
+        if (add->if_not_exists) {
+          continue;
+        }
+        throw ApiError::Invalid("Column already exists: " + add->field.name);
+      }
+      // Existing rows read an added REPEATED column as empty, as rows that leave it out later do;
+      // see RepeatedColumnDefaultStatements.
+      statements.push_back(std::format(
+          "ALTER TABLE {} ADD COLUMN {}{}", QualifiedName(table), ColumnDefinition(add->field),
+          add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
+      schema.push_back(add->field);
+      added.push_back(add->field.name);
+    } else if (const auto* drop = std::get_if<DropColumnAction>(&action)) {
+      const auto column = FindColumn(schema, drop->name);
+      if (column == schema.end()) {
+        if (drop->if_exists) {
+          continue;
+        }
+        throw ApiError::Invalid("Column not found: " + drop->name);
+      }
+      const auto names = [&](const std::string& field) {
+        return ToLowerAscii(field) == ToLowerAscii(column->name);
+      };
+      if ((metadata.time_partitioning.has_value() && names(metadata.time_partitioning->field)) ||
+          (metadata.range_partitioning.has_value() && names(metadata.range_partitioning->field))) {
+        throw ApiError::Invalid("Cannot drop partitioning column " + column->name);
+      }
+      if (std::ranges::any_of(metadata.clustering, names)) {
+        throw ApiError::Invalid("Cannot drop clustering column " + column->name);
+      }
+      statements.push_back(std::format("ALTER TABLE {} DROP COLUMN {}", QualifiedName(table),
+                                       QuoteIdentifier(column->name)));
+      schema.erase(column);
+    } else if (const auto* rename = std::get_if<RenameTableAction>(&action)) {
+      statements.push_back(std::format("ALTER TABLE {} RENAME TO {}", QualifiedName(table),
+                                       QuoteIdentifier(rename->table_id)));
+      table.table_id = rename->table_id;
+    } else {
+      ApplyOptionUpdates(std::get<OptionUpdates>(action), metadata);
+      set_options = true;
+    }
+  }
+  for (const std::string& name : added) {
+    if (const auto column = FindColumn(schema, name); column != schema.end()) {
+      std::ranges::move(ColumnCommentStatements(table, {*column}), std::back_inserter(statements));
+    }
+  }
+  if (set_options) {
+    statements.push_back(TableCommentStatement(table, metadata, schema));
+  }
+  return statements;
+}
+
+std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alteration,
+                                                DatasetMetadata metadata) {
+  ApplyOptionUpdates(alteration.options, metadata);
+  return DatasetMetadataStatements(alteration.dataset, metadata);
+}
+
 std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
   if (statement.table.has_value()) {
     return CreateTableWrite(*statement.table);
-  }
-  if (statement.added_column.has_value()) {
-    return AddColumnWrite(*statement.added_column);
   }
   if (statement.view.has_value()) {
     return CreateViewWrite(*statement.view);

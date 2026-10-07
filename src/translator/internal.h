@@ -17,6 +17,8 @@
 #include "src/type_mapping.h"
 
 namespace googlesql {
+class ResolvedAlterSchemaStmt;
+class ResolvedAlterTableSetOptionsStmt;
 class ResolvedAlterTableStmt;
 class ResolvedCreateSchemaStmt;
 class ResolvedCreateTableAsSelectStmt;
@@ -74,9 +76,10 @@ struct Context {
   std::optional<TableReference> ddl_target_table = {};
   std::optional<DatasetReference> ddl_target_dataset = {};
   std::optional<TableDefinition> table = {};
-  std::optional<AddedColumn> added_column = {};
+  std::optional<TableAlteration> altered_table = {};
   std::optional<ViewDefinition> view = {};
   std::optional<DatasetDefinition> dataset = {};
+  std::optional<DatasetAlteration> altered_dataset = {};
   int next_name = 0;
 
   // A name no other call returns, for WITH queries and lambda parameters.
@@ -193,10 +196,14 @@ std::optional<std::string> CreateTableAsSelect(
     const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope);
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope);
+std::optional<std::string> AlterTableSetOptions(
+    const googlesql::ResolvedAlterTableSetOptionsStmt& alter, const Scope& scope);
 std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
                                       const Scope& scope);
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
                                         const Scope& scope);
+std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt& alter,
+                                       const Scope& scope);
 std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope);
 
 }  // namespace bigquery_emulator_duckdb::translator

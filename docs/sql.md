@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 11 |
+| Partial | 12 |
 | Supported | 59 |
-| Unsupported | 21 |
+| Unsupported | 20 |
 
 ## Queries
 
@@ -100,11 +100,11 @@ the probe's own notes name what it rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |
 | `CREATE EXTERNAL TABLE` | Unsupported | statement CreateExternalTableStmt |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | Supports one ADD COLUMN action per statement, including IF EXISTS and IF NOT EXISTS. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE action DropColumnAction; ALTER TABLE action RenameToAction; ALTER TABLE with multiple actions; statement AlterTableSetOptionsStmt |
+| `ALTER TABLE` | Partial | Supports ADD COLUMN, DROP COLUMN, RENAME TO and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN or DROP COLUMN actions. SET OPTIONS stores the description, friendly name and labels; other options are unsupported. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE option expiration_timestamp; ALTER TABLE with different kinds of actions |
 | `CREATE SCHEMA` | Partial | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.; CREATE SCHEMA option default_table_expiration_days; CREATE SCHEMA option location |
 | `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
-| `ALTER SCHEMA` | Unsupported | statement AlterSchemaStmt |
+| `ALTER SCHEMA` | Partial | Supports SET OPTIONS, which stores the description, friendly name and labels; other options and actions are unsupported.; ALTER SCHEMA option default_table_expiration_days |
 | `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.; CREATE VIEW option expiration_timestamp |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |

@@ -41,6 +41,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedAlterTableStmt>()) {
     return AlterTable(*statement.GetAs<googlesql::ResolvedAlterTableStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedAlterTableSetOptionsStmt>()) {
+    return AlterTableSetOptions(*statement.GetAs<googlesql::ResolvedAlterTableSetOptionsStmt>(),
+                                scope);
+  }
   if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
     return CreateTableAsSelect(*statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>(),
                                scope);
@@ -50,6 +54,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
     return CreateSchema(*statement.GetAs<googlesql::ResolvedCreateSchemaStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedAlterSchemaStmt>()) {
+    return AlterSchema(*statement.GetAs<googlesql::ResolvedAlterSchemaStmt>(), scope);
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), scope);
@@ -115,8 +122,12 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
     return "CREATE_TABLE_AS_SELECT";
   }
-  if (statement.Is<googlesql::ResolvedAlterTableStmt>()) {
+  if (statement.Is<googlesql::ResolvedAlterTableStmt>() ||
+      statement.Is<googlesql::ResolvedAlterTableSetOptionsStmt>()) {
     return "ALTER_TABLE";
+  }
+  if (statement.Is<googlesql::ResolvedAlterSchemaStmt>()) {
+    return "ALTER_SCHEMA";
   }
   if (statement.Is<googlesql::ResolvedCreateViewStmt>()) {
     return "CREATE_VIEW";
@@ -154,9 +165,10 @@ std::optional<TranslatedStatement> TranslateStatement(
                              .ddl_target_table = std::move(context.ddl_target_table),
                              .ddl_target_dataset = std::move(context.ddl_target_dataset),
                              .table = std::move(context.table),
-                             .added_column = std::move(context.added_column),
+                             .altered_table = std::move(context.altered_table),
                              .view = std::move(context.view),
-                             .dataset = std::move(context.dataset)};
+                             .dataset = std::move(context.dataset),
+                             .altered_dataset = std::move(context.altered_dataset)};
 }
 
 std::optional<std::string> TranslateExpression(
