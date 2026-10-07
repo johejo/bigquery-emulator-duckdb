@@ -35,7 +35,7 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
       return "bq_time_string(" + sql + ")";
     }
     if (from->IsTimestamp()) {
-      return "bq_timestamp_string(" + sql + ")";
+      return "bq_timestamp_string(" + sql + ", 'UTC')";
     }
   }
   if (from->IsString()) {

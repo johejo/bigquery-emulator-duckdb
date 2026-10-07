@@ -500,9 +500,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"DATETIME", Concat({{{6, "make_timestamp($1, $2, $3, $4, $5, $6)"},
                             {2, "($1 + $2)", {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})}}},
                            Civil("TIMESTAMP")})},
+      // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
       {"TIMESTAMP",
-       {{1, "CAST($1 AS TIMESTAMPTZ)"},
-        // A civil time in the given zone; a string with its own offset keeps the offset.
+       {{1, "bq_string_to_timestamp($1, false)", {Is(1, {TYPE_STRING})}},
+        {2, "bq_string_to_timestamp_in($1, $2)", {Is(1, {TYPE_STRING})}},
+        {1, "CAST($1 AS TIMESTAMPTZ)"},
+        // A civil time in the given zone.
         {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {TYPE_DATE, TYPE_DATETIME})}}}},
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
@@ -716,7 +719,9 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       // JSON goes to GoogleSQL as its text; see src/backend_functions.cc.
       {"PARSE_JSON", {{{1, 2}, "json(bq_parse_json($1, $2))", {}, {"'exact'"}}}},
       {"BOOL", {{1, "bq_json_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"STRING", {{1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {"STRING",
+       {{1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}},
+        {{1, 2}, "bq_timestamp_string($1, $2)", {Is(1, {TYPE_TIMESTAMP})}, {"'UTC'"}}}},
       {"INT64", {{1, "bq_json_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
       {"FLOAT64",
        {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}}},
