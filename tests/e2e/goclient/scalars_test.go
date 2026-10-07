@@ -22,10 +22,11 @@ var scalarFixture = []string{
 }
 
 type scalarCase struct {
-	path string
-	line int
-	sql  string
-	want any
+	path      string
+	line      int
+	sql       string
+	want      any
+	wantError *string
 	// A known bug: want is BigQuery's answer, which the emulator does not give yet.
 	knownBug bool
 }
@@ -35,6 +36,7 @@ type scalarCase struct {
 // A known bug is written with "!> " instead, followed by BigQuery's answer; the case passes while
 // the emulator answers otherwise, and fails once it is fixed, to be turned into a "=> " case.
 // Blank lines and lines starting with # between cases are ignored.
+// "=> error:" expects a query error, optionally followed by BigQuery's exact message.
 func readScalarCases(t *testing.T, path string) []scalarCase {
 	t.Helper()
 	file, err := os.Open(path)
@@ -55,11 +57,15 @@ func readScalarCases(t *testing.T, path string) []scalarCase {
 				t.Fatalf("%s:%d: expected value without a query", path, line)
 			}
 			var want any
-			if err := json.Unmarshal([]byte(text[len("=> "):]), &want); err != nil {
+			var wantError *string
+			if strings.HasPrefix(text[len("=> "):], "error:") {
+				message := strings.TrimSpace(strings.TrimPrefix(text[len("=> "):], "error:"))
+				wantError = &message
+			} else if err := json.Unmarshal([]byte(text[len("=> "):]), &want); err != nil {
 				t.Fatalf("%s:%d: %v", path, line, err)
 			}
 			cases = append(cases, scalarCase{path: path, line: start, sql: strings.Join(sql, "\n"),
-				want: want, knownBug: strings.HasPrefix(text, "!> ")})
+				want: want, wantError: wantError, knownBug: strings.HasPrefix(text, "!> ")})
 			sql = nil
 		case len(sql) > 0:
 			sql = append(sql, text)
@@ -148,11 +154,22 @@ func TestScalars(t *testing.T) {
 			t.Run(fmt.Sprintf("%s:%d", filepath.Base(c.path), c.line), func(t *testing.T) {
 				t.Parallel()
 				response, err := runQuery(endpoint, project, "scalars", c.sql)
+				queryFailed := response.Error != nil || len(response.Errors) > 0
 				if c.knownBug {
-					if err == nil && len(response.Rows) == 1 && len(response.Rows[0].F) == 1 &&
-						reflect.DeepEqual(response.Rows[0].F[0].V, c.want) {
+					matches := err == nil && len(response.Rows) == 1 && len(response.Rows[0].F) == 1 &&
+						reflect.DeepEqual(response.Rows[0].F[0].V, c.want)
+					if c.wantError != nil {
+						matches = queryFailed && err != nil && (*c.wantError == "" || err.Error() == *c.wantError)
+					}
+					if matches {
 						t.Errorf("%s:%d: %s: known bug is fixed; write the case with => instead of !>",
 							c.path, c.line, c.sql)
+					}
+					return
+				}
+				if c.wantError != nil {
+					if !queryFailed || err == nil || (*c.wantError != "" && err.Error() != *c.wantError) {
+						t.Errorf("%s:%d: %s: got error %v, want a query error with message %q", c.path, c.line, c.sql, err, *c.wantError)
 					}
 					return
 				}

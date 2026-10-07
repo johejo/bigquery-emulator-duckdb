@@ -260,13 +260,13 @@ void DecimalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
 }
 
 // The text of a FLOAT64 as BigQuery writes it, the shortest that reads back as the same value,
-// without DuckDB's ".0" for a whole number.
+// without DuckDB's ".0" for a whole number, preserving the sign of negative zero.
 void DoubleString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& arguments) {
     std::string out;
     absl::Status error;
     const bool ok = googlesql::functions::NumericToString(arguments.Double(0), &out, &error,
-                                                          /*canonicalize_zero=*/true);
+                                                          /*canonicalize_zero=*/false);
     return ToStatusOr(ok, out, error);
   });
 }

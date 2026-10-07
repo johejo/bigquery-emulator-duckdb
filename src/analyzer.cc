@@ -173,6 +173,17 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);
   if (!status.ok()) {
+    // This array-cast error has been checked against BigQuery, including its location format:
+    // the first line of the caret message, with " [at 1:29]" written as " at [1:29]".
+    if (const std::string_view message = status.message();
+        message.starts_with("Casting between arrays with incompatible element types")) {
+      const std::string_view line = message.substr(0, message.find('\n'));
+      if (const size_t at = line.rfind(" [at ");
+          at != std::string_view::npos && line.ends_with(']')) {
+        throw std::runtime_error(std::string(line.substr(0, at)) + " at [" +
+                                 std::string(line.substr(at + 5)));
+      }
+    }
     // In the caret mode the analyzer has already folded the location into the message; this
     // only matters for the few errors that still carry it as a payload.
     const googlesql::ErrorMessageOptions error_message_options = {

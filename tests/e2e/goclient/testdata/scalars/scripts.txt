@@ -364,3 +364,10 @@ SET n = total();
 ROLLBACK TRANSACTION;
 SELECT n
 => "5"
+
+# Answers collected from BigQuery with bqanswers.
+# A variable keeps a NULL array, which BigQuery returns to clients as an empty one.
+DECLARE x ARRAY<INT64> DEFAULT [1];
+SET x = NULL;
+SELECT x IS NULL
+=> "true"

@@ -183,7 +183,7 @@ absl::StatusOr<Value> ResultValue(const QueryResult& result, googlesql::TypeFact
       table_type, googlesql::InternalValue::kIgnoresOrder, std::move(rows));
 }
 
-// The status a failed job stands for. Analysis errors keep GoogleSQL's status text; DuckDB
+// The status a failed job stands for. Analysis errors are invalid arguments; DuckDB
 // errors that mean the translation is wrong are internal, which no expected error matches;
 // any other failure is a runtime error.
 absl::Status JobStatus(const ApiError& error) {
@@ -191,7 +191,8 @@ absl::Status JobStatus(const ApiError& error) {
   if (message.starts_with("The emulator does not support")) {
     return absl::UnimplementedError(message);
   }
-  if (message.starts_with("INVALID_ARGUMENT:")) {
+  if (message.starts_with("INVALID_ARGUMENT:") ||
+      message.starts_with("Casting between arrays with incompatible element types")) {
     return absl::InvalidArgumentError(message);
   }
   for (const std::string_view prefix :

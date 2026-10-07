@@ -73,7 +73,7 @@ std::optional<std::vector<FieldSchema>> ResultSchema(const googlesql::ResolvedSt
 
 // Parses `sql` as a single GoogleSQL statement and resolves its names and types against
 // `catalog`. Throws std::runtime_error with a caret-annotated message when the statement does
-// not parse or analyze.
+// not parse or analyze. Array-cast errors use BigQuery's message and location format.
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
                                 const AnalyzerSettings& settings = {});
