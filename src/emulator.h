@@ -240,14 +240,15 @@ class Emulator {
   // Runs `translation` as a query job without a destination table does, recording the metadata
   // of a DDL statement, and returns its result with the schema the translation gives it.
   QueryResult RunStatement(const TranslatedStatement& translation,
-                           const std::vector<std::string>& setup, bool null_arrays = false);
+                           const std::vector<std::string>& setup, bool null_arrays = false,
+                           Backend* session = nullptr);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
   // for any other statement.
   std::optional<std::vector<std::string>> AlterationStatements(
       const TranslatedStatement& translation);
   // A catalog source for the tables, views and datasets the emulator holds.
-  std::unique_ptr<TableSource> NewTableSource();
+  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr);
   // The script that `query` is, or null when it is a single statement or does not parse, which
   // RunQuery then reports as it does for a single statement.
   static std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query);

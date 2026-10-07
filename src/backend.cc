@@ -537,9 +537,28 @@ struct Backend::Database {
   }
 };
 
-Backend::Backend() : db_(std::make_unique<Database>()) {}
+struct Backend::Session {
+  Connection connection;
+  bool in_transaction = false;
+  explicit Session(Database& database) : connection(database.Connect()) {}
+};
+
+Backend::Backend() : db_(std::make_shared<Database>()) {}
+
+Backend::Backend(std::shared_ptr<Database> database)
+    : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}
+
+std::unique_ptr<Backend> Backend::NewSession() {
+  return std::unique_ptr<Backend>(new Backend(db_));
+}
 
 Backend::~Backend() = default;
+
+void Backend::Transaction(const std::string& statement) {
+  if (!session_) throw BackendError("Transactions require a session");
+  Query(session_->connection.get(), statement);
+  session_->in_transaction = statement == "BEGIN TRANSACTION";
+}
 
 QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup,
                              bool null_arrays) {
@@ -552,14 +571,15 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   if (statements.empty()) {
     throw BackendError("No statement to execute");
   }
-  Connection connection = db_->Connect();
-  RunSetup(connection.get(), setup);
+  Connection owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  RunSetup(connection, setup);
   // A transaction left open by a failed statement is rolled back when the connection closes.
   for (size_t i = 0; i + 1 < statements.size(); ++i) {
-    Query(connection.get(), statements[i]);
+    Query(connection, statements[i]);
   }
   Result result;
-  Query(connection.get(), statements.back(), result);
+  Query(connection, statements.back(), result);
   const auto statement_type = duckdb_result_statement_type(result.result);
   QueryResult query_result;
   if (!ProducesResultSet(statement_type)) {
@@ -594,32 +614,40 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
 void Backend::ExecuteDdl(const std::string& sql,
                          const std::vector<std::string>& metadata_statements,
                          const std::string& skip_query, const std::vector<std::string>& setup) {
-  Connection connection = db_->Connect();
-  RunSetup(connection.get(), setup);
-  Query(connection.get(), "BEGIN TRANSACTION");
-  if (!skip_query.empty()) {
-    Result existing;
-    Query(connection.get(), skip_query, existing);
-    if (duckdb_row_count(&existing.result) != 0) {
-      Query(connection.get(), "COMMIT");
-      return;
+  Connection owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  RunSetup(connection, setup);
+  const bool own_transaction = !session_ || !session_->in_transaction;
+  if (own_transaction) Query(connection, "BEGIN TRANSACTION");
+  try {
+    if (!skip_query.empty()) {
+      Result existing;
+      Query(connection, skip_query, existing);
+      if (duckdb_row_count(&existing.result) != 0) {
+        if (own_transaction) Query(connection, "COMMIT");
+        return;
+      }
     }
+    Query(connection, sql);
+    for (const std::string& statement : metadata_statements) {
+      Query(connection, statement);
+    }
+    if (own_transaction) Query(connection, "COMMIT");
+  } catch (...) {
+    if (own_transaction && session_) Query(connection, "ROLLBACK");
+    throw;
   }
-  Query(connection.get(), sql);
-  for (const std::string& statement : metadata_statements) {
-    Query(connection.get(), statement);
-  }
-  Query(connection.get(), "COMMIT");
 }
 
 QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
-  Connection connection = db_->Connect();
-  RunSetup(connection.get(), setup);
+  Connection owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  RunSetup(connection, setup);
   // Preparing binds names and types without running the statement, which is what a dry run
   // needs: the query is validated and its result schema is known, but nothing is read or
   // written.
   Prepared prepared;
-  if (duckdb_prepare(connection.get(), sql.c_str(), prepared.out()) == DuckDBError) {
+  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
     const char* error = duckdb_prepare_error(prepared.get());
     throw BackendError(error != nullptr ? error : "DuckDB failed to prepare the query");
   }
@@ -639,25 +667,26 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
 
 std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     const std::vector<std::string>& statements, bool skip_invalid_rows) {
-  Connection connection = db_->Connect();
-  RunSetup(connection.get(), {});
+  Connection owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  RunSetup(connection, {});
   std::vector<std::pair<size_t, std::string>> errors;
   if (!skip_invalid_rows) {
-    Query(connection.get(), "BEGIN TRANSACTION");
+    Query(connection, "BEGIN TRANSACTION");
   }
   for (size_t i = 0; i < statements.size(); ++i) {
     Result result;
-    if (duckdb_query(connection.get(), statements[i].c_str(), &result.result) == DuckDBError) {
+    if (duckdb_query(connection, statements[i].c_str(), &result.result) == DuckDBError) {
       const char* error = duckdb_result_error(&result.result);
       errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");
       if (!skip_invalid_rows) {
-        Query(connection.get(), "ROLLBACK");
+        Query(connection, "ROLLBACK");
         return errors;
       }
     }
   }
   if (!skip_invalid_rows) {
-    Query(connection.get(), "COMMIT");
+    Query(connection, "COMMIT");
   }
   return errors;
 }

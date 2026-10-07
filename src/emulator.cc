@@ -567,19 +567,21 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
 }
 
 QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
-                                   const std::vector<std::string>& setup, bool null_arrays) {
+                                   const std::vector<std::string>& setup, bool null_arrays,
+                                   Backend* session) {
+  Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
   QueryResult result;
   if (const std::optional<std::vector<std::string>> statements =
           AlterationStatements(translation)) {
     if (!statements->empty()) {
-      backend_.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
-                          setup);
+      backend.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
+                         setup);
     }
   } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
-    backend_.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
+    backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
   } else {
-    result = Execute(translation.sql, setup, null_arrays);
+    result = backend.Execute(translation.sql, setup, null_arrays);
   }
   if (translation.result_schema.has_value()) {
     result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
@@ -620,8 +622,8 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
   return std::nullopt;
 }
 
-std::unique_ptr<TableSource> Emulator::NewTableSource() {
-  return std::make_unique<DuckDbTableSource>(backend_);
+std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session) {
+  return std::make_unique<DuckDbTableSource>(session != nullptr ? *session : backend_);
 }
 
 std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
