@@ -140,8 +140,12 @@ Behavior that applies across them:
   tables, are unsupported.
 - SQL UDFs created with `CREATE TEMP FUNCTION` are available within their query and
   are expanded by GoogleSQL before translation. The body of a UDF with `ANY TYPE` parameters is
-  resolved for the argument types of each call, against the UDFs declared before it. JavaScript,
-  persistent and aggregate UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` UDF calls, UDF options, and views that call temporary
+  resolved for the argument types of each call, against the UDFs declared before it. Temporary
+  JavaScript UDFs run in an embedded QuickJS and so far take BOOL, FLOAT64 and STRING arguments,
+  named by JavaScript identifiers, and return those or INT64. No JavaScript state outlives a
+  query, a call fails after 5 minutes, and the calls of a query may allocate 256 MiB on each
+  thread; BigQuery documents neither limit exactly. Persistent and aggregate UDFs, `OR REPLACE`,
+  `IF NOT EXISTS`, `SAFE.` UDF calls, UDF options such as `library`, and views that call temporary
   UDFs are unsupported. Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do not support dry runs,
   destination tables or positional parameters.
 - Multi-statement queries return the result of the last statement that ran. They create no
@@ -182,6 +186,10 @@ These differences are deliberate exceptions, kept for convenience:
   partial response asked for. Clients such as the Go client send it on every `jobs.get`.
 - `updateMode` of `datasets.patch` and `datasets.update` is ignored; they change the metadata
   that the emulator keeps, since it keeps no access controls.
+- JavaScript UDFs run in QuickJS rather than V8, which BigQuery uses. The language is the same,
+  but built-ins differ: QuickJS has no `Intl`, so `toLocaleString` and similar methods ignore
+  locales, and the formats `Date.parse` accepts beyond the standard one differ. A thrown error's
+  message lacks the line and column that BigQuery reports.
 
 ## Development
 

@@ -1,7 +1,12 @@
-# Known bugs that GoogleSQL's compliance tests (`just compliance`) found. Each case gives
-# BigQuery's answer after `!>`, which the emulator does not give yet: the case passes while the
-# emulator answers otherwise. Every one of them is to be fixed; a fix fails its case, which then
+# Known bugs that GoogleSQL's compliance tests (`just compliance`) or BigQuery's answers to
+# unverified cases found. Each case gives BigQuery's answer after `!>`, which the emulator does
+# not give yet: the case passes while the emulator answers otherwise. Every one of them is to be fixed; a fix fails its case, which then
 # moves to the file of its function, written with `=>`.
 #
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant, which
 # it evaluates correctly.
+
+# BigQuery reports where the exception was thrown; QuickJS keeps only where an Error was created.
+CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
+SELECT f()
+!> error: Error: boom at f() line 1, column 1

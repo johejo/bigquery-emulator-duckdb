@@ -36,6 +36,7 @@ cc_library(
         ":literal",
         "//:catalog",
         "//:duckdb_sql",
+        "//:javascript_function",
         "//:type_mapping",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
