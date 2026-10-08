@@ -14,6 +14,7 @@
 #include "duckdb.h"
 #include "googlesql/public/functions/arithmetics.h"
 #include "googlesql/public/functions/generate_array.h"
+#include "googlesql/public/functions/numeric.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/internal.h"
 #include "src/duckdb_handle.h"
@@ -138,6 +139,17 @@ void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
           });
 }
 
+void ParseNumeric(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<__int128> {
+    googlesql::NumericValue out;
+    absl::Status error;
+    if (!googlesql::functions::ParseNumeric(arguments.String(0), &out, &error)) {
+      return error;
+    }
+    return out.as_packed_int();
+  });
+}
+
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix) {
@@ -164,6 +176,7 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
            DecimalMath2<T, fn::DivideToIntegralValue<T>>);
   Register(connection, ("bq_log" + suffix).c_str(), two, type.get(),
            DecimalMath2<T, fn::Logarithm<T>>);
+  Register(connection, "bq_parse_numeric", {kVarchar}, type.get(), ParseNumeric);
 }
 
 }  // namespace

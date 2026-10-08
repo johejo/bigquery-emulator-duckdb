@@ -626,6 +626,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"LN", Numbers("ln")},
       {"LOG10", Numbers("log10")},
       {"LOG", Concat({Numbers("ln"), Numbers("log", 2)})},
+      {"PARSE_NUMERIC", {{1, "bq_parse_numeric($1)"}}},
       {"PARSE_BIGNUMERIC", {{1, "CAST(bq_parse_bignumeric($1) AS BIGNUM)"}}},
       {"SIN", Float64("bq_sin")},
       {"COS", Float64("bq_cos")},
@@ -702,6 +703,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"SHA512",
        {{1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
         {1, "bq_sha512($1)", {Is(1, {TYPE_BYTES})}}}},
+      // GoogleSQL leaves base32 out of its open source; src/backend_functions/string.cc
+      // implements RFC 4648's.
+      {"TO_BASE32", {{1, "bq_to_base32($1)"}}},
+      {"FROM_BASE32", {{1, "bq_from_base32($1)"}}},
       {"FARM_FINGERPRINT",
        {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
         {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}}}},

@@ -1886,6 +1886,27 @@ known_errors {
 }
 
 known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "The reference implementation leaves out base32, which GoogleSQL does not open source, and expects TO_BASE32 and FROM_BASE32 to be unimplemented"
+  label: "code:from_base32_STRING_<>"
+  label: "code:from_base32_STRING_<GE======>"
+  label: "code:from_base32_STRING_<GEZDGNBV>"
+  label: "code:from_base32_STRING_<GEZDGNBVGY======>"
+  label: "code:from_base32_STRING_<GEZDGNBV_kSl__y173zo_GY======>"
+  label: "code:from_base32_STRING_<GFQQ====>"
+  label: "code:from_base32_STRING_NULL"
+  label: "code:safe_error_mode__safe_from_base32_STRING_<12>"
+  label: "code:safe_error_mode__safe_from_base32_STRING_<GE0>"
+  label: "code:to_base32_BYTES_<1234567890123456>"
+  label: "code:to_base32_BYTES_<123456>"
+  label: "code:to_base32_BYTES_<12345>"
+  label: "code:to_base32_BYTES_<1>"
+  label: "code:to_base32_BYTES_<1a>"
+  label: "code:to_base32_BYTES_<>"
+  label: "code:to_base32_BYTES_NULL"
+}
+
+known_errors {
   mode: ALLOW_ERROR
   reason: "A subquery in a branch of IF or CASE is evaluated even when the branch is not taken"
   label: "conditional_evaluation_test:correlated_subquery_in_false_branch"
