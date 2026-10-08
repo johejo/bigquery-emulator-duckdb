@@ -23,6 +23,10 @@ jobs:
     # Jobs tend to finish sooner on the ARM runner.
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 120
+    permissions:
+      contents: read
+      # Main runs delete the caches they replace.
+      actions: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,10 +43,8 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-
-            go-v1-${{ runner.os }}-${{ runner.arch }}-
+          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}
+          restore-keys: go-v1-${{ runner.os }}-${{ runner.arch }}-
       # Repository downloads are shared with the Test workflow, which saves this cache.
       - name: Restore Bazel repository cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -79,6 +81,14 @@ jobs:
         with:
           path: ~/.cache/bazel-disk
           key: ${{ steps.disk-cache.outputs.cache-primary-key }}
+      - name: Prune older caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          .github/scripts/prune-caches.sh '${{ steps.disk-cache.outputs.cache-primary-key }}'
+          'bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-'
       # The logs of failing statements would flood the output; the summary lists them.
       - name: Compliance tests
         id: tests
