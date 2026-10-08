@@ -259,7 +259,6 @@ cc_library(
         "//src/translator:function",
         "//src/translator:functions",
         "//src/translator:literal",
-        "//src/translator:rules",
         "//src/translator:scan",
         "//src/translator:scan_interface",
         "@googlesql//googlesql/public:type",
@@ -268,7 +267,7 @@ cc_library(
     deps = [
         ":query_parameters",
         ":translated_statement",
-        "//src/translator:functions_interface",
+        "//src/translator:functions",
         "@googlesql//googlesql/public:analyzer",
     ],
 )

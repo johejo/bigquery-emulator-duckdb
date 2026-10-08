@@ -58,14 +58,14 @@ different NULL semantics. Casts of these values to JSON and correlated aggregate
 returning them also remain unsupported; use the JSON functions for JSON conversion.
 
 The translator's sources in [src/translator/](../src/translator) share
-[internal.h](../src/translator/internal.h): a `Context` for the whole statement, and the `Scope`
+[context.h](../src/translator/context.h): a `Context` for the whole statement, and the `Scope`
 of what a scan can see besides its input. Expressions, scalar functions, scans, aggregation, DML,
 DDL, and types and literals each have a file of their own.
 
 [src/translator/functions.cc](../src/translator/functions.cc) is the registry of the functions the
 emulator supports, each under one implementation: a DuckDB function of the same or another name,
 DuckDB SQL templates, GoogleSQL's own implementation, code in
-[src/translator/function.cc](../src/translator/function.cc), or a DuckDB aggregate or window
+[src/translator/handlers.cc](../src/translator/handlers.cc), or a DuckDB aggregate or window
 function. A **template** rewrites the call using `$n` for the n-th argument and `#n` for that
 argument as a lowercase string literal, so `DATE_DIFF(a, b, DAY)` becomes
 `date_diff('day', b, a)`; the rules are chosen by argument count, types, date parts, rounding

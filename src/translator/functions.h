@@ -60,7 +60,7 @@ enum class Implementation : std::uint8_t {
   // Templates calling GoogleSQL's own implementation, which src/backend_functions.cc registers
   // with DuckDB as a bq_* function.
   kBackend,
-  // Code in src/translator/function.cc.
+  // Code in src/translator/handlers.cc.
   kHandler,
   // Another function with the SAFE. prefix, as SAFE_ADD is SAFE.$ADD.
   kSafe,

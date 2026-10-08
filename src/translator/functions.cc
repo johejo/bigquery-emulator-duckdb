@@ -822,7 +822,7 @@ const std::unordered_set<std::string_view>& PlainFunctions() {
   return *kPlain;
 }
 
-// Functions that src/translator/function.cc translates in code.
+// Functions that src/translator/handlers.cc translates in code.
 const std::unordered_map<std::string_view, Handler>& Handlers() {
   static const auto* const kHandlers = new std::unordered_map<std::string_view, Handler>{
       {"$MAKE_ARRAY", MakeArray},

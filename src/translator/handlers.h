@@ -1,13 +1,32 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
 #include "src/translator/functions.h"
 
+namespace googlesql {
+class ResolvedExpr;
+}  // namespace googlesql
+
 namespace bigquery_emulator_duckdb::translator {
 
-// The handlers that the registry in functions.cc names, in function.cc.
+// Date parts are enum literals after analysis, not SQL identifier expressions.
+std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr);
+
+// A bucket width INTERVAL of a single part, as a count of months, days or microseconds.
+// INTERVAL n PART resolves to $interval(n, PART), and an INTERVAL string to a literal.
+struct BucketWidth {
+  std::string unit;
+  // The n of INTERVAL n PART, or null for a literal, whose count is all in `factor`.
+  const googlesql::ResolvedExpr* count = nullptr;
+  int64_t factor = 1;
+};
+
+std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr);
+
+// The handlers that the registry in functions.cc names.
 std::optional<std::string> MakeArray(const ScalarCall& call);
 std::optional<std::string> Logical(const ScalarCall& call);
 std::optional<std::string> InList(const ScalarCall& call);

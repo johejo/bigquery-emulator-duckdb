@@ -8,7 +8,7 @@ cc_library(
     implementation_deps = [
         ":expression_interface",
         ":function",
-        ":functions_interface",
+        ":functions",
         ":scan_interface",
         "//:duckdb_sql",
         "//:type_mapping",
@@ -91,13 +91,41 @@ cc_library(
 cc_library(
     name = "function",
     srcs = ["function.cc"],
+    hdrs = ["function.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":expression_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [
+        ":context",
+        ":functions",
+    ],
+)
+
+# The registry of BigQuery functions and how each is spelled in DuckDB: as is, renamed, by
+# template rules or backend rules, or by a handler.
+cc_library(
+    name = "functions",
+    srcs = [
+        "functions.cc",
+        "handlers.cc",
+        "rules.cc",
+    ],
     hdrs = [
-        "function.h",
+        "functions.h",
         "handlers.h",
     ],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":expression_interface",
+        ":context",
         "//:duckdb_sql",
         "//:type_mapping",
         "@googlesql//googlesql/public:function",
@@ -108,22 +136,7 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [
-        ":context",
-        ":functions_interface",
-    ],
-)
-
-cc_library(
-    name = "functions",
-    srcs = ["functions.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":function",
-        ":functions_interface",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
+    deps = ["@googlesql//googlesql/public:type_cc_proto"],
 )
 
 cc_library(
@@ -141,15 +154,6 @@ cc_library(
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
     ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
-)
-
-cc_library(
-    name = "rules",
-    srcs = ["rules.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [":functions_interface"],
     linkstatic = True,
     visibility = ["//:__pkg__"],
 )
@@ -175,16 +179,6 @@ cc_library(
     visibility = ["//:__pkg__"],
 )
 
-# Headers separate from their implementations, which depend on each other: expressions contain
-# subqueries, scans contain expressions, and the registry in functions.cc names handlers in
-# function.cc, which looks up the registry.
-cc_library(
-    name = "functions_interface",
-    hdrs = ["functions.h"],
-    visibility = ["//:__pkg__"],
-    deps = ["@googlesql//googlesql/public:type_cc_proto"],
-)
-
 cc_library(
     name = "context",
     hdrs = ["context.h"],
@@ -197,6 +191,8 @@ cc_library(
     ],
 )
 
+# Headers separate from their implementations, which depend on each other: expressions contain
+# subqueries, and scans contain expressions.
 cc_library(
     name = "expression_interface",
     hdrs = ["expression.h"],
