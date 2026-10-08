@@ -14,8 +14,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "httplib.h"
 #include "src/api_error.h"
+#include "src/httplib.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

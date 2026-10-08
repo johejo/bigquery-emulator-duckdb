@@ -11,10 +11,10 @@
 #include <system_error>
 #include <vector>
 
-#include "httplib.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/discovery_document.h"
+#include "src/httplib.h"
 
 namespace bigquery_emulator_duckdb::server {
 namespace {
