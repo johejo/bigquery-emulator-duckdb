@@ -44,11 +44,61 @@ CREATE TEMP FUNCTION AggregateArray(value ARRAY<INT64>) AS
 SELECT TO_JSON_STRING(AggregateArray([1, 2, 3]))
 => "[2,3,4]"
 
+CREATE TEMP FUNCTION IdentityTemplate(value ANY TYPE) AS (value);
+SELECT CAST(IdentityTemplate(DATE '2020-01-01') AS STRING)
+=> "2020-01-01"
+
+CREATE TEMP FUNCTION IdentityTemplate(value ANY TYPE) AS (value);
+SELECT IdentityTemplate('abc')
+=> "abc"
+
+CREATE TEMP FUNCTION IdentityTemplate(value ANY TYPE) AS (value);
+SELECT TO_HEX(IdentityTemplate(b'abc'))
+=> "616263"
+
+CREATE TEMP FUNCTION IdentityTemplate(value ANY TYPE) AS (value);
+SELECT IdentityTemplate(false)
+=> "false"
+
+CREATE TEMP FUNCTION MyValueIsNull(value ANY TYPE) AS (value IS NULL);
+SELECT MyValueIsNull(EXTRACT(DAY FROM CURRENT_DATE()))
+=> "false"
+
+CREATE TEMP FUNCTION MyValueIsNull(value ANY TYPE) AS (value IS NULL);
+SELECT MyValueIsNull(NULL)
+=> "true"
+
+CREATE TEMP FUNCTION MyValueIsNull(value ANY TYPE) AS (value IS NULL);
+SELECT MyValueIsNull(SAFE_DIVIDE(1, 0))
+=> "true"
+
+CREATE TEMP FUNCTION Element(a ANY TYPE) AS ((SELECT e FROM UNNEST(a) e));
+SELECT Element([1])
+=> "1"
+
+CREATE TEMP FUNCTION b290673529(thing_id ANY TYPE) RETURNS BOOL AS
+  (thing_id IN (SELECT thing_id FROM (SELECT 1 AS thing_id)));
+SELECT b290673529(1)
+=> "true"
+
 # BigQuery's SQL UDF documentation:
 # https://cloud.google.com/bigquery/docs/user-defined-functions#sql_udfs
 CREATE TEMP FUNCTION AddFourAndDivide(x INT64, y INT64) RETURNS FLOAT64 AS ((x + 4) / y);
 SELECT AddFourAndDivide(3, 2)
 => "3.5"
+
+# https://cloud.google.com/bigquery/docs/user-defined-functions#templated-sql-udf-parameters
+CREATE TEMP FUNCTION addFourAndDivideAny(x ANY TYPE, y ANY TYPE) AS ((x + 4) / y);
+SELECT addFourAndDivideAny(3, 4)
+=> "1.75"
+
+CREATE TEMP FUNCTION addFourAndDivideAny(x ANY TYPE, y ANY TYPE) AS ((x + 4) / y);
+SELECT addFourAndDivideAny(1.59, 3.14)
+=> "1.7802547770700636"
+
+CREATE TEMP FUNCTION lastArrayElement(arr ANY TYPE) AS (arr[ORDINAL(ARRAY_LENGTH(arr))]);
+SELECT lastArrayElement(x) FROM (SELECT [2, 3, 5, 8, 13] AS x)
+=> "13"
 
 # https://cloud.google.com/bigquery/docs/user-defined-functions#scalar_subqueries
 CREATE TEMP TABLE users AS
