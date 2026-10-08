@@ -39,6 +39,7 @@
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
+#include "googlesql/scripting/stack_frame.h"
 #include "googlesql/scripting/type_aliases.h"
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
@@ -49,6 +50,7 @@
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/query_parameters.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
 
@@ -83,8 +85,6 @@ class RowIterator : public googlesql::EvaluatorTableIterator {
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
   switch (node.node_kind()) {
-    case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
-      return "EXECUTE IMMEDIATE";
     case googlesql::AST_CALL_STATEMENT:
       return "CALL";
     case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT:
@@ -248,6 +248,46 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return googlesql::ApplyConstraints(type_params, googlesql::PRODUCT_EXTERNAL, *value);
   }
 
+  // BigQuery runs one SQL statement as dynamic SQL, but no control statement, CALL or another
+  // EXECUTE IMMEDIATE; the emulator runs neither the other scripting statements nor transactions
+  // there, which OnProcedureEntered then rejects before the statement runs.
+  bool IsAllowedAsDynamicSql(const googlesql::ASTStatement* statement) override {
+    unsupported_dynamic_sql_.reset();
+    switch (statement->node_kind()) {
+      case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
+      case googlesql::AST_CALL_STATEMENT:
+      case googlesql::AST_IF_STATEMENT:
+      case googlesql::AST_CASE_STATEMENT:
+      case googlesql::AST_WHILE_STATEMENT:
+      case googlesql::AST_REPEAT_STATEMENT:
+      case googlesql::AST_FOR_IN_STATEMENT:
+        return false;
+      case googlesql::AST_BEGIN_STATEMENT:
+      case googlesql::AST_COMMIT_STATEMENT:
+      case googlesql::AST_ROLLBACK_STATEMENT:
+        unsupported_dynamic_sql_ = "transactions in EXECUTE IMMEDIATE";
+        break;
+      default:
+        if (!statement->IsSqlStatement()) {
+          unsupported_dynamic_sql_ = "scripting statements in EXECUTE IMMEDIATE";
+        }
+        break;
+    }
+    return true;
+  }
+
+  // Called as EXECUTE IMMEDIATE enters its statement, which is the only procedure the emulator
+  // runs. An unsupported construct fails the script, which the script cannot handle.
+  absl::Status OnProcedureEntered(const googlesql::ScriptExecutor& /*executor*/,
+                                  const absl::Span<const std::string>& /*path*/) override {
+    const std::optional<std::string> unsupported =
+        std::exchange(unsupported_dynamic_sql_, std::nullopt);
+    if (unsupported.has_value()) {
+      return Unsupported(*unsupported);
+    }
+    return absl::OkStatus();
+  }
+
   absl::StatusOr<int64_t> GetIteratorMemoryUsage(
       const googlesql::EvaluatorTableIterator& /*iterator*/) override {
     return 0;
@@ -390,14 +430,38 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return absl::OkStatus();
   }
 
+  // Sets `settings` to those that what the script runs now is analyzed with, and returns its query
+  // parameters: those of the request, but in dynamic SQL only the ones that EXECUTE IMMEDIATE
+  // passes with USING, which the executor adds to the analyzer options itself.
+  absl::StatusOr<QueryParameters> Parameters(const googlesql::ScriptExecutor& executor,
+                                             AnalyzerSettings& settings) {
+    settings = settings_;
+    settings.script = &executor;
+    const googlesql::StackFrame* frame = executor.GetCurrentStackFrame();
+    if (frame == nullptr || !frame->is_dynamic_sql()) {
+      return request_.parameters;
+    }
+    settings.named_parameters.clear();
+    const auto& values = executor.GetCurrentParameterValues();
+    if (!values.has_value()) {
+      return QueryParameters();
+    }
+    std::string unsupported;
+    std::optional<QueryParameters> parameters = TranslateParameters(*values, &unsupported);
+    if (!parameters.has_value()) {
+      return Unsupported(unsupported);
+    }
+    return *std::move(parameters);
+  }
+
   // Runs the statement `segment` as the statement of a query job, after `check` accepts its
   // resolved form. NULL arrays in the result stay null when `null_arrays` is set.
   absl::StatusOr<QueryResult> RunStatement(
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment,
       bool null_arrays,
       const std::function<absl::Status(const googlesql::ResolvedStatement&)>& check = nullptr) {
-    AnalyzerSettings settings = settings_;
-    settings.script = &executor;
+    AnalyzerSettings settings;
+    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     // Transaction control needs no tables, and ROLLBACK must work on an aborted connection.
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
@@ -475,7 +539,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     std::string unsupported;
     const std::optional<TranslatedStatement> translation =
-        TranslateStatement(analyzed.statement(), request_.parameters,
+        TranslateStatement(analyzed.statement(), parameters,
                            DefaultDataset{settings.default_project, settings.default_dataset,
                                           catalog.temporary.get(), emulator_.has_session_user_},
                            &unsupported, &executor.GetKnownSystemVariables());
@@ -491,15 +555,15 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       std::string_view sql,
                                                       const googlesql::ScriptSegment* segment,
                                                       const googlesql::Type* target_type) {
-    AnalyzerSettings settings = settings_;
-    settings.script = &executor;
+    AnalyzerSettings settings;
+    GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
     GOOGLESQL_ASSIGN_OR_RETURN(AnalyzerResult analyzed,
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));
     std::string unsupported;
     const std::optional<std::string> query =
-        TranslateExpression(analyzed.expression(), request_.parameters,
+        TranslateExpression(analyzed.expression(), parameters,
                             DefaultDataset{settings.default_project, settings.default_dataset,
                                            catalog.temporary.get(), emulator_.has_session_user_},
                             &unsupported, &executor.GetKnownSystemVariables());
@@ -533,6 +597,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   bool transaction_failed_ = false;
   std::optional<QueryResult> last_result_;
   std::optional<ApiError> error_;
+  // What the emulator does not support in the statement that EXECUTE IMMEDIATE is about to run.
+  std::optional<std::string> unsupported_dynamic_sql_;
 };
 
 std::unique_ptr<googlesql::ParserOutput> Emulator::ParseScript(const std::string& query) {
@@ -542,9 +608,11 @@ std::unique_ptr<googlesql::ParserOutput> Emulator::ParseScript(const std::string
            .ok()) {
     return nullptr;
   }
-  // A TEMP function needs a job-local catalog even when it is the only statement.
+  // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
+  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
   const auto& statements = output->script()->statement_list();
-  if (statements.size() == 1 && statements[0]->IsSqlStatement()) {
+  if (statements.size() == 1 && statements[0]->IsSqlStatement() &&
+      statements[0]->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT) {
     const auto* create = statements[0]->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
     if (create == nullptr || !create->is_temp()) {
       return nullptr;

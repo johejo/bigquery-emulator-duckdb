@@ -262,6 +262,7 @@ cc_library(
         ":query_parameters",
         ":translated_statement",
         "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:value",
     ],
 )
 
@@ -433,6 +434,7 @@ cc_library(
         "@googlesql//googlesql/scripting:error_helpers",
         "@googlesql//googlesql/scripting:script_executor",
         "@googlesql//googlesql/scripting:script_segment",
+        "@googlesql//googlesql/scripting:stack_frame",
         "@googlesql//googlesql/scripting:type_aliases",
     ],
     deps = [

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "nlohmann/json_fwd.hpp"
@@ -17,6 +18,10 @@ namespace bigquery_emulator_duckdb {
 class QueryParameters {
  public:
   QueryParameters() = default;
+  // Parameters given as DuckDB literals, such as those EXECUTE IMMEDIATE passes with USING; they
+  // declare no types.
+  QueryParameters(const std::vector<std::pair<std::string, std::string>>& named,
+                  std::vector<std::string> positional);
 
   // Parses BigQuery's QueryParameter list. Throws ApiError when a parameter is malformed or
   // has a type the emulator does not support.

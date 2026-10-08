@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/numeric_value.h"
@@ -149,6 +150,14 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
 }
 
 }  // namespace
+
+QueryParameters::QueryParameters(const std::vector<std::pair<std::string, std::string>>& named,
+                                 std::vector<std::string> positional)
+    : by_position_(std::move(positional)) {
+  for (const auto& [name, literal] : named) {
+    by_name_[ToUpperAscii(name)] = literal;
+  }
+}
 
 QueryParameters QueryParameters::Parse(const json& parameters) {
   QueryParameters result;

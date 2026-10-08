@@ -1,9 +1,13 @@
 #pragma once
 
+#include <map>
 #include <optional>
 #include <string>
+#include <variant>
+#include <vector>
 
 #include "googlesql/public/analyzer.h"
+#include "googlesql/public/value.h"
 #include "src/query_parameters.h"
 #include "src/translated_statement.h"
 
@@ -34,5 +38,12 @@ std::optional<std::string> TranslateExpression(
     const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
     const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables);
+
+// The query parameters that EXECUTE IMMEDIATE passes with USING, as literals of their values.
+// nullopt means a value the emulator cannot write as a literal, which `unsupported` then names.
+std::optional<QueryParameters> TranslateParameters(
+    const std::variant<std::vector<googlesql::Value>, std::map<std::string, googlesql::Value>>&
+        values,
+    std::string* unsupported);
 
 }  // namespace bigquery_emulator_duckdb
