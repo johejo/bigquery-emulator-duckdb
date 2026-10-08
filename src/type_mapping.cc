@@ -153,6 +153,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       return "BIGNUM";
     case googlesql::TYPE_JSON:
       return "JSON";
+    case googlesql::TYPE_INTERVAL:
+      return column_type ? std::nullopt : std::optional<std::string>("INTERVAL");
     case googlesql::TYPE_GEOGRAPHY:
       // Stored as text; queries over it are not translated.
       return column_type ? std::optional<std::string>("VARCHAR") : std::nullopt;
@@ -314,6 +316,16 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
     }
   }
   return field;
+}
+
+bool HasInterval(const googlesql::Type* type) {
+  if (type->IsInterval()) return true;
+  if (type->IsArray()) return HasInterval(type->AsArray()->element_type());
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(),
+                               [](const auto& field) { return HasInterval(field.type); });
+  }
+  return false;
 }
 
 std::optional<std::string> DuckDbType(const googlesql::Type* type,

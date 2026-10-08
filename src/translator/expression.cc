@@ -131,6 +131,11 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     }
     return std::nullopt;
   }
+  if (HasInterval(from) || HasInterval(to)) {
+    return from->IsInterval() && to->IsString()
+               ? std::optional<std::string>("bq_interval_string(" + sql + ")")
+               : std::nullopt;
+  }
   if (!from->IsBigNumericType()) {
     if (const auto converted = ConvertedCast(from, to, sql, safe)) {
       return converted;
@@ -194,6 +199,9 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
     case googlesql::ResolvedSubqueryExpr::ARRAY:
       return "CAST(ARRAY(" + select + relation->Order() + ") AS " + type + ")";
     case googlesql::ResolvedSubqueryExpr::IN: {
+      if (HasInterval(subquery.in_expr()->type())) {
+        return Unsupported(scope, "IN subquery with INTERVAL");
+      }
       if (HasInternalStructNames(subquery.in_expr()->type())) {
         return Unsupported(scope, "IN subquery with anonymous or duplicate STRUCT fields");
       }
@@ -441,6 +449,9 @@ std::optional<std::string> OrderItems(
     const Scope& scope, const Columns& columns) {
   std::vector<std::string> sql;
   for (const auto& item : items) {
+    if (HasInterval(item->column_ref()->type())) {
+      return Unsupported(scope, "ORDER BY with INTERVAL");
+    }
     const auto order = OrderItem(*item, scope, columns);
     if (!order) {
       return std::nullopt;

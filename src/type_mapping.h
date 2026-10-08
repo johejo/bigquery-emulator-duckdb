@@ -19,6 +19,9 @@ class TypeParameters;
 
 namespace bigquery_emulator_duckdb {
 
+// Whether a type contains INTERVAL, including array elements and struct fields.
+bool HasInterval(const googlesql::Type* type);
+
 // Maps a BigQuery TableFieldSchema to the GoogleSQL type of the column.
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory);
@@ -37,7 +40,7 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
 // nullopt for a type the translator does not support. DuckDB ignores lengths, so STRING(L) and
 // BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S) as
 // the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; empty structs are
-// unsupported.
+// unsupported. INTERVAL is available only for query values.
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 

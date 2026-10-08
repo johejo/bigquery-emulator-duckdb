@@ -116,6 +116,9 @@ std::optional<googlesql::TypeParameters> ColumnTypeParameters(
 
 std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
                                                 const Scope& scope) {
+  if (HasInterval(column.type())) {
+    return Unsupported(scope, "stored INTERVAL columns");
+  }
   if (HasCollation(column.annotations())) {
     return Unsupported(scope, "column collation");
   }
@@ -782,6 +785,9 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
+    if (HasInterval(output->column().type())) {
+      return Unsupported(scope, "stored INTERVAL columns");
+    }
     const auto type = DuckDbType(output->column().type());
     if (column == relation->columns.end() || !type) {
       return std::nullopt;

@@ -14,6 +14,7 @@
 #include "src/backend_functions.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/interval.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -406,6 +407,15 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
         text[10] = 'T';
       }
       value = std::move(text);
+      break;
+    }
+    case DUCKDB_TYPE_INTERVAL: {
+      const auto interval = IntervalFromDuckDb(VectorElement<duckdb_interval>(vector, row));
+      if (!interval.ok()) {
+        throw BackendError("DuckDB returned an invalid INTERVAL: " +
+                           std::string(interval.status().message()));
+      }
+      value = interval->ToString();
       break;
     }
     case DUCKDB_TYPE_BIGNUM: {

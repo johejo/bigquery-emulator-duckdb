@@ -87,6 +87,14 @@ query `TABLESAMPLE` | SELECT id FROM t TABLESAMPLE SYSTEM (50 PERCENT)
 query Pipe syntax | FROM t |> WHERE id > 0 |> SELECT id, name |> ORDER BY id
 query Pipe syntax | FROM t |> AGGREGATE COUNT(*) GROUP BY name
 
+query INTERVAL values | SELECT INTERVAL '2-3 4 5:06:07.123456' YEAR TO SECOND, INTERVAL n MINUTE FROM UNNEST([150]) AS n
+query INTERVAL values | SELECT CAST(MAKE_INTERVAL(month => 7) AS STRING), CAST(NULL AS INTERVAL), [INTERVAL 2 SECOND]
+query INTERVAL values | CREATE TABLE interval_storage (i INTERVAL)
+query INTERVAL values | SELECT CAST('0-0 2 0:0:0' AS INTERVAL)
+query INTERVAL values | SELECT INTERVAL 2 DAY + INTERVAL 3 DAY
+query INTERVAL values | SELECT TO_JSON(INTERVAL 2 DAY)
+note INTERVAL values | Query values retain separate month, day and microsecond components. Literals, constructors, JUSTIFY functions, EXTRACT and CAST to STRING are supported. Stored columns, INTERVAL query parameters, casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are unsupported.
+
 section DML
 
 query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, 'c')

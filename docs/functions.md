@@ -34,9 +34,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 15 |
-| Supported | 244 |
-| Unsupported | 134 |
+| Partial | 14 |
+| Supported | 249 |
+| Unsupported | 130 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -70,7 +70,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | DuckDB function |  |
 | [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
+| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | aggregate or analytic function AVG with INTERVAL |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | aggregate_functions | Partial | DuckDB aggregate | type ENUM<BITWISE_AGG_MODE> |
 | [`BIT_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/bit_functions#bit_count) | bit_functions | Supported | DuckDB SQL |  |
@@ -141,7 +141,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`EXP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#exp) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`EXTERNAL_OBJECT_TRANSFORM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/table-functions-built-in#external_object_transform) | table-functions-built-in | Unsupported |  | the analyzer does not know this function |
 | [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | federated_query_functions | Unsupported |  | the analyzer does not know this function |
-| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Partial | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery; type INTERVAL |
+| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | date_functions, datetime_functions, interval_functions, time_functions, timestamp_functions | Supported | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery |
 | [`FARM_FINGERPRINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#farm_fingerprint) | hash_functions | Supported | GoogleSQL function |  |
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
@@ -195,9 +195,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_VALUE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value_array) | json_functions | Supported | GoogleSQL function |  |
-| [`JUSTIFY_DAYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_days) | interval_functions | Unsupported |  | type INTERVAL |
-| [`JUSTIFY_HOURS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_hours) | interval_functions | Unsupported |  | type INTERVAL |
-| [`JUSTIFY_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_interval) | interval_functions | Unsupported |  | type INTERVAL |
+| [`JUSTIFY_DAYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_days) | interval_functions | Supported | GoogleSQL function |  |
+| [`JUSTIFY_HOURS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_hours) | interval_functions | Supported | GoogleSQL function |  |
+| [`JUSTIFY_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#justify_interval) | interval_functions | Supported | GoogleSQL function |  |
 | [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | aead_encryption_functions | Unsupported |  | function ADD_KEY_FROM_RAW_BYTES |
 | [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | aead_encryption_functions | Unsupported |  | function KEYSET_CHAIN |
 | [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | aead_encryption_functions | Unsupported |  | function KEYSET_FROM_JSON |
@@ -239,7 +239,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | string_functions | Supported | GoogleSQL function |  |
 | [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | string_functions | Supported | GoogleSQL function | pads with spaces by default |
 | [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | string_functions | Supported | GoogleSQL function |  |
-| [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Unsupported |  | type INTERVAL |
+| [`MAKE_INTERVAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#make_interval) | interval_functions | Supported | GoogleSQL function |  |
 | [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MAX_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max_by) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`MD5`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#md5) | hash_functions | Supported | DuckDB SQL |  |
@@ -284,7 +284,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported | DuckDB function, renamed |  |
 | [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported |  | type RANGE<DATE> |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Partial | DuckDB SQL | type INTERVAL; type RANGE<DATE> |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Partial | DuckDB SQL | function RANGE_BUCKET with INTERVAL; type RANGE<DATE> |
 | [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Unsupported |  | `SELECT RANGE_CONTAINS(RANGE<DATE> '[2024-01-01, 2024-02-01)', 2)`: INVALID_ARGUMENT: No matching signature for function RANGE_CONTAINS; function RANGE_CONTAINS |
 | [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Unsupported |  | function RANGE_END |
 | [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Unsupported |  | type RANGE<DATE> |
@@ -407,7 +407,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | geography_functions | Unsupported |  | function ST_Y |
 | [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | string_functions | Supported | GoogleSQL function | starts at the first character for a position of 0 or before the start |
 | [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | GoogleSQL function | starts at the first character for a position of 0 or before the start |
-| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | unsupported construct |
+| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | aggregate or analytic function SUM with INTERVAL |
 | [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported | DuckDB function |  |
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |

@@ -200,18 +200,38 @@ std::vector<Rule> WithInterval(const std::string& spelling) {
 
 // EXTRACT, where a time zone argument moves a TIMESTAMP to the civil time there.
 std::vector<Rule> Extract() {
-  std::vector<Rule> rules;
+  std::vector<Rule> rules = {
+      {2,
+       "date_part(#2, $1)",
+       {Is(1, {TYPE_INTERVAL}), Part(2, {"year", "month", "day", "hour", "minute", "second"})}},
+      {2, "(date_part(#2, $1) % 1000)", {Is(1, {TYPE_INTERVAL}), Part(2, {"millisecond"})}},
+      {2, "(date_part(#2, $1) % 1000000)", {Is(1, {TYPE_INTERVAL}), Part(2, {"microsecond"})}}};
   for (const auto& [arity, value] :
        {std::pair<std::size_t, std::string>{2, "$1"}, {3, "timezone($3, $1)"}}) {
     rules.push_back(
-        {arity, "(date_part('dayofweek', " + value + ") + 1)", {Part(2, {"dayofweek"})}});
-    rules.push_back({arity, "CAST(strftime(" + value + ", '%U') AS BIGINT)", {Part(2, {"week"})}});
-    rules.push_back({arity, "date_part('week', " + value + ")", {Part(2, {"isoweek"})}});
-    // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
-    rules.push_back({arity, "(date_part(#2, " + value + ") % 1000)", {Part(2, {"millisecond"})}});
+        {arity,
+         "(date_part('dayofweek', " + value + ") + 1)",
+         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"dayofweek"})}});
     rules.push_back(
-        {arity, "(date_part(#2, " + value + ") % 1000000)", {Part(2, {"microsecond"})}});
-    rules.push_back({arity, "date_part(#2, " + value + ")"});
+        {arity,
+         "CAST(strftime(" + value + ", '%U') AS BIGINT)",
+         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"week"})}});
+    rules.push_back(
+        {arity,
+         "date_part('week', " + value + ")",
+         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"isoweek"})}});
+    // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
+    rules.push_back(
+        {arity,
+         "(date_part(#2, " + value + ") % 1000)",
+         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"millisecond"})}});
+    rules.push_back(
+        {arity,
+         "(date_part(#2, " + value + ") % 1000000)",
+         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"microsecond"})}});
+    rules.push_back({arity,
+                     "date_part(#2, " + value + ")",
+                     {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})}});
   }
   return rules;
 }
@@ -616,6 +636,16 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 // src/backend_functions.cc registers as bq_* DuckDB functions.
 const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      // Construct and normalize separate interval components through GoogleSQL.
+      {"$INTERVAL",
+       {{2,
+         "bq_interval($1, upper(#2))",
+         {Part(2, {"year", "quarter", "month", "week", "day", "hour", "minute", "second",
+                   "millisecond", "microsecond"})}}}},
+      {"MAKE_INTERVAL", {{6, "bq_make_interval($1, $2, $3, $4, $5, $6)"}}},
+      {"JUSTIFY_HOURS", {{1, "bq_justify_hours($1)"}}},
+      {"JUSTIFY_DAYS", {{1, "bq_justify_days($1)"}}},
+      {"JUSTIFY_INTERVAL", {{1, "bq_justify_interval($1)"}}},
       // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
       // infinities where BigQuery raises errors, such as EXP(1000).
       {"SQRT", Numbers("sqrt")},

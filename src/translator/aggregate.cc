@@ -47,6 +47,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       (entry->implementation == Implementation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
+  if (HasInterval(call.type()) ||
+      std::ranges::any_of(call.argument_list(),
+                          [](const auto& argument) { return HasInterval(argument->type()); })) {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with INTERVAL");
+  }
   if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
@@ -188,6 +193,7 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {
+      if (HasInterval(ref->type())) return Unsupported(scope, "PARTITION BY with INTERVAL");
       const auto key = Expression(*ref, scope, columns);
       if (!key) {
         return std::nullopt;
@@ -298,6 +304,10 @@ std::optional<std::string> GroupingSet(const googlesql::ResolvedGroupingSetBase&
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
+  if (std::ranges::any_of(aggregate.group_by_list(),
+                          [](const auto& key) { return HasInterval(key->column().type()); })) {
+    return Unsupported(scope, "GROUP BY with INTERVAL");
+  }
   if (!aggregate.collation_list().empty()) {
     return Unsupported(scope, "GROUP BY with collation");
   }

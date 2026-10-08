@@ -13,6 +13,8 @@
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "googlesql/base/status_macros.h"
+#include "googlesql/parser/parse_tree.h"
+#include "googlesql/parser/parser.h"
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/analyzer_output.h"
@@ -26,6 +28,7 @@
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
 #include "src/catalog.h"
+#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/type_mapping.h"
 
@@ -92,6 +95,36 @@ std::optional<std::vector<FieldSchema>> ResultSchema(
 namespace {
 
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
+// Literal CASTs disappear during resolution. Check the source AST so unsupported interval
+// casts cannot become supported merely because GoogleSQL folded them into values.
+absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
+  if (ToUpperAscii(std::string(sql)).find("INTERVAL") == std::string::npos) return absl::OkStatus();
+  std::unique_ptr<googlesql::ParserOutput> parsed;
+  const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
+  GOOGLESQL_RETURN_IF_ERROR(expression ? googlesql::ParseExpression(sql, options, &parsed)
+                                       : googlesql::ParseStatement(sql, options, &parsed));
+  std::vector<const googlesql::ASTNode*> nodes{
+      expression ? static_cast<const googlesql::ASTNode*>(parsed->expression())
+                 : static_cast<const googlesql::ASTNode*>(parsed->statement())};
+  while (!nodes.empty()) {
+    const auto* node = nodes.back();
+    nodes.pop_back();
+    if (const auto* cast = node->GetAsOrNull<googlesql::ASTCastExpression>()) {
+      const auto* type = cast->type()->GetAsOrNull<googlesql::ASTSimpleType>();
+      if (type != nullptr && type->type_name()->num_names() == 1 &&
+          ToUpperAscii(type->type_name()->names()[0]->GetAsString()) == "INTERVAL" &&
+          cast->expr()->node_kind() != googlesql::AST_NULL_LITERAL &&
+          cast->expr()->node_kind() != googlesql::AST_INTERVAL_EXPR) {
+        return absl::UnimplementedError(
+            "The emulator does not support CAST to INTERVAL other than typed NULL or INTERVAL "
+            "literals");
+      }
+    }
+    for (int i = 0; i < node->num_children(); ++i) nodes.push_back(node->child(i));
+  }
+  return absl::OkStatus();
+}
+
 absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSettings& settings,
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
@@ -196,6 +229,9 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     throw std::runtime_error(
         googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status).ToString());
   }
+  if (const auto casts = CheckIntervalCasts(sql, false); !casts.ok()) {
+    throw std::runtime_error(std::string(casts.message()));
+  }
   if (const absl::Status temporary =
           CheckTemporaryTable(*analyzer_output->resolved_statement(), settings.script != nullptr);
       !temporary.ok()) {
@@ -232,6 +268,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
                                                         &type_factory, &analyzer_output))
       .With(googlesql::ConvertLocalErrorToScriptError(segment));
+  GOOGLESQL_RETURN_IF_ERROR(CheckIntervalCasts(segment.GetSegmentText(), false));
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
   return AnalyzerResult(std::move(analyzer_output));
 }
@@ -257,6 +294,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
     GOOGLESQL_RETURN_IF_ERROR(status).With(googlesql::ConvertLocalErrorToScriptError(*segment));
   }
   GOOGLESQL_RETURN_IF_ERROR(status);
+  GOOGLESQL_RETURN_IF_ERROR(CheckIntervalCasts(sql, true));
   return AnalyzerResult(std::move(analyzer_output));
 }
 

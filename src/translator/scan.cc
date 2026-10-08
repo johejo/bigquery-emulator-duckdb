@@ -213,6 +213,10 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   Relation result;
   std::vector<std::string> names;
   for (const auto& column : set.column_list()) {
+    if (set.op_type() != googlesql::ResolvedSetOperationScan::UNION_ALL &&
+        HasInterval(column.type())) {
+      return Unsupported(scope, "set operation with INTERVAL");
+    }
     names.push_back(ColumnName(column.column_id()));
     result.columns.emplace(column.column_id(), "q." + names.back());
   }

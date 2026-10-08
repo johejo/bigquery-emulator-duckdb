@@ -244,9 +244,12 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":catalog",
+        ":duckdb_sql",
         ":type_mapping",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/parser",
+        "@googlesql//googlesql/parser:parse_tree",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:error_helpers",
@@ -306,6 +309,18 @@ cc_library(
 )
 
 cc_library(
+    name = "interval",
+    srcs = ["src/interval.cc"],
+    hdrs = ["src/interval.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        "//third_party/duckdb",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:interval_value",
+    ],
+)
+
+cc_library(
     name = "backend_functions",
     srcs = ["src/backend_functions.cc"],
     hdrs = ["src/backend_functions.h"],
@@ -316,6 +331,7 @@ cc_library(
         "//src/backend_functions:aead",
         "//src/backend_functions:bignumeric",
         "//src/backend_functions:datetime",
+        "//src/backend_functions:interval",
         "//src/backend_functions:json",
         "//src/backend_functions:math",
         "//src/backend_functions:percentile",
@@ -340,6 +356,7 @@ cc_library(
         ":backend_functions",
         ":bignumeric",
         ":duckdb_handle",
+        ":interval",
         "//third_party/duckdb",
         "@googlesql//googlesql/public:numeric_value",
     ],
