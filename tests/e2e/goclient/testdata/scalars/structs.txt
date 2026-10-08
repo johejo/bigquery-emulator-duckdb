@@ -86,8 +86,10 @@ SELECT CAST(identity(STRUCT(a + 0, CONCAT(b, ''))) AS STRUCT<x INT64, y STRING>)
 SELECT CAST(s AS STRUCT<inner_value STRUCT<x INT64, y STRING>>).inner_value.y FROM (SELECT STRUCT(STRUCT(a + 0, CONCAT(b, ''))) AS s FROM t WHERE a = 1)
 => "x"
 
+# ARRAY casts require compatible element types; SAFE_CAST does not suppress static errors.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_array
 SELECT SAFE_CAST(items AS ARRAY<STRUCT<INT64, INT64>>) IS NULL FROM (SELECT [STRUCT(a + 0, CONCAT(b, ''))] AS items FROM t WHERE a = 1)
-=> "true"
+=> error:
 
 SELECT TO_JSON_STRING(STRUCT(STRUCT(a + 0, CONCAT(b, '')) AS nested)) FROM t WHERE a = 1
 => "{\"nested\":{\"\":1,\"\":\"x\"}}"
