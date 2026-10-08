@@ -5,7 +5,6 @@ Checks:
   - concurrency-*
   - cppcoreguidelines-*
   - google-*
-  - hicpp-*
   - misc-*
   - modernize-*
   - performance-*
@@ -32,11 +31,6 @@ Checks:
   - -cppcoreguidelines-pro-bounds-constant-array-index
   - -cppcoreguidelines-pro-bounds-pointer-arithmetic
   - -cppcoreguidelines-special-member-functions
-  - -hicpp-avoid-c-arrays
-  - -hicpp-braces-around-statements
-  - -hicpp-no-array-decay
-  - -hicpp-signed-bitwise
-  - -hicpp-special-member-functions
   - -misc-const-correctness
   - -misc-include-cleaner
   - -misc-no-recursion
