@@ -1,3 +1,5 @@
+#include "src/translator/ddl.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <map>
@@ -19,7 +21,9 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/table_metadata.h"
-#include "src/translator/internal.h"
+#include "src/translator/context.h"
+#include "src/translator/expression.h"
+#include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {

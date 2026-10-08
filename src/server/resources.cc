@@ -1,3 +1,5 @@
+#include "src/server/resources.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
@@ -18,7 +20,7 @@
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
-#include "src/server/internal.h"
+#include "src/server/requests.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb::server {

@@ -12,12 +12,15 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "duckdb.h"
-#include "src/backend_functions/internal.h"
 #include "utf8_validity.h"
 
 // AEAD.ENCRYPT, AEAD.DECRYPT_BYTES and AEAD.DECRYPT_STRING, which take a serialized Tink keyset
 // of AES-GCM keys and produce and read Tink's ciphertexts: the output prefix of the key, a
 // 12-byte IV, and the encrypted data followed by a 16-byte tag.
+
+#include "src/backend_functions/aead.h"
+#include "src/backend_functions/register.h"
+#include "src/backend_functions/scalar.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {

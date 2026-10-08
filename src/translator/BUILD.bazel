@@ -1,0 +1,139 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_library(
+    name = "context",
+    hdrs = ["context.h"],
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//:duckdb_sql",
+        "//:query_parameters",
+        "//:translated_statement",
+        "@googlesql//googlesql/public:analyzer",
+    ],
+)
+
+# Queries and expressions, which contain each other: expressions contain subqueries, scans contain
+# expressions, aggregates and function calls, and function calls contain expressions.
+cc_library(
+    name = "query",
+    srcs = [
+        "aggregate.cc",
+        "expression.cc",
+        "function.cc",
+        "scan.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+        "expression.h",
+        "function.h",
+        "scan.h",
+    ],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":functions",
+        ":literal",
+        "//:catalog",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:constant",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+# The registry of BigQuery functions and how each is spelled in DuckDB: as is, renamed, by
+# template rules or backend rules, or by a handler.
+cc_library(
+    name = "functions",
+    srcs = [
+        "functions.cc",
+        "handlers.cc",
+        "rules.cc",
+    ],
+    hdrs = [
+        "functions.h",
+        "handlers.h",
+    ],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+        "@nlohmann_json//:json",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["@googlesql//googlesql/public:type_cc_proto"],
+)
+
+cc_library(
+    name = "literal",
+    srcs = ["literal.cc"],
+    hdrs = ["literal.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        "//:bignumeric",
+        "//:catalog",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:strings",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "ddl",
+    srcs = ["ddl.cc"],
+    hdrs = ["ddl.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":query",
+        "//:catalog",
+        "//:duckdb_sql",
+        "//:field_schema",
+        "//:table_metadata",
+        "//:type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "dml",
+    srcs = ["dml.cc"],
+    hdrs = ["dml.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":query",
+        "//:catalog",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)

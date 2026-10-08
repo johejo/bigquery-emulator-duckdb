@@ -65,7 +65,7 @@ GoogleSQL's for BYTES:
   difference such as argument order, a default or a date part.
 - **A backend rule** (`BackendRules`, registered in `src/backend_functions/`): a call to
   GoogleSQL's implementation.
-- **A handler** (`Handlers`, `src/translator/function.cc`): when the spelling depends on more of
+- **A handler** (`Handlers`, `src/translator/handlers.cc`): when the spelling depends on more of
   the resolved AST than a rule sees, such as a variable number of arguments or a literal pattern
   or path. The handler builds the call and leaves the semantics to the backend chosen above; do
   not reimplement them in generated SQL, such as by walking BYTES as hex digits.

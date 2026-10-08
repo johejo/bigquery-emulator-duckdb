@@ -10,7 +10,11 @@
 #include "src/analyzer.h"
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
-#include "src/translator/internal.h"
+#include "src/translator/context.h"
+#include "src/translator/ddl.h"
+#include "src/translator/dml.h"
+#include "src/translator/expression.h"
+#include "src/translator/scan.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {

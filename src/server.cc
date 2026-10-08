@@ -19,7 +19,9 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
-#include "src/server/internal.h"
+#include "src/server/requests.h"
+#include "src/server/resources.h"
+#include "src/server/routes.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
 

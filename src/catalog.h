@@ -17,7 +17,6 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
-#include "src/type_mapping.h"
 
 namespace googlesql {
 class LanguageOptions;

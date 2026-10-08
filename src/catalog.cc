@@ -27,6 +27,7 @@
 #include "googlesql/public/type.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

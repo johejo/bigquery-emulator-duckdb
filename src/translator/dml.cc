@@ -1,3 +1,5 @@
+#include "src/translator/dml.h"
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -9,7 +11,10 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/translator/internal.h"
+#include "src/translator/context.h"
+#include "src/translator/expression.h"
+#include "src/translator/scan.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
