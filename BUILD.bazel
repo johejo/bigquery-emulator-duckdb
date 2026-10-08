@@ -4,19 +4,22 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
+# The emulator's libraries, shared with the packages under src/ that hold its components.
+package(default_visibility = ["//src:__subpackages__"])
+
 refresh_compile_commands(
     name = "refresh_compile_commands",
     exclude_external_sources = True,
     exclude_headers = "external",
     targets = {
-        "//:backend_test": "",
-        "//:catalog_test": "",
-        "//:emulator_test": "",
-        "//:functions_test": "",
-        "//:query_parameters_test": "",
-        "//:translator_test": "",
-        "//:bigquery-emulator-duckdb": "",
-        "//:server_test": "",
+        ":backend_test": "",
+        ":catalog_test": "",
+        ":emulator_test": "",
+        ":functions_test": "",
+        ":query_parameters_test": "",
+        ":translator_test": "",
+        ":bigquery-emulator-duckdb": "",
+        ":server_test": "",
     },
 )
 
@@ -225,168 +228,6 @@ cc_library(
 )
 
 cc_library(
-    name = "translator_aggregate",
-    srcs = ["src/translator/aggregate.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":duckdb_sql",
-        ":translator_aggregate_interface",
-        ":translator_context",
-        ":translator_expression_interface",
-        ":translator_function_interface",
-        ":translator_functions_interface",
-        ":translator_scan_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_ddl",
-    srcs = ["src/translator/ddl.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":catalog_interface",
-        ":duckdb_sql",
-        ":field_schema",
-        ":table_metadata",
-        ":translator_context",
-        ":translator_ddl_interface",
-        ":translator_expression_interface",
-        ":translator_scan_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/public/types",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_dml",
-    srcs = ["src/translator/dml.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":catalog_interface",
-        ":duckdb_sql",
-        ":translator_context",
-        ":translator_dml_interface",
-        ":translator_expression_interface",
-        ":translator_scan_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/public:catalog",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_expression",
-    srcs = ["src/translator/expression.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":duckdb_sql",
-        ":translator_context",
-        ":translator_expression_interface",
-        ":translator_function_interface",
-        ":translator_literal_interface",
-        ":translator_scan_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:constant",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_function",
-    srcs = ["src/translator/function.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":duckdb_sql",
-        ":translator_context",
-        ":translator_expression_interface",
-        ":translator_function_interface",
-        ":translator_functions_interface",
-        ":translator_handlers_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
-        "@nlohmann_json//:json",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_functions",
-    srcs = ["src/translator/functions.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":translator_functions_interface",
-        ":translator_handlers_interface",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_literal",
-    srcs = ["src/translator/literal.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":bignumeric",
-        ":catalog_interface",
-        ":duckdb_sql",
-        ":translator_context",
-        ":translator_literal_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/public:strings",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_rules",
-    srcs = ["src/translator/rules.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [":translator_functions_interface"],
-    linkstatic = True,
-)
-
-cc_library(
-    name = "translator_scan",
-    srcs = ["src/translator/scan.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":catalog_interface",
-        ":duckdb_sql",
-        ":translator_aggregate_interface",
-        ":translator_context",
-        ":translator_expression_interface",
-        ":translator_function_interface",
-        ":translator_scan_interface",
-        ":type_mapping",
-        "@googlesql//googlesql/public:catalog",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-)
-
-cc_library(
     name = "translator",
     srcs = ["src/translator.cc"],
     copts = ["-std=c++20"],
@@ -394,192 +235,27 @@ cc_library(
         ":analyzer",
         ":duckdb_sql",
         ":query_parameters",
-        ":translator_aggregate",
-        ":translator_context",
-        ":translator_ddl",
-        ":translator_ddl_interface",
-        ":translator_dml",
-        ":translator_dml_interface",
-        ":translator_expression",
-        ":translator_expression_interface",
-        ":translator_function",
-        ":translator_functions",
-        ":translator_literal",
-        ":translator_rules",
-        ":translator_scan",
-        ":translator_scan_interface",
+        "//src/translator:aggregate",
+        "//src/translator:context",
+        "//src/translator:ddl",
+        "//src/translator:ddl_interface",
+        "//src/translator:dml",
+        "//src/translator:dml_interface",
+        "//src/translator:expression",
+        "//src/translator:expression_interface",
+        "//src/translator:function",
+        "//src/translator:functions",
+        "//src/translator:literal",
+        "//src/translator:rules",
+        "//src/translator:scan",
+        "//src/translator:scan_interface",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
     ],
     deps = [
-        ":translator_functions_interface",
         ":translator_interface",
+        "//src/translator:functions_interface",
     ],
-)
-
-cc_library(
-    name = "backend_functions_bignumeric",
-    srcs = ["src/backend_functions/bignumeric.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":backend_interface",
-        ":bignumeric",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:numeric_value",
-        "@googlesql//googlesql/public/functions:arithmetics",
-        "@googlesql//googlesql/public/functions:convert",
-        "@googlesql//googlesql/public/functions:convert_string",
-        "@googlesql//googlesql/public/functions:generate_array",
-        "@googlesql//googlesql/public/functions:math",
-        "@googlesql//googlesql/public/functions:numeric",
-        "@googlesql//googlesql/public/functions:rounding_mode_cc_proto",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_bignumeric_interface"],
-)
-
-cc_library(
-    name = "backend_functions_math",
-    srcs = ["src/backend_functions/math.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:numeric_value",
-        "@googlesql//googlesql/public/functions:arithmetics",
-        "@googlesql//googlesql/public/functions:generate_array",
-        "@googlesql//googlesql/public/functions:math",
-        "@googlesql//googlesql/public/functions:numeric",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_math_interface"],
-)
-
-cc_library(
-    name = "backend_functions_string",
-    srcs = ["src/backend_functions/string.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:numeric_value",
-        "@googlesql//googlesql/public/functions:convert_string",
-        "@googlesql//googlesql/public/functions:distance",
-        "@googlesql//googlesql/public/functions:hash",
-        "@googlesql//googlesql/public/functions:net",
-        "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
-        "@googlesql//googlesql/public/functions:regexp",
-        "@googlesql//googlesql/public/functions:string",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_string_interface"],
-)
-
-cc_library(
-    name = "backend_functions_datetime",
-    srcs = ["src/backend_functions/datetime.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":bignumeric",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:civil_time",
-        "@googlesql//googlesql/public:options_cc_proto",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/public/functions:date_time_util",
-        "@googlesql//googlesql/public/functions:parse_date_time",
-        "@googlesql//googlesql/public/functions:string_format",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_datetime_interface"],
-)
-
-cc_library(
-    name = "backend_functions_json",
-    srcs = ["src/backend_functions/json.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_datetime",
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":bignumeric",
-        ":catalog",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:json_value",
-        "@googlesql//googlesql/public:language_options",
-        "@googlesql//googlesql/public:numeric_value",
-        "@googlesql//googlesql/public:options_cc_proto",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/public/functions:json",
-        "@googlesql//googlesql/public/functions:json_format",
-        "@googlesql//googlesql/public/functions:json_internal",
-        "@googlesql//googlesql/public/functions:to_json",
-        "@googlesql//googlesql/public/types",
-        "@nlohmann_json//:json",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_json_interface"],
-)
-
-cc_library(
-    name = "backend_functions_aead",
-    srcs = ["src/backend_functions/aead.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        "//third_party/duckdb",
-        "@boringssl//:crypto",
-        "@googlesql//googlesql/base:status",
-        "@protobuf//third_party/utf8_range:utf8_validity",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_aead_interface"],
-)
-
-cc_library(
-    name = "backend_functions_percentile",
-    srcs = ["src/backend_functions/percentile.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_functions_register",
-        ":backend_functions_scalar",
-        ":duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:numeric_value",
-        "@googlesql//googlesql/public/functions:percentile",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_percentile_interface"],
-)
-
-cc_library(
-    name = "backend_functions_register",
-    srcs = ["src/backend_functions/register.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":backend_interface",
-        ":duckdb_handle",
-    ],
-    linkstatic = True,
-    deps = [":backend_functions_register_interface"],
 )
 
 cc_library(
@@ -587,15 +263,15 @@ cc_library(
     srcs = ["src/backend_functions.cc"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":backend_functions_aead",
-        ":backend_functions_bignumeric",
-        ":backend_functions_datetime",
-        ":backend_functions_json",
-        ":backend_functions_math",
-        ":backend_functions_percentile",
-        ":backend_functions_string",
         ":backend_interface",
         ":duckdb_handle",
+        "//src/backend_functions:aead",
+        "//src/backend_functions:bignumeric",
+        "//src/backend_functions:datetime",
+        "//src/backend_functions:json",
+        "//src/backend_functions:math",
+        "//src/backend_functions:percentile",
+        "//src/backend_functions:string",
     ],
     linkstatic = True,
     deps = [":backend_functions_interface"],
@@ -790,57 +466,6 @@ cc_library(
 )
 
 cc_library(
-    name = "server_routes",
-    srcs = ["src/server/routes.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":api_error",
-        ":discovery_document",
-        ":httplib",
-        "@nlohmann_json//:json",
-    ],
-    linkstatic = True,
-    deps = [":server_routes_interface"],
-)
-
-cc_library(
-    name = "server_requests",
-    srcs = ["src/server/requests.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":api_error",
-        ":emulator_interface",
-        ":field_schema",
-        ":httplib",
-        ":query_parameters",
-        ":references",
-        ":server_routes",
-        ":table_metadata",
-        "@nlohmann_json//:json",
-    ],
-    linkstatic = True,
-    deps = [":server_requests_interface"],
-)
-
-cc_library(
-    name = "server_resources",
-    srcs = ["src/server/resources.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":api_error",
-        ":emulator_interface",
-        ":field_schema",
-        ":project",
-        ":references",
-        ":server_requests_interface",
-        ":table_metadata",
-        "@nlohmann_json//:json",
-    ],
-    linkstatic = True,
-    deps = [":server_resources_interface"],
-)
-
-cc_library(
     name = "server",
     srcs = ["src/server.cc"],
     hdrs = ["src/server.h"],
@@ -849,11 +474,11 @@ cc_library(
         ":api_error",
         ":emulator",
         ":httplib",
-        ":server_requests",
-        ":server_resources",
-        ":server_routes",
         ":table_metadata",
         ":temporary_files",
+        "//src/server:requests",
+        "//src/server:resources",
+        "//src/server:routes",
         "@nlohmann_json//:json",
     ],
 )
@@ -1198,153 +823,5 @@ cc_library(
 cc_library(
     name = "backend_functions_interface",
     hdrs = ["src/backend_functions.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "translator_functions_interface",
-    hdrs = ["src/translator/functions.h"],
-    deps = ["@googlesql//googlesql/public:type_cc_proto"],
-)
-
-cc_library(
-    name = "translator_context",
-    hdrs = ["src/translator/context.h"],
-    deps = [
-        ":duckdb_sql",
-        ":query_parameters",
-        ":translator_interface",
-    ],
-)
-
-cc_library(
-    name = "backend_functions_scalar",
-    hdrs = ["src/backend_functions/scalar.h"],
-    deps = [
-        ":duckdb_handle",
-        "@googlesql//googlesql/base:status",
-    ],
-)
-
-cc_library(
-    name = "backend_functions_register_interface",
-    hdrs = ["src/backend_functions/register.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "server_routes_interface",
-    hdrs = ["src/server/routes.h"],
-    deps = ["@nlohmann_json//:json"],
-)
-
-cc_library(
-    name = "server_requests_interface",
-    hdrs = ["src/server/requests.h"],
-    deps = [
-        ":emulator_interface",
-        ":field_schema",
-        ":references",
-        ":table_metadata",
-        "@nlohmann_json//:json",
-    ],
-)
-
-cc_library(
-    name = "server_resources_interface",
-    hdrs = ["src/server/resources.h"],
-    deps = ["@nlohmann_json//:json"],
-)
-
-cc_library(
-    name = "translator_literal_interface",
-    hdrs = ["src/translator/literal.h"],
-)
-
-cc_library(
-    name = "translator_expression_interface",
-    hdrs = ["src/translator/expression.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "translator_function_interface",
-    hdrs = ["src/translator/function.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "translator_handlers_interface",
-    hdrs = ["src/translator/handlers.h"],
-    deps = [":translator_functions_interface"],
-)
-
-cc_library(
-    name = "translator_scan_interface",
-    hdrs = ["src/translator/scan.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "translator_aggregate_interface",
-    hdrs = ["src/translator/aggregate.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "translator_dml_interface",
-    hdrs = ["src/translator/dml.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "translator_ddl_interface",
-    hdrs = ["src/translator/ddl.h"],
-    deps = [":translator_context"],
-)
-
-cc_library(
-    name = "backend_functions_bignumeric_interface",
-    hdrs = ["src/backend_functions/bignumeric.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_math_interface",
-    hdrs = ["src/backend_functions/math.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_string_interface",
-    hdrs = ["src/backend_functions/string.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_datetime_interface",
-    hdrs = ["src/backend_functions/datetime.h"],
-    deps = [
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:civil_time",
-    ],
-)
-
-cc_library(
-    name = "backend_functions_json_interface",
-    hdrs = ["src/backend_functions/json.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_aead_interface",
-    hdrs = ["src/backend_functions/aead.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_percentile_interface",
-    hdrs = ["src/backend_functions/percentile.h"],
     deps = ["//third_party/duckdb"],
 )

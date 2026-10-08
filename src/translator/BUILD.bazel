@@ -1,0 +1,241 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_library(
+    name = "aggregate",
+    srcs = ["aggregate.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":aggregate_interface",
+        ":context",
+        ":expression_interface",
+        ":function_interface",
+        ":functions_interface",
+        ":scan_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "ddl",
+    srcs = ["ddl.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        ":ddl_interface",
+        ":expression_interface",
+        ":scan_interface",
+        "//:catalog_interface",
+        "//:duckdb_sql",
+        "//:field_schema",
+        "//:table_metadata",
+        "//:type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "dml",
+    srcs = ["dml.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        ":dml_interface",
+        ":expression_interface",
+        ":scan_interface",
+        "//:catalog_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "expression",
+    srcs = ["expression.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        ":expression_interface",
+        ":function_interface",
+        ":literal_interface",
+        ":scan_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:constant",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "function",
+    srcs = ["function.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        ":expression_interface",
+        ":function_interface",
+        ":functions_interface",
+        ":handlers_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+        "@nlohmann_json//:json",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "functions",
+    srcs = ["functions.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":functions_interface",
+        ":handlers_interface",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "literal",
+    srcs = ["literal.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        ":literal_interface",
+        "//:bignumeric",
+        "//:catalog_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:strings",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "rules",
+    srcs = ["rules.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":functions_interface"],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "scan",
+    srcs = ["scan.cc"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":aggregate_interface",
+        ":context",
+        ":expression_interface",
+        ":function_interface",
+        ":scan_interface",
+        "//:catalog_interface",
+        "//:duckdb_sql",
+        "//:type_mapping",
+        "@googlesql//googlesql/public:catalog",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
+    name = "functions_interface",
+    hdrs = ["functions.h"],
+    visibility = ["//:__pkg__"],
+    deps = ["@googlesql//googlesql/public:type_cc_proto"],
+)
+
+cc_library(
+    name = "context",
+    hdrs = ["context.h"],
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//:duckdb_sql",
+        "//:query_parameters",
+        "//:translator_interface",
+    ],
+)
+
+cc_library(
+    name = "literal_interface",
+    hdrs = ["literal.h"],
+)
+
+cc_library(
+    name = "expression_interface",
+    hdrs = ["expression.h"],
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "function_interface",
+    hdrs = ["function.h"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "handlers_interface",
+    hdrs = ["handlers.h"],
+    deps = [":functions_interface"],
+)
+
+cc_library(
+    name = "scan_interface",
+    hdrs = ["scan.h"],
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "aggregate_interface",
+    hdrs = ["aggregate.h"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "dml_interface",
+    hdrs = ["dml.h"],
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "ddl_interface",
+    hdrs = ["ddl.h"],
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
