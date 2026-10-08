@@ -17,20 +17,21 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
-#include "src/catalog.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
-#include "src/translator.h"
 
 namespace googlesql {
 class ParserOutput;
 }
 
 namespace bigquery_emulator_duckdb {
+
+class TableSource;
+struct TranslatedStatement;
 
 // JobStatistics2.statementType of a multi-statement query.
 inline constexpr char kScriptStatementType[] = "SCRIPT";

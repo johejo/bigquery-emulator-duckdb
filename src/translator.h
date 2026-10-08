@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "googlesql/public/analyzer.h"
-#include "src/catalog.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
@@ -19,6 +18,8 @@ class ResolvedStatement;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
+
+struct TemporaryTables;
 
 // The project and dataset that unqualified table and dataset names in DDL belong to, and the
 // temporary tables of a multi-statement query that take precedence over them, matching the

@@ -16,7 +16,9 @@
 #include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/numeric.h"
 #include "googlesql/public/numeric_value.h"
-#include "src/backend_functions/internal.h"
+#include "src/backend_functions/math.h"
+#include "src/backend_functions/register.h"
+#include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {

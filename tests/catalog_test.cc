@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 #include "src/analyzer.h"
 #include "src/field_schema.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

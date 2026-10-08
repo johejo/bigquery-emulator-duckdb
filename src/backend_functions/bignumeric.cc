@@ -24,12 +24,15 @@
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend.h"
-#include "src/backend_functions/internal.h"
 #include "src/duckdb_handle.h"
 
 // BIGNUMERIC arithmetic and conversions. The translator passes a BIGNUM to these functions, and
 // takes one back, as the VARCHAR of its units; see src/bignumeric.h. A conversion's last argument
 // is true under SAFE_CAST, which makes its errors NULL.
+
+#include "src/backend_functions/bignumeric.h"
+#include "src/backend_functions/register.h"
+#include "src/backend_functions/scalar.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {

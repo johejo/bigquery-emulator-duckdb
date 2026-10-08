@@ -13,12 +13,15 @@
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "googlesql/public/numeric_value.h"
-#include "src/backend_functions/internal.h"
 #include "src/duckdb_handle.h"
 
 // PERCENTILE_CONT and PERCENTILE_DISC. The translator collects each partition's values with
 // list(), sorted as GoogleSQL sorts them: NULLs first, then NaNs, then the other values in
 // ascending order. GoogleSQL's PercentileEvaluator then reads the result off the sorted list.
+
+#include "src/backend_functions/percentile.h"
+#include "src/backend_functions/register.h"
+#include "src/backend_functions/scalar.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {

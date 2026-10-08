@@ -1,58 +1,23 @@
 #pragma once
 
-// Shared by the server's sources; not part of its interface, which is src/server.h.
-
 #include <cstdint>
-#include <functional>
 #include <map>
-#include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <variant>
 #include <vector>
 
-#include "httplib.h"
 #include "nlohmann/json.hpp"
-#include "src/api_error.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
-#include "src/project.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 
+namespace httplib {
+struct Request;
+}
+
 namespace bigquery_emulator_duckdb::server {
-
-// routes.cc: the methods of the discovery document, which the server routes requests by.
-
-// A query parameter of a method, as the discovery document describes it.
-struct QueryParameter {
-  std::string type;    // "string", "integer" or "boolean"
-  std::string format;  // such as "int32", "uint32" or "uint64"; empty for any value of the type
-  std::vector<std::string> values;  // the values an enum takes; empty for any value
-};
-
-struct ApiMethod {
-  std::string http_method;
-  // The cpp-httplib patterns of the method's path below the API prefix, such as
-  // "/projects/:projectId/jobs", and of its media upload paths below the root.
-  std::string path;
-  std::vector<std::string> upload_paths;
-  // The query parameters it takes, the API-wide ones such as prettyPrint included.
-  std::map<std::string, QueryParameter, std::less<>> parameters;
-};
-
-// The parsed discovery document.
-const nlohmann::json& Discovery();
-// The discovery document's method `id`, such as "bigquery.tables.get". Throws std::logic_error
-// when the document lacks it or cpp-httplib cannot match its path.
-ApiMethod FindApiMethod(std::string_view id);
-// Rejects a request with a query parameter `method` does not take or a value its type does not
-// allow, as BigQuery does, and with a non-empty one the emulator does not handle as unsupported.
-// The handler of `method` handles the parameters `accepted`, reading or deliberately ignoring
-// them; every method handles some of the API-wide ones.
-void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string>& accepted,
-                          const httplib::Request& request);
 
 // requests.cc: HTTP requests to the emulator's request structs. Every malformed request is
 // rejected with ApiError::Invalid.
@@ -156,31 +121,5 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlo
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
 TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
-
-// resources.cc: the emulator's structs to BigQuery's JSON resources and responses.
-
-nlohmann::json ErrorBody(const ApiError& error);
-nlohmann::json JobResource(const Job& job);
-// Filters and pages `jobs` as `request` asks.
-nlohmann::json JobList(const std::vector<std::shared_ptr<const Job>>& jobs,
-                       const JobListRequest& request);
-nlohmann::json JobCancelResponse(const Job& job);
-nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
-nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
-nlohmann::json ProjectList(const std::vector<Project>& projects, const ListPage& page);
-
-nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata);
-// `entries` and `tables` are sorted by id; the lists carry the page of them `page` asks for.
-nlohmann::json DatasetList(const std::string& project_id,
-                           const std::vector<DatasetListEntry>& entries, const ListPage& page);
-nlohmann::json TableResource(const TableInfo& info);
-// Applies tables.get's schema selection and metadata view to the resource.
-nlohmann::json TableGetResource(const TableInfo& info, const TableGetRequest& request);
-nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
-                         const ListPage& page);
-// `result` holds the rows from `page.start_index` on; the table has `total_rows`.
-nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
-                             std::string_view selected_fields);
-nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
 
 }  // namespace bigquery_emulator_duckdb::server

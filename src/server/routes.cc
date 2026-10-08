@@ -1,3 +1,5 @@
+#include "src/server/routes.h"
+
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
@@ -13,7 +15,6 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/discovery_document.h"
-#include "src/server/internal.h"
 
 namespace bigquery_emulator_duckdb::server {
 namespace {

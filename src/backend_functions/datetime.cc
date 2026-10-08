@@ -1,3 +1,5 @@
+#include "src/backend_functions/datetime.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -13,7 +15,8 @@
 #include "googlesql/public/functions/string_format.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/value.h"
-#include "src/backend_functions/internal.h"
+#include "src/backend_functions/register.h"
+#include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 

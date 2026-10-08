@@ -26,6 +26,7 @@
 #include "googlesql/scripting/script_segment.h"
 #include "src/catalog.h"
 #include "src/field_schema.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 

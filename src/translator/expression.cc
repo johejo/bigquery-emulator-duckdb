@@ -1,3 +1,5 @@
+#include "src/translator/expression.h"
+
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -12,7 +14,11 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
-#include "src/translator/internal.h"
+#include "src/translator/context.h"
+#include "src/translator/function.h"
+#include "src/translator/literal.h"
+#include "src/translator/scan.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
