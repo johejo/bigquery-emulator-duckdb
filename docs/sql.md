@@ -19,9 +19,9 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 16 |
+| Partial | 17 |
 | Supported | 58 |
-| Unsupported | 18 |
+| Unsupported | 17 |
 
 ## Queries
 
@@ -127,7 +127,7 @@ the probe's own notes name what it rejected.
 | `FOR ... IN` | Supported |  |
 | `RAISE`, `RETURN` | Supported |  |
 | System variables | Partial | assignment to system variables |
-| `EXECUTE IMMEDIATE` | Unsupported | EXECUTE IMMEDIATE |
+| `EXECUTE IMMEDIATE` | Partial | Scripting statements such as `BEGIN ... END`, and transactions, are unsupported in the dynamic statement.; scripting statements in EXECUTE IMMEDIATE |
 | Transactions | Partial | Multi-statement queries only. Transaction modes, SQL UDF declarations inside transactions, writes to multiple DuckDB databases, and committing after a handled error are unsupported.; committing a transaction after a handled error; roll it back instead |
 | `CALL` | Unsupported | CALL |
 
