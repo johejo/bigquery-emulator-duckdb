@@ -1,14 +1,18 @@
 #include "src/catalog.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"

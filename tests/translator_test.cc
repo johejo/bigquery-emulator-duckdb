@@ -1,5 +1,6 @@
 #include "src/translator.h"
 
+#include <cstddef>
 #include <exception>
 #include <optional>
 #include <stdexcept>
@@ -11,7 +12,11 @@
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
 #include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/catalog.h"
+#include "src/field_schema.h"
+#include "src/query_parameters.h"
+#include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

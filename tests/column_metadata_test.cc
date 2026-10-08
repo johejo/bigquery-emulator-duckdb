@@ -1,5 +1,6 @@
 #include "src/column_metadata.h"
 
+#include <cstddef>
 #include <vector>
 
 #include "gtest/gtest.h"

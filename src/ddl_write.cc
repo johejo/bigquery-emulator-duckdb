@@ -17,7 +17,7 @@
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
-#include "src/translator.h"
+#include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

@@ -14,6 +14,7 @@
 #include "src/backend.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
+#include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

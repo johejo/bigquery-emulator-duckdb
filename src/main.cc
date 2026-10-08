@@ -1,8 +1,9 @@
-#include <pthread.h>
+// include-cleaner requires signal.h for POSIX APIs such as sigwait and pthread_sigmask;
+// the deprecated-header checks suggest csignal instead, so suppress them on this include.
+#include <signal.h>  // NOLINT(hicpp-deprecated-headers,modernize-deprecated-headers)
 #include <unistd.h>
 
 #include <charconv>
-#include <csignal>
 #include <exception>
 #include <iostream>
 #include <optional>

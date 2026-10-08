@@ -1,7 +1,10 @@
 #include "tools/probe.h"
 
+#include <cstddef>
 #include <exception>
 #include <fstream>
+#include <istream>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -12,6 +15,8 @@
 
 #include "googlesql/public/types/type_factory.h"
 #include "src/analyzer.h"
+#include "src/catalog.h"
+#include "src/emulator.h"
 
 namespace bigquery_emulator_duckdb {
 

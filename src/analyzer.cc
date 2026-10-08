@@ -1,6 +1,7 @@
 #include "src/analyzer.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <stdexcept>

@@ -32,7 +32,6 @@ Checks:
   - -cppcoreguidelines-pro-bounds-pointer-arithmetic
   - -cppcoreguidelines-special-member-functions
   - -misc-const-correctness
-  - -misc-include-cleaner
   - -misc-no-recursion
   - -misc-non-private-member-variables-in-classes
   - -modernize-avoid-c-arrays
@@ -59,6 +58,11 @@ Checks:
   # '= {}' keeps designated initializers from warning about the members they leave out.
   - -readability-redundant-member-init
 HeaderFilterRegex: '^(src|tests|tools)/'
+CheckOptions:
+  # GoogleSQL's TYPE_* enumerators and umbrella headers, and nlohmann's json_fwd/json.hpp
+  # split, produce false positives. glibc's sigset_t is provided by the public signal.h;
+  # include-cleaner instead asks for its internal bits/types/sigset_t.h.
+  misc-include-cleaner.IgnoreHeaders: '(googlesql|nlohmann)/.*|bits/types/sigset_t\.h'
 # The aspect runner only prints clang-tidy's log when it exits non-zero, so findings
 # have to be errors to be visible at all.
 WarningsAsErrors: '*'

@@ -1,6 +1,8 @@
 #include "src/gcs.h"
 
-#include <unistd.h>
+// include-cleaner requires stdlib.h for the POSIX mkdtemp/setenv/unsetenv APIs; the
+// deprecated-header checks suggest cstdlib instead, so suppress them on this include.
+#include <stdlib.h>  // NOLINT(hicpp-deprecated-headers,modernize-deprecated-headers)
 
 #include <atomic>
 #include <cstdlib>

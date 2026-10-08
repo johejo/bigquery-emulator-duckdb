@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"

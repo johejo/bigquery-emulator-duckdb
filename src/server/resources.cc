@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -16,6 +17,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/backend.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/project.h"

@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "google/cloud/credentials.h"
 #include "google/cloud/oauth2/access_token_generator.h"
@@ -16,6 +17,7 @@
 #include "google/cloud/status.h"
 #include "google/cloud/storage/client.h"
 #include "google/cloud/storage/options.h"
+#include "google/cloud/storage/well_known_parameters.h"
 #include "src/api_error.h"
 
 namespace bigquery_emulator_duckdb {

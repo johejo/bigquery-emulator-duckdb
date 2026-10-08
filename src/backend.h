@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -8,7 +9,6 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
-#include "src/backend_error.h"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {

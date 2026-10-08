@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "duckdb.h"
 #include "src/backend_error.h"
 #include "src/duckdb_handle.h"
 

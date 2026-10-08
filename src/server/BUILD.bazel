@@ -47,6 +47,7 @@ cc_library(
     implementation_deps = [
         ":requests",
         "//:api_error",
+        "//:backend",
         "//:emulator",
         "//:field_schema",
         "//:project",

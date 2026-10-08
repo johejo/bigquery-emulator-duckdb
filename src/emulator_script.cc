@@ -20,6 +20,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
+#include "google/protobuf/any.pb.h"
 #include "googlesql/base/status_builder.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/parser/parser.h"
@@ -56,6 +57,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/query_parameters.h"
+#include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
 

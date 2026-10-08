@@ -5,6 +5,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 
 namespace bigquery_emulator_duckdb {

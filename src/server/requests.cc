@@ -1,5 +1,6 @@
 #include "src/server/requests.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <optional>

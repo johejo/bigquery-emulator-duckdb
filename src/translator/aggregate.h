@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <string>
 
 #include "src/translator/context.h"
 

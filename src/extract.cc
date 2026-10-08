@@ -7,8 +7,10 @@
 #include <cstdlib>
 #include <format>
 #include <fstream>
+#include <ios>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -21,6 +23,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/parquet_metadata.h"
 #include "src/type_mapping.h"
 
