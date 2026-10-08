@@ -16,6 +16,8 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "googlesql/base/status_builder.h"
@@ -52,6 +54,7 @@
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/javascript_function.h"
 #include "src/query_parameters.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
@@ -83,6 +86,44 @@ class RowIterator : public googlesql::EvaluatorTableIterator {
   // The number of rows NextRow has moved to; the current row is the one before it.
   size_t next_ = 0;
 };
+
+// The types a JavaScript UDF takes and returns in the emulator so far, and its argument names,
+// which must be JavaScript identifiers to name the parameters of the function the body becomes.
+// BigQuery rejects INT64 arguments, since JavaScript numbers cannot hold every INT64, but returns
+// INT64 results.
+absl::Status CheckJavaScriptSignature(const googlesql::FunctionSignature& signature,
+                                      const std::vector<std::string>& argument_names) {
+  for (const auto& name : argument_names) {
+    const auto identifier = [](char c, bool first) {
+      return absl::ascii_isalpha(c) || c == '_' || c == '$' || (!first && absl::ascii_isdigit(c));
+    };
+    if (name.empty() || !identifier(name.front(), true) ||
+        !std::ranges::all_of(name, [&](char c) { return identifier(c, false); })) {
+      return absl::UnimplementedError(
+          absl::StrCat(kUnsupported, "JavaScript UDF argument name ", name));
+    }
+  }
+  for (const auto& argument : signature.arguments()) {
+    const googlesql::Type* type = argument.type();
+    if (type != nullptr && type->IsInt64()) {
+      return absl::InvalidArgumentError(
+          "INT64 is not supported as an argument type of JavaScript UDFs; use FLOAT64 or STRING");
+    }
+    if (type == nullptr || !(type->IsBool() || type->IsDouble() || type->IsString())) {
+      return absl::UnimplementedError(
+          absl::StrCat(kUnsupported, "JavaScript UDF arguments of type ",
+                       type == nullptr ? "ANY TYPE" : type->DebugString()));
+    }
+  }
+  const googlesql::Type* result = signature.result_type().type();
+  if (result == nullptr ||
+      !(result->IsBool() || result->IsDouble() || result->IsString() || result->IsInt64())) {
+    return absl::UnimplementedError(
+        absl::StrCat(kUnsupported, "JavaScript UDF results of type ",
+                     result == nullptr ? "ANY TYPE" : result->DebugString()));
+  }
+  return absl::OkStatus();
+}
 
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
@@ -400,7 +441,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_TEMP) {
       return Unsupported("persistent UDFs");
     }
-    if (create.language() != "SQL" || create.is_remote()) {
+    const bool javascript = absl::EqualsIgnoreCase(create.language(), "js");
+    if (create.is_remote() || (!javascript && create.language() != "SQL")) {
       return Unsupported("non-SQL UDFs");
     }
     if (create.is_aggregate() || !create.aggregate_expression_list().empty() ||
@@ -408,7 +450,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         create.sql_security() != googlesql::ResolvedCreateStatement::SQL_SECURITY_UNSPECIFIED ||
         create.determinism_level() !=
             googlesql::ResolvedCreateFunctionStmt::DETERMINISM_UNSPECIFIED) {
-      return Unsupported("SQL UDF options, security, determinism or aggregates");
+      return Unsupported("UDF options, security, determinism or aggregates");
     }
     if (create.name_path().size() != 1 ||
         create.name_path().front().find('.') != std::string::npos) {
@@ -422,6 +464,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     GOOGLESQL_RETURN_IF_ERROR(functions_.GetFunction(name, &existing));
     if (existing != nullptr) {
       return absl::InvalidArgumentError("Already Exists: Function " + name);
+    }
+    if (javascript) {
+      GOOGLESQL_RETURN_IF_ERROR(
+          CheckJavaScriptSignature(create.signature(), create.argument_name_list()));
+      functions_.AddOwnedFunction(std::make_unique<JavaScriptFunction>(
+          create.name_path(), create.signature(), create.argument_name_list(), create.code()));
+      return absl::OkStatus();
     }
     if (create.function_expression() != nullptr) {
       GOOGLESQL_ASSIGN_OR_RETURN(

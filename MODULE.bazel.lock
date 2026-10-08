@@ -348,6 +348,8 @@
     "https://bcr.bazel.build/modules/pybind11_bazel/2.12.0/MODULE.bazel": "e6f4c20442eaa7c90d7190d8dc539d0ab422f95c65a57cc59562170c58ae3d34",
     "https://bcr.bazel.build/modules/pybind11_bazel/2.13.6/MODULE.bazel": "2d746fda559464b253b2b2e6073cb51643a2ac79009ca02100ebbc44b4548656",
     "https://bcr.bazel.build/modules/pybind11_bazel/2.13.6/source.json": "6aa0703de8efb20cc897bbdbeb928582ee7beaf278bcd001ac253e1605bddfae",
+    "https://bcr.bazel.build/modules/quickjs-ng/0.15.1.bcr.1/MODULE.bazel": "702a01f41135946c51503406f1286dae75013d0fe064be2e56d224d7e2594986",
+    "https://bcr.bazel.build/modules/quickjs-ng/0.15.1.bcr.1/source.json": "08b588b220e3b8f2cfe40ec5c51dfdf4a2c71eeb9fcf7e4b6125ce019f3f9198",
     "https://bcr.bazel.build/modules/rapidjson/1.1.0.bcr.20241007/MODULE.bazel": "82fbcb2e42f9e0040e76ccc74c06c3e46dfd33c64ca359293f8b84df0e6dff4c",
     "https://bcr.bazel.build/modules/rapidjson/1.1.0.bcr.20241007/source.json": "5c42389ad0e21fc06b95ad7c0b730008271624a2fa3292e0eab5f30e15adeee3",
     "https://bcr.bazel.build/modules/rapidyaml/0.9.0/MODULE.bazel": "36e9c768229ed2ca0e80d45c92560f515e6525147317b680e2e182aa2193dce0",

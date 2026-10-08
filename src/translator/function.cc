@@ -14,6 +14,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/javascript_function.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -91,12 +92,48 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
                              [](const auto& argument) { return HasBigNumeric(argument->type()); });
 }
 
+namespace {
+
+// A call to a JavaScript UDF, which the backend function for its result type runs on `source`.
+std::optional<std::string> JavaScriptCall(const googlesql::ResolvedFunctionCall& call,
+                                          const std::string& source, const Scope& scope,
+                                          const Columns& columns) {
+  const std::string name = call.function()->Name();
+  if (call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
+    return Unsupported(scope, "SAFE. calls of JavaScript UDFs");
+  }
+  const googlesql::Type* type = call.type();
+  const char* function = type->IsBool()     ? "bq_js_bool"
+                         : type->IsDouble() ? "bq_js_double"
+                         : type->IsString() ? "bq_js_string"
+                         : type->IsInt64()  ? "bq_js_int64"
+                                            : nullptr;
+  if (function == nullptr) {
+    return Unsupported(scope, "JavaScript UDF " + name + " result type");
+  }
+  std::vector<std::string> args = {QuoteLiteral(source)};
+  for (const auto& argument : call.argument_list()) {
+    const auto sql = Expression(*argument, scope, columns);
+    const auto duckdb_type = DuckDbType(argument->type());
+    if (!sql || !duckdb_type) {
+      return std::nullopt;
+    }
+    args.push_back("CAST(" + *sql + " AS " + *duckdb_type + ")");
+  }
+  return std::string(function) + "(" + Join(args, ", ") + ")";
+}
+
+}  // namespace
+
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns) {
   const std::string name = ToUpperAscii(call.function()->Name());
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty()) {
     return Unsupported(scope, "function " + name + " with generic arguments, hints or collation");
+  }
+  if (const auto* javascript = dynamic_cast<const JavaScriptFunction*>(call.function())) {
+    return JavaScriptCall(call, javascript->source(), scope, columns);
   }
   // CONTAINS_SUBSTR is supplied by our catalog because GoogleSQL lacks this BigQuery builtin.
   if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {

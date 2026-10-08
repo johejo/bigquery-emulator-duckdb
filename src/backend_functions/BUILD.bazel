@@ -232,3 +232,22 @@ cc_library(
     visibility = ["//:__pkg__"],
     deps = ["//third_party/duckdb"],
 )
+
+cc_library(
+    name = "javascript",
+    srcs = ["javascript.cc"],
+    hdrs = ["javascript.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":scalar",
+        "//:backend_error",
+        "//:duckdb_handle",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@quickjs-ng//:quickjs",
+        "@quickjs-ng//:quickjs_hdrs",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)

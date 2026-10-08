@@ -1,0 +1,66 @@
+# JavaScript UDF cases from BigQuery's documentation:
+# https://cloud.google.com/bigquery/docs/user-defined-functions#javascript-udf-structure
+
+CREATE TEMP FUNCTION multiplyInputs(x FLOAT64, y FLOAT64)
+RETURNS FLOAT64
+LANGUAGE js
+AS r"""
+  return x*y;
+""";
+SELECT multiplyInputs(2, 10)
+=> "20.0"
+
+CREATE TEMP FUNCTION plusOne(x FLOAT64)
+RETURNS FLOAT64
+LANGUAGE js
+AS "return x+1;";
+SELECT plusOne(5)
+=> "6.0"
+
+CREATE TEMP FUNCTION plusOne(x FLOAT64)
+RETURNS FLOAT64
+LANGUAGE js
+AS "return x+1;";
+SELECT SUM(plusOne(x)) FROM UNNEST([1, 2, 3, 4, 5]) AS x
+=> "20.0"
+
+# BigQuery's answers to cases that its documentation does not settle.
+CREATE TEMP FUNCTION f(x STRING) RETURNS STRING LANGUAGE js AS "return x === null ? 'null' : typeof x;";
+SELECT f(NULL)
+=> "null"
+
+CREATE TEMP FUNCTION f() RETURNS FLOAT64 LANGUAGE js AS "return undefined;";
+SELECT f() IS NULL
+=> "true"
+
+CREATE TEMP FUNCTION f() RETURNS INT64 LANGUAGE js AS "return '9007199254740993';";
+SELECT f()
+=> "9007199254740993"
+
+CREATE TEMP FUNCTION f() RETURNS INT64 LANGUAGE js AS "return 1.5;";
+SELECT f()
+=> "2"
+
+CREATE TEMP FUNCTION f() RETURNS INT64 LANGUAGE js AS "return 2.5;";
+SELECT f()
+=> "3"
+
+CREATE TEMP FUNCTION f() RETURNS INT64 LANGUAGE js AS "return -2.5;";
+SELECT f()
+=> "-3"
+
+CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "return 1;";
+SELECT f()
+=> "1"
+
+CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "return true;";
+SELECT f()
+=> "true"
+
+CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "return [1, 2];";
+SELECT f()
+=> "1,2"
+
+CREATE TEMP FUNCTION f() RETURNS FLOAT64 LANGUAGE js AS "return Promise.resolve(1);";
+SELECT f()
+=> "1.0"
