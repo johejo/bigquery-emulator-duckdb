@@ -1,0 +1,319 @@
+## Vector distances
+
+# Sources: BigQuery mathematical_functions#cosine_distance and #euclidean_distance;
+# GoogleSQL compliance/functions_testlib_distance.cc, GetFunctionTestsCosineDistance
+# and GetFunctionTestsEuclideanDistance, for empty arrays, NULL fields, non-finite
+# values, overflow and custom struct field names. Approximate comparisons account
+# for the documented examples rounding their FLOAT64 results.
+
+SELECT ROUND(COSINE_DISTANCE([1.0, 2.0], [3.0, 4.0]), 6) = 0.016130
+=> "true"
+
+SELECT ROUND(COSINE_DISTANCE([(1, 1.0), (2, 2.0)], [(2, 4.0), (1, 3.0)]), 6) = 0.016130
+=> "true"
+
+SELECT ROUND(COSINE_DISTANCE([('a', 1.0), ('b', 2.0)], [('b', 4.0), ('a', 3.0)]), 6) = 0.016130
+=> "true"
+
+SELECT ROUND(COSINE_DISTANCE([STRUCT(1 AS key, 1.0 AS weight), (2, 2.0)], [STRUCT(2 AS dimension, 4.0 AS magnitude), (1, 3.0)]), 6) = 0.016130
+=> "true"
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<FLOAT64>), [1.0, 2.0])
+=> null
+
+SELECT COSINE_DISTANCE([1.0, 2.0], CAST(NULL AS ARRAY<FLOAT64>))
+=> null
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<FLOAT64>), CAST(NULL AS ARRAY<FLOAT64>))
+=> null
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>), [(1, 1.0), (2, 2.0)])
+=> null
+
+SELECT COSINE_DISTANCE([(1, 1.0), (2, 2.0)], CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>))
+=> null
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>), CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>))
+=> null
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>), [('a', 1.0), ('b', 2.0)])
+=> null
+
+SELECT COSINE_DISTANCE([('a', 1.0), ('b', 2.0)], CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>))
+=> null
+
+SELECT COSINE_DISTANCE(CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>), CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>))
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([9.0, 7.0], [8.0, 4.0, 5.0])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([1.0, NULL], [3.0, 4.0])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([1.0, 2.0], [3.0, NULL])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([(1, 9.0), (2, 7.0), (2, 8.0)], [(1, 8.0), (2, 4.0), (3, 5.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([('a', 9.0)], [('a', 8.0), ('a', 4.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([(1, 1.0), (2, NULL)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([('a', 1.0)], [('a', CAST(NULL AS FLOAT64))])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([(NULL, 1.0)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([('a', 1.0)], [(CAST(NULL AS STRING), 3.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([CAST(NULL AS STRUCT<INT64, FLOAT64>)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([('a', 1.0)], [CAST(NULL AS STRUCT<STRING, FLOAT64>)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([1.7976931348623157e308, 0.0], [0.0, 1.7976931348623157e308])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([0.0, 0.0], [3.0, 4.0])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([3.0, 4.0], [0.0, 0.0])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE(ARRAY<FLOAT64>[], ARRAY<FLOAT64>[])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE([(1, 0.0), (2, 0.0)], [(1, 3.0), (2, 4.0)])
+=> null
+
+SELECT SAFE.COSINE_DISTANCE(ARRAY<STRUCT<STRING, FLOAT64>>[], [('a', 1.0)])
+=> null
+
+BEGIN
+  SELECT COSINE_DISTANCE([9.0, 7.0], [8.0, 4.0, 5.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT COSINE_DISTANCE([1.0, NULL], [3.0, 4.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT COSINE_DISTANCE([1.0, 2.0], [3.0, NULL]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT COSINE_DISTANCE([(1, 9.0), (2, 7.0), (2, 8.0)], [(1, 8.0), (2, 4.0), (3, 5.0)]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+SELECT IS_NAN(COSINE_DISTANCE([1.0, CAST('NaN' AS FLOAT64)], [3.0, 4.0]))
+=> "true"
+
+SELECT IS_NAN(COSINE_DISTANCE([1.0, CAST('+inf' AS FLOAT64)], [3.0, 4.0]))
+=> "true"
+
+SELECT IF(TRUE, 1.0, COSINE_DISTANCE([1.0, NULL], [3.0, 4.0]))
+=> "1.0"
+
+SELECT TYPEOF(COSINE_DISTANCE([1.0], [2.0]))
+=> "FLOAT64"
+
+SELECT ROUND(EUCLIDEAN_DISTANCE([1.0, 2.0], [3.0, 4.0]), 3) = 2.828
+=> "true"
+
+SELECT ROUND(EUCLIDEAN_DISTANCE([(1, 1.0), (2, 2.0)], [(2, 4.0), (1, 3.0)]), 3) = 2.828
+=> "true"
+
+SELECT ROUND(EUCLIDEAN_DISTANCE([('a', 1.0), ('b', 2.0)], [('b', 4.0), ('a', 3.0)]), 3) = 2.828
+=> "true"
+
+SELECT ROUND(EUCLIDEAN_DISTANCE([STRUCT(1 AS key, 1.0 AS weight), (2, 2.0)], [STRUCT(2 AS dimension, 4.0 AS magnitude), (1, 3.0)]), 3) = 2.828
+=> "true"
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<FLOAT64>), [1.0, 2.0])
+=> null
+
+SELECT EUCLIDEAN_DISTANCE([1.0, 2.0], CAST(NULL AS ARRAY<FLOAT64>))
+=> null
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<FLOAT64>), CAST(NULL AS ARRAY<FLOAT64>))
+=> null
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>), [(1, 1.0), (2, 2.0)])
+=> null
+
+SELECT EUCLIDEAN_DISTANCE([(1, 1.0), (2, 2.0)], CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>))
+=> null
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>), CAST(NULL AS ARRAY<STRUCT<INT64, FLOAT64>>))
+=> null
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>), [('a', 1.0), ('b', 2.0)])
+=> null
+
+SELECT EUCLIDEAN_DISTANCE([('a', 1.0), ('b', 2.0)], CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>))
+=> null
+
+SELECT EUCLIDEAN_DISTANCE(CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>), CAST(NULL AS ARRAY<STRUCT<STRING, FLOAT64>>))
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([9.0, 7.0], [8.0, 4.0, 5.0])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([1.0, NULL], [3.0, 4.0])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([1.0, 2.0], [3.0, NULL])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([(1, 9.0), (2, 7.0), (2, 8.0)], [(1, 8.0), (2, 4.0), (3, 5.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([('a', 9.0)], [('a', 8.0), ('a', 4.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([(1, 1.0), (2, NULL)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([('a', 1.0)], [('a', CAST(NULL AS FLOAT64))])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([(NULL, 1.0)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([('a', 1.0)], [(CAST(NULL AS STRING), 3.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([CAST(NULL AS STRUCT<INT64, FLOAT64>)], [(1, 3.0)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([('a', 1.0)], [CAST(NULL AS STRUCT<STRING, FLOAT64>)])
+=> null
+
+SELECT SAFE.EUCLIDEAN_DISTANCE([1.7976931348623157e308, 0.0], [0.0, 1.7976931348623157e308])
+=> null
+
+BEGIN
+  SELECT EUCLIDEAN_DISTANCE([9.0, 7.0], [8.0, 4.0, 5.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT EUCLIDEAN_DISTANCE([1.0, NULL], [3.0, 4.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT EUCLIDEAN_DISTANCE([1.0, 2.0], [3.0, NULL]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+BEGIN
+  SELECT EUCLIDEAN_DISTANCE([(1, 9.0), (2, 7.0), (2, 8.0)], [(1, 8.0), (2, 4.0), (3, 5.0)]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+SELECT IS_NAN(EUCLIDEAN_DISTANCE([1.0, CAST('NaN' AS FLOAT64)], [3.0, 4.0]))
+=> "true"
+
+SELECT IS_INF(EUCLIDEAN_DISTANCE([1.0, CAST('+inf' AS FLOAT64)], [3.0, 4.0]))
+=> "true"
+
+SELECT IF(TRUE, 1.0, EUCLIDEAN_DISTANCE([1.0, NULL], [3.0, 4.0]))
+=> "1.0"
+
+SELECT TYPEOF(EUCLIDEAN_DISTANCE([1.0], [2.0]))
+=> "FLOAT64"
+
+SELECT EUCLIDEAN_DISTANCE(ARRAY<FLOAT64>[], ARRAY<FLOAT64>[])
+=> "0.0"
+
+SELECT EUCLIDEAN_DISTANCE(ARRAY<STRUCT<INT64, FLOAT64>>[], ARRAY<STRUCT<INT64, FLOAT64>>[])
+=> "0.0"
+
+SELECT EUCLIDEAN_DISTANCE(ARRAY<STRUCT<STRING, FLOAT64>>[], ARRAY<STRUCT<STRING, FLOAT64>>[])
+=> "0.0"
+
+SELECT EUCLIDEAN_DISTANCE([0.0, 0.0], [3.0, 4.0])
+=> "5.0"
+
+SELECT EUCLIDEAN_DISTANCE([(1, 3.0)], [(2, 4.0)])
+=> "5.0"
+
+SELECT EUCLIDEAN_DISTANCE(ARRAY<STRUCT<STRING, FLOAT64>>[], [('a', 3.0), ('b', 4.0)])
+=> "5.0"
+
+SELECT COSINE_DISTANCE([1.0, 0.0], [0.0, 1.0])
+=> "1.0"
+
+SELECT COSINE_DISTANCE([1.0], [-1.0])
+=> "2.0"
+
+SELECT COSINE_DISTANCE([(1, 1.0)], [(2, 1.0)])
+=> "1.0"
+
+SELECT COSINE_DISTANCE([1e140, 2e140], [-2e-140, 1e-140])
+=> "1.0"
+
+WITH vectors AS (SELECT [1.0, 2.0] a, [3.0, 4.0] b UNION ALL SELECT NULL, [3.0, 4.0] UNION ALL SELECT [1.0, 2.0], [3.0, 4.0]) SELECT COUNTIF(ROUND(COSINE_DISTANCE(a, b), 6) = 0.016130) = 2 AND COUNTIF(EUCLIDEAN_DISTANCE(a, b) IS NULL) = 1 FROM vectors
+=> "true"
+
+WITH vectors AS (SELECT [('a', 1.0), ('b', 2.0)] a, [('b', 4.0), ('a', 3.0)] b UNION ALL SELECT NULL, [('a', 3.0)] UNION ALL SELECT [('a', 1.0), ('b', NULL)], [('a', 3.0), ('b', 4.0)]) SELECT COUNTIF(ROUND(SAFE.COSINE_DISTANCE(a, b), 6) = 0.016130) = 1 AND COUNTIF(SAFE.EUCLIDEAN_DISTANCE(a, b) IS NULL) = 2 FROM vectors
+=> "true"
+
+# STRING dimensions are labels, including empty and Unicode strings. Missing
+# dimensions have zero magnitude, so these are orthogonal vectors / a 3-4-5 triangle.
+SELECT COSINE_DISTANCE([('', 1.0)], [('あ', 1.0)])
+=> "1.0"
+
+SELECT EUCLIDEAN_DISTANCE([('', 3.0)], [('あ', 4.0)])
+=> "5.0"
+
+# The documented zero-vector case must raise, rather than silently return NULL.
+BEGIN
+  SELECT COSINE_DISTANCE([0.0, 0.0], [3.0, 4.0]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT TRUE;
+END;
+=> "true"
+
+# BigQuery answers supplied by a maintainer: parallel vectors may have a negative
+# rounding residual, and squared magnitudes can underflow to zero.
+SELECT COSINE_DISTANCE([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]) = -2.220446049250313E-16
+=> "true"
+
+BEGIN
+  SELECT COSINE_DISTANCE([1e-200], [1e-200]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT ENDS_WITH(@@error.message, 'Cannot compute cosine distance against zero vector. Error in COSINE_DISTANCE expression');
+END;
+=> "true"
+
+SELECT EUCLIDEAN_DISTANCE([1e-200], [0.0])
+=> "0.0"
