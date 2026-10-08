@@ -79,6 +79,17 @@ With `--data-dir`, registrations are stored in `projects.json` and restored at s
 fields omitted from the supplied object. Other saved projects remain registered. Existing DuckDB
 files from before explicit registration must be registered once with `--project` to use them.
 
+## Execution identity
+
+With `--session-user ID`, `SESSION_USER()` returns that identity as a `STRING` for every
+client and project. Supply an email address or a principal identifier; the value must be nonempty
+and is returned unchanged. Without this option, the function is unsupported. The identity is not
+persisted: stored views use the identity configured for the process executing them.
+
+```sh
+just run --project='{"projectId":"test"}' --session-user='alice@example.com'
+```
+
 ## Persistence
 
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
@@ -157,6 +168,8 @@ Behavior that applies across them:
 The emulator rejects what it cannot emulate rather than accepting it and behaving differently.
 These differences are deliberate exceptions, kept for convenience:
 
+- `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
+  caller.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy

@@ -22,11 +22,14 @@ namespace bigquery_emulator_duckdb {
 
 // The project and dataset that unqualified table and dataset names in DDL belong to, and the
 // temporary tables of a multi-statement query that take precedence over them, matching the
-// defaults the catalog resolves queries with. `dataset` may be empty.
+// defaults the catalog resolves queries with, plus the execution identity availability.
+// `dataset` may be empty.
 struct DefaultDataset {
   std::string project;
   std::string dataset;
   const TemporaryTables* temporary = nullptr;
+  // Whether SESSION_USER is available from the execution backend.
+  bool has_session_user = false;
 };
 
 // The view a CREATE VIEW defines, which the emulator records next to the DuckDB view: DuckDB

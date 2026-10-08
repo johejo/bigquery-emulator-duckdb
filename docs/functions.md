@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 15 |
-| Supported | 241 |
-| Unsupported | 137 |
+| Supported | 242 |
+| Unsupported | 136 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -318,7 +318,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SEARCH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/search_functions#search) | search_functions | Unsupported |  | the analyzer does not know this function |
 | [`SEC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sec) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`SECH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#sech) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Unsupported |  | function SESSION_USER |
+| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | security_functions | Supported | DuckDB function, renamed | Requires --session-user; returns the configured identity for every client. |
 | [`SHA1`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha1) | hash_functions | Supported | DuckDB SQL |  |
 | [`SHA256`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha256) | hash_functions | Supported | DuckDB SQL |  |
 | [`SHA512`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hash_functions#sha512) | hash_functions | Supported | GoogleSQL function |  |

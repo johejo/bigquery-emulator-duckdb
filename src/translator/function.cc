@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -451,6 +452,14 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // CONTAINS_SUBSTR is supplied by our catalog because GoogleSQL lacks this BigQuery builtin.
   if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
     return Unsupported(scope, "function " + name);
+  }
+  // BigQuery rejects this prefix although GoogleSQL accepts it.
+  if (name == "SESSION_USER" &&
+      call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
+    throw std::invalid_argument("SAFE with function session_user is not supported.");
+  }
+  if (name == "SESSION_USER" && !scope.context.defaults.has_session_user) {
+    return Unsupported(scope, "function SESSION_USER");
   }
   const FunctionEntry* entry = FindFunction(name);
   if (entry == nullptr) {

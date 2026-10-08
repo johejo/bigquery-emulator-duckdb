@@ -18,3 +18,9 @@ steps:
     test: |
       current.exit_code == 0 &&
       current.stdout contains '"datasetId":"scoped"'
+  session_user_view:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT v.identity FROM persist.identity AS v'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"identity":"principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice"}]'

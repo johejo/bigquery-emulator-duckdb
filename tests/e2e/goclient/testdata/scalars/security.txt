@@ -1,0 +1,31 @@
+# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user
+# The E2E server uses the identity from the documented example.
+SELECT SESSION_USER()
+=> "jdoe@example.com"
+
+SELECT TYPEOF(SESSION_USER())
+=> "STRING"
+
+CREATE TEMP FUNCTION Identity() AS (SESSION_USER());
+SELECT Identity()
+=> "jdoe@example.com"
+
+DECLARE identity STRING DEFAULT SESSION_USER();
+SELECT identity
+=> "jdoe@example.com"
+
+SELECT SESSION_USER();
+SELECT SESSION_USER()
+=> "jdoe@example.com"
+
+# The documented signature takes no arguments.
+SELECT SESSION_USER('jdoe@example.com')
+=> error:
+
+# Verified against BigQuery by a maintainer: SAFE. is rejected for SESSION_USER.
+SELECT SAFE.SESSION_USER() IS NOT NULL
+=> error: SAFE with function session_user is not supported.
+
+DECLARE identity STRING DEFAULT SAFE.SESSION_USER();
+SELECT identity
+=> error:

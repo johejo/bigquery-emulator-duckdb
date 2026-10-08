@@ -1,0 +1,43 @@
+desc: configured identity is returned unchanged across projects and rows
+vars:
+  identity: ${SESSION_USER_ID}
+runners:
+  req: ${SESSION_USER_API}
+steps:
+  rows:
+    req:
+      /projects/one/queries:
+        post:
+          body:
+            application/json:
+              query: 'SELECT SESSION_USER() AS identity, SESSION_USER() AS again FROM UNNEST([1, 2, 3])'
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.totalRows == "3" &&
+      current.res.body.schema.fields[0].type == "STRING" &&
+      current.res.body.rows[0].f[0].v == vars.identity &&
+      current.res.body.rows[0].f[1].v == vars.identity &&
+      current.res.body.rows[2].f[0].v == vars.identity
+  job:
+    req:
+      /projects/two/jobs:
+        post:
+          body:
+            application/json:
+              jobReference: {jobId: identity}
+              configuration:
+                query: {query: 'SELECT SESSION_USER() AS identity, 1 AS n', useLegacySql: false}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE" && !('errorResult' in current.res.body.status)
+  results:
+    req:
+      /projects/two/queries/identity:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == vars.identity
+  dry_run:
+    req:
+      /projects/one/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT SESSION_USER() AS identity', useLegacySql: false, dryRun: true}
+    test: current.res.status == 200 && current.res.body.schema.fields[0].type == "STRING"

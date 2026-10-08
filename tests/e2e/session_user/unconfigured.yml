@@ -1,0 +1,40 @@
+desc: unconfigured SESSION_USER is unsupported, including dry runs and scripts
+runners:
+  req: ${SESSION_USER_API}
+steps:
+  query:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT SESSION_USER()', useLegacySql: false}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'does not support function SESSION_USER'
+  dry_run:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT SESSION_USER()', useLegacySql: false, dryRun: true}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'does not support function SESSION_USER'
+  script:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'DECLARE identity STRING DEFAULT SESSION_USER(); SELECT identity', useLegacySql: false}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'does not support function SESSION_USER'
+  safe_prefix:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT SAFE.SESSION_USER()', useLegacySql: false}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == 'SAFE with function session_user is not supported.'

@@ -21,3 +21,9 @@ steps:
     exec:
       command: BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh mk --dataset scoped
     test: current.exit_code == 0
+  session_user_view:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE VIEW persist.identity AS SELECT SESSION_USER() AS identity"
+    test: current.exit_code == 0

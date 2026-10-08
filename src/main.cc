@@ -5,6 +5,7 @@
 #include <csignal>
 #include <exception>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -20,8 +21,9 @@ namespace {
 void PrintUsage() {
   std::cerr
       << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--data-dir DIR] [--project "
-         "JSON|@FILE]...\n"
+         "JSON|@FILE]... [--session-user ID]\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
+         "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
          "  --host HOST     Address to listen on (default: 0.0.0.0)\n"
          "  --port PORT     Port to listen on (default: 9050)\n"
          "  --data-dir DIR  Store each project in DIR/<project>.duckdb so that data survives\n"
@@ -50,6 +52,7 @@ void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& 
 int Run(int argc, char** argv) {
   bigquery_emulator_duckdb::ServerOptions options;
   std::string data_dir;
+  std::optional<std::string> session_user;
   std::vector<bigquery_emulator_duckdb::Project> projects;
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
@@ -58,6 +61,10 @@ int Run(int argc, char** argv) {
       projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(argv[++i]));
     } else if (arg.starts_with("--project=")) {
       projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(arg.substr(10)));
+    } else if (arg == "--session-user" && has_value) {
+      session_user = argv[++i];
+    } else if (arg.starts_with("--session-user=")) {
+      session_user = arg.substr(15);
     } else if (arg == "--host" && has_value) {
       options.host = argv[++i];
     } else if (arg == "--port" && has_value) {
@@ -80,7 +87,7 @@ int Run(int argc, char** argv) {
   }
 
   const sigset_t signals = BlockShutdownSignals();
-  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects);
+  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Bind()) {
     std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';

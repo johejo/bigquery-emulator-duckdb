@@ -163,3 +163,5 @@ note FLOAT64 from JSON, fails when the value has another JSON type
 note BOOL from JSON, fails when the value has another JSON type
 note STRING from JSON, fails when the value has another JSON type
 note FORMAT NUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported
+
+note SESSION_USER Requires --session-user; returns the configured identity for every client.

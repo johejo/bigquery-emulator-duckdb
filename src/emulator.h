@@ -178,8 +178,10 @@ struct ExtractRequest {
 class Emulator {
  public:
   // Restores persisted registrations and replaces those explicitly supplied at startup.
-  // With no data directory, registrations and data live in memory only.
-  explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {});
+  // With no data directory, registrations and data live in memory only. A nonempty
+  // session_user enables SESSION_USER for every client; it is not persisted.
+  explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {},
+                    const std::optional<std::string>& session_user = std::nullopt);
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 
@@ -278,6 +280,7 @@ class Emulator {
                                const std::vector<std::string>& setup, bool count_only = false);
 
   Backend backend_;
+  bool has_session_user_;
   GcsClient gcs_client_;
   std::string data_dir_;
   std::mutex mutex_;
