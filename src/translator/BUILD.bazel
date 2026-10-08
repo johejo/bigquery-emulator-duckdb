@@ -1,5 +1,7 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
+package(features = ["layering_check"])
+
 cc_library(
     name = "context",
     hdrs = ["context.h"],
@@ -35,6 +37,7 @@ cc_library(
         "//:catalog",
         "//:duckdb_sql",
         "//:type_mapping",
+        "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:constant",
@@ -108,6 +111,8 @@ cc_library(
         "//:field_schema",
         "//:table_metadata",
         "//:type_mapping",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/time",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",

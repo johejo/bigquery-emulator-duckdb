@@ -1,5 +1,7 @@
 #include "src/load.h"
 
+#include <zlib.h>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +26,6 @@
 #include "src/parquet_metadata.h"
 #include "src/schema_sql.h"
 #include "src/temporary_files.h"
-#include "zlib.h"
 
 namespace bigquery_emulator_duckdb {
 

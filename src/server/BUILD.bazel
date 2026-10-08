@@ -1,5 +1,7 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
+package(features = ["layering_check"])
+
 cc_library(
     name = "routes",
     srcs = ["routes.cc"],
@@ -9,6 +11,7 @@ cc_library(
         "//:api_error",
         "//:discovery_document",
         "//:httplib",
+        "@cpp-httplib//:httplib",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
@@ -25,6 +28,7 @@ cc_library(
         "//:api_error",
         "//:httplib",
         "//:query_parameters",
+        "@cpp-httplib//:httplib",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
