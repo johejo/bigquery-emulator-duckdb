@@ -27,6 +27,11 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
   std::string literal;
   if (value.is_null()) {
     literal = "NULL";
+  } else if (value.type()->IsInterval()) {
+    const auto& interval = value.interval_value();
+    if (interval.get_nano_fractions() != 0) return std::nullopt;
+    return "bq_interval_parts(" + std::to_string(interval.get_months()) + ", " +
+           std::to_string(interval.get_days()) + ", " + std::to_string(interval.get_micros()) + ")";
   } else if (value.type()->IsString()) {
     literal = QuoteLiteral(value.string_value());
   } else if (value.type()->IsBytes()) {

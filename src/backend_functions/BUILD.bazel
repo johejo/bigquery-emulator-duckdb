@@ -210,3 +210,25 @@ cc_library(
         "@googlesql//googlesql/base:status",
     ],
 )
+
+cc_library(
+    name = "interval",
+    srcs = ["interval.cc"],
+    hdrs = ["interval.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":register",
+        ":scalar",
+        "//:duckdb_handle",
+        "//:interval",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:interval_value",
+        "@googlesql//googlesql/public/functions:datetime_cc_proto",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)

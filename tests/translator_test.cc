@@ -111,6 +111,41 @@ class TranslatorTest : public ::testing::Test {
   BigQueryCatalog catalog_{source_, &types_, "p", "ds"};
 };
 
+TEST_F(TranslatorTest, RejectsIntervalCastsBeforeLiteralFolding) {
+  for (const auto* sql : {"SELECT CAST('P9D' AS INTERVAL)", "SELECT SAFE_CAST('P9D' AS INTERVAL)",
+                          "SELECT CAST(CAST('P9D' AS STRING) AS INTERVAL)"}) {
+    SCOPED_TRACE(sql);
+    EXPECT_THROW(Statement(sql), std::runtime_error);
+  }
+}
+
+// Enabling query INTERVAL values must not enable the generic DuckDB fallbacks.
+TEST_F(TranslatorTest, IntervalScopeRemainsExplicit) {
+  for (const auto* sql :
+       {"SELECT MAKE_INTERVAL(day => 7) * 2",
+        "SELECT MAKE_INTERVAL(day => 7) = MAKE_INTERVAL(hour => 168)",
+        "SELECT NULLIF(MAKE_INTERVAL(day => 7), MAKE_INTERVAL())",
+        "SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)",
+        "SELECT TO_JSON_STRING([MAKE_INTERVAL(day => 7)])",
+        "SELECT FORMAT('%t', MAKE_INTERVAL(day => 7))",
+        "SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))",
+        "SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))",
+        "SELECT SUM(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+        "SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+        "SELECT MAKE_INTERVAL(day => 7) IN (SELECT MAKE_INTERVAL(day => 7))",
+        "SELECT ROW_NUMBER() OVER (PARTITION BY i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+        "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY i",
+        "SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+        "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i ORDER BY i",
+        "SELECT MAKE_INTERVAL(day => 7) UNION DISTINCT SELECT MAKE_INTERVAL(day => 8)",
+        "CREATE TABLE p.ds.intervals (i ARRAY<STRUCT<v INTERVAL>>)",
+        "CREATE TABLE p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i",
+        "CREATE VIEW p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i"}) {
+    SCOPED_TRACE(sql);
+    EXPECT_FALSE(Translate(sql).has_value());
+  }
+}
+
 TEST_F(TranslatorTest, SelectsByteLengthOverloadFromResolvedType) {
   const auto sql = Translate("SELECT BYTE_LENGTH('あ') AS s, BYTE_LENGTH(b'abc') AS b");
   if (!sql.has_value()) {

@@ -19,7 +19,7 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 17 |
+| Partial | 18 |
 | Supported | 58 |
 | Unsupported | 17 |
 
@@ -60,6 +60,7 @@ the probe's own notes name what it rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported | scan SampleScan |
 | Pipe syntax | Supported |  |
+| INTERVAL values | Partial | Query values retain separate month, day and microsecond components. Literals, constructors, JUSTIFY functions, EXTRACT and CAST to STRING are supported. Stored columns, INTERVAL query parameters, casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are unsupported.; CAST to INTERVAL other than typed NULL or INTERVAL literals; function $ADD with INTERVAL; function TO_JSON with INTERVAL; stored INTERVAL columns |
 
 ## DML
 

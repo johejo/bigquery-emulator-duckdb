@@ -91,6 +91,7 @@ cc_library(
         "//:catalog",
         "//:duckdb_sql",
         "//:type_mapping",
+        "@googlesql//googlesql/public:interval_value",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",

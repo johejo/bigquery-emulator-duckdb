@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -122,6 +123,35 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   if (!SupportsBigNumeric(function) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
+  }
+  const bool interval = HasInterval(call.type()) ||
+                        std::ranges::any_of(call.argument_list(), [](const auto& argument) {
+                          return HasInterval(argument->type());
+                        });
+  // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
+  static constexpr std::string_view interval_functions[] = {"$INTERVAL",
+                                                            "$EXTRACT",
+                                                            "MAKE_INTERVAL",
+                                                            "JUSTIFY_HOURS",
+                                                            "JUSTIFY_DAYS",
+                                                            "JUSTIFY_INTERVAL",
+                                                            "$IS_NULL",
+                                                            "$CASE_NO_VALUE",
+                                                            "IF",
+                                                            "IFNULL",
+                                                            "COALESCE",
+                                                            "ERROR",
+                                                            "$MAKE_ARRAY",
+                                                            "$ARRAY_AT_OFFSET",
+                                                            "$ARRAY_AT_ORDINAL",
+                                                            "$SAFE_ARRAY_AT_OFFSET",
+                                                            "$SAFE_ARRAY_AT_ORDINAL",
+                                                            "ARRAY_LENGTH",
+                                                            "ARRAY_REVERSE",
+                                                            "ARRAY_CONCAT"};
+  if (interval && entry->handler != Bucket &&
+      std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
+    return Unsupported(scope, "function " + name + " with INTERVAL");
   }
   // Supporting a new physical STRUCT shape does not make DuckDB's composite comparisons
   // compatible: its equality treats NULL fields as values instead of propagating NULL. Keep

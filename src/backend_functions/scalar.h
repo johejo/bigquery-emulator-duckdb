@@ -98,6 +98,10 @@ inline void SetResult(duckdb_vector output, idx_t row, int32_t value) {
   static_cast<int32_t*>(duckdb_vector_get_data(output))[row] = value;
 }
 
+inline void SetResult(duckdb_vector output, idx_t row, duckdb_interval value) {
+  static_cast<duckdb_interval*>(duckdb_vector_get_data(output))[row] = value;
+}
+
 inline void SetResult(duckdb_vector output, idx_t row, bool value) {
   static_cast<bool*>(duckdb_vector_get_data(output))[row] = value;
 }
