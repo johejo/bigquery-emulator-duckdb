@@ -3,7 +3,3 @@
 # followed by an empty "?>" line. A maintainer fills those in with BigQuery's answers through
 # `just bigquery-answers PROJECT`; each answered case then moves to scalars/, written with "=>",
 # or with "!>" to known_bugs.txt where the emulator answers otherwise.
-
-# Whether FROM_BASE32 accepts partial padding, which the emulator rejects.
-SELECT TO_HEX(SAFE.FROM_BASE32('MFRGG='))
-?>

@@ -104,12 +104,15 @@ SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(FROM_BASE32(x) AS STRING) FROM UNNEST([
 SELECT TO_HEX(FROM_BASE32(''))
 => ""
 
-# FROM_BASE32 accepts lower case and unpadded text; BigQuery's answers.
+# FROM_BASE32 accepts lower case and unpadded text, but not partial padding; BigQuery's answers.
 SELECT TO_HEX(SAFE.FROM_BASE32('mfrgg==='))
 => "616263"
 
 SELECT TO_HEX(SAFE.FROM_BASE32('MFRGG'))
 => "616263"
+
+SELECT TO_HEX(SAFE.FROM_BASE32('MFRGG='))
+=> null
 
 SELECT TO_BASE32(CAST(NULL AS BYTES))
 => null
