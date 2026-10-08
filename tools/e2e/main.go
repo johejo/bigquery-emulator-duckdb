@@ -44,12 +44,15 @@ func runn(ctx context.Context, args ...string) error {
 	return command(ctx, "runn", append([]string{"run", "--scopes", "run:exec"}, args...)...).Run()
 }
 
-func startEmulator(ctx context.Context, binary, dataDir string, projects []string) (*emulatorprocess.Process, error) {
+func startEmulator(ctx context.Context, binary, dataDir string, projects []string, sessionUser string) (*emulatorprocess.Process, error) {
 	port := os.Getenv("BQ_EMULATOR_PORT")
 	if port == "" {
 		port = "0"
 	}
 	args := []string{"--host", "127.0.0.1", "--port", port, "--data-dir", dataDir}
+	if sessionUser != "" {
+		args = append(args, "--session-user="+sessionUser)
+	}
 	for _, project := range projects {
 		args = append(args, "--project="+project)
 	}
@@ -156,7 +159,7 @@ func run(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"))
+	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"), "jdoe@example.com")
 	if err != nil {
 		return err
 	}
@@ -180,9 +183,19 @@ func run(ctx context.Context, args []string) (err error) {
 	if err := p.Stop(); err != nil {
 		return err
 	}
-	p, err = startEmulator(ctx, binary, dataDir, nil)
+	p, err = startEmulator(ctx, binary, dataDir, nil, "principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice")
 	if err != nil {
 		return err
 	}
-	return runn(ctx, "tests/e2e/restart/after.yml")
+	if err := runn(ctx, "tests/e2e/restart/after.yml"); err != nil {
+		return err
+	}
+	if err := p.Stop(); err != nil {
+		return err
+	}
+	p, err = startEmulator(ctx, binary, dataDir, nil, "")
+	if err != nil {
+		return err
+	}
+	return runn(ctx, "tests/e2e/restart/unconfigured.yml")
 }

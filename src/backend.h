@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -39,7 +40,7 @@ class BackendError : public std::runtime_error {
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {
  public:
-  Backend();
+  explicit Backend(const std::optional<std::string>& session_user = std::nullopt);
   ~Backend();
 
   Backend(const Backend&) = delete;

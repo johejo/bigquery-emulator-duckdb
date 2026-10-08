@@ -1,0 +1,6 @@
+desc: SESSION_USER configuration and rejection without an identity
+steps:
+  configuration:
+    exec:
+      command: go test -count=1 ./tests/e2e/session_user
+    test: current.exit_code == 0

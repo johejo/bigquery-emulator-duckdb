@@ -518,14 +518,17 @@ json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row
 
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
-  Database() {
+  explicit Database(const std::optional<std::string>& session_user) {
+    if (session_user && session_user->empty()) {
+      throw std::invalid_argument("session_user must not be empty");
+    }
     char* error = nullptr;
     const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), nullptr, &error);
     DuckString message(error);
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
-    RegisterBackendFunctions(handle.get());
+    RegisterBackendFunctions(handle.get(), session_user);
   }
 
   Connection Connect() const {
@@ -543,7 +546,8 @@ struct Backend::Session {
   explicit Session(Database& database) : connection(database.Connect()) {}
 };
 
-Backend::Backend() : db_(std::make_shared<Database>()) {}
+Backend::Backend(const std::optional<std::string>& session_user)
+    : db_(std::make_shared<Database>(session_user)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)
     : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}
@@ -696,7 +700,7 @@ std::string ExecuteScalarString(const std::string& sql) {
   if (duckdb_open(nullptr, database.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to open database");
   }
-  RegisterBackendFunctions(database.get());
+  RegisterBackendFunctions(database.get(), std::nullopt);
   Connection connection;
   if (duckdb_connect(database.get(), connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");

@@ -1,0 +1,31 @@
+desc: stored SESSION_USER views require a configured execution identity after restart
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  view_metadata:
+    req:
+      /projects/test/datasets/persist/tables/identity:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields[0].type == 'STRING' &&
+      current.res.body.view.query == 'SELECT SESSION_USER() AS identity'
+  query_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT v.identity FROM persist.identity AS v', useLegacySql: false}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'does not support function SESSION_USER'
+  dry_run_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT v.identity FROM persist.identity AS v', useLegacySql: false, dryRun: true}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'does not support function SESSION_USER'

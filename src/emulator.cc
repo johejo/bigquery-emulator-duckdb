@@ -148,9 +148,17 @@ std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
   return RelationComment(backend, "duckdb_views()", "view_name", table);
 }
 
-// The BigQuery schema of `table`: its columns as DuckDB types describe them, each replaced by the
-// field its comment records. Throws BackendError when the table does not exist.
+// The BigQuery schema of `table`: the recorded schema for a view, or its columns as DuckDB types
+// describe them, each replaced by the field its comment records. Throws BackendError when the
+// table does not exist.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
+  // Reading a view's schema must not require its execution identity to be configured.
+  if (const std::optional<json> comment = ViewComment(backend, table); comment.has_value()) {
+    if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
+        metadata.has_value()) {
+      return metadata->schema;
+    }
+  }
   std::vector<FieldSchema> schema = backend.Prepare("SELECT * FROM " + QualifiedName(table)).schema;
   std::vector<json> comments;
   std::ranges::transform(backend.Execute(ColumnCommentsQuery(table)).rows,
@@ -340,8 +348,11 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
   return std::nullopt;
 }
 
-Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects)
-    : data_dir_(std::move(data_dir)) {
+Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
+                   const std::optional<std::string>& session_user)
+    : backend_(session_user),
+      has_session_user_(session_user.has_value()),
+      data_dir_(std::move(data_dir)) {
   const auto registry = std::filesystem::path(data_dir_) / "projects.json";
   std::map<std::string, Project> registered;
   if (!data_dir_.empty()) {
@@ -450,9 +461,11 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                           settings.default_dataset);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
-  std::optional<TranslatedStatement> translated = TranslateStatement(
-      analyzed.statement(), parameters,
-      DefaultDataset{settings.default_project, settings.default_dataset}, &unsupported);
+  std::optional<TranslatedStatement> translated =
+      TranslateStatement(analyzed.statement(), parameters,
+                         DefaultDataset{settings.default_project, settings.default_dataset, nullptr,
+                                        has_session_user_},
+                         &unsupported);
   if (!translated.has_value()) {
     throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
   }

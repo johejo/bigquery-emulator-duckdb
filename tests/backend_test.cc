@@ -1,6 +1,7 @@
 #include "src/backend.h"
 
 #include <cstddef>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,22 @@ namespace {
 using nlohmann::json;
 
 TEST(BackendTest, ExecutesSelectOne) { EXPECT_EQ(ExecuteScalarString("SELECT 1"), "1"); }
+
+TEST(BackendTest, SessionIdentitiesAreIsolatedAcrossConcurrentDatabases) {
+  Backend first("first@example.com");
+  Backend second("second@example.com");
+  const auto read = [](Backend& backend) {
+    auto session = backend.NewSession();
+    session->Transaction("BEGIN TRANSACTION");
+    const QueryResult result = session->Execute("SELECT bq_session_user()");
+    session->Transaction("COMMIT");
+    return result.rows.at(0).at("f").at(0).at("v");
+  };
+  auto a = std::async(std::launch::async, [&] { return read(first); });
+  auto b = std::async(std::launch::async, [&] { return read(second); });
+  EXPECT_EQ(a.get(), "first@example.com");
+  EXPECT_EQ(b.get(), "second@example.com");
+}
 
 TEST(BackendTest, RollsBackViewCreationWhenMetadataFails) {
   Backend backend;

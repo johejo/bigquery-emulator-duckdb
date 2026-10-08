@@ -474,10 +474,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return QueryResult{};
     }
     std::string unsupported;
-    const std::optional<TranslatedStatement> translation = TranslateStatement(
-        analyzed.statement(), request_.parameters,
-        DefaultDataset{settings.default_project, settings.default_dataset, catalog.temporary.get()},
-        &unsupported, &executor.GetKnownSystemVariables());
+    const std::optional<TranslatedStatement> translation =
+        TranslateStatement(analyzed.statement(), request_.parameters,
+                           DefaultDataset{settings.default_project, settings.default_dataset,
+                                          catalog.temporary.get(), emulator_.has_session_user_},
+                           &unsupported, &executor.GetKnownSystemVariables());
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
@@ -497,10 +498,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));
     std::string unsupported;
-    const std::optional<std::string> query = TranslateExpression(
-        analyzed.expression(), request_.parameters,
-        DefaultDataset{settings.default_project, settings.default_dataset, catalog.temporary.get()},
-        &unsupported, &executor.GetKnownSystemVariables());
+    const std::optional<std::string> query =
+        TranslateExpression(analyzed.expression(), request_.parameters,
+                            DefaultDataset{settings.default_project, settings.default_dataset,
+                                           catalog.temporary.get(), emulator_.has_session_user_},
+                            &unsupported, &executor.GetKnownSystemVariables());
     if (!query.has_value()) {
       return Unsupported(unsupported);
     }

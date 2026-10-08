@@ -286,7 +286,7 @@ int Main(int argc, char** argv) {
   googlesql::TypeFactory type_factory;
   NoTables tables;
   BigQueryCatalog catalog(tables, &type_factory, "test", "");
-  Emulator emulator("", {{.project_id = "test"}});
+  Emulator emulator("", {{.project_id = "test"}}, "jdoe@example.com");
   std::map<std::string, int> totals;
   std::ostringstream rows;
   for (const auto& [name, docs] : functions) {
