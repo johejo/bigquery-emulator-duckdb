@@ -1,83 +1,42 @@
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 cc_library(
-    name = "aggregate",
-    srcs = ["aggregate.cc"],
-    hdrs = ["aggregate.h"],
+    name = "context",
+    hdrs = ["context.h"],
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//:duckdb_sql",
+        "//:query_parameters",
+        "//:translated_statement",
+        "@googlesql//googlesql/public:analyzer",
+    ],
+)
+
+# Queries and expressions, which contain each other: expressions contain subqueries, scans contain
+# expressions, aggregates and function calls, and function calls contain expressions.
+cc_library(
+    name = "query",
+    srcs = [
+        "aggregate.cc",
+        "expression.cc",
+        "function.cc",
+        "scan.cc",
+    ],
+    hdrs = [
+        "aggregate.h",
+        "expression.h",
+        "function.h",
+        "scan.h",
+    ],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":expression_interface",
-        ":function",
         ":functions",
-        ":scan_interface",
-        "//:duckdb_sql",
-        "//:type_mapping",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
-    deps = [":context"],
-)
-
-cc_library(
-    name = "ddl",
-    srcs = ["ddl.cc"],
-    hdrs = ["ddl.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":expression_interface",
-        ":scan_interface",
-        "//:catalog",
-        "//:duckdb_sql",
-        "//:field_schema",
-        "//:table_metadata",
-        "//:type_mapping",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/public/types",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
-    deps = [":context"],
-)
-
-cc_library(
-    name = "dml",
-    srcs = ["dml.cc"],
-    hdrs = ["dml.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":expression_interface",
-        ":scan_interface",
-        "//:catalog",
-        "//:duckdb_sql",
-        "//:type_mapping",
-        "@googlesql//googlesql/public:catalog",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
-    deps = [":context"],
-)
-
-cc_library(
-    name = "expression",
-    srcs = ["expression.cc"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":context",
-        ":expression_interface",
-        ":function",
         ":literal",
-        ":scan_interface",
+        "//:catalog",
         "//:duckdb_sql",
         "//:type_mapping",
         "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:constant",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
@@ -86,28 +45,7 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-)
-
-cc_library(
-    name = "function",
-    srcs = ["function.cc"],
-    hdrs = ["function.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        ":expression_interface",
-        "//:duckdb_sql",
-        "//:type_mapping",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
-    deps = [
-        ":context",
-        ":functions",
-    ],
+    deps = [":context"],
 )
 
 # The registry of BigQuery functions and how each is spelled in DuckDB: as is, renamed, by
@@ -159,15 +97,35 @@ cc_library(
 )
 
 cc_library(
-    name = "scan",
-    srcs = ["scan.cc"],
+    name = "ddl",
+    srcs = ["ddl.cc"],
+    hdrs = ["ddl.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":aggregate",
-        ":context",
-        ":expression_interface",
-        ":function",
-        ":scan_interface",
+        ":query",
+        "//:catalog",
+        "//:duckdb_sql",
+        "//:field_schema",
+        "//:table_metadata",
+        "//:type_mapping",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [":context"],
+)
+
+cc_library(
+    name = "dml",
+    srcs = ["dml.cc"],
+    hdrs = ["dml.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":query",
         "//:catalog",
         "//:duckdb_sql",
         "//:type_mapping",
@@ -176,33 +134,6 @@ cc_library(
         "@googlesql//googlesql/resolved_ast",
     ],
     linkstatic = True,
-    visibility = ["//:__pkg__"],
-)
-
-cc_library(
-    name = "context",
-    hdrs = ["context.h"],
-    visibility = ["//:__pkg__"],
-    deps = [
-        "//:duckdb_sql",
-        "//:query_parameters",
-        "//:translated_statement",
-        "@googlesql//googlesql/public:analyzer",
-    ],
-)
-
-# Headers separate from their implementations, which depend on each other: expressions contain
-# subqueries, and scans contain expressions.
-cc_library(
-    name = "expression_interface",
-    hdrs = ["expression.h"],
-    visibility = ["//:__pkg__"],
-    deps = [":context"],
-)
-
-cc_library(
-    name = "scan_interface",
-    hdrs = ["scan.h"],
     visibility = ["//:__pkg__"],
     deps = [":context"],
 )
