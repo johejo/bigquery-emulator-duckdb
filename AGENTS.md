@@ -4,6 +4,10 @@ C++20 built with Bazel; prefer the standard library. `nix develop` provides the 
 including `bq`. Use `just` recipes (see the `Justfile`) for building, testing, formatting and
 generating docs.
 
+Bazel rejects cyclic dependencies; do not break a cycle with a target that holds only headers.
+Move what causes it, such as a type or an error class, to a lower target, or build sources that
+call each other, such as expressions and scans, as one target.
+
 ## Partial support
 
 The emulator is useful because it fails locally where BigQuery would behave differently, so a
