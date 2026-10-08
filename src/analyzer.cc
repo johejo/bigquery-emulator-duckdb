@@ -20,6 +20,7 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/strings.h"
+#include "googlesql/public/templated_sql_function.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
@@ -110,9 +111,10 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
       statement->GetDescendantsSatisfying(
           &googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCall>, &calls);
       if (std::ranges::any_of(calls, [](const auto* node) {
-            return node->template GetAs<googlesql::ResolvedFunctionCall>()
-                ->function()
-                ->template Is<googlesql::SQLFunction>();
+            const auto* function =
+                node->template GetAs<googlesql::ResolvedFunctionCall>()->function();
+            return function->template Is<googlesql::SQLFunction>() ||
+                   function->template Is<googlesql::TemplatedSQLFunction>();
           })) {
         return absl::UnimplementedError(
             "The emulator does not support views that call temporary UDFs");

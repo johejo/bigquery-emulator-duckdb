@@ -28,8 +28,10 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/multi_catalog.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/sql_function.h"
+#include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/types/struct_type.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/types/type_parameters.h"
@@ -381,9 +383,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
 
   // SQLFunction borrows its body; keep both the analysis and its catalog alive until the
   // script ends. Bodies may also reference tables and previously defined functions.
+  // A templated function resolves its body at each call, against `functions`, those defined
+  // before it, and the tables of `catalog`.
   struct FunctionDefinition {
     ScriptCatalog catalog;
     AnalyzerResult analyzed;
+    std::unique_ptr<googlesql::SimpleCatalog> functions;
+    std::unique_ptr<googlesql::MultiCatalog> body_catalog;
   };
 
   absl::Status CreateFunction(ScriptCatalog catalog, AnalyzerResult analyzed) {
@@ -396,9 +402,6 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     if (create.language() != "SQL" || create.is_remote()) {
       return Unsupported("non-SQL UDFs");
-    }
-    if (create.function_expression() == nullptr) {
-      return Unsupported("templated SQL UDFs (ANY TYPE)");
     }
     if (create.is_aggregate() || !create.aggregate_expression_list().empty() ||
         !create.option_list().empty() || create.connection() != nullptr ||
@@ -420,13 +423,32 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (existing != nullptr) {
       return absl::InvalidArgumentError("Already Exists: Function " + name);
     }
-    GOOGLESQL_ASSIGN_OR_RETURN(
-        auto function,
-        googlesql::SQLFunction::Create(create.name_path(), googlesql::Function::SCALAR,
-                                       create.signature(), googlesql::FunctionOptions(),
-                                       create.function_expression(), create.argument_name_list()));
+    if (create.function_expression() != nullptr) {
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          auto function, googlesql::SQLFunction::Create(
+                             create.name_path(), googlesql::Function::SCALAR, create.signature(),
+                             googlesql::FunctionOptions(), create.function_expression(),
+                             create.argument_name_list()));
+      functions_.AddOwnedFunction(std::move(function));
+      definitions_.push_back({std::move(catalog), std::move(analyzed), nullptr, nullptr});
+      return absl::OkStatus();
+    }
+    // An ANY TYPE argument defers resolving the body to each call. Resolve it as a typed body
+    // is resolved, without the script's variables or functions defined later, itself included.
+    FunctionDefinition definition{std::move(catalog), std::move(analyzed), nullptr, nullptr};
+    definition.functions = std::make_unique<googlesql::SimpleCatalog>("functions", &type_factory_);
+    for (const googlesql::Function* function : functions_.functions()) {
+      definition.functions->AddFunction(function);
+    }
+    GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+        "function body", {definition.functions.get(), definition.catalog.tables.get()},
+        &definition.body_catalog));
+    auto function = std::make_unique<googlesql::TemplatedSQLFunction>(
+        create.name_path(), create.signature(), create.argument_name_list(),
+        googlesql::ParseResumeLocation::FromStringView(create.code()));
+    function->set_resolution_catalog(definition.body_catalog.get());
     functions_.AddOwnedFunction(std::move(function));
-    definitions_.push_back({std::move(catalog), std::move(analyzed)});
+    definitions_.push_back(std::move(definition));
     return absl::OkStatus();
   }
 
