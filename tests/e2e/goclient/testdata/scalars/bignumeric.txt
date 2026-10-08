@@ -433,37 +433,38 @@ SELECT SAFE_CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x
 SELECT SAFE_CAST(x AS NUMERIC) FROM UNNEST([BIGNUMERIC '1e30']) x
 => null
 
-# Arrays and structs are cast element by element and field by field.
+# BigQuery rejects casts between arrays with different element types, including struct fields.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_array
 SELECT TO_JSON_STRING(CAST(x AS ARRAY<STRING>)) FROM UNNEST([STRUCT([BIGNUMERIC '-0.10', NULL] AS x)])
-=> "[\"-0.1\",null]"
+=> error:
 
 SELECT TO_JSON_STRING(CAST(x AS ARRAY<BIGNUMERIC>)) FROM UNNEST([STRUCT([0.1] AS x)])
-=> "[\"0.10000000000000000555111512312578270212\"]"
+=> error:
 
 SELECT TO_JSON_STRING(CAST(s AS STRUCT<b BIGNUMERIC, n STRING, c ARRAY<INT64>>))
 FROM UNNEST([STRUCT(1 AS a, NUMERIC '1.50' AS n, [BIGNUMERIC '-2.5'] AS c)]) s
-=> "{\"b\":1,\"n\":\"1.5\",\"c\":[-3]}"
+=> error:
 
 SELECT CAST(s AS STRUCT<b STRING>) IS NULL
 FROM UNNEST([CAST(NULL AS STRUCT<b BIGNUMERIC>)]) s
 => "true"
 
-# SAFE_CAST makes a whole array or struct NULL when one of its values fails, at any depth; a NULL
-# value does not fail.
+# SAFE_CAST still rejects incompatible array types during analysis. For supported struct casts,
+# a failing field makes the whole struct NULL; a NULL field does not fail.
 SELECT TO_JSON_STRING(SAFE_CAST(x AS ARRAY<INT64>)) FROM UNNEST([STRUCT([BIGNUMERIC '1.5', NULL] AS x)])
-=> "[2,null]"
+=> error:
 
 SELECT TO_JSON_STRING(SAFE_CAST(x AS ARRAY<BIGNUMERIC>)) FROM UNNEST([STRUCT(['1.5', NULL] AS x)])
-=> "[\"1.5\",null]"
+=> error:
 
 SELECT SAFE_CAST(x AS ARRAY<INT64>) IS NULL FROM UNNEST([STRUCT([BIGNUMERIC '1', BIGNUMERIC '1e20'] AS x)])
-=> "true"
+=> error:
 
 SELECT SAFE_CAST(x AS ARRAY<BIGNUMERIC>) IS NULL FROM UNNEST([STRUCT(['1', 'x'] AS x)])
-=> "true"
+=> error:
 
 SELECT SAFE_CAST(x AS ARRAY<INT64>) IS NULL FROM UNNEST([STRUCT(CAST(NULL AS ARRAY<BIGNUMERIC>) AS x)])
-=> "true"
+=> error:
 
 SELECT TO_JSON_STRING(SAFE_CAST(s AS STRUCT<a INT64, b INT64>))
 FROM UNNEST([STRUCT(BIGNUMERIC '2' AS a, CAST(NULL AS STRING) AS b)]) s
@@ -479,7 +480,7 @@ FROM UNNEST([STRUCT(BIGNUMERIC '2' AS a, 'x' AS b)]) s
 
 SELECT SAFE_CAST(x AS ARRAY<STRUCT<a INT64>>) IS NULL
 FROM UNNEST([STRUCT([STRUCT(BIGNUMERIC '1' AS a), STRUCT(BIGNUMERIC '1e20' AS a)] AS x)])
-=> "true"
+=> error:
 
 # JSON and FORMAT follow GoogleSQL: a BIGNUMERIC that a FLOAT64 cannot hold exactly is a JSON
 # string in TO_JSON_STRING, and a number in TO_JSON unless stringify_wide_numbers is set.

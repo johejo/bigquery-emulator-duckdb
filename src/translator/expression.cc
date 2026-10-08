@@ -60,8 +60,9 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
 
 // A cast of `sql` from `from` to `to`. A BIGNUMERIC is cast by GoogleSQL's conversions, which make
 // their errors NULL under SAFE_CAST, where DuckDB would cast a BIGNUM through DOUBLE or truncate a
-// string. Arrays and structs are cast element by element and field by field, structs by position
-// as BigQuery does, and their other values as DuckDB casts them, except where ConvertedCast
+// string. Implicit array coercions convert elements; explicit casts between different array
+// types are rejected by the analyzer. Structs are cast field by field, by position as BigQuery
+// does, and their other values as DuckDB casts them, except where ConvertedCast
 // applies. Under SAFE_CAST, a value that fails makes its whole array or struct NULL, which its
 // parent then counts as failed.
 std::optional<std::string> CastValue(const googlesql::Type* from, const googlesql::Type* to,

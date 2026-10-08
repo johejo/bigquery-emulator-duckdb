@@ -928,7 +928,6 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR
   reason: "A STRING or BYTES value with a NUL character ends the literal the emulator writes it as"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BYTES>_ARRAY<STRING>_<@@@@x00@@>"
   label: "code:CastTo_BYTES_STRING_<@x00>"
   label: "code:Like_STRING_<a>_STRING_<a@x00@x63>"
   label: "code:Like_STRING_<a@x00@x63>_STRING_<a>"
@@ -2073,24 +2072,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "Casting FLOAT64 to INT64 rounds halves to even rather than away from zero, and large FLOAT64 values fail to cast to NUMERIC"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<NUMERIC>_ARRAY<FLOAT64>_<1e@29>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casting FLOAT64 to INT64 rounds halves to even rather than away from zero, and large FLOAT64 values fail to cast to NUMERIC"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BOOL>_ARRAY<STRING>_<@@0@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<BOOL>_ARRAY<STRING>_<@@1@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<INT64>_ARRAY<FLOAT64>_<-2@5>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<INT64>_ARRAY<FLOAT64>_<2@5>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<NUMERIC>_ARRAY<FLOAT64>_<1@844674_QsMAUYNjEbE_0955e@19>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<STRING>_ARRAY<BYTES>_<b@@@@x00@@x0a@@>"
-  label: "code:CastArraysBetweenDifferentType_WithoutNulls_ARRAY<STRING>_ARRAY<BYTES>_<b@@@@xd7@@>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "Casts between TIMESTAMP and TIME fail in DuckDB, and DATE_ADD and DATE_DIFF on DATETIME differ"
   label: "civil_time_test:datetime_timestamp_date_time_casts"
 }
@@ -2119,6 +2100,13 @@ known_errors {
   label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
   label: "code:CastTo_STRING_BYTES_<@x00@n>"
   label: "code:CastTo_STRING_BYTES_<@xd7>"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "Casting FLOAT64 negative zero to STRING gives '-0', as BigQuery does, where the reference implementation gives '0'"
+  label: "code:CastTo_STRING_FLOAT64_-0"
+  label: "code:SafeCastTo_STRING_FLOAT64_-0"
 }
 
 known_errors {
@@ -2353,12 +2341,6 @@ known_errors {
   label: "aggregation_having_modifier_queries_test:aggregate_max_id_having_double_include_nan_inf"
   label: "any_value_aggregation_test:aggregate_any_value_having_nan_having_modifier"
   label: "any_value_aggregation_test:aggregate_any_value_having_with_group_by"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "IEEE_DIVIDE by negative zero returns positive infinity"
-  label: "math_functions_test:math_abs_zero"
 }
 
 known_errors {

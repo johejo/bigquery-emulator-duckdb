@@ -65,3 +65,36 @@ CREATE TEMP FUNCTION countUserByAge(userAge INT64) AS
   ((SELECT COUNT(1) FROM users WHERE age = userAge));
 SELECT countUserByAge(age) FROM UNNEST([10]) AS age
 => "2"
+
+# Answers collected from BigQuery with bqanswers.
+# TEMP UDF boundaries checked against BigQuery.
+CREATE TEMP FUNCTION f(x STRING) AS (x);
+SELECT f(NULL)
+=> null
+
+CREATE TEMP FUNCTION f(x STRING) AS (x);
+SELECT f('')
+=> ""
+
+CREATE TEMP FUNCTION f(x BYTES) AS (x);
+SELECT TO_HEX(f(b'abc'))
+=> "616263"
+
+CREATE TEMP FUNCTION f(x STRUCT<a INT64>) AS (x);
+SELECT f(STRUCT(1 AS a)).a
+=> "1"
+
+CREATE TEMP FUNCTION f(x INT64) AS (IF(x = 0, 0, DIV(1, x)));
+SELECT f(0)
+=> "0"
+
+DECLARE result FLOAT64;
+CREATE TEMP FUNCTION AddFourAndDivide(x INT64, y INT64) RETURNS FLOAT64 AS ((x + 4) / y);
+SET result = AddFourAndDivide(3, 2);
+SELECT result
+=> "3.5"
+
+# Per-row volatile arguments must not become a shared uncorrelated scalar subquery.
+CREATE TEMP FUNCTION f(x FLOAT64) AS (x);
+SELECT COUNT(DISTINCT f(RAND())) FROM UNNEST(GENERATE_ARRAY(1, 100))
+=> "100"

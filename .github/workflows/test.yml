@@ -80,25 +80,30 @@ jobs:
         run: nix develop --command just go-vet
       - name: Clang-tidy
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.bep.json --profile=$RUNNER_TEMP/bazel-reports/clang-tidy.profile.json.gz" >> .bazelrc.local
           nix develop --command just tidy
       - name: Unit tests
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/unit-tests.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/unit-tests.bep.json --profile=$RUNNER_TEMP/bazel-reports/unit-tests.profile.json.gz" >> .bazelrc.local
           nix develop --command just test
       - name: Generated docs check
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/docs-check.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/docs-check.bep.json --profile=$RUNNER_TEMP/bazel-reports/docs-check.profile.json.gz" >> .bazelrc.local
           nix develop --command just docs-check
       - name: End-to-end tests
         run: |
-          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/e2e.json" >> .bazelrc.local
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/e2e.bep.json --profile=$RUNNER_TEMP/bazel-reports/e2e.profile.json.gz" >> .bazelrc.local
           nix develop --command just e2e
 
-      - name: Bazel summary
+      - name: Upload Bazel reports
         if: success() || failure()
         continue-on-error: true
-        run: nix develop --command just bazel-summary "$RUNNER_TEMP/bazel-reports" >> "$GITHUB_STEP_SUMMARY"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bazel-reports-test-${{ matrix.os }}
+          path: ${{ runner.temp }}/bazel-reports/
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Save Go cache
         if: >-
