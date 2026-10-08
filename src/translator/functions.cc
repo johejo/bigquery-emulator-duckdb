@@ -643,6 +643,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"CSCH", Float64("bq_csch")},
       {"SECH", Float64("bq_sech")},
       {"COTH", Float64("bq_coth")},
+      {"COSINE_DISTANCE", {{2, "bq_cosine_distance($1, $2)"}}},
+      {"EUCLIDEAN_DISTANCE", {{2, "bq_euclidean_distance($1, $2)"}}},
       // Strings. DuckDB's BLOB has almost no functions, its case mapping is simple rather than
       // full, it reverses grapheme clusters rather than characters, it trims spaces rather than
       // whitespace, and it neither raises BigQuery's errors nor has its output limit. Where it
