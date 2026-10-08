@@ -35,6 +35,7 @@ std::optional<std::string> Bucket(const ScalarCall& call);
 std::optional<std::string> ToJson(const ScalarCall& call);
 std::optional<std::string> JsonRemove(const ScalarCall& call);
 std::optional<std::string> JsonSet(const ScalarCall& call);
+std::optional<std::string> JsonArrayModify(const ScalarCall& call);
 std::optional<std::string> JsonArray(const ScalarCall& call);
 std::optional<std::string> JsonObject(const ScalarCall& call);
 std::optional<std::string> ArrayConcat(const ScalarCall& call);

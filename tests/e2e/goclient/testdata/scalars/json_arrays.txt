@@ -1,0 +1,262 @@
+# Expected values: BigQuery JSON function documentation (examples and rules):
+# https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/json_functions
+# Empty arrays and typed NULL arrays also follow GoogleSQL compliance data in
+# functions_testlib_json.cc, GetFunctionTestsJsonFlatten and
+# GetFunctionTestsJsonArrayAppend / GetFunctionTestsJsonArrayInsert.
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '1'))
+=> "[1]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '[1, 2, null]'))
+=> "[1,2,null]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '[[[1]], 2, [3]]'))
+=> "[1,2,3]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '{"a": [[1]]}'))
+=> "[{\"a\":[[1]]}]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '[[[1, 2], 3], {"a": 4}, true]'))
+=> "[1,2,3,{\"a\":4},true]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '[]'))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '[[[], []]]'))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_FLATTEN(JSON 'null'))
+=> "[null]"
+
+SELECT JSON_FLATTEN(CAST(NULL AS JSON)) IS NULL
+=> "true"
+
+SELECT JSON_TYPE(JSON_FLATTEN(JSON '[1, null]')[OFFSET(1)])
+=> "null"
+
+SELECT JSON_FLATTEN(JSON '[null]')[OFFSET(0)] IS NULL
+=> "false"
+
+SELECT TYPEOF(JSON_FLATTEN(JSON '[]'))
+=> "ARRAY<JSON>"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '["a", "b", "c"]', '$', 1))
+=> "[\"a\",\"b\",\"c\",1]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '["a", "b", "c"]', '$', [1, 2]))
+=> "[\"a\",\"b\",\"c\",1,2]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '["a", "b", "c"]', '$', [1, 2], append_each_element => FALSE))
+=> "[\"a\",\"b\",\"c\",[1,2]]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '["a", ["b"], "c"]', '$[1]', [1, 2], '$[1][1]', [3, 4], append_each_element => FALSE))
+=> "[\"a\",[\"b\",[1,2,[3,4]]],\"c\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '["a", ["b"], "c"]', '$[1]', [1, 2], '$[1][1]', [3, 4]))
+=> "[\"a\",[\"b\",1,2],\"c\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '{"a": [1]}', '$.a', 2))
+=> "{\"a\":[1,2]}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '{"a": null}', '$.a', 10))
+=> "{\"a\":[10]}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '{"a": 1}', '$.a', 2))
+=> "{\"a\":1}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '{"a": 1}', '$.b', 2))
+=> "{\"a\":1}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '["a", ["b", "c"], "d"]', '$[1]', 1))
+=> "[\"a\",1,[\"b\",\"c\"],\"d\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '["a", ["b", "c"], "d"]', '$[1][0]', 1))
+=> "[\"a\",[1,\"b\",\"c\"],\"d\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '["a", "b", "c"]', '$[1]', [1, 2]))
+=> "[\"a\",1,2,\"b\",\"c\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '["a", "b", "c"]', '$[1]', [1, 2], insert_each_element => FALSE))
+=> "[\"a\",[1,2],\"b\",\"c\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '["a", "b", "c", "d"]', '$[7]', 'e'))
+=> "[\"a\",\"b\",\"c\",\"d\",null,null,null,\"e\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '{"a": {}}', '$.a[0]', 2))
+=> "{\"a\":{}}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[1, 2]', '$', 3))
+=> "[1,2]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '{"a": null}', '$.a[2]', 10))
+=> "{\"a\":[null,null,10]}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '1', '$[0]', 'r1'))
+=> "1"
+
+SELECT JSON_ARRAY_APPEND(CAST(NULL AS JSON), '$', 1)
+=> null
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[1]', NULL, 2))
+=> "[1]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[1]', '$', 2, append_each_element => NULL))
+=> "[1]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST(NULL AS INT64)))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', [1, NULL, 2]))
+=> "[1,null,2]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST(NULL AS ARRAY<INT64>)))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST(NULL AS ARRAY<INT64>), append_each_element => FALSE))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', ARRAY<INT64>[]))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', ARRAY<INT64>[], append_each_element => FALSE))
+=> "[[]]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', JSON '[1,2]'))
+=> "[[1,2]]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT(1 AS a, b'abc' AS b)))
+=> "[{\"a\":1,\"b\":\"YWJj\"}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', NUMERIC '1.5', '$', BIGNUMERIC '2.5'))
+=> "[1.5,2.5]"
+
+SELECT TYPEOF(JSON_ARRAY_APPEND(JSON '[]', '$', 1))
+=> "JSON"
+
+SELECT JSON_ARRAY_APPEND(JSON '[]', '$$', 1)
+=> error:
+
+SELECT JSON_ARRAY_APPEND(CAST(NULL AS JSON), '$', 1, '$$', 2)
+=> error:
+
+SELECT JSON_ARRAY_APPEND(JSON '[]', '$', 1, '$$', 2, append_each_element => NULL)
+=> error:
+
+SELECT SAFE.JSON_ARRAY_APPEND(JSON '[]', '$$', 1)
+=> null
+
+SELECT TO_JSON_STRING(IF(FALSE, JSON_ARRAY_APPEND(JSON '[]', '$$', 1), JSON '[2]'))
+=> "[2]"
+
+SELECT JSON_ARRAY_INSERT(CAST(NULL AS JSON), '$[0]', 1)
+=> null
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[1]', NULL, 2))
+=> "[1]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[1]', '$[0]', 2, insert_each_element => NULL))
+=> "[1]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST(NULL AS INT64)))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', [1, NULL, 2]))
+=> "[1,null,2]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST(NULL AS ARRAY<INT64>)))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST(NULL AS ARRAY<INT64>), insert_each_element => FALSE))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', ARRAY<INT64>[], insert_each_element => FALSE))
+=> "[[]]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', JSON '[1,2]'))
+=> "[[1,2]]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', STRUCT(1 AS a, b'abc' AS b)))
+=> "[{\"a\":1,\"b\":\"YWJj\"}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', NUMERIC '1.5', '$[0]', BIGNUMERIC '2.5'))
+=> "[2.5,1.5]"
+
+SELECT TYPEOF(JSON_ARRAY_INSERT(JSON '[]', '$[0]', 1))
+=> "JSON"
+
+SELECT JSON_ARRAY_INSERT(JSON '[]', '$$', 1)
+=> error:
+
+SELECT JSON_ARRAY_INSERT(CAST(NULL AS JSON), '$[0]', 1, '$$', 2)
+=> error:
+
+SELECT JSON_ARRAY_INSERT(JSON '[]', '$[0]', 1, '$$', 2, insert_each_element => NULL)
+=> error:
+
+SELECT SAFE.JSON_ARRAY_INSERT(JSON '[]', '$$', 1)
+=> null
+
+SELECT TO_JSON_STRING(IF(FALSE, JSON_ARRAY_INSERT(JSON '[]', '$$', 1), JSON '[2]'))
+=> "[2]"
+
+# TO_JSON encoding boundaries, documented above; the strict-number error also
+# appears in GoogleSQL mutator compliance cases for this BIGNUMERIC value.
+
+SELECT JSON_ARRAY_APPEND(JSON '[]', '$', BIGNUMERIC '123.123456981723189237198273')
+=> error:
+
+SELECT SAFE.JSON_ARRAY_APPEND(JSON '[]', '$', BIGNUMERIC '123.123456981723189237198273')
+=> null
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST('nan' AS FLOAT64)))
+=> "[\"NaN\"]"
+
+SELECT IEEE_DIVIDE(1, FLOAT64(JSON_ARRAY_APPEND(JSON '[]', '$', -0.0)[0])) > 0
+=> "true"
+
+SELECT JSON_TYPE(JSON_ARRAY_APPEND(JSON '[]', '$', 9007199254740993)[0])
+=> "number"
+
+SELECT JSON_ARRAY_INSERT(JSON '[]', '$[0]', BIGNUMERIC '123.123456981723189237198273')
+=> error:
+
+SELECT SAFE.JSON_ARRAY_INSERT(JSON '[]', '$[0]', BIGNUMERIC '123.123456981723189237198273')
+=> null
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST('nan' AS FLOAT64)))
+=> "[\"NaN\"]"
+
+SELECT IEEE_DIVIDE(1, FLOAT64(JSON_ARRAY_INSERT(JSON '[]', '$[0]', -0.0)[0])) > 0
+=> "true"
+
+SELECT JSON_TYPE(JSON_ARRAY_INSERT(JSON '[]', '$[0]', 9007199254740993)[0])
+=> "number"
+
+# INTERVAL encodings from the documented SQL-to-JSON encoding table.
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', INTERVAL '10:20:30.52' HOUR TO SECOND))
+=> "[\"PT10H20M30.52S\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT([INTERVAL 1 SECOND] AS i)))
+=> "[{\"i\":[\"PT1S\"]}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', INTERVAL '10:20:30.52' HOUR TO SECOND))
+=> "[\"PT10H20M30.52S\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', STRUCT([INTERVAL 1 SECOND] AS i)))
+=> "[{\"i\":[\"PT1S\"]}]"
+
+# Ignored operations continue to the next pair; empty SQL arrays at JSON null
+# follow the documented rules and GoogleSQL mutator compliance cases.
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[1,2]', '$[0]', 9, '$', 3))
+=> "[1,2,3]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[1,2]', '$', 9, '$[0]', 3))
+=> "[3,1,2]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON 'null', '$', ARRAY<INT64>[]))
+=> "[]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON 'null', '$[2]', ARRAY<INT64>[]))
+=> "[null,null,null]"

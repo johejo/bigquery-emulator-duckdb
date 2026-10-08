@@ -285,6 +285,28 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
   return "json(" + result + ")";
 }
 
+// JSON_ARRAY_APPEND and JSON_ARRAY_INSERT pass every pair to one backend call so that all
+// paths are validated before any mutation. Each argument occurs once, including the flag.
+std::optional<std::string> JsonArrayModify(const ScalarCall& call) {
+  const size_t n = call.arguments.size();
+  if (n < 4 || n % 2 != 0) {
+    return std::nullopt;
+  }
+  std::vector<std::string> args = {"CAST(" + call.arguments[0].sql + " AS VARCHAR)"};
+  for (size_t i = 1; i + 1 < n; i += 2) {
+    const auto value = JsonArgument(call, i + 1);
+    if (!value) {
+      return std::nullopt;
+    }
+    args.push_back("CAST(" + call.arguments[i].sql + " AS VARCHAR)");
+    args.push_back(*value);
+  }
+  args.push_back("CAST(" + call.arguments[n - 1].sql + " AS BOOLEAN)");
+  const std::string function =
+      call.name == "JSON_ARRAY_INSERT" ? "bq_json_array_insert" : "bq_json_array_append";
+  return "json(" + function + "(" + Join(args, ", ") + "))";
+}
+
 // JSON_ARRAY(values...).
 std::optional<std::string> JsonArray(const ScalarCall& call) {
   const auto args = JsonArguments(call);

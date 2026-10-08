@@ -124,6 +124,7 @@ cc_library(
         "//:bignumeric",
         "//:catalog",
         "//:duckdb_handle",
+        "//:interval",
         "@abseil-cpp//absl/numeric:int128",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",

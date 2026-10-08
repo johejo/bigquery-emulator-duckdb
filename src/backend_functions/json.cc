@@ -42,6 +42,7 @@
 #include "src/bignumeric.h"
 #include "src/catalog.h"
 #include "src/duckdb_handle.h"
+#include "src/interval.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
@@ -106,6 +107,8 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       return googlesql::types::DatetimeType();
     case DUCKDB_TYPE_TIMESTAMP_TZ:
       return googlesql::types::TimestampType();
+    case DUCKDB_TYPE_INTERVAL:
+      return googlesql::types::IntervalType();
     case DUCKDB_TYPE_BIGNUM:
       return googlesql::types::BigNumericType();
     case DUCKDB_TYPE_DECIMAL:
@@ -179,6 +182,13 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
     }
     case googlesql::TYPE_TIMESTAMP:
       return googlesql::Value::Timestamp(absl::FromUnixMicros(VectorElement<int64_t>(vector, row)));
+    case googlesql::TYPE_INTERVAL: {
+      const auto interval = IntervalFromDuckDb(VectorElement<duckdb_interval>(vector, row));
+      if (!interval.ok()) {
+        return interval.status();
+      }
+      return googlesql::Value::Interval(*interval);
+    }
     case googlesql::TYPE_NUMERIC: {
       // A DECIMAL(38, 9), stored as a 128-bit integer of units of 10^-9.
       const auto value = VectorElement<duckdb_hugeint>(vector, row);
@@ -245,7 +255,7 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
 class AnyArguments {
  public:
   // Only these columns carry value/name pairs; an empty list means every column does.
-  explicit AnyArguments(duckdb_data_chunk input, std::initializer_list<idx_t> paired = {}) {
+  explicit AnyArguments(duckdb_data_chunk input, const std::vector<idx_t>& paired = {}) {
     if (duckdb_data_chunk_get_size(input) == 0) {
       return;
     }
@@ -253,7 +263,7 @@ class AnyArguments {
       duckdb_vector vector = duckdb_data_chunk_get_vector(input, column);
       LogicalType type(duckdb_vector_get_column_type(vector));
       std::vector<std::string> names;
-      if (paired.size() == 0 || std::ranges::find(paired, column) != paired.end()) {
+      if (paired.empty() || std::ranges::find(paired, column) != paired.end()) {
         names = nlohmann::json::parse(VectorString(duckdb_struct_vector_get_child(vector, 1), 0))
                     .get<std::vector<std::string>>();
         vector = duckdb_struct_vector_get_child(vector, 0);
@@ -637,6 +647,23 @@ void JsonElement(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
       });
 }
 
+// JSON_FLATTEN returns JSON elements as text, cast to JSON[] by the rule.
+void JsonFlatten(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& arguments) -> absl::StatusOr<std::vector<std::string>> {
+            const auto document = ParseJson(arguments.String(0));
+            if (!document.ok()) {
+              return document.status();
+            }
+            std::vector<std::string> elements;
+            std::ranges::transform(
+                googlesql::functions::JsonFlatten(document->GetConstRef()),
+                std::back_inserter(elements),
+                [](googlesql::JSONValueConstRef element) { return element.ToString(); });
+            return elements;
+          });
+}
+
 // JSON_KEYS(json, max_depth, mode), as the JSON array of the keys.
 void JsonKeys(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   using googlesql::functions::json_internal::JsonPathOptions;
@@ -738,6 +765,66 @@ void JsonSet(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector o
       /*nulls=*/false);
 }
 
+// Validate every path before checking NULL input or the flag, then apply pairs in order.
+// A SQL array is expanded only when the flag is true; JSON arrays remain single values.
+template <bool kInsert>
+void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  const idx_t columns = duckdb_data_chunk_get_column_count(input);
+  // BigQuery's TO_JSON encoding rejects lossy decimals, where GoogleSQL's default rounds.
+  googlesql::LanguageOptions options = GoogleSqlLanguageOptions();
+  options.EnableLanguageFeature(googlesql::FEATURE_JSON_STRICT_NUMBER_PARSING);
+  std::vector<idx_t> paired;
+  for (idx_t i = 2; i + 1 < columns; i += 2) {
+    paired.push_back(i);
+  }
+  const AnyArguments values(input, paired);
+  EachRow(
+      info, input, output,
+      [&values, &options,
+       columns](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+        const std::string function = kInsert ? "JSON_ARRAY_INSERT" : "JSON_ARRAY_APPEND";
+        std::vector<std::unique_ptr<googlesql::functions::json_internal::StrictJSONPathIterator>>
+            paths;
+        for (idx_t i = 1; i + 1 < columns; i += 2) {
+          auto path = JsonPathArgument(arguments, i, function);
+          if (!path.ok()) {
+            return path.status();
+          }
+          paths.push_back(*std::move(path));
+        }
+        if (arguments.IsNull(0)) {
+          return std::nullopt;
+        }
+        auto document = ParseJson(arguments.String(0));
+        if (!document.ok()) {
+          return document.status();
+        }
+        if (arguments.IsNull(columns - 1)) {
+          return document->GetConstRef().ToString();
+        }
+        for (idx_t i = 0; i < paths.size(); ++i) {
+          if (paths[i] == nullptr) {
+            continue;
+          }
+          const auto value = values.Get((2 * i) + 2, arguments.Row());
+          if (!value.ok()) {
+            return value.status();
+          }
+          const auto modify = kInsert ? googlesql::functions::JsonInsertArrayElement
+                                      : googlesql::functions::JsonAppendArrayElement;
+          const absl::Status status =
+              modify(document->GetRef(), *paths[i], *value, options,
+                     /*canonicalize_zero=*/true, arguments.Bool(columns - 1));
+          if (!status.ok()) {
+            return absl::OutOfRangeError("Invalid input to " + function + ": " +
+                                         std::string(status.message()));
+          }
+        }
+        return document->GetConstRef().ToString();
+      },
+      /*nulls=*/false);
+}
+
 // JSON_STRIP_NULLS(json, path, include_arrays, remove_empty); a NULL argument past the JSON
 // strips nothing.
 void JsonStripNulls(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -797,6 +884,7 @@ void RegisterJsonFunctions(duckdb_connection connection) {
   {
     LogicalType varchar(duckdb_create_logical_type(kVarchar));
     LogicalType list(duckdb_create_list_type(varchar.get()));
+    Register(connection, "bq_json_flatten", {kVarchar}, list.get(), JsonFlatten);
     for (const auto& [name, function, array] :
          std::initializer_list<std::tuple<const char*, duckdb_scalar_function_t, bool>>{
              {"bq_json_query", JsonExtract<Extraction::kQuery, false>, false},
@@ -818,6 +906,10 @@ void RegisterJsonFunctions(duckdb_connection connection) {
            /*nulls=*/false);
   Register(connection, "bq_json_set", {kVarchar, kVarchar, kAny, kBoolean}, kVarchar, JsonSet,
            /*nulls=*/false);
+  Register(connection, "bq_json_array_append", {kVarchar}, kVarchar, JsonArrayModify<false>,
+           /*nulls=*/false, kAny);
+  Register(connection, "bq_json_array_insert", {kVarchar}, kVarchar, JsonArrayModify<true>,
+           /*nulls=*/false, kAny);
   Register(connection, "bq_json_strip_nulls", {kVarchar, kVarchar, kBoolean, kBoolean}, kVarchar,
            JsonStripNulls, /*nulls=*/false);
 }

@@ -203,6 +203,7 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                                 const googlesql::Function& function,
                                                 const googlesql::FunctionSignature& signature,
                                                 const std::string& element = "") {
+  const bool json_mutator = name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT";
   std::vector<std::string> arguments;
   for (const googlesql::FunctionArgumentType& argument : signature.arguments()) {
     if (argument.optional() && !argument.has_argument_name()) {
@@ -212,7 +213,11 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
       continue;
     }
     const auto sample =
-        !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1
+        json_mutator && argument.type() != nullptr && argument.type()->IsString()
+            ? std::optional<std::string>(name == "JSON_ARRAY_INSERT" ? "'$[0]'" : "'$'")
+        : json_mutator && !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARBITRARY
+            ? std::optional(element)
+        : !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1
             ? std::optional(element)
         : !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1
             ? std::optional("[" + element + "]")
@@ -315,6 +320,28 @@ int Main(int argc, char** argv) {
           continue;
         }
         std::vector<std::string> elements = {""};
+        // These mutators take independently typed values, including containers. Probe the
+        // supported JSON encoding types rather than declaring the arbitrary signature supported
+        // from INT64 alone. GeneratedQuery supplies valid paths for both operations.
+        if (name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT") {
+          elements = {"2",
+                      "2.0",
+                      "NUMERIC '2'",
+                      "BIGNUMERIC '2'",
+                      "TRUE",
+                      "'abc'",
+                      "b'abc'",
+                      "DATE '2024-01-15'",
+                      "TIME '10:20:30'",
+                      "DATETIME '2024-01-15 10:20:30'",
+                      "TIMESTAMP '2024-01-15 10:20:30+00'",
+                      "INTERVAL 1 SECOND",
+                      "JSON '[1]'",
+                      "[1, NULL]",
+                      "STRUCT(BIGNUMERIC '2' AS b)",
+                      "STRUCT()",
+                      "RANGE<DATE> '[2024-01-01, 2024-02-01)'"};
+        }
         // Probe a point and same-typed boundaries across orderable scalar types,
         // rather than declaring the generic signature supported from INT64 alone.
         if (signature.arguments().size() == 2 &&
