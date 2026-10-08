@@ -19,8 +19,8 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 14 |
-| Supported | 59 |
+| Partial | 16 |
+| Supported | 58 |
 | Unsupported | 18 |
 
 ## Queries
@@ -38,7 +38,7 @@ the probe's own notes name what it rejected.
 | `WITH RECURSIVE` | Supported |  |
 | `WITH RECURSIVE ... WITH DEPTH` | Unsupported | WITH RECURSIVE depth modifier |
 | Subqueries | Supported |  |
-| Correlated subqueries | Supported |  |
+| Correlated subqueries | Partial | Aggregate subqueries returning anonymous or duplicate STRUCT fields are unsupported when correlated.; correlated aggregate subquery with anonymous or duplicate STRUCT fields |
 | Aggregates and `GROUP BY` | Supported |  |
 | `GROUP BY ALL` | Supported |  |
 | `GROUPING SETS`, `ROLLUP`, `CUBE` | Supported |  |
@@ -54,6 +54,7 @@ the probe's own notes name what it rejected.
 | `SELECT AS STRUCT`, `SELECT AS VALUE` | Supported |  |
 | `* EXCEPT`, `* REPLACE` | Supported |  |
 | `.*` of a struct | Supported |  |
+| STRUCT constructors and casts | Partial | Nonempty structs may have anonymous or duplicate field names; casts match fields by position. Empty structs, comparisons and casts to JSON involving anonymous or duplicate fields are unsupported.; CAST to JSON with anonymous or duplicate STRUCT fields; comparison with anonymous or duplicate STRUCT fields; type STRUCT<> |
 | Struct field and array element access | Supported |  |
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |
@@ -117,7 +118,7 @@ the probe's own notes name what it rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Statement lists | Supported | Returns the result of the last statement that ran. Creates no child jobs, so `jobs.list` rejects `parentJobId` of a multi-statement query. |
-| `DECLARE`, `SET` | Partial | type STRUCT<INT64, STRING> |
+| `DECLARE`, `SET` | Partial | Empty structs are unsupported.; type STRUCT<> |
 | `BEGIN ... END` | Supported |  |
 | `BEGIN ... EXCEPTION ... END` | Supported | An error the emulator reports as unsupported is never handled. |
 | `IF` | Supported |  |

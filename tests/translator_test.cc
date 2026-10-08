@@ -180,7 +180,7 @@ TEST_F(TranslatorTest, MatchesDuplicateAliasesByColumnId) {
 TEST_F(TranslatorTest, RejectsUnsupportedConstructs) {
   for (const std::string& sql :
        {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
-        std::string("SELECT STRUCT(1, 2)")}) {
+        std::string("SELECT STRUCT()")}) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }

@@ -379,3 +379,51 @@ func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 		})
 	}
 }
+
+// The analyzer's logical names are reported even when DuckDB uses positional internal names.
+// STRUCT names and order, including duplicate names, follow the data types reference:
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#struct_type
+func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
+	client := newClient(t)
+	rows, err := client.Query(`SELECT STRUCT(1 AS duplicate, 'x' AS duplicate,
+      STRUCT(2 AS _field_2, 'y' AS _field_2) AS nested) AS s`).Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	fields := rows.Schema[0].Schema
+	if len(fields) != 3 || fields[0].Name != "duplicate" || fields[1].Name != "duplicate" || fields[2].Name != "nested" {
+		t.Fatalf("got STRUCT schema %+v", fields)
+	}
+	inner := fields[2].Schema
+	if len(inner) != 2 || inner[0].Name != "_field_2" || inner[1].Name != "_field_2" {
+		t.Fatalf("got nested STRUCT schema %+v", inner)
+	}
+}
+
+// These comparisons would inherit DuckDB's NULL-field equality; keep the newly representable
+// types unsupported until comparison semantics are implemented.
+func TestAnonymousStructFormsRemainUnsupported(t *testing.T) {
+	client := newClient(t)
+	for _, sql := range []string{
+		`SELECT STRUCT(NULL) = STRUCT(1)`,
+		`SELECT STRUCT(1 AS a, NULL AS a) != STRUCT(1 AS a, 2 AS a)`,
+		`SELECT NULLIF(STRUCT(NULL), STRUCT(1))`,
+		`SELECT CASE STRUCT(NULL) WHEN STRUCT(1) THEN 1 ELSE 2 END`,
+		`SELECT STRUCT(NULL) IN (STRUCT(1), STRUCT(2))`,
+		`SELECT STRUCT(NULL) IN UNNEST([STRUCT(1), STRUCT(2)])`,
+		`SELECT STRUCT(NULL) IN (SELECT STRUCT(1))`,
+		`SELECT STRUCT(NULL) = ALL UNNEST([STRUCT(1), STRUCT(2)])`,
+		`SELECT [STRUCT(NULL)] = [STRUCT(1)]`,
+		`SELECT CAST(STRUCT(1, 2) AS JSON)`,
+		`SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM UNNEST([1, 2]) AS a`,
+	} {
+		_, _, err := runScript(t, client, "", sql)
+		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
+			t.Errorf("%s: got %v, want unsupported STRUCT form", sql, err)
+		}
+	}
+}

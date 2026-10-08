@@ -90,6 +90,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
   if (from->IsStruct() && to->IsStruct()) {
     const std::string value = context.FreshName("_s");
     const std::string casts = context.FreshName("_c");
+    const auto names = DuckDbStructFieldNames(to->AsStruct());
     std::vector<std::string> fields;
     std::vector<std::string> failures;
     for (int i = 0; i < to->AsStruct()->num_fields(); ++i) {
@@ -99,7 +100,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       if (!cast) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(to->AsStruct()->field(i).name) + " := " + *cast);
+      fields.push_back(QuoteIdentifier(names[i]) + " := " + *cast);
       std::string failure =
           "(struct_extract_at(" + casts + ", " + std::to_string(i + 1) + ") IS NULL AND ";
       failure += "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ") IS NOT NULL)";
@@ -155,6 +156,17 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
   if (!subquery.hint_list().empty()) {
     return std::nullopt;
   }
+  // The correlated aggregate projection path cannot yet carry these new STRUCT shapes: it
+  // exposes enclosing columns as local, ungrouped projections. Reject instead of binding a
+  // query that DuckDB will fail.
+  if (!subquery.parameter_list().empty() && HasInternalStructNames(subquery.type())) {
+    std::vector<const googlesql::ResolvedNode*> aggregates;
+    subquery.subquery()->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_SCAN}, &aggregates);
+    if (!aggregates.empty()) {
+      return Unsupported(scope,
+                         "correlated aggregate subquery with anonymous or duplicate STRUCT fields");
+    }
+  }
   const auto relation = Scan(*subquery.subquery(), Nested(scope, columns));
   if (!relation) {
     return std::nullopt;
@@ -176,6 +188,9 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
     case googlesql::ResolvedSubqueryExpr::ARRAY:
       return "CAST(ARRAY(" + select + relation->Order() + ") AS " + type + ")";
     case googlesql::ResolvedSubqueryExpr::IN: {
+      if (HasInternalStructNames(subquery.in_expr()->type())) {
+        return Unsupported(scope, "IN subquery with anonymous or duplicate STRUCT fields");
+      }
       if (!subquery.in_collation().Empty()) {
         return std::nullopt;
       }
@@ -209,6 +224,22 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
 }
 
 }  // namespace
+
+bool HasInternalStructNames(const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return HasInternalStructNames(type->AsArray()->element_type());
+  }
+  if (type->IsStruct()) {
+    const auto names = DuckDbStructFieldNames(type->AsStruct());
+    for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+      const auto& field = type->AsStruct()->field(i);
+      if (names[i] != field.name || HasInternalStructNames(field.type)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 // Correlated references in a subquery name the enclosing columns without the q qualifier, which
 // the subquery's own scopes shadow. Column IDs are unique per statement, so nothing collides.
@@ -344,6 +375,9 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return std::nullopt;
     }
     const googlesql::Type* from = cast->expr()->type();
+    if (cast->type()->IsJson() && HasInternalStructNames(from)) {
+      return Unsupported(scope, "CAST to JSON with anonymous or duplicate STRUCT fields");
+    }
     if (!from->Equals(cast->type())) {
       const auto sql =
           CastValue(from, cast->type(), *argument, cast->return_null_on_error(), scope.context);
@@ -362,13 +396,14 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   }
   if (expr.Is<googlesql::ResolvedMakeStruct>()) {
     const auto* make = expr.GetAs<googlesql::ResolvedMakeStruct>();
+    const auto names = DuckDbStructFieldNames(expr.type()->AsStruct());
     std::vector<std::string> fields;
     for (int i = 0; i < make->field_list_size(); ++i) {
       const auto field = Expression(*make->field_list(i), scope, columns);
       if (!field) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(expr.type()->AsStruct()->field(i).name) + " := " + *field);
+      fields.push_back(QuoteIdentifier(names[i]) + " := " + *field);
     }
     return "CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *type + ")";
   }

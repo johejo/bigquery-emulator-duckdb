@@ -100,6 +100,9 @@ std::string ArrayLiteral(const TypedValue& parameter) {
 }
 
 std::string StructLiteral(const TypedValue& parameter) {
+  // Parameter values are keyed by field name, so anonymous or duplicate names cannot carry
+  // distinct field values. Validate their stored schema before spelling the value.
+  (void)ToDuckDbType(parameter.type);
   const json& values = parameter.value["structValues"];
   std::string fields;
   for (const json& field : parameter.type.value("structTypes", json::array())) {

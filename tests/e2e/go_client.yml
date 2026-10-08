@@ -4,4 +4,6 @@ steps:
     exec:
       # just e2e supplies BQ_EMULATOR_API. Never cache results against a live server.
       command: go test -count=1 ./tests/e2e/goclient
+    dump:
+      expr: current.stdout + current.stderr
     test: current.exit_code == 0

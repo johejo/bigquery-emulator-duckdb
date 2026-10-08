@@ -1,0 +1,24 @@
+desc: STRUCT parameters require distinct field names to carry their keyed values
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  duplicate_fields:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @s
+              useLegacySql: false
+              queryParameters:
+                - name: s
+                  parameterType:
+                    type: STRUCT
+                    structTypes:
+                      - {name: x, type: {type: INT64}}
+                      - {name: x, type: {type: STRING}}
+                  parameterValue:
+                    structValues: {x: {value: '1'}}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Unsupported query parameter type'

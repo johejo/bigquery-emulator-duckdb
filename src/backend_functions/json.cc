@@ -76,7 +76,9 @@ absl::StatusOr<googlesql::functions::WideNumberMode> WideNumberMode(const std::s
 // The GoogleSQL type that the DuckDB type `type` stands for, the inverse of DuckDbType in
 // src/type_mapping.cc.
 absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
-                                                       googlesql::TypeFactory& factory) {
+                                                       googlesql::TypeFactory& factory,
+                                                       const std::vector<std::string>& names,
+                                                       size_t& next_name) {
   const DuckString alias(duckdb_logical_type_get_alias(type));
   if (alias != nullptr && std::string_view(alias.get()) == "JSON") {
     return googlesql::types::JsonType();
@@ -109,7 +111,7 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       break;
     case DUCKDB_TYPE_LIST: {
       LogicalType child(duckdb_list_type_child_type(type));
-      const auto element = GoogleSqlTypeOf(child.get(), factory);
+      const auto element = GoogleSqlTypeOf(child.get(), factory, names, next_name);
       if (!element.ok()) {
         return element.status();
       }
@@ -123,12 +125,12 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       std::vector<googlesql::StructField> fields;
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
         LogicalType child(duckdb_struct_type_child_type(type, i));
-        const DuckString name(duckdb_struct_type_child_name(type, i));
-        const auto field = GoogleSqlTypeOf(child.get(), factory);
+        const std::string& name = names.at(next_name++);
+        const auto field = GoogleSqlTypeOf(child.get(), factory, names, next_name);
         if (!field.ok()) {
           return field.status();
         }
-        fields.emplace_back(name.get(), *field);
+        fields.emplace_back(name, *field);
       }
       const googlesql::StructType* type_struct = nullptr;
       if (absl::Status status = factory.MakeStructType(fields, &type_struct); !status.ok()) {
@@ -238,15 +240,30 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
 // values' types belong to the factory, which outlives them.
 class AnyArguments {
  public:
-  explicit AnyArguments(duckdb_data_chunk input) : input_(input) {
+  // Only these columns carry value/name pairs; an empty list means every column does.
+  explicit AnyArguments(duckdb_data_chunk input, std::initializer_list<idx_t> paired = {}) {
+    if (duckdb_data_chunk_get_size(input) == 0) {
+      return;
+    }
     for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(input); ++column) {
-      LogicalType type(duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
-      auto googlesql_type = GoogleSqlTypeOf(type.get(), factory_);
+      duckdb_vector vector = duckdb_data_chunk_get_vector(input, column);
+      LogicalType type(duckdb_vector_get_column_type(vector));
+      std::vector<std::string> names;
+      if (paired.size() == 0 || std::ranges::find(paired, column) != paired.end()) {
+        names = nlohmann::json::parse(VectorString(duckdb_struct_vector_get_child(vector, 1), 0))
+                    .get<std::vector<std::string>>();
+        vector = duckdb_struct_vector_get_child(vector, 0);
+        duck_types_.emplace_back(duckdb_struct_type_child_type(type.get(), 0));
+      } else {
+        duck_types_.push_back(std::move(type));
+      }
+      size_t next_name = 0;
+      auto googlesql_type = GoogleSqlTypeOf(duck_types_.back().get(), factory_, names, next_name);
       if (!googlesql_type.ok()) {
         status_ = googlesql_type.status();
       }
       types_.push_back(googlesql_type.value_or(nullptr));
-      duck_types_.push_back(std::move(type));
+      vectors_.push_back(vector);
     }
   }
 
@@ -254,14 +271,15 @@ class AnyArguments {
     if (!status_.ok()) {
       return status_;
     }
-    return ValueOf(duckdb_data_chunk_get_vector(input_, column), duck_types_[column].get(),
-                   types_[column], row);
+    return ValueOf(vectors_[column], duck_types_[column].get(), types_[column], row);
   }
 
-  [[nodiscard]] const googlesql::Type* Type(idx_t column) const { return types_[column]; }
+  [[nodiscard]] const googlesql::Type* Type(idx_t column) const {
+    return column < types_.size() ? types_[column] : nullptr;
+  }
 
  private:
-  duckdb_data_chunk input_;
+  std::vector<duckdb_vector> vectors_;
   googlesql::TypeFactory factory_;
   std::vector<LogicalType> duck_types_;
   std::vector<const googlesql::Type*> types_;
@@ -304,7 +322,7 @@ void ParseJsonFunction(duckdb_function_info info, duckdb_data_chunk input, duckd
 
 // TO_JSON_STRING(value, pretty_print), where a NULL value is JSON null.
 void ToJsonString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const AnyArguments values(input);
+  const AnyArguments values(input, {0});
   EachRow(
       info, input, output,
       [&values](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
@@ -328,7 +346,7 @@ void ToJsonString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
 
 // TO_JSON(value, stringify_wide_numbers), where a NULL value is JSON null.
 void ToJson(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const AnyArguments values(input);
+  const AnyArguments values(input, {0});
   EachRow(
       info, input, output,
       [&values](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
@@ -682,7 +700,7 @@ void JsonRemove(duckdb_function_info info, duckdb_data_chunk input, duckdb_vecto
 // JSON_SET(json, path, value, create_if_missing) for one path, with a value of any type; a NULL
 // path or create_if_missing sets nothing.
 void JsonSet(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const AnyArguments values(input);
+  const AnyArguments values(input, {2});
   EachRow(
       info, input, output,
       [&values](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {

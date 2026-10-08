@@ -5,12 +5,14 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
 class Type;
+class StructType;
 class TypeFactory;
 class TypeParameters;
 }  // namespace googlesql
@@ -27,17 +29,21 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
 absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
                                                 const googlesql::Type* type);
 
+// Field names for a nonempty DuckDB struct. Preserve names when they are distinct and nonempty;
+// otherwise use positional internal names for every field. GoogleSQL retains the original names.
+std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* type);
+
 // The DuckDB type of `type`, narrowed by `parameters` when a column definition gives some, or
 // nullopt for a type the translator does not support. DuckDB ignores lengths, so STRING(L) and
 // BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S) as
-// the type BigNumericTypeName names. DuckDB structs need distinct field names, which anonymous
-// BigQuery fields lack.
+// the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; empty structs are
+// unsupported.
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 
 // The DuckDB type of a column described by a BigQuery TableFieldSchema, as DuckDbType maps its
 // GoogleSQL type and the precision and scale the schema gives, except that GEOGRAPHY is stored as
-// its text.
+// its text. Stored structs still require distinct nonempty field names.
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
 }  // namespace bigquery_emulator_duckdb
