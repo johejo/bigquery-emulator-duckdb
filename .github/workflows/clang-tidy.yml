@@ -18,6 +18,10 @@ jobs:
     name: Clang-tidy
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 120
+    permissions:
+      contents: read
+      # Main runs delete the caches they replace.
+      actions: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -65,3 +69,11 @@ jobs:
         with:
           path: ~/.cache/bazel-disk
           key: ${{ steps.disk-cache.outputs.cache-primary-key }}
+      - name: Prune older caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          .github/scripts/prune-caches.sh '${{ steps.disk-cache.outputs.cache-primary-key }}'
+          'bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-'

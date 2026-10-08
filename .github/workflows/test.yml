@@ -12,6 +12,10 @@ jobs:
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      # Main runs delete the caches they replace.
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -30,8 +34,9 @@ jobs:
 
       # Caches are saved only from main; pull requests read main's caches, so they do not fill
       # the repository's cache quota with per-branch copies.
+      # Each cache keeps one entry per prefix; main runs delete the entries they replace.
       # Go validates cached builds against their inputs; versioned modules are reusable even
-      # when dependencies change. The SHA lets each main commit save newly built packages.
+      # when dependencies change. The cache is saved again only when the dependencies change.
       - name: Restore Go cache
         id: go-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -39,10 +44,8 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}-
-            go-v1-${{ runner.os }}-${{ runner.arch }}-
+          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}
+          restore-keys: go-v1-${{ runner.os }}-${{ runner.arch }}-
       - name: Restore Bazel repository cache
         id: repo-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -138,3 +141,14 @@ jobs:
         with:
           path: .cache/cppcheck
           key: ${{ steps.cppcheck-cache.outputs.cache-primary-key }}
+      - name: Prune older caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PREFIX: ${{ runner.os }}-${{ runner.arch }}-
+        run: |
+          .github/scripts/prune-caches.sh '${{ steps.go-cache.outputs.cache-primary-key }}' "go-v1-$PREFIX"
+          .github/scripts/prune-caches.sh '${{ steps.disk-cache.outputs.cache-primary-key }}' "bazel-disk-$PREFIX"
+          .github/scripts/prune-caches.sh '${{ steps.repo-cache.outputs.cache-primary-key }}' "bazel-repo-$PREFIX"
+          .github/scripts/prune-caches.sh '${{ steps.cppcheck-cache.outputs.cache-primary-key }}' "cppcheck-v1-$PREFIX"
