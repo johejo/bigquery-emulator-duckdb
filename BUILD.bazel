@@ -180,23 +180,27 @@ cc_library(
         "src/catalog.cc",
         "src/information_schema.cc",
     ],
-    hdrs = ["src/information_schema.h"],
+    hdrs = [
+        "src/catalog.h",
+        "src/information_schema.h",
+    ],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":duckdb_sql",
+        ":type_mapping",
+        "@googlesql//googlesql/public:builtin_function_options",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:type",
+    ],
+    deps = [
         ":field_schema",
         ":references",
         ":table_metadata",
-        ":type_mapping",
-        "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:catalog_wrapper",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:simple_catalog",
-        "@googlesql//googlesql/public:type",
     ],
-    deps = [":catalog_interface"],
 )
 
 cc_library(
@@ -238,9 +242,7 @@ cc_library(
         "//src/translator:aggregate",
         "//src/translator:context",
         "//src/translator:ddl",
-        "//src/translator:ddl_interface",
         "//src/translator:dml",
-        "//src/translator:dml_interface",
         "//src/translator:expression",
         "//src/translator:expression_interface",
         "//src/translator:function",
@@ -261,6 +263,7 @@ cc_library(
 cc_library(
     name = "backend_functions",
     srcs = ["src/backend_functions.cc"],
+    hdrs = ["src/backend_functions.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":backend_interface",
@@ -274,7 +277,7 @@ cc_library(
         "//src/backend_functions:string",
     ],
     linkstatic = True,
-    deps = [":backend_functions_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
@@ -378,10 +381,10 @@ cc_library(
         "src/emulator.cc",
         "src/emulator_script.cc",
     ],
+    hdrs = ["src/emulator.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":analyzer",
-        ":api_error",
         ":backend",
         ":catalog",
         ":cell_value",
@@ -389,15 +392,9 @@ cc_library(
         ":ddl_write",
         ":duckdb_sql",
         ":extract",
-        ":field_schema",
-        ":gcs",
         ":load",
-        ":project",
-        ":query_parameters",
-        ":references",
         ":schema_sql",
         ":table_comments",
-        ":table_metadata",
         ":temporary_files",
         ":translator",
         ":type_mapping",
@@ -422,9 +419,18 @@ cc_library(
         "@googlesql//googlesql/scripting:script_executor",
         "@googlesql//googlesql/scripting:script_segment",
         "@googlesql//googlesql/scripting:type_aliases",
+    ],
+    deps = [
+        ":api_error",
+        ":backend_interface",
+        ":field_schema",
+        ":gcs",
+        ":project",
+        ":query_parameters",
+        ":references",
+        ":table_metadata",
         "@nlohmann_json//:json",
     ],
-    deps = [":emulator_interface"],
 )
 
 cc_library(
@@ -761,8 +767,10 @@ cc_test(
     ],
 )
 
-# Internal interfaces are separate from implementations so new declarations do not invalidate
-# unrelated sources. Implementation dependencies keep private headers out of client compilations.
+# Headers whose implementations depend back on their clients, which Bazel's acyclic dependencies
+# require to be separate targets: translator.cc and backend.cc depend on the packages that
+# implement them, which include translator.h and backend.h. Implementation dependencies keep
+# private headers out of client compilations.
 
 cc_library(
     name = "translator_interface",
@@ -773,35 +781,6 @@ cc_library(
         ":references",
         ":table_metadata",
         "@googlesql//googlesql/public:analyzer",
-    ],
-)
-
-cc_library(
-    name = "catalog_interface",
-    hdrs = ["src/catalog.h"],
-    deps = [
-        ":field_schema",
-        ":references",
-        ":table_metadata",
-        "@googlesql//googlesql/public:catalog",
-        "@googlesql//googlesql/public:catalog_wrapper",
-        "@googlesql//googlesql/public:simple_catalog",
-    ],
-)
-
-cc_library(
-    name = "emulator_interface",
-    hdrs = ["src/emulator.h"],
-    deps = [
-        ":api_error",
-        ":backend_interface",
-        ":field_schema",
-        ":gcs",
-        ":project",
-        ":query_parameters",
-        ":references",
-        ":table_metadata",
-        "@nlohmann_json//:json",
     ],
 )
 
@@ -817,11 +796,5 @@ cc_library(
 cc_library(
     name = "duckdb_handle",
     hdrs = ["src/duckdb_handle.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "backend_functions_interface",
-    hdrs = ["src/backend_functions.h"],
     deps = ["//third_party/duckdb"],
 )

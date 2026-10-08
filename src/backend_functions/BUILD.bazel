@@ -3,6 +3,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 cc_library(
     name = "bignumeric",
     srcs = ["bignumeric.cc"],
+    hdrs = ["bignumeric.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
@@ -10,7 +11,6 @@ cc_library(
         "//:backend_interface",
         "//:bignumeric",
         "//:duckdb_handle",
-        "//third_party/duckdb",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:arithmetics",
@@ -23,18 +23,18 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":bignumeric_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "math",
     srcs = ["math.cc"],
+    hdrs = ["math.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
         ":scalar",
         "//:duckdb_handle",
-        "//third_party/duckdb",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:arithmetics",
@@ -44,18 +44,18 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":math_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "string",
     srcs = ["string.cc"],
+    hdrs = ["string.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
         ":scalar",
         "//:duckdb_handle",
-        "//third_party/duckdb",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:convert_string",
@@ -68,21 +68,19 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":string_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "datetime",
     srcs = ["datetime.cc"],
+    hdrs = ["datetime.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
         ":scalar",
         "//:bignumeric",
         "//:duckdb_handle",
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:civil_time",
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
@@ -91,12 +89,17 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":datetime_interface"],
+    deps = [
+        "//third_party/duckdb",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:civil_time",
+    ],
 )
 
 cc_library(
     name = "json",
     srcs = ["json.cc"],
+    hdrs = ["json.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":datetime",
@@ -105,7 +108,6 @@ cc_library(
         "//:bignumeric",
         "//:catalog",
         "//:duckdb_handle",
-        "//third_party/duckdb",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:language_options",
@@ -122,54 +124,55 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":json_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "aead",
     srcs = ["aead.cc"],
+    hdrs = ["aead.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
         ":scalar",
-        "//third_party/duckdb",
         "@boringssl//:crypto",
         "@googlesql//googlesql/base:status",
         "@protobuf//third_party/utf8_range:utf8_validity",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":aead_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "percentile",
     srcs = ["percentile.cc"],
+    hdrs = ["percentile.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":register",
         ":scalar",
         "//:duckdb_handle",
-        "//third_party/duckdb",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:percentile",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = [":percentile_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
     name = "register",
     srcs = ["register.cc"],
+    hdrs = ["register.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         "//:backend_interface",
         "//:duckdb_handle",
     ],
     linkstatic = True,
-    deps = [":register_interface"],
+    deps = ["//third_party/duckdb"],
 )
 
 cc_library(
@@ -179,56 +182,4 @@ cc_library(
         "//:duckdb_handle",
         "@googlesql//googlesql/base:status",
     ],
-)
-
-cc_library(
-    name = "register_interface",
-    hdrs = ["register.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "bignumeric_interface",
-    hdrs = ["bignumeric.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "math_interface",
-    hdrs = ["math.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "string_interface",
-    hdrs = ["string.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "datetime_interface",
-    hdrs = ["datetime.h"],
-    deps = [
-        "//third_party/duckdb",
-        "@googlesql//googlesql/base:status",
-        "@googlesql//googlesql/public:civil_time",
-    ],
-)
-
-cc_library(
-    name = "json_interface",
-    hdrs = ["json.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "aead_interface",
-    hdrs = ["aead.h"],
-    deps = ["//third_party/duckdb"],
-)
-
-cc_library(
-    name = "percentile_interface",
-    hdrs = ["percentile.h"],
-    deps = ["//third_party/duckdb"],
 )
