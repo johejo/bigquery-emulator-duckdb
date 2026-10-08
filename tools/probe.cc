@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -22,7 +23,7 @@ std::vector<std::pair<std::string, std::string>> ReadLines(const std::string& pa
   std::vector<std::pair<std::string, std::string>> lines;
   std::string line;
   for (int number = 1; std::getline(in, line); ++number) {
-    if (line.empty() || line.starts_with("#")) {
+    if (line.empty() || line.starts_with('#')) {
       continue;
     }
     std::istringstream words(line);
@@ -54,7 +55,7 @@ std::string Escape(const std::string& text) {
   return out;
 }
 
-std::string Status(std::map<Outcome, int> counts) {
+std::string_view Status(std::map<Outcome, int> counts) {
   const int tested =
       counts[Outcome::kRuns] + counts[Outcome::kUnsupported] + counts[Outcome::kFailsOnDuckDb];
   if (counts[Outcome::kFailsOnDuckDb] > 0) {

@@ -97,9 +97,9 @@ class BigQueryTable : public googlesql::SimpleTable {
       : googlesql::SimpleTable(path.back()), source_(source), path_(std::move(path)) {}
 
   std::optional<TableDescription> Describe() const {
-    return source_.DescribeTable(path_[0], path_[1], path_[2]);
+    return source_.DescribeTable(path_.at(0), path_.at(1), path_.at(2));
   }
-  TableReference reference() const { return {path_[0], path_[1], path_[2]}; }
+  TableReference reference() const { return {path_.at(0), path_.at(1), path_.at(2)}; }
 
  private:
   TableSource& source_;

@@ -31,7 +31,7 @@ namespace {
 using nlohmann::json;
 
 // The path prefix of the BigQuery REST API, below the API root.
-const std::string kApiPrefix = "/bigquery/v2";  // NOLINT(cert-err58-cpp)
+constexpr std::string_view kApiPrefix = "/bigquery/v2";
 
 // The path of resumable upload sessions, below the API root.
 constexpr std::string_view kResumablePath = "/resumable/upload/bigquery/v2/projects/";
@@ -100,7 +100,7 @@ class Server::Impl {
     } else {
       throw std::logic_error("Cannot route " + std::string(id) + " over " + method.http_method);
     }
-    std::vector<std::string> patterns = {kApiPrefix + method.path, method.path};
+    std::vector<std::string> patterns = {std::string(kApiPrefix) + method.path, method.path};
     patterns.insert(patterns.end(), method.upload_paths.begin(), method.upload_paths.end());
     // Shared by the handlers of every pattern.
     struct CheckedRoute {
@@ -198,8 +198,15 @@ class Server::Impl {
     // Ignores location and timeoutMs, since jobs finish before they are inserted, and
     // formatOptions.timestampOutputFormat.
     Route("bigquery.jobs.getQueryResults",
-          {"formatOptions.timestampOutputFormat", "formatOptions.useInt64Timestamp", "location",
-           "maxResults", "pageToken", "startIndex", "timeoutMs"},
+          {
+              "formatOptions.timestampOutputFormat",
+              "formatOptions.useInt64Timestamp",
+              "location",
+              "maxResults",
+              "pageToken",
+              "startIndex",
+              "timeoutMs",
+          },
           Json([this](const httplib::Request& request, httplib::Response&) {
             const auto job = emulator_.GetJob(Param(request, "projectId"), Param(request, "jobId"));
             return GetQueryResultsResponse(*job, ParseResultPage(request));
@@ -225,8 +232,16 @@ class Server::Impl {
               }));
     // Ignores allUsers: every job is the caller's.
     Route("bigquery.jobs.list",
-          {"allUsers", "maxCreationTime", "maxResults", "minCreationTime", "pageToken",
-           "parentJobId", "projection", "stateFilter"},
+          {
+              "allUsers",
+              "maxCreationTime",
+              "maxResults",
+              "minCreationTime",
+              "pageToken",
+              "parentJobId",
+              "projection",
+              "stateFilter",
+          },
           Json([this](const httplib::Request& request, httplib::Response&) {
             const JobListRequest list = ParseJobList(request);
             return JobList(emulator_.ListJobs(Param(request, "projectId")), list);
@@ -347,8 +362,14 @@ class Server::Impl {
           }));
     // Ignores formatOptions.timestampOutputFormat.
     Route("bigquery.tabledata.list",
-          {"formatOptions.timestampOutputFormat", "formatOptions.useInt64Timestamp", "maxResults",
-           "pageToken", "selectedFields", "startIndex"},
+          {
+              "formatOptions.timestampOutputFormat",
+              "formatOptions.useInt64Timestamp",
+              "maxResults",
+              "pageToken",
+              "selectedFields",
+              "startIndex",
+          },
           Json([this](const httplib::Request& request, httplib::Response&) {
             const TableReference table = TableFromPath(request);
             const ResultPage page = ParseResultPage(request);

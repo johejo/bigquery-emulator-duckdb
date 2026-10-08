@@ -29,6 +29,8 @@ namespace bigquery_emulator_duckdb {
 // `system_variables`.
 std::optional<TranslatedStatement> TranslateStatement(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},
+    // LLVM 23 mistakes the argument separator after {} for an initializer's trailing comma.
+    // NOLINTNEXTLINE(readability-trailing-comma)
     const DefaultDataset& defaults = {}, std::string* unsupported = nullptr,
     const googlesql::SystemVariableValuesMap* system_variables = nullptr);
 

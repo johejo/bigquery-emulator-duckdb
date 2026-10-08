@@ -261,8 +261,8 @@ void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
         std::vector<BigNumericValue> values;
         if (absl::Status status =
                 fn::GenerateArrayHelper<fn::ArrayGenTrait<BigNumericValue, BigNumericValue>,
-                                        kMaxGeneratedArraySize>(bounds[0], bounds[1], bounds[2],
-                                                                &values);
+                                        kMaxGeneratedArraySize>(bounds.at(0), bounds.at(1),
+                                                                bounds.at(2), &values);
             !status.ok()) {
           return status;
         }

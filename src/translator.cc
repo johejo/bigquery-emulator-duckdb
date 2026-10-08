@@ -92,7 +92,7 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     for (size_t i = 0; i < fields.size(); ++i) {
       projections.push_back(
           "struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ") AS " +
-          QuoteIdentifier(ValueTableFieldName(fields[i].name, static_cast<int>(i))));
+          QuoteIdentifier(ValueTableFieldName(fields.at(i).name, static_cast<int>(i))));
     }
     return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
   }
@@ -161,7 +161,10 @@ std::optional<TranslatedStatement> TranslateStatement(
     const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
   translator::Context context{
-      .parameters = parameters, .defaults = defaults, .system_variables = system_variables};
+      .parameters = parameters,
+      .defaults = defaults,
+      .system_variables = system_variables,
+  };
   auto sql = translator::Statement(statement, translator::Scope{.context = context});
   if (!sql) {
     if (unsupported != nullptr) {
@@ -169,16 +172,18 @@ std::optional<TranslatedStatement> TranslateStatement(
     }
     return std::nullopt;
   }
-  return TranslatedStatement{.sql = *std::move(sql),
-                             .statement_type = translator::StatementType(statement),
-                             .result_schema = ResultSchema(statement),
-                             .ddl_target_table = std::move(context.ddl_target_table),
-                             .ddl_target_dataset = std::move(context.ddl_target_dataset),
-                             .table = std::move(context.table),
-                             .altered_table = std::move(context.altered_table),
-                             .view = std::move(context.view),
-                             .dataset = std::move(context.dataset),
-                             .altered_dataset = std::move(context.altered_dataset)};
+  return TranslatedStatement{
+      .sql = *std::move(sql),
+      .statement_type = translator::StatementType(statement),
+      .result_schema = ResultSchema(statement),
+      .ddl_target_table = std::move(context.ddl_target_table),
+      .ddl_target_dataset = std::move(context.ddl_target_dataset),
+      .table = std::move(context.table),
+      .altered_table = std::move(context.altered_table),
+      .view = std::move(context.view),
+      .dataset = std::move(context.dataset),
+      .altered_dataset = std::move(context.altered_dataset),
+  };
 }
 
 std::optional<std::string> TranslateExpression(
@@ -186,7 +191,10 @@ std::optional<std::string> TranslateExpression(
     const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
   translator::Context context{
-      .parameters = parameters, .defaults = defaults, .system_variables = system_variables};
+      .parameters = parameters,
+      .defaults = defaults,
+      .system_variables = system_variables,
+  };
   auto sql = translator::Expression(expression, translator::Scope{.context = context}, {});
   if (!sql) {
     if (unsupported != nullptr) {

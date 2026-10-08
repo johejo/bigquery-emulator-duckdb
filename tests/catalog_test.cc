@@ -62,9 +62,9 @@ std::string Describe(const FieldSchema& field) {
   if (!field.fields.empty()) {
     description += " (";
     for (size_t i = 0; i < field.fields.size(); ++i) {
-      description += (i == 0 ? "" : ", ") + Describe(field.fields[i]);
+      description += (i == 0 ? "" : ", ") + Describe(field.fields.at(i));
     }
-    description += ")";
+    description += ')';
   }
   return description;
 }
@@ -154,8 +154,12 @@ TEST(BigQueryFieldSchemaTest, RoundTripsGoogleSqlType) {
       .name = "c",
       .type = FieldType::kRecord,
       .mode = FieldMode::kRepeated,
-      .fields = {{.name = "x", .type = FieldType::kDate, .mode = FieldMode::kNullable},
-                 {.name = "y", .type = FieldType::kString, .mode = FieldMode::kRepeated}}};
+      .fields =
+          {
+              {.name = "x", .type = FieldType::kDate, .mode = FieldMode::kNullable},
+              {.name = "y", .type = FieldType::kString, .mode = FieldMode::kRepeated},
+          },
+  };
   absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
   ASSERT_TRUE(type.ok()) << type.status();
   EXPECT_EQ(BigQueryTypeOf(*type), Describe(field));
@@ -205,8 +209,10 @@ class BigQueryCatalogTest : public ::testing::Test {
  protected:
   BigQueryCatalogTest() {
     source_.Add("p", "ds", "t",
-                {{.name = "a", .type = FieldType::kInteger, .mode = FieldMode::kNullable},
-                 {.name = "b", .type = FieldType::kString, .mode = FieldMode::kRepeated}});
+                {
+                    {.name = "a", .type = FieldType::kInteger, .mode = FieldMode::kNullable},
+                    {.name = "b", .type = FieldType::kString, .mode = FieldMode::kRepeated},
+                });
   }
 
   AnalyzerResult Analyze(const std::string& sql, const AnalyzerSettings& settings = {}) {
@@ -317,12 +323,12 @@ TEST_F(BigQueryCatalogTest, DescribesTheResultSchema) {
   }
   const std::vector<FieldSchema>& schema = *result_schema;
   ASSERT_EQ(schema.size(), 5);
-  EXPECT_EQ(Describe(schema[0]), "a INTEGER NULLABLE");
-  EXPECT_EQ(Describe(schema[1]), "f0_ INTEGER NULLABLE");
-  EXPECT_EQ(Describe(schema[2]), "b STRING REPEATED");
-  EXPECT_EQ(Describe(schema[3]),
+  EXPECT_EQ(Describe(schema.at(0)), "a INTEGER NULLABLE");
+  EXPECT_EQ(Describe(schema.at(1)), "f0_ INTEGER NULLABLE");
+  EXPECT_EQ(Describe(schema.at(2)), "b STRING REPEATED");
+  EXPECT_EQ(Describe(schema.at(3)),
             "f1_ RECORD NULLABLE (x INTEGER NULLABLE, _field_2 STRING NULLABLE)");
-  EXPECT_EQ(Describe(schema[4]), "f2_ FLOAT NULLABLE");
+  EXPECT_EQ(Describe(schema.at(4)), "f2_ FLOAT NULLABLE");
 }
 
 TEST_F(BigQueryCatalogTest, HasNoResultSchemaForDml) {

@@ -42,7 +42,7 @@ std::optional<std::string> TargetTable(const std::vector<std::string>& path, con
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
-  scope.context.ddl_target_table = TableReference{parts[0], parts[1], parts[2]};
+  scope.context.ddl_target_table = TableReference{parts.at(0), parts.at(1), parts.at(2)};
   return QualifiedName(*scope.context.ddl_target_table);
 }
 
@@ -84,7 +84,7 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
-  scope.context.ddl_target_dataset = DatasetReference{parts[0], parts[1]};
+  scope.context.ddl_target_dataset = DatasetReference{parts.at(0), parts.at(1)};
   return QualifiedName(*scope.context.ddl_target_dataset);
 }
 
@@ -109,7 +109,7 @@ std::optional<googlesql::TypeParameters> ColumnTypeParameters(
   absl::StatusOr<googlesql::TypeParameters> parameters =
       column.annotations()->GetFullTypeParameters(column.type());
   if (!parameters.ok()) {
-    return Unsupported(scope, std::string(parameters.status().message()));
+    return Unsupported(scope, parameters.status().message());
   }
   return *std::move(parameters);
 }
@@ -278,7 +278,7 @@ bool ApplyAnnotations(const googlesql::Type* type,
                     i < type->AsStruct()->num_fields();
          ++i) {
       if (!ApplyAnnotations(type->AsStruct()->field(i).type, *annotations.child_list(i),
-                            field.fields[i], scope)) {
+                            field.fields.at(i), scope)) {
         return false;
       }
     }
@@ -309,7 +309,7 @@ void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParam
     for (int i = 0; std::cmp_less(i, parameters.num_children()) &&
                     std::cmp_less(i, field.fields.size()) && i < type->AsStruct()->num_fields();
          ++i) {
-      ApplyTypeParameters(type->AsStruct()->field(i).type, parameters.child(i), field.fields[i]);
+      ApplyTypeParameters(type->AsStruct()->field(i).type, parameters.child(i), field.fields.at(i));
     }
   }
 }
@@ -366,10 +366,12 @@ std::optional<RangePartitioning> GenerateArrayRange(const googlesql::ResolvedExp
   if (call.function()->Name() != "generate_array" || values.size() < 2) {
     return std::nullopt;
   }
-  return RangePartitioning{.field = field,
-                           .start = values[0],
-                           .end = values[1],
-                           .interval = values.size() > 2 ? values[2] : 1};
+  return RangePartitioning{
+      .field = field,
+      .start = values.at(0),
+      .end = values.at(1),
+      .interval = values.size() > 2 ? values.at(2) : 1,
+  };
 }
 
 // Records the partitioning that a PARTITION BY expression gives on `metadata`: a DATE column,
@@ -387,27 +389,27 @@ bool Partitioning(const googlesql::ResolvedExpr& expression, TableMetadata& meta
   const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
   const std::string function = call.function()->Name();
   const auto& arguments = call.argument_list();
-  const std::string column = arguments.empty() ? "" : ColumnName(*arguments[0]);
+  const std::string column = arguments.empty() ? "" : ColumnName(*arguments.at(0));
   if (column.empty()) {
     return false;
   }
-  const googlesql::Type* type = arguments[0]->type();
+  const googlesql::Type* type = arguments.at(0)->type();
   if (function == "date" && arguments.size() == 1) {
     metadata.time_partitioning = TimePartitioning{.type = "DAY", .field = column};
     return type->IsTimestamp() || type->IsDatetime();
   }
   if (function == "range_bucket" && arguments.size() == 2) {
-    metadata.range_partitioning = GenerateArrayRange(*arguments[1], column);
+    metadata.range_partitioning = GenerateArrayRange(*arguments.at(1), column);
     return metadata.range_partitioning.has_value();
   }
   const bool truncates = (function == "timestamp_trunc" && type->IsTimestamp()) ||
                          (function == "datetime_trunc" && type->IsDatetime()) ||
                          (function == "date_trunc" && type->IsDate());
-  if (!truncates || arguments.size() != 2 || !arguments[1]->Is<googlesql::ResolvedLiteral>()) {
+  if (!truncates || arguments.size() != 2 || !arguments.at(1)->Is<googlesql::ResolvedLiteral>()) {
     return false;
   }
   const std::string part =
-      arguments[1]->GetAs<googlesql::ResolvedLiteral>()->value().EnumDisplayName();
+      arguments.at(1)->GetAs<googlesql::ResolvedLiteral>()->value().EnumDisplayName();
   metadata.time_partitioning = TimePartitioning{.type = part, .field = column};
   return part == "MONTH" || part == "YEAR" ||
          (!type->IsDate() && (part == "DAY" || part == "HOUR"));
@@ -525,10 +527,12 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   if (!columns) {
     return std::nullopt;
   }
-  scope.context.table = TableDefinition{.table = *target,
-                                        .schema = std::move(description->schema),
-                                        .metadata = *std::move(metadata),
-                                        .if_not_exists = IfNotExists(create)};
+  scope.context.table = TableDefinition{
+      .table = *target,
+      .schema = std::move(description->schema),
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+  };
   return *head + " (" + *columns + ")";
 }
 
@@ -584,11 +588,13 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   if (replace && ToLowerAscii(QualifiedName(*target)) == ToLowerAscii(QualifiedName(source))) {
     return Unsupported(scope, "CREATE OR REPLACE TABLE COPY of itself");
   }
-  scope.context.table = TableDefinition{.table = *target,
-                                        .schema = std::move(description->schema),
-                                        .metadata = *std::move(metadata),
-                                        .if_not_exists = IfNotExists(create),
-                                        .rows_from = source};
+  scope.context.table = TableDefinition{
+      .table = *target,
+      .schema = std::move(description->schema),
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+      .rows_from = source,
+  };
   return *head + " (" + *columns + ")";
 }
 
@@ -630,10 +636,10 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     } else if (action->Is<googlesql::ResolvedRenameToAction>()) {
       // BigQuery takes only the new name of the table, which stays in its dataset.
       const auto& new_path = action->GetAs<googlesql::ResolvedRenameToAction>()->new_path();
-      if (new_path.size() != 1 || new_path[0].find('.') != std::string::npos) {
+      if (new_path.size() != 1 || new_path.at(0).find('.') != std::string::npos) {
         return Unsupported(scope, "RENAME TO a table path");
       }
-      alteration.actions.emplace_back(RenameTableAction{.table_id = new_path[0]});
+      alteration.actions.emplace_back(RenameTableAction{.table_id = new_path.at(0)});
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
@@ -659,7 +665,10 @@ std::optional<std::string> AlterTableSetOptions(
     return std::nullopt;
   }
   scope.context.altered_table = TableAlteration{
-      .table = *target, .actions = {std::move(updates)}, .if_exists = alter.is_if_exists()};
+      .table = *target,
+      .actions = {std::move(updates)},
+      .if_exists = alter.is_if_exists(),
+  };
   return "";
 }
 
@@ -678,7 +687,10 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
     return std::nullopt;
   }
   TableDefinition table{
-      .table = *target, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
+      .table = *target,
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+  };
   std::vector<std::string> columns;
   for (const auto& column : create.column_definition_list()) {
     if (column->is_hidden() || column->generated_column_info() != nullptr) {
@@ -740,7 +752,10 @@ std::optional<std::string> CreateTableAsSelect(
     return std::nullopt;
   }
   TableDefinition table{
-      .table = *target, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
+      .table = *target,
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+  };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
@@ -778,10 +793,12 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   if (!path || !target || !relation || !metadata) {
     return std::nullopt;
   }
-  ViewDefinition view{.table = *target,
-                      .query = create.sql(),
-                      .metadata = *std::move(metadata),
-                      .if_not_exists = IfNotExists(create)};
+  ViewDefinition view{
+      .table = *target,
+      .query = create.sql(),
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+  };
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
@@ -829,7 +846,10 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
     return std::nullopt;
   }
   scope.context.dataset = DatasetDefinition{
-      .dataset = *dataset, .metadata = *std::move(metadata), .if_not_exists = IfNotExists(create)};
+      .dataset = *dataset,
+      .metadata = *std::move(metadata),
+      .if_not_exists = IfNotExists(create),
+  };
   switch (create.create_mode()) {
     case googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE:
       return Unsupported(scope, "CREATE OR REPLACE SCHEMA");

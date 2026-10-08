@@ -274,11 +274,11 @@ class AnyArguments {
     if (!status_.ok()) {
       return status_;
     }
-    return ValueOf(vectors_[column], duck_types_[column].get(), types_[column], row);
+    return ValueOf(vectors_.at(column), duck_types_.at(column).get(), types_.at(column), row);
   }
 
   [[nodiscard]] const googlesql::Type* Type(idx_t column) const {
-    return column < types_.size() ? types_[column] : nullptr;
+    return column < types_.size() ? types_.at(column) : nullptr;
   }
 
  private:
@@ -419,23 +419,23 @@ void JsonObject(duckdb_function_info info, duckdb_data_chunk input, duckdb_vecto
         std::vector<googlesql::Value> keys;
         std::vector<const googlesql::Value*> pointers;
         if (arrays) {
-          if (arguments_list[0].is_null()) {
+          if (arguments_list.at(0).is_null()) {
             return invalid("The keys array cannot be NULL");
           }
-          if (arguments_list[1].is_null()) {
+          if (arguments_list.at(1).is_null()) {
             return invalid("The values array cannot be NULL");
           }
-          if (arguments_list[0].num_elements() != arguments_list[1].num_elements()) {
+          if (arguments_list.at(0).num_elements() != arguments_list.at(1).num_elements()) {
             return invalid("The number of keys and values must match");
           }
-          for (int i = 0; i < arguments_list[0].num_elements(); ++i) {
-            keys.push_back(arguments_list[0].element(i));
-            pointers.push_back(&arguments_list[1].element(i));
+          for (int i = 0; i < arguments_list.at(0).num_elements(); ++i) {
+            keys.push_back(arguments_list.at(0).element(i));
+            pointers.push_back(&arguments_list.at(1).element(i));
           }
         } else {
           for (idx_t i = 0; i + 1 < columns; i += 2) {
-            keys.push_back(arguments_list[i]);
-            pointers.push_back(&arguments_list[i + 1]);
+            keys.push_back(arguments_list.at(i));
+            pointers.push_back(&arguments_list.at(i + 1));
           }
         }
         std::vector<absl::string_view> key_views;
@@ -805,7 +805,8 @@ void RegisterJsonFunctions(duckdb_connection connection) {
              {"bq_json_query_array", JsonExtract<Extraction::kQueryArray, false>, true},
              {"bq_json_query_array_json", JsonExtract<Extraction::kQueryArray, true>, true},
              {"bq_json_value_array", JsonExtract<Extraction::kValueArray, false>, true},
-             {"bq_json_value_array_json", JsonExtract<Extraction::kValueArray, true>, true}}) {
+             {"bq_json_value_array_json", JsonExtract<Extraction::kValueArray, true>, true},
+         }) {
       Register(connection, name, {kVarchar, kVarchar, kBoolean}, array ? list.get() : varchar.get(),
                function);
     }

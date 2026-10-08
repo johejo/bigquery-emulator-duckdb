@@ -27,7 +27,11 @@ std::string CanonicalTypeName(const json& type) {
   }
   const std::string name = ToUpperAscii(type["type"].get<std::string>());
   static const auto* const kAliases = new std::unordered_map<std::string, std::string>{
-      {"INTEGER", "INT64"}, {"FLOAT", "FLOAT64"}, {"BOOLEAN", "BOOL"}, {"RECORD", "STRUCT"}};
+      {"INTEGER", "INT64"},
+      {"FLOAT", "FLOAT64"},
+      {"BOOLEAN", "BOOL"},
+      {"RECORD", "STRUCT"},
+  };
   const auto it = kAliases->find(name);
   return it == kAliases->end() ? name : it->second;
 }
@@ -169,8 +173,10 @@ QueryParameters QueryParameters::Parse(const json& parameters) {
       throw ApiError::Invalid("Query parameter is missing parameterType");
     }
     const auto value = parameter.find("parameterValue");
-    std::string literal = ToDuckDbLiteral({.type = parameter["parameterType"],
-                                           .value = value == parameter.end() ? NoValue() : *value});
+    std::string literal = ToDuckDbLiteral({
+        .type = parameter["parameterType"],
+        .value = value == parameter.end() ? NoValue() : *value,
+    });
     const std::string name = parameter.value("name", "");
     FieldSchema type = ToFieldSchema(name, parameter["parameterType"]);
     if (name.empty()) {
@@ -197,7 +203,7 @@ const std::string& QueryParameters::ByPosition(int position) const {
     throw ApiError::InvalidQuery("Query parameter not found at position " +
                                  std::to_string(position));
   }
-  return by_position_[position - 1];
+  return by_position_.at(position - 1);
 }
 
 }  // namespace bigquery_emulator_duckdb

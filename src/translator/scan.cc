@@ -28,7 +28,7 @@ std::optional<std::vector<std::string>> Renamed(
     const std::vector<std::string>& names) {
   std::vector<std::string> projections;
   for (size_t i = 0; i < columns.size(); ++i) {
-    const auto column = relation.columns.find(columns[i].column_id());
+    const auto column = relation.columns.find(columns.at(i).column_id());
     if (column == relation.columns.end()) {
       return std::nullopt;
     }
@@ -169,7 +169,7 @@ Relation WithRead(const WithQuery& query, const std::vector<googlesql::ResolvedC
   Relation result;
   std::vector<std::string> projections;
   for (size_t i = 0; i < columns.size(); ++i) {
-    const int id = columns[i].column_id();
+    const int id = columns.at(i).column_id();
     projections.push_back("q." + QuoteIdentifier("_p" + std::to_string(i)) + " AS " +
                           ColumnName(id));
     result.columns.emplace(id, "q." + ColumnName(id));
@@ -200,12 +200,14 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   // CORRESPONDING is resolved into each input item's output_column_list, which is positional
   // and pads missing columns with NULLs, so the match and propagation modes need no handling.
   static const std::map<googlesql::ResolvedSetOperationScan::SetOperationType, std::string>
-      operators = {{googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
-                   {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
-                   {googlesql::ResolvedSetOperationScan::INTERSECT_ALL, " INTERSECT ALL "},
-                   {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
-                   {googlesql::ResolvedSetOperationScan::EXCEPT_ALL, " EXCEPT ALL "},
-                   {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "}};
+      operators = {
+          {googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
+          {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
+          {googlesql::ResolvedSetOperationScan::INTERSECT_ALL, " INTERSECT ALL "},
+          {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
+          {googlesql::ResolvedSetOperationScan::EXCEPT_ALL, " EXCEPT ALL "},
+          {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "},
+  };
   const auto op = operators.find(set.op_type());
   if (op == operators.end() || set.column_list().empty()) {
     return std::nullopt;

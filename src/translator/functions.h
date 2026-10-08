@@ -77,7 +77,7 @@ std::string_view Describe(Implementation implementation);
 struct Arity {
   // A bare count reads best in the table.
   // cppcheck-suppress noExplicitConstructor
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions)
+  // NOLINTNEXTLINE(google-explicit-constructor,cppcoreguidelines-explicit-constructor,misc-explicit-constructor)
   Arity(std::size_t count) : min(count), max(count) {}
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the order reads as a range.
   Arity(std::size_t min, std::size_t max) : min(min), max(max) {}

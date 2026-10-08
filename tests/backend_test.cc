@@ -44,8 +44,8 @@ TEST(BackendTest, RollsBackViewCreationWhenMetadataFails) {
   const QueryResult metadata =
       backend.Execute("SELECT comment FROM duckdb_views() WHERE view_name = 'v'");
   ASSERT_EQ(metadata.rows.size(), 1);
-  EXPECT_EQ(metadata.rows[0]["f"][0]["v"], "original");
-  EXPECT_EQ(backend.Prepare("SELECT * FROM v").schema[0].name, "x");
+  EXPECT_EQ(metadata.rows.at(0)["f"][0]["v"], "original");
+  EXPECT_EQ(backend.Prepare("SELECT * FROM v").schema.at(0).name, "x");
 }
 
 TEST(BackendTest, ReturnsSchemaAndRows) {
@@ -57,7 +57,7 @@ TEST(BackendTest, ReturnsSchemaAndRows) {
               {"name": "b", "type": "STRING", "mode": "NULLABLE"},
               {"name": "c", "type": "INTEGER", "mode": "NULLABLE"}]})"));
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.rows[0], json::parse(R"({"f": [{"v": "1"}, {"v": "x"}, {"v": null}]})"));
+  EXPECT_EQ(result.rows.at(0), json::parse(R"({"f": [{"v": "1"}, {"v": "x"}, {"v": null}]})"));
 }
 
 TEST(BackendTest, EncodesScalarTypes) {
@@ -73,7 +73,7 @@ TEST(BackendTest, EncodesScalarTypes) {
   }
   EXPECT_EQ(fields, json::parse(R"(["BOOLEAN", "FLOAT", "DATE", "TIME", "DATETIME",
                                      "TIMESTAMP", "BYTES", "NUMERIC"])"));
-  EXPECT_EQ(result.rows[0]["f"],
+  EXPECT_EQ(result.rows.at(0)["f"],
             json::parse(R"([{"v": "true"}, {"v": "1.5"}, {"v": "2020-01-02"}, {"v": "12:34:56"},
                            {"v": "2020-01-02T03:04:05.5"}, {"v": "1577934245250000"},
                            {"v": "YUdrPQ=="}, {"v": "1.25"}])"));
@@ -89,7 +89,7 @@ TEST(BackendTest, EncodesArraysAndStructs) {
                 {"name": "x", "type": "INTEGER", "mode": "NULLABLE"},
                 {"name": "y", "type": "STRING", "mode": "REPEATED"}]},
               {"name": "e", "type": "INTEGER", "mode": "REPEATED"}]})"));
-  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([{"v": [{"v": "1"}, {"v": "2"}]},
+  EXPECT_EQ(result.rows.at(0)["f"], json::parse(R"([{"v": [{"v": "1"}, {"v": "2"}]},
                            {"v": {"f": [{"v": "1"}, {"v": [{"v": "a"}]}]}},
                            {"v": []}])"));
 }
@@ -100,7 +100,7 @@ TEST(BackendTest, KeepsNullArraysWhenAsked) {
   Backend backend;
   const QueryResult result = backend.Execute(
       "SELECT NULL::INTEGER[] AS e, {'y': NULL::VARCHAR[]} AS s, []::INTEGER[] AS a", {}, true);
-  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([{"v": null}, {"v": {"f": [{"v": null}]}},
+  EXPECT_EQ(result.rows.at(0)["f"], json::parse(R"([{"v": null}, {"v": {"f": [{"v": null}]}},
                            {"v": []}])"));
 }
 
@@ -110,7 +110,7 @@ TEST(BackendTest, ReportsStatementsWithoutRows) {
   const QueryResult insert = backend.Execute("INSERT INTO t VALUES (1), (2)");
   EXPECT_FALSE(insert.has_rows);
   EXPECT_EQ(insert.affected_rows, 2);
-  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "2");
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows.at(0)["f"][0]["v"], "2");
 }
 
 TEST(BackendTest, ConvertsTimestampsToSeconds) {
@@ -121,7 +121,7 @@ TEST(BackendTest, ConvertsTimestampsToSeconds) {
              {'inner': TIMESTAMPTZ '1969-12-31 23:59:59+00'} AS s,
              NULL::TIMESTAMPTZ AS n, 'x' AS other)");
   EXPECT_TRUE(HasTimestampField(result.schema));
-  EXPECT_EQ(TimestampsAsSeconds(result.schema, result.rows[0])["f"],
+  EXPECT_EQ(TimestampsAsSeconds(result.schema, result.rows.at(0))["f"],
             json::parse(R"([{"v": "1577934245.25"}, {"v": [{"v": "1"}]},
                            {"v": {"f": [{"v": "-1"}]}}, {"v": null}, {"v": "x"}])"));
 }
@@ -145,7 +145,7 @@ TEST(BackendTest, PreparesWithoutExecuting) {
   // A statement that produces no result set has no schema, and preparing it leaves the table
   // untouched.
   EXPECT_FALSE(backend.Prepare("INSERT INTO t VALUES (1)").has_rows);
-  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "0");
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows.at(0)["f"][0]["v"], "0");
   EXPECT_THROW(backend.Prepare("SELECT * FROM missing"), BackendError);
 }
 
@@ -155,11 +155,11 @@ TEST(BackendTest, EncodesFixedArraysAndNullStructs) {
       SELECT [{'x': 1}, {'x': NULL}]::STRUCT(x INTEGER)[2] AS a,
              NULL::STRUCT(x INTEGER) AS s, NULL::INTEGER[2] AS n)";
   const QueryResult result = backend.Execute(sql);
-  EXPECT_EQ(result.schema[0].type, FieldType::kRecord);
-  EXPECT_EQ(result.schema[0].mode, FieldMode::kRepeated);
-  ASSERT_EQ(result.schema[0].fields.size(), 1);
-  EXPECT_EQ(result.schema[0].fields[0].type, FieldType::kInteger);
-  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([
+  EXPECT_EQ(result.schema.at(0).type, FieldType::kRecord);
+  EXPECT_EQ(result.schema.at(0).mode, FieldMode::kRepeated);
+  ASSERT_EQ(result.schema.at(0).fields.size(), 1);
+  EXPECT_EQ(result.schema.at(0).fields.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(result.rows.at(0)["f"], json::parse(R"([
       {"v": [{"v": {"f": [{"v": "1"}]}}, {"v": {"f": [{"v": null}]}}]},
       {"v": null}, {"v": []}])"));
   EXPECT_EQ(backend.Prepare(sql).SchemaToJson(), result.SchemaToJson());
@@ -174,17 +174,17 @@ TEST(BackendTest, PreservesBinaryStringsAndDecimalPrecision) {
              -1234567890.123456::DECIMAL(18,6) AS d64,
              -12345678901234567890.1234567890::DECIMAL(38,10) AS d128,
              '00112233-4455-6677-8899-aabbccddeeff'::UUID AS uuid)");
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], std::string("\0abc", 4));
-  EXPECT_EQ(result.rows[0]["f"][1]["v"], "AP8Q");
-  EXPECT_EQ(result.rows[0]["f"][2]["v"], "");
-  EXPECT_EQ(result.rows[0]["f"][3]["v"], "YQ==");
-  EXPECT_EQ(result.rows[0]["f"][4]["v"], "YWI=");
-  EXPECT_EQ(result.rows[0]["f"][5]["v"], "-1.23");
-  EXPECT_EQ(result.rows[0]["f"][6]["v"], "-12345.67");
-  EXPECT_EQ(result.rows[0]["f"][7]["v"], "-1234567890.123456");
-  EXPECT_EQ(result.rows[0]["f"][8]["v"], "-12345678901234567890.123456789");
-  EXPECT_EQ(result.rows[0]["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
-  EXPECT_EQ(result.schema[8].type, FieldType::kNumeric);
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], std::string("\0abc", 4));
+  EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "AP8Q");
+  EXPECT_EQ(result.rows.at(0)["f"][2]["v"], "");
+  EXPECT_EQ(result.rows.at(0)["f"][3]["v"], "YQ==");
+  EXPECT_EQ(result.rows.at(0)["f"][4]["v"], "YWI=");
+  EXPECT_EQ(result.rows.at(0)["f"][5]["v"], "-1.23");
+  EXPECT_EQ(result.rows.at(0)["f"][6]["v"], "-12345.67");
+  EXPECT_EQ(result.rows.at(0)["f"][7]["v"], "-1234567890.123456");
+  EXPECT_EQ(result.rows.at(0)["f"][8]["v"], "-12345678901234567890.123456789");
+  EXPECT_EQ(result.rows.at(0)["f"][9]["v"], "00112233-4455-6677-8899-aabbccddeeff");
+  EXPECT_EQ(result.schema.at(8).type, FieldType::kNumeric);
 }
 
 // A BIGNUM is the integer number of units of 10^-38 of a BIGNUMERIC, over its whole range. Its
@@ -197,7 +197,7 @@ TEST(BackendTest, ReadsBigNumAsBigNumeric) {
           ('57896044618658097711785492504343953926634992332820282019728792003956564819967'),
           ('-57896044618658097711785492504343953926634992332820282019728792003956564819968'))
       AS t(x))");
-  EXPECT_EQ(result.schema[0].type, FieldType::kBigNumeric);
+  EXPECT_EQ(result.schema.at(0).type, FieldType::kBigNumeric);
   ASSERT_EQ(result.rows.size(), 8);
   const std::vector<std::string> expected = {
       "0",
@@ -207,9 +207,10 @@ TEST(BackendTest, ReadsBigNumAsBigNumeric) {
       "-0.00000000000000000000000000000000000256",
       "1",
       "578960446186580977117854925043439539266.34992332820282019728792003956564819967",
-      "-578960446186580977117854925043439539266.34992332820282019728792003956564819968"};
+      "-578960446186580977117854925043439539266.34992332820282019728792003956564819968",
+  };
   for (size_t i = 0; i < expected.size(); ++i) {
-    EXPECT_EQ(result.rows[i]["f"][0]["v"], expected[i]) << i;
+    EXPECT_EQ(result.rows.at(i)["f"][0]["v"], expected.at(i)) << i;
   }
   EXPECT_THROW(backend.Execute("SELECT "
                                "'578960446186580977117854925043439539266349923328202820197287920039"
@@ -226,7 +227,7 @@ TEST(BackendTest, FormatsOtherDuckDBScalarTypes) {
              '-170141183460469231731687303715884105728'::HUGEINT AS hi,
              TIMESTAMP_NS '2020-01-02 03:04:05.123456789' AS ns,
              TIMESTAMP_NS 'infinity' AS inf)");
-  EXPECT_EQ(result.rows[0]["f"], json::parse(R"([
+  EXPECT_EQ(result.rows.at(0)["f"], json::parse(R"([
       {"v": "happy"}, {"v": "101"}, {"v": "{x=[1, NULL]}"}, {"v": "hello"},
       {"v": "18446744073709551615"}, {"v": "-170141183460469231731687303715884105728"},
       {"v": "2020-01-02T03:04:05.123456"}, {"v": "infinity"}])"));
@@ -237,9 +238,9 @@ TEST(BackendTest, ReadsMultipleChunks) {
   const QueryResult result = backend.Execute("SELECT i, [i, NULL] AS a FROM range(5000) t(i)");
   ASSERT_EQ(result.rows.size(), 5000);
   for (size_t i = 0; i < result.rows.size(); ++i) {
-    EXPECT_EQ(result.rows[i]["f"][0]["v"], std::to_string(i));
-    EXPECT_EQ(result.rows[i]["f"][1]["v"][0]["v"], std::to_string(i));
-    EXPECT_TRUE(result.rows[i]["f"][1]["v"][1]["v"].is_null());
+    EXPECT_EQ(result.rows.at(i)["f"][0]["v"], std::to_string(i));
+    EXPECT_EQ(result.rows.at(i)["f"][1]["v"][0]["v"], std::to_string(i));
+    EXPECT_TRUE(result.rows.at(i)["f"][1]["v"][1]["v"].is_null());
   }
 }
 
@@ -248,17 +249,20 @@ TEST(BackendTest, RollsBackFailedTransactionsAndCanSkipInvalidRows) {
   backend.Execute("CREATE TABLE t (id INTEGER PRIMARY KEY)");
   EXPECT_THROW(backend.ExecuteAll({"BEGIN", "INSERT INTO t VALUES (1)", "SELECT * FROM missing"}),
                BackendError);
-  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "0");
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows.at(0)["f"][0]["v"], "0");
   const std::vector<std::string> statements = {
-      "INSERT INTO t VALUES (1)", "INSERT INTO t VALUES (1)", "INSERT INTO t VALUES (2)"};
+      "INSERT INTO t VALUES (1)",
+      "INSERT INTO t VALUES (1)",
+      "INSERT INTO t VALUES (2)",
+  };
   auto errors = backend.InsertRows(statements, false);
   ASSERT_EQ(errors.size(), 1);
-  EXPECT_EQ(errors[0].first, 1);
-  EXPECT_FALSE(errors[0].second.empty());
-  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows[0]["f"][0]["v"], "0");
+  EXPECT_EQ(errors.at(0).first, 1);
+  EXPECT_FALSE(errors.at(0).second.empty());
+  EXPECT_EQ(backend.Execute("SELECT count(*) FROM t").rows.at(0)["f"][0]["v"], "0");
   errors = backend.InsertRows(statements, true);
   ASSERT_EQ(errors.size(), 1);
-  EXPECT_EQ(errors[0].first, 1);
+  EXPECT_EQ(errors.at(0).first, 1);
   EXPECT_EQ(backend.Execute("UPDATE t SET id = id + 10").affected_rows, 2);
   EXPECT_EQ(backend.Execute("DELETE FROM t WHERE id = 999").affected_rows, 0);
   EXPECT_EQ(backend.Execute("DELETE FROM t").affected_rows, 2);

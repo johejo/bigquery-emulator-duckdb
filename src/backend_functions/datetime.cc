@@ -62,8 +62,10 @@ std::vector<duckdb_type> ColumnTypes(duckdb_data_chunk input) {
 }
 
 // BigQuery expands %Q to the quarter and %J to the ISO day of the year.
-constexpr googlesql::functions::FormatDateTimestampOptions kFormatOptions = {.expand_Q = true,
-                                                                             .expand_J = true};
+constexpr googlesql::functions::FormatDateTimestampOptions kFormatOptions = {
+    .expand_Q = true,
+    .expand_J = true,
+};
 
 // FORMAT_DATE(format, date).
 void FormatDate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -326,7 +328,7 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
         }
         std::vector<googlesql::Value> values;
         for (idx_t column = 1; column < types.size(); ++column) {
-          auto value = FormatArgument(arguments, column, types[column]);
+          auto value = FormatArgument(arguments, column, types.at(column));
           if (!value.ok()) {
             return value.status();
           }

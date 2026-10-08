@@ -106,7 +106,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       if (!cast) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(names[i]) + " := " + *cast);
+      fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *cast);
       std::string failure =
           "(struct_extract_at(" + casts + ", " + std::to_string(i + 1) + ") IS NULL AND ";
       failure += "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ") IS NOT NULL)";
@@ -247,7 +247,7 @@ bool HasInternalStructNames(const googlesql::Type* type) {
     const auto names = DuckDbStructFieldNames(type->AsStruct());
     for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
       const auto& field = type->AsStruct()->field(i);
-      if (names[i] != field.name || HasInternalStructNames(field.type)) {
+      if (names.at(i) != field.name || HasInternalStructNames(field.type)) {
         return true;
       }
     }
@@ -417,7 +417,7 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       if (!field) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(names[i]) + " := " + *field);
+      fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *field);
     }
     return "CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *type + ")";
   }

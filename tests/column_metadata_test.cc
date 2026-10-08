@@ -14,16 +14,21 @@ using nlohmann::json;
 
 TEST(ColumnMetadataTest, KeepsTheDerivedFieldWithoutAFieldComment) {
   const std::vector<FieldSchema> derived = {
-      {.name = "a"}, {.name = "b"}, {.name = "c"}, {.name = "d"}, {.name = "e"}};
+      {.name = "a"}, {.name = "b"}, {.name = "c"}, {.name = "d"}, {.name = "e"},
+  };
   const std::vector<FieldSchema> schema = ApplyColumnComments(
-      derived, {json(R"({"name": "a", "type": "JSON", "mode": "REQUIRED"})"),
-                // Comments the emulator did not write, or that describe another column.
-                json("written by someone else"), json(R"({"name": "other", "type": "JSON"})"),
-                json(R"({"name": "d", "type": "NOPE"})"), json(nullptr)});
-  EXPECT_EQ(schema[0].type, FieldType::kJson);
-  EXPECT_EQ(schema[0].mode, FieldMode::kRequired);
+      derived, {
+                   json(R"({"name": "a", "type": "JSON", "mode": "REQUIRED"})"),
+                   // Comments the emulator did not write, or that describe another column.
+                   json("written by someone else"),
+                   json(R"({"name": "other", "type": "JSON"})"),
+                   json(R"({"name": "d", "type": "NOPE"})"),
+                   json(nullptr),
+               });
+  EXPECT_EQ(schema.at(0).type, FieldType::kJson);
+  EXPECT_EQ(schema.at(0).mode, FieldMode::kRequired);
   for (size_t i = 1; i < schema.size(); ++i) {
-    EXPECT_EQ(schema[i].ToJson(), derived[i].ToJson()) << i;
+    EXPECT_EQ(schema.at(i).ToJson(), derived.at(i).ToJson()) << i;
   }
 }
 
@@ -42,7 +47,8 @@ TEST(ColumnMetadataTest, RejectsABigNumericStoredAsADecimal) {
               R"({"name": "s", "type": "RECORD", "fields": [{"name": "n", "type": "BIGNUMERIC"}]})")}),
       ApiError);
   EXPECT_EQ(ApplyColumnComments({{.name = "n", .type = FieldType::kBigNumeric}},
-                                {json(R"({"name": "n", "type": "BIGNUMERIC"})")})[0]
+                                {json(R"({"name": "n", "type": "BIGNUMERIC"})")})
+                .at(0)
                 .type,
             FieldType::kBigNumeric);
 }

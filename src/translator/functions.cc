@@ -45,9 +45,11 @@ std::vector<Rule> WeekTrunc(std::string_view target = "") {
   std::vector<Rule> rules;
   for (const bool iso : {false, true}) {
     const std::string start = WeekStart("$1", iso);
-    rules.push_back({2,
-                     target.empty() ? start : "CAST(" + start + " AS " + std::string(target) + ")",
-                     {Part(2, {iso ? "isoweek" : "week"})}});
+    rules.push_back({
+        2,
+        target.empty() ? start : "CAST(" + start + " AS " + std::string(target) + ")",
+        {Part(2, {iso ? "isoweek" : "week"})},
+    });
   }
   return rules;
 }
@@ -56,10 +58,11 @@ std::vector<Rule> WeekTrunc(std::string_view target = "") {
 std::vector<Rule> WeekDiff() {
   std::vector<Rule> rules;
   for (const bool iso : {false, true}) {
-    rules.push_back(
-        {3,
-         "(date_diff('day', " + WeekStart("$2", iso) + ", " + WeekStart("$1", iso) + ") // 7)",
-         {Part(3, {iso ? "isoweek" : "week"})}});
+    rules.push_back({
+        3,
+        "(date_diff('day', " + WeekStart("$2", iso) + ", " + WeekStart("$1", iso) + ") // 7)",
+        {Part(3, {iso ? "isoweek" : "week"})},
+    });
   }
   return rules;
 }
@@ -68,9 +71,11 @@ std::vector<Rule> WeekDiff() {
 std::vector<Rule> Civil(const std::string& target) {
   // DuckDB cannot cast a TIMESTAMPTZ to TIME, so it goes through the civil time in UTC, the
   // session's time zone.
-  return {{1, "CAST(CAST($1 AS TIMESTAMP) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}},
-          {1, "CAST($1 AS " + target + ")"},
-          {2, "CAST(timezone($2, $1) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}}};
+  return {
+      {1, "CAST(CAST($1 AS TIMESTAMP) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}},
+      {1, "CAST($1 AS " + target + ")"},
+      {2, "CAST(timezone($2, $1) AS " + target + ")", {Is(1, {TYPE_TIMESTAMP})}},
+  };
 }
 
 // The DuckDB function of the same name, called with each argument count in `arity`, when the
@@ -100,12 +105,15 @@ std::vector<Rule> CodePointsTo(googlesql::TypeKind result) {
       bytes ? "unhex(array_to_string(list_transform($1, _p -> lpad(hex(_p), 2, '0')), ''))"
             : "array_to_string(list_transform($1, _p -> chr(CAST(_p AS INTEGER))), '')";
   return {
-      {1,
-       "CASE WHEN list_count($1) <> len($1) THEN NULL WHEN " + first +
-           " IS NOT NULL THEN !1 ELSE " + spelling + " END",
-       {},
-       {},
-       {std::string(bytes ? "'Invalid ASCII value '" : "'Invalid codepoint '") + " || " + first}}};
+      {
+          1,
+          "CASE WHEN list_count($1) <> len($1) THEN NULL WHEN " + first +
+              " IS NOT NULL THEN !1 ELSE " + spelling + " END",
+          {},
+          {},
+          {std::string(bytes ? "'Invalid ASCII value '" : "'Invalid codepoint '") + " || " + first},
+      },
+  };
 }
 
 // SUBSTR and SUBSTRING. BigQuery starts at the first character for a position of 0 or one
@@ -115,13 +123,17 @@ std::vector<Rule> Substr() {
   const std::string start =
       "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -length($1) THEN 1 ELSE length($1) + $2 + 1 "
       "END";
-  return {{2, "substr($1, " + start + ")", {Is(1, {TYPE_STRING})}},
-          {3,
-           "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
-           {Is(1, {TYPE_STRING})},
-           {},
-           {"'Third argument in SUBSTR() cannot be negative'"}},
-          {{2, 3}, "bq_substr_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"9223372036854775807"}}};
+  return {
+      {2, "substr($1, " + start + ")", {Is(1, {TYPE_STRING})}},
+      {
+          3,
+          "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
+          {Is(1, {TYPE_STRING})},
+          {},
+          {"'Third argument in SUBSTR() cannot be negative'"},
+      },
+      {{2, 3}, "bq_substr_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"9223372036854775807"}},
+  };
 }
 
 // RANGE_BUCKET counts boundaries <= the point, including duplicates. GoogleSQL implements it
@@ -140,16 +152,32 @@ std::vector<Rule> RangeBucket() {
     spelling +=
         " WHEN len(list_filter($2, (_e, _i) -> _e < $2[_i - 1])) > 0 THEN !3 "
         "ELSE len(list_filter($2, _e -> _e <= $1)) END";
-    rules.push_back(
-        {2,
-         std::move(spelling),
-         {floating ? Is(1, {TYPE_DOUBLE})
-                   : Is(1, {TYPE_INT64, TYPE_NUMERIC, TYPE_BIGNUMERIC, TYPE_BOOL, TYPE_STRING,
-                            TYPE_BYTES, TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})},
-         {},
-         {"'Elements in input array to RANGE_BUCKET cannot be null.'",
-          "'Elements in input array to RANGE_BUCKET cannot be NaN.'",
-          "'Elements in input array to RANGE_BUCKET must be in ascending order.'"}});
+    rules.push_back({
+        2,
+        std::move(spelling),
+        {
+            floating ? Is(1, {TYPE_DOUBLE})
+                     : Is(1,
+                          {
+                              TYPE_INT64,
+                              TYPE_NUMERIC,
+                              TYPE_BIGNUMERIC,
+                              TYPE_BOOL,
+                              TYPE_STRING,
+                              TYPE_BYTES,
+                              TYPE_DATE,
+                              TYPE_TIME,
+                              TYPE_DATETIME,
+                              TYPE_TIMESTAMP,
+                          }),
+        },
+        {},
+        {
+            "'Elements in input array to RANGE_BUCKET cannot be null.'",
+            "'Elements in input array to RANGE_BUCKET cannot be NaN.'",
+            "'Elements in input array to RANGE_BUCKET must be in ascending order.'",
+        },
+    });
   }
   return rules;
 }
@@ -167,9 +195,11 @@ std::string RoundHalfEven() {
 // FORMAT_DATE, FORMAT_DATETIME and FORMAT_TIMESTAMP, by the type of the value. A TIMESTAMP is
 // formatted in the given time zone, by default UTC.
 std::vector<Rule> FormatDateTime() {
-  return {{2, "bq_format_date($1, $2)", {Is(2, {TYPE_DATE})}},
-          {2, "bq_format_datetime($1, $2)", {Is(2, {TYPE_DATETIME})}},
-          {{2, 3}, "bq_format_timestamp($1, $2, $3)", {Is(2, {TYPE_TIMESTAMP})}, {"'UTC'"}}};
+  return {
+      {2, "bq_format_date($1, $2)", {Is(2, {TYPE_DATE})}},
+      {2, "bq_format_datetime($1, $2)", {Is(2, {TYPE_DATETIME})}},
+      {{2, 3}, "bq_format_timestamp($1, $2, $3)", {Is(2, {TYPE_TIMESTAMP})}, {"'UTC'"}},
+  };
 }
 
 // A FLOAT64 function of `arity` arguments that src/backend_functions.cc registers.
@@ -182,15 +212,25 @@ std::vector<Rule> Float64(std::string_view function, std::size_t arity = 1) {
 // $2 multiplied out to that part.
 std::vector<Rule> WithInterval(const std::string& spelling) {
   std::vector<Rule> rules = {{2, spelling}};
-  for (const std::string_view part : {"year", "quarter", "month", "week", "day", "hour", "minute",
-                                      "second", "millisecond", "microsecond"}) {
+  for (const std::string_view part : {
+           "year",
+           "quarter",
+           "month",
+           "week",
+           "day",
+           "hour",
+           "minute",
+           "second",
+           "millisecond",
+           "microsecond",
+       }) {
     std::string expanded;
     for (std::size_t i = 0; i < spelling.size(); ++i) {
       if (spelling.compare(i, 2, "$2") == 0) {
         expanded += "($2 * INTERVAL '1 " + std::string(part) + "')";
         ++i;
       } else {
-        expanded += spelling[i];
+        expanded += spelling.at(i);
       }
     }
     rules.push_back({3, expanded, {Part(3, {part})}});
@@ -201,37 +241,47 @@ std::vector<Rule> WithInterval(const std::string& spelling) {
 // EXTRACT, where a time zone argument moves a TIMESTAMP to the civil time there.
 std::vector<Rule> Extract() {
   std::vector<Rule> rules = {
-      {2,
-       "date_part(#2, $1)",
-       {Is(1, {TYPE_INTERVAL}), Part(2, {"year", "month", "day", "hour", "minute", "second"})}},
+      {
+          2,
+          "date_part(#2, $1)",
+          {Is(1, {TYPE_INTERVAL}), Part(2, {"year", "month", "day", "hour", "minute", "second"})},
+      },
       {2, "(date_part(#2, $1) % 1000)", {Is(1, {TYPE_INTERVAL}), Part(2, {"millisecond"})}},
-      {2, "(date_part(#2, $1) % 1000000)", {Is(1, {TYPE_INTERVAL}), Part(2, {"microsecond"})}}};
+      {2, "(date_part(#2, $1) % 1000000)", {Is(1, {TYPE_INTERVAL}), Part(2, {"microsecond"})}},
+  };
   for (const auto& [arity, value] :
        {std::pair<std::size_t, std::string>{2, "$1"}, {3, "timezone($3, $1)"}}) {
-    rules.push_back(
-        {arity,
-         "(date_part('dayofweek', " + value + ") + 1)",
-         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"dayofweek"})}});
-    rules.push_back(
-        {arity,
-         "CAST(strftime(" + value + ", '%U') AS BIGINT)",
-         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"week"})}});
-    rules.push_back(
-        {arity,
-         "date_part('week', " + value + ")",
-         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"isoweek"})}});
+    rules.push_back({
+        arity,
+        "(date_part('dayofweek', " + value + ") + 1)",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"dayofweek"})},
+    });
+    rules.push_back({
+        arity,
+        "CAST(strftime(" + value + ", '%U') AS BIGINT)",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"week"})},
+    });
+    rules.push_back({
+        arity,
+        "date_part('week', " + value + ")",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"isoweek"})},
+    });
     // DuckDB counts these from the start of the minute, BigQuery from the start of the second.
-    rules.push_back(
-        {arity,
-         "(date_part(#2, " + value + ") % 1000)",
-         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"millisecond"})}});
-    rules.push_back(
-        {arity,
-         "(date_part(#2, " + value + ") % 1000000)",
-         {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"microsecond"})}});
-    rules.push_back({arity,
-                     "date_part(#2, " + value + ")",
-                     {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})}});
+    rules.push_back({
+        arity,
+        "(date_part(#2, " + value + ") % 1000)",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"millisecond"})},
+    });
+    rules.push_back({
+        arity,
+        "(date_part(#2, " + value + ") % 1000000)",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}), Part(2, {"microsecond"})},
+    });
+    rules.push_back({
+        arity,
+        "date_part(#2, " + value + ")",
+        {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})},
+    });
   }
   return rules;
 }
@@ -243,29 +293,34 @@ std::vector<Rule> GenerateDateArray() {
     return "list_transform(generate_series(CAST($1 AS TIMESTAMP), CAST($2 AS TIMESTAMP), " + step +
            "), _d -> CAST(_d AS DATE))";
   };
-  return {{2, series("INTERVAL 1 DAY")},
-          {4, series("($3 * INTERVAL '1 day')"), {Part(4, {"day"})}},
-          {4, series("($3 * INTERVAL '1 week')"), {Part(4, {"week"})}}};
+  return {
+      {2, series("INTERVAL 1 DAY")},
+      {4, series("($3 * INTERVAL '1 day')"), {Part(4, {"day"})}},
+      {4, series("($3 * INTERVAL '1 week')"), {Part(4, {"week"})}},
+  };
 }
 
 // Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return an
 // empty array for a zero step.
 std::vector<Rule> GenerateTimestampArray() {
   std::vector<Rule> rules;
-  for (const auto& [part, micros] :
-       std::initializer_list<std::pair<std::string_view, std::string>>{{"day", "86400000000"},
-                                                                       {"hour", "3600000000"},
-                                                                       {"minute", "60000000"},
-                                                                       {"second", "1000000"},
-                                                                       {"millisecond", "1000"},
-                                                                       {"microsecond", "1"}}) {
-    rules.push_back({4,
-                     "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
-                         ")], _g -> CASE WHEN _g.s = 0 THEN !1 "
-                         "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
-                     {Part(4, {part})},
-                     {},
-                     {"'Sequence step cannot be 0.'"}});
+  for (const auto& [part, micros] : std::initializer_list<std::pair<std::string_view, std::string>>{
+           {"day", "86400000000"},
+           {"hour", "3600000000"},
+           {"minute", "60000000"},
+           {"second", "1000000"},
+           {"millisecond", "1000"},
+           {"microsecond", "1"},
+       }) {
+    rules.push_back({
+        4,
+        "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
+            ")], _g -> CASE WHEN _g.s = 0 THEN !1 "
+            "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
+        {Part(4, {part})},
+        {},
+        {"'Sequence step cannot be 0.'"},
+    });
   }
   return rules;
 }
@@ -274,23 +329,31 @@ std::vector<Rule> GenerateTimestampArray() {
 // count negative indexes from the end.
 std::vector<Rule> ArrayAt(bool ordinal, bool safe) {
   const std::string out_of_range = ordinal ? "$2 < 1 OR $2 > len($1)" : "$2 < 0 OR $2 >= len($1)";
-  return {{2,
-           "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN " + out_of_range + " THEN " +
-               (safe ? "NULL" : "!1") + " ELSE " + (ordinal ? "$1[$2]" : "$1[$2 + 1]") + " END",
-           {},
-           {},
-           {"'Array index ' || $2 || ' is out of bounds'"}}};
+  return {
+      {
+          2,
+          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN " + out_of_range + " THEN " +
+              (safe ? "NULL" : "!1") + " ELSE " + (ordinal ? "$1[$2]" : "$1[$2 + 1]") + " END",
+          {},
+          {},
+          {"'Array index ' || $2 || ' is out of bounds'"},
+      },
+  };
 }
 
 // DuckDB's integer shifts fail on overflow and extend the sign; BigQuery's drop the bits shifted
 // out and fill with zeros, which is what shifting a 64-bit BIT string does.
 std::vector<Rule> Shift(std::string_view op) {
-  return {{2,
-           "CASE WHEN $2 < 0 THEN !1 WHEN $2 >= 64 THEN 0 ELSE CAST(CAST($1 AS BIT) " +
-               std::string(op) + " CAST($2 AS INTEGER) AS BIGINT) END",
-           {Is(1, {TYPE_INT64})},
-           {},
-           {"'Bit shift by a negative value'"}}};
+  return {
+      {
+          2,
+          "CASE WHEN $2 < 0 THEN !1 WHEN $2 >= 64 THEN 0 ELSE CAST(CAST($1 AS BIT) " +
+              std::string(op) + " CAST($2 AS INTEGER) AS BIGINT) END",
+          {Is(1, {TYPE_INT64})},
+          {},
+          {"'Bit shift by a negative value'"},
+      },
+  };
 }
 
 // JSON_QUERY and the other extractions of `function` in src/backend_functions.cc, of a STRING
@@ -301,7 +364,8 @@ std::vector<Rule> JsonExtract(std::string_view function, bool standard, bool jso
       std::string(function) + "_json(CAST($1 AS VARCHAR), $2, " + flag + ")";
   return {
       {{1, 2}, json_result ? "json(" + of_json + ")" : of_json, {Is(1, {TYPE_JSON})}, {"'$'"}},
-      {{1, 2}, std::string(function) + "($1, $2, " + flag + ")", {Is(1, {TYPE_STRING})}, {"'$'"}}};
+      {{1, 2}, std::string(function) + "($1, $2, " + flag + ")", {Is(1, {TYPE_STRING})}, {"'$'"}},
+  };
 }
 
 std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
@@ -315,8 +379,10 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
 // A function that src/backend_functions.cc registers as `function` for STRING and as
 // `function`_bytes for BYTES.
 std::vector<Rule> Strings(std::string_view function, Arity arity) {
-  return Concat({Same(function, arity, {Is(1, {TYPE_STRING})}),
-                 Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})})});
+  return Concat({
+      Same(function, arity, {Is(1, {TYPE_STRING})}),
+      Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})}),
+  });
 }
 
 // A call to `function`, a BIGNUMERIC function that src/backend_functions/bignumeric.cc
@@ -343,9 +409,11 @@ Rule BigNumericOperator(std::string_view function, std::size_t arity) {
 // keep their precision rather than going through FLOAT64.
 std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
   const std::string function = "bq_" + std::string(name);
-  return Concat({{BigNumericOperator("bq_bignumeric_" + std::string(name), arity)},
-                 Float64(function, arity),
-                 Same(function + "_numeric", arity, {Is(1, {TYPE_NUMERIC})})});
+  return Concat({
+      {BigNumericOperator("bq_bignumeric_" + std::string(name), arity)},
+      Float64(function, arity),
+      Same(function + "_numeric", arity, {Is(1, {TYPE_NUMERIC})}),
+  });
 }
 
 // ROUND and TRUNC of a BIGNUMERIC, which take a number of digits, and with `modes` a rounding
@@ -354,14 +422,19 @@ std::vector<Rule> BigNumericRounding(std::string_view function, bool modes) {
   const std::string name(function);
   std::vector<Rule> rules = {
       BigNumericOperator(name, 1),
-      {2, BigNumericCall(name + "_digits", 1, 1), {Is(1, {TYPE_BIGNUMERIC})}}};
+      {2, BigNumericCall(name + "_digits", 1, 1), {Is(1, {TYPE_BIGNUMERIC})}},
+  };
   if (modes) {
-    rules.push_back({3,
-                     BigNumericCall(name + "_digits", 1, 1),
-                     {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}});
-    rules.push_back({3,
-                     BigNumericCall(name + "_half_even", 1, 1),
-                     {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_EVEN")}});
+    rules.push_back({
+        3,
+        BigNumericCall(name + "_digits", 1, 1),
+        {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
+    });
+    rules.push_back({
+        3,
+        BigNumericCall(name + "_half_even", 1, 1),
+        {Is(1, {TYPE_BIGNUMERIC}), Mode(3, "ROUND_HALF_EVEN")},
+    });
   }
   return rules;
 }
@@ -369,15 +442,19 @@ std::vector<Rule> BigNumericRounding(std::string_view function, bool modes) {
 // TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
 // DuckDB's trim() only trims spaces.
 std::vector<Rule> Trim(const std::string& function) {
-  return {{1, function + "($1)", {Is(1, {TYPE_STRING})}},
-          {2, function + "_chars($1, $2)", {Is(1, {TYPE_STRING})}},
-          {2, function + "_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}};
+  return {
+      {1, function + "($1)", {Is(1, {TYPE_STRING})}},
+      {2, function + "_chars($1, $2)", {Is(1, {TYPE_STRING})}},
+      {2, function + "_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+  };
 }
 
 // LPAD and RPAD, which pad with spaces by default.
 std::vector<Rule> Pad(const std::string& function) {
-  return {{{2, 3}, function + "($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
-          {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}}};
+  return {
+      {{2, 3}, function + "($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
+      {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}},
+  };
 }
 
 // `left` `op` `right`, where a NaN FLOAT64 compares unequal to everything, itself included, and
@@ -390,8 +467,10 @@ std::string FloatCompare(const std::string& left, std::string_view op, const std
 
 // A comparison `op`, with FloatCompare's NaN for FLOAT64.
 std::vector<Rule> Compare(std::string_view op) {
-  return {{2, FloatCompare("$1", op, "$2"), {Is(1, {TYPE_DOUBLE})}},
-          {2, "($1 " + std::string(op) + " $2)"}};
+  return {
+      {2, FloatCompare("$1", op, "$2"), {Is(1, {TYPE_DOUBLE})}},
+      {2, "($1 " + std::string(op) + " $2)"},
+  };
 }
 
 // Functions implemented by DuckDB SQL templates.
@@ -402,13 +481,20 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"$ADD", {BigNumericOperator("bq_bignumeric_add", 2), {2, "($1 + $2)"}}},
       {"$SUBTRACT", {BigNumericOperator("bq_bignumeric_subtract", 2), {2, "($1 - $2)"}}},
       {"$MULTIPLY", {BigNumericOperator("bq_bignumeric_multiply", 2), {2, "($1 * $2)"}}},
-      {"$DIVIDE",
-       {BigNumericOperator("bq_bignumeric_divide", 2),
-        {2,
-         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE $1 / $2 END",
-         {},
-         {},
-         {"'division by zero'"}}}},
+      {
+          "$DIVIDE",
+          {
+              BigNumericOperator("bq_bignumeric_divide", 2),
+              {
+                  2,
+                  "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE $1 / $2 "
+                  "END",
+                  {},
+                  {},
+                  {"'division by zero'"},
+              },
+          },
+      },
       {"$UNARY_MINUS", {BigNumericOperator("bq_bignumeric_negate", 1), {1, "(-$1)"}}},
       {"$EQUAL", Compare("=")},
       {"$NOT_EQUAL", Compare("<>")},
@@ -416,20 +502,33 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"$LESS_OR_EQUAL", Compare("<=")},
       {"$GREATER", Compare(">")},
       {"$GREATER_OR_EQUAL", Compare(">=")},
-      {"$BETWEEN",
-       {{3,
-         "(" + FloatCompare("$1", ">=", "$2") + " AND " + FloatCompare("$1", "<=", "$3") + ")",
-         {Is(1, {TYPE_DOUBLE})}},
-        {3, "($1 BETWEEN $2 AND $3)"}}},
+      {
+          "$BETWEEN",
+          {
+              {
+                  3,
+                  "(" + FloatCompare("$1", ">=", "$2") + " AND " + FloatCompare("$1", "<=", "$3") +
+                      ")",
+                  {Is(1, {TYPE_DOUBLE})},
+              },
+              {3, "($1 BETWEEN $2 AND $3)"},
+          },
+      },
       // A backslash escapes the character after it, and must not end the pattern. BYTES are
       // unsupported, since DuckDB's LIKE takes only VARCHAR.
-      {"$LIKE",
-       {{2,
-         "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') THEN !1 ELSE "
-         "($1 LIKE $2 ESCAPE '\\') END",
-         {Is(1, {TYPE_STRING})},
-         {},
-         {"'LIKE pattern ends with a backslash'"}}}},
+      {
+          "$LIKE",
+          {
+              {
+                  2,
+                  "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') THEN !1 ELSE "
+                  "($1 LIKE $2 ESCAPE '\\') END",
+                  {Is(1, {TYPE_STRING})},
+                  {},
+                  {"'LIKE pattern ends with a backslash'"},
+              },
+          },
+      },
       {"$IS_DISTINCT_FROM", {{2, "($1 IS DISTINCT FROM $2)"}}},
       {"$IS_NOT_DISTINCT_FROM", {{2, "($1 IS NOT DISTINCT FROM $2)"}}},
       {"$IS_NULL", {{1, "($1 IS NULL)"}}},
@@ -451,62 +550,102 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
       // make the zero itself disappear.
-      {"SAFE_DIVIDE",
-       {BigNumericOperator("bq_bignumeric_safe_divide", 2), {2, "($1 / NULLIF($2, 0))"}}},
+      {
+          "SAFE_DIVIDE",
+          {BigNumericOperator("bq_bignumeric_safe_divide", 2), {2, "($1 / NULLIF($2, 0))"}},
+      },
       {"IEEE_DIVIDE", {{2, "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
       // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
       // in DuckDB where it is 0 in BigQuery.
-      {"MOD",
-       {BigNumericOperator("bq_bignumeric_mod", 2),
-        {2,
-         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 WHEN $2 = -1 THEN 0 "
-         "ELSE mod($1, $2) END",
-         {Is(1, {TYPE_INT64})},
-         {},
-         {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}},
-        {2,
-         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE mod($1, $2) END",
-         {},
-         {},
-         {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"}}}},
+      {
+          "MOD",
+          {
+              BigNumericOperator("bq_bignumeric_mod", 2),
+              {
+                  2,
+                  "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 WHEN $2 = -1 "
+                  "THEN 0 "
+                  "ELSE mod($1, $2) END",
+                  {Is(1, {TYPE_INT64})},
+                  {},
+                  {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
+              },
+              {
+                  2,
+                  "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE mod($1, "
+                  "$2) END",
+                  {},
+                  {},
+                  {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
+              },
+          },
+      },
       // DuckDB's divide() of DECIMAL values returns a DOUBLE; GoogleSQL computes the exact
       // NUMERIC quotient and checks overflow.
-      {"DIV",
-       {BigNumericOperator("bq_bignumeric_div", 2),
-        {2, "bq_div_numeric($1, $2)", {Is(1, {TYPE_NUMERIC})}},
-        {2,
-         "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE divide($1, $2) "
-         "END",
-         {Is(1, {TYPE_INT64})},
-         {},
-         {"'division by zero: ' || $1 || ' / ' || $2"}}}},
+      {
+          "DIV",
+          {
+              BigNumericOperator("bq_bignumeric_div", 2),
+              {2, "bq_div_numeric($1, $2)", {Is(1, {TYPE_NUMERIC})}},
+              {
+                  2,
+                  "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE "
+                  "divide($1, $2) "
+                  "END",
+                  {Is(1, {TYPE_INT64})},
+                  {},
+                  {"'division by zero: ' || $1 || ' / ' || $2"},
+              },
+          },
+      },
       // DuckDB's sign() is 0 for NaN.
-      {"SIGN",
-       {BigNumericOperator("bq_bignumeric_sign", 1),
-        {1, "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END", {Is(1, {TYPE_DOUBLE})}},
-        {1, "sign($1)"}}},
+      {
+          "SIGN",
+          {
+              BigNumericOperator("bq_bignumeric_sign", 1),
+              {1, "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END", {Is(1, {TYPE_DOUBLE})}},
+              {1, "sign($1)"},
+          },
+      },
       // DuckDB takes the digits as an INTEGER.
       // DuckDB rounds halfway values away from zero, and its round_even() goes through
       // DOUBLE, so ROUND_HALF_EVEN takes the truncated value instead at a tie whose truncated
       // value is even. Only NUMERIC and BIGNUMERIC take a rounding mode.
-      {"ROUND",
-       Concat({BigNumericRounding("bq_bignumeric_round", true),
-               {{1, "round($1)"},
-                {2, "round($1, CAST($2 AS INTEGER))"},
-                {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
-                {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}}}})},
-      {"TRUNC", Concat({BigNumericRounding("bq_bignumeric_trunc", false),
-                        {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}}})},
+      {
+          "ROUND",
+          Concat({
+              BigNumericRounding("bq_bignumeric_round", true),
+              {
+                  {1, "round($1)"},
+                  {2, "round($1, CAST($2 AS INTEGER))"},
+                  {3, "round($1, CAST($2 AS INTEGER))", {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")}},
+                  {3, RoundHalfEven(), {Mode(3, "ROUND_HALF_EVEN")}},
+              },
+          }),
+      },
+      {
+          "TRUNC",
+          Concat({
+              BigNumericRounding("bq_bignumeric_trunc", false),
+              {{1, "trunc($1)"}, {2, "trunc($1, CAST($2 AS INTEGER))"}},
+          }),
+      },
       {"ABS", {BigNumericOperator("bq_bignumeric_abs", 1), {1, "abs($1)"}}},
       {"CEIL", {BigNumericOperator("bq_bignumeric_ceil", 1), {1, "ceil($1)"}}},
       {"CEILING", {BigNumericOperator("bq_bignumeric_ceil", 1), {1, "ceil($1)"}}},
       {"FLOOR", {BigNumericOperator("bq_bignumeric_floor", 1), {1, "floor($1)"}}},
       // DuckDB cannot cast an empty BLOB to BIT.
-      {"BIT_COUNT",
-       {{1, "bit_count($1)", {Is(1, {TYPE_INT64})}},
-        {1,
-         "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
-         {Is(1, {TYPE_BYTES})}}}},
+      {
+          "BIT_COUNT",
+          {
+              {1, "bit_count($1)", {Is(1, {TYPE_INT64})}},
+              {
+                  1,
+                  "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
+                  {Is(1, {TYPE_BYTES})},
+              },
+          },
+      },
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
@@ -523,12 +662,22 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
       // Below a day, BigQuery counts whole units rather than the boundaries crossed, which is
       // DuckDB's date_sub rather than date_diff.
-      {"DATE_DIFF", Concat({WeekDiff(),
-                            {{3, "date_sub(#3, $2, $1)", {SubDay(3)}}},
-                            {{3, "date_diff(#3, $2, $1)"}}})},
-      {"DATETIME_DIFF", Concat({WeekDiff(),
-                                {{3, "date_sub(#3, $2, $1)", {SubDay(3)}}},
-                                {{3, "date_diff(#3, $2, $1)"}}})},
+      {
+          "DATE_DIFF",
+          Concat({
+              WeekDiff(),
+              {{3, "date_sub(#3, $2, $1)", {SubDay(3)}}},
+              {{3, "date_diff(#3, $2, $1)"}},
+          }),
+      },
+      {
+          "DATETIME_DIFF",
+          Concat({
+              WeekDiff(),
+              {{3, "date_sub(#3, $2, $1)", {SubDay(3)}}},
+              {{3, "date_diff(#3, $2, $1)"}},
+          }),
+      },
       // Every TIMESTAMP and TIME difference counts whole units.
       {"TIMESTAMP_DIFF", Concat({WeekDiff(), {{3, "date_sub(#3, $2, $1)"}}})},
       {"TIME_DIFF", Concat({WeekDiff(), {{3, "date_sub(#3, $2, $1)"}}})},
@@ -549,16 +698,27 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"$EXTRACT_DATETIME", Civil("TIMESTAMP")},
       {"DATE", Concat({{{3, "make_date($1, $2, $3)"}}, Civil("DATE")})},
       {"TIME", Concat({{{3, "make_time($1, $2, $3)"}}, Civil("TIME")})},
-      {"DATETIME", Concat({{{6, "make_timestamp($1, $2, $3, $4, $5, $6)"},
-                            {2, "($1 + $2)", {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})}}},
-                           Civil("TIMESTAMP")})},
+      {
+          "DATETIME",
+          Concat({
+              {
+                  {6, "make_timestamp($1, $2, $3, $4, $5, $6)"},
+                  {2, "($1 + $2)", {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})}},
+              },
+              Civil("TIMESTAMP"),
+          }),
+      },
       // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
-      {"TIMESTAMP",
-       {{1, "bq_string_to_timestamp($1, false)", {Is(1, {TYPE_STRING})}},
-        {2, "bq_string_to_timestamp_in($1, $2)", {Is(1, {TYPE_STRING})}},
-        {1, "CAST($1 AS TIMESTAMPTZ)"},
-        // A civil time in the given zone.
-        {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {TYPE_DATE, TYPE_DATETIME})}}}},
+      {
+          "TIMESTAMP",
+          {
+              {1, "bq_string_to_timestamp($1, false)", {Is(1, {TYPE_STRING})}},
+              {2, "bq_string_to_timestamp_in($1, $2)", {Is(1, {TYPE_STRING})}},
+              {1, "CAST($1 AS TIMESTAMPTZ)"},
+              // A civil time in the given zone.
+              {2, "timezone($2, CAST($1 AS TIMESTAMP))", {Is(1, {TYPE_DATE, TYPE_DATETIME})}},
+          },
+      },
 
       // Epoch conversions. The DuckDB functions return a civil timestamp, which is read as UTC
       // to arrive at the instant BigQuery means.
@@ -569,24 +729,41 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"UNIX_DATE", {{1, "date_diff('day', DATE '1970-01-01', $1)"}}},
       {"TIMESTAMP_MILLIS", {{1, "(epoch_ms($1) AT TIME ZONE 'UTC')"}}},
       {"TIMESTAMP_MICROS", {{1, "(make_timestamp($1) AT TIME ZONE 'UTC')"}}},
-      {"DATE_FROM_UNIX_DATE",
-       {{1, "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE)"}}},
+      {
+          "DATE_FROM_UNIX_DATE",
+          {{1, "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE)"}},
+      },
 
       // Strings. The other string functions are GoogleSQL's, at least for BYTES; see
       // BackendRules().
       {"LENGTH", {{1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}, {1, "length($1)"}}},
-      {"BYTE_LENGTH",
-       {{1, "strlen($1)", {Is(1, {TYPE_STRING})}}, {1, "octet_length($1)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "BYTE_LENGTH",
+          {
+              {1, "strlen($1)", {Is(1, {TYPE_STRING})}},
+              {1, "octet_length($1)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
       {"UNICODE", {{1, "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END", {Is(1, {TYPE_STRING})}}}},
       {"CHR", {{1, "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}}},
       // '.' would skip line breaks without the s flag.
-      {"TO_CODE_POINTS",
-       {{1,
-         "list_transform(regexp_extract_all($1, '(?s).'), _c -> CAST(unicode(_c) AS BIGINT))",
-         {Is(1, {TYPE_STRING})}},
-        {1,
-         "list_transform(regexp_extract_all(hex($1), '..'), _b -> CAST('0x' || _b AS BIGINT))",
-         {Is(1, {TYPE_BYTES})}}}},
+      {
+          "TO_CODE_POINTS",
+          {
+              {
+                  1,
+                  "list_transform(regexp_extract_all($1, '(?s).'), _c -> CAST(unicode(_c) AS "
+                  "BIGINT))",
+                  {Is(1, {TYPE_STRING})},
+              },
+              {
+                  1,
+                  "list_transform(regexp_extract_all(hex($1), '..'), _b -> CAST('0x' || _b AS "
+                  "BIGINT))",
+                  {Is(1, {TYPE_BYTES})},
+              },
+          },
+      },
       {"CODE_POINTS_TO_STRING", CodePointsTo(TYPE_STRING)},
       {"CODE_POINTS_TO_BYTES", CodePointsTo(TYPE_BYTES)},
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
@@ -602,32 +779,52 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
       {"RANGE_BUCKET", RangeBucket()},
       // DuckDB's array_to_string() skips NULL elements and has no NULL text.
-      {"ARRAY_TO_STRING",
-       {{2, "array_to_string($1, $2)", {Is(2, {TYPE_STRING})}},
-        {3,
-         "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)",
-         {Is(2, {TYPE_STRING})}},
-        {2,
-         "unhex(array_to_string(list_transform($1, _e -> hex(_e)), hex($2)))",
-         {Is(2, {TYPE_BYTES})}},
-        {3,
-         "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), hex($2)))",
-         {Is(2, {TYPE_BYTES})}}}},
+      {
+          "ARRAY_TO_STRING",
+          {
+              {2, "array_to_string($1, $2)", {Is(2, {TYPE_STRING})}},
+              {
+                  3,
+                  "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)",
+                  {Is(2, {TYPE_STRING})},
+              },
+              {
+                  2,
+                  "unhex(array_to_string(list_transform($1, _e -> hex(_e)), hex($2)))",
+                  {Is(2, {TYPE_BYTES})},
+              },
+              {
+                  3,
+                  "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), "
+                  "hex($2)))",
+                  {Is(2, {TYPE_BYTES})},
+              },
+          },
+      },
       // generate_series() has no floating point overload, and returns an empty list for a zero
       // step, which BigQuery rejects. Other types go to GoogleSQL's implementation.
-      {"GENERATE_ARRAY",
-       {{{2, 3}, "bq_generate_array_numeric($1, $2, $3)", {Is(1, {TYPE_NUMERIC})}, {"1"}},
-        {{2, 3}, "bq_generate_array($1, $2, $3)", {Is(1, {TYPE_DOUBLE})}, {"1"}},
-        {{2, 3},
-         "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS VARCHAR), "
-         "CAST($3 AS VARCHAR)), _e -> CAST(_e AS BIGNUM))",
-         {Is(1, {TYPE_BIGNUMERIC})},
-         {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"}},
-        {{2, 3},
-         "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
-         {Is(1, {TYPE_INT64}), Is(2, {TYPE_INT64}), Is(3, {TYPE_INT64})},
-         {"1"},
-         {"'Sequence step cannot be 0.'"}}}},
+      {
+          "GENERATE_ARRAY",
+          {
+              {{2, 3}, "bq_generate_array_numeric($1, $2, $3)", {Is(1, {TYPE_NUMERIC})}, {"1"}},
+              {{2, 3}, "bq_generate_array($1, $2, $3)", {Is(1, {TYPE_DOUBLE})}, {"1"}},
+              {
+                  {2, 3},
+                  "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS "
+                  "VARCHAR), "
+                  "CAST($3 AS VARCHAR)), _e -> CAST(_e AS BIGNUM))",
+                  {Is(1, {TYPE_BIGNUMERIC})},
+                  {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
+              },
+              {
+                  {2, 3},
+                  "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+                  {Is(1, {TYPE_INT64}), Is(2, {TYPE_INT64}), Is(3, {TYPE_INT64})},
+                  {"1"},
+                  {"'Sequence step cannot be 0.'"},
+              },
+          },
+      },
   };
   return *kRules;
 }
@@ -637,11 +834,30 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // Construct and normalize separate interval components through GoogleSQL.
-      {"$INTERVAL",
-       {{2,
-         "bq_interval($1, upper(#2))",
-         {Part(2, {"year", "quarter", "month", "week", "day", "hour", "minute", "second",
-                   "millisecond", "microsecond"})}}}},
+      {
+          "$INTERVAL",
+          {
+              {
+                  2,
+                  "bq_interval($1, upper(#2))",
+                  {
+                      Part(2,
+                           {
+                               "year",
+                               "quarter",
+                               "month",
+                               "week",
+                               "day",
+                               "hour",
+                               "minute",
+                               "second",
+                               "millisecond",
+                               "microsecond",
+                           }),
+                  },
+              },
+          },
+      },
       {"MAKE_INTERVAL", {{6, "bq_make_interval($1, $2, $3, $4, $5, $6)"}}},
       {"JUSTIFY_HOURS", {{1, "bq_justify_hours($1)"}}},
       {"JUSTIFY_DAYS", {{1, "bq_justify_days($1)"}}},
@@ -693,23 +909,43 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"TRIM", Trim("bq_trim")},
       {"LTRIM", Trim("bq_ltrim")},
       {"RTRIM", Trim("bq_rtrim")},
-      {"INSTR",
-       {{{2, 4}, "bq_instr($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
-        {{2, 4}, "bq_instr_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}}}},
-      {"STRPOS",
-       {{2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "bq_instr_bytes($1, $2, 1, 1)", {Is(1, {TYPE_BYTES})}}}},
-      {"STARTS_WITH",
-       {{2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "bq_starts_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
-      {"ENDS_WITH",
-       {{2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
-        {2, "bq_ends_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "INSTR",
+          {
+              {{2, 4}, "bq_instr($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
+              {{2, 4}, "bq_instr_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}},
+          },
+      },
+      {
+          "STRPOS",
+          {
+              {2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
+              {2, "bq_instr_bytes($1, $2, 1, 1)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
+      {
+          "STARTS_WITH",
+          {
+              {2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
+              {2, "bq_starts_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
+      {
+          "ENDS_WITH",
+          {
+              {2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
+              {2, "bq_ends_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
       {"SUBSTR", Substr()},
       {"SUBSTRING", Substr()},
-      {"SPLIT",
-       {{{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
-        {2, "bq_split_bytes($1, $2)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "SPLIT",
+          {
+              {{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
+              {2, "bq_split_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
       // The mode is passed by its name.
       // Formatting and parsing dates and times. DuckDB's strftime() and strptime() differ in
       // the format elements, in how leniently they parse and in their errors. FORMAT_DATE,
@@ -727,21 +963,36 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"NORMALIZE_AND_CASEFOLD", {{{1, 2}, "bq_normalize_and_casefold($1, $2)", {}, {"'NFC'"}}}},
       // BigQuery compares the NFKC normal forms, case folded. Only the STRING overload is
       // declared.
-      {"CONTAINS_SUBSTR",
-       {{2,
-         "contains(bq_normalize_and_casefold($1, 'NFKC'), bq_normalize_and_casefold($2, 'NFKC'))",
-         {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})}}}},
+      {
+          "CONTAINS_SUBSTR",
+          {
+              {
+                  2,
+                  "contains(bq_normalize_and_casefold($1, 'NFKC'), bq_normalize_and_casefold($2, "
+                  "'NFKC'))",
+                  {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})},
+              },
+          },
+      },
       // encode() takes a STRING's UTF-8 bytes.
-      {"SHA512",
-       {{1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
-        {1, "bq_sha512($1)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "SHA512",
+          {
+              {1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
+              {1, "bq_sha512($1)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
       // GoogleSQL leaves base32 out of its open source; src/backend_functions/string.cc
       // implements RFC 4648's.
       {"TO_BASE32", {{1, "bq_to_base32($1)"}}},
       {"FROM_BASE32", {{1, "bq_from_base32($1)"}}},
-      {"FARM_FINGERPRINT",
-       {{1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
-        {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "FARM_FINGERPRINT",
+          {
+              {1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
+              {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}},
+          },
+      },
       {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
       {"SOUNDEX", {{1, "bq_soundex($1)"}}},
       {"SAFE_CONVERT_BYTES_TO_STRING", {{1, "bq_safe_convert_bytes_to_string($1)"}}},
@@ -759,54 +1010,109 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"PUBLIC_SUFFIX", {{1, "bq_net_public_suffix($1)"}}},
       // AEAD with Tink keysets of AES-GCM keys, where a STRING is its UTF-8 bytes. The keyset
       // chain of KEYS.KEYSET_CHAIN needs Cloud KMS.
-      {"ENCRYPT",
-       {{3,
-         "bq_aead_encrypt($1, encode($2), encode($3))",
-         {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})}},
-        {3, "bq_aead_encrypt($1, $2, $3)", {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})}}}},
+      {
+          "ENCRYPT",
+          {
+              {
+                  3,
+                  "bq_aead_encrypt($1, encode($2), encode($3))",
+                  {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})},
+              },
+              {3, "bq_aead_encrypt($1, $2, $3)", {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})}},
+          },
+      },
       {"DECRYPT_BYTES", {{3, "bq_aead_decrypt_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}}}},
-      {"DECRYPT_STRING",
-       {{3, "bq_aead_decrypt_string($1, $2, encode($3))", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "DECRYPT_STRING",
+          {{3, "bq_aead_decrypt_string($1, $2, encode($3))", {Is(1, {TYPE_BYTES})}}},
+      },
       // Without max_distance, the distance is not capped.
-      {"EDIT_DISTANCE",
-       {{{2, 3}, "bq_edit_distance($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"9223372036854775807"}},
-        {{2, 3},
-         "bq_edit_distance_bytes($1, $2, $3)",
-         {Is(1, {TYPE_BYTES})},
-         {"9223372036854775807"}}}},
+      {
+          "EDIT_DISTANCE",
+          {
+              {
+                  {2, 3},
+                  "bq_edit_distance($1, $2, $3)",
+                  {Is(1, {TYPE_STRING})},
+                  {"9223372036854775807"},
+              },
+              {
+                  {2, 3},
+                  "bq_edit_distance_bytes($1, $2, $3)",
+                  {Is(1, {TYPE_BYTES})},
+                  {"9223372036854775807"},
+              },
+          },
+      },
       // Regular expressions. DuckDB raises no error for a replacement that refers to a missing
       // group, and returns '' or NULL elements where a capturing group takes no part in a match.
       {"REGEXP_CONTAINS", Strings("bq_regexp_contains", 2)},
       {"REGEXP_REPLACE", Strings("bq_regexp_replace", 3)},
-      {"REGEXP_EXTRACT",
-       {{{2, 4}, "bq_regexp_extract($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
-        {{2, 4}, "bq_regexp_extract_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}}}},
+      {
+          "REGEXP_EXTRACT",
+          {
+              {{2, 4}, "bq_regexp_extract($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
+              {
+                  {2, 4},
+                  "bq_regexp_extract_bytes($1, $2, $3, $4)",
+                  {Is(1, {TYPE_BYTES})},
+                  {"1", "1"},
+              },
+          },
+      },
       {"REGEXP_EXTRACT_ALL", Strings("bq_regexp_extract_all", 2)},
-      {"REGEXP_INSTR",
-       {{{2, 5}, "bq_regexp_instr($1, $2, $3, $4, $5)", {Is(1, {TYPE_STRING})}, {"1", "1", "0"}},
-        {{2, 5},
-         "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
-         {Is(1, {TYPE_BYTES})},
-         {"1", "1", "0"}}}},
+      {
+          "REGEXP_INSTR",
+          {
+              {
+                  {2, 5},
+                  "bq_regexp_instr($1, $2, $3, $4, $5)",
+                  {Is(1, {TYPE_STRING})},
+                  {"1", "1", "0"},
+              },
+              {
+                  {2, 5},
+                  "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
+                  {Is(1, {TYPE_BYTES})},
+                  {"1", "1", "0"},
+              },
+          },
+      },
       // JSON goes to GoogleSQL as its text; see src/backend_functions.cc.
       {"PARSE_JSON", {{{1, 2}, "json(bq_parse_json($1, $2))", {}, {"'exact'"}}}},
       {"BOOL", {{1, "bq_json_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"STRING",
-       {{1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}},
-        {{1, 2}, "bq_timestamp_string($1, $2)", {Is(1, {TYPE_TIMESTAMP})}, {"'UTC'"}}}},
+      {
+          "STRING",
+          {
+              {1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}},
+              {{1, 2}, "bq_timestamp_string($1, $2)", {Is(1, {TYPE_TIMESTAMP})}, {"'UTC'"}},
+          },
+      },
       {"INT64", {{1, "bq_json_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"FLOAT64",
-       {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}}},
-      {"DOUBLE",
-       {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}}},
+      {
+          "FLOAT64",
+          {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}},
+      },
+      {
+          "DOUBLE",
+          {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}},
+      },
       {"JSON_TYPE", {{1, "bq_json_type(CAST($1 AS VARCHAR))"}}},
-      {"$SUBSCRIPT",
-       {{2,
-         "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
-         {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})}},
-        {2,
-         "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
-         {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})}}}},
+      {
+          "$SUBSCRIPT",
+          {
+              {
+                  2,
+                  "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
+                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
+              },
+              {
+                  2,
+                  "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
+                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
+              },
+          },
+      },
       {"JSON_QUERY", JsonExtract("bq_json_query", true, true)},
       {"JSON_EXTRACT", JsonExtract("bq_json_query", false, true)},
       {"JSON_VALUE", JsonExtract("bq_json_value", true, false)},
@@ -820,12 +1126,20 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
       {"LAX_DOUBLE", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
       {"LAX_STRING", {{1, "bq_lax_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"JSON_KEYS",
-       {{3,
-         "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
-         {Is(1, {TYPE_JSON})}}}},
-      {"JSON_STRIP_NULLS",
-       {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {TYPE_JSON})}}}},
+      {
+          "JSON_KEYS",
+          {
+              {
+                  3,
+                  "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
+                  {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
+      {
+          "JSON_STRIP_NULLS",
+          {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {TYPE_JSON})}}},
+      },
   };
   return *kRules;
 }
@@ -850,7 +1164,8 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
 const std::unordered_set<std::string_view>& PlainFunctions() {
   static const auto* const kPlain = new std::unordered_set<std::string_view>{
       "IF",           "IFNULL", "NULLIF", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH",
-      "ARRAY_LENGTH", "ATAN",   "ATAN2",  "TANH",     "ASINH"};
+      "ARRAY_LENGTH", "ATAN",   "ATAN2",  "TANH",     "ASINH",
+  };
   return *kPlain;
 }
 
@@ -929,8 +1244,11 @@ AggregateRule BigNumericAggregate(std::size_t arity) {
   return {
       .function = "list",
       .type = googlesql::TYPE_BIGNUMERIC,
-      .arguments = {arity == 1 ? "CAST($1 AS VARCHAR)"
-                               : "CAST($1 AS VARCHAR) || ',' || CAST($2 AS VARCHAR)"},
+      .arguments =
+          {
+              arity == 1 ? "CAST($1 AS VARCHAR)"
+                         : "CAST($1 AS VARCHAR) || ',' || CAST($2 AS VARCHAR)",
+          },
       .skip_nulls = true,
       .finish =
           [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
@@ -955,45 +1273,71 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
       new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
           {"COUNT", {{.function = "count"}}},
           {"$COUNT_STAR", {{.function = "count", .arguments = {"*"}}}},
-          {"SUM",
-           {{.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
-            {.function = "sum"}}},
+          {
+              "SUM",
+              {
+                  {.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
+                  {.function = "sum"},
+              },
+          },
           {"AVG", {BigNumericAggregate<kBigNumericAvg>(1), {.function = "avg"}}},
           {"MIN", {{.function = "min"}}},
           {"MAX", {{.function = "max"}}},
           {"ANY_VALUE", {{.function = "any_value"}}},
           {"ARRAY_AGG", {{.function = "list", .nulls = kFilter, .limit = kSlice}}},
           // ARRAY_CONCAT_AGG skips NULL arrays.
-          {"ARRAY_CONCAT_AGG",
-           {{.function = "list", .limit = kSlice, .skip_nulls = true, .finish = Flatten}}},
+          {
+              "ARRAY_CONCAT_AGG",
+              {{.function = "list", .limit = kSlice, .skip_nulls = true, .finish = Flatten}},
+          },
           // Exact, which is within any approximation error.
-          {"APPROX_COUNT_DISTINCT",
-           {{.function = "count", .distinct = AggregateRule::Distinct::kAlways}}},
+          {
+              "APPROX_COUNT_DISTINCT",
+              {{.function = "count", .distinct = AggregateRule::Distinct::kAlways}},
+          },
           // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
           // skips NULLs, as APPROX_QUANTILES does by default.
-          {"APPROX_QUANTILES",
-           {{.function = "quantile_disc",
-             .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
-             .nulls = kIgnore}}},
+          {
+              "APPROX_QUANTILES",
+              {
+                  {
+                      .function = "quantile_disc",
+                      .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
+                      .nulls = kIgnore,
+                  },
+              },
+          },
           // histogram() takes only the values; TopCount() applies the count afterwards.
-          {"APPROX_TOP_COUNT",
-           {{.function = "histogram",
-             .arguments = {"$1"},
-             .distinct = AggregateRule::Distinct::kUnsupported,
-             .finish = TopCount}}},
+          {
+              "APPROX_TOP_COUNT",
+              {
+                  {
+                      .function = "histogram",
+                      .arguments = {"$1"},
+                      .distinct = AggregateRule::Distinct::kUnsupported,
+                      .finish = TopCount,
+                  },
+              },
+          },
           // The _null variants return a NULL x instead of skipping its row.
           {"MAX_BY", {{.function = "arg_max_null"}}},
           {"MIN_BY", {{.function = "arg_min_null"}}},
           // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
           // hexadecimal digits; the default delimiter is b','.
-          {"STRING_AGG",
-           {{.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
-            {.function = "string_agg",
-             .type = googlesql::TYPE_BYTES,
-             .arguments = {"hex($1)", "hex($2)"},
-             .defaults = {"", "unhex('2C')"},
-             .limit = kJoin,
-             .finish = Unhex}}},
+          {
+              "STRING_AGG",
+              {
+                  {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+                  {
+                      .function = "string_agg",
+                      .type = googlesql::TYPE_BYTES,
+                      .arguments = {"hex($1)", "hex($2)"},
+                      .defaults = {"", "unhex('2C')"},
+                      .limit = kJoin,
+                      .finish = Unhex,
+                  },
+              },
+          },
           {"COUNTIF", {{.function = "count_if"}}},
           {"LOGICAL_AND", {{.function = "bool_and"}}},
           {"LOGICAL_OR", {{.function = "bool_or"}}},
@@ -1001,18 +1345,24 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           {"BIT_OR", {{.function = "bit_or"}}},
           {"BIT_XOR", {{.function = "bit_xor"}}},
           {"STDDEV", {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}}},
-          {"STDDEV_SAMP",
-           {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}}},
-          {"STDDEV_POP",
-           {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}}},
+          {
+              "STDDEV_SAMP",
+              {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+          },
+          {
+              "STDDEV_POP",
+              {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}},
+          },
           {"VARIANCE", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
           {"VAR_SAMP", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
           {"VAR_POP", {BigNumericAggregate<kBigNumericVarPop>(1), {.function = "var_pop"}}},
           {"CORR", {BigNumericAggregate<kBigNumericCorr>(2), {.function = "corr"}}},
           {"COVAR_POP", {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}}},
-          {"COVAR_SAMP",
-           {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}}},
-      };
+          {
+              "COVAR_SAMP",
+              {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}},
+          },
+  };
   return *kAggregates;
 }
 
@@ -1071,25 +1421,37 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
           {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier}}},
           {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier}}},
           {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier}}},
-          {"PERCENTILE_CONT",
-           {{.function = "list",
-             .type = googlesql::TYPE_DOUBLE,
-             .arguments = {"$1"},
-             .order = kFloatPercentileOrder,
-             .nulls = kFilterUnlessRespected,
-             .finish = PercentileCont<false>},
-            {.function = "list",
-             .type = googlesql::TYPE_NUMERIC,
-             .arguments = {"$1"},
-             .order = kPercentileOrder,
-             .nulls = kFilterUnlessRespected,
-             .finish = PercentileCont<true>}}},
-          {"PERCENTILE_DISC",
-           {PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_DOUBLE),
-            PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_NUMERIC),
-            PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_DOUBLE),
-            PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_NUMERIC)}},
-      };
+          {
+              "PERCENTILE_CONT",
+              {
+                  {
+                      .function = "list",
+                      .type = googlesql::TYPE_DOUBLE,
+                      .arguments = {"$1"},
+                      .order = kFloatPercentileOrder,
+                      .nulls = kFilterUnlessRespected,
+                      .finish = PercentileCont<false>,
+                  },
+                  {
+                      .function = "list",
+                      .type = googlesql::TYPE_NUMERIC,
+                      .arguments = {"$1"},
+                      .order = kPercentileOrder,
+                      .nulls = kFilterUnlessRespected,
+                      .finish = PercentileCont<true>,
+                  },
+              },
+          },
+          {
+              "PERCENTILE_DISC",
+              {
+                  PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_DOUBLE),
+                  PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_NUMERIC),
+                  PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_DOUBLE),
+                  PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_NUMERIC),
+              },
+          },
+  };
   return *kAnalytics;
 }
 

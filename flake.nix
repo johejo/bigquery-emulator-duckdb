@@ -30,7 +30,7 @@
                 [
                   bazelisk
                   buildifier
-                  llvmPackages.clang-tools
+                  llvmPackages_23.clang-tools
                   # tools/update_bigquery_functions.sh fetches upstream documentation.
                   curlMinimal
                   (callPackage ./duckdb-bin.nix { })
@@ -49,9 +49,9 @@
                 # Bazel's toolchain detection links with lld when clang finds ld.lld, and with
                 # gold otherwise; bintools wraps ld.lld so Nix's runtime paths are set.
                 ++ lib.optionals stdenv.hostPlatform.isLinux [
-                  llvmPackages.bintools
-                  llvmPackages.clang
-                  llvmPackages.llvm
+                  llvmPackages_23.bintools
+                  llvmPackages_23.clang
+                  llvmPackages_23.llvm
                 ];
 
               TZDIR = "${pkgs.tzdata}/share/zoneinfo";

@@ -1,5 +1,6 @@
 #include "googlesql/public/functions/percentile.h"
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -50,7 +51,9 @@ absl::StatusOr<googlesql::PercentileEvaluator<T>> Evaluator(const Arguments& arg
 
 // A NUMERIC from the units of a DECIMAL(38, 9), whose range is NUMERIC's.
 NumericValue Numeric(duckdb_hugeint units) {
-  return NumericValue::FromPackedInt((static_cast<__int128>(units.upper) << 64) | units.lower)
+  return NumericValue::FromPackedInt(
+             std::bit_cast<__int128>((static_cast<unsigned __int128>(units.upper) << 64U) |
+                                     units.lower))
       .value_or(NumericValue());
 }
 

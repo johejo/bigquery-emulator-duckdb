@@ -35,7 +35,8 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   const std::string part = ToLowerAscii(value.EnumDisplayName());
   static const std::set<std::string> supported = {
       "year",   "quarter",     "month",       "week",    "day",     "hour",      "minute",
-      "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear"};
+      "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear",
+  };
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
 }
 
@@ -55,14 +56,18 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
         {"minute", {"micros", 60000000}},
         {"second", {"micros", 1000000}},
         {"millisecond", {"micros", 1000}},
-        {"microsecond", {"micros", 1}}};
+        {"microsecond", {"micros", 1}},
+    };
     const auto part = DatePart(*call->argument_list(1));
     const auto unit = part ? units.find(*part) : units.end();
     if (unit == units.end()) {
       return std::nullopt;
     }
     return BucketWidth{
-        .unit = unit->second.first, .count = call->argument_list(0), .factor = unit->second.second};
+        .unit = unit->second.first,
+        .count = call->argument_list(0),
+        .factor = unit->second.second,
+    };
   }
   if (!expr.Is<googlesql::ResolvedLiteral>()) {
     return std::nullopt;
@@ -74,10 +79,11 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
   }
   // A zero width counts as days, which raises the error BigQuery raises for every input type.
   std::vector<BucketWidth> parts;
-  for (const auto& [unit, count] :
-       {std::pair<std::string, int64_t>{"months", value.interval_value().get_months()},
-        {"days", value.interval_value().get_days()},
-        {"micros", value.interval_value().get_micros()}}) {
+  for (const auto& [unit, count] : {
+           std::pair<std::string, int64_t>{"months", value.interval_value().get_months()},
+           {"days", value.interval_value().get_days()},
+           {"micros", value.interval_value().get_micros()},
+       }) {
     if (count != 0) {
       parts.push_back({.unit = unit, .factor = count});
     }
@@ -85,7 +91,7 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
   if (parts.size() > 1) {
     return std::nullopt;
   }
-  return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts[0];
+  return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts.at(0);
 }
 
 namespace {
@@ -121,7 +127,7 @@ std::optional<std::string> InList(const ScalarCall& call) {
     return std::nullopt;
   }
   const std::vector<std::string> values(args.begin() + 1, args.end());
-  return "(" + args[0] + " IN (" + Join(values, ", ") + "))";
+  return "(" + args.at(0) + " IN (" + Join(values, ", ") + "))";
 }
 
 std::optional<std::string> Case(const ScalarCall& call) {
@@ -133,10 +139,10 @@ std::optional<std::string> Case(const ScalarCall& call) {
   }
   std::string sql = "CASE ";
   if (start == 1) {
-    sql += args[0] + " ";
+    sql += args.at(0) + " ";
   }
   for (size_t i = start; i + 1 < n; i += 2) {
-    sql += "WHEN " + args[i] + " THEN " + args[i + 1] + " ";
+    sql += "WHEN " + args.at(i) + " THEN " + args.at(i + 1) + " ";
   }
   return "(" + sql + "ELSE " + args.back() + " END)";
 }
@@ -172,15 +178,15 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
     bucket = "_bk.x - to_microseconds((((epoch_us(_bk.x) - epoch_us(_bk.o)) % " + w + ") + " + w +
              ") % " + w + ")";
   }
-  const std::string origin = n == 3                ? args[2]
+  const std::string origin = n == 3                ? args.at(2)
                              : input->IsDate()     ? "DATE '1950-01-01'"
                              : input->IsDatetime() ? "TIMESTAMP '1950-01-01 00:00:00'"
                                                    : "TIMESTAMPTZ '1950-01-01 00:00:00+00'";
   const std::string zero = input->IsTimestamp()
                                ? "'Zero bucket width INTERVAL is not allowed'"
                                : "'Exactly one non-zero INTERVAL part in bucket width is required'";
-  return "list_transform([struct_pack(x := " + args[0] + ", w := " + args[1] + ", o := " + origin +
-         ")], _bk -> CASE WHEN _bk.w < 0 THEN " +
+  return "list_transform([struct_pack(x := " + args.at(0) + ", w := " + args.at(1) +
+         ", o := " + origin + ")], _bk -> CASE WHEN _bk.w < 0 THEN " +
          call.Raise("'Negative bucket width INTERVAL is not allowed'") + " WHEN _bk.w = 0 THEN " +
          call.Raise(zero) + " ELSE " + bucket + " END)[1]";
 }
@@ -209,7 +215,7 @@ std::optional<std::string> JsonArgument(const ScalarCall& call, size_t i) {
   }
   std::vector<std::string> names;
   JsonFieldNames(TypeOf(call, i), names);
-  return "struct_pack(value := CAST(" + call.arguments[i].sql + " AS " + *type +
+  return "struct_pack(value := CAST(" + call.arguments.at(i).sql + " AS " + *type +
          "), names := " + QuoteLiteral(nlohmann::json(names).dump()) + ")";
 }
 
@@ -235,7 +241,7 @@ std::optional<std::string> ToJson(const ScalarCall& call) {
   if (!value) {
     return std::nullopt;
   }
-  const std::string flag = n == 2 ? call.arguments[1].sql : "false";
+  const std::string flag = n == 2 ? call.arguments.at(1).sql : "false";
   if (call.name == "TO_JSON_STRING") {
     return "bq_to_json_string(" + *value + ", " + flag + ")";
   }
@@ -248,9 +254,9 @@ std::optional<std::string> JsonRemove(const ScalarCall& call) {
   if (args.size() < 2) {
     return std::nullopt;
   }
-  std::string result = "CAST(" + args[0] + " AS VARCHAR)";
+  std::string result = "CAST(" + args.at(0) + " AS VARCHAR)";
   for (size_t i = 1; i < args.size(); ++i) {
-    result.insert(0, "bq_json_remove(").append(", ").append(args[i]).append(")");
+    result.insert(0, "bq_json_remove(").append(", ").append(args.at(i)).append(")");
   }
   return "json(" + result + ")";
 }
@@ -261,7 +267,7 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
   if (n < 4 || n % 2 != 0) {
     return std::nullopt;
   }
-  std::string result = "CAST(" + args[0] + " AS VARCHAR)";
+  std::string result = "CAST(" + args.at(0) + " AS VARCHAR)";
   for (size_t i = 1; i + 1 < n; i += 2) {
     const auto value = JsonArgument(call, i + 1);
     if (!value) {
@@ -269,11 +275,11 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
     }
     result.insert(0, "bq_json_set(")
         .append(", ")
-        .append(args[i])
+        .append(args.at(i))
         .append(", ")
         .append(*value)
         .append(", ")
-        .append(args[n - 1])
+        .append(args.at(n - 1))
         .append(")");
   }
   return "json(" + result + ")";
@@ -304,7 +310,7 @@ std::optional<std::string> ArrayConcat(const ScalarCall& call) {
     return std::nullopt;
   }
   if (n == 1) {
-    return args[0];
+    return args.at(0);
   }
   // BigQuery returns NULL when any array is NULL, where DuckDB skips it.
   std::vector<std::string> fields;
@@ -312,7 +318,7 @@ std::optional<std::string> ArrayConcat(const ScalarCall& call) {
   std::vector<std::string> lists;
   for (size_t i = 0; i < n; ++i) {
     const std::string field = "a" + std::to_string(i);
-    fields.push_back(field + " := " + args[i]);
+    fields.push_back(field + " := " + args.at(i));
     nulls.push_back("_cat." + field + " IS NULL");
     lists.push_back("_cat." + field);
   }
@@ -342,7 +348,8 @@ std::optional<std::string> Format(const ScalarCall& call) {
       {googlesql::TYPE_TIME, "TIME"},
       {googlesql::TYPE_DATETIME, "TIMESTAMP"},
       {googlesql::TYPE_TIMESTAMP, "TIMESTAMPTZ"},
-      {googlesql::TYPE_BIGNUMERIC, "BIGNUM"}};
+      {googlesql::TYPE_BIGNUMERIC, "BIGNUM"},
+  };
   std::vector<std::string> arguments;
   for (const FunctionArgument& argument : call.arguments) {
     const auto type = types.find(argument.type);

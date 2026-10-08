@@ -116,7 +116,7 @@ void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells,
   out += '{';
   bool first = true;
   for (size_t i = 0; i < fields.size(); ++i) {
-    const FieldSchema& field = fields[i];
+    const FieldSchema& field = fields.at(i);
     const json& value = cells.at(i).at("v");
     if (value.is_null()) continue;
     if (!first) out += ',';
@@ -256,7 +256,7 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
     AnnotateBigNumerics(element, column.children.at(0), schema, leaves);
   } else if (field.type == FieldType::kRecord) {
     for (size_t i = 0; i < field.fields.size(); ++i) {
-      AnnotateBigNumerics(field.fields[i], column.children.at(i), schema, leaves);
+      AnnotateBigNumerics(field.fields.at(i), column.children.at(i), schema, leaves);
     }
   } else if (field.type == FieldType::kBigNumeric) {
     namespace pq = parquet;
@@ -265,11 +265,15 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
     element.SetField(pq::kElementScale, ThriftValue::Int32(38));
     element.SetField(pq::kElementPrecision, ThriftValue::Int32(76));
     element.SetField(pq::kElementLogicalType,
-                     ThriftValue::Struct(
-                         {{pq::kLogicalDecimal, ThriftValue::Struct({
-                                                    {pq::kDecimalScale, ThriftValue::Int32(38)},
-                                                    {pq::kDecimalPrecision, ThriftValue::Int32(76)},
-                                                })}}));
+                     ThriftValue::Struct({
+                         {
+                             pq::kLogicalDecimal,
+                             ThriftValue::Struct({
+                                 {pq::kDecimalScale, ThriftValue::Int32(38)},
+                                 {pq::kDecimalPrecision, ThriftValue::Int32(76)},
+                             }),
+                         },
+                     }));
     leaves.push_back(column.element);
   }
 }
@@ -298,7 +302,7 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
     if (options.print_header) {
       for (size_t i = 0; i < schema.size(); ++i) {
         if (i > 0) contents += delimiter;
-        AppendCsvField(schema[i].name, delimiter, contents);
+        AppendCsvField(schema.at(i).name, delimiter, contents);
       }
       contents += '\n';
     }
@@ -308,7 +312,7 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
         if (i > 0) contents += delimiter;
         const json& value = cells.at(i).at("v");
         if (!value.is_null()) {
-          AppendCsvField(ScalarText(schema[i], value.get<std::string>()), delimiter, contents);
+          AppendCsvField(ScalarText(schema.at(i), value.get<std::string>()), delimiter, contents);
         }
       }
       contents += '\n';
@@ -334,7 +338,7 @@ void AnnotateParquetBigNumerics(const std::string& path, const std::vector<Field
   std::vector<ThriftValue>& elements = metadata.Field(parquet::kSchema)->elements;
   std::vector<size_t> leaves;
   for (size_t i = 0; i < schema.size(); ++i) {
-    AnnotateBigNumerics(schema[i], columns.children.at(i), elements, leaves);
+    AnnotateBigNumerics(schema.at(i), columns.children.at(i), elements, leaves);
   }
   // A row group has a column chunk for each leaf, in the schema's order. The statistics, column
   // index and bloom filter DuckDB wrote compare and hash the bytes as BYTES, which readers of a
@@ -342,7 +346,7 @@ void AnnotateParquetBigNumerics(const std::string& path, const std::vector<Field
   std::vector<size_t> chunks;
   size_t leaf = 0;
   for (size_t i = 0; i < elements.size(); ++i) {
-    const ThriftValue* children = elements[i].Field(parquet::kElementChildren);
+    const ThriftValue* children = elements.at(i).Field(parquet::kElementChildren);
     if (children != nullptr && children->integer > 0) continue;
     if (std::ranges::find(leaves, i) != leaves.end()) chunks.push_back(leaf);
     ++leaf;

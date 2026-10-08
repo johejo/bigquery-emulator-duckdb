@@ -9,8 +9,11 @@ absl::StatusOr<googlesql::IntervalValue> IntervalFromDuckDb(const duckdb_interva
 }
 
 duckdb_interval IntervalToDuckDb(const googlesql::IntervalValue& value) {
-  return {static_cast<int32_t>(value.get_months()), static_cast<int32_t>(value.get_days()),
-          value.get_micros()};
+  return {
+      static_cast<int32_t>(value.get_months()),
+      static_cast<int32_t>(value.get_days()),
+      value.get_micros(),
+  };
 }
 
 }  // namespace bigquery_emulator_duckdb

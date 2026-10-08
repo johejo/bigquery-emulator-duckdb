@@ -233,7 +233,7 @@ std::string ReadMaybeGzip(const std::string& path) {
   gzFile input = gzopen(path.c_str(), "rb");
   if (input == nullptr) throw ApiError::Invalid("Could not read " + path);
   std::string contents;
-  std::string buffer(1 << 16, '\0');
+  std::string buffer(1U << 16U, '\0');
   int read = 0;
   while ((read = gzread(input, buffer.data(), static_cast<unsigned>(buffer.size()))) > 0) {
     contents.append(buffer, 0, static_cast<std::size_t>(read));
@@ -358,8 +358,12 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
     }
     for (const size_t index : wide) {
       ThriftValue& element = metadata.Field(parquet::kSchema)->elements.at(index);
-      for (const int16_t id : {parquet::kElementConvertedType, parquet::kElementScale,
-                               parquet::kElementPrecision, parquet::kElementLogicalType}) {
+      for (const int16_t id : {
+               parquet::kElementConvertedType,
+               parquet::kElementScale,
+               parquet::kElementPrecision,
+               parquet::kElementLogicalType,
+           }) {
         element.RemoveField(id);
       }
     }
@@ -439,7 +443,7 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
       sql += ", columns={" + columns + "})";
       return std::format("SELECT {} FROM ({}) AS source", conversions, sql);
     }
-    sql += ")";
+    sql += ')';
   } else if (format == "NEWLINE_DELIMITED_JSON") {
     sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
   } else {
