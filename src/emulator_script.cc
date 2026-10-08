@@ -57,6 +57,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/query_parameters.h"
+#include "src/routine_catalog.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
@@ -394,7 +395,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   struct ScriptCatalog {
     std::unique_ptr<TableSource> source;
     std::unique_ptr<TemporaryTables> temporary;
-    std::unique_ptr<BigQueryCatalog> tables;
+    std::unique_ptr<RoutineCatalog> tables;
     std::unique_ptr<googlesql::SimpleCatalog> variables;
     std::unique_ptr<googlesql::MultiCatalog> catalog;
   };
@@ -409,9 +410,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         catalog.temporary->names.insert(std::move(name));
       }
     }
-    catalog.tables = std::make_unique<BigQueryCatalog>(
-        *catalog.source, &type_factory_, settings_.default_project, settings_.default_dataset,
-        catalog.temporary.get());
+    catalog.tables =
+        std::make_unique<RoutineCatalog>(*catalog.source, &type_factory_, settings_.default_project,
+                                         settings_.default_dataset, catalog.temporary.get());
     catalog.variables = std::make_unique<googlesql::SimpleCatalog>("variables", &type_factory_);
     for (const auto& [name, value] : executor.GetCurrentVariables()) {
       std::unique_ptr<googlesql::SimpleConstant> constant;
@@ -439,9 +440,6 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateFunctionStmt>();
     if (!create.hint_list().empty()) {
       return Unsupported("statement hints");
-    }
-    if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_TEMP) {
-      return Unsupported("persistent UDFs");
     }
     const bool javascript = absl::EqualsIgnoreCase(create.language(), "js");
     if (create.is_remote() || (!javascript && create.language() != "SQL")) {
@@ -572,9 +570,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       transaction_failed_ = false;
       return QueryResult{};
     }
+    const bool temporary_function =
+        statement.Is<googlesql::ResolvedCreateFunctionStmt>() &&
+        statement.GetAs<googlesql::ResolvedCreateFunctionStmt>()->create_scope() ==
+            googlesql::ResolvedCreateStatement::CREATE_TEMP;
     // BigQuery permits only queries, DML and DDL on temporary tables in a transaction.
     if (in_transaction_) {
-      if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
+      if (temporary_function) {
         return Unsupported("SQL UDF declarations in transactions");
       }
       const bool temporary_create =
@@ -607,7 +609,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (check) {
       GOOGLESQL_RETURN_IF_ERROR(check(analyzed.statement()));
     }
-    if (analyzed.statement().Is<googlesql::ResolvedCreateFunctionStmt>()) {
+    if (temporary_function) {
       GOOGLESQL_RETURN_IF_ERROR(CreateFunction(std::move(catalog), std::move(analyzed)));
       return QueryResult{};
     }
@@ -623,6 +625,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                            &unsupported, &executor.GetKnownSystemVariables());
     if (!translation.has_value()) {
       return Unsupported(unsupported);
+    }
+    if (translation->routine.has_value()) {
+      GOOGLESQL_RETURN_IF_ERROR(catalog.tables->CheckRoutine(translation->routine->routine));
     }
     return emulator_.RunStatement(*translation, setup_, null_arrays, backend_.get());
   }

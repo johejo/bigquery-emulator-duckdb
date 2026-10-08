@@ -22,6 +22,7 @@
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/server/requests.h"
 #include "src/table_metadata.h"
 
@@ -126,6 +127,14 @@ json DatasetReferenceJson(const DatasetReference& dataset) {
   return json{{"projectId", dataset.project_id}, {"datasetId", dataset.dataset_id}};
 }
 
+json RoutineReferenceJson(const RoutineReference& routine) {
+  return json{
+      {"projectId", routine.project_id},
+      {"datasetId", routine.dataset_id},
+      {"routineId", routine.routine_id},
+  };
+}
+
 // The entries of `items`, sorted by `id`, that `page` asks for. Sets nextPageToken on `response`
 // when more entries follow.
 template <typename T, typename Id>
@@ -208,6 +217,9 @@ json JobStatistics(const Job& job) {
   }
   if (query.ddl_target_dataset.has_value()) {
     query_statistics["ddlTargetDataset"] = DatasetReferenceJson(*query.ddl_target_dataset);
+  }
+  if (query.ddl_target_routine.has_value()) {
+    query_statistics["ddlTargetRoutine"] = RoutineReferenceJson(*query.ddl_target_routine);
   }
   if (job.result.has_value() && job.result->affected_rows >= 0) {
     query_statistics["numDmlAffectedRows"] = std::to_string(job.result->affected_rows);
@@ -593,6 +605,29 @@ json InsertAllResponse(const std::vector<InsertError>& errors) {
       });
     }
   }
+  return response;
+}
+
+json RoutineResource(const Routine& routine) {
+  json resource = routine.resource;
+  resource["etag"] = kEtag;
+  resource["routineReference"] = RoutineReferenceJson(routine.reference);
+  return resource;
+}
+
+json RoutineList(const std::vector<Routine>& routines, const ListPage& page) {
+  json response = json::object();
+  json entries = json::array();
+  const auto id = [](const Routine& routine) { return routine.reference.routine_id; };
+  for (const Routine& routine : ListPageItems(routines, page, id, response)) {
+    // A list entry carries only these fields of the routine unless a read mask asks for more.
+    json item{{"etag", kEtag}, {"routineReference", RoutineReferenceJson(routine.reference)}};
+    for (const char* field : {"routineType", "language", "creationTime", "lastModifiedTime"}) {
+      if (routine.resource.contains(field)) item[field] = routine.resource[field];
+    }
+    entries.push_back(std::move(item));
+  }
+  response["routines"] = std::move(entries);
   return response;
 }
 

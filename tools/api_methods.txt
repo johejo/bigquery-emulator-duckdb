@@ -19,6 +19,7 @@ setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tab
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "w"}, "view": {"query": "SELECT 1 AS id", "useLegacySql": false}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "r"}, "schema": {"fields": [{"name": "record", "type": "RECORD", "mode": "REPEATED", "fields": [{"name": "id", "type": "INTEGER"}]}]}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
+setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x INT64) AS (x + 1)", "useLegacySql": false}
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
@@ -62,6 +63,12 @@ request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": 
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "dryRun": true}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": true}
 note bigquery.jobs.query | Runs GoogleSQL only; an omitted `useLegacySql` runs as GoogleSQL, although BigQuery defaults it to true. Ignores `timeoutMs`, `location`, `labels` and `useQueryCache`.
+
+request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/routines/f
+request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f
+request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?maxResults=1
+request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:SCALAR_FUNCTION
+note bigquery.routines.get | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. `routines.insert` and `routines.update` are unsupported, so DDL creates them.
 
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}

@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
@@ -44,6 +45,8 @@
 #include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/routine.h"
+#include "src/routine_catalog.h"
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
@@ -248,6 +251,17 @@ class DuckDbTableSource : public TableSource {
     return metadata.has_value() ? metadata->query : "";
   }
 
+  std::optional<Routine> FindRoutine(const RoutineReference& routine) override {
+    if (IsDuckDbSchema(routine.dataset_id)) {
+      return std::nullopt;
+    }
+    const QueryResult result = backend_.Execute(RoutineQuery(routine));
+    if (result.rows.empty()) {
+      return std::nullopt;
+    }
+    return ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+  }
+
  private:
   Backend& backend_;
 };
@@ -262,6 +276,44 @@ void CheckDdlTarget(const TranslatedStatement& translation) {
   if (const auto& target = translation.ddl_target_dataset;
       target.has_value() && IsDuckDbSchema(target->dataset_id)) {
     throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
+  }
+  if (const auto& target = translation.ddl_target_routine;
+      target.has_value() && IsDuckDbSchema(target->dataset_id)) {
+    throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
+  }
+}
+
+// Throws DuckDB's `error` about the macro that records the routine a CREATE or DROP FUNCTION
+// names in BigQuery's words, if it says that the routine exists or that it does not.
+void RoutineError(const TranslatedStatement& translation, const BackendError& error) {
+  const std::optional<RoutineReference>& routine = translation.ddl_target_routine;
+  if (!routine.has_value()) {
+    return;
+  }
+  const std::string name =
+      routine->project_id + ":" + routine->dataset_id + "." + routine->routine_id;
+  const std::string_view message = error.what();
+  if (message.find("Schema with name") != std::string_view::npos) {
+    throw ApiError::NotFound("Not found: Dataset " + routine->project_id + ":" +
+                             routine->dataset_id);
+  }
+  if (message.find("already exists") != std::string_view::npos) {
+    throw ApiError::Duplicate("Already Exists: Function " + name);
+  }
+  if (message.find("does not exist") != std::string_view::npos) {
+    throw ApiError::NotFound("Not found: Function " + name);
+  }
+}
+
+// Resolves the body of the routine a CREATE FUNCTION defines as its calls will, which the
+// statement's own analysis does not: against the routine's project, with no default dataset.
+void CheckRoutine(const TranslatedStatement& translation, RoutineCatalog& catalog) {
+  if (!translation.routine.has_value()) {
+    return;
+  }
+  if (const absl::Status status = catalog.CheckRoutine(translation.routine->routine);
+      !status.ok()) {
+    throw ApiError::InvalidQuery(std::string(status.message()));
   }
 }
 
@@ -470,8 +522,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
     settings.positional_parameters.push_back(ParameterType(field, type_factory));
   }
   DuckDbTableSource source(backend_);
-  BigQueryCatalog catalog(source, &type_factory, settings.default_project,
-                          settings.default_dataset);
+  RoutineCatalog catalog(source, &type_factory, settings.default_project, settings.default_dataset);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated =
@@ -486,6 +537,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   if (!translated.has_value()) {
     throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
   }
+  CheckRoutine(*translated, catalog);
   return *std::move(translated);
 }
 
@@ -576,6 +628,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
+    query.ddl_target_routine = translation.ddl_target_routine;
     if (!request.dry_run && !request.destination_table.has_value()) {
       job.result = RunStatement(translation, setup, request.null_arrays);
       return;
@@ -613,7 +666,19 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                          setup);
     }
   } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
-    backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
+    try {
+      backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
+    } catch (const BackendError& error) {
+      RoutineError(translation, error);
+      throw;
+    }
+  } else if (translation.ddl_target_routine.has_value()) {
+    try {
+      backend.Execute(translation.sql, setup);
+    } catch (const BackendError& error) {
+      RoutineError(translation, error);
+      throw;
+    }
   } else {
     result = backend.Execute(translation.sql, setup, null_arrays);
   }
@@ -1018,7 +1083,8 @@ void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& me
 void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
-  if (!delete_contents && !ListTables(dataset).empty()) {
+  if (!delete_contents &&
+      (!ListTables(dataset).empty() || !Execute(RoutinesQuery(dataset)).rows.empty())) {
     throw ApiError::Invalid("Dataset " + dataset.project_id + ":" + dataset.dataset_id +
                             " is still in use");
   }
@@ -1209,6 +1275,43 @@ void Emulator::DeleteTable(TableReference table) {
   }
   GetTable(table, false);
   Execute("DROP TABLE " + QualifiedName(table));
+}
+
+std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
+  dataset.project_id = ResolveProject(dataset.project_id);
+  GetDataset(dataset);
+  std::vector<Routine> routines;
+  for (const json& row : Execute(RoutinesQuery(dataset)).rows) {
+    const RoutineReference reference{
+        dataset.project_id,
+        dataset.dataset_id,
+        row["f"][0]["v"].get<std::string>(),
+    };
+    if (std::optional<Routine> routine = ParseRoutineComment(reference, row["f"][1]["v"])) {
+      routines.push_back(*std::move(routine));
+    }
+  }
+  return routines;
+}
+
+Routine Emulator::GetRoutine(RoutineReference routine) {
+  routine.project_id = ResolveProject(routine.project_id);
+  GetDataset(DatasetReference{routine.project_id, routine.dataset_id});
+  const QueryResult result = Execute(RoutineQuery(routine));
+  std::optional<Routine> found = result.rows.empty()
+                                     ? std::nullopt
+                                     : ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+  if (!found.has_value()) {
+    throw ApiError::NotFound("Not found: Routine " + routine.project_id + ":" + routine.dataset_id +
+                             "." + routine.routine_id);
+  }
+  return *std::move(found);
+}
+
+void Emulator::DeleteRoutine(RoutineReference routine) {
+  routine.project_id = ResolveProject(routine.project_id);
+  GetRoutine(routine);
+  Execute("DROP MACRO " + QualifiedName(routine));
 }
 
 QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,

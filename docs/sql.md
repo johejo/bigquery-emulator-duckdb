@@ -20,7 +20,7 @@ the probe's own notes name what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 18 |
-| Supported | 58 |
+| Supported | 59 |
 | Unsupported | 17 |
 
 ## Queries
@@ -110,7 +110,8 @@ the probe's own notes name what it rejected.
 | `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.; CREATE VIEW option expiration_timestamp |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported | statement CreateMaterializedViewStmt |
-| `CREATE FUNCTION` | Partial | Temporary SQL UDFs, typed or templated with `ANY TYPE`, are inlined within their query. Temporary JavaScript UDFs run in QuickJS and take BOOL, FLOAT64 and STRING arguments and return those or INT64; other types, argument names that are not JavaScript identifiers and the `library` option are unsupported. A call fails after 5 minutes. Persistent and aggregate UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` calls, UDF options, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.; JavaScript UDF arguments of type DATE; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; statement CreateFunctionStmt; volatile SQL UDF arguments with subquery bodies |
+| `CREATE FUNCTION` | Partial | SQL UDFs, typed or templated with `ANY TYPE`, are inlined into each query that calls them. A persistent UDF keeps its definition and description in its dataset; each call resolves its body against the UDF's project, so the body names tables and other UDFs with their datasets. Persistent function names must name their dataset. Temporary JavaScript UDFs run in QuickJS and take BOOL, FLOAT64 and STRING arguments and return those or INT64; other types, argument names that are not JavaScript identifiers and the `library` option are unsupported. A call fails after 5 minutes. Persistent JavaScript UDFs, aggregate UDFs, `OR REPLACE` and `IF NOT EXISTS` for temporary UDFs, `SAFE.` calls, options other than a persistent UDF's description, views that call SQL UDFs, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.; JavaScript UDF arguments of type DATE; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; persistent non-SQL UDFs; views that call SQL UDFs; volatile SQL UDF arguments with subquery bodies |
+| `DROP FUNCTION` | Supported |  |
 | `CREATE TABLE FUNCTION` | Unsupported | statement CreateTableFunctionStmt |
 | `CREATE PROCEDURE` | Unsupported | statement CreateProcedureStmt |
 

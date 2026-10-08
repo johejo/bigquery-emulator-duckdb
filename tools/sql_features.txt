@@ -211,6 +211,10 @@ query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
 note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
+query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1) OPTIONS (description = 'x'); SELECT d.f(1)
+query `CREATE FUNCTION` | CREATE OR REPLACE FUNCTION d.f(x ANY TYPE) AS ((SELECT COUNT(*) FROM d.t WHERE id = x)); SELECT d.f(1)
+query `CREATE FUNCTION` | CREATE FUNCTION IF NOT EXISTS d.f(x INT64) AS (x); CREATE VIEW d.n AS SELECT d.f(1) AS y
+query `CREATE FUNCTION` | CREATE FUNCTION d.f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) AS (x + 1); SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x INT64) RETURNS INT64 AS (x + 1); SELECT f(id) FROM t
@@ -223,7 +227,9 @@ query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE, y ANY TYPE) RETURNS FLOAT64 AS (x + y); SELECT f(id, 1.5) FROM t
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'; SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT f(CURRENT_DATE())
-note `CREATE FUNCTION` | Temporary SQL UDFs, typed or templated with `ANY TYPE`, are inlined within their query. Temporary JavaScript UDFs run in QuickJS and take BOOL, FLOAT64 and STRING arguments and return those or INT64; other types, argument names that are not JavaScript identifiers and the `library` option are unsupported. A call fails after 5 minutes. Persistent and aggregate UDFs, `OR REPLACE`, `IF NOT EXISTS`, `SAFE.` calls, UDF options, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.
+note `CREATE FUNCTION` | SQL UDFs, typed or templated with `ANY TYPE`, are inlined into each query that calls them. A persistent UDF keeps its definition and description in its dataset; each call resolves its body against the UDF's project, so the body names tables and other UDFs with their datasets. Persistent function names must name their dataset. Temporary JavaScript UDFs run in QuickJS and take BOOL, FLOAT64 and STRING arguments and return those or INT64; other types, argument names that are not JavaScript identifiers and the `library` option are unsupported. A call fails after 5 minutes. Persistent JavaScript UDFs, aggregate UDFs, `OR REPLACE` and `IF NOT EXISTS` for temporary UDFs, `SAFE.` calls, options other than a persistent UDF's description, views that call SQL UDFs, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.
+query `DROP FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x); DROP FUNCTION d.f
+query `DROP FUNCTION` | DROP FUNCTION IF EXISTS d.missing
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
 

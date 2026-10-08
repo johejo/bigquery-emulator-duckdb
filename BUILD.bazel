@@ -228,6 +228,7 @@ cc_library(
     deps = [
         ":field_schema",
         ":references",
+        ":routine",
         ":table_metadata",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -235,6 +236,32 @@ cc_library(
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:catalog_wrapper",
         "@googlesql//googlesql/public:simple_catalog",
+    ],
+)
+
+cc_library(
+    name = "routine_catalog",
+    srcs = ["src/routine_catalog.cc"],
+    hdrs = ["src/routine_catalog.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":analyzer",
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:parse_resume_location",
+        "@googlesql//googlesql/public:sql_function",
+        "@googlesql//googlesql/public:templated_sql_function",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    deps = [
+        ":catalog",
+        ":references",
+        ":routine",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
+        "@googlesql//googlesql/public:catalog",
     ],
 )
 
@@ -282,12 +309,29 @@ cc_library(
 )
 
 cc_library(
+    name = "routine",
+    srcs = ["src/routine.cc"],
+    hdrs = ["src/routine.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":duckdb_sql",
+        "@googlesql//googlesql/public:strings",
+    ],
+    deps = [
+        ":references",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
     name = "translated_statement",
     hdrs = ["src/translated_statement.h"],
     copts = ["-std=c++20"],
     deps = [
         ":field_schema",
         ":references",
+        ":routine",
         ":table_metadata",
     ],
 )
@@ -420,6 +464,7 @@ cc_library(
         ":duckdb_sql",
         ":field_schema",
         ":references",
+        ":routine",
         ":schema_sql",
         ":table_comments",
         ":table_metadata",
@@ -481,6 +526,7 @@ cc_library(
         ":javascript_function",
         ":load",
         ":parquet_metadata",
+        ":routine_catalog",
         ":schema_sql",
         ":table_comments",
         ":temporary_files",
@@ -525,6 +571,7 @@ cc_library(
         ":project",
         ":query_parameters",
         ":references",
+        ":routine",
         ":table_metadata",
         "@nlohmann_json//:json",
     ],

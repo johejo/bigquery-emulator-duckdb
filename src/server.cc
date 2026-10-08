@@ -360,6 +360,20 @@ class Server::Impl {
     Route("bigquery.tables.delete", {}, NoContent([this](const httplib::Request& request) {
             emulator_.DeleteTable(TableFromPath(request));
           }));
+    // routines; routines.insert and routines.update are unsupported, so routines come from DDL.
+    Route("bigquery.routines.list", {"maxResults", "pageToken"},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            return RoutineList(emulator_.ListRoutines(DatasetFromPath(request)),
+                               ParseListPage(request));
+          }));
+    Route("bigquery.routines.get", {},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            return RoutineResource(emulator_.GetRoutine(RoutineFromPath(request)));
+          }));
+    Route("bigquery.routines.delete", {}, NoContent([this](const httplib::Request& request) {
+            emulator_.DeleteRoutine(RoutineFromPath(request));
+          }));
+
     // Ignores formatOptions.timestampOutputFormat.
     Route("bigquery.tabledata.list",
           {
