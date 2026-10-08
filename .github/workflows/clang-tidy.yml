@@ -1,0 +1,67 @@
+name: Clang-tidy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clang-tidy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-tidy:
+    name: Clang-tidy
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      # Repository downloads are shared with the Test workflow, which saves this cache.
+      - name: Restore Bazel repository cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/bazel-repo
+            ~/.cache/bazelisk
+          key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
+      - name: Restore Bazel disk cache
+        id: disk-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-
+            bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+      - name: Configure Bazel for CI
+        run: |
+          echo 'common --config=ci' > .bazelrc.local
+          mkdir -p "$RUNNER_TEMP/bazel-reports"
+      - name: Clang-tidy
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.bep.json --profile=$RUNNER_TEMP/bazel-reports/clang-tidy.profile.json.gz" >> .bazelrc.local
+          nix develop --command just tidy
+      - name: Upload Bazel reports
+        if: success() || failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bazel-reports-clang-tidy-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/bazel-reports/
+          retention-days: 7
+          if-no-files-found: ignore
+      # Only main pushes save caches; pull requests and manual runs reuse them.
+      - name: Save Bazel disk cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.disk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/bazel-disk
+          key: ${{ steps.disk-cache.outputs.cache-primary-key }}
