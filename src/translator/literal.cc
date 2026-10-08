@@ -54,7 +54,7 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
       if (!sql) {
         return std::nullopt;
       }
-      fields.push_back(QuoteIdentifier(names[i]) + " := " + *sql);
+      fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *sql);
     }
     literal = "struct_pack(" + Join(fields, ", ") + ")";
   } else if (value.type()->IsDouble() && value.double_value() == 0 &&

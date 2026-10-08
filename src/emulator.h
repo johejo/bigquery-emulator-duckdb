@@ -72,7 +72,7 @@ enum class WriteDisposition : std::uint8_t {
   kWriteEmpty,
   kWriteAppend,
   kWriteTruncate,
-  kWriteTruncateData
+  kWriteTruncateData,
 };
 
 // BigQuery's name for each disposition, and the disposition a name stands for.

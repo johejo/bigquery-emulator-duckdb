@@ -146,13 +146,13 @@ std::string Base64(const std::string& bytes) {
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string result;
   for (size_t i = 0; i < bytes.size(); i += 3) {
-    const auto a = static_cast<unsigned char>(bytes[i]);
-    const auto b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes[i + 1]) : 0;
-    const auto c = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes[i + 2]) : 0;
-    result += alphabet[a >> 2];
-    result += alphabet[((a & 3) << 4) | (b >> 4)];
-    result += i + 1 < bytes.size() ? alphabet[((b & 15) << 2) | (c >> 6)] : '=';
-    result += i + 2 < bytes.size() ? alphabet[c & 63] : '=';
+    const auto a = static_cast<unsigned char>(bytes.at(i));
+    const auto b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes.at(i + 1)) : 0U;
+    const auto c = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes.at(i + 2)) : 0U;
+    result += alphabet[a >> 2U];
+    result += alphabet[((a & 3U) << 4U) | (b >> 4U)];
+    result += i + 1 < bytes.size() ? alphabet[((b & 15U) << 2U) | (c >> 6U)] : '=';
+    result += i + 2 < bytes.size() ? alphabet[c & 63U] : '=';
   }
   return result;
 }
@@ -249,7 +249,7 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
     case DUCKDB_TYPE_UUID: {
       const auto uuid = VectorElement<duckdb_hugeint>(vector, row);
       return Value(duckdb_create_uuid(
-          {uuid.lower, static_cast<uint64_t>(uuid.upper) ^ (uint64_t{1} << 63)}));
+          {uuid.lower, static_cast<uint64_t>(uuid.upper) ^ (uint64_t{1} << 63U)}));
     }
     case DUCKDB_TYPE_VARCHAR: {
       const std::string text = VectorString(vector, row);
@@ -325,11 +325,12 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
       if (bytes.size() < 3) {
         throw BackendError("DuckDB returned an invalid BIGNUM");
       }
-      const bool negative = (static_cast<unsigned char>(bytes[0]) & 0x80) == 0;
+      const bool negative = (static_cast<unsigned char>(bytes.at(0)) & 0x80U) == 0;
       bytes.erase(0, 3);
       if (negative) {
-        std::ranges::transform(bytes, bytes.begin(),
-                               [](char byte) { return static_cast<char>(~byte); });
+        std::ranges::transform(bytes, bytes.begin(), [](char byte) {
+          return static_cast<char>(~static_cast<unsigned char>(byte));
+        });
       }
       return Value(
           duckdb_create_bignum({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size(), negative}));
@@ -403,8 +404,8 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
       } else {
         text = ValueString(VectorValue(vector, type, row).get());
       }
-      if (text.size() > 10 && text[10] == ' ') {
-        text[10] = 'T';
+      if (text.size() > 10 && text.at(10) == ' ') {
+        text.at(10) = 'T';
       }
       value = std::move(text);
       break;
@@ -477,7 +478,7 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
 json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
   json result = json::array();
   for (size_t i = 0; i < schema.size() && i < cells.size(); ++i) {
-    const FieldSchema& field = schema[i];
+    const FieldSchema& field = schema.at(i);
     const json& value = cells[i].at("v");
     if (field.mode != FieldMode::kRepeated || value.is_null()) {
       result.push_back(json{{"v", ValueAsSeconds(field, value)}});
@@ -590,7 +591,7 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   RunSetup(connection, setup);
   // A transaction left open by a failed statement is rolled back when the connection closes.
   for (size_t i = 0; i + 1 < statements.size(); ++i) {
-    Query(connection, statements[i]);
+    Query(connection, statements.at(i));
   }
   Result result;
   Query(connection, statements.back(), result);
@@ -690,7 +691,7 @@ std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
   }
   for (size_t i = 0; i < statements.size(); ++i) {
     Result result;
-    if (duckdb_query(connection, statements[i].c_str(), &result.result) == DuckDBError) {
+    if (duckdb_query(connection, statements.at(i).c_str(), &result.result) == DuckDBError) {
       const char* error = duckdb_result_error(&result.result);
       errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");
       if (!skip_invalid_rows) {

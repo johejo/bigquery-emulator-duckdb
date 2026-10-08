@@ -169,10 +169,10 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
         const auto& field = type->AsStruct()->field(i);
         const auto field_type = MapToDuckDb(field.type, child(i), column_type);
         // Stored columns keep their declared names; only query values use internal names.
-        if (!field_type || (column_type && names[i] != field.name)) {
+        if (!field_type || (column_type && names.at(i) != field.name)) {
           return std::nullopt;
         }
-        fields.push_back(QuoteIdentifier(names[i]) + " " + *field_type);
+        fields.push_back(QuoteIdentifier(names.at(i)) + " " + *field_type);
       }
       return fields.empty()
                  ? std::nullopt
@@ -249,7 +249,7 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
   }
   if (positional) {
     for (size_t i = 0; i < names.size(); ++i) {
-      names[i] = "_field_" + std::to_string(i + 1);
+      names.at(i) = "_field_" + std::to_string(i + 1);
     }
   }
   return names;
@@ -305,10 +305,10 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
   if (type->IsStruct()) {
     const std::vector<googlesql::StructField>& struct_fields = type->AsStruct()->fields();
     for (size_t i = 0; i < struct_fields.size(); ++i) {
-      const std::string& child_name = struct_fields[i].name;
+      const std::string& child_name = struct_fields.at(i).name;
       absl::StatusOr<FieldSchema> child =
           BigQueryFieldSchema(child_name.empty() ? "_field_" + std::to_string(i + 1) : child_name,
-                              struct_fields[i].type);
+                              struct_fields.at(i).type);
       if (!child.ok()) {
         return child.status();
       }

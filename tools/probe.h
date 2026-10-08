@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -30,7 +31,7 @@ std::string FirstLine(const std::string& text);
 std::string Escape(const std::string& text);
 
 // Supported, Partial, Unsupported, Broken or Untested, from how many probes had each outcome.
-std::string Status(std::map<Outcome, int> counts);
+std::string_view Status(std::map<Outcome, int> counts);
 
 // Runs `sql` on `emulator` in project `test` and reports whether it translates and runs. The query
 // is analyzed first against `tables`, so a query that is not valid GoogleSQL is reported as

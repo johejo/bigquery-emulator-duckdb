@@ -121,15 +121,15 @@ void ToBase32(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
     const std::string bytes = arguments.String(0);
     std::string out;
     uint32_t buffer = 0;
-    int bits = 0;
+    unsigned bits = 0;
     for (const char byte : bytes) {
-      buffer = (buffer << 8) | static_cast<uint8_t>(byte);
-      for (bits += 8; bits >= 5; bits -= 5) {
-        out += kBase32Alphabet[(buffer >> (bits - 5)) & 31];
+      buffer = (buffer << 8U) | static_cast<uint8_t>(byte);
+      for (bits += 8; bits >= 5U; bits -= 5) {
+        out += kBase32Alphabet.at((buffer >> (bits - 5U)) & 31U);
       }
     }
     if (bits > 0) {
-      out += kBase32Alphabet[(buffer << (5 - bits)) & 31];
+      out += kBase32Alphabet.at((buffer << (5U - bits)) & 31U);
     }
     out.resize((out.size() + 7) / 8 * 8, '=');
     return out;
@@ -150,13 +150,13 @@ void FromBase32(duckdb_function_info info, duckdb_data_chunk input, duckdb_vecto
     }
     std::string out;
     uint32_t buffer = 0;
-    int bits = 0;
+    unsigned bits = 0;
     for (const char c : data) {
       const std::size_t value = kBase32Alphabet.find(absl::ascii_toupper(c));
       if (value == std::string_view::npos) {
         return absl::OutOfRangeError("Failed to decode invalid base32 string");
       }
-      buffer = (buffer << 5) | value;
+      buffer = (buffer << 5U) | value;
       bits += 5;
       if (bits >= 8) {
         bits -= 8;
@@ -292,16 +292,18 @@ void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
         const std::string source = arguments.String(0);
         int64_t out = 0;
         absl::Status error;
-        const bool ok =
-            regexp.Instr({.input_str = source,
-                          .position_unit = PositionUnit(kBytes),
-                          .position = arguments.Int(2),
-                          .occurrence_index = arguments.Int(3),
-                          .return_position = occurrence_position == 0
-                                                 ? googlesql::functions::RegExp::kStartOfMatch
-                                                 : googlesql::functions::RegExp::kEndOfMatch,
-                          .out = &out},
-                         /*use_legacy_position_behavior=*/false, &error);
+        const bool ok = regexp.Instr(
+            {
+                .input_str = source,
+                .position_unit = PositionUnit(kBytes),
+                .position = arguments.Int(2),
+                .occurrence_index = arguments.Int(3),
+                .return_position = occurrence_position == 0
+                                       ? googlesql::functions::RegExp::kStartOfMatch
+                                       : googlesql::functions::RegExp::kEndOfMatch,
+                .out = &out,
+            },
+            /*use_legacy_position_behavior=*/false, &error);
         return ToStatusOr(ok, out, error);
       });
 }
@@ -391,14 +393,18 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_ends_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::EndsWithBytes>},
            {"bq_ascii", {kVarchar}, kBigint, Apply<fn::FirstCharOfStringToASCII>},
            {"bq_ascii_bytes", {kBlob}, kBigint, Apply<fn::FirstByteOfBytesToASCII>},
-           {"bq_instr",
-            {kVarchar, kVarchar, kBigint, kBigint},
-            kBigint,
-            Apply<fn::StrPosOccurrenceUtf8>},
-           {"bq_instr_bytes",
-            {kBlob, kBlob, kBigint, kBigint},
-            kBigint,
-            Apply<fn::StrPosOccurrenceBytes>},
+           {
+               "bq_instr",
+               {kVarchar, kVarchar, kBigint, kBigint},
+               kBigint,
+               Apply<fn::StrPosOccurrenceUtf8>,
+           },
+           {
+               "bq_instr_bytes",
+               {kBlob, kBlob, kBigint, kBigint},
+               kBigint,
+               Apply<fn::StrPosOccurrenceBytes>,
+           },
            {"bq_left", {kVarchar, kBigint}, kVarchar, Apply<fn::LeftUtf8>},
            {"bq_left_bytes", {kBlob, kBigint}, kBlob, Apply<fn::LeftBytes>},
            {"bq_right", {kVarchar, kBigint}, kVarchar, Apply<fn::RightUtf8>},
@@ -472,7 +478,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
   for (const auto& [name, type, function] :
        std::initializer_list<std::tuple<const char*, duckdb_type, duckdb_scalar_function_t>>{
            {"bq_regexp_extract_all", kVarchar, RegexpExtractAll<false>},
-           {"bq_regexp_extract_all_bytes", kBlob, RegexpExtractAll<true>}}) {
+           {"bq_regexp_extract_all_bytes", kBlob, RegexpExtractAll<true>},
+       }) {
     LogicalType element(duckdb_create_logical_type(type));
     LogicalType list(duckdb_create_list_type(element.get()));
     Register(connection, name, {type, type}, list.get(), function);

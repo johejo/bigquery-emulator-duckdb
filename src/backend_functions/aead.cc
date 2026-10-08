@@ -45,11 +45,11 @@ struct Field {
 
 bool ReadVarint(std::string_view& data, uint64_t& value) {
   value = 0;
-  for (int shift = 0; shift < 64 && !data.empty(); shift += 7) {
+  for (unsigned shift = 0; shift < 64 && !data.empty(); shift += 7) {
     const auto byte = static_cast<uint8_t>(data.front());
     data.remove_prefix(1);
-    value |= static_cast<uint64_t>(byte & 0x7f) << shift;
-    if ((byte & 0x80) == 0) {
+    value |= static_cast<uint64_t>(byte & 0x7fU) << shift;
+    if ((byte & 0x80U) == 0) {
       return true;
     }
   }
@@ -66,9 +66,9 @@ absl::StatusOr<std::vector<Field>> ParseMessage(std::string_view data) {
     if (!ReadVarint(data, tag)) {
       return Malformed();
     }
-    Field field{.number = tag >> 3};
+    Field field{.number = tag >> 3U};
     uint64_t size = 0;
-    switch (tag & 7) {
+    switch (tag & 7U) {
       case 0:
         if (!ReadVarint(data, field.varint)) {
           return Malformed();
@@ -169,7 +169,7 @@ absl::StatusOr<std::optional<Key>> ParseKey(std::string_view data) {
     case kCrunchy:
       key.prefix.push_back(prefix_type == kTink ? '\x01' : '\x00');
       for (int shift = 24; shift >= 0; shift -= 8) {
-        key.prefix.push_back(static_cast<char>((key.id >> shift) & 0xff));
+        key.prefix.push_back(static_cast<char>((key.id >> static_cast<unsigned>(shift)) & 0xffU));
       }
       break;
     case kRaw:

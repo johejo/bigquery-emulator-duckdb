@@ -225,20 +225,20 @@ void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
             std::array<T, 3> bounds{};
             for (idx_t column = 0; column < bounds.size(); ++column) {
               if constexpr (std::is_same_v<T, double>) {
-                bounds[column] = arguments.Double(column);
+                bounds.at(column) = arguments.Double(column);
               } else {
                 const auto bound = Decimal<T>::From(arguments.Decimal(column));
                 if (!bound.ok()) {
                   return bound.status();
                 }
-                bounds[column] = *bound;
+                bounds.at(column) = *bound;
               }
             }
             std::vector<T> values;
             namespace fn = googlesql::functions;
             if (absl::Status status =
                     fn::GenerateArrayHelper<fn::ArrayGenTrait<T, T>, kMaxGeneratedArraySize>(
-                        bounds[0], bounds[1], bounds[2], &values);
+                        bounds.at(0), bounds.at(1), bounds.at(2), &values);
                 !status.ok()) {
               return status;
             }

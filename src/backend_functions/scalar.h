@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bit>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -52,7 +53,8 @@ class Arguments {
   [[nodiscard]] __int128 Decimal(idx_t column) const {
     const auto value = static_cast<duckdb_hugeint*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
-    return (static_cast<__int128>(value.upper) << 64) | value.lower;
+    return std::bit_cast<__int128>((static_cast<unsigned __int128>(value.upper) << 64U) |
+                                   value.lower);
   }
 
   // A list of VARCHAR without NULL elements.
@@ -113,7 +115,9 @@ inline void SetResult(duckdb_vector output, idx_t row, double value) {
 // A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
 inline void SetResult(duckdb_vector output, idx_t row, __int128 value) {
   static_cast<duckdb_hugeint*>(duckdb_vector_get_data(output))[row] = {
-      static_cast<uint64_t>(value), static_cast<int64_t>(value >> 64)};
+      static_cast<uint64_t>(value),
+      static_cast<int64_t>(static_cast<unsigned __int128>(value) >> 64U),
+  };
 }
 
 inline void SetResult(duckdb_vector output, idx_t row, const std::string& value) {

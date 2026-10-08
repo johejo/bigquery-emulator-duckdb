@@ -27,20 +27,33 @@ class TestTableSource : public TableSource {
     if (table == "st") {
       return std::vector<FieldSchema>{
           {.name = "id", .type = FieldType::kInteger},
-          {.name = "s",
-           .type = FieldType::kRecord,
-           .fields = {{.name = "x", .type = FieldType::kInteger},
-                      {.name = "y",
-                       .type = FieldType::kRecord,
-                       .fields = {{.name = "z", .type = FieldType::kString},
-                                  {.name = "w", .type = FieldType::kInteger}}}}}};
+          {
+              .name = "s",
+              .type = FieldType::kRecord,
+              .fields =
+                  {
+                      {.name = "x", .type = FieldType::kInteger},
+                      {
+                          .name = "y",
+                          .type = FieldType::kRecord,
+                          .fields =
+                              {
+                                  {.name = "z", .type = FieldType::kString},
+                                  {.name = "w", .type = FieldType::kInteger},
+                              },
+                      },
+                  },
+          },
+      };
     }
     if (table != "t") {
       return std::nullopt;
     }
-    return std::vector<FieldSchema>{{.name = "a", .type = FieldType::kInteger},
-                                    {.name = "b", .type = FieldType::kString},
-                                    {.name = "raw", .type = FieldType::kBytes}};
+    return std::vector<FieldSchema>{
+        {.name = "a", .type = FieldType::kInteger},
+        {.name = "b", .type = FieldType::kString},
+        {.name = "raw", .type = FieldType::kBytes},
+    };
   }
 };
 
@@ -87,7 +100,7 @@ class TranslatorTest : public ::testing::Test {
     if (result.rows.size() != 1 || result.schema.size() != 1) {
       throw std::runtime_error("Expected one cell: " + sql);
     }
-    const auto& cell = result.rows[0]["f"][0]["v"];
+    const auto& cell = result.rows.at(0)["f"][0]["v"];
     return cell.is_null() ? std::nullopt : std::optional<std::string>(cell.get<std::string>());
   }
 
@@ -112,8 +125,11 @@ class TranslatorTest : public ::testing::Test {
 };
 
 TEST_F(TranslatorTest, RejectsIntervalCastsBeforeLiteralFolding) {
-  for (const auto* sql : {"SELECT CAST('P9D' AS INTERVAL)", "SELECT SAFE_CAST('P9D' AS INTERVAL)",
-                          "SELECT CAST(CAST('P9D' AS STRING) AS INTERVAL)"}) {
+  for (const auto* sql : {
+           "SELECT CAST('P9D' AS INTERVAL)",
+           "SELECT SAFE_CAST('P9D' AS INTERVAL)",
+           "SELECT CAST(CAST('P9D' AS STRING) AS INTERVAL)",
+       }) {
     SCOPED_TRACE(sql);
     EXPECT_THROW(Statement(sql), std::runtime_error);
   }
@@ -121,26 +137,27 @@ TEST_F(TranslatorTest, RejectsIntervalCastsBeforeLiteralFolding) {
 
 // Enabling query INTERVAL values must not enable the generic DuckDB fallbacks.
 TEST_F(TranslatorTest, IntervalScopeRemainsExplicit) {
-  for (const auto* sql :
-       {"SELECT MAKE_INTERVAL(day => 7) * 2",
-        "SELECT MAKE_INTERVAL(day => 7) = MAKE_INTERVAL(hour => 168)",
-        "SELECT NULLIF(MAKE_INTERVAL(day => 7), MAKE_INTERVAL())",
-        "SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)",
-        "SELECT TO_JSON_STRING([MAKE_INTERVAL(day => 7)])",
-        "SELECT FORMAT('%t', MAKE_INTERVAL(day => 7))",
-        "SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))",
-        "SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))",
-        "SELECT SUM(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
-        "SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
-        "SELECT MAKE_INTERVAL(day => 7) IN (SELECT MAKE_INTERVAL(day => 7))",
-        "SELECT ROW_NUMBER() OVER (PARTITION BY i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
-        "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY i",
-        "SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
-        "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i ORDER BY i",
-        "SELECT MAKE_INTERVAL(day => 7) UNION DISTINCT SELECT MAKE_INTERVAL(day => 8)",
-        "CREATE TABLE p.ds.intervals (i ARRAY<STRUCT<v INTERVAL>>)",
-        "CREATE TABLE p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i",
-        "CREATE VIEW p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i"}) {
+  for (const auto* sql : {
+           "SELECT MAKE_INTERVAL(day => 7) * 2",
+           "SELECT MAKE_INTERVAL(day => 7) = MAKE_INTERVAL(hour => 168)",
+           "SELECT NULLIF(MAKE_INTERVAL(day => 7), MAKE_INTERVAL())",
+           "SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)",
+           "SELECT TO_JSON_STRING([MAKE_INTERVAL(day => 7)])",
+           "SELECT FORMAT('%t', MAKE_INTERVAL(day => 7))",
+           "SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))",
+           "SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))",
+           "SELECT SUM(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+           "SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+           "SELECT MAKE_INTERVAL(day => 7) IN (SELECT MAKE_INTERVAL(day => 7))",
+           "SELECT ROW_NUMBER() OVER (PARTITION BY i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+           "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY i",
+           "SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i",
+           "SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i ORDER BY i",
+           "SELECT MAKE_INTERVAL(day => 7) UNION DISTINCT SELECT MAKE_INTERVAL(day => 8)",
+           "CREATE TABLE p.ds.intervals (i ARRAY<STRUCT<v INTERVAL>>)",
+           "CREATE TABLE p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i",
+           "CREATE VIEW p.ds.intervals AS SELECT MAKE_INTERVAL(day => 7) AS i",
+       }) {
     SCOPED_TRACE(sql);
     EXPECT_FALSE(Translate(sql).has_value());
   }
@@ -163,15 +180,15 @@ TEST_F(TranslatorTest, PreservesScalarTypesAndOutputOrder) {
   const auto result = backend_.Execute(*sql);
   ASSERT_EQ(result.schema.size(), 5);
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.schema[0].name, "z");
-  EXPECT_EQ(result.schema[1].name, "a");
-  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
-  EXPECT_EQ(result.schema[1].type, FieldType::kFloat);
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "1");
-  EXPECT_EQ(result.rows[0]["f"][1]["v"], "2.5");
-  EXPECT_TRUE(result.rows[0]["f"][2]["v"].is_null());
-  EXPECT_EQ(result.rows[0]["f"][3]["v"], "true");
-  EXPECT_EQ(result.rows[0]["f"][4]["v"], "AP8=");
+  EXPECT_EQ(result.schema.at(0).name, "z");
+  EXPECT_EQ(result.schema.at(1).name, "a");
+  EXPECT_EQ(result.schema.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(result.schema.at(1).type, FieldType::kFloat);
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "1");
+  EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "2.5");
+  EXPECT_TRUE(result.rows.at(0)["f"][2]["v"].is_null());
+  EXPECT_EQ(result.rows.at(0)["f"][3]["v"], "true");
+  EXPECT_EQ(result.rows.at(0)["f"][4]["v"], "AP8=");
 }
 
 TEST_F(TranslatorTest, SubstitutesParametersAndSafeCasts) {
@@ -204,18 +221,20 @@ TEST_F(TranslatorTest, MatchesDuplicateAliasesByColumnId) {
   const auto result = backend_.Execute(*sql);
   ASSERT_EQ(result.schema.size(), 3);
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.schema[0].name, "same");
-  EXPECT_EQ(result.schema[1].name, "same");
-  EXPECT_EQ(result.schema[2].name, "a.b");
+  EXPECT_EQ(result.schema.at(0).name, "same");
+  EXPECT_EQ(result.schema.at(1).name, "same");
+  EXPECT_EQ(result.schema.at(2).name, "a.b");
   for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(result.rows[0]["f"][i]["v"], std::to_string(i + 1));
+    EXPECT_EQ(result.rows.at(0)["f"][i]["v"], std::to_string(i + 1));
   }
 }
 
 TEST_F(TranslatorTest, RejectsUnsupportedConstructs) {
-  for (const std::string& sql :
-       {std::string("SELECT SAFE.RAND()"), std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
-        std::string("SELECT STRUCT()")}) {
+  for (const std::string& sql : {
+           std::string("SELECT SAFE.RAND()"),
+           std::string("SELECT BYTE_LENGTH('abc'), SESSION_USER()"),
+           std::string("SELECT STRUCT()"),
+       }) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }
@@ -258,9 +277,9 @@ TEST_F(TranslatorTest, DescribesTheViewACreateViewDefines) {
   EXPECT_EQ(view.query, "SELECT a, [b] AS bs FROM t");
   EXPECT_TRUE(view.if_not_exists);
   ASSERT_EQ(view.schema.size(), 2);
-  EXPECT_EQ(view.schema[0].type, FieldType::kInteger);
-  EXPECT_EQ(view.schema[1].type, FieldType::kString);
-  EXPECT_EQ(view.schema[1].mode, FieldMode::kRepeated);
+  EXPECT_EQ(view.schema.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(view.schema.at(1).type, FieldType::kString);
+  EXPECT_EQ(view.schema.at(1).mode, FieldMode::kRepeated);
   const auto table = Statement("CREATE TABLE new_t (x INT64)");
   if (!table.has_value()) {
     FAIL() << "CREATE TABLE is not translated";
@@ -279,10 +298,10 @@ TEST_F(TranslatorTest, RunsDdl) {
   EXPECT_THROW(backend_.Execute("INSERT INTO p.other.typed (price) VALUES (1)"), BackendError);
   auto result = backend_.Execute("SELECT * FROM p.other.typed");
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.rows[0]["f"][1]["v"], "1.24");
-  EXPECT_EQ(result.rows[0]["f"][2]["v"], "none");
-  EXPECT_EQ(result.schema[3].mode, FieldMode::kRepeated);
-  EXPECT_EQ(result.schema[4].type, FieldType::kRecord);
+  EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "1.24");
+  EXPECT_EQ(result.rows.at(0)["f"][2]["v"], "none");
+  EXPECT_EQ(result.schema.at(3).mode, FieldMode::kRepeated);
+  EXPECT_EQ(result.schema.at(4).type, FieldType::kRecord);
 
   EXPECT_THROW(Execute("CREATE TABLE other.typed (x INT64)"), BackendError);
   Execute("CREATE TABLE IF NOT EXISTS other.typed (x INT64)");
@@ -294,12 +313,12 @@ TEST_F(TranslatorTest, RunsDdl) {
       "SELECT a * 10, b FROM t WHERE a IS NOT NULL ORDER BY a");
   result = backend_.Execute("SELECT * FROM p.ds.copied");
   ASSERT_EQ(result.rows.size(), 3);
-  EXPECT_EQ(result.schema[0].name, "n");
-  EXPECT_EQ(result.schema[1].name, "label");
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "10");
+  EXPECT_EQ(result.schema.at(0).name, "n");
+  EXPECT_EQ(result.schema.at(1).name, "label");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "10");
 
   Execute("CREATE OR REPLACE TABLE ds.copied AS SELECT COUNT(*) AS c FROM t");
-  EXPECT_EQ(backend_.Execute("SELECT c FROM p.ds.copied").rows[0]["f"][0]["v"], "4");
+  EXPECT_EQ(backend_.Execute("SELECT c FROM p.ds.copied").rows.at(0)["f"][0]["v"], "4");
 
   Execute("DROP TABLE ds.copied");
   Execute("DROP TABLE IF EXISTS ds.copied");
@@ -319,13 +338,13 @@ TEST_F(TranslatorTest, ReadsTablesAndKeepsHiddenSortColumns) {
       "SELECT BYTE_LENGTH(b) AS bytes, BYTE_LENGTH(raw) AS raw_bytes FROM `p.ds.t` "
       "WHERE a >= 1 AND a < 4 ORDER BY a DESC LIMIT 2 OFFSET 1");
   ASSERT_EQ(result.rows.size(), 2);
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "2");
-  EXPECT_TRUE(result.rows[0]["f"][1]["v"].is_null());
-  EXPECT_EQ(result.rows[1]["f"][0]["v"], "1");
-  EXPECT_EQ(result.rows[1]["f"][1]["v"], "1");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "2");
+  EXPECT_TRUE(result.rows.at(0)["f"][1]["v"].is_null());
+  EXPECT_EQ(result.rows.at(1)["f"][0]["v"], "1");
+  EXPECT_EQ(result.rows.at(1)["f"][1]["v"], "1");
   ASSERT_EQ(result.schema.size(), 2);
-  EXPECT_EQ(result.schema[0].name, "bytes");
-  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
+  EXPECT_EQ(result.schema.at(0).name, "bytes");
+  EXPECT_EQ(result.schema.at(0).type, FieldType::kInteger);
 }
 
 TEST_F(TranslatorTest, ResolvesScopesAliasesAndStarModifiers) {
@@ -335,20 +354,20 @@ TEST_F(TranslatorTest, ResolvesScopesAliasesAndStarModifiers) {
       "WHERE q.a > 2 ORDER BY q.a DESC");
   ASSERT_EQ(result.rows.size(), 2);
   ASSERT_EQ(result.schema.size(), 3);
-  EXPECT_EQ(result.schema[0].name, "same");
-  EXPECT_EQ(result.schema[1].name, "same");
-  EXPECT_EQ(result.schema[2].name, "_c1");
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "4");
-  EXPECT_EQ(result.rows[0]["f"][1]["v"], "あ");
-  EXPECT_EQ(result.rows[0]["f"][2]["v"], "14");
-  EXPECT_EQ(result.rows[1]["f"][0]["v"], "3");
+  EXPECT_EQ(result.schema.at(0).name, "same");
+  EXPECT_EQ(result.schema.at(1).name, "same");
+  EXPECT_EQ(result.schema.at(2).name, "_c1");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "4");
+  EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "あ");
+  EXPECT_EQ(result.rows.at(0)["f"][2]["v"], "14");
+  EXPECT_EQ(result.rows.at(1)["f"][0]["v"], "3");
   const auto star = Execute(
       "SELECT * EXCEPT(raw) REPLACE(a * 10 AS a) FROM t "
       "WHERE a IS NOT NULL ORDER BY a DESC LIMIT 1");
   ASSERT_EQ(star.schema.size(), 2);
   ASSERT_EQ(star.rows.size(), 1);
-  EXPECT_EQ(star.rows[0]["f"][0]["v"], "30");
-  EXPECT_EQ(star.rows[0]["f"][1]["v"], "あ");
+  EXPECT_EQ(star.rows.at(0)["f"][0]["v"], "30");
+  EXPECT_EQ(star.rows.at(0)["f"][1]["v"], "あ");
 }
 
 TEST_F(TranslatorTest, PreservesCardinalityWithoutReferencedTableColumns) {
@@ -362,18 +381,18 @@ TEST_F(TranslatorTest, SortsNullsAndAppliesLimitsAtTheCorrectScope) {
   for (const auto* order : {"a", "a ASC NULLS FIRST", "a DESC NULLS FIRST"}) {
     const auto result = Execute(std::string("SELECT a FROM t ORDER BY ") + order + " LIMIT 1");
     ASSERT_EQ(result.rows.size(), 1);
-    EXPECT_TRUE(result.rows[0]["f"][0]["v"].is_null()) << order;
+    EXPECT_TRUE(result.rows.at(0)["f"][0]["v"].is_null()) << order;
   }
   for (const auto* order : {"a DESC", "a DESC NULLS LAST", "a ASC NULLS LAST"}) {
     const auto result = Execute(std::string("SELECT a FROM t ORDER BY ") + order + " LIMIT 1");
     ASSERT_EQ(result.rows.size(), 1);
-    EXPECT_FALSE(result.rows[0]["f"][0]["v"].is_null()) << order;
+    EXPECT_FALSE(result.rows.at(0)["f"][0]["v"].is_null()) << order;
   }
   const auto result = Execute(
       "SELECT a FROM (SELECT a FROM t ORDER BY a DESC LIMIT 2) "
       "ORDER BY a LIMIT 1");
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "2");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "2");
   const auto computed = Execute("SELECT a FROM t WHERE a IS NOT NULL ORDER BY -a LIMIT 1");
   EXPECT_EQ(computed.rows.at(0)["f"][0]["v"], "3");
   const auto ordinal = Execute("SELECT -a AS a FROM t WHERE a IS NOT NULL ORDER BY 1 LIMIT 1");
@@ -389,7 +408,7 @@ TEST_F(TranslatorTest, RunsOperatorsAndConditions) {
       "IF(a IS NULL, 0, a), COALESCE(a, 5), IFNULL(a, 6), NULLIF(a, 1) "
       "FROM t ORDER BY a");
   ASSERT_EQ(result.rows.size(), 4);
-  const auto& row = result.rows[0]["f"];
+  const auto& row = result.rows.at(0)["f"];
   EXPECT_EQ(row[0]["v"], "5");
   EXPECT_EQ(row[1]["v"], "1.5");
   for (int i = 2; i < 6; ++i) {
@@ -401,9 +420,9 @@ TEST_F(TranslatorTest, RunsOperatorsAndConditions) {
   EXPECT_EQ(row[9]["v"], "5");
   EXPECT_EQ(row[10]["v"], "6");
   EXPECT_TRUE(row[11]["v"].is_null());
-  EXPECT_EQ(result.rows[1]["f"][6]["v"], "one");
-  EXPECT_EQ(result.rows[1]["f"][7]["v"], "10");
-  EXPECT_TRUE(result.rows[1]["f"][11]["v"].is_null());
+  EXPECT_EQ(result.rows.at(1)["f"][6]["v"], "one");
+  EXPECT_EQ(result.rows.at(1)["f"][7]["v"], "10");
+  EXPECT_TRUE(result.rows.at(1)["f"][11]["v"].is_null());
   EXPECT_THROW(Execute("SELECT 1 / 0"), BackendError);
   const auto division = Translate("SELECT 1 / RAND()");
   if (!division) {
@@ -444,11 +463,11 @@ TEST_F(TranslatorTest, PreparesParameterizedTableQueries) {
   }
   const auto prepared = backend_.Prepare(*sql);
   ASSERT_EQ(prepared.schema.size(), 1);
-  EXPECT_EQ(prepared.schema[0].name, "x");
-  EXPECT_EQ(prepared.schema[0].type, FieldType::kInteger);
+  EXPECT_EQ(prepared.schema.at(0).name, "x");
+  EXPECT_EQ(prepared.schema.at(0).type, FieldType::kInteger);
   const auto result = backend_.Execute(*sql);
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "3");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "3");
 }
 
 // Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
@@ -503,7 +522,7 @@ std::vector<std::string> Rows(const QueryResult& result) {
   for (size_t i = 0; i < result.schema.size(); ++i) {
     const auto column = Column(result, i);
     for (size_t j = 0; j < rows.size(); ++j) {
-      rows[j] += (i == 0 ? "" : "|") + column[j];
+      rows.at(j) += (i == 0 ? "" : "|") + column.at(j);
     }
   }
   return rows;
@@ -533,8 +552,8 @@ TEST_F(TranslatorTest, RunsAggregatesAndDistinct) {
       "STRING_AGG(b, ',' ORDER BY a DESC), ARRAY_LENGTH(ARRAY_AGG(a IGNORE NULLS)), "
       "COUNTIF(a > 1), LOGICAL_AND(a > 0) FROM t");
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.schema[0].type, FieldType::kInteger);
-  const auto& row = result.rows[0]["f"];
+  EXPECT_EQ(result.schema.at(0).type, FieldType::kInteger);
+  const auto& row = result.rows.at(0)["f"];
   EXPECT_EQ(row[0]["v"], "6");
   EXPECT_EQ(row[1]["v"], "4");
   EXPECT_EQ(row[2]["v"], "3");
@@ -566,8 +585,8 @@ TEST_F(TranslatorTest, RunsValueTables) {
   const auto structs =
       Execute("SELECT AS STRUCT a, b AS name FROM t WHERE a IS NOT NULL ORDER BY a DESC");
   ASSERT_EQ(structs.schema.size(), 2);
-  EXPECT_EQ(structs.schema[0].name, "a");
-  EXPECT_EQ(structs.schema[1].name, "name");
+  EXPECT_EQ(structs.schema.at(0).name, "a");
+  EXPECT_EQ(structs.schema.at(1).name, "name");
   EXPECT_EQ(Rows(structs), (V{"3|あ", "2|yy", "1|x"}));
   EXPECT_EQ(Rows(Execute("SELECT AS VALUE a FROM t WHERE a > 1 ORDER BY a")), (V{"2", "3"}));
   EXPECT_EQ(Rows(Execute("SELECT AS VALUE STRUCT(a AS x) FROM t WHERE a = 1")), (V{"1"}));
@@ -738,11 +757,12 @@ TEST_F(TranslatorTest, InsertsValuesAndQueryResults) {
       {"12", "reordered", std::nullopt},
       {"13", "param", std::nullopt},
       {"101", std::nullopt, std::nullopt},
-      {"102", std::nullopt, std::nullopt}};
+      {"102", std::nullopt, std::nullopt},
+  };
   for (size_t row = 0; row < expected.size(); ++row) {
     for (size_t i = 0; i < 3; ++i) {
-      const auto& cell = result.rows[row]["f"][i]["v"];
-      const auto& want = expected[row][i];
+      const auto& cell = result.rows.at(row)["f"][i]["v"];
+      const auto& want = expected.at(row).at(i);
       if (want.has_value()) {
         EXPECT_EQ(cell, *want) << row << "," << i;
       } else {
@@ -753,9 +773,11 @@ TEST_F(TranslatorTest, InsertsValuesAndQueryResults) {
 }
 
 TEST_F(TranslatorTest, RejectsUnsupportedInsertModifiers) {
-  for (const std::string& sql : {std::string("INSERT OR IGNORE INTO t (a) VALUES (1)"),
-                                 std::string("INSERT INTO t (a) VALUES (1) ASSERT_ROWS_MODIFIED 1"),
-                                 std::string("INSERT INTO t (a) VALUES (1) THEN RETURN a")}) {
+  for (const std::string& sql : {
+           std::string("INSERT OR IGNORE INTO t (a) VALUES (1)"),
+           std::string("INSERT INTO t (a) VALUES (1) ASSERT_ROWS_MODIFIED 1"),
+           std::string("INSERT INTO t (a) VALUES (1) THEN RETURN a"),
+       }) {
     EXPECT_FALSE(Translate(sql).has_value()) << sql;
   }
 }

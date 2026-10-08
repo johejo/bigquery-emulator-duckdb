@@ -65,7 +65,7 @@ void MergeLabels(const json& labels, std::map<std::string, std::string>& into) {
 // The characters of UTF-8 `text`: its bytes other than continuation bytes.
 size_t CharacterCount(const std::string& text) {
   return std::ranges::count_if(
-      text, [](char c) { return (static_cast<unsigned char>(c) & 0xC0) != 0x80; });
+      text, [](char c) { return (static_cast<unsigned char>(c) & 0xC0U) != 0x80; });
 }
 
 bool LabelCharacter(char c) {
@@ -74,7 +74,7 @@ bool LabelCharacter(char c) {
 }
 
 // What is wrong with a label key or value `text`, or "" when nothing is.
-std::string LabelTextProblem(const std::string& text) {
+std::string_view LabelTextProblem(const std::string& text) {
   if (CharacterCount(text) > kMaxLabelLength) {
     return "is longer than 63 characters";
   }
@@ -109,8 +109,10 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
   if (!value.is_object()) {
     throw ApiError::Invalid("Field timePartitioning must be an object");
   }
-  TimePartitioning partitioning{.type = StringValue(value.value("type", json()), "type"),
-                                .field = StringValue(value.value("field", json()), "field")};
+  TimePartitioning partitioning{
+      .type = StringValue(value.value("type", json()), "type"),
+      .field = StringValue(value.value("field", json()), "field"),
+  };
   if (partitioning.type != "DAY" && partitioning.type != "HOUR" && partitioning.type != "MONTH" &&
       partitioning.type != "YEAR") {
     throw ApiError::Invalid("Invalid time partitioning type: " + partitioning.type);
@@ -135,10 +137,12 @@ std::optional<RangePartitioning> ParseRangePartitioning(const json& value) {
     throw ApiError::Invalid("Field rangePartitioning must be an object with a range");
   }
   const json& range = value["range"];
-  return RangePartitioning{.field = StringValue(value.value("field", json()), "field"),
-                           .start = Int64Member(range, "start"),
-                           .end = Int64Member(range, "end"),
-                           .interval = Int64Member(range, "interval")};
+  return RangePartitioning{
+      .field = StringValue(value.value("field", json()), "field"),
+      .start = Int64Member(range, "start"),
+      .end = Int64Member(range, "end"),
+      .interval = Int64Member(range, "interval"),
+  };
 }
 
 std::vector<std::string> ParseClustering(const json& value) {
@@ -206,16 +210,18 @@ void CheckDatasetFields(const json& dataset) {
   if (!dataset.is_object()) {
     throw ApiError::Invalid("Invalid dataset resource");
   }
-  static constexpr std::string_view kKnown[] = {"kind",
-                                                "etag",
-                                                "id",
-                                                "selfLink",
-                                                "datasetReference",
-                                                "creationTime",
-                                                "lastModifiedTime",
-                                                "description",
-                                                "friendlyName",
-                                                "labels"};
+  static constexpr std::string_view kKnown[] = {
+      "kind",
+      "etag",
+      "id",
+      "selfLink",
+      "datasetReference",
+      "creationTime",
+      "lastModifiedTime",
+      "description",
+      "friendlyName",
+      "labels",
+  };
   for (const auto& [key, value] : dataset.items()) {
     if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
         std::ranges::find(kKnown, key) != std::end(kKnown)) {
@@ -301,7 +307,8 @@ void ValidateClustering(const std::vector<std::string>& clustering,
     static constexpr FieldType kClusterable[] = {
         FieldType::kBigNumeric, FieldType::kBoolean,   FieldType::kDate,
         FieldType::kDatetime,   FieldType::kGeography, FieldType::kInteger,
-        FieldType::kNumeric,    FieldType::kString,    FieldType::kTimestamp};
+        FieldType::kNumeric,    FieldType::kString,    FieldType::kTimestamp,
+    };
     if (std::ranges::find(kClusterable, field->type) == std::end(kClusterable) ||
         field->mode == FieldMode::kRepeated) {
       throw ApiError::Invalid(std::format("Field {} of type {} cannot be a clustering field",
@@ -324,25 +331,39 @@ json TableMetadata::ToJson() const {
     fields["labels"] = labels;
   }
   if (time_partitioning.has_value()) {
-    fields["timePartitioning"] = {{"type", time_partitioning->type},
-                                  {"field", time_partitioning->field}};
+    fields["timePartitioning"] = {
+        {"type", time_partitioning->type},
+        {"field", time_partitioning->field},
+    };
   }
   if (range_partitioning.has_value()) {
-    fields["rangePartitioning"] = {{"field", range_partitioning->field},
-                                   {"range",
-                                    {{"start", std::to_string(range_partitioning->start)},
-                                     {"end", std::to_string(range_partitioning->end)},
-                                     {"interval", std::to_string(range_partitioning->interval)}}}};
+    fields["rangePartitioning"] = {
+        {"field", range_partitioning->field},
+        {
+            "range",
+            {
+                {"start", std::to_string(range_partitioning->start)},
+                {"end", std::to_string(range_partitioning->end)},
+                {"interval", std::to_string(range_partitioning->interval)},
+            },
+        },
+    };
   }
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
   if (clone.has_value()) {
-    fields["cloneDefinition"] = {{"baseTableReference",
-                                  {{"projectId", clone->base_table.project_id},
-                                   {"datasetId", clone->base_table.dataset_id},
-                                   {"tableId", clone->base_table.table_id}}},
-                                 {"cloneTime", clone->clone_time}};
+    fields["cloneDefinition"] = {
+        {
+            "baseTableReference",
+            {
+                {"projectId", clone->base_table.project_id},
+                {"datasetId", clone->base_table.dataset_id},
+                {"tableId", clone->base_table.table_id},
+            },
+        },
+        {"cloneTime", clone->clone_time},
+    };
   }
   return fields;
 }
@@ -404,13 +425,13 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
   for (const auto& [key, value] : labels) {
     const std::string what = "Label key \"" + key + "\"";
     if (key.empty() ||
-        ((key[0] < 'a' || key[0] > 'z') && static_cast<unsigned char>(key[0]) < 0x80)) {
+        ((key.at(0) < 'a' || key.at(0) > 'z') && static_cast<unsigned char>(key.at(0)) < 0x80)) {
       throw ApiError::Invalid(what + " must start with a lowercase letter");
     }
-    if (const std::string problem = LabelTextProblem(key); !problem.empty()) {
+    if (const std::string_view problem = LabelTextProblem(key); !problem.empty()) {
       throw ApiError::Invalid(std::format("{} {}", what, problem));
     }
-    if (const std::string problem = LabelTextProblem(value); !problem.empty()) {
+    if (const std::string_view problem = LabelTextProblem(value); !problem.empty()) {
       throw ApiError::Invalid(std::format("Label value \"{}\" {}", value, problem));
     }
   }

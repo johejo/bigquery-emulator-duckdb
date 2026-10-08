@@ -46,19 +46,27 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
     // translator supports.
     catalog->AddOwnedFunction(new googlesql::Function(
         "contains_substr", "bigquery", googlesql::Function::SCALAR,
-        {googlesql::FunctionSignature(
-            googlesql::FunctionArgumentType(googlesql::types::BoolType()),
-            {googlesql::FunctionArgumentType(googlesql::types::StringType()),
-             googlesql::FunctionArgumentType(googlesql::types::StringType())},
-            /*context_id=*/static_cast<int64_t>(0))}));
+        {
+            googlesql::FunctionSignature(
+                googlesql::FunctionArgumentType(googlesql::types::BoolType()),
+                {
+                    googlesql::FunctionArgumentType(googlesql::types::StringType()),
+                    googlesql::FunctionArgumentType(googlesql::types::StringType()),
+                },
+                /*context_id=*/static_cast<int64_t>(0)),
+        }));
     for (const char* name : {"max_by", "min_by"}) {
       catalog->AddOwnedFunction(new googlesql::Function(
           name, "bigquery", googlesql::Function::AGGREGATE,
-          {googlesql::FunctionSignature(
-              googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
-              {googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
-               googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_2)},
-              /*context_id=*/static_cast<int64_t>(0))},
+          {
+              googlesql::FunctionSignature(
+                  googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
+                  {
+                      googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_1),
+                      googlesql::FunctionArgumentType(googlesql::ARG_KIND_EXPR_ANY_2),
+                  },
+                  /*context_id=*/static_cast<int64_t>(0)),
+          },
           googlesql::FunctionOptions(googlesql::FunctionOptions::ORDER_OPTIONAL,
                                      /*window_framing_support_in=*/true)));
     }
@@ -80,10 +88,13 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // they are turned off again: BigQuery has no MAP, UUID or FLOAT32, and its timestamps hold
     // microseconds, not nanoseconds or picoseconds. BigQuery also rejects explicit casts between
     // arrays with different element types, including SAFE_CAST and arrays inside structs.
-    for (const googlesql::LanguageFeature feature :
-         {googlesql::FEATURE_MAP_TYPE, googlesql::FEATURE_UUID_TYPE,
-          googlesql::FEATURE_TIMESTAMP_NANOS, googlesql::FEATURE_TIMESTAMP_PICOS,
-          googlesql::FEATURE_CAST_DIFFERENT_ARRAY_TYPES}) {
+    for (const googlesql::LanguageFeature feature : {
+             googlesql::FEATURE_MAP_TYPE,
+             googlesql::FEATURE_UUID_TYPE,
+             googlesql::FEATURE_TIMESTAMP_NANOS,
+             googlesql::FEATURE_TIMESTAMP_PICOS,
+             googlesql::FEATURE_CAST_DIFFERENT_ARRAY_TYPES,
+         }) {
       options->DisableLanguageFeature(feature);
     }
     options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
@@ -142,11 +153,11 @@ std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
 
 std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path) {
   const std::vector<std::string> parts = SplitTablePath(path);
-  if (parts.size() == 1 && !parts[0].empty()) {
-    return parts[0];
+  if (parts.size() == 1 && !parts.at(0).empty()) {
+    return parts.at(0);
   }
-  if (parts.size() == 2 && parts[0] == kSessionDataset && !parts[1].empty()) {
-    return parts[1];
+  if (parts.size() == 2 && parts.at(0) == kSessionDataset && !parts.at(1).empty()) {
+    return parts.at(1);
   }
   return std::nullopt;
 }
@@ -157,8 +168,8 @@ std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
                                           const TemporaryTables* temporary) {
   if (temporary != nullptr) {
     const std::vector<std::string> parts = SplitTablePath(path);
-    const bool session = parts.size() == 2 && parts[0] == kSessionDataset;
-    if (session || (parts.size() == 1 && temporary->names.contains(parts[0]))) {
+    const bool session = parts.size() == 2 && parts.at(0) == kSessionDataset;
+    if (session || (parts.size() == 1 && temporary->names.contains(parts.at(0)))) {
       return {temporary->project, temporary->dataset, parts.back()};
     }
   }
@@ -209,7 +220,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
   }
 
   const std::optional<std::vector<FieldSchema>> schema =
-      source_.FindTable(normalized[0], normalized[1], normalized[2]);
+      source_.FindTable(normalized.at(0), normalized.at(1), normalized.at(2));
   if (!schema.has_value()) {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(normalized, "."));
   }
@@ -224,7 +235,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
       return type.status();
     }
     if (absl::Status status = simple_table->AddColumn(
-            std::make_unique<googlesql::SimpleColumn>(normalized[2], field.name, *type));
+            std::make_unique<googlesql::SimpleColumn>(normalized.at(2), field.name, *type));
         !status.ok()) {
       return status;
     }

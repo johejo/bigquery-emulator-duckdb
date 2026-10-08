@@ -1,6 +1,7 @@
 #include "src/parquet_metadata.h"
 
 #include <algorithm>
+#include <bit>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
@@ -37,22 +38,22 @@ class Reader {
 
   uint8_t Byte() {
     if (position_ >= input_.size()) Invalid("truncated footer");
-    return static_cast<uint8_t>(input_[position_++]);
+    return static_cast<uint8_t>(input_.at(position_++));
   }
 
   uint64_t Varint() {
     uint64_t value = 0;
-    for (int shift = 0; shift < 64; shift += 7) {
+    for (unsigned shift = 0; shift < 64; shift += 7) {
       const uint8_t byte = Byte();
-      value |= static_cast<uint64_t>(byte & 0x7f) << shift;
-      if ((byte & 0x80) == 0) return value;
+      value |= static_cast<uint64_t>(byte & 0x7fU) << shift;
+      if ((byte & 0x80U) == 0) return value;
     }
     Invalid("malformed varint");
   }
 
   int64_t ZigZag() {
     const uint64_t value = Varint();
-    return static_cast<int64_t>(value >> 1) ^ -static_cast<int64_t>(value & 1);
+    return std::bit_cast<int64_t>((value >> 1U) ^ (uint64_t{0} - (value & 1U)));
   }
 
   std::string Bytes(uint64_t size) {
@@ -91,8 +92,8 @@ class Reader {
       case Type::kList:
       case Type::kSet: {
         const uint8_t header = Byte();
-        value.element_type = ElementType(header & 0x0f);
-        uint64_t size = header >> 4;
+        value.element_type = ElementType(header & 0x0fU);
+        uint64_t size = header >> 4U;
         if (size == 15) size = Varint();
         for (uint64_t i = 0; i < size; ++i) {
           value.elements.push_back(Value(value.element_type, true, depth + 1));
@@ -103,8 +104,8 @@ class Reader {
         const uint64_t size = Varint();
         if (size == 0) break;
         const uint8_t types = Byte();
-        value.element_type = ElementType(types >> 4);
-        value.value_type = ElementType(types & 0x0f);
+        value.element_type = ElementType(types >> 4U);
+        value.value_type = ElementType(types & 0x0fU);
         for (uint64_t i = 0; i < size; ++i) {
           value.elements.push_back(Value(value.element_type, true, depth + 1));
           value.elements.push_back(Value(value.value_type, true, depth + 1));
@@ -114,10 +115,10 @@ class Reader {
       case Type::kStruct: {
         int16_t id = 0;
         for (uint8_t header = Byte(); header != 0; header = Byte()) {
-          const uint8_t delta = header >> 4;
+          const uint8_t delta = header >> 4U;
           id = static_cast<int16_t>(delta != 0 ? id + delta : ZigZag());
           value.fields.push_back(
-              {.id = id, .value = Value(ElementType(header & 0x0f), false, depth + 1)});
+              {.id = id, .value = Value(ElementType(header & 0x0fU), false, depth + 1)});
         }
         break;
       }
@@ -143,14 +144,14 @@ class Writer {
 
   void Varint(uint64_t value) {
     while (value >= 0x80) {
-      out_ += static_cast<char>((value & 0x7f) | 0x80);
-      value >>= 7;
+      out_ += static_cast<char>((value & 0x7fU) | 0x80U);
+      value >>= 7U;
     }
     out_ += static_cast<char>(value);
   }
 
   void ZigZag(int64_t value) {
-    const uint64_t shifted = static_cast<uint64_t>(value) << 1;
+    const uint64_t shifted = static_cast<uint64_t>(value) << 1U;
     Varint(value < 0 ? ~shifted : shifted);
   }
 
@@ -179,9 +180,9 @@ class Writer {
       case Type::kSet: {
         const auto type = static_cast<uint8_t>(value.element_type);
         if (value.elements.size() < 15) {
-          out_ += static_cast<char>((value.elements.size() << 4) | type);
+          out_ += static_cast<char>((value.elements.size() << 4U) | type);
         } else {
-          out_ += static_cast<char>(0xf0 | type);
+          out_ += static_cast<char>(0xf0U | type);
           Varint(value.elements.size());
         }
         for (const ThriftValue& item : value.elements) Value(item, true);
@@ -190,7 +191,7 @@ class Writer {
       case Type::kMap:
         Varint(value.elements.size() / 2);
         if (value.elements.empty()) break;
-        out_ += static_cast<char>((static_cast<uint8_t>(value.element_type) << 4) |
+        out_ += static_cast<char>((static_cast<uint32_t>(value.element_type) << 4U) |
                                   static_cast<uint8_t>(value.value_type));
         for (const ThriftValue& item : value.elements) Value(item, true);
         break;
@@ -200,7 +201,7 @@ class Writer {
           const int delta = id - last;
           const auto type = static_cast<uint8_t>(field.type);
           if (delta > 0 && delta <= 15) {
-            out_ += static_cast<char>((delta << 4) | type);
+            out_ += static_cast<char>((static_cast<unsigned>(delta) << 4U) | type);
           } else {
             out_ += static_cast<char>(type);
             ZigZag(id);
@@ -234,7 +235,7 @@ std::pair<std::string, uint64_t> ReadFooter(const std::string& path) {
   // The footer's length is little endian, before the magic number.
   const uint64_t length = std::accumulate(
       tail.rbegin() + kMagic.size(), tail.rend(), uint64_t{0},
-      [](uint64_t sum, char byte) { return (sum << 8) | static_cast<uint8_t>(byte); });
+      [](uint64_t sum, char byte) { return (sum << 8U) | static_cast<uint8_t>(byte); });
   if (length > size - tail.size() - kMagic.size()) Invalid("footer length out of range");
   const uint64_t start = size - tail.size() - length;
   std::string footer(length, '\0');
@@ -272,7 +273,7 @@ bool Annotated(const ThriftValue& element, int16_t member, const std::vector<int
 ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int depth) {
   if (depth > kMaxDepth) Invalid("schema nested too deeply");
   if (next >= schema.size()) Invalid("schema has fewer elements than its groups count");
-  const ThriftValue& element = schema[next];
+  const ThriftValue& element = schema.at(next);
   ParquetColumn column;
   column.element = next++;
   if (const ThriftValue* name = element.Field(parquet::kElementName)) column.name = name->bytes;
@@ -301,7 +302,7 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
     } else if (Annotated(element, parquet::kLogicalList, {parquet::kConvertedList})) {
       const ParquetColumn& child = column.children.front();
       if (count != 1 || child.kind != ParquetColumn::Kind::kList ||
-          IntField(schema[elements.front()], parquet::kElementRepetition).value_or(0) !=
+          IntField(schema.at(elements.front()), parquet::kElementRepetition).value_or(0) !=
               parquet::kRepeated) {
         column.kind = ParquetColumn::Kind::kMap;
       } else {
@@ -407,7 +408,7 @@ void RewriteParquetMetadata(const std::string& path, const ThriftValue& metadata
   writer.Value(metadata, false);
   std::string footer = writer.Output();
   const uint64_t length = footer.size();
-  for (int i = 0; i < 4; ++i) footer += static_cast<char>((length >> (8 * i)) & 0xff);
+  for (unsigned i = 0; i < 4; ++i) footer += static_cast<char>((length >> (8U * i)) & 0xffU);
   footer += kMagic;
   {
     std::fstream output(path, std::ios::binary | std::ios::in | std::ios::out);

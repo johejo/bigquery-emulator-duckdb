@@ -57,9 +57,9 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
   const std::string mismatch =
       std::format("Provided Schema does not match Table {}.", TableName(table));
   for (size_t i = 0; i < current.size(); ++i) {
-    const FieldSchema& before = current[i];
+    const FieldSchema& before = current.at(i);
     const std::string name = prefix + before.name;
-    if (i >= updated.size() || updated[i].name != before.name) {
+    if (i >= updated.size() || updated.at(i).name != before.name) {
       const bool kept = std::ranges::any_of(
           updated, [&](const FieldSchema& field) { return field.name == before.name; });
       throw ApiError::Invalid(std::format(
@@ -67,7 +67,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
           kept ? "has changed position; the emulator keeps existing fields in their order"
                : "is missing in new schema"));
     }
-    const FieldSchema& after = updated[i];
+    const FieldSchema& after = updated.at(i);
     if (after.type != before.type) {
       throw ApiError::Invalid(std::format("{} Field {} has changed type from {} to {}", mismatch,
                                           name, FieldTypeName(before.type),
@@ -101,7 +101,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
     }
   }
   for (size_t i = current.size(); i < updated.size(); ++i) {
-    const FieldSchema& added = updated[i];
+    const FieldSchema& added = updated.at(i);
     if (added.mode == FieldMode::kRequired) {
       throw ApiError::Invalid(
           std::format("{} Cannot add required fields to an existing schema. (field: {}{})",

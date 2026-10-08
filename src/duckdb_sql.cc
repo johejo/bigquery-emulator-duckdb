@@ -80,8 +80,8 @@ std::string ToHex(std::string_view value) {
   result.reserve(value.size() * 2);
   for (const char c : value) {
     const auto byte = static_cast<unsigned char>(c);
-    result += kDigits[byte >> 4U];
-    result += kDigits[byte & 0x0FU];
+    result += kDigits.at(byte >> 4U);
+    result += kDigits.at(byte & 0x0FU);
   }
   return result;
 }

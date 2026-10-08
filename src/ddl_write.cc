@@ -37,8 +37,9 @@ std::string DatasetExists(const DatasetReference& dataset) {
 }
 
 DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
-  DdlWrite write{.metadata_statements =
-                     DatasetMetadataStatements(definition.dataset, definition.metadata)};
+  DdlWrite write{
+      .metadata_statements = DatasetMetadataStatements(definition.dataset, definition.metadata),
+  };
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + DatasetExists(definition.dataset);
   }
@@ -78,7 +79,8 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
   ValidateLabels(metadata.labels);
   const std::string table = DatasetMetadataTable(dataset.project_id);
   std::vector<std::string> statements = {
-      std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id))};
+      std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id)),
+  };
   if (!metadata.empty()) {
     statements.push_back(std::format("INSERT INTO {} VALUES ({}, {})", table,
                                      QuoteLiteral(dataset.dataset_id),
@@ -99,7 +101,8 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-      ViewCommentStatement(table, {view.query, view.schema, view.metadata})};
+      ViewCommentStatement(table, {view.query, view.schema, view.metadata}),
+  };
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);
   }
@@ -107,8 +110,9 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
 }
 
 DdlWrite CreateTableWrite(const TableDefinition& definition) {
-  DdlWrite write{.metadata_statements =
-                     ColumnCommentStatements(definition.table, definition.schema)};
+  DdlWrite write{
+      .metadata_statements = ColumnCommentStatements(definition.table, definition.schema),
+  };
   std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
                     std::back_inserter(write.metadata_statements));
   if (!definition.metadata.empty()) {

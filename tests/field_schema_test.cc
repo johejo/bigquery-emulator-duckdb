@@ -15,9 +15,9 @@ TEST(FieldSchemaTest, AcceptsStandardSqlTypeNamesInAnyCase) {
       "fields": [{"name": "a", "type": "INT64"}, {"name": "b", "type": "Bool"}]})"));
   EXPECT_EQ(field.type, FieldType::kRecord);
   EXPECT_EQ(field.mode, FieldMode::kRepeated);
-  EXPECT_EQ(field.fields[0].type, FieldType::kInteger);
-  EXPECT_EQ(field.fields[0].mode, FieldMode::kNullable);
-  EXPECT_EQ(field.fields[1].type, FieldType::kBoolean);
+  EXPECT_EQ(field.fields.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(field.fields.at(0).mode, FieldMode::kNullable);
+  EXPECT_EQ(field.fields.at(1).type, FieldType::kBoolean);
   EXPECT_EQ(field.ToJson()["type"], "RECORD");
 }
 

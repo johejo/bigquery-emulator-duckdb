@@ -16,18 +16,18 @@ namespace {
 
 // The argument a $n, #n or !n at spelling[i] refers to, counted from 0; for !n, the error.
 std::optional<std::size_t> Placeholder(std::string_view spelling, std::size_t i) {
-  if ((spelling[i] != '$' && spelling[i] != '#' && spelling[i] != '!') ||
-      i + 1 >= spelling.size() || spelling[i + 1] < '1' || spelling[i + 1] > '9') {
+  if ((spelling.at(i) != '$' && spelling.at(i) != '#' && spelling.at(i) != '!') ||
+      i + 1 >= spelling.size() || spelling.at(i + 1) < '1' || spelling.at(i + 1) > '9') {
     return std::nullopt;
   }
-  return static_cast<std::size_t>(spelling[i + 1] - '1');
+  return static_cast<std::size_t>(spelling.at(i + 1) - '1');
 }
 
 bool Holds(const Condition& condition, const std::vector<FunctionArgument>& arguments) {
   if (condition.argument > arguments.size()) {
     return true;
   }
-  const FunctionArgument& argument = arguments[condition.argument - 1];
+  const FunctionArgument& argument = arguments.at(condition.argument - 1);
   if (!condition.types.empty() &&
       std::ranges::find(condition.types, argument.type) == condition.types.end()) {
     return false;
@@ -46,8 +46,8 @@ bool Matches(const Rule& rule, const std::vector<FunctionArgument>& arguments) {
   }
   for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
     if (const auto index = Placeholder(rule.spelling, i);
-        index && rule.spelling[i] == '#' &&
-        (*index >= arguments.size() || !arguments[*index].date_part)) {
+        index && rule.spelling.at(i) == '#' &&
+        (*index >= arguments.size() || !arguments.at(*index).date_part)) {
       return false;
     }
   }
@@ -59,13 +59,13 @@ bool Matches(const Rule& rule, const std::vector<FunctionArgument>& arguments) {
 // string without quotes in it, possibly negated or cast to a type such as BIGINT.
 bool Trivial(std::string_view sql) {
   constexpr std::string_view kCast = "CAST(";
-  if (sql.starts_with(kCast) && sql.ends_with(")")) {
+  if (sql.starts_with(kCast) && sql.ends_with(')')) {
     const std::string_view inner = sql.substr(kCast.size(), sql.size() - kCast.size() - 1);
     const std::size_t as = inner.rfind(" AS ");
     return as != std::string_view::npos && Trivial(inner.substr(0, as)) &&
            Trivial(inner.substr(as + 4));
   }
-  if (sql.size() >= 2 && sql.front() == '-' && sql[1] != '-') {
+  if (sql.size() >= 2 && sql.front() == '-' && sql.at(1) != '-') {
     sql.remove_prefix(1);
   }
   if (sql.size() >= 2 && sql.front() == '\'' && sql.back() == '\'') {
@@ -82,11 +82,11 @@ std::string WithErrors(const Rule& rule, bool safe) {
   std::string spelling;
   for (std::size_t i = 0; i < rule.spelling.size(); ++i) {
     const auto index = Placeholder(rule.spelling, i);
-    if (index && rule.spelling[i] == '!') {
+    if (index && rule.spelling.at(i) == '!') {
       spelling += Raise(rule.errors.at(*index), safe);
       ++i;
     } else {
-      spelling += rule.spelling[i];
+      spelling += rule.spelling.at(i);
     }
   }
   return spelling;
@@ -99,11 +99,11 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   std::ranges::transform(arguments, std::back_inserter(sql), &FunctionArgument::sql);
   // An optional argument without a default must not appear in the spelling.
   for (std::size_t i = arguments.size(); i - rule.arity.min < rule.defaults.size(); ++i) {
-    sql.emplace_back(rule.defaults[i - rule.arity.min]);
+    sql.emplace_back(rule.defaults.at(i - rule.arity.min));
   }
   std::vector<int> uses(sql.size());
   for (std::size_t i = 0; i < spelling.size(); ++i) {
-    if (const auto index = Placeholder(spelling, i); index && spelling[i] == '$') {
+    if (const auto index = Placeholder(spelling, i); index && spelling.at(i) == '$') {
       ++uses.at(*index);
     }
   }
@@ -111,7 +111,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   // expression that CASE and IF can short-circuit.
   bool bind = false;
   for (std::size_t i = 0; i < sql.size(); ++i) {
-    bind = bind || (uses[i] > 1 && !Trivial(sql[i]));
+    bind = bind || (uses.at(i) > 1 && !Trivial(sql.at(i)));
   }
   std::vector<std::string> references = sql;
   std::string fields;
@@ -119,21 +119,21 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
     // Trivial arguments stay as they are, so a literal that DuckDB needs as a constant, such as a
     // rounding precision, remains one.
     for (std::size_t i = 0; i < sql.size(); ++i) {
-      if (uses[i] == 0 || Trivial(sql[i])) {
+      if (uses.at(i) == 0 || Trivial(sql.at(i))) {
         continue;
       }
       const std::string field = "a" + std::to_string(i + 1);
-      fields += (fields.empty() ? "" : ", ") + field + " := " + sql[i];
-      references[i] = "_fn." + field;
+      fields += (fields.empty() ? "" : ", ") + field + " := " + sql.at(i);
+      references.at(i) = "_fn." + field;
     }
   }
   std::string body;
   for (std::size_t i = 0; i < spelling.size(); ++i) {
     if (const auto index = Placeholder(spelling, i)) {
-      body += spelling[i] == '$' ? references.at(*index) : sql.at(*index);
+      body += spelling.at(i) == '$' ? references.at(*index) : sql.at(*index);
       ++i;
     } else {
-      body += spelling[i];
+      body += spelling.at(i);
     }
   }
   if (!bind) {
@@ -145,7 +145,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
 std::string Invoke(std::string_view function, const std::vector<FunctionArgument>& arguments) {
   std::string sql = std::string(function) + "(";
   for (std::size_t i = 0; i < arguments.size(); ++i) {
-    sql += (i == 0 ? "" : ", ") + arguments[i].sql;
+    sql += (i == 0 ? "" : ", ") + arguments.at(i).sql;
   }
   return sql + ")";
 }
@@ -154,11 +154,11 @@ std::string Invoke(std::string_view function, const std::vector<FunctionArgument
 std::string Substitute(std::string_view spelling, const std::vector<std::string>& arguments) {
   std::string sql;
   for (std::size_t i = 0; i < spelling.size(); ++i) {
-    if (const auto index = Placeholder(spelling, i); index && spelling[i] == '$') {
+    if (const auto index = Placeholder(spelling, i); index && spelling.at(i) == '$') {
       sql += arguments.at(*index);
       ++i;
     } else {
-      sql += spelling[i];
+      sql += spelling.at(i);
     }
   }
   return sql;
@@ -200,7 +200,7 @@ std::vector<std::string> AggregateArguments(const AggregateRule& rule,
   }
   std::vector<std::string> given = arguments;
   for (std::size_t i = given.size(); i < rule.defaults.size(); ++i) {
-    given.emplace_back(rule.defaults[i]);
+    given.emplace_back(rule.defaults.at(i));
   }
   std::vector<std::string> sql;
   sql.reserve(rule.arguments.size());

@@ -33,9 +33,11 @@ struct ViewColumn {
 };
 
 FieldSchema ColumnField(const ViewColumn& column) {
-  return {.name = column.name,
-          .type = column.type,
-          .mode = column.repeated ? FieldMode::kRepeated : FieldMode::kNullable};
+  return {
+      .name = column.name,
+      .type = column.type,
+      .mode = column.repeated ? FieldMode::kRepeated : FieldMode::kNullable,
+  };
 }
 
 // A cell as a DuckDB literal; nothing is NULL.
@@ -45,7 +47,7 @@ using Row = std::vector<Cell>;
 Cell String(const std::string& value) { return QuoteLiteral(value); }
 Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
-const Cell kEmptyArray = "[]";
+constexpr const char* kEmptyArray = "[]";
 
 const std::vector<ViewColumn>& SchemataColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
@@ -165,13 +167,13 @@ absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
   std::vector<std::string> names;
   std::vector<std::string> projections;
   for (size_t i = 0; i < columns.size(); ++i) {
-    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(columns[i]));
+    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(columns.at(i)));
     if (!type.ok()) {
       return type.status();
     }
     names.push_back("c" + std::to_string(i));
     projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
-                          QuoteIdentifier(columns[i].name));
+                          QuoteIdentifier(columns.at(i).name));
   }
   std::vector<std::string> values;
   for (const Row& row : rows) {
@@ -230,8 +232,18 @@ absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& t
   if (!type.ok()) {
     return type.status();
   }
-  rows.push_back({String(dataset.project), String(dataset.dataset), String(table), String(column),
-                  String(path), String(*type), kNull, kNull, kNull, kEmptyArray});
+  rows.push_back({
+      String(dataset.project),
+      String(dataset.dataset),
+      String(table),
+      String(column),
+      String(path),
+      String(*type),
+      kNull,
+      kNull,
+      kNull,
+      kEmptyArray,
+  });
   for (const FieldSchema& child : field.fields) {
     if (absl::Status status = AppendFieldPaths(dataset, table, column, path + "." + child.name,
                                                child, type_factory, rows);
@@ -275,35 +287,37 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         } else if (!view_query->empty()) {
           ddl = String(ViewDdl(dataset.project, dataset.dataset, table, *view_query));
         }
-        rows.push_back({String(dataset.project),
-                        String(dataset.dataset),
-                        String(table),
-                        String(view_query.has_value() ? "VIEW"
-                               : clone.has_value()    ? "CLONE"
-                                                      : "BASE TABLE"),
-                        view_query.has_value() ? kNull : String("NATIVE"),
-                        String(view_query.has_value() ? "NO" : "YES"),
-                        String("NO"),
-                        String("NO"),
-                        String("NO"),
-                        kNull,
-                        clone ? String(clone->base_table.project_id) : kNull,
-                        clone ? String(clone->base_table.dataset_id) : kNull,
-                        clone ? String(clone->base_table.table_id) : kNull,
-                        clone ? String(clone->clone_time) : kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        ddl,
-                        kNull,
-                        kNull,
-                        kNull});
+        rows.push_back({
+            String(dataset.project),
+            String(dataset.dataset),
+            String(table),
+            String(view_query.has_value() ? "VIEW"
+                   : clone.has_value()    ? "CLONE"
+                                          : "BASE TABLE"),
+            view_query.has_value() ? kNull : String("NATIVE"),
+            String(view_query.has_value() ? "NO" : "YES"),
+            String("NO"),
+            String("NO"),
+            String("NO"),
+            kNull,
+            clone ? String(clone->base_table.project_id) : kNull,
+            clone ? String(clone->base_table.dataset_id) : kNull,
+            clone ? String(clone->base_table.table_id) : kNull,
+            clone ? String(clone->clone_time) : kNull,
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+            ddl,
+            kNull,
+            kNull,
+            kNull,
+        });
         continue;
       }
       for (size_t i = 0; i < schema->size(); ++i) {
-        const FieldSchema& field = (*schema)[i];
+        const FieldSchema& field = (*schema).at(i);
         if (view == "COLUMN_FIELD_PATHS") {
           if (absl::Status status = AppendFieldPaths(dataset, table, field.name, field.name, field,
                                                      type_factory, rows);
@@ -316,32 +330,34 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         if (!type.ok()) {
           return type.status();
         }
-        rows.push_back({String(dataset.project),
-                        String(dataset.dataset),
-                        String(table),
-                        String(field.name),
-                        Int(static_cast<int64_t>(i) + 1),
-                        String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
-                        String(*type),
-                        String("NEVER"),
-                        kNull,
-                        kNull,
-                        String("NO"),
-                        kNull,
-                        String("NO"),
-                        String("NO"),
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kEmptyArray,
-                        String("NO"),
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull,
-                        kNull});
+        rows.push_back({
+            String(dataset.project),
+            String(dataset.dataset),
+            String(table),
+            String(field.name),
+            Int(static_cast<int64_t>(i) + 1),
+            String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
+            String(*type),
+            String("NEVER"),
+            kNull,
+            kNull,
+            String("NO"),
+            kNull,
+            String("NO"),
+            String("NO"),
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+            kEmptyArray,
+            String("NO"),
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+            kNull,
+        });
       }
     }
   }
@@ -351,7 +367,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
 }  // namespace
 
 bool IsInformationSchemaPath(const std::vector<std::string>& parts) {
-  return parts.size() >= 2 && EqualsIgnoreCase(parts[parts.size() - 2], "INFORMATION_SCHEMA");
+  return parts.size() >= 2 && EqualsIgnoreCase(parts.at(parts.size() - 2), "INFORMATION_SCHEMA");
 }
 
 // The order of the defaults follows BigQueryCatalog's.
@@ -374,19 +390,27 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
   std::vector<Row> rows;
   if (view == "SCHEMATA") {
     // Scoped to a project, optionally with a region: [PROJECT.][`region-REGION`.]
-    if (qualifier.size() == 2 && (IsRegion(qualifier[0]) || !IsRegion(qualifier[1]))) {
+    if (qualifier.size() == 2 && (IsRegion(qualifier.at(0)) || !IsRegion(qualifier.at(1)))) {
       return not_found();
     }
     const std::string project =
-        qualifier.empty() || IsRegion(qualifier[0]) ? default_project : qualifier[0];
+        qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
     columns = SchemataColumns();
     for (const std::string& dataset : DatasetsIn(source, project, qualifier)) {
       // The row layout reads directly as the information schema's column order.
       // cppcheck-suppress useStlAlgorithm
-      rows.push_back({String(project), String(dataset), kNull, kNull, kNull, String("US"),
-                      String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
-                                          "`\nOPTIONS(\n  location=\"us\"\n);")),
-                      kNull, kNull});
+      rows.push_back({
+          String(project),
+          String(dataset),
+          kNull,
+          kNull,
+          kNull,
+          String("US"),
+          String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
+                              "`\nOPTIONS(\n  location=\"us\"\n);")),
+          kNull,
+          kNull,
+      });
     }
   } else if (view == "TABLES" || view == "COLUMNS" || view == "COLUMN_FIELD_PATHS") {
     // Scoped to a dataset or to a region: [PROJECT.](DATASET | `region-REGION`).
@@ -401,10 +425,10 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       dataset = default_dataset;
     } else {
       if (qualifier.size() == 2) {
-        if (IsRegion(qualifier[0])) {
+        if (IsRegion(qualifier.at(0))) {
           return not_found();
         }
-        project = qualifier[0];
+        project = qualifier.at(0);
       }
       if (!IsRegion(qualifier.back())) {
         dataset = qualifier.back();

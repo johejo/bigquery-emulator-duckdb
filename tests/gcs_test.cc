@@ -30,9 +30,12 @@ std::string ReadFile(const std::filesystem::path& path) {
 class GcsTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    for (const char* name :
-         {"STORAGE_EMULATOR_HOST", "GOOGLE_APPLICATION_CREDENTIALS",
-          "CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
+    for (const char* name : {
+             "STORAGE_EMULATOR_HOST",
+             "GOOGLE_APPLICATION_CREDENTIALS",
+             "CLOUD_STORAGE_EMULATOR_ENDPOINT",
+             "CLOUD_STORAGE_TESTBENCH_ENDPOINT",
+         }) {
       const char* value = std::getenv(name);
       environment_[name] = value != nullptr ? std::optional<std::string>(value) : std::nullopt;
       unsetenv(name);

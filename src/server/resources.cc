@@ -79,7 +79,7 @@ json ProjectRow(const std::vector<FieldSchema>& schema, const SchemaSelection& s
   for (const auto& [index, child] : selection.fields) {
     json cell = row.at("f").at(index);
     if (!child.all && !cell.at("v").is_null()) {
-      const FieldSchema& field = schema[index];
+      const FieldSchema& field = schema.at(index);
       if (field.mode == FieldMode::kRepeated) {
         for (auto& element : cell["v"]) {
           if (!element.at("v").is_null()) {
@@ -99,7 +99,7 @@ std::vector<FieldSchema> ProjectSchema(const std::vector<FieldSchema>& schema,
                                        const SchemaSelection& selection) {
   std::vector<FieldSchema> projected;
   for (const auto& [index, child] : selection.fields) {
-    FieldSchema field = schema[index];
+    FieldSchema field = schema.at(index);
     if (!child.all) {
       field.fields = ProjectSchema(field.fields, child);
     }
@@ -113,9 +113,11 @@ json ErrorProto(const ApiError& error) {
 }
 
 json TableReferenceJson(const TableReference& table) {
-  return json{{"projectId", table.project_id},
-              {"datasetId", table.dataset_id},
-              {"tableId", table.table_id}};
+  return json{
+      {"projectId", table.project_id},
+      {"datasetId", table.dataset_id},
+      {"tableId", table.table_id},
+  };
 }
 
 json DatasetReferenceJson(const DatasetReference& dataset) {
@@ -167,9 +169,11 @@ json JobStatus(const Job& job) {
 }
 
 json JobStatistics(const Job& job) {
-  json statistics = {{"creationTime", std::to_string(job.creation_time_ms)},
-                     {"startTime", std::to_string(job.creation_time_ms)},
-                     {"endTime", std::to_string(job.end_time_ms)}};
+  json statistics = {
+      {"creationTime", std::to_string(job.creation_time_ms)},
+      {"startTime", std::to_string(job.creation_time_ms)},
+      {"endTime", std::to_string(job.end_time_ms)},
+  };
   if (std::holds_alternative<CopyJob>(job.configuration)) {
     statistics["copy"] = {{"copiedRows", std::to_string(job.output_rows)}};
     return statistics;
@@ -189,7 +193,10 @@ json JobStatistics(const Job& job) {
   }
   const QueryJob& query = *job.query();
   json query_statistics = {
-      {"totalBytesProcessed", "0"}, {"totalBytesBilled", "0"}, {"cacheHit", false}};
+      {"totalBytesProcessed", "0"},
+      {"totalBytesBilled", "0"},
+      {"cacheHit", false},
+  };
   // A query that failed before it was translated has no statement to describe.
   if (!query.statement_type.empty()) {
     query_statistics["statementType"] = query.statement_type;
@@ -254,12 +261,14 @@ json JobConfiguration(const Job& job) {
 }
 
 json JobListEntry(const Job& job, bool full) {
-  json entry = {{"kind", "bigquery#job"},
-                {"id", JobId(job)},
-                {"jobReference", JobReference(job)},
-                {"state", "DONE"},
-                {"configuration", JobConfiguration(job)},
-                {"statistics", JobStatistics(job)}};
+  json entry = {
+      {"kind", "bigquery#job"},
+      {"id", JobId(job)},
+      {"jobReference", JobReference(job)},
+      {"state", "DONE"},
+      {"configuration", JobConfiguration(job)},
+      {"statistics", JobStatistics(job)},
+  };
   if (job.error.has_value()) {
     entry["errorResult"] = ErrorProto(*job.error);
   }
@@ -275,8 +284,8 @@ json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool
   const bool as_seconds = !int64_timestamps && HasTimestampField(result.schema);
   json rows = json::array();
   for (int64_t i = begin; i < end; ++i) {
-    rows.push_back(as_seconds ? TimestampsAsSeconds(result.schema, result.rows[i])
-                              : result.rows[i]);
+    rows.push_back(as_seconds ? TimestampsAsSeconds(result.schema, result.rows.at(i))
+                              : result.rows.at(i));
   }
   return rows;
 }
@@ -317,10 +326,12 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
 
 // A dry run creates no job, so its response has no job reference either.
 json DryRunQueryResponse(const Job& job) {
-  json response = {{"kind", "bigquery#queryResponse"},
-                   {"jobComplete", true},
-                   {"totalBytesProcessed", "0"},
-                   {"cacheHit", false}};
+  json response = {
+      {"kind", "bigquery#queryResponse"},
+      {"jobComplete", true},
+      {"totalBytesProcessed", "0"},
+      {"cacheHit", false},
+  };
   if (job.error.has_value()) {
     throw ApiError(*job.error);
   }
@@ -340,24 +351,39 @@ json ErrorBody(const ApiError& error) {
   } else if (error.http_status() == 409) {
     status = "ALREADY_EXISTS";
   }
-  return json{{"error",
-               {{"code", error.http_status()},
-                {"message", error.what()},
-                {"errors", json::array({json{{"message", error.what()},
-                                             {"domain", "global"},
-                                             {"reason", error.reason()}}})},
-                {"status", status}}}};
+  return json{
+      {
+          "error",
+          {
+              {"code", error.http_status()},
+              {"message", error.what()},
+              {
+                  "errors",
+                  json::array({
+                      json{
+                          {"message", error.what()},
+                          {"domain", "global"},
+                          {"reason", error.reason()},
+                      },
+                  }),
+              },
+              {"status", status},
+          },
+      },
+  };
 }
 
 json JobResource(const Job& job) {
-  return json{{"kind", "bigquery#job"},
-              {"etag", kEtag},
-              {"id", JobId(job)},
-              {"selfLink", ""},
-              {"jobReference", JobReference(job)},
-              {"configuration", JobConfiguration(job)},
-              {"status", JobStatus(job)},
-              {"statistics", JobStatistics(job)}};
+  return json{
+      {"kind", "bigquery#job"},
+      {"etag", kEtag},
+      {"id", JobId(job)},
+      {"selfLink", ""},
+      {"jobReference", JobReference(job)},
+      {"configuration", JobConfiguration(job)},
+      {"status", JobStatus(job)},
+      {"statistics", JobStatistics(job)},
+  };
 }
 
 json JobList(const std::vector<std::shared_ptr<const Job>>& jobs, const JobListRequest& request) {
@@ -423,9 +449,11 @@ json ProjectList(const std::vector<Project>& projects, const ListPage& page) {
   if (!entries.empty()) {
     response["projects"] = json::array();
     for (const Project& project : entries) {
-      json entry = {{"kind", "bigquery#project"},
-                    {"id", project.project_id},
-                    {"projectReference", {{"projectId", project.project_id}}}};
+      json entry = {
+          {"kind", "bigquery#project"},
+          {"id", project.project_id},
+          {"projectReference", {{"projectId", project.project_id}}},
+      };
       if (project.numeric_id) entry["numericId"] = *project.numeric_id;
       if (project.friendly_name) entry["friendlyName"] = *project.friendly_name;
       response["projects"].push_back(std::move(entry));
@@ -436,11 +464,13 @@ json ProjectList(const std::vector<Project>& projects, const ListPage& page) {
 }
 
 json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata) {
-  json resource{{"kind", "bigquery#dataset"},
-                {"etag", kEtag},
-                {"id", dataset.project_id + ":" + dataset.dataset_id},
-                {"datasetReference", DatasetReferenceJson(dataset)},
-                {"location", kLocation}};
+  json resource{
+      {"kind", "bigquery#dataset"},
+      {"etag", kEtag},
+      {"id", dataset.project_id + ":" + dataset.dataset_id},
+      {"datasetReference", DatasetReferenceJson(dataset)},
+      {"location", kLocation},
+  };
   resource.update(metadata.ToJson());
   return resource;
 }
@@ -451,10 +481,12 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
   json datasets = json::array();
   for (const DatasetListEntry& entry :
        ListPageItems(entries, page, &DatasetListEntry::dataset_id, response)) {
-    json item{{"kind", "bigquery#dataset"},
-              {"id", project_id + ":" + entry.dataset_id},
-              {"datasetReference", DatasetReferenceJson({project_id, entry.dataset_id})},
-              {"location", kLocation}};
+    json item{
+        {"kind", "bigquery#dataset"},
+        {"id", project_id + ":" + entry.dataset_id},
+        {"datasetReference", DatasetReferenceJson({project_id, entry.dataset_id})},
+        {"location", kLocation},
+    };
     // A list entry carries the metadata but the description.
     item.update(entry.metadata.ToJson());
     item.erase("description");
@@ -468,15 +500,17 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
 }
 
 json TableResource(const TableInfo& info) {
-  json resource{{"kind", "bigquery#table"},
-                {"etag", kEtag},
-                {"id", TableId(info.reference)},
-                {"tableReference", TableReferenceJson(info.reference)},
-                {"schema", SchemaToJson(info.schema)},
-                {"type", TableTypeName(info.view_query ? TableType::kView : TableType::kTable)},
-                {"numRows", std::to_string(info.num_rows)},
-                {"numBytes", "0"},
-                {"location", kLocation}};
+  json resource{
+      {"kind", "bigquery#table"},
+      {"etag", kEtag},
+      {"id", TableId(info.reference)},
+      {"tableReference", TableReferenceJson(info.reference)},
+      {"schema", SchemaToJson(info.schema)},
+      {"type", TableTypeName(info.view_query ? TableType::kView : TableType::kTable)},
+      {"numRows", std::to_string(info.num_rows)},
+      {"numBytes", "0"},
+      {"location", kLocation},
+  };
   resource.update(info.metadata.ToJson());
   if (info.view_query) {
     resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
@@ -506,10 +540,12 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   for (const TableListEntry& entry :
        ListPageItems(tables, page, &TableListEntry::table_id, response)) {
     const TableReference table{dataset.project_id, dataset.dataset_id, entry.table_id};
-    json item{{"kind", "bigquery#table"},
-              {"id", TableId(table)},
-              {"tableReference", TableReferenceJson(table)},
-              {"type", TableTypeName(entry.type)}};
+    json item{
+        {"kind", "bigquery#table"},
+        {"id", TableId(table)},
+        {"tableReference", TableReferenceJson(table)},
+        {"type", TableTypeName(entry.type)},
+    };
     // A list entry carries the metadata but the description and cloneDefinition.
     item.update(entry.metadata.ToJson());
     item.erase("description");
@@ -526,10 +562,12 @@ json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPa
                                         ? SchemaSelection{.all = true}
                                         : ParseSchemaSelection(result.schema, selected_fields);
   const auto size = static_cast<int64_t>(result.rows.size());
-  json response = {{"kind", "bigquery#tableDataList"},
-                   {"etag", kEtag},
-                   {"totalRows", std::to_string(total_rows)},
-                   {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)}};
+  json response = {
+      {"kind", "bigquery#tableDataList"},
+      {"etag", kEtag},
+      {"totalRows", std::to_string(total_rows)},
+      {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)},
+  };
   if (!selection.all) {
     json& rows = response["rows"];
     std::ranges::transform(rows, rows.begin(), [&](const json& row) {
@@ -547,9 +585,10 @@ json InsertAllResponse(const std::vector<InsertError>& errors) {
   if (!errors.empty()) {
     response["insertErrors"] = json::array();
     for (const InsertError& error : errors) {
-      response["insertErrors"].push_back(
-          {{"index", error.index},
-           {"errors", json::array({{{"reason", "invalid"}, {"message", error.message}}})}});
+      response["insertErrors"].push_back({
+          {"index", error.index},
+          {"errors", json::array({{{"reason", "invalid"}, {"message", error.message}}})},
+      });
     }
   }
   return response;

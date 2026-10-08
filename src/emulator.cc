@@ -68,8 +68,8 @@ std::string ProjectFileName(const std::string& project_id) {
       name += c;
     } else {
       name += '%';
-      name += kHex[byte >> 4];
-      name += kHex[byte & 0xF];
+      name += kHex[byte >> 4U];
+      name += kHex[byte & 0xFU];
     }
   }
   return name + ".duckdb";
@@ -141,7 +141,7 @@ std::optional<json> RelationComment(Backend& backend, std::string_view relations
   if (result.rows.empty()) {
     return std::nullopt;
   }
-  return result.rows[0]["f"][0]["v"];
+  return result.rows.at(0)["f"][0]["v"];
 }
 
 std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
@@ -212,8 +212,10 @@ class DuckDbTableSource : public TableSource {
       if (!comment.has_value()) {
         return std::nullopt;
       }
-      return TableDescription{.schema = TableSchema(backend_, reference),
-                              .metadata = CommentMetadata(*comment)};
+      return TableDescription{
+          .schema = TableSchema(backend_, reference),
+          .metadata = CommentMetadata(*comment),
+      };
     } catch (const BackendError&) {
       return std::nullopt;
     }
@@ -271,7 +273,8 @@ const googlesql::Type* ParameterType(const FieldSchema& field,
 bool SameWireEncoding(FieldType a, FieldType b) {
   static const auto* const kGroups = new std::vector<std::set<FieldType>>{
       {FieldType::kInteger, FieldType::kFloat, FieldType::kNumeric, FieldType::kBigNumeric},
-      {FieldType::kString, FieldType::kJson, FieldType::kGeography}};
+      {FieldType::kString, FieldType::kJson, FieldType::kGeography},
+  };
   if (a == b) {
     return true;
   }
@@ -290,8 +293,8 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
     return duckdb_schema;
   }
   for (size_t i = 0; i < duckdb_schema.size(); ++i) {
-    FieldSchema& field = duckdb_schema[i];
-    const FieldSchema& resolved = resolved_schema[i];
+    FieldSchema& field = duckdb_schema.at(i);
+    const FieldSchema& resolved = resolved_schema.at(i);
     field.name = resolved.name;
     if (field.mode != resolved.mode) {
       continue;
@@ -340,9 +343,12 @@ std::optional<CreateDisposition> ParseCreateDisposition(std::string_view name) {
 }
 
 std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
-  for (const WriteDisposition disposition :
-       {WriteDisposition::kWriteEmpty, WriteDisposition::kWriteAppend,
-        WriteDisposition::kWriteTruncate, WriteDisposition::kWriteTruncateData}) {
+  for (const WriteDisposition disposition : {
+           WriteDisposition::kWriteEmpty,
+           WriteDisposition::kWriteAppend,
+           WriteDisposition::kWriteTruncate,
+           WriteDisposition::kWriteTruncateData,
+       }) {
     if (DispositionName(disposition) == name) return disposition;
   }
   return std::nullopt;
@@ -463,8 +469,12 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   std::string unsupported;
   std::optional<TranslatedStatement> translated =
       TranslateStatement(analyzed.statement(), parameters,
-                         DefaultDataset{settings.default_project, settings.default_dataset, nullptr,
-                                        has_session_user_},
+                         DefaultDataset{
+                             settings.default_project,
+                             settings.default_dataset,
+                             nullptr,
+                             has_session_user_,
+                         },
                          &unsupported);
   if (!translated.has_value()) {
     throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
@@ -517,11 +527,13 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
-  job->configuration = QueryJob{.query = request.query,
-                                .dry_run = request.dry_run,
-                                .destination_table = request.destination_table,
-                                .create_disposition = request.create_disposition,
-                                .write_disposition = request.write_disposition};
+  job->configuration = QueryJob{
+      .query = request.query,
+      .dry_run = request.dry_run,
+      .destination_table = request.destination_table,
+      .create_disposition = request.create_disposition,
+      .write_disposition = request.write_disposition,
+  };
   return RunJob(std::move(job), [&](Job& job) {
     if (request.destination_table) {
       auto& project = request.destination_table->project_id;
@@ -534,7 +546,9 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
                                                              ? request.project_id
                                                              : request.default_dataset->project_id);
       setup.push_back("USE " + QualifiedName(DatasetReference{
-                                   dataset_project, request.default_dataset->dataset_id}));
+                                   dataset_project,
+                                   request.default_dataset->dataset_id,
+                               }));
       settings.default_project = dataset_project;
       settings.default_dataset = request.default_dataset->dataset_id;
     } else {
@@ -630,7 +644,8 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
       throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" +
                                dataset.dataset_id);
     }
-    return AlterDatasetStatements(*alteration, ParseDatasetMetadata(result.rows[0]["f"][1]["v"]));
+    return AlterDatasetStatements(*alteration,
+                                  ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]));
   }
   return std::nullopt;
 }
@@ -712,7 +727,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     }
     if (copy.configuration.contains("sourceTables")) {
       for (size_t i = 0; i < copy.source_tables.size(); ++i) {
-        copy.configuration["sourceTables"][i]["projectId"] = copy.source_tables[i].project_id;
+        copy.configuration["sourceTables"][i]["projectId"] = copy.source_tables.at(i).project_id;
       }
     }
 
@@ -800,10 +815,12 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       AnnotateParquetBigNumerics(path, table.schema);
     } else {
       WriteTextExtract(table.schema, Execute("SELECT * FROM " + QualifiedName(source)).rows,
-                       {.json = format == "NEWLINE_DELIMITED_JSON",
-                        .gzip = compression == "GZIP",
-                        .field_delimiter = config.value("fieldDelimiter", ","),
-                        .print_header = config.value("printHeader", true)},
+                       {
+                           .json = format == "NEWLINE_DELIMITED_JSON",
+                           .gzip = compression == "GZIP",
+                           .field_delimiter = config.value("fieldDelimiter", ","),
+                           .print_header = config.value("printHeader", true),
+                       },
                        path);
     }
     if (uri.starts_with("gs://")) gcs_client_.Upload(path, uri);
@@ -867,7 +884,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
       std::format("CREATE TEMP TABLE _bigquery_emulator_query_result AS"
                   " SELECT * FROM ({}) AS _bigquery_emulator_query_result({})",
                   sql, aliases),
-      "BEGIN TRANSACTION"};
+      "BEGIN TRANSACTION",
+  };
   if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {
     if (existing.has_value()) {
       statements.push_back("DROP TABLE " + target);
@@ -948,8 +966,10 @@ std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_i
   for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
     // Keep the wire-field decoding beside the named result fields.
     // cppcheck-suppress useStlAlgorithm
-    entries.push_back({.dataset_id = row["f"][0]["v"].get<std::string>(),
-                       .metadata = ParseDatasetMetadata(row["f"][1]["v"])});
+    entries.push_back({
+        .dataset_id = row["f"][0]["v"].get<std::string>(),
+        .metadata = ParseDatasetMetadata(row["f"][1]["v"]),
+    });
   }
   return entries;
 }
@@ -960,7 +980,7 @@ DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
   }
-  return ParseDatasetMetadata(result.rows[0]["f"][1]["v"]);
+  return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
 }
 
 void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
@@ -1025,9 +1045,11 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
            .rows) {
     // Keep the wire-field decoding beside the named result fields.
     // cppcheck-suppress useStlAlgorithm
-    entries.push_back({.table_id = row["f"][0]["v"].get<std::string>(),
-                       .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable,
-                       .metadata = CommentMetadata(row["f"][2]["v"])});
+    entries.push_back({
+        .table_id = row["f"][0]["v"].get<std::string>(),
+        .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable,
+        .metadata = CommentMetadata(row["f"][2]["v"]),
+    });
   }
   return entries;
 }
@@ -1238,7 +1260,7 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
       statement += columns;
       statement += ") VALUES (";
       statement += literals;
-      statement += ")";
+      statement += ')';
       statements.push_back(std::move(statement));
       indexes.push_back(i);
     } catch (const ApiError& error) {
@@ -1250,7 +1272,7 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
   }
   try {
     for (const auto& [index, message] : backend_.InsertRows(statements, skip_invalid_rows)) {
-      errors.push_back({indexes[index], message});
+      errors.push_back({indexes.at(index), message});
     }
   } catch (const BackendError& error) {
     throw ApiError::Invalid(error.what());

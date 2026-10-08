@@ -1,6 +1,7 @@
 #include "src/server/routes.h"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <format>
@@ -23,10 +24,12 @@ using nlohmann::json;
 
 // The API-wide parameters every method accepts. The others are unsupported: `callback` wraps the
 // response in JSONP and `$.xgafv` changes the error format.
-// NOLINTNEXTLINE(cert-err58-cpp)
-const std::vector<std::string_view> kAcceptedApiParameters = {
+constexpr std::array<std::string_view, 9> kAcceptedApiParameters = {
     // Credentials and quota accounting, which the emulator does not check.
-    "access_token", "key", "oauth_token", "quotaUser",
+    "access_token",
+    "key",
+    "oauth_token",
+    "quotaUser",
     // Formatting of the JSON response.
     "prettyPrint",
     // Partial responses are not emulated: the response carries every field, a superset of the
@@ -35,11 +38,16 @@ const std::vector<std::string_view> kAcceptedApiParameters = {
     // The response format; anything but JSON is rejected below.
     "alt",
     // Media uploads, which jobs.insert reads.
-    "uploadType", "upload_protocol"};
+    "uploadType",
+    "upload_protocol",
+};
 
 QueryParameter ReadQueryParameter(const json& parameter) {
   QueryParameter result{
-      .type = parameter.value("type", ""), .format = parameter.value("format", ""), .values = {}};
+      .type = parameter.value("type", ""),
+      .format = parameter.value("format", ""),
+      .values = {},
+  };
   if (parameter.contains("enum")) {
     result.values = parameter["enum"].get<std::vector<std::string>>();
   }
@@ -114,10 +122,12 @@ ApiMethod FindApiMethod(std::string_view id) {
   for (const auto& [resource_name, resource] : Discovery()["resources"].items()) {
     for (const auto& [method_name, method] : resource["methods"].items()) {
       if (method["id"] != id) continue;
-      ApiMethod result{.http_method = method["httpMethod"].get<std::string>(),
-                       .path = RoutePattern(method["path"].get<std::string>()),
-                       .upload_paths = {},
-                       .parameters = {}};
+      ApiMethod result{
+          .http_method = method["httpMethod"].get<std::string>(),
+          .path = RoutePattern(method["path"].get<std::string>()),
+          .upload_paths = {},
+          .parameters = {},
+      };
       if (method.contains("mediaUpload")) {
         for (const auto& [protocol, upload] : method["mediaUpload"]["protocols"].items()) {
           result.upload_paths.push_back(RoutePattern(upload["path"].get<std::string>()));

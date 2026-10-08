@@ -56,7 +56,7 @@ bool EqualsIgnoringCase(std::string_view a, std::string_view b) {
   }
   for (size_t i = 0; i < a.size(); ++i) {
     const auto upper = [](char c) { return c >= 'a' && c <= 'z' ? static_cast<char>(c - 32) : c; };
-    if (upper(a[i]) != upper(b[i])) {
+    if (upper(a.at(i)) != upper(b.at(i))) {
       return false;
     }
   }

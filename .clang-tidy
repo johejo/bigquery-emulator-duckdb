@@ -63,3 +63,7 @@ HeaderFilterRegex: '^(src|tests|tools)/'
 # have to be errors to be visible at all.
 WarningsAsErrors: '*'
 FormatStyle: file
+CheckOptions:
+  # JSON's subscript inserts missing object keys and grows arrays, just as map's inserts keys.
+  # at() would change that behavior. Keep the standard map exclusions as well.
+  cppcoreguidelines-pro-bounds-avoid-unchecked-container-access.ExcludeClasses: '::std::map;::std::unordered_map;::std::flat_map;::nlohmann::.*basic_json'

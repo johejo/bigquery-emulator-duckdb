@@ -49,8 +49,11 @@ std::string StringField(const json& object, const char* key, std::string_view wh
 // Reads a TableReference, whose project defaults to the job's. `what` names it in errors.
 TableReference ParseTableReference(const json& table, std::string_view what) {
   if (!table.is_object()) throw ApiError::Invalid("Invalid " + std::string(what));
-  TableReference result{StringField(table, "projectId", what),
-                        StringField(table, "datasetId", what), StringField(table, "tableId", what)};
+  TableReference result{
+      StringField(table, "projectId", what),
+      StringField(table, "datasetId", what),
+      StringField(table, "tableId", what),
+  };
   if (result.dataset_id.empty() || result.table_id.empty()) {
     throw ApiError::Invalid("Invalid " + std::string(what));
   }
@@ -63,8 +66,10 @@ std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
   }
   const json& dataset = config["defaultDataset"];
   if (!dataset.is_object()) throw ApiError::Invalid("Invalid default dataset");
-  return DatasetReference{StringField(dataset, "projectId", "default dataset"),
-                          StringField(dataset, "datasetId", "default dataset")};
+  return DatasetReference{
+      StringField(dataset, "projectId", "default dataset"),
+      StringField(dataset, "datasetId", "default dataset"),
+  };
 }
 
 // jobs.query takes the query configuration as the request body and jobs.insert takes it as
@@ -237,8 +242,11 @@ DatasetReference DatasetFromPath(const httplib::Request& request) {
 }
 
 TableReference TableFromPath(const httplib::Request& request) {
-  return TableReference{Param(request, "projectId"), Param(request, "datasetId"),
-                        Param(request, "tableId")};
+  return TableReference{
+      Param(request, "projectId"),
+      Param(request, "datasetId"),
+      Param(request, "tableId"),
+  };
 }
 
 json ParseBody(const httplib::Request& request) {
@@ -290,7 +298,7 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
   }
   if (parts.size() != 2) throw ApiError::Invalid("Invalid multipart upload");
   try {
-    return {json::parse(parts[0]), std::move(parts[1])};
+    return {json::parse(parts.at(0)), std::move(parts.at(1))};
   } catch (const json::exception& error) {
     throw ApiError::Invalid(std::string("Invalid upload metadata: ") + error.what());
   }
@@ -303,16 +311,20 @@ QueryRequest ParseQuery(const std::string& project_id, const json& body) {
 }
 
 ResultPage ParseQueryPage(const json& body) {
-  return {.max_results = body.value("maxResults", kDefaultMaxResults),
-          .int64_timestamps =
-              body.value("formatOptions", json::object()).value("useInt64Timestamp", false)};
+  return {
+      .max_results = body.value("maxResults", kDefaultMaxResults),
+      .int64_timestamps =
+          body.value("formatOptions", json::object()).value("useInt64Timestamp", false),
+  };
 }
 
 ResultPage ParseResultPage(const httplib::Request& request) {
-  return {.start_index = request.has_param("pageToken") ? QueryParamInt(request, "pageToken", 0)
-                                                        : QueryParamInt(request, "startIndex", 0),
-          .max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults),
-          .int64_timestamps = QueryParamBool(request, "formatOptions.useInt64Timestamp")};
+  return {
+      .start_index = request.has_param("pageToken") ? QueryParamInt(request, "pageToken", 0)
+                                                    : QueryParamInt(request, "startIndex", 0),
+      .max_results = QueryParamInt(request, "maxResults", kDefaultMaxResults),
+      .int64_timestamps = QueryParamBool(request, "formatOptions.useInt64Timestamp"),
+  };
 }
 
 JobRequest ParseJobInsert(const std::string& project_id, const json& body) {
@@ -360,8 +372,10 @@ JobListRequest ParseJobList(const httplib::Request& request) {
 }
 
 ListPage ParseListPage(const httplib::Request& request) {
-  ListPage result{.max_results = QueryParamInt(request, "maxResults", INT64_MAX),
-                  .page_token = request.get_param_value("pageToken")};
+  ListPage result{
+      .max_results = QueryParamInt(request, "maxResults", INT64_MAX),
+      .page_token = request.get_param_value("pageToken"),
+  };
   if (result.max_results <= 0) throw ApiError::Invalid("Invalid value for maxResults");
   return result;
 }
@@ -396,8 +410,10 @@ DatasetFilter ParseDatasetFilter(const httplib::Request& request) {
 
 TableGetRequest ParseTableGet(const httplib::Request& request) {
   // CheckQueryParameters has checked the value of view.
-  return {.storage_stats = request.get_param_value("view") != "BASIC",
-          .selected_fields = request.get_param_value("selectedFields")};
+  return {
+      .storage_stats = request.get_param_value("view") != "BASIC",
+      .selected_fields = request.get_param_value("selectedFields"),
+  };
 }
 
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& body) {
@@ -408,7 +424,8 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
   }
   return {
       .dataset = DatasetReference{project_id, StringField(reference, "datasetId", "dataset ID")},
-      .metadata = DatasetMetadataFromJson(body)};
+      .metadata = DatasetMetadataFromJson(body),
+  };
 }
 
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json& body) {
@@ -417,8 +434,11 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
     throw ApiError::Invalid("Required parameter is missing: tableId");
   }
   TableInsertRequest request;
-  request.table = TableReference{dataset.project_id, dataset.dataset_id,
-                                 StringField(reference, "tableId", "table ID")};
+  request.table = TableReference{
+      dataset.project_id,
+      dataset.dataset_id,
+      StringField(reference, "tableId", "table ID"),
+  };
   if (body.contains("view")) {
     request.view = body["view"];
   } else {
@@ -450,9 +470,11 @@ InsertAllRequest ParseInsertAll(const json& body) {
        !body["templateSuffix"].get_ref<const std::string&>().empty())) {
     throw ApiError::Invalid("The emulator does not support templateSuffix");
   }
-  return InsertAllRequest{.rows = body["rows"],
-                          .skip_invalid_rows = body.value("skipInvalidRows", false),
-                          .ignore_unknown_values = body.value("ignoreUnknownValues", false)};
+  return InsertAllRequest{
+      .rows = body["rows"],
+      .skip_invalid_rows = body.value("skipInvalidRows", false),
+      .ignore_unknown_values = body.value("ignoreUnknownValues", false),
+  };
 }
 
 }  // namespace bigquery_emulator_duckdb::server

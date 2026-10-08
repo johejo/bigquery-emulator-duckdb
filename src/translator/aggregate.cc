@@ -56,8 +56,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
   const auto type_of = [&](std::size_t argument) {
-    return argument < call.argument_list().size() ? call.argument_list()[argument]->type()->kind()
-                                                  : googlesql::TYPE_UNKNOWN;
+    return argument < call.argument_list().size()
+               ? call.argument_list().at(argument)->type()->kind()
+               : googlesql::TYPE_UNKNOWN;
   };
   const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
     return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
@@ -372,7 +373,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     }
     input = Relation{
         .sql = "SELECT " + (inner.empty() ? "1 AS _unit" : Join(inner, ", ")) + input->From(),
-        .columns = columns};
+        .columns = columns,
+    };
   } else {
     // HAVING MAX/MIN keeps the rows whose expression reaches the group's maximum or minimum,
     // which a window over the group computes alongside the input.

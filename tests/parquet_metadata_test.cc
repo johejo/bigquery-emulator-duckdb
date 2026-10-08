@@ -131,29 +131,29 @@ TEST(ParquetMetadataTest, ColumnsTakeDuckDbsShape) {
   ASSERT_EQ(columns.kind, Kind::kStruct);
   ASSERT_EQ(columns.children.size(), 6);
 
-  const ParquetColumn& a = columns.children[0];
+  const ParquetColumn& a = columns.children.at(0);
   ASSERT_EQ(a.kind, Kind::kList);
   EXPECT_EQ(a.children.at(0).kind, Kind::kLeaf);
   EXPECT_EQ(a.children.at(0).element, 3);
   EXPECT_EQ(a.children.at(0).type, parquet::kFixedLenByteArray);
 
-  const ParquetColumn& b = columns.children[1];
+  const ParquetColumn& b = columns.children.at(1);
   ASSERT_EQ(b.kind, Kind::kList);
   EXPECT_EQ(b.children.at(0).kind, Kind::kLeaf);
 
-  const ParquetColumn& c = columns.children[2];
+  const ParquetColumn& c = columns.children.at(2);
   ASSERT_EQ(c.kind, Kind::kList);
   ASSERT_EQ(c.children.at(0).kind, Kind::kStruct);
   EXPECT_NE(c.children.at(0).Child("X"), nullptr);
 
-  const ParquetColumn& d = columns.children[3];
+  const ParquetColumn& d = columns.children.at(3);
   ASSERT_EQ(d.kind, Kind::kList);
   ASSERT_EQ(d.children.at(0).kind, Kind::kStruct);
   EXPECT_EQ(d.children.at(0).children.size(), 2);
 
-  EXPECT_EQ(columns.children[4].kind, Kind::kList);
-  EXPECT_EQ(columns.children[4].children.at(0).kind, Kind::kLeaf);
-  EXPECT_EQ(columns.children[5].kind, Kind::kStruct);
+  EXPECT_EQ(columns.children.at(4).kind, Kind::kList);
+  EXPECT_EQ(columns.children.at(4).children.at(0).kind, Kind::kLeaf);
+  EXPECT_EQ(columns.children.at(5).kind, Kind::kStruct);
 }
 
 TEST(ParquetMetadataTest, TellsWideDecimals) {

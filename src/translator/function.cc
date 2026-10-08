@@ -60,10 +60,12 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
   ScalarCall call{.resolved = resolved, .name = name, .safe = safe};
   for (size_t i = 0; i < args.size(); ++i) {
     const googlesql::ResolvedExpr& argument = *resolved.argument_list(static_cast<int>(i));
-    call.arguments.push_back({.sql = args[i],
-                              .type = argument.type()->kind(),
-                              .date_part = DatePart(argument),
-                              .rounding_mode = RoundingMode(argument)});
+    call.arguments.push_back({
+        .sql = args.at(i),
+        .type = argument.type()->kind(),
+        .date_part = DatePart(argument),
+        .rounding_mode = RoundingMode(argument),
+    });
   }
   if (entry->implementation == Implementation::kHandler) {
     return entry->handler(call);
@@ -129,26 +131,28 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                           return HasInterval(argument->type());
                         });
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
-  static constexpr std::string_view interval_functions[] = {"$INTERVAL",
-                                                            "$EXTRACT",
-                                                            "MAKE_INTERVAL",
-                                                            "JUSTIFY_HOURS",
-                                                            "JUSTIFY_DAYS",
-                                                            "JUSTIFY_INTERVAL",
-                                                            "$IS_NULL",
-                                                            "$CASE_NO_VALUE",
-                                                            "IF",
-                                                            "IFNULL",
-                                                            "COALESCE",
-                                                            "ERROR",
-                                                            "$MAKE_ARRAY",
-                                                            "$ARRAY_AT_OFFSET",
-                                                            "$ARRAY_AT_ORDINAL",
-                                                            "$SAFE_ARRAY_AT_OFFSET",
-                                                            "$SAFE_ARRAY_AT_ORDINAL",
-                                                            "ARRAY_LENGTH",
-                                                            "ARRAY_REVERSE",
-                                                            "ARRAY_CONCAT"};
+  static constexpr std::string_view interval_functions[] = {
+      "$INTERVAL",
+      "$EXTRACT",
+      "MAKE_INTERVAL",
+      "JUSTIFY_HOURS",
+      "JUSTIFY_DAYS",
+      "JUSTIFY_INTERVAL",
+      "$IS_NULL",
+      "$CASE_NO_VALUE",
+      "IF",
+      "IFNULL",
+      "COALESCE",
+      "ERROR",
+      "$MAKE_ARRAY",
+      "$ARRAY_AT_OFFSET",
+      "$ARRAY_AT_ORDINAL",
+      "$SAFE_ARRAY_AT_OFFSET",
+      "$SAFE_ARRAY_AT_ORDINAL",
+      "ARRAY_LENGTH",
+      "ARRAY_REVERSE",
+      "ARRAY_CONCAT",
+  };
   if (interval && entry->handler != Bucket &&
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
@@ -161,7 +165,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "$EQUAL",         "$NOT_EQUAL",        "$LESS",
       "$LESS_OR_EQUAL", "$GREATER",          "$GREATER_OR_EQUAL",
       "$BETWEEN",       "$IS_DISTINCT_FROM", "$IN",
-      "$IN_ARRAY",      "$CASE_WITH_VALUE",  "NULLIF"};
+      "$IN_ARRAY",      "$CASE_WITH_VALUE",  "NULLIF",
+  };
   const auto compares_internal_struct = [&] {
     for (int i = 0; i < call.argument_list_size(); ++i) {
       // CASE's THEN and ELSE values are results, not operands of its comparison.
@@ -241,11 +246,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   std::vector<std::string> placeholders;
   for (size_t i = 0; i < args.size(); ++i) {
     if (call.argument_list(static_cast<int>(i))->type()->IsEnum()) {
-      placeholders.push_back(args[i]);
+      placeholders.push_back(args.at(i));
       continue;
     }
     const std::string field = "a" + std::to_string(i + 1);
-    bound.push_back(field + " := " + args[i]);
+    bound.push_back(field + " := " + args.at(i));
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }

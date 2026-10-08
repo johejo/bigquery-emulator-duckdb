@@ -69,7 +69,7 @@ std::optional<std::vector<FieldSchema>> ResultSchema(
     const auto& fields = query->output_column_list(0)->column().type()->AsStruct()->fields();
     for (size_t i = 0; i < fields.size(); ++i) {
       absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(
-          ValueTableFieldName(fields[i].name, static_cast<int>(i)), fields[i].type);
+          ValueTableFieldName(fields.at(i).name, static_cast<int>(i)), fields.at(i).type);
       if (!field.ok()) {
         return std::nullopt;
       }
@@ -98,21 +98,22 @@ namespace {
 // Literal CASTs disappear during resolution. Check the source AST so unsupported interval
 // casts cannot become supported merely because GoogleSQL folded them into values.
 absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
-  if (ToUpperAscii(std::string(sql)).find("INTERVAL") == std::string::npos) return absl::OkStatus();
+  if (ToUpperAscii(sql).find("INTERVAL") == std::string::npos) return absl::OkStatus();
   std::unique_ptr<googlesql::ParserOutput> parsed;
   const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
   GOOGLESQL_RETURN_IF_ERROR(expression ? googlesql::ParseExpression(sql, options, &parsed)
                                        : googlesql::ParseStatement(sql, options, &parsed));
   std::vector<const googlesql::ASTNode*> nodes{
       expression ? static_cast<const googlesql::ASTNode*>(parsed->expression())
-                 : static_cast<const googlesql::ASTNode*>(parsed->statement())};
+                 : static_cast<const googlesql::ASTNode*>(parsed->statement()),
+  };
   while (!nodes.empty()) {
     const auto* node = nodes.back();
     nodes.pop_back();
     if (const auto* cast = node->GetAsOrNull<googlesql::ASTCastExpression>()) {
       const auto* type = cast->type()->GetAsOrNull<googlesql::ASTSimpleType>();
       if (type != nullptr && type->type_name()->num_names() == 1 &&
-          ToUpperAscii(type->type_name()->names()[0]->GetAsString()) == "INTERVAL" &&
+          ToUpperAscii(type->type_name()->names().at(0)->GetAsString()) == "INTERVAL" &&
           cast->expr()->node_kind() != googlesql::AST_NULL_LITERAL &&
           cast->expr()->node_kind() != googlesql::AST_INTERVAL_EXPR) {
         return absl::UnimplementedError(

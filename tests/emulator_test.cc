@@ -56,7 +56,7 @@ class EmulatorTest : public ::testing::Test {
     if (result.schema.size() != 1 || result.rows.size() != 1) {
       return std::nullopt;
     }
-    const nlohmann::json& value = result.rows[0]["f"][0]["v"];
+    const nlohmann::json& value = result.rows.at(0)["f"][0]["v"];
     if (value.is_null()) {
       return std::nullopt;
     }
@@ -98,17 +98,17 @@ TEST_F(EmulatorTest, RunsAndPreparesResolvedParameters) {
     }
     const auto& result = job->result.value();
     ASSERT_EQ(result.schema.size(), 3);
-    EXPECT_EQ(result.schema[0].name, "f0_");
-    EXPECT_EQ(result.schema[1].name, "bytes");
-    EXPECT_EQ(result.schema[2].name, "f1_");
+    EXPECT_EQ(result.schema.at(0).name, "f0_");
+    EXPECT_EQ(result.schema.at(1).name, "bytes");
+    EXPECT_EQ(result.schema.at(2).name, "f1_");
     for (const auto& field : result.schema) {
       EXPECT_EQ(field.type, FieldType::kInteger);
     }
     if (!dry_run) {
       ASSERT_EQ(result.rows.size(), 1);
-      EXPECT_EQ(result.rows[0]["f"][0]["v"], "3");
-      EXPECT_EQ(result.rows[0]["f"][1]["v"], "2");
-      EXPECT_TRUE(result.rows[0]["f"][2]["v"].is_null());
+      EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "3");
+      EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "2");
+      EXPECT_TRUE(result.rows.at(0)["f"][2]["v"].is_null());
     }
   }
   request.dry_run = false;
@@ -147,14 +147,14 @@ TEST_F(EmulatorTest, ReportsTheResolvedResultSchema) {
   const std::vector<FieldSchema>& schema = job->result->schema;
   ASSERT_EQ(schema.size(), 4);
   // DuckDB sums integers into a HUGEINT, which alone would be reported as BIGNUMERIC.
-  EXPECT_EQ(schema[0].name, "s");
-  EXPECT_EQ(schema[0].type, FieldType::kInteger);
-  EXPECT_EQ(schema[1].name, "f0_");
-  EXPECT_EQ(schema[1].type, FieldType::kString);
-  EXPECT_EQ(schema[2].name, "f1_");
-  EXPECT_EQ(schema[2].type, FieldType::kFloat);
-  EXPECT_EQ(schema[3].name, "f2_");
-  EXPECT_EQ(schema[3].type, FieldType::kDate);
+  EXPECT_EQ(schema.at(0).name, "s");
+  EXPECT_EQ(schema.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(schema.at(1).name, "f0_");
+  EXPECT_EQ(schema.at(1).type, FieldType::kString);
+  EXPECT_EQ(schema.at(2).name, "f1_");
+  EXPECT_EQ(schema.at(2).type, FieldType::kFloat);
+  EXPECT_EQ(schema.at(3).name, "f2_");
+  EXPECT_EQ(schema.at(3).type, FieldType::kDate);
 }
 
 // A value table of structs comes back as the structs' fields; any other value is one column.
@@ -165,12 +165,12 @@ TEST_F(EmulatorTest, ReturnsValueTablesAsColumns) {
   }
   const std::vector<FieldSchema>& schema = job->result->schema;
   ASSERT_EQ(schema.size(), 2);
-  EXPECT_EQ(schema[0].name, "a");
-  EXPECT_EQ(schema[0].type, FieldType::kInteger);
-  EXPECT_EQ(schema[1].name, "b");
-  EXPECT_EQ(schema[1].type, FieldType::kString);
+  EXPECT_EQ(schema.at(0).name, "a");
+  EXPECT_EQ(schema.at(0).type, FieldType::kInteger);
+  EXPECT_EQ(schema.at(1).name, "b");
+  EXPECT_EQ(schema.at(1).type, FieldType::kString);
   ASSERT_EQ(job->result->rows.size(), 1);
-  EXPECT_EQ(job->result->rows[0]["f"][1]["v"], "x");
+  EXPECT_EQ(job->result->rows.at(0)["f"][1]["v"], "x");
   EXPECT_EQ(Scalar("SELECT AS VALUE 7"), "7");
 }
 
@@ -180,8 +180,10 @@ TEST_F(EmulatorTest, AliasesUnnestedElements) {
 
 TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {
   emulator_.CreateDataset({"test", "ds"});
-  emulator_.CreateTable({"test", "ds", "t"}, {{.name = "a", .type = FieldType::kInteger},
-                                              {.name = "b", .type = FieldType::kString}});
+  emulator_.CreateTable({"test", "ds", "t"}, {
+                                                 {.name = "a", .type = FieldType::kInteger},
+                                                 {.name = "b", .type = FieldType::kString},
+                                             });
   QueryRequest request;
   request.project_id = "test";
   request.default_dataset = DatasetReference{"test", "ds"};
@@ -288,8 +290,8 @@ TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
   EXPECT_EQ(created->result->rows.size(), 1);
   const TableInfo table = emulator_.GetTable(destination);
   ASSERT_EQ(table.schema.size(), 2);
-  EXPECT_EQ(table.schema[1].name, "f0_");
-  EXPECT_EQ(table.schema[1].type, FieldType::kInteger);
+  EXPECT_EQ(table.schema.at(1).name, "f0_");
+  EXPECT_EQ(table.schema.at(1).type, FieldType::kInteger);
   EXPECT_EQ(values(), (std::vector<std::string>{"1/2"}));
 
   const std::shared_ptr<const Job> not_empty =
@@ -312,8 +314,8 @@ TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
       write("SELECT 'x' AS b, 5 AS c", WriteDisposition::kWriteTruncate)->error.has_value());
   const TableInfo replaced = emulator_.GetTable(destination);
   ASSERT_EQ(replaced.schema.size(), 2);
-  EXPECT_EQ(replaced.schema[0].name, "b");
-  EXPECT_EQ(replaced.schema[0].type, FieldType::kString);
+  EXPECT_EQ(replaced.schema.at(0).name, "b");
+  EXPECT_EQ(replaced.schema.at(0).type, FieldType::kString);
   EXPECT_EQ(values(), (std::vector<std::string>{"x/5"}));
 
   // A failed write leaves the table as it was.
@@ -373,8 +375,8 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
   Emulator emulator(data_dir.string(), {{.project_id = "proj"}});
   const std::vector<TableListEntry> entries = emulator.ListTableEntries({"proj", "ds"});
   ASSERT_EQ(entries.size(), 1);
-  EXPECT_EQ(entries[0].table_id, "v");
-  EXPECT_EQ(entries[0].type, TableType::kView);
+  EXPECT_EQ(entries.at(0).table_id, "v");
+  EXPECT_EQ(entries.at(0).type, TableType::kView);
   try {
     emulator.GetTable({"proj", "ds", "v"});
     ADD_FAILURE() << "GetTable succeeded";
@@ -397,8 +399,8 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
   }
   const QueryResult& result = *job->result;
   ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.rows[0]["f"][0]["v"], "VIEW");
-  EXPECT_EQ(result.rows[0]["f"][1]["v"], "true");
+  EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "VIEW");
+  EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "true");
 
   emulator.DeleteTable({"proj", "ds", "v"});
   EXPECT_TRUE(emulator.ListTables({"proj", "ds"}).empty());

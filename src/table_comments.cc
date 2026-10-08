@@ -34,10 +34,15 @@ std::optional<CloneDefinition> ParseCloneDefinition(const json& comment) {
     return std::nullopt;
   }
   const json base = clone.value("baseTableReference", json::object());
-  return CloneDefinition{.base_table = {.project_id = base.value("projectId", ""),
-                                        .dataset_id = base.value("datasetId", ""),
-                                        .table_id = base.value("tableId", "")},
-                         .clone_time = clone.value("cloneTime", "")};
+  return CloneDefinition{
+      .base_table =
+          {
+              .project_id = base.value("projectId", ""),
+              .dataset_id = base.value("datasetId", ""),
+              .table_id = base.value("tableId", ""),
+          },
+      .clone_time = clone.value("cloneTime", ""),
+  };
 }
 
 }  // namespace

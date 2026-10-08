@@ -57,7 +57,7 @@ bool StoresBigNumericAsDecimal(const FieldSchema& recorded, const FieldSchema& s
     return stored.type != FieldType::kBigNumeric;
   }
   for (size_t i = 0; i < recorded.fields.size() && i < stored.fields.size(); ++i) {
-    if (StoresBigNumericAsDecimal(recorded.fields[i], stored.fields[i])) {
+    if (StoresBigNumericAsDecimal(recorded.fields.at(i), stored.fields.at(i))) {
       return true;
     }
   }
@@ -69,11 +69,11 @@ bool StoresBigNumericAsDecimal(const FieldSchema& recorded, const FieldSchema& s
 std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
                                              const std::vector<json>& comments) {
   for (size_t i = 0; i < derived.size() && i < comments.size(); ++i) {
-    if (!comments[i].is_string()) {
+    if (!comments.at(i).is_string()) {
       continue;
     }
     const json value =
-        json::parse(comments[i].get<std::string>(), nullptr, /*allow_exceptions=*/false);
+        json::parse(comments.at(i).get<std::string>(), nullptr, /*allow_exceptions=*/false);
     if (!value.is_object()) {
       continue;
     }
@@ -84,13 +84,13 @@ std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
       // Not a TableFieldSchema, so not a comment the emulator wrote.
       continue;
     }
-    if (ToLowerAscii(field.name) == ToLowerAscii(derived[i].name)) {
-      if (StoresBigNumericAsDecimal(field, derived[i])) {
+    if (ToLowerAscii(field.name) == ToLowerAscii(derived.at(i).name)) {
+      if (StoresBigNumericAsDecimal(field, derived.at(i))) {
         throw ApiError::Invalid("Column " + field.name +
                                 " was created by an earlier version of the emulator, which "
                                 "stored BIGNUMERIC as DECIMAL(38, 19); recreate the table");
       }
-      derived[i] = std::move(field);
+      derived.at(i) = std::move(field);
     }
   }
   return derived;

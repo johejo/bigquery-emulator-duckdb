@@ -221,9 +221,9 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
   }
   std::string call = name + "(";
   for (size_t i = 0; i < arguments.size(); ++i) {
-    call += (i == 0 ? "" : ", ") + arguments[i];
+    call += (i == 0 ? "" : ", ") + arguments.at(i);
   }
-  call += ")";
+  call += ')';
   return function.IsAnalytic()    ? "SELECT " + call + " OVER (ORDER BY x) FROM UNNEST([1, 2]) AS x"
          : function.IsAggregate() ? "SELECT " + call + " FROM UNNEST([1, 2]) AS x"
                                   : "SELECT " + call;
@@ -257,13 +257,13 @@ int Main(int argc, char** argv) {
   // The pages and anchors that document each function. A name can be documented on several
   // pages, such as EXTRACT for each type it takes, and the probe covers them in one row.
   std::map<std::string, std::vector<std::string>> functions;
-  for (const auto& [name, doc] : ReadLines(args[0])) {
+  for (const auto& [name, doc] : ReadLines(args.at(0))) {
     functions[name].push_back(doc);
   }
   std::map<std::string, std::vector<std::string>> hints;
   // Behavior a probe cannot observe, such as where results differ from DuckDB's defaults.
   std::map<std::string, std::string> documented;
-  for (const auto& [directive, hint] : ReadLines(args[1])) {
+  for (const auto& [directive, hint] : ReadLines(args.at(1))) {
     const std::string name = hint.substr(0, hint.find(' '));
     const std::string text = hint.substr(std::min(hint.size(), name.size() + 1));
     if ((directive != "query" && directive != "note") || text.empty() ||
@@ -273,7 +273,7 @@ int Main(int argc, char** argv) {
     }
     // A hint for a function BigQuery does not have is a typo or a function BigQuery dropped.
     if (!functions.contains(name)) {
-      std::cerr << "hint names a function not in " << args[0] << ": " << name << "\n";
+      std::cerr << "hint names a function not in " << args.at(0) << ": " << name << "\n";
       return 1;
     }
     if (directive == "note") {
@@ -287,7 +287,7 @@ int Main(int argc, char** argv) {
   NoTables tables;
   BigQueryCatalog catalog(tables, &type_factory, "test", "");
   Emulator emulator("", {{.project_id = "test"}}, "jdoe@example.com");
-  std::map<std::string, int> totals;
+  std::map<std::string_view, int> totals;
   std::ostringstream rows;
   for (const auto& [name, docs] : functions) {
     std::vector<Probe> probes;
@@ -315,21 +315,23 @@ int Main(int argc, char** argv) {
         // Probe a point and same-typed boundaries across orderable scalar types,
         // rather than declaring the generic signature supported from INT64 alone.
         if (signature.arguments().size() == 2 &&
-            signature.arguments()[0].kind() == googlesql::ARG_KIND_EXPR_ANY_1 &&
-            signature.arguments()[1].kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1) {
-          elements = {"2",
-                      "2.0",
-                      "NUMERIC '2'",
-                      "BIGNUMERIC '2'",
-                      "TRUE",
-                      "'abc'",
-                      "b'abc'",
-                      "DATE '2024-01-15'",
-                      "TIME '10:20:30'",
-                      "DATETIME '2024-01-15 10:20:30'",
-                      "TIMESTAMP '2024-01-15 10:20:30+00'",
-                      "INTERVAL 1 DAY",
-                      "RANGE<DATE> '[2024-01-01, 2024-02-01)'"};
+            signature.arguments().at(0).kind() == googlesql::ARG_KIND_EXPR_ANY_1 &&
+            signature.arguments().at(1).kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1) {
+          elements = {
+              "2",
+              "2.0",
+              "NUMERIC '2'",
+              "BIGNUMERIC '2'",
+              "TRUE",
+              "'abc'",
+              "b'abc'",
+              "DATE '2024-01-15'",
+              "TIME '10:20:30'",
+              "DATETIME '2024-01-15 10:20:30'",
+              "TIMESTAMP '2024-01-15 10:20:30+00'",
+              "INTERVAL 1 DAY",
+              "RANGE<DATE> '[2024-01-01, 2024-02-01)'",
+          };
         }
         for (const std::string& element : elements) {
           const auto query = GeneratedQuery(name, *function, signature, element);
@@ -360,7 +362,7 @@ int Main(int argc, char** argv) {
         notes.insert(probe.detail);
       }
     }
-    const std::string status = Status(counts);
+    const std::string_view status = Status(counts);
     ++totals[status];
     std::string note;
     if (const auto it = documented.find(name); it != documented.end()) {
