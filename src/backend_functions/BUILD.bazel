@@ -8,7 +8,7 @@ cc_library(
     implementation_deps = [
         ":register",
         ":scalar",
-        "//:backend_interface",
+        "//:backend_error",
         "//:bignumeric",
         "//:duckdb_handle",
         "@googlesql//googlesql/base:status",
@@ -168,7 +168,7 @@ cc_library(
     hdrs = ["register.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        "//:backend_interface",
+        "//:backend_error",
         "//:duckdb_handle",
     ],
     linkstatic = True,

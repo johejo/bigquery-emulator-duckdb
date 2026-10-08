@@ -266,7 +266,7 @@ cc_library(
     hdrs = ["src/backend_functions.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":backend_interface",
+        ":backend_error",
         ":duckdb_handle",
         "//src/backend_functions:aead",
         "//src/backend_functions:bignumeric",
@@ -281,8 +281,15 @@ cc_library(
 )
 
 cc_library(
+    name = "backend_error",
+    hdrs = ["src/backend_error.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
     name = "backend",
     srcs = ["src/backend.cc"],
+    hdrs = ["src/backend.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":backend_functions",
@@ -290,9 +297,12 @@ cc_library(
         ":duckdb_handle",
         "//third_party/duckdb",
         "@googlesql//googlesql/public:numeric_value",
+    ],
+    deps = [
+        ":backend_error",
+        ":field_schema",
         "@nlohmann_json//:json",
     ],
-    deps = [":backend_interface"],
 )
 
 cc_library(
@@ -422,7 +432,7 @@ cc_library(
     ],
     deps = [
         ":api_error",
-        ":backend_interface",
+        ":backend",
         ":field_schema",
         ":gcs",
         ":project",
@@ -768,9 +778,9 @@ cc_test(
 )
 
 # Headers whose implementations depend back on their clients, which Bazel's acyclic dependencies
-# require to be separate targets: translator.cc and backend.cc depend on the packages that
-# implement them, which include translator.h and backend.h. Implementation dependencies keep
-# private headers out of client compilations.
+# require to be separate targets: translator.cc depends on the package that implements it, which
+# includes translator.h. Implementation dependencies keep private headers out of client
+# compilations.
 
 cc_library(
     name = "translator_interface",
@@ -781,15 +791,6 @@ cc_library(
         ":references",
         ":table_metadata",
         "@googlesql//googlesql/public:analyzer",
-    ],
-)
-
-cc_library(
-    name = "backend_interface",
-    hdrs = ["src/backend.h"],
-    deps = [
-        ":field_schema",
-        "@nlohmann_json//:json",
     ],
 )
 

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/duckdb_handle.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {

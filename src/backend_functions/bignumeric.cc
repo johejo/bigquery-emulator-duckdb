@@ -23,7 +23,7 @@
 #include "googlesql/public/functions/numeric.h"
 #include "googlesql/public/functions/rounding_mode.pb.h"
 #include "googlesql/public/numeric_value.h"
-#include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/duckdb_handle.h"
 
 // BIGNUMERIC arithmetic and conversions. The translator passes a BIGNUM to these functions, and

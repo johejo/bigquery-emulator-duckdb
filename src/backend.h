@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "nlohmann/json.hpp"
+#include "src/backend_error.h"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
@@ -31,11 +32,6 @@ bool HasTimestampField(const std::vector<FieldSchema>& schema);
 // formatOptions.useInt64Timestamp are served the row as it is.
 nlohmann::json TimestampsAsSeconds(const std::vector<FieldSchema>& schema,
                                    const nlohmann::json& row);
-
-class BackendError : public std::runtime_error {
- public:
-  using std::runtime_error::runtime_error;
-};
 
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {

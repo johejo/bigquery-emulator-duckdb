@@ -1,7 +1,7 @@
 #include "src/backend_functions.h"
 
 #include "duckdb.h"
-#include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/backend_functions/aead.h"
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/datetime.h"
