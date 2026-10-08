@@ -1,0 +1,16 @@
+diff --git a/clang_tidy/clang_tidy.bzl b/clang_tidy/clang_tidy.bzl
+--- a/clang_tidy/clang_tidy.bzl
++++ b/clang_tidy/clang_tidy.bzl
+@@ -152,8 +152,10 @@
+         for define in compilation_context.defines.to_list():
+             flags.append("-D" + define)
+ 
+-        for define in compilation_context.local_defines.to_list():
+-            flags.append("-D" + define)
++        # Local defines apply to a target's own sources, not to those of its dependents.
++        if compilation_context == compilation_contexts[0]:
++            for define in compilation_context.local_defines.to_list():
++                flags.append("-D" + define)
+ 
+         # add includes
+         for i in compilation_context.framework_includes.to_list():

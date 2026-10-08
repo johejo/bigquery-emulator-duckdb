@@ -3,6 +3,7 @@ module(
     version = "0.0.0",
 )
 
+bazel_dep(name = "abseil-cpp", version = "20260526.0")
 bazel_dep(name = "boringssl", version = "0.20260327.0")
 bazel_dep(name = "cpp-httplib", version = "0.46.0")
 bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
@@ -23,7 +24,10 @@ git_override(
     module_name = "bazel_clang_tidy",
     commit = "c4d35e0d0b838309358e57a2efed831780f85cd0",
     patch_strip = 1,
-    patches = ["//third_party/bazel_clang_tidy:cxx_include_order.patch"],
+    patches = [
+        "//third_party/bazel_clang_tidy:cxx_include_order.patch",
+        "//third_party/bazel_clang_tidy:local_defines.patch",
+    ],
     remote = "https://github.com/erenon/bazel_clang_tidy.git",
 )
 

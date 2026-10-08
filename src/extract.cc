@@ -1,5 +1,7 @@
 #include "src/extract.h"
 
+#include <zlib.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -21,7 +23,6 @@
 #include "src/duckdb_sql.h"
 #include "src/parquet_metadata.h"
 #include "src/type_mapping.h"
-#include "zlib.h"
 
 namespace bigquery_emulator_duckdb {
 

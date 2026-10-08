@@ -38,7 +38,6 @@ build --incompatible_default_to_explicit_init_py
 
 # macOS build compatibility.
 build:macos --features=-header_modules
-build:macos --features=-layering_check
 build:macos --features=-parse_headers
 # Apple's linker warns about the -lm and -lpthread that protobuf adds to each of its targets; Bazel
 # does not deduplicate link options across targets.

@@ -16,3 +16,12 @@ to reordering the explicit `-isystem` paths. The native Linux case reported in
 https://github.com/erenon/bazel_clang_tidy/issues/106 has not been verified here.
 
 Drop the patch once it is fixed upstream.
+
+`local_defines.patch` passes only the target's own `local_defines` to clang-tidy. The upstream
+aspect also passes those of each target in `implementation_deps`, which apply only to that
+target's sources. cpp-httplib builds with `CPPHTTPLIB_OPENSSL_SUPPORT` as a local define, so a
+target depending on it directly had clang-tidy parse httplib.h with OpenSSL support, which the
+build never does. On macOS, clang-tidy then crashed in modernize-use-scoped-lock, or with httplib.h
+as a system header, failed on a missing CFNetwork header.
+
+Drop it once it is fixed upstream.

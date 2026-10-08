@@ -15,10 +15,10 @@
 #include <variant>
 #include <vector>
 
-#include "httplib.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
+#include "src/httplib.h"
 #include "src/server/requests.h"
 #include "src/server/resources.h"
 #include "src/server/routes.h"

@@ -4,8 +4,12 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
-# The emulator's libraries, shared with the packages under src/ that hold its components.
-package(default_visibility = ["//src:__subpackages__"])
+# The emulator's libraries, shared with the packages under src/ that hold its components. Each
+# package checks that its sources include only headers of the targets they depend on directly.
+package(
+    default_visibility = ["//src:__subpackages__"],
+    features = ["layering_check"],
+)
 
 refresh_compile_commands(
     name = "refresh_compile_commands",
@@ -111,7 +115,11 @@ cc_library(
     srcs = ["src/bignumeric.cc"],
     hdrs = ["src/bignumeric.h"],
     copts = ["-std=c++20"],
-    deps = ["@googlesql//googlesql/public:numeric_value"],
+    implementation_deps = ["@abseil-cpp//absl/status"],
+    deps = [
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:numeric_value",
+    ],
 )
 
 cc_library(
@@ -119,10 +127,17 @@ cc_library(
     srcs = ["src/type_mapping.cc"],
     hdrs = ["src/type_mapping.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/public:type_parameters_cc_proto",
+        "@googlesql//googlesql/public/types",
+    ],
     deps = [
         ":bignumeric",
         ":duckdb_sql",
         ":field_schema",
+        "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/public:type",
     ],
 )
@@ -140,6 +155,11 @@ cc_library(
     srcs = ["src/extract.cc"],
     hdrs = ["src/extract.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/time",
+    ],
     deps = [
         ":api_error",
         ":duckdb_sql",
@@ -160,7 +180,15 @@ cc_library(
     srcs = ["src/cell_value.cc"],
     hdrs = ["src/cell_value.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/public/types",
+        # json_value brings nlohmann's single header, which nlohmann/json.hpp then names.
+        "@nlohmann_json//:singleheader-json",
+    ],
     deps = [
+        "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/common:internal_value",
         "@googlesql//googlesql/public:civil_time",
@@ -188,15 +216,21 @@ cc_library(
     implementation_deps = [
         ":duckdb_sql",
         ":type_mapping",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:type",
     ],
     deps = [
         ":field_schema",
         ":references",
         ":table_metadata",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:catalog_wrapper",
         "@googlesql//googlesql/public:simple_catalog",
@@ -211,10 +245,13 @@ cc_library(
     implementation_deps = [
         ":catalog",
         ":type_mapping",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:error_helpers",
         "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:sql_function",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public/types",
@@ -225,6 +262,7 @@ cc_library(
     ],
     deps = [
         ":field_schema",
+        "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/scripting:type_aliases",
@@ -331,6 +369,7 @@ cc_library(
     srcs = ["src/schema_sql.cc"],
     hdrs = ["src/schema_sql.h"],
     copts = ["-std=c++20"],
+    implementation_deps = ["@abseil-cpp//absl/status:statusor"],
     deps = [
         ":api_error",
         ":bignumeric",
@@ -367,6 +406,10 @@ cc_library(
     srcs = ["src/load.cc"],
     hdrs = ["src/load.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+    ],
     deps = [
         ":api_error",
         ":bignumeric",
@@ -401,7 +444,6 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":analyzer",
-        ":backend",
         ":catalog",
         ":cell_value",
         ":column_metadata",
@@ -414,6 +456,10 @@ cc_library(
         ":temporary_files",
         ":translator",
         ":type_mapping",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/parser",
         "@googlesql//googlesql/proto:script_exception_cc_proto",
@@ -479,9 +525,10 @@ cc_library(
 )
 
 # cpp-httplib configured for the emulator. Its settings are macros read by the header-only library,
-# so every target that includes httplib.h depends on this one to see the same values.
+# so sources include src/httplib.h, whose target gives every one of them the same values.
 cc_library(
     name = "httplib",
+    hdrs = ["src/httplib.h"],
     # The default backlog of 5 resets connections when clients open many at once, such as
     # parallel queries from a test suite. The kernel caps it at its own limit (SOMAXCONN).
     defines = ["CPPHTTPLIB_LISTEN_BACKLOG=1024"],
@@ -523,6 +570,7 @@ cc_library(
     srcs = ["tools/probe.cc"],
     hdrs = ["tools/probe.h"],
     copts = ["-std=c++20"],
+    implementation_deps = ["@googlesql//googlesql/public/types"],
     deps = [
         ":analyzer",
         ":bignumeric",
@@ -542,8 +590,10 @@ cc_binary(
         ":probe",
         ":translator",
         "//src/translator:functions",
+        "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
     ],
 )
 
@@ -575,6 +625,7 @@ cc_test(
         ":catalog",
         ":field_schema",
         ":type_mapping",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
@@ -591,6 +642,7 @@ cc_test(
         ":emulator",
         ":field_schema",
         ":query_parameters",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],
@@ -603,6 +655,7 @@ cc_test(
     deps = [
         ":translator",
         "//src/translator:functions",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -614,6 +667,7 @@ cc_test(
     deps = [
         ":api_error",
         ":parquet_metadata",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -626,6 +680,7 @@ cc_test(
         ":api_error",
         ":column_metadata",
         ":field_schema",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],
@@ -638,6 +693,7 @@ cc_test(
     deps = [
         ":api_error",
         ":field_schema",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],
@@ -650,6 +706,7 @@ cc_test(
     deps = [
         ":api_error",
         ":query_parameters",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],
@@ -661,6 +718,7 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":backend",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],
@@ -674,6 +732,7 @@ cc_test(
         ":api_error",
         ":gcs",
         ":httplib",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -686,6 +745,7 @@ cc_test(
         ":emulator",
         ":httplib",
         ":server",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -700,6 +760,7 @@ cc_test(
         ":catalog",
         ":query_parameters",
         ":translator",
+        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@googlesql//googlesql/public:type",
         "@nlohmann_json//:json",
@@ -770,6 +831,12 @@ cc_test(
         ":query_parameters",
         ":references",
         ":type_mapping",
+        "@abseil-cpp//absl/log",
+        "@abseil-cpp//absl/log:globals",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
         "@googlesql//googlesql/base/testing:googlesql_gtest_main",
         "@googlesql//googlesql/common:internal_value",
         "@googlesql//googlesql/compliance:compliance_test_cases",
@@ -782,6 +849,7 @@ cc_test(
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
+        "@googlesql//googlesql/public/types",
         "@nlohmann_json//:json",
     ],
 )
