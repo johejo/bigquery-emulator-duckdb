@@ -134,22 +134,29 @@ void Distance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
             ? (kCosine ? fn::CosineDistanceSparseStringKey : fn::EuclideanDistanceSparseStringKey)
             : (kCosine ? fn::CosineDistanceSparseInt64Key : fn::EuclideanDistanceSparseInt64Key);
   }
-  EachRow(info, input, output,
-          [array, function](const Arguments& arguments) -> absl::StatusOr<double> {
-            auto first = DistanceArray(arguments, 0, array);
-            if (!first.ok()) {
-              return first.status();
+  EachRow(
+      info, input, output, [array, function](const Arguments& arguments) -> absl::StatusOr<double> {
+        auto first = DistanceArray(arguments, 0, array);
+        if (!first.ok()) {
+          return first.status();
+        }
+        auto second = DistanceArray(arguments, 1, array);
+        if (!second.ok()) {
+          return second.status();
+        }
+        const auto result = function(*std::move(first), *std::move(second));
+        if (!result.ok()) {
+          if constexpr (kCosine) {
+            if (result.status().message() == "Cannot compute cosine distance against zero vector") {
+              return absl::OutOfRangeError(
+                  "Cannot compute cosine distance against zero vector. Error in COSINE_DISTANCE "
+                  "expression");
             }
-            auto second = DistanceArray(arguments, 1, array);
-            if (!second.ok()) {
-              return second.status();
-            }
-            const auto result = function(*std::move(first), *std::move(second));
-            if (!result.ok()) {
-              return result.status();
-            }
-            return result->double_value();
-          });
+          }
+          return result.status();
+        }
+        return result->double_value();
+      });
 }
 
 // DuckDB keeps NUMERIC as DECIMAL(38, 9), whose units are the packed integer of NumericValue.

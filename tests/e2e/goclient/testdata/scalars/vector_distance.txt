@@ -302,3 +302,18 @@ EXCEPTION WHEN ERROR THEN
   SELECT TRUE;
 END;
 => "true"
+
+# BigQuery answers supplied by a maintainer: parallel vectors may have a negative
+# rounding residual, and squared magnitudes can underflow to zero.
+SELECT COSINE_DISTANCE([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]) = -2.220446049250313E-16
+=> "true"
+
+BEGIN
+  SELECT COSINE_DISTANCE([1e-200], [1e-200]) = -1;
+EXCEPTION WHEN ERROR THEN
+  SELECT ENDS_WITH(@@error.message, 'Cannot compute cosine distance against zero vector. Error in COSINE_DISTANCE expression');
+END;
+=> "true"
+
+SELECT EUCLIDEAN_DISTANCE([1e-200], [0.0])
+=> "0.0"
