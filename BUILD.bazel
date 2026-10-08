@@ -232,13 +232,24 @@ cc_library(
 )
 
 cc_library(
+    name = "translated_statement",
+    hdrs = ["src/translated_statement.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":field_schema",
+        ":references",
+        ":table_metadata",
+    ],
+)
+
+cc_library(
     name = "translator",
     srcs = ["src/translator.cc"],
+    hdrs = ["src/translator.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":analyzer",
         ":duckdb_sql",
-        ":query_parameters",
         "//src/translator:aggregate",
         "//src/translator:context",
         "//src/translator:ddl",
@@ -255,8 +266,10 @@ cc_library(
         "@googlesql//googlesql/resolved_ast",
     ],
     deps = [
-        ":translator_interface",
+        ":query_parameters",
+        ":translated_statement",
         "//src/translator:functions_interface",
+        "@googlesql//googlesql/public:analyzer",
     ],
 )
 
@@ -774,23 +787,6 @@ cc_test(
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@nlohmann_json//:json",
-    ],
-)
-
-# Headers whose implementations depend back on their clients, which Bazel's acyclic dependencies
-# require to be separate targets: translator.cc depends on the package that implements it, which
-# includes translator.h. Implementation dependencies keep private headers out of client
-# compilations.
-
-cc_library(
-    name = "translator_interface",
-    hdrs = ["src/translator.h"],
-    deps = [
-        ":field_schema",
-        ":query_parameters",
-        ":references",
-        ":table_metadata",
-        "@googlesql//googlesql/public:analyzer",
     ],
 )
 
