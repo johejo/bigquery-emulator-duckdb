@@ -491,7 +491,7 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
   if (create.is_value_table() || !create.pseudo_column_list().empty() ||
-      create.collation_name() != nullptr || create.connection() != nullptr ||
+      create.collation_name() != nullptr || create.connection_list() != nullptr ||
       !create.check_constraint_list().empty()) {
     return Unsupported(scope, "CREATE TABLE option");
   }

@@ -68,17 +68,15 @@ diff --git a/googlesql/compliance/compliance_test_cases.cc b/googlesql/complianc
 diff --git a/bazel/http_archive_deps.bzl b/bazel/http_archive_deps.bzl
 --- a/bazel/http_archive_deps.bzl
 +++ b/bazel/http_archive_deps.bzl
-@@ -51,6 +51,10 @@
- 
-     http_archive(
-         name = "com_google_file_based_test_driver",
-+        # Match and GetContents stat() the data of a string_view that is not NUL-terminated.
-+        patch_cmds = [
+@@ -58,6 +58,8 @@
+         # -Wnullability-completeness warnings.
+         patch_cmds = [
+             "sed -i.bak 's/absl::Nonnull<\\([^>]*\\)>/\\1/g' file_based_test_driver/file_based_test_driver.h file_based_test_driver/file_based_test_driver.cc && rm -f file_based_test_driver/*.bak",
++            # Match and GetContents stat() the data of a string_view that is not NUL-terminated.
 +            "perl -pi -e 's/stat\\(filespec\\.data\\(\\)/stat(filespec_str.c_str()/; s/stat\\(filename\\.data\\(\\)/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h",
-+        ],
-         sha256 = "b564acb6f083ce6e91fc2734bdad259cc4edf1a95766f93750a16784ff86218a",
-         strip_prefix = "file-based-test-driver-fd7661b168f640f68da39f97dad26e426eb6c339",
-         url = "https://github.com/google/file-based-test-driver/archive/fd7661b168f640f68da39f97dad26e426eb6c339.tar.gz",
+         ],
+         sha256 = "de4a12e88731198ef89ce3438b8c57ccea9185ac30ece9da1165f224ec02c8b1",
+         strip_prefix = "file-based-test-driver-ec67daf4282c1bbe025e1b88512d540b03687efd",
 diff --git a/googlesql/compliance/test_driver.h b/googlesql/compliance/test_driver.h
 --- a/googlesql/compliance/test_driver.h
 +++ b/googlesql/compliance/test_driver.h

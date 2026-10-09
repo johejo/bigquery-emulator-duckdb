@@ -20,3 +20,8 @@ SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', -0.0))
 
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', ARRAY<INT64>[]))
 ?>
+
+# GoogleSQL 2026.10.1 fixes grouping with integer precision. BigQuery's documentation describes
+# minimum digits but says "trailing zeros"; confirm the exact output for the affected forms.
+SELECT FORMAT("%'.2d|%'.5d|%'.6d", 5, 1234, 1234)
+?>
