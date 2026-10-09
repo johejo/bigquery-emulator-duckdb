@@ -3,6 +3,7 @@ load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("//tools/clang_tidy:clang_tidy_test.bzl", "clang_tidy_test")
 
 # The emulator's libraries, shared with the packages under src/ that hold its components. Each
 # package checks that its sources include only headers of the targets they depend on directly.
@@ -29,8 +30,19 @@ refresh_compile_commands(
 
 filegroup(
     name = "clang_tidy_config",
-    srcs = [".clang-tidy"],
+    srcs = [
+        ".clang-tidy",
+        "tests/.clang-tidy",
+    ],
     visibility = ["//visibility:public"],
+)
+
+clang_tidy_test(
+    name = "clang_tidy_test",
+    size = "small",
+    header_target = ":httplib",
+    implementation_target = ":query_parameters",
+    test_target = ":query_parameters_test",
 )
 
 cc_library(

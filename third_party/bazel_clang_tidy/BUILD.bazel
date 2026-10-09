@@ -1,4 +1,0 @@
-exports_files([
-    "cxx_include_order.patch",
-    "local_defines.patch",
-])

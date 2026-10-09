@@ -10,7 +10,6 @@ bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
 bazel_dep(name = "googlesql", version = "2026.9.2")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 
-bazel_dep(name = "bazel_clang_tidy", dev_dependency = True)
 bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
@@ -21,15 +20,11 @@ bazel_dep(name = "quickjs-ng", version = "0.15.1.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.19")
 bazel_dep(name = "zlib", version = "1.3.1.bcr.6")
 
-git_override(
-    module_name = "bazel_clang_tidy",
-    commit = "c4d35e0d0b838309358e57a2efed831780f85cd0",
-    patch_strip = 1,
-    patches = [
-        "//third_party/bazel_clang_tidy:cxx_include_order.patch",
-        "//third_party/bazel_clang_tidy:local_defines.patch",
-    ],
-    remote = "https://github.com/erenon/bazel_clang_tidy.git",
+clang_tidy_repository = use_repo_rule("//tools/clang_tidy:repository.bzl", "clang_tidy_repository")
+
+clang_tidy_repository(
+    name = "clang_tidy_tool",
+    dev_dependency = True,
 )
 
 git_override(
