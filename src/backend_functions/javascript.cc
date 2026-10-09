@@ -57,6 +57,8 @@ class Engine {
     }
     Start();
     JSValue function =
+        // QuickJS defines this flag as the signed expression (0 << 0).
+        // NOLINTNEXTLINE(bugprone-signed-bitwise)
         JS_Eval(context_, source.data(), source.size(), "<udf>", JS_EVAL_TYPE_GLOBAL);
     if (JS_IsException(function)) {
       return Exception();

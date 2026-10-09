@@ -61,7 +61,7 @@ TEST_F(JavaScriptTest, InterruptsACallPastTheTimeLimit) {
 }
 
 TEST_F(JavaScriptTest, FailsACallPastTheMemoryLimit) {
-  Open({.memory = size_t{16} << 20});
+  Open({.memory = size_t{16} << 20U});
   EXPECT_EQ(Query("SELECT bq_js_double('(function() {\n"
                   "const a = []; while (true) a.push(new Array(1000).fill(1));\n})')")
                 .rfind("error: ", 0),
