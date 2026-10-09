@@ -1,6 +1,7 @@
 #include "src/backend_functions/javascript.h"
 
 #include <chrono>
+#include <cstddef>
 #include <string>
 
 #include "duckdb.h"
