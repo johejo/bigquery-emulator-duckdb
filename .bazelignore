@@ -3,3 +3,5 @@
 .direnv
 # Claude Code keeps git worktrees of this repository here, each with its own Bazel output symlinks.
 .claude
+
+.cache
