@@ -335,6 +335,21 @@ bool ApplyAnnotations(const googlesql::Type* type,
   return true;
 }
 
+// The description ALTER COLUMN SET OPTIONS sets on `action`. The other column options change how
+// BigQuery stores or reads the column, which the emulator does not emulate, so they are
+// unsupported, and so are += and -=.
+bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsAction& action) {
+  for (const auto& option : options) {
+    const googlesql::Value* value = OptionLiteral(*option);
+    if (ToLowerAscii(option->name()) != "description" || value == nullptr ||
+        !StringOption(*value, action.description.emplace())) {
+      Unsupported(scope, "column option " + option->name());
+      return false;
+    }
+  }
+  return true;
+}
+
 // Records the parameters of a parameterized type, STRING(10) or NUMERIC(10, 2), on `field`.
 void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParameters& parameters,
                          FieldSchema& field) {
@@ -649,8 +664,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 
 }  // namespace
 
-// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO and SET OPTIONS, which the emulator applies to the
-// table as it is when the statement runs.
+// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS and SET OPTIONS, which
+// the emulator applies to the table as it is when the statement runs.
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
@@ -689,6 +704,16 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
         return Unsupported(scope, "RENAME TO a table path");
       }
       alteration.actions.emplace_back(RenameTableAction{.table_id = new_path.at(0)});
+    } else if (action->Is<googlesql::ResolvedAlterColumnOptionsAction>()) {
+      const auto& alter_column = *action->GetAs<googlesql::ResolvedAlterColumnOptionsAction>();
+      ColumnOptionsAction column_options{
+          .name = alter_column.column(),
+          .if_exists = alter_column.is_if_exists(),
+      };
+      if (!ColumnSetOptions(alter_column.option_list(), scope, column_options)) {
+        return std::nullopt;
+      }
+      alteration.actions.emplace_back(std::move(column_options));
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
