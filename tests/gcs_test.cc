@@ -2,6 +2,8 @@
 
 // include-cleaner requires stdlib.h for the POSIX mkdtemp/setenv/unsetenv APIs; the
 // deprecated-header checks suggest cstdlib instead, so suppress them on this include.
+// On macOS, include-cleaner still misses these declarations through libc++'s stdlib.h wrapper;
+// suppress those false positives at the calls.
 #include <stdlib.h>  // NOLINT(hicpp-deprecated-headers,modernize-deprecated-headers)
 
 #include <atomic>
@@ -40,10 +42,10 @@ class GcsTest : public ::testing::Test {
          }) {
       const char* value = std::getenv(name);
       environment_[name] = value != nullptr ? std::optional<std::string>(value) : std::nullopt;
-      unsetenv(name);
+      unsetenv(name);  // NOLINT(misc-include-cleaner)
     }
     std::string pattern = ::testing::TempDir() + "/gcs-test-XXXXXX";
-    const char* directory = mkdtemp(pattern.data());
+    const char* directory = mkdtemp(pattern.data());  // NOLINT(misc-include-cleaner)
     ASSERT_NE(directory, nullptr);
     directory_ = directory;
     output_ = directory_ / "object";
@@ -108,7 +110,7 @@ class GcsTest : public ::testing::Test {
   }
 
   static void SetEnv(const std::string& name, const std::string& value) {
-    ASSERT_EQ(setenv(name.c_str(), value.c_str(), 1), 0);
+    ASSERT_EQ(setenv(name.c_str(), value.c_str(), 1), 0);  // NOLINT(misc-include-cleaner)
   }
 
   // The client reads the environment on construction, so it is created on first use after a

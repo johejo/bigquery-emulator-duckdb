@@ -61,8 +61,9 @@ HeaderFilterRegex: '^(src|tests|tools)/'
 CheckOptions:
   # GoogleSQL's TYPE_* enumerators and umbrella headers, and nlohmann's json_fwd/json.hpp
   # split, produce false positives. glibc's sigset_t is provided by the public signal.h;
-  # include-cleaner instead asks for its internal bits/types/sigset_t.h.
-  misc-include-cleaner.IgnoreHeaders: '(googlesql|nlohmann)/.*|bits/types/sigset_t\.h'
+  # include-cleaner instead asks for its internal bits/types/sigset_t.h. On macOS it
+  # asks for sys/_types/_sigset_t.h and sys/signal.h (SIG_BLOCK) instead of signal.h.
+  misc-include-cleaner.IgnoreHeaders: '(googlesql|nlohmann)/.*|bits/types/sigset_t\.h|sys/_types/_sigset_t\.h|sys/signal\.h'
   # JSON's subscript inserts missing object keys and grows arrays, just as map's inserts keys.
   # at() would change that behavior. Keep the standard map exclusions as well.
   cppcoreguidelines-pro-bounds-avoid-unchecked-container-access.ExcludeClasses: '::std::map;::std::unordered_map;::std::flat_map;::nlohmann::.*basic_json'

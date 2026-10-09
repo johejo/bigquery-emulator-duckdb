@@ -803,7 +803,7 @@ void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_
           return document->GetConstRef().ToString();
         }
         for (idx_t i = 0; i < paths.size(); ++i) {
-          if (paths[i] == nullptr) {
+          if (paths.at(i) == nullptr) {
             continue;
           }
           const auto value = values.Get((2 * i) + 2, arguments.Row());
@@ -813,7 +813,7 @@ void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_
           const auto modify = kInsert ? googlesql::functions::JsonInsertArrayElement
                                       : googlesql::functions::JsonAppendArrayElement;
           const absl::Status status =
-              modify(document->GetRef(), *paths[i], *value, options,
+              modify(document->GetRef(), *paths.at(i), *value, options,
                      /*canonicalize_zero=*/true, arguments.Bool(columns - 1));
           if (!status.ok()) {
             return absl::OutOfRangeError("Invalid input to " + function + ": " +

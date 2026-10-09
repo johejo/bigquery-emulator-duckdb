@@ -292,16 +292,16 @@ std::optional<std::string> JsonArrayModify(const ScalarCall& call) {
   if (n < 4 || n % 2 != 0) {
     return std::nullopt;
   }
-  std::vector<std::string> args = {"CAST(" + call.arguments[0].sql + " AS VARCHAR)"};
+  std::vector<std::string> args = {"CAST(" + call.arguments.at(0).sql + " AS VARCHAR)"};
   for (size_t i = 1; i + 1 < n; i += 2) {
     const auto value = JsonArgument(call, i + 1);
     if (!value) {
       return std::nullopt;
     }
-    args.push_back("CAST(" + call.arguments[i].sql + " AS VARCHAR)");
+    args.push_back("CAST(" + call.arguments.at(i).sql + " AS VARCHAR)");
     args.push_back(*value);
   }
-  args.push_back("CAST(" + call.arguments[n - 1].sql + " AS BOOLEAN)");
+  args.push_back("CAST(" + call.arguments.at(n - 1).sql + " AS BOOLEAN)");
   const std::string function =
       call.name == "JSON_ARRAY_INSERT" ? "bq_json_array_insert" : "bq_json_array_append";
   return "json(" + function + "(" + Join(args, ", ") + "))";
