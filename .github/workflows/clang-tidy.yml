@@ -60,6 +60,17 @@ jobs:
           path: ${{ runner.temp }}/bazel-reports/
           retention-days: 7
           if-no-files-found: ignore
+      # Bazel collects the disk cache once idle. Give it time, then stop the server so that it does
+      # not delete entries while they are archived.
+      - name: Stop Bazel
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.disk-cache.outputs.cache-hit != 'true'
+        run: |
+          du -sh ~/.cache/bazel-disk
+          sleep 30
+          nix develop --command bazelisk shutdown
+          du -sh ~/.cache/bazel-disk
       # Only main pushes save caches; pull requests and manual runs reuse them.
       - name: Save Bazel disk cache
         if: >-

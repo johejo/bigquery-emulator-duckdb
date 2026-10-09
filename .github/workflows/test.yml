@@ -114,9 +114,13 @@ jobs:
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
           key: ${{ steps.go-cache.outputs.cache-primary-key }}
-      - name: Report Bazel disk cache size
+      # Bazel collects the disk cache once idle, which the end-to-end tests leave time for. Stop the
+      # server so that it does not delete entries while they are archived.
+      - name: Stop Bazel
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: du -sh ~/.cache/bazel-disk
+        run: |
+          nix develop --command bazelisk shutdown
+          du -sh ~/.cache/bazel-disk
       - name: Save Bazel disk cache
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
