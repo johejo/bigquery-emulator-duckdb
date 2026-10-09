@@ -12,7 +12,7 @@ namespace bigquery_emulator_duckdb::backend_functions {
 // be as short as 5 minutes", and its memory per query is limited.
 struct JavaScriptLimits {
   std::chrono::milliseconds call_time = std::chrono::minutes(5);
-  size_t memory = size_t{256} << 20;
+  size_t memory = size_t{256} << 20U;
 };
 
 void RegisterJavaScriptFunctions(duckdb_connection connection, const JavaScriptLimits& limits = {});
