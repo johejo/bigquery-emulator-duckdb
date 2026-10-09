@@ -1,9 +1,5 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-# Tracked and untracked files, minus those that .gitignore and .git/info/exclude ignore, such as
-# Bazel output symlinks and worktrees under .claude.
-_cpp_sources := "git ls-files -z --cached --others --exclude-standard -- ':(glob)src/**/*.cc' ':(glob)tests/**/*.cc' ':(glob)tools/**/*.cc'"
-
 # Formatters and the files they cover are in treefmt.toml.
 fmt:
     treefmt
@@ -23,11 +19,10 @@ tidy:
 # function checks would produce false positives.
 cppcheck *args:
     mkdir -p .cache/cppcheck
-    {{_cpp_sources}} | tr '\0' '\n' | \
-        cppcheck --quiet -j "$(nproc)" --file-list=- --cppcheck-build-dir=.cache/cppcheck \
-            --std=c++20 -I . --enable=warning,style,performance,portability \
-            --library=googletest --inline-suppr --error-exitcode=1 \
-            --suppressions-list=.cppcheck-suppressions {{args}}
+    cppcheck --quiet -j "$(nproc)" --cppcheck-build-dir=.cache/cppcheck \
+        --std=c++20 -I . --enable=warning,style,performance,portability \
+        --library=googletest --inline-suppr --error-exitcode=1 \
+        --suppressions-list=.cppcheck-suppressions {{args}} src tests tools
 
 # The DuckDB CLI in the dev shell and the libraries linked into the binary come from the same
 # release.
