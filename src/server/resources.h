@@ -19,6 +19,7 @@ struct TableInfo;
 struct TableListEntry;
 struct QueryResult;
 struct InsertError;
+struct Routine;
 }  // namespace bigquery_emulator_duckdb
 
 namespace bigquery_emulator_duckdb::server {
@@ -53,5 +54,8 @@ nlohmann::json TableList(const DatasetReference& dataset, const std::vector<Tabl
 nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
                              std::string_view selected_fields);
 nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
+nlohmann::json RoutineResource(const Routine& routine);
+// `routines` are sorted by id; the list carries the page of them `page` asks for.
+nlohmann::json RoutineList(const std::vector<Routine>& routines, const ListPage& page);
 
 }  // namespace bigquery_emulator_duckdb::server

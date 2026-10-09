@@ -15,6 +15,7 @@
 #include "googlesql/public/simple_catalog.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
@@ -69,6 +70,11 @@ class TableSource {
   virtual std::optional<std::string> FindViewQuery(const std::string& /*project*/,
                                                    const std::string& /*dataset*/,
                                                    const std::string& /*table*/) {
+    return std::nullopt;
+  }
+
+  // The persistent UDF `routine`, or nothing if there is no such routine. None by default.
+  virtual std::optional<Routine> FindRoutine(const RoutineReference& /*routine*/) {
     return std::nullopt;
   }
 };
@@ -156,6 +162,11 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
 
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override;
+
+ protected:
+  TableSource& source() const { return source_; }
+  googlesql::TypeFactory* type_factory() const { return type_factory_; }
+  const std::string& default_project() const { return default_project_; }
 
  private:
   TableSource& source_;

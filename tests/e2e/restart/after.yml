@@ -24,3 +24,9 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"identity":"principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice"}]'
+  function:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT persist.add_one(a) AS b FROM persist.t'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"b":"2"}]'

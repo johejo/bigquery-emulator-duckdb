@@ -367,7 +367,6 @@ func TestTemporaryFunctionsHaveQueryScope(t *testing.T) {
 func TestTemporaryFunctionsRejectUnsupportedForms(t *testing.T) {
 	client := newClient(t)
 	for _, sql := range []string{
-		"CREATE FUNCTION d.f(x INT64) AS (x); SELECT 1",
 		"@{test_hint = 1} CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
 		"CREATE OR REPLACE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
 		"CREATE TEMP FUNCTION IF NOT EXISTS f(x INT64) AS (x); SELECT 1",

@@ -9,10 +9,12 @@ namespace googlesql {
 class ResolvedAlterSchemaStmt;
 class ResolvedAlterTableSetOptionsStmt;
 class ResolvedAlterTableStmt;
+class ResolvedCreateFunctionStmt;
 class ResolvedCreateSchemaStmt;
 class ResolvedCreateTableAsSelectStmt;
 class ResolvedCreateTableStmt;
 class ResolvedCreateViewStmt;
+class ResolvedDropFunctionStmt;
 class ResolvedDropStmt;
 }  // namespace googlesql
 
@@ -35,5 +37,10 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
 std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt& alter,
                                        const Scope& scope);
 std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope);
+// A persistent SQL UDF, which the emulator records on a DuckDB macro of its dataset; see Routine.
+std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctionStmt& create,
+                                          const Scope& scope);
+std::optional<std::string> DropFunction(const googlesql::ResolvedDropFunctionStmt& drop,
+                                        const Scope& scope);
 
 }  // namespace bigquery_emulator_duckdb::translator

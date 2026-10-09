@@ -8,6 +8,7 @@
 
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/table_metadata.h"
 
 // What the translator takes besides the resolved statement, and what it returns: the statement's
@@ -67,6 +68,12 @@ struct OptionUpdates {
   std::optional<std::map<std::string, std::string>> labels = {};
 };
 
+// The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.
+struct RoutineDefinition {
+  Routine routine;
+  bool if_not_exists = false;
+};
+
 // ALTER TABLE ADD COLUMN [IF NOT EXISTS].
 struct AddColumnAction {
   FieldSchema field;
@@ -112,15 +119,17 @@ struct TranslatedStatement {
   std::string statement_type;
   // The schema of the rows a query returns, as ResultSchema reports it; empty for other statements.
   std::optional<std::vector<FieldSchema>> result_schema;
-  // The table or view, or the dataset, that a DDL statement creates, alters or drops.
+  // The table or view, the dataset, or the routine that a DDL statement creates, alters or drops.
   std::optional<TableReference> ddl_target_table;
   std::optional<DatasetReference> ddl_target_dataset;
+  std::optional<RoutineReference> ddl_target_routine;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.
   std::optional<TableDefinition> table;
   std::optional<TableAlteration> altered_table;
   std::optional<ViewDefinition> view;
   std::optional<DatasetDefinition> dataset;
   std::optional<DatasetAlteration> altered_dataset;
+  std::optional<RoutineDefinition> routine;
 };
 
 }  // namespace bigquery_emulator_duckdb

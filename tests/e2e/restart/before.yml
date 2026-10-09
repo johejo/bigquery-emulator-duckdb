@@ -27,3 +27,9 @@ steps:
         tests/e2e/bq.sh query --nouse_legacy_sql
         "CREATE VIEW persist.identity AS SELECT SESSION_USER() AS identity"
     test: current.exit_code == 0
+  function:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql
+        "CREATE FUNCTION persist.add_one(x INT64) AS (x + 1)"
+    test: current.exit_code == 0

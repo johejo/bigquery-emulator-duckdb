@@ -138,7 +138,8 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
     options.disable_rewrite(googlesql::REWRITE_WITH_EXPR);
   }
   // A view keeps its original GoogleSQL text, which cannot call a job-local function once
-  // that job ends. Check before inlining erases the function calls.
+  // that job ends, while the DuckDB view would keep the body of a persistent one as it was when
+  // the view was created. Check before inlining erases the function calls.
   options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) {
     const auto* statement = output.resolved_statement();
     if (statement != nullptr && statement->Is<googlesql::ResolvedCreateViewStmt>()) {
@@ -151,8 +152,7 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
             return function->template Is<googlesql::SQLFunction>() ||
                    function->template Is<googlesql::TemplatedSQLFunction>();
           })) {
-        return absl::UnimplementedError(
-            "The emulator does not support views that call temporary UDFs");
+        return absl::UnimplementedError("The emulator does not support views that call SQL UDFs");
       }
     }
     return absl::OkStatus();

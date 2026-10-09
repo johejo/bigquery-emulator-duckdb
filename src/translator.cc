@@ -73,6 +73,12 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
+    return CreateFunction(*statement.GetAs<googlesql::ResolvedCreateFunctionStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedDropFunctionStmt>()) {
+    return DropFunction(*statement.GetAs<googlesql::ResolvedDropFunctionStmt>(), scope);
+  }
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return Unsupported(scope, "statement " + statement.node_kind_string());
   }
@@ -150,6 +156,12 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
   }
+  if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
+    return "CREATE_FUNCTION";
+  }
+  if (statement.Is<googlesql::ResolvedDropFunctionStmt>()) {
+    return "DROP_FUNCTION";
+  }
   return "SELECT";
 }
 
@@ -180,11 +192,13 @@ std::optional<TranslatedStatement> TranslateStatement(
       .result_schema = ResultSchema(statement),
       .ddl_target_table = std::move(context.ddl_target_table),
       .ddl_target_dataset = std::move(context.ddl_target_dataset),
+      .ddl_target_routine = std::move(context.ddl_target_routine),
       .table = std::move(context.table),
       .altered_table = std::move(context.altered_table),
       .view = std::move(context.view),
       .dataset = std::move(context.dataset),
       .altered_dataset = std::move(context.altered_dataset),
+      .routine = std::move(context.routine),
   };
 }
 

@@ -250,6 +250,14 @@ TableReference TableFromPath(const httplib::Request& request) {
   };
 }
 
+RoutineReference RoutineFromPath(const httplib::Request& request) {
+  return RoutineReference{
+      Param(request, "projectId"),
+      Param(request, "datasetId"),
+      Param(request, "routineId"),
+  };
+}
+
 json ParseBody(const httplib::Request& request) {
   if (request.body.empty()) {
     return json::object();

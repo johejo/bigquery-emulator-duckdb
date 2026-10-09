@@ -138,15 +138,21 @@ Behavior that applies across them:
   and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
   cannot read them. Temporary, recursive and value-table views, and views that read temporary
   tables, are unsupported.
-- SQL UDFs created with `CREATE TEMP FUNCTION` are available within their query and
-  are expanded by GoogleSQL before translation. The body of a UDF with `ANY TYPE` parameters is
-  resolved for the argument types of each call, against the UDFs declared before it. Temporary
-  JavaScript UDFs run in an embedded QuickJS and so far take BOOL, FLOAT64 and STRING arguments,
-  named by JavaScript identifiers, and return those or INT64. No JavaScript state outlives a
-  query, a call fails after 5 minutes, and the calls of a query may allocate 256 MiB on each
-  thread; BigQuery documents neither limit exactly. Persistent and aggregate UDFs, `OR REPLACE`,
-  `IF NOT EXISTS`, `SAFE.` UDF calls, UDF options such as `library`, and views that call temporary
-  UDFs are unsupported. Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do not support dry runs,
+- SQL UDFs created with `CREATE TEMP FUNCTION` are available within their query, and persistent
+  ones created with `CREATE [OR REPLACE] FUNCTION [IF NOT EXISTS] dataset.name` in every query
+  until `DROP FUNCTION` or `routines.delete` removes them; GoogleSQL expands both before
+  translation. A persistent UDF keeps its definition and description, which `routines.get` and
+  `routines.list` return, and each call resolves its body anew against the UDF's project, so the
+  body names tables and other UDFs with their datasets and cannot call temporary UDFs. The body of
+  a UDF with `ANY TYPE` parameters is resolved for the argument types of each call, a temporary
+  one against the UDFs declared before it. Temporary JavaScript UDFs run in an embedded QuickJS
+  and so far take BOOL, FLOAT64 and STRING arguments, named by JavaScript identifiers, and return
+  those or INT64. No JavaScript state outlives a query, a call fails after 5 minutes, and the calls
+  of a query may allocate 256 MiB on each thread; BigQuery documents neither limit exactly.
+  Persistent JavaScript UDFs, aggregate UDFs, `routines.insert` and `routines.update`, `OR REPLACE`
+  and `IF NOT EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent
+  UDF's description, and views that call SQL UDFs are unsupported. Subquery bodies do not support
+  volatile arguments. Queries with TEMP function declarations do not support dry runs,
   destination tables or positional parameters.
 - Multi-statement queries return the result of the last statement that ran. They create no
   child jobs and cannot be dry runs. Their temporary tables are dropped when they end, and no

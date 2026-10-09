@@ -97,6 +97,7 @@ std::string Param(const httplib::Request& request, const char* name);
 bool QueryParamBool(const httplib::Request& request, const char* name);
 DatasetReference DatasetFromPath(const httplib::Request& request);
 TableReference TableFromPath(const httplib::Request& request);
+RoutineReference RoutineFromPath(const httplib::Request& request);
 
 nlohmann::json ParseBody(const httplib::Request& request);
 bool IsResumableUpload(const httplib::Request& request);

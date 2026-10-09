@@ -14,6 +14,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
@@ -210,6 +211,12 @@ std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
   }
   if (statement.statement_type == "DROP_SCHEMA" && statement.ddl_target_dataset.has_value()) {
     return DropDatasetWrite(*statement.ddl_target_dataset);
+  }
+  if (const auto& definition = statement.routine) {
+    return DdlWrite{
+        .metadata_statements = RoutineCommentStatements(definition->routine),
+        .skip_query = definition->if_not_exists ? RoutineQuery(definition->routine.reference) : "",
+    };
   }
   return std::nullopt;
 }

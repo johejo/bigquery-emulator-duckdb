@@ -22,6 +22,7 @@
 #include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
@@ -94,6 +95,7 @@ struct QueryJob {
   std::string statement_type = {};
   std::optional<TableReference> ddl_target_table = {};
   std::optional<DatasetReference> ddl_target_dataset = {};
+  std::optional<RoutineReference> ddl_target_routine = {};
 };
 
 struct LoadJob {
@@ -224,6 +226,10 @@ class Emulator {
                    const std::optional<nlohmann::json>& view,
                    const std::optional<TableMetadata>& metadata = std::nullopt);
   void DeleteTable(TableReference table);
+  // The persistent UDFs of `dataset`, sorted by id.
+  std::vector<Routine> ListRoutines(DatasetReference dataset);
+  Routine GetRoutine(RoutineReference routine);
+  void DeleteRoutine(RoutineReference routine);
   QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
   std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,
                                            bool skip_invalid_rows, bool ignore_unknown_values);
