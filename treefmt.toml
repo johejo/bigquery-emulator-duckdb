@@ -14,3 +14,13 @@ includes = ["src/*.cc", "src/*.h", "tests/*.cc", "tests/*.h", "tools/*.cc", "too
 command = "gofmt"
 options = ["-w"]
 includes = ["*.go"]
+
+[formatter.just]
+command = "just"
+options = ["--fmt", "--justfile"]
+includes = ["Justfile"]
+
+[formatter.tombi]
+command = "tombi"
+options = ["format"]
+includes = ["*.toml"]

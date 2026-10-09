@@ -44,6 +44,7 @@
                   python3
                   runn
                   cppcheck
+                  tombi
                   treefmt
                 ]
                 # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.

@@ -22,7 +22,7 @@ cppcheck *args:
     cppcheck --quiet -j "$(nproc)" --cppcheck-build-dir=.cache/cppcheck \
         --std=c++20 -I . --enable=warning,style,performance,portability \
         --library=googletest --inline-suppr --error-exitcode=1 \
-        --suppressions-list=.cppcheck-suppressions {{args}} src tests tools
+        --suppressions-list=.cppcheck-suppressions {{ args }} src tests tools
 
 # The DuckDB CLI in the dev shell and the libraries linked into the binary come from the same
 # release.
@@ -60,23 +60,23 @@ e2e *args:
 # GoogleSQL's compliance tests against the emulator; not part of `check`, since they take long.
 # Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
 compliance *args:
-    bazelisk test //:compliance_test {{args}}
+    bazelisk test //:compliance_test {{ args }}
 
 # Summarizes the last `just compliance` run as Markdown, and fails when a shard did not finish or a
 # known failure passes.
 # Extra arguments go to tools/compliancesummary, such as -results FILE for each statement's outcome.
 compliance-summary *args:
-    go run ./tools/compliancesummary {{args}} bazel-testlogs/compliance_test
+    go run ./tools/compliancesummary {{ args }} bazel-testlogs/compliance_test
 
 # Evaluates a query on GoogleSQL's reference implementation, which is not BigQuery: a lead for
 # what to check on BigQuery, never an expected value.
 reference sql:
-    bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{quote(sql)}}
+    bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{ quote(sql) }}
 
 # Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified.txt; for maintainers only,
 # since queries on BigQuery are billed.
 bigquery-answers project:
-    go run ./tools/bqanswers {{quote(project)}} {{justfile_directory()}}/tests/e2e/goclient/testdata/unverified.txt
+    go run ./tools/bqanswers {{ quote(project) }} {{ justfile_directory() }}/tests/e2e/goclient/testdata/unverified.txt
 
 [positional-arguments]
 run *args:
@@ -94,11 +94,11 @@ _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigque
 docs:
     bazelisk build //:functions_md //:bigquery-emulator-duckdb
     install -m 644 bazel-bin/functions.md docs/functions.md
-    {{_sql_probe}} > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
-    {{_api_probe}} > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
+    {{ _sql_probe }} > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
+    {{ _api_probe }} > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
 
 # Fails when docs/sql.md or docs/api.md is stale; `just test` checks docs/functions.md.
 docs-check:
     bazelisk build //:bigquery-emulator-duckdb
-    {{_sql_probe}} | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
-    {{_api_probe}} | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
+    {{ _sql_probe }} | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
+    {{ _api_probe }} | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
