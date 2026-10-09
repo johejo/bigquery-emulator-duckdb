@@ -10,3 +10,12 @@
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
 !> error: Error: boom at f() line 1, column 1
+
+# Embedded NUL characters terminate DuckDB SQL literals. Expected values come
+# from GoogleSQL mutator compliance cases and BigQuery JSON string encodings.
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '{"a":[1,"foo"]}', '$.a', 'abca\x00\x01\x1a\x1f ', append_each_element => FALSE))
+!> "{\"a\":[1,\"foo\",\"abca\\u0000\\u0001\\u001a\\u001f \"]}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '{"a":[1,"foo"]}', '$.a[1]', 'abca\x00\x01\x1a\x1f ', insert_each_element => FALSE))
+!> "{\"a\":[1,\"abca\\u0000\\u0001\\u001a\\u001f \",\"foo\"]}"

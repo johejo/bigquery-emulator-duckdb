@@ -1113,6 +1113,22 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               },
           },
       },
+      {"JSON_FLATTEN", {{1, "CAST(bq_json_flatten(CAST($1 AS VARCHAR)) AS JSON[])"}}},
+      {
+          "$SUBSCRIPT",
+          {
+              {
+                  2,
+                  "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
+                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
+              },
+              {
+                  2,
+                  "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
+                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
+              },
+          },
+      },
       {"JSON_QUERY", JsonExtract("bq_json_query", true, true)},
       {"JSON_EXTRACT", JsonExtract("bq_json_query", false, true)},
       {"JSON_VALUE", JsonExtract("bq_json_value", true, false)},
@@ -1186,6 +1202,8 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"JSON_ARRAY", JsonArray},
       {"JSON_REMOVE", JsonRemove},
       {"JSON_SET", JsonSet},
+      {"JSON_ARRAY_APPEND", JsonArrayModify},
+      {"JSON_ARRAY_INSERT", JsonArrayModify},
       {"JSON_OBJECT", JsonObject},
       {"FORMAT", Format},
       {"ARRAY_CONCAT", ArrayConcat},
@@ -1524,6 +1542,8 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "JSON_ARRAY",
       "JSON_OBJECT",
       "JSON_SET",
+      "JSON_ARRAY_APPEND",
+      "JSON_ARRAY_INSERT",
       "FORMAT",
       "PARSE_BIGNUMERIC",
       // Aggregate and analytic functions.

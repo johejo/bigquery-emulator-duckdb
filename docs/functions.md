@@ -34,9 +34,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 14 |
-| Supported | 249 |
-| Unsupported | 130 |
+| Partial | 16 |
+| Supported | 250 |
+| Unsupported | 127 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -178,13 +178,13 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Unsupported |  | function JSON_ARRAY_APPEND |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Unsupported |  | function JSON_ARRAY_INSERT |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; type RANGE<DATE>; type STRUCT<> |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; type RANGE<DATE>; type STRUCT<> |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | json_functions | Supported | GoogleSQL function |  |
-| [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Unsupported |  | function JSON_FLATTEN |
+| [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | json_functions | Supported | DuckDB SQL, in code |  |
 | [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | json_functions | Supported | GoogleSQL function |  |

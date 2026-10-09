@@ -10,7 +10,6 @@
 #include <ios>
 #include <string>
 #include <string_view>
-#include <system_error>
 
 #include "src/api_error.h"
 
@@ -18,8 +17,7 @@ namespace bigquery_emulator_duckdb {
 
 TemporaryFiles::~TemporaryFiles() {
   for (const std::string& path : paths_) {
-    std::error_code ignored;
-    std::filesystem::remove(path, ignored);
+    unlink(path.c_str());
   }
 }
 

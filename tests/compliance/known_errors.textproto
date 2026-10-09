@@ -978,6 +978,8 @@ known_errors {
   label: "code:instr_STRING_<abca@x00_9Ou-AzeZU4c_@x63@x00>_STRING_<a@x00@x6_Jtq_o671MPo_@x00@x63>_INT64_4"
   label: "code:instr_STRING_<abca@x00_9Ou-AzeZU4c_@x63@x00>_STRING_<a@x00@x6_Jtq_o671MPo_@x00@x63>_INT64_5"
   label: "code:json_array_STRING_<abca@x00_HM2YR28AdZA_x1a@x1f >"
+  label: "code:json_array_append_JSON_<@@@a@@:@_gtHpeo_6FZo_@foo@@@@>_STRING_<@@a>_STRING_<abca@x00_HM2YR28AdZA_x1a@x1f >_BOOL_false"
+  label: "code:json_array_insert_JSON_<@@@a@@:@_gtHpeo_6FZo_@foo@@@@>_STRING_<@@a@1@>_STRING_<abca@x00_HM2YR28AdZA_x1a@x1f >_BOOL_false"
   label: "code:json_object_ARRAY<STRING>_<@@field@@>_ARRAY<STRING>_<@@abca@@_oZHtGO7BTU0_@@x1f @@>"
   label: "code:json_object_STRING_<field>_STRING_<abca@x00_HM2YR28AdZA_x1a@x1f >"
   label: "code:json_set_JSON_<@@@a@@:10@>_STRING_<@@a>_STRING_<abca@x00_HM2YR28AdZA_x1a@x1f >"
@@ -2368,6 +2370,15 @@ known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "IN UNNEST matches a struct with a NULL field"
   label: "in_queries_test:in_unnest_structs_with_different_field_names"
+}
+
+# BigQuery TO_JSON encoding rejects lossy decimals. GoogleSQL without
+# FEATURE_JSON_STRICT_NUMBER_PARSING expects rounded results for these cases.
+known_errors {
+  mode: ALLOW_ERROR
+  reason: "BigQuery JSON array mutators reject lossy BIGNUMERIC conversion where GoogleSQL rounds"
+  label: "code:json_array_append_JSON_<@@1,2,3@_c8YZwGMcUL4_o@@@@@@@>_STRING_<@@0@>_BIGNUMERIC_123.123456981723189237198273"
+  label: "code:json_array_insert_JSON_<@@1,2,3@_c8YZwGMcUL4_o@@@@@@@>_STRING_<@@0@@0@>_BIGNUMERIC_123.123456981723189237198273"
 }
 
 known_errors {
