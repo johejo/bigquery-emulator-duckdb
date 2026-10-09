@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "googlesql/public/analyzer.h"
 #include "googlesql/public/constant.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
