@@ -1,0 +1,5 @@
+# The static analyzer explores each test body until it exhausts its budget, which made test files
+# the slowest to check while it finds little in straight-line test code.
+InheritParentConfig: true
+Checks:
+  - -clang-analyzer-*
