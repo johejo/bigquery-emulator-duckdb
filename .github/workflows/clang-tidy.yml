@@ -69,7 +69,7 @@ jobs:
         run: |
           du -sh ~/.cache/bazel-disk
           sleep 30
-          nix develop --command bazelisk shutdown
+          nix develop --command bazelisk --ignore_all_rc_files shutdown
           du -sh ~/.cache/bazel-disk
       # Only main pushes save caches; pull requests and manual runs reuse them.
       - name: Save Bazel disk cache

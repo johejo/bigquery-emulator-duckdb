@@ -119,7 +119,7 @@ jobs:
       - name: Stop Bazel
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          nix develop --command bazelisk shutdown
+          nix develop --command bazelisk --ignore_all_rc_files shutdown
           du -sh ~/.cache/bazel-disk
       - name: Save Bazel disk cache
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
