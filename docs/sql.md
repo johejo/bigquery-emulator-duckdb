@@ -19,7 +19,7 @@ the probe's own notes name what it rejected.
 
 | Status | Features |
 | --- | --- |
-| Partial | 18 |
+| Partial | 19 |
 | Supported | 59 |
 | Unsupported | 17 |
 
@@ -61,6 +61,7 @@ the probe's own notes name what it rejected.
 | `TABLESAMPLE` | Unsupported | scan SampleScan |
 | Pipe syntax | Supported |  |
 | INTERVAL values | Partial | Query values retain separate month, day and microsecond components. Literals, constructors, JUSTIFY functions, EXTRACT and CAST to STRING are supported. Stored columns, INTERVAL query parameters, casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are unsupported.; CAST to INTERVAL other than typed NULL or INTERVAL literals; function $ADD with INTERVAL; function TO_JSON with INTERVAL; stored INTERVAL columns |
+| RANGE values | Partial | Values, stored columns, query parameters and tabledata.insertAll rows of RANGE<DATE>, RANGE<DATETIME> and RANGE<TIMESTAMP> are supported, with comparisons, ordering, grouping, COUNT, MIN, MAX and ANY_VALUE, ARRAY_AGG, navigation functions and casts to and from STRING. SAFE_CAST from STRING, JSON conversion, FORMAT, other functions over RANGE values, loads and extracts of RANGE columns are unsupported.; CAST from STRING to RANGE<DATE>; function TO_JSON with RANGE |
 
 ## DML
 

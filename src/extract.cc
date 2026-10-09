@@ -76,7 +76,8 @@ std::string ScalarText(const FieldSchema& field, const std::string& value) {
 
 void CheckTextFields(const std::vector<FieldSchema>& fields) {
   for (const FieldSchema& field : fields) {
-    if (field.type == FieldType::kInterval || field.type == FieldType::kGeography) {
+    if (field.type == FieldType::kInterval || field.type == FieldType::kRange ||
+        field.type == FieldType::kGeography) {
       throw ApiError::Invalid(std::string(kUnsupported) + "extracting " +
                               std::string(FieldTypeName(field.type)) + " columns");
     }
@@ -181,6 +182,7 @@ void WriteFile(const std::string& path, std::string_view contents, bool gzip) {
 FieldSchema ParquetField(FieldSchema field) {
   switch (field.type) {
     case FieldType::kInterval:
+    case FieldType::kRange:
     case FieldType::kGeography:
       throw ApiError::Invalid(std::string(kUnsupported) + "extracting " +
                               std::string(FieldTypeName(field.type)) + " columns to Parquet");

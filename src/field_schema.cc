@@ -35,9 +35,9 @@ constexpr std::array kTypeNames = {
     TypeName{"BOOLEAN", FieldType::kBoolean},     TypeName{"BOOL", FieldType::kBoolean},
     TypeName{"TIMESTAMP", FieldType::kTimestamp}, TypeName{"DATE", FieldType::kDate},
     TypeName{"TIME", FieldType::kTime},           TypeName{"DATETIME", FieldType::kDatetime},
-    TypeName{"INTERVAL", FieldType::kInterval},   TypeName{"GEOGRAPHY", FieldType::kGeography},
-    TypeName{"JSON", FieldType::kJson},           TypeName{"RECORD", FieldType::kRecord},
-    TypeName{"STRUCT", FieldType::kRecord},
+    TypeName{"INTERVAL", FieldType::kInterval},   TypeName{"RANGE", FieldType::kRange},
+    TypeName{"GEOGRAPHY", FieldType::kGeography}, TypeName{"JSON", FieldType::kJson},
+    TypeName{"RECORD", FieldType::kRecord},       TypeName{"STRUCT", FieldType::kRecord},
 };
 
 struct ModeName {
@@ -133,6 +133,9 @@ std::string_view FieldModeName(FieldMode mode) {
 
 json FieldSchema::ToJson() const {
   json field = {{"name", name}, {"type", FieldTypeName(type)}, {"mode", FieldModeName(mode)}};
+  if (range_element_type.has_value()) {
+    field["rangeElementType"] = {{"type", FieldTypeName(*range_element_type)}};
+  }
   if (!fields.empty()) {
     field["fields"] = json::array();
     for (const FieldSchema& child : fields) {
@@ -182,6 +185,19 @@ FieldSchema FieldSchemaFromJson(const json& value) {
       throw ApiError::Invalid("Unsupported field mode: " + mode);
     }
     field.mode = *parsed;
+  }
+  if (field.type == FieldType::kRange) {
+    const auto it = value.find("rangeElementType");
+    const std::optional<FieldType> element = it == value.end() || !it->is_object()
+                                                 ? std::nullopt
+                                                 : ParseFieldType(StringMember(*it, "type"));
+    if (element != FieldType::kDate && element != FieldType::kDatetime &&
+        element != FieldType::kTimestamp) {
+      throw ApiError::Invalid("Field " + field.name +
+                              " of type RANGE needs a rangeElementType of DATE, DATETIME or "
+                              "TIMESTAMP");
+    }
+    field.range_element_type = element;
   }
   if (const auto it = value.find("fields"); it != value.end() && !it->is_null()) {
     if (!it->is_array()) {

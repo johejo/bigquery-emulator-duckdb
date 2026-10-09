@@ -305,9 +305,9 @@ void ValidateClustering(const std::vector<std::string>& clustering,
                               name);
     }
     static constexpr FieldType kClusterable[] = {
-        FieldType::kBigNumeric, FieldType::kBoolean,   FieldType::kDate,
-        FieldType::kDatetime,   FieldType::kGeography, FieldType::kInteger,
-        FieldType::kNumeric,    FieldType::kString,    FieldType::kTimestamp,
+        FieldType::kBigNumeric, FieldType::kBoolean,   FieldType::kDate,    FieldType::kDatetime,
+        FieldType::kGeography,  FieldType::kInteger,   FieldType::kNumeric, FieldType::kRange,
+        FieldType::kString,     FieldType::kTimestamp,
     };
     if (std::ranges::find(kClusterable, field->type) == std::end(kClusterable) ||
         field->mode == FieldMode::kRepeated) {

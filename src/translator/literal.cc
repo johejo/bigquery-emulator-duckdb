@@ -3,6 +3,7 @@
 #include <cmath>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/strings.h"
@@ -32,6 +33,19 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
     if (interval.get_nano_fractions() != 0) return std::nullopt;
     return "bq_interval_parts(" + std::to_string(interval.get_months()) + ", " +
            std::to_string(interval.get_days()) + ", " + std::to_string(interval.get_micros()) + ")";
+  } else if (value.type()->IsRange()) {
+    std::vector<std::string> bounds;
+    for (const auto& [bound, unbounded] :
+         {std::pair{&value.start(), "-infinity"}, std::pair{&value.end(), "infinity"}}) {
+      const auto sql =
+          bound->is_null() ? std::optional<std::string>(QuoteLiteral(unbounded)) : Literal(*bound);
+      if (!sql) {
+        return std::nullopt;
+      }
+      bounds.push_back(*sql);
+    }
+    literal = "struct_pack(" + QuoteIdentifier(kRangeStart) + " := " + bounds.at(0) + ", " +
+              QuoteIdentifier(kRangeEnd) + " := " + bounds.at(1) + ")";
   } else if (value.type()->IsString()) {
     literal = QuoteLiteral(value.string_value());
   } else if (value.type()->IsBytes()) {

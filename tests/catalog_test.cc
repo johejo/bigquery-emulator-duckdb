@@ -121,6 +121,10 @@ TEST(GoogleSqlTypeTest, MapsScalarTypes) {
   EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kJson}), "JSON");
   EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kInterval}), "INTERVAL");
   EXPECT_EQ(TypeName({.name = "c", .type = FieldType::kGeography}), "GEOGRAPHY");
+  EXPECT_EQ(
+      TypeName(
+          {.name = "c", .type = FieldType::kRange, .range_element_type = FieldType::kTimestamp}),
+      "RANGE<TIMESTAMP>");
 }
 
 TEST(GoogleSqlTypeTest, MapsRepeatedAndRecordFields) {
@@ -190,6 +194,15 @@ TEST(DuckDbColumnTypeTest, MapsFieldsThroughTheirGoogleSqlTypes) {
            .mode = FieldMode::kRepeated,
            .fields = {{.name = "a", .type = FieldType::kString, .mode = FieldMode::kRepeated}}}),
       "STRUCT(\"a\" VARCHAR[])[]");
+}
+
+// A RANGE is a STRUCT whose unbounded ends are infinite, so that DuckDB orders it as BigQuery does.
+TEST(DuckDbColumnTypeTest, StoresRangeAsStruct) {
+  EXPECT_EQ(ColumnType({.name = "c",
+                        .type = FieldType::kRange,
+                        .mode = FieldMode::kRepeated,
+                        .range_element_type = FieldType::kDatetime}),
+            R"(STRUCT("$start" TIMESTAMP, "$end" TIMESTAMP)[])");
 }
 
 // Tables keep GEOGRAPHY as text, though queries over it are not translated.

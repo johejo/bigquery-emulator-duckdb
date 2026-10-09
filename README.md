@@ -169,9 +169,9 @@ Behavior that applies across them:
 - Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,
   `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from
   DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`,
-  structs → `RECORD`.
+  structs → `RECORD`, except the structs that keep `RANGE` values → `RANGE`.
 - Timestamps are encoded as epoch seconds, or epoch microseconds with
-  `formatOptions.useInt64Timestamp`.
+  `formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`.
 - The `SAFE.` prefix returns NULL for the function's own errors while argument errors still
   propagate. It is unsupported on volatile functions.
 - Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier

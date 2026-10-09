@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "googlesql/public/function.h"
@@ -53,6 +55,17 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       std::ranges::any_of(call.argument_list(),
                           [](const auto& argument) { return HasInterval(argument->type()); })) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with INTERVAL");
+  }
+  // These order, compare or carry a RANGE's STRUCT as BigQuery does its RANGE.
+  static constexpr std::string_view range_functions[] = {
+      "COUNT",      "MIN",       "MAX", "ANY_VALUE", "ARRAY_AGG", "FIRST_VALUE",
+      "LAST_VALUE", "NTH_VALUE", "LAG", "LEAD",      "MIN_BY",    "MAX_BY",
+  };
+  if ((HasRange(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasRange(argument->type()); })) &&
+      std::ranges::find(range_functions, name) == std::end(range_functions)) {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with RANGE");
   }
   if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");

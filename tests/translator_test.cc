@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "googlesql/public/type.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -138,6 +139,31 @@ TEST_F(TranslatorTest, RejectsIntervalCastsBeforeLiteralFolding) {
     SCOPED_TRACE(sql);
     EXPECT_THROW(Statement(sql), std::runtime_error);
   }
+}
+
+// A RANGE is a STRUCT in DuckDB, which functions that serialize or inspect values would see.
+TEST_F(TranslatorTest, RangeScopeRemainsExplicit) {
+  for (const auto* sql : {
+           "SELECT TO_JSON_STRING(RANGE<DATE> '[2020-01-01, 2020-02-01)')",
+           "SELECT TO_JSON([RANGE<DATE> '[2020-01-01, 2020-02-01)'])",
+           "SELECT CAST(r AS JSON) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r",
+           "SELECT FORMAT('%t', RANGE<DATE> '[2020-01-01, 2020-02-01)')",
+           "SELECT GENERATE_RANGE_ARRAY(RANGE<DATE> '[2020-01-01, 2020-02-01)', INTERVAL 1 DAY)",
+           "SELECT SAFE_CAST(CONCAT('[2020-01-01, ', '2020-01-02)') AS RANGE<DATE>)",
+           "SELECT APPROX_COUNT_DISTINCT(r) FROM UNNEST([RANGE(DATE '2020-01-01', NULL)]) r",
+       }) {
+    SCOPED_TRACE(sql);
+    EXPECT_FALSE(Translate(sql).has_value());
+  }
+}
+
+// A STRUCT whose field names could pass for a RANGE's gets positional names in DuckDB.
+TEST_F(TranslatorTest, StructFieldsCannotPassForARange) {
+  const auto sql =
+      Translate("SELECT STRUCT(DATE '2020-01-01' AS `$start`, DATE '2020-01-02' AS `$end`)");
+  ASSERT_TRUE(sql.has_value());
+  EXPECT_THAT(*sql, ::testing::HasSubstr("_field_1"));
+  EXPECT_THAT(*sql, ::testing::Not(::testing::HasSubstr("\"$start\"")));
 }
 
 // Enabling query INTERVAL values must not enable the generic DuckDB fallbacks.

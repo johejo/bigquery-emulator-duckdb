@@ -24,6 +24,7 @@ enum class FieldType : uint8_t {
   kTime,
   kDatetime,
   kInterval,
+  kRange,
   kGeography,
   kJson,
   kRecord,
@@ -47,6 +48,8 @@ struct FieldSchema {
   FieldType type = FieldType::kString;
   FieldMode mode = FieldMode::kNullable;
   std::vector<FieldSchema> fields = {};  // Populated for RECORD.
+  // rangeElementType.type for RANGE: DATE, DATETIME or TIMESTAMP.
+  std::optional<FieldType> range_element_type = {};
   std::string description = {};
   std::optional<int64_t> max_length = {};  // STRING and BYTES.
   std::optional<int64_t> precision = {};   // NUMERIC and BIGNUMERIC.

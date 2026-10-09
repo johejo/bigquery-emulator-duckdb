@@ -38,7 +38,23 @@ TEST(FieldSchemaTest, RoundTripsColumnOptions) {
   EXPECT_EQ(field.ToJson()["maxLength"], "5");
 }
 
+TEST(FieldSchemaTest, RoundTripsRangeElementType) {
+  const json value = json::parse(R"({
+      "name": "r", "type": "RANGE", "mode": "NULLABLE", "rangeElementType": {"type": "DATE"}})");
+  const FieldSchema field = FieldSchemaFromJson(value);
+  EXPECT_EQ(field.range_element_type, FieldType::kDate);
+  EXPECT_EQ(field.ToJson(), value);
+  // Only a RANGE has an element type.
+  EXPECT_FALSE(FieldSchemaFromJson(json::parse(R"({
+      "name": "d", "type": "DATE", "rangeElementType": {"type": "DATE"}})"))
+                   .range_element_type.has_value());
+}
+
 TEST(FieldSchemaTest, RejectsWhatBigQueryRejects) {
+  EXPECT_THROW(FieldSchemaFromJson(json::parse(R"({"name": "r", "type": "RANGE"})")), ApiError);
+  EXPECT_THROW(FieldSchemaFromJson(json::parse(
+                   R"({"name": "r", "type": "RANGE", "rangeElementType": {"type": "TIME"}})")),
+               ApiError);
   EXPECT_THROW(FieldSchemaFromJson(json::parse(R"({"type": "STRING"})")), ApiError);
   EXPECT_THROW(FieldSchemaFromJson(json::parse(R"({"name": "c", "type": "NOPE"})")), ApiError);
   EXPECT_THROW(FieldSchemaFromJson(json::parse(R"({"name": "c", "mode": "OPTIONAL"})")), ApiError);

@@ -198,12 +198,23 @@ bool IsBigQuerySignature(const googlesql::FunctionSignature& signature) {
          std::ranges::all_of(signature.arguments(), supported);
 }
 
+// Whether the signature takes or returns a RANGE of its templated type.
+bool IsRangeSignature(const googlesql::FunctionSignature& signature) {
+  return signature.result_type().kind() == googlesql::ARG_KIND_EXPR_RANGE_ANY_1 ||
+         std::ranges::any_of(signature.arguments(), [](const auto& argument) {
+           return argument.kind() == googlesql::ARG_KIND_EXPR_RANGE_ANY_1;
+         });
+}
+
 // The generated query for a signature, or why there is none.
 std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                                 const googlesql::Function& function,
                                                 const googlesql::FunctionSignature& signature,
                                                 const std::string& element = "") {
   const bool json_mutator = name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT";
+  // A RANGE of `element` starts at it, and is unbounded where a second element would end it.
+  const bool range = IsRangeSignature(signature);
+  bool element_used = false;
   std::vector<std::string> arguments;
   for (const googlesql::FunctionArgumentType& argument : signature.arguments()) {
     if (argument.optional() && !argument.has_argument_name()) {
@@ -217,6 +228,10 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
             ? std::optional<std::string>(name == "JSON_ARRAY_INSERT" ? "'$[0]'" : "'$'")
         : json_mutator && !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARBITRARY
             ? std::optional(element)
+        : range && !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_RANGE_ANY_1
+            ? std::optional("RANGE(" + element + ", NULL)")
+        : range && element_used && argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1
+            ? std::optional<std::string>("NULL")
         : !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1
             ? std::optional(element)
         : !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARRAY_ANY_1
@@ -225,6 +240,7 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
     if (!sample) {
       return Probe{Outcome::kUntested, "no sample for " + argument.DebugString()};
     }
+    element_used = element_used || argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1;
     arguments.push_back(*sample);
   }
   std::string call = name + "(";
@@ -363,6 +379,14 @@ int Main(int argc, char** argv) {
               "TIMESTAMP '2024-01-15 10:20:30+00'",
               "INTERVAL 1 DAY",
               "RANGE<DATE> '[2024-01-01, 2024-02-01)'",
+          };
+        }
+        // Probe each element type a RANGE can have.
+        if (IsRangeSignature(signature)) {
+          elements = {
+              "DATE '2024-01-15'",
+              "DATETIME '2024-01-15 10:20:30'",
+              "TIMESTAMP '2024-01-15 10:20:30+00'",
           };
         }
         for (const std::string& element : elements) {

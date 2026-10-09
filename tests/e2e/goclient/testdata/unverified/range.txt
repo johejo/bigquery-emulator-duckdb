@@ -1,0 +1,24 @@
+# BigQuery's documentation allows casting a RANGE to STRING without showing the text. GoogleSQL
+# writes "[start, end)" with each bound cast to STRING and UNBOUNDED for a missing one.
+
+SELECT CAST(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS STRING)
+?>
+
+SELECT CAST(RANGE<DATETIME> '[UNBOUNDED, 2021-01-01 12:30:00)' AS STRING)
+?>
+
+SELECT CAST(RANGE<TIMESTAMP> '[2020-01-01 01:02:03.5+00, 2021-01-01 00:00:00+00)' AS STRING)
+?>
+
+# A RANGE<TIMESTAMP> result without formatOptions.useInt64Timestamp: whether its bounds are
+# decimal seconds, as a TIMESTAMP cell's are, or microseconds.
+SELECT RANGE<TIMESTAMP> '[2020-01-01 00:00:00.5+00, UNBOUNDED)'
+?>
+
+# BigQuery's message for a RANGE whose start does not precede its end, and for RANGE_INTERSECT of
+# ranges that do not overlap.
+SELECT RANGE(DATE '2022-12-31', DATE '2022-12-01')
+?>
+
+SELECT RANGE_INTERSECT(RANGE<DATE> '[2020-02-01, 2020-09-01)', RANGE<DATE> '[2021-06-15, UNBOUNDED)')
+?>

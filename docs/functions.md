@@ -35,8 +35,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | Status | Functions |
 | --- | --- |
 | Partial | 15 |
-| Supported | 251 |
-| Unsupported | 127 |
+| Supported | 257 |
+| Unsupported | 121 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -157,7 +157,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported |  | the analyzer does not know this function |
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Supported | DuckDB SQL |  |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | DuckDB SQL | takes only a DAY or WEEK step |
-| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | type ARRAY<RANGE<DATE>>; type ARRAY<RANGE<DATETIME>>; type ARRAY<RANGE<TIMESTAMP>> |
+| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | function GENERATE_RANGE_ARRAY |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported | DuckDB SQL |  |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported | DuckDB function, renamed |  |
 | [`GREATEST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#greatest) | mathematical_functions | Supported | DuckDB SQL, in code |  |
@@ -178,8 +178,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | json_functions | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; type RANGE<DATE>; type STRUCT<> |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; type RANGE<DATE>; type STRUCT<> |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; function JSON_ARRAY_APPEND with RANGE; type STRUCT<> |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | json_functions | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported; function JSON_ARRAY_INSERT with RANGE; type STRUCT<> |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | json_functions | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | json_functions | Supported | GoogleSQL function |  |
@@ -283,14 +283,14 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | mathematical_functions | Supported | DuckDB function, renamed |  |
-| [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Unsupported |  | type RANGE<DATE> |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Partial | DuckDB SQL | function RANGE_BUCKET with INTERVAL; type RANGE<DATE> |
-| [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Unsupported |  | `SELECT RANGE_CONTAINS(RANGE<DATE> '[2024-01-01, 2024-02-01)', 2)`: INVALID_ARGUMENT: No matching signature for function RANGE_CONTAINS; function RANGE_CONTAINS |
-| [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Unsupported |  | function RANGE_END |
-| [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Unsupported |  | type RANGE<DATE> |
-| [`RANGE_OVERLAPS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_overlaps) | range-functions | Unsupported |  | function RANGE_OVERLAPS |
+| [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | range-functions | Supported | DuckDB SQL |  |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | mathematical_functions | Partial | DuckDB SQL | function RANGE_BUCKET with INTERVAL; function RANGE_BUCKET with RANGE |
+| [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | range-functions | Supported | DuckDB SQL |  |
+| [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | range-functions | Supported | DuckDB SQL |  |
+| [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | range-functions | Supported | DuckDB SQL |  |
+| [`RANGE_OVERLAPS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_overlaps) | range-functions | Supported | DuckDB SQL |  |
 | [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | range-functions | Unsupported |  | the analyzer does not know this function |
-| [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Unsupported |  | function RANGE_START |
+| [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | range-functions | Supported | DuckDB SQL |  |
 | [`RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#rank) | numbering_functions | Supported | DuckDB window function |  |
 | [`REGEXP_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains) | string_functions | Supported | GoogleSQL function |  |
 | [`REGEXP_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_extract) | string_functions | Supported | GoogleSQL function |  |

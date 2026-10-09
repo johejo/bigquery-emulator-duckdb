@@ -74,6 +74,10 @@ json ParameterType(const googlesql::Type* type) {
     }
     return {{"type", "STRUCT"}, {"structTypes", std::move(fields)}};
   }
+  if (type->IsRange()) {
+    return {{"type", "RANGE"},
+            {"rangeElementType", ParameterType(type->AsRange()->element_type())}};
+  }
   return {{"type", type->TypeName(googlesql::PRODUCT_EXTERNAL)}};
 }
 
@@ -143,6 +147,12 @@ absl::StatusOr<json> ParameterValue(const Value& value) {
                                  ParameterValue(value.field(i)));
     }
     return json{{"structValues", std::move(fields)}};
+  }
+  if (value.type()->IsRange()) {
+    // An unbounded end is a NULL bound.
+    GOOGLESQL_ASSIGN_OR_RETURN(json start, ParameterValue(value.start()));
+    GOOGLESQL_ASSIGN_OR_RETURN(json end, ParameterValue(value.end()));
+    return json{{"rangeValue", {{"start", std::move(start)}, {"end", std::move(end)}}}};
   }
   GOOGLESQL_ASSIGN_OR_RETURN(std::string text, ScalarText(value));
   return json{{"value", std::move(text)}};

@@ -13,6 +13,7 @@
 #include "src/backend_functions/json.h"
 #include "src/backend_functions/math.h"
 #include "src/backend_functions/percentile.h"
+#include "src/backend_functions/range.h"
 #include "src/backend_functions/string.h"
 #include "src/duckdb_handle.h"
 
@@ -76,6 +77,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());
+  backend_functions::RegisterRangeFunctions(connection.get());
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get());
