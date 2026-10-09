@@ -96,6 +96,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
          }) {
       options->DisableLanguageFeature(feature);
     }
+    // GoogleSQL released JSON_EXISTS functions before BigQuery documented them.
+    options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);
     options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
     // BigQuery has EDIT_DISTANCE over BYTES and CREATE TABLE CLONE, which GoogleSQL still marks
     // in development.

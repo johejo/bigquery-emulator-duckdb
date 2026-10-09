@@ -1,0 +1,16 @@
+--- a/googlesql/public/functions/string_format.cc
++++ b/googlesql/public/functions/string_format.cc
+@@ -1354,7 +1354,12 @@
+     if (conv.conversion_char() == absl::FormatConversionChar::o) {
+       prefix1 = '\0';
+     }
+-    total_digits = conv.precision();
++    // BigQuery includes decimal grouping separators in the minimum precision.
++    // A group of three digits occupies four characters after the first group.
++    total_digits = GROUPING && group_size == 3
++                       ? std::max(sig_digits, conv.precision() -
++                                                  (conv.precision() - 1) / 4)
++                       : conv.precision();
+     precision_digits = total_digits - sig_digits;
+     leading_digits = ((total_digits - 1) % group_size) + 1;
+     separators = (total_digits - leading_digits) / group_size;
