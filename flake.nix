@@ -44,6 +44,7 @@
                   python3
                   runn
                   cppcheck
+                  treefmt
                 ]
                 # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.
                 # Bazel's toolchain detection links with lld when clang finds ld.lld, and with

@@ -2,21 +2,14 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # Tracked and untracked files, minus those that .gitignore and .git/info/exclude ignore, such as
 # Bazel output symlinks and worktrees under .claude.
-_git_files := "git ls-files -z --cached --others --exclude-standard --"
-_bazel_files := _git_files + " ':(glob)**/BUILD' ':(glob)**/BUILD.bazel' ':(glob)**/*.bzl' ':(glob)**/MODULE.bazel'"
-_cpp_sources := _git_files + " ':(glob)src/**/*.cc' ':(glob)tests/**/*.cc' ':(glob)tools/**/*.cc'"
-_cpp_files := _cpp_sources + " ':(glob)src/**/*.h' ':(glob)tests/**/*.h' ':(glob)tools/**/*.h'"
-_go_files := _git_files + " ':(glob)**/*.go'"
+_cpp_sources := "git ls-files -z --cached --others --exclude-standard -- ':(glob)src/**/*.cc' ':(glob)tests/**/*.cc' ':(glob)tools/**/*.cc'"
 
+# Formatters and the files they cover are in treefmt.toml.
 fmt:
-    {{_bazel_files}} | xargs -0 buildifier
-    {{_cpp_files}} | xargs -0 clang-format -i
-    {{_go_files}} | xargs -0 gofmt -w
+    treefmt
 
 fmt-check:
-    {{_bazel_files}} | xargs -0 buildifier -mode=check
-    {{_cpp_files}} | xargs -0 clang-format --dry-run --Werror
-    {{_go_files}} | xargs -0 gofmt -l | { errors=$(cat); if [[ -n "$errors" ]]; then echo "$errors" >&2; exit 1; fi; }
+    treefmt --ci
 
 # compile_commands.json is for clangd; clang-tidy no longer needs it.
 refresh-compile-commands:
