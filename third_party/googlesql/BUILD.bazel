@@ -1,4 +1,5 @@
 exports_files([
     "compliance.patch",
+    "format_precision.patch",
     "throw_delegate.patch",
 ])

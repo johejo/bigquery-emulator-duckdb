@@ -1,5 +1,10 @@
 # googlesql patch
 
+`format_precision.patch` counts decimal grouping separators toward integer precision in
+`FORMAT`, matching BigQuery's confirmed `FORMAT("%'.2d|%'.5d|%'.6d", 5, 1234, 1234)` result,
+`"05|1,234|01,234"`. GoogleSQL 2026.10.1 instead returns `"05|01,234|001,234"`.
+Drop the patch when GoogleSQL agrees with BigQuery for these forms.
+
 `throw_delegate.patch` replaces `absl::base_internal::ThrowStdOutOfRange` with the public
 `absl::ThrowStdOutOfRange` in `googlesql/base/associative_view_internal.h`.
 

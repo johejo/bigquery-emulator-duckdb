@@ -45,6 +45,7 @@ archive_override(
     # Abseil 20260526 (required by google_cloud_cpp 3.9+) removes an internal API GoogleSQL uses.
     patches = [
         "//third_party/googlesql:throw_delegate.patch",
+        "//third_party/googlesql:format_precision.patch",
         # Lets //:compliance_test use GoogleSQL's compliance test cases.
         "//third_party/googlesql:compliance.patch",
     ],

@@ -76,6 +76,10 @@ SELECT FORMAT('%5.2f|%-5s|%05d|%x', 3.14159, 'ab', 42, 255)
 SELECT FORMAT("%'d|%e|%g", 1234567, 1.5, 1.5)
 => "1,234,567|1.500000e+00|1.5"
 
+# Grouping with integer precision; confirmed against BigQuery.
+SELECT FORMAT("%'.2d|%'.5d|%'.6d", 5, 1234, 1234)
+=> "05|1,234|01,234"
+
 SELECT FORMAT('%T|%T|%t|%T', 'abc', b'ab', DATE '2024-01-02', DATE '2024-01-02')
 => "\"abc\"|b\"ab\"|2024-01-02|DATE \"2024-01-02\""
 
