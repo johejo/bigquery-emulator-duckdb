@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

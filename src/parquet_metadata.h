@@ -5,6 +5,7 @@
 // emulator reads such a column as its bytes and writes BIGNUMERIC as bytes, and edits the
 // footer's types to match. See https://github.com/apache/parquet-format.
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>

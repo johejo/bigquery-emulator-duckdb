@@ -2,6 +2,9 @@
 
 #include <cstdint>
 
+#include "absl/status/statusor.h"
+#include "duckdb.h"
+
 namespace bigquery_emulator_duckdb {
 
 absl::StatusOr<googlesql::IntervalValue> IntervalFromDuckDb(const duckdb_interval& value) {

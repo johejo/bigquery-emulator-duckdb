@@ -1,5 +1,8 @@
 #include "src/backend_functions.h"
 
+#include <optional>
+#include <string>
+
 #include "duckdb.h"
 #include "src/backend_error.h"
 #include "src/backend_functions/aead.h"

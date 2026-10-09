@@ -1,9 +1,12 @@
 #include "src/backend.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -11,9 +14,11 @@
 #include "duckdb.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
+#include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/field_schema.h"
 #include "src/interval.h"
 
 namespace bigquery_emulator_duckdb {

@@ -9,6 +9,7 @@ cc_library(
     deps = [
         "//:duckdb_sql",
         "//:query_parameters",
+        "//:references",
         "//:translated_statement",
         "@googlesql//googlesql/public:analyzer",
     ],
@@ -111,7 +112,9 @@ cc_library(
         "//:catalog",
         "//:duckdb_sql",
         "//:field_schema",
+        "//:references",
         "//:table_metadata",
+        "//:translated_statement",
         "//:type_mapping",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/time",

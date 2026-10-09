@@ -10,6 +10,7 @@
 #include "googlesql/public/analyzer.h"
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
+#include "src/references.h"
 #include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb::translator {

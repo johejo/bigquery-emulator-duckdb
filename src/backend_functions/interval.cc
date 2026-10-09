@@ -5,6 +5,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/functions/datetime.pb.h"
 #include "googlesql/public/interval_value.h"

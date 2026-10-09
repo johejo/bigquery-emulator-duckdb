@@ -5,10 +5,12 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <functional>
+#include <ios>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -29,6 +31,7 @@
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/backend_error.h"
 #include "src/catalog.h"
 #include "src/column_metadata.h"
 #include "src/ddl_write.h"
@@ -37,11 +40,15 @@
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/load.h"
+#include "src/parquet_metadata.h"
+#include "src/project.h"
+#include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
+#include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
 

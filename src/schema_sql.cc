@@ -1,6 +1,7 @@
 #include "src/schema_sql.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <optional>
 #include <string>

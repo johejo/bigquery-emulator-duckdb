@@ -1,6 +1,8 @@
 #include "src/translator/aggregate.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>

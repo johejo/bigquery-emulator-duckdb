@@ -1,11 +1,13 @@
 #include "src/query_parameters.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "absl/status/statusor.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"

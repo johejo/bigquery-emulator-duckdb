@@ -20,6 +20,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {

@@ -7,6 +7,8 @@
 // notes.
 
 #include <algorithm>
+#include <cstddef>
+#include <exception>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -28,6 +30,7 @@
 #include "googlesql/public/types/type_factory.h"
 #include "src/catalog.h"
 #include "src/emulator.h"
+#include "src/field_schema.h"
 #include "src/translator/functions.h"
 #include "tools/probe.h"
 
