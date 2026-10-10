@@ -42,7 +42,9 @@ ThriftValue Element(const std::string& name, int64_t repetition, int32_t childre
   element.SetField(parquet::kElementRepetition,
                    ThriftValue::Int32(static_cast<int32_t>(repetition)));
   element.SetField(parquet::kElementName, Binary(name));
-  if (children > 0) element.SetField(parquet::kElementChildren, ThriftValue::Int32(children));
+  if (children > 0) {
+    element.SetField(parquet::kElementChildren, ThriftValue::Int32(children));
+  }
   return element;
 }
 
@@ -66,7 +68,9 @@ std::string EmptyParquetFile() {
 
 TEST(ParquetMetadataTest, RewritesAndReadsBackAFooter) {
   std::vector<ThriftValue> schema = {Element("schema", 0, 18)};
-  for (int i = 0; i < 18; ++i) schema.push_back(Element("c" + std::to_string(i), kOptional, 0));
+  for (int i = 0; i < 18; ++i) {
+    schema.push_back(Element("c" + std::to_string(i), kOptional, 0));
+  }
   ThriftValue flag;
   flag.type = Type::kTrue;
   // Field 40 is past the deltas of the short form of a field header, and a list of 19 elements

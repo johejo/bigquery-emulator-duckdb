@@ -65,7 +65,9 @@ std::string SqlTypeName(const json& type) {
           throw ApiError::Invalid("Invalid routine struct field: " + name);
         }
       }
-      if (!fields.empty()) fields += ", ";
+      if (!fields.empty()) {
+        fields += ", ";
+      }
       if (const std::string name = field.value("name", ""); !name.empty()) {
         fields += googlesql::ToIdentifierLiteral(name) + " ";
       }
@@ -116,7 +118,9 @@ std::string RoutineStatement(const Routine& routine) {
   const RoutineReference& reference = routine.reference;
   std::string arguments;
   for (const json& argument : resource.value("arguments", json::array())) {
-    if (!arguments.empty()) arguments += ", ";
+    if (!arguments.empty()) {
+      arguments += ", ";
+    }
     arguments += googlesql::ToIdentifierLiteral(argument.value("name", "")) + " ";
     arguments += argument.value("argumentKind", "") == "ANY_TYPE"
                      ? "ANY TYPE"

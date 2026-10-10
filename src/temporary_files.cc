@@ -26,7 +26,9 @@ std::string TemporaryFiles::Create(std::string_view suffix) {
       (std::filesystem::temp_directory_path() / "bigquery-emulator-XXXXXX").string();
   pattern += suffix;
   const int fd = mkstemps(pattern.data(), static_cast<int>(suffix.size()));
-  if (fd < 0) throw ApiError::Internal("Could not create temporary file");
+  if (fd < 0) {
+    throw ApiError::Internal("Could not create temporary file");
+  }
   close(fd);
   paths_.push_back(pattern);
   return pattern;
@@ -37,7 +39,9 @@ std::string TemporaryFiles::Write(std::string_view contents) {
   std::ofstream stream(path, std::ios::binary);
   stream.write(contents.data(), static_cast<std::streamsize>(contents.size()));
   stream.close();
-  if (!stream) throw ApiError::Internal("Could not write temporary file");
+  if (!stream) {
+    throw ApiError::Internal("Could not write temporary file");
+  }
   return path;
 }
 

@@ -99,7 +99,9 @@ namespace {
 // Literal CASTs disappear during resolution. Check the source AST so unsupported interval
 // casts cannot become supported merely because GoogleSQL folded them into values.
 absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
-  if (ToUpperAscii(sql).find("INTERVAL") == std::string::npos) return absl::OkStatus();
+  if (ToUpperAscii(sql).find("INTERVAL") == std::string::npos) {
+    return absl::OkStatus();
+  }
   std::unique_ptr<googlesql::ParserOutput> parsed;
   const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
   GOOGLESQL_RETURN_IF_ERROR(expression ? googlesql::ParseExpression(sql, options, &parsed)
@@ -122,7 +124,9 @@ absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
             "literals");
       }
     }
-    for (int i = 0; i < node->num_children(); ++i) nodes.push_back(node->child(i));
+    for (int i = 0; i < node->num_children(); ++i) {
+      nodes.push_back(node->child(i));
+    }
   }
   return absl::OkStatus();
 }

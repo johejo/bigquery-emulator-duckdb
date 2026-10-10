@@ -652,7 +652,9 @@ std::unique_ptr<Backend> Backend::NewSession() {
 Backend::~Backend() = default;
 
 void Backend::Transaction(const std::string& statement) {
-  if (!session_) throw BackendError("Transactions require a session");
+  if (!session_) {
+    throw BackendError("Transactions require a session");
+  }
   Query(session_->connection.get(), statement);
   session_->in_transaction = statement == "BEGIN TRANSACTION";
 }
@@ -715,13 +717,17 @@ void Backend::ExecuteDdl(const std::string& sql,
   auto* const connection = session_ ? session_->connection.get() : owned.get();
   RunSetup(connection, setup);
   const bool own_transaction = !session_ || !session_->in_transaction;
-  if (own_transaction) Query(connection, "BEGIN TRANSACTION");
+  if (own_transaction) {
+    Query(connection, "BEGIN TRANSACTION");
+  }
   try {
     if (!skip_query.empty()) {
       Result existing;
       Query(connection, skip_query, existing);
       if (duckdb_row_count(&existing.result) != 0) {
-        if (own_transaction) Query(connection, "COMMIT");
+        if (own_transaction) {
+          Query(connection, "COMMIT");
+        }
         return;
       }
     }
@@ -729,9 +735,13 @@ void Backend::ExecuteDdl(const std::string& sql,
     for (const std::string& statement : metadata_statements) {
       Query(connection, statement);
     }
-    if (own_transaction) Query(connection, "COMMIT");
+    if (own_transaction) {
+      Query(connection, "COMMIT");
+    }
   } catch (...) {
-    if (own_transaction && session_) Query(connection, "ROLLBACK");
+    if (own_transaction && session_) {
+      Query(connection, "ROLLBACK");
+    }
     throw;
   }
 }

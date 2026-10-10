@@ -37,7 +37,9 @@ class Reader {
   explicit Reader(std::string_view input) : input_(input) {}
 
   uint8_t Byte() {
-    if (position_ >= input_.size()) Invalid("truncated footer");
+    if (position_ >= input_.size()) {
+      Invalid("truncated footer");
+    }
     return static_cast<uint8_t>(input_.at(position_++));
   }
 
@@ -46,7 +48,9 @@ class Reader {
     for (unsigned shift = 0; shift < 64; shift += 7) {
       const uint8_t byte = Byte();
       value |= static_cast<uint64_t>(byte & 0x7fU) << shift;
-      if ((byte & 0x80U) == 0) return value;
+      if ((byte & 0x80U) == 0) {
+        return value;
+      }
     }
     Invalid("malformed varint");
   }
@@ -57,26 +61,34 @@ class Reader {
   }
 
   std::string Bytes(uint64_t size) {
-    if (size > input_.size() - position_) Invalid("truncated footer");
+    if (size > input_.size() - position_) {
+      Invalid("truncated footer");
+    }
     std::string bytes(input_.substr(position_, size));
     position_ += size;
     return bytes;
   }
 
   ThriftValue Value(Type type, bool element, int depth) {
-    if (depth > kMaxDepth) Invalid("footer nested too deeply");
+    if (depth > kMaxDepth) {
+      Invalid("footer nested too deeply");
+    }
     ThriftValue value;
     value.type = type;
     switch (type) {
       case Type::kTrue:
       case Type::kFalse:
         // A struct field's boolean is its type; an element's is a byte of its own.
-        if (element) value.type = Byte() == 1 ? Type::kTrue : Type::kFalse;
+        if (element) {
+          value.type = Byte() == 1 ? Type::kTrue : Type::kFalse;
+        }
         break;
       case Type::kByte:
         // A byte is signed.
         value.integer = Byte();
-        if (value.integer > 127) value.integer -= 256;
+        if (value.integer > 127) {
+          value.integer -= 256;
+        }
         break;
       case Type::kI16:
       case Type::kI32:
@@ -94,7 +106,9 @@ class Reader {
         const uint8_t header = Byte();
         value.element_type = ElementType(header & 0x0fU);
         uint64_t size = header >> 4U;
-        if (size == 15) size = Varint();
+        if (size == 15) {
+          size = Varint();
+        }
         for (uint64_t i = 0; i < size; ++i) {
           value.elements.push_back(Value(value.element_type, true, depth + 1));
         }
@@ -102,7 +116,9 @@ class Reader {
       }
       case Type::kMap: {
         const uint64_t size = Varint();
-        if (size == 0) break;
+        if (size == 0) {
+          break;
+        }
         const uint8_t types = Byte();
         value.element_type = ElementType(types >> 4U);
         value.value_type = ElementType(types & 0x0fU);
@@ -159,7 +175,9 @@ class Writer {
     switch (value.type) {
       case Type::kTrue:
       case Type::kFalse:
-        if (element) out_ += static_cast<char>(value.type);
+        if (element) {
+          out_ += static_cast<char>(value.type);
+        }
         break;
       case Type::kByte:
         out_ += static_cast<char>(value.integer);
@@ -185,15 +203,21 @@ class Writer {
           out_ += static_cast<char>(0xf0U | type);
           Varint(value.elements.size());
         }
-        for (const ThriftValue& item : value.elements) Value(item, true);
+        for (const ThriftValue& item : value.elements) {
+          Value(item, true);
+        }
         break;
       }
       case Type::kMap:
         Varint(value.elements.size() / 2);
-        if (value.elements.empty()) break;
+        if (value.elements.empty()) {
+          break;
+        }
         out_ += static_cast<char>((static_cast<uint32_t>(value.element_type) << 4U) |
                                   static_cast<uint8_t>(value.value_type));
-        for (const ThriftValue& item : value.elements) Value(item, true);
+        for (const ThriftValue& item : value.elements) {
+          Value(item, true);
+        }
         break;
       case Type::kStruct: {
         int16_t last = 0;
@@ -222,38 +246,52 @@ class Writer {
 // The footer of the Parquet file `path` and the offset it starts at.
 std::pair<std::string, uint64_t> ReadFooter(const std::string& path) {
   std::ifstream input(path, std::ios::binary);
-  if (!input) throw ApiError::Invalid("Could not read " + path);
+  if (!input) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
   const uint64_t size = std::filesystem::file_size(path);
-  if (size < (2 * kMagic.size()) + 4) Invalid("too short");
+  if (size < (2 * kMagic.size()) + 4) {
+    Invalid("too short");
+  }
   std::string tail(8, '\0');
   input.seekg(static_cast<std::streamoff>(size - tail.size()));
   input.read(tail.data(), static_cast<std::streamsize>(tail.size()));
   if (tail.ends_with(kEncryptedMagic)) {
     throw ApiError::Invalid("The emulator does not support Parquet files with an encrypted footer");
   }
-  if (!tail.ends_with(kMagic)) Invalid("no Parquet magic number");
+  if (!tail.ends_with(kMagic)) {
+    Invalid("no Parquet magic number");
+  }
   // The footer's length is little endian, before the magic number.
   const uint64_t length = std::accumulate(
       tail.rbegin() + kMagic.size(), tail.rend(), uint64_t{0},
       [](uint64_t sum, char byte) { return (sum << 8U) | static_cast<uint8_t>(byte); });
-  if (length > size - tail.size() - kMagic.size()) Invalid("footer length out of range");
+  if (length > size - tail.size() - kMagic.size()) {
+    Invalid("footer length out of range");
+  }
   const uint64_t start = size - tail.size() - length;
   std::string footer(length, '\0');
   input.seekg(static_cast<std::streamoff>(start));
   input.read(footer.data(), static_cast<std::streamsize>(length));
-  if (!input) throw ApiError::Invalid("Could not read " + path);
+  if (!input) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
   return {std::move(footer), start};
 }
 
 const std::vector<ThriftValue>& Schema(const ThriftValue& metadata) {
   const ThriftValue* schema = metadata.Field(parquet::kSchema);
-  if (schema == nullptr || schema->elements.empty()) Invalid("no schema");
+  if (schema == nullptr || schema->elements.empty()) {
+    Invalid("no schema");
+  }
   return schema->elements;
 }
 
 std::optional<int64_t> IntField(const ThriftValue& element, int16_t id) {
   const ThriftValue* field = element.Field(id);
-  if (field == nullptr) return std::nullopt;
+  if (field == nullptr) {
+    return std::nullopt;
+  }
   return field->integer;
 }
 
@@ -261,7 +299,9 @@ std::optional<int64_t> IntField(const ThriftValue& element, int16_t id) {
 // with one of the ConvertedType values `converted`.
 bool Annotated(const ThriftValue& element, int16_t member, const std::vector<int64_t>& converted) {
   const ThriftValue* logical = element.Field(parquet::kElementLogicalType);
-  if (logical != nullptr && logical->Field(member) != nullptr) return true;
+  if (logical != nullptr && logical->Field(member) != nullptr) {
+    return true;
+  }
   return std::ranges::find(converted,
                            IntField(element, parquet::kElementConvertedType).value_or(-1)) !=
          converted.end();
@@ -271,12 +311,18 @@ bool Annotated(const ThriftValue& element, int16_t member, const std::vector<int
 // order, leaving `next` after them. The elements of a LIST group follow DuckDB's reading of the
 // format's backward compatibility rules.
 ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int depth) {
-  if (depth > kMaxDepth) Invalid("schema nested too deeply");
-  if (next >= schema.size()) Invalid("schema has fewer elements than its groups count");
+  if (depth > kMaxDepth) {
+    Invalid("schema nested too deeply");
+  }
+  if (next >= schema.size()) {
+    Invalid("schema has fewer elements than its groups count");
+  }
   const ThriftValue& element = schema.at(next);
   ParquetColumn column;
   column.element = next++;
-  if (const ThriftValue* name = element.Field(parquet::kElementName)) column.name = name->bytes;
+  if (const ThriftValue* name = element.Field(parquet::kElementName)) {
+    column.name = name->bytes;
+  }
   const bool repeated =
       IntField(element, parquet::kElementRepetition).value_or(0) == parquet::kRepeated;
   const int64_t count = IntField(element, parquet::kElementChildren).value_or(0);
@@ -319,7 +365,9 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
     }
   }
   // Writers differ in the repetition they give the schema's root, which is the row.
-  if (!repeated || depth == 0) return column;
+  if (!repeated || depth == 0) {
+    return column;
+  }
   ParquetColumn list;
   list.name = column.name;
   list.kind = ParquetColumn::Kind::kList;
@@ -387,7 +435,9 @@ bool ParquetColumn::HasWideDecimal() const {
 }
 
 const ParquetColumn* ParquetColumn::Child(std::string_view field) const {
-  if (kind != Kind::kStruct) return nullptr;
+  if (kind != Kind::kStruct) {
+    return nullptr;
+  }
   const auto found = std::ranges::find_if(children, [field](const ParquetColumn& child) {
     return std::ranges::equal(child.name, field, [](unsigned char a, unsigned char b) {
       return std::tolower(a) == std::tolower(b);
@@ -408,13 +458,17 @@ void RewriteParquetMetadata(const std::string& path, const ThriftValue& metadata
   writer.Value(metadata, false);
   std::string footer = writer.Output();
   const uint64_t length = footer.size();
-  for (unsigned i = 0; i < 4; ++i) footer += static_cast<char>((length >> (8U * i)) & 0xffU);
+  for (unsigned i = 0; i < 4; ++i) {
+    footer += static_cast<char>((length >> (8U * i)) & 0xffU);
+  }
   footer += kMagic;
   {
     std::fstream output(path, std::ios::binary | std::ios::in | std::ios::out);
     output.seekp(static_cast<std::streamoff>(start));
     output.write(footer.data(), static_cast<std::streamsize>(footer.size()));
-    if (!output) throw ApiError::Invalid("Could not write " + path);
+    if (!output) {
+      throw ApiError::Invalid("Could not write " + path);
+    }
   }
   std::filesystem::resize_file(path, start + footer.size());
 }
@@ -423,7 +477,9 @@ ParquetColumn ParquetColumns(const ThriftValue& metadata) {
   const std::vector<ThriftValue>& schema = Schema(metadata);
   size_t next = 0;
   ParquetColumn root = Column(schema, next, 0);
-  if (root.kind != ParquetColumn::Kind::kStruct) Invalid("schema root is not a group");
+  if (root.kind != ParquetColumn::Kind::kStruct) {
+    Invalid("schema root is not a group");
+  }
   return root;
 }
 

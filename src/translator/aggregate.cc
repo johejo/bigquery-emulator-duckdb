@@ -209,7 +209,9 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {
-      if (HasInterval(ref->type())) return Unsupported(scope, "PARTITION BY with INTERVAL");
+      if (HasInterval(ref->type())) {
+        return Unsupported(scope, "PARTITION BY with INTERVAL");
+      }
       const auto key = Expression(*ref, scope, columns);
       if (!key) {
         return std::nullopt;

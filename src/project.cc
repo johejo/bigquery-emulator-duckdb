@@ -11,14 +11,20 @@
 namespace bigquery_emulator_duckdb {
 
 Project ParseProject(const nlohmann::json& value) {
-  if (!value.is_object()) throw std::invalid_argument("Project must be a JSON object");
+  if (!value.is_object()) {
+    throw std::invalid_argument("Project must be a JSON object");
+  }
   for (const auto& [key, field] : value.items()) {
     if (key != "projectId" && key != "numericId" && key != "friendlyName") {
       throw std::invalid_argument("Unknown project field: " + key);
     }
-    if (!field.is_string()) throw std::invalid_argument("Project field must be a string: " + key);
+    if (!field.is_string()) {
+      throw std::invalid_argument("Project field must be a string: " + key);
+    }
   }
-  if (!value.contains("projectId")) throw std::invalid_argument("projectId is required");
+  if (!value.contains("projectId")) {
+    throw std::invalid_argument("projectId is required");
+  }
   Project project{.project_id = value.at("projectId").get<std::string>()};
   if (project.project_id.empty() || project.project_id.find('/') != std::string::npos) {
     throw std::invalid_argument("projectId must be nonempty and contain no slash");
@@ -40,18 +46,28 @@ Project ParseProject(const nlohmann::json& value) {
 }
 
 Project ReadProjectArgument(std::string_view argument) {
-  if (!argument.starts_with('@')) return ParseProject(nlohmann::json::parse(argument));
+  if (!argument.starts_with('@')) {
+    return ParseProject(nlohmann::json::parse(argument));
+  }
   const std::string path(argument.substr(1));
-  if (path.empty() || path == "-") throw std::invalid_argument("--project @ requires a file path");
+  if (path.empty() || path == "-") {
+    throw std::invalid_argument("--project @ requires a file path");
+  }
   std::ifstream input(path);
-  if (!input) throw std::runtime_error("Cannot read project file: " + path);
+  if (!input) {
+    throw std::runtime_error("Cannot read project file: " + path);
+  }
   return ParseProject(nlohmann::json::parse(input));
 }
 
 nlohmann::json ProjectJson(const Project& project) {
   nlohmann::json value = {{"projectId", project.project_id}};
-  if (project.numeric_id) value["numericId"] = *project.numeric_id;
-  if (project.friendly_name) value["friendlyName"] = *project.friendly_name;
+  if (project.numeric_id) {
+    value["numericId"] = *project.numeric_id;
+  }
+  if (project.friendly_name) {
+    value["friendlyName"] = *project.friendly_name;
+  }
   return value;
 }
 

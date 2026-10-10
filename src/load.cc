@@ -34,10 +34,14 @@ using nlohmann::json;
 std::vector<std::string> StageLoadSources(const json& config, const std::string& format,
                                           GcsClient& gcs, TemporaryFiles& downloads) {
   const json uris = config.value("sourceUris", json::array());
-  if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("sourceUris is required");
+  if (!uris.is_array() || uris.empty()) {
+    throw ApiError::Invalid("sourceUris is required");
+  }
   std::vector<std::string> sources;
   for (const json& item : uris) {
-    if (!item.is_string()) throw ApiError::Invalid("Invalid source URI");
+    if (!item.is_string()) {
+      throw ApiError::Invalid("Invalid source URI");
+    }
     const std::string uri = item.get<std::string>();
     if (uri.starts_with("gs://")) {
       const auto matches = gcs.Expand(uri);
@@ -142,7 +146,9 @@ class NumericQuoter {
   }
   bool key(json::string_t& name) {
     Frame& frame = frames_.back();
-    if (!frame.first) out_ += ',';
+    if (!frame.first) {
+      out_ += ',';
+    }
     frame.first = false;
     out_ += json(name).dump() + ':';
     frame.field = nullptr;
@@ -150,7 +156,9 @@ class NumericQuoter {
       const auto found = std::ranges::find_if(*frame.fields, [&name](const FieldSchema& field) {
         return absl::EqualsIgnoreCase(field.name, name);
       });
-      if (found != frame.fields->end()) frame.field = &*found;
+      if (found != frame.fields->end()) {
+        frame.field = &*found;
+      }
     }
     return true;
   }
@@ -197,8 +205,12 @@ class NumericQuoter {
 
   // Writes the comma before an array's elements after the first; key() writes an object's.
   void Separate() {
-    if (frames_.empty() || !frames_.back().array) return;
-    if (!frames_.back().first) out_ += ',';
+    if (frames_.empty() || !frames_.back().array) {
+      return;
+    }
+    if (!frames_.back().first) {
+      out_ += ',';
+    }
     frames_.back().first = false;
   }
 
@@ -231,7 +243,9 @@ class NumericQuoter {
 // The contents of the file at `path`, decompressed when it is gzip.
 std::string ReadMaybeGzip(const std::string& path) {
   gzFile input = gzopen(path.c_str(), "rb");
-  if (input == nullptr) throw ApiError::Invalid("Could not read " + path);
+  if (input == nullptr) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
   std::string contents;
   std::string buffer(1U << 16U, '\0');
   int read = 0;
@@ -240,7 +254,9 @@ std::string ReadMaybeGzip(const std::string& path) {
   }
   const bool ok = read == 0;
   gzclose(input);
-  if (!ok) throw ApiError::Invalid("Could not read " + path);
+  if (!ok) {
+    throw ApiError::Invalid("Could not read " + path);
+  }
   return contents;
 }
 
@@ -260,7 +276,9 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
   }
   // Where the shapes differ, DuckDB's cast reports it.
   if (field.mode == FieldMode::kRepeated) {
-    if (column->kind != ParquetColumn::Kind::kList) return cast;
+    if (column->kind != ParquetColumn::Kind::kList) {
+      return cast;
+    }
     FieldSchema element = field;
     element.mode = FieldMode::kNullable;
     const std::string name = "_e" + std::to_string(depth);
@@ -268,7 +286,9 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
                        ParquetValue(name, element, &column->children.front(), depth + 1));
   }
   if (field.type == FieldType::kRecord) {
-    if (column->kind != ParquetColumn::Kind::kStruct) return cast;
+    if (column->kind != ParquetColumn::Kind::kStruct) {
+      return cast;
+    }
     std::string fields;
     for (const FieldSchema& child : field.fields) {
       fields += std::format(
@@ -284,7 +304,9 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
         std::format("{}loading a Parquet DECIMAL({}, {}) column into {} field {}", kUnsupported,
                     column->precision, column->scale, FieldTypeName(field.type), field.name));
   }
-  if (field.type != FieldType::kBigNumeric) return cast;
+  if (field.type != FieldType::kBigNumeric) {
+    return cast;
+  }
   if (column->IsWideDecimal()) {
     return std::format("CAST(bq_bignumeric_from_decimal_bytes({}, {}) AS BIGNUM)", sql,
                        column->scale);
@@ -300,8 +322,12 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
 
 // The schema elements of the wide DECIMAL leaves of `column`.
 void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
-  if (column.IsWideDecimal()) elements.push_back(column.element);
-  for (const ParquetColumn& child : column.children) WideDecimals(child, elements);
+  if (column.IsWideDecimal()) {
+    elements.push_back(column.element);
+  }
+  for (const ParquetColumn& child : column.children) {
+    WideDecimals(child, elements);
+  }
 }
 
 // Gives `field` the type BigQuery detects for `column` when it is a wide DECIMAL. Of the
@@ -309,9 +335,13 @@ void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
 // cannot either and STRING is listed. Converting to NUMERIC, which is picked when it is the only
 // one, or to STRING is unsupported.
 void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json& targets) {
-  if (column == nullptr) return;
+  if (column == nullptr) {
+    return;
+  }
   if (field.mode == FieldMode::kRepeated) {
-    if (column->kind != ParquetColumn::Kind::kList) return;
+    if (column->kind != ParquetColumn::Kind::kList) {
+      return;
+    }
     column = &column->children.front();
   }
   if (field.type == FieldType::kRecord) {
@@ -320,7 +350,9 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json&
     }
     return;
   }
-  if (!column->IsWideDecimal()) return;
+  if (!column->IsWideDecimal()) {
+    return;
+  }
   const auto listed = [&targets](std::string_view type) {
     return std::ranges::find(targets, json(type)) != targets.end();
   };
@@ -378,9 +410,15 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
 void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
                            const json& config) {
   json targets = config.value("decimalTargetTypes", json::array());
-  if (!targets.is_array()) throw ApiError::Invalid("Invalid decimalTargetTypes");
-  if (targets.empty()) targets.push_back("NUMERIC");
-  for (FieldSchema& field : schema) DetectDecimals(field, columns.Child(field.name), targets);
+  if (!targets.is_array()) {
+    throw ApiError::Invalid("Invalid decimalTargetTypes");
+  }
+  if (targets.empty()) {
+    targets.push_back("NUMERIC");
+  }
+  for (FieldSchema& field : schema) {
+    DetectDecimals(field, columns.Child(field.name), targets);
+  }
 }
 
 std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths,
@@ -395,7 +433,9 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
     std::string rewritten;
     for (std::size_t start = 0; start < contents.size();) {
       std::size_t end = contents.find('\n', start);
-      if (end == std::string::npos) end = contents.size();
+      if (end == std::string::npos) {
+        end = contents.size();
+      }
       const std::string_view line(contents.data() + start, end - start);
       if (line.find_first_not_of(" \t\r") == std::string_view::npos) {
         rewritten += line;
@@ -455,7 +495,9 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
   if (!schema.empty() && format != "CSV") {
     std::string columns;
     for (const FieldSchema& field : schema) {
-      if (!columns.empty()) columns += ", ";
+      if (!columns.empty()) {
+        columns += ", ";
+      }
       const std::string name = QuoteIdentifier(field.name);
       columns += std::format("{} AS {}",
                              format == "PARQUET"

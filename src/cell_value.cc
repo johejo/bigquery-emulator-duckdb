@@ -64,22 +64,30 @@ absl::StatusOr<googlesql::Value> CellValue(const googlesql::Type* type, const js
       return Value::String(text);
     case googlesql::TYPE_BYTES: {
       std::string bytes;
-      if (!absl::Base64Unescape(text, &bytes)) return Undecodable(type, text);
+      if (!absl::Base64Unescape(text, &bytes)) {
+        return Undecodable(type, text);
+      }
       return Value::Bytes(bytes);
     }
     case googlesql::TYPE_BOOL:
-      if (text != "true" && text != "false") return Undecodable(type, text);
+      if (text != "true" && text != "false") {
+        return Undecodable(type, text);
+      }
       return Value::Bool(text == "true");
     case googlesql::TYPE_INT64: {
       int64_t number = 0;
-      if (!absl::SimpleAtoi(text, &number)) return Undecodable(type, text);
+      if (!absl::SimpleAtoi(text, &number)) {
+        return Undecodable(type, text);
+      }
       return Value::Int64(number);
     }
     case googlesql::TYPE_DOUBLE: {
       // BigQuery spells NaN and the infinities NaN, Infinity and -Infinity; clients also accept
       // DuckDB's nan and inf.
       double number = 0;
-      if (!absl::SimpleAtod(text, &number)) return Undecodable(type, text);
+      if (!absl::SimpleAtod(text, &number)) {
+        return Undecodable(type, text);
+      }
       return Value::Double(number);
     }
     case googlesql::TYPE_NUMERIC: {

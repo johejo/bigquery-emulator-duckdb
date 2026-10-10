@@ -45,7 +45,9 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
   const auto status =
       googlesql::ParseExpression(routine.resource.at("definitionBody").get<std::string>(),
                                  googlesql::ParserOptions(GoogleSqlLanguageOptions()), &parsed);
-  if (!status.ok()) throw ApiError::Invalid(std::string(status.message()));
+  if (!status.ok()) {
+    throw ApiError::Invalid(std::string(status.message()));
+  }
   googlesql::TypeFactory types;
   BigQueryCatalog builtins(source, &types, "", "");
   std::vector<const googlesql::ASTNode*> nodes{parsed->expression()};
@@ -54,7 +56,9 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
     nodes.pop_back();
     if (const auto* call = node->GetAsOrNull<googlesql::ASTFunctionCall>()) {
       std::vector<std::string> path = SplitTablePath(call->function()->ToIdentifierVector());
-      if (!path.empty() && ToLowerAscii(path.front()) == "safe") path.erase(path.begin());
+      if (!path.empty() && ToLowerAscii(path.front()) == "safe") {
+        path.erase(path.begin());
+      }
       const googlesql::Function* function = nullptr;
       if (path.size() == 2 && !builtins.FindFunction(path, &function).ok()) {
         throw ApiError::Invalid(
@@ -62,7 +66,9 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
             "project ID");
       }
     }
-    for (int i = 0; i < node->num_children(); ++i) nodes.push_back(node->child(i));
+    for (int i = 0; i < node->num_children(); ++i) {
+      nodes.push_back(node->child(i));
+    }
   }
 }
 
@@ -589,14 +595,20 @@ Routine Emulator::WriteRoutine(Routine routine, bool update) {
   const RoutineReference& reference = routine.reference;
   GetDataset({.project_id = reference.project_id, .dataset_id = reference.dataset_id});
   std::optional<Routine> previous;
-  if (update) previous = GetRoutine(reference);
+  if (update) {
+    previous = GetRoutine(reference);
+  }
   try {
     const auto source = NewTableSource();
     CheckApiRoutineBody(routine, *source);
     std::string statement = RoutineStatement(routine);
-    if (update) statement.replace(0, std::string("CREATE").size(), "CREATE OR REPLACE");
+    if (update) {
+      statement.replace(0, std::string("CREATE").size(), "CREATE OR REPLACE");
+    }
     const TranslatedStatement translation = Translate(statement, {}, reference.project_id, "");
-    if (!translation.routine.has_value()) throw ApiError::Invalid("Invalid routine definition");
+    if (!translation.routine.has_value()) {
+      throw ApiError::Invalid("Invalid routine definition");
+    }
     const json& created = translation.routine->routine.resource;
     // Keep the API's body verbatim; the analyzer's code includes the newline we append to it.
     routine.resource["creationTime"] =

@@ -62,7 +62,9 @@ class GcsTest : public ::testing::Test {
       }
       if (check_connection_reuse_) {
         const int previous_port = peer_port_.exchange(request.remote_port);
-        if (previous_port != 0) EXPECT_EQ(request.remote_port, previous_port);
+        if (previous_port != 0) {
+          EXPECT_EQ(request.remote_port, previous_port);
+        }
       }
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
       if (list_objects_) {
@@ -98,8 +100,12 @@ class GcsTest : public ::testing::Test {
 
   void TearDown() override {
     server_.stop();
-    if (thread_.joinable()) thread_.join();
-    if (!directory_.empty()) std::filesystem::remove_all(directory_);
+    if (thread_.joinable()) {
+      thread_.join();
+    }
+    if (!directory_.empty()) {
+      std::filesystem::remove_all(directory_);
+    }
     for (const auto& [name, value] : environment_) {
       if (value) {
         SetEnv(name, *value);
@@ -116,7 +122,9 @@ class GcsTest : public ::testing::Test {
   // The client reads the environment on construction, so it is created on first use after a
   // test has configured the environment.
   GcsClient& client() {
-    if (!client_) client_.emplace();
+    if (!client_) {
+      client_.emplace();
+    }
     return *client_;
   }
 
@@ -230,8 +238,12 @@ TEST_F(GcsTest, SupportsConcurrentDownloads) {
       EXPECT_NO_THROW(client.Download(kUri, directory_ / std::to_string(i)));
     });
   }
-  for (auto& download : downloads) download.join();
-  for (int i = 0; i < 4; ++i) EXPECT_EQ(ReadFile(directory_ / std::to_string(i)), "fixture\n");
+  for (auto& download : downloads) {
+    download.join();
+  }
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(ReadFile(directory_ / std::to_string(i)), "fixture\n");
+  }
 }
 
 TEST_F(GcsTest, RetriesTransientFailures) {

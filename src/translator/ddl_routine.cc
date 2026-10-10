@@ -45,21 +45,29 @@ std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& pa
 std::optional<nlohmann::json> StandardSqlDataType(const googlesql::Type* type) {
   if (type->IsArray()) {
     auto element = StandardSqlDataType(type->AsArray()->element_type());
-    if (!element) return std::nullopt;
+    if (!element) {
+      return std::nullopt;
+    }
     return nlohmann::json{{"typeKind", "ARRAY"}, {"arrayElementType", *std::move(element)}};
   }
   if (type->IsRangeType()) {
     auto element = StandardSqlDataType(type->AsRange()->element_type());
-    if (!element) return std::nullopt;
+    if (!element) {
+      return std::nullopt;
+    }
     return nlohmann::json{{"typeKind", "RANGE"}, {"rangeElementType", *std::move(element)}};
   }
   if (type->IsStruct()) {
     nlohmann::json fields = nlohmann::json::array();
     for (const googlesql::StructField& field : type->AsStruct()->fields()) {
       auto field_type = StandardSqlDataType(field.type);
-      if (!field_type) return std::nullopt;
+      if (!field_type) {
+        return std::nullopt;
+      }
       nlohmann::json entry{{"type", *std::move(field_type)}};
-      if (!field.name.empty()) entry["name"] = field.name;
+      if (!field.name.empty()) {
+        entry["name"] = field.name;
+      }
       fields.push_back(std::move(entry));
     }
     return nlohmann::json{{"typeKind", "STRUCT"}, {"structType", {{"fields", std::move(fields)}}}};

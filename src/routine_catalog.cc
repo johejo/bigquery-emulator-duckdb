@@ -116,7 +116,9 @@ absl::StatusOr<std::unique_ptr<googlesql::Function>> RoutineCatalog::Resolve(
     // emulator wrote.
     std::string_view message = exception.what();
     message = message.substr(0, message.find('\n'));
-    if (message.starts_with(kInvalidArgument)) message.remove_prefix(kInvalidArgument.size());
+    if (message.starts_with(kInvalidArgument)) {
+      message.remove_prefix(kInvalidArgument.size());
+    }
     error = message.substr(0, message.rfind(" [at "));
   }
   state_->resolving.erase(key);

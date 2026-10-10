@@ -60,14 +60,18 @@ QueryParameter ReadQueryParameter(const json& parameter) {
 // what the pattern of every path parameter of the discovery document asks for.
 std::string RoutePattern(std::string_view path) {
   std::string pattern;
-  if (path.starts_with('/')) path.remove_prefix(1);
+  if (path.starts_with('/')) {
+    path.remove_prefix(1);
+  }
   while (true) {
     const size_t slash = path.find('/');
     std::string_view segment = path.substr(0, slash);
     pattern += '/';
     if (segment.starts_with('{') && segment.ends_with('}')) {
       segment = segment.substr(1, segment.size() - 2);
-      if (segment.starts_with('+')) segment.remove_prefix(1);
+      if (segment.starts_with('+')) {
+        segment.remove_prefix(1);
+      }
       pattern += ':';
       pattern += segment;
     } else if (segment.find_first_of("{}:") != std::string_view::npos) {
@@ -76,7 +80,9 @@ std::string RoutePattern(std::string_view path) {
     } else {
       pattern += segment;
     }
-    if (slash == std::string_view::npos) return pattern;
+    if (slash == std::string_view::npos) {
+      return pattern;
+    }
     path.remove_prefix(slash + 1);
   }
 }
@@ -94,7 +100,9 @@ bool Fits(const QueryParameter& parameter, std::string_view value) {
   if (!parameter.values.empty()) {
     return std::ranges::find(parameter.values, value) != parameter.values.end();
   }
-  if (parameter.type == "boolean") return value == "true" || value == "false";
+  if (parameter.type == "boolean") {
+    return value == "true" || value == "false";
+  }
   if (parameter.format == "int32") {
     return IsInteger<int64_t>(value, std::numeric_limits<int32_t>::min(),
                               std::numeric_limits<int32_t>::max());
@@ -122,7 +130,9 @@ const json& Discovery() {
 ApiMethod FindApiMethod(std::string_view id) {
   for (const auto& [resource_name, resource] : Discovery()["resources"].items()) {
     for (const auto& [method_name, method] : resource["methods"].items()) {
-      if (method["id"] != id) continue;
+      if (method["id"] != id) {
+        continue;
+      }
       ApiMethod result{
           .http_method = method["httpMethod"].get<std::string>(),
           .path = RoutePattern(method["path"].get<std::string>()),
@@ -162,7 +172,9 @@ void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string
           name));
     }
     // An empty value leaves the parameter unset.
-    if (value.empty()) continue;
+    if (value.empty()) {
+      continue;
+    }
     if (!Fits(parameter->second, value)) {
       throw ApiError::Invalid(std::format("Invalid value for {}: \"{}\"", name, value));
     }

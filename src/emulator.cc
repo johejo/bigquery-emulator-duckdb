@@ -56,9 +56,13 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
     std::filesystem::create_directories(data_dir_);
     if (std::filesystem::exists(registry)) {
       std::ifstream input(registry);
-      if (!input) throw std::runtime_error("Cannot read " + registry.string());
+      if (!input) {
+        throw std::runtime_error("Cannot read " + registry.string());
+      }
       const json saved = json::parse(input);
-      if (!saved.is_array()) throw std::invalid_argument("Project registry must be an array");
+      if (!saved.is_array()) {
+        throw std::invalid_argument("Project registry must be an array");
+      }
       for (const auto& value : saved) {
         Project project = ParseProject(value);
         if (!registered.emplace(project.project_id, project).second) {
@@ -81,7 +85,9 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
     projects_.push_back(project);
   }
   for (const Project& project : projects_) {
-    if (!project.numeric_id) continue;
+    if (!project.numeric_id) {
+      continue;
+    }
     const auto alias = project_ids_.emplace(*project.numeric_id, project.project_id).first;
     if (alias->second != project.project_id) {
       throw std::invalid_argument("Conflicting numericId: " + *project.numeric_id);
@@ -100,7 +106,9 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
   }
   if (!data_dir_.empty()) {
     json saved = json::array();
-    for (const Project& project : projects_) saved.push_back(ProjectJson(project));
+    for (const Project& project : projects_) {
+      saved.push_back(ProjectJson(project));
+    }
     const auto temporary = registry.string() + ".tmp";
     {
       std::ofstream output(temporary);
@@ -116,12 +124,16 @@ const std::vector<Project>& Emulator::ListProjects() const { return projects_; }
 
 std::string Emulator::ResolveProject(const std::string& project_id) const {
   const auto found = project_ids_.find(project_id);
-  if (found == project_ids_.end()) throw ApiError::NotFound("Not found: Project " + project_id);
+  if (found == project_ids_.end()) {
+    throw ApiError::NotFound("Not found: Project " + project_id);
+  }
   return found->second;
 }
 
 std::string Emulator::ProjectDatabase(const std::string& project_id) const {
-  if (data_dir_.empty()) return ":memory:";
+  if (data_dir_.empty()) {
+    return ":memory:";
+  }
   return (std::filesystem::path(data_dir_) / ProjectFileName(project_id)).string();
 }
 
