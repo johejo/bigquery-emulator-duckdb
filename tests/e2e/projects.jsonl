@@ -16,6 +16,7 @@
 {"projectId": "rest-metadata-selection"}
 {"projectId": "rest-query"}
 {"projectId": "rest-resources"}
+{"projectId": "rest-routines"}
 {"projectId": "rest-timestamps"}
 {"projectId": "rest-upload"}
 {"projectId": "test", "numericId": "123456789012", "friendlyName": "Local test"}

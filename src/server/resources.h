@@ -28,6 +28,7 @@ struct JobListRequest;
 struct ResultPage;
 struct ListPage;
 struct TableGetRequest;
+struct RoutineListRequest;
 
 // resources.cc: the emulator's structs to BigQuery's JSON resources and responses.
 
@@ -55,7 +56,7 @@ nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, cons
                              std::string_view selected_fields);
 nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
 nlohmann::json RoutineResource(const Routine& routine);
-// `routines` are sorted by id; the list carries the page of them `page` asks for.
-nlohmann::json RoutineList(const std::vector<Routine>& routines, const ListPage& page);
+// Filters, pages and projects routines sorted by ID.
+nlohmann::json RoutineList(const std::vector<Routine>& routines, const RoutineListRequest& request);
 
 }  // namespace bigquery_emulator_duckdb::server

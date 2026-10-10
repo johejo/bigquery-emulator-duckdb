@@ -22,8 +22,8 @@ rejected as unsupported.
 
 | Status | Methods |
 | --- | --- |
-| Partial | 10 |
-| Supported | 15 |
+| Partial | 9 |
+| Supported | 16 |
 | Unsupported | 22 |
 
 ## datasets
@@ -74,7 +74,7 @@ rejected as unsupported.
 | [`routines.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/get) | `GET projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Supported | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. `routines.insert` and `routines.update` are unsupported, so DDL creates them. |
 | [`routines.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:getIamPolicy` | Unsupported |  |
 | [`routines.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/routines` | Unsupported |  |
-| [`routines.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/list) | `GET projects/{projectsId}/datasets/{datasetsId}/routines` | Partial | Rejected as unsupported: filter. |
+| [`routines.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/list) | `GET projects/{projectsId}/datasets/{datasetsId}/routines` | Supported | Supports `routineType:{RoutineType}` filters and `readMask` field projection; always returns the routine reference. |
 | [`routines.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:setIamPolicy` | Unsupported |  |
 | [`routines.testIamPermissions`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/testIamPermissions) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:testIamPermissions` | Unsupported |  |
 | [`routines.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Unsupported |  |
