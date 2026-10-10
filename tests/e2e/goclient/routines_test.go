@@ -242,3 +242,113 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 		t.Error("a recursive call: got no error")
 	}
 }
+
+// API fields and replacement semantics follow the Routine resource and routines.update
+// documentation: https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
+func TestRoutineInsertUpdate(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_routine_api")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	routine := dataset.Routine("f")
+	args := []*bigquery.RoutineArgument{{Name: "x", DataType: &bigquery.StandardSQLDataType{TypeKind: "INT64"}}}
+	initial := &bigquery.RoutineMetadata{Type: "SCALAR_FUNCTION", Arguments: args,
+		ReturnType: &bigquery.StandardSQLDataType{TypeKind: "INT64"}, Body: "x + 1 -- adds one", Description: "adds one"}
+	if err := routine.Create(ctx, initial); err != nil {
+		t.Fatal(err)
+	}
+	before, err := routine.Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Language != "SQL" || before.Body != initial.Body || before.Description != initial.Description ||
+		before.CreationTime.IsZero() || before.LastModifiedTime.IsZero() || before.ReturnType.TypeKind != "INT64" {
+		t.Errorf("unexpected metadata: %+v", before)
+	}
+	expect := func(sql string, want bigquery.Value) {
+		t.Helper()
+		got, err := queryValue(t, client, "", sql)
+		if err != nil || got != want {
+			t.Fatalf("%s: got %v, %v; want %v", sql, got, err, want)
+		}
+	}
+	expect("SELECT go_routine_api.f(41)", int64(42))
+	expect("SELECT go_routine_api.f(NULL)", nil)
+	if err := routine.Create(ctx, initial); err == nil {
+		t.Error("duplicate insert succeeded")
+	}
+	after, err := routine.Update(ctx, &bigquery.RoutineMetadataToUpdate{
+		Type: "SCALAR_FUNCTION", Arguments: args, Body: "x + 2"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Description != "" || after.ReturnType != nil || !after.CreationTime.Equal(before.CreationTime) ||
+		after.LastModifiedTime.Before(before.LastModifiedTime) || after.Body != "x + 2" {
+		t.Errorf("unexpected replacement metadata: %+v", after)
+	}
+	expect("SELECT go_routine_api.f(40)", int64(42))
+	if _, err := routine.Update(ctx, &bigquery.RoutineMetadataToUpdate{
+		Type: "SCALAR_FUNCTION", Arguments: args, Body: "unknown_column"}, ""); err == nil {
+		t.Error("invalid replacement succeeded")
+	}
+	expect("SELECT go_routine_api.f(40)", int64(42))
+	if _, err := dataset.Routine("missing").Update(ctx, &bigquery.RoutineMetadataToUpdate{
+		Type: "SCALAR_FUNCTION", Body: "1"}, ""); err == nil {
+		t.Error("update created a missing routine")
+	}
+	for _, metadata := range []*bigquery.RoutineMetadata{
+		{Type: "SCALAR_FUNCTION", Arguments: []*bigquery.RoutineArgument{{Name: "x", Kind: "ANY_TYPE"}}, Body: "[x, x]"},
+		{Type: "SCALAR_FUNCTION", Body: "`" + client.Project() + ".go_routine_api.f`(40)"},
+	} {
+		r := dataset.Routine("other")
+		if err := r.Create(ctx, metadata); err != nil {
+			t.Fatal(err)
+		}
+		if len(metadata.Arguments) != 0 {
+			expect("SELECT ARRAY_LENGTH(go_routine_api.other('a'))", int64(2))
+		} else {
+			expect("SELECT go_routine_api.other()", int64(42))
+		}
+		if err := r.Delete(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Routine.definitionBody requires references to other routines to include the project ID.
+	if err := dataset.Routine("unqualified").Create(ctx, &bigquery.RoutineMetadata{
+		Type: "SCALAR_FUNCTION", Body: "go_routine_api.f(40)"}); err == nil {
+		t.Error("unqualified routine reference succeeded")
+	}
+	if err := dataset.Routine("builtin").Create(ctx, &bigquery.RoutineMetadata{
+		Type: "SCALAR_FUNCTION", Body: "NET.HOST('https://example.com')"}); err != nil {
+		t.Fatal(err)
+	}
+	expect("SELECT go_routine_api.builtin()", "example.com")
+
+	composite := dataset.Routine("composite")
+	compositeType := &bigquery.StandardSQLDataType{TypeKind: "STRUCT", StructType: &bigquery.StandardSQLStructType{
+		Fields: []*bigquery.StandardSQLField{{Name: "values", Type: &bigquery.StandardSQLDataType{
+			TypeKind: "ARRAY", ArrayElementType: &bigquery.StandardSQLDataType{TypeKind: "INT64"}}}}}}
+	if err := composite.Create(ctx, &bigquery.RoutineMetadata{Type: "SCALAR_FUNCTION",
+		Arguments:  []*bigquery.RoutineArgument{{Name: "x", DataType: compositeType}},
+		ReturnType: &bigquery.StandardSQLDataType{TypeKind: "FLOAT64"}, Body: "x.values[OFFSET(0)]"}); err != nil {
+		t.Fatal(err)
+	}
+	expect("SELECT go_routine_api.composite(STRUCT([42] AS values))", float64(42))
+	compositeMetadata, err := composite.Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(compositeMetadata.Arguments[0].DataType, compositeType) {
+		t.Errorf("got composite type %+v, want %+v", compositeMetadata.Arguments[0].DataType, compositeType)
+	}
+
+	// DDL and the API use the same persistent definition.
+	if _, _, err := runScript(t, client, "", "CREATE OR REPLACE FUNCTION go_routine_api.f(x INT64) AS (x + 3)"); err != nil {
+		t.Fatal(err)
+	}
+	expect("SELECT go_routine_api.f(39)", int64(42))
+}

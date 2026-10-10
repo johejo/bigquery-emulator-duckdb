@@ -229,6 +229,7 @@ class Emulator {
   // The persistent UDFs of `dataset`, sorted by id.
   std::vector<Routine> ListRoutines(DatasetReference dataset);
   Routine GetRoutine(RoutineReference routine);
+  Routine WriteRoutine(Routine routine, bool update);
   void DeleteRoutine(RoutineReference routine);
   QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
   std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,

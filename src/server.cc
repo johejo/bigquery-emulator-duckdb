@@ -19,6 +19,7 @@
 #include "src/api_error.h"
 #include "src/emulator.h"
 #include "src/httplib.h"
+#include "src/references.h"
 #include "src/server/requests.h"
 #include "src/server/resources.h"
 #include "src/server/routes.h"
@@ -360,7 +361,24 @@ class Server::Impl {
     Route("bigquery.tables.delete", {}, NoContent([this](const httplib::Request& request) {
             emulator_.DeleteTable(TableFromPath(request));
           }));
-    // routines; routines.insert and routines.update are unsupported, so routines come from DDL.
+    Route("bigquery.routines.insert", {},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            return RoutineResource(emulator_.WriteRoutine(
+                ParseRoutine(DatasetFromPath(request), ParseBody(request)), /*update=*/false));
+          }));
+    Route("bigquery.routines.update", {},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            if (request.has_header("If-Match")) {
+              throw ApiError::Invalid("The emulator does not support conditional routine updates");
+            }
+            const RoutineReference reference = RoutineFromPath(request);
+            Routine routine =
+                ParseRoutine({reference.project_id, reference.dataset_id}, ParseBody(request));
+            if (routine.reference.routine_id != reference.routine_id) {
+              throw ApiError::Invalid("Routine reference does not match the request path");
+            }
+            return RoutineResource(emulator_.WriteRoutine(std::move(routine), /*update=*/true));
+          }));
     Route("bigquery.routines.list", {"maxResults", "pageToken", "filter", "readMask"},
           Json([this](const httplib::Request& request, httplib::Response&) {
             return RoutineList(emulator_.ListRoutines(DatasetFromPath(request)),

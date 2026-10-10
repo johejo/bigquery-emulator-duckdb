@@ -18,6 +18,7 @@
 #include "src/httplib.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/server/routes.h"
 #include "src/table_metadata.h"
 
@@ -509,6 +510,71 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   }
   request.metadata = TableMetadataFromJson(body);
   return request;
+}
+
+Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
+  if (!body.is_object()) throw ApiError::Invalid("Invalid routine resource");
+  const json reference = body.value("routineReference", json::object());
+  if (!reference.is_object()) throw ApiError::Invalid("Invalid routine reference");
+  for (const auto& [name, value] : reference.items()) {
+    if (name != "projectId" && name != "datasetId" && name != "routineId") {
+      throw ApiError::Invalid("Invalid routine reference field: " + name);
+    }
+  }
+  const std::string id = StringField(reference, "routineId", "routine ID");
+  if (id.empty()) throw ApiError::Invalid("Required parameter is missing: routineId");
+  if (StringField(reference, "projectId", "project ID") != dataset.project_id ||
+      StringField(reference, "datasetId", "dataset ID") != dataset.dataset_id) {
+    throw ApiError::Invalid("Routine reference does not match the request path");
+  }
+  json resource = json::object();
+  for (const auto& [name, value] : body.items()) {
+    if (name == "routineReference" || name == "creationTime" || name == "lastModifiedTime" ||
+        name == "etag" || name == "buildStatus" || value.is_null()) {
+      continue;
+    }
+    if (name != "routineType" && name != "language" && name != "arguments" &&
+        name != "returnType" && name != "definitionBody" && name != "description") {
+      throw ApiError::Invalid("The emulator does not support routine field " + name);
+    }
+    resource[name] = value;
+  }
+  if (StringField(resource, "routineType", "routine type") != "SCALAR_FUNCTION") {
+    throw ApiError::Invalid(
+        "The emulator does not support routines other than SQL scalar functions");
+  }
+  if (resource.contains("language") &&
+      StringField(resource, "language", "routine language") != "SQL") {
+    throw ApiError::Invalid("The emulator does not support non-SQL routines");
+  }
+  resource["language"] = "SQL";
+  if (StringField(resource, "definitionBody", "routine body").empty()) {
+    throw ApiError::Invalid("Required parameter is missing: definitionBody");
+  }
+  if (resource.contains("description")) StringField(resource, "description", "routine description");
+  if (!resource.contains("arguments")) resource["arguments"] = json::array();
+  if (!resource["arguments"].is_array()) throw ApiError::Invalid("Invalid routine arguments");
+  for (const json& argument : resource["arguments"]) {
+    if (!argument.is_object() || StringField(argument, "name", "argument name").empty()) {
+      throw ApiError::Invalid("Invalid routine argument");
+    }
+    for (const auto& [name, value] : argument.items()) {
+      if (name != "name" && name != "argumentKind" && name != "dataType") {
+        throw ApiError::Invalid("The emulator does not support routine argument field " + name);
+      }
+    }
+    const std::string kind = StringField(argument, "argumentKind", "argument kind");
+    if (!kind.empty() && kind != "FIXED_TYPE" && kind != "ANY_TYPE") {
+      throw ApiError::Invalid("The emulator does not support routine argument kind " + kind);
+    }
+    if (kind == "ANY_TYPE" && argument.contains("dataType")) {
+      throw ApiError::Invalid("ANY_TYPE arguments cannot have dataType");
+    }
+  }
+  return {
+      .reference = {dataset.project_id, dataset.dataset_id, id},
+      .resource = std::move(resource),
+  };
 }
 
 TableUpdateRequest ParseTableUpdate(const json& body) {
