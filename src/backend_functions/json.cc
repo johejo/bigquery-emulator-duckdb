@@ -812,9 +812,10 @@ void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_
           }
           const auto modify = kInsert ? googlesql::functions::JsonInsertArrayElement
                                       : googlesql::functions::JsonAppendArrayElement;
+          // BigQuery keeps the sign of a negative zero it inserts.
           const absl::Status status =
               modify(document->GetRef(), *paths.at(i), *value, options,
-                     /*canonicalize_zero=*/true, arguments.Bool(columns - 1));
+                     /*canonicalize_zero=*/false, arguments.Bool(columns - 1));
           if (!status.ok()) {
             return absl::OutOfRangeError("Invalid input to " + function + ": " +
                                          std::string(status.message()));

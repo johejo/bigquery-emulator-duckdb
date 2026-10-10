@@ -80,6 +80,10 @@ SELECT FORMAT("%'d|%e|%g", 1234567, 1.5, 1.5)
 SELECT FORMAT("%'.2d|%'.5d|%'.6d", 5, 1234, 1234)
 => "05|1,234|01,234"
 
+# Grouping when the padding crosses another separator boundary; confirmed against BigQuery.
+SELECT FORMAT("%'.7d|%'.8d|%'.9d|%'.10d", 1234, 1234, 1234, 1234)
+=> "001,234|0,001,234|0,001,234|00,001,234"
+
 SELECT FORMAT('%T|%T|%t|%T', 'abc', b'ab', DATE '2024-01-02', DATE '2024-01-02')
 => "\"abc\"|b\"ab\"|2024-01-02|DATE \"2024-01-02\""
 
