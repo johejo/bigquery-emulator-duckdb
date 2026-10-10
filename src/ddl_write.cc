@@ -192,7 +192,11 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       }
       commented.push_back(column->name);
     } else {
-      ApplyOptionUpdates(std::get<OptionUpdates>(action), metadata);
+      const auto& updates = std::get<OptionUpdates>(action);
+      ApplyOptionUpdates(updates, metadata);
+      if (updates.expiration_time.has_value()) {
+        metadata.expiration_time = *updates.expiration_time;
+      }
       set_options = true;
     }
   }

@@ -88,9 +88,8 @@ func TestTableMetadata(t *testing.T) {
 	check("ddl", metadata{})
 
 	for sql, want := range map[string]string{
-		"CREATE TABLE expiring (id INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "CREATE TABLE option expiration_timestamp",
-		"CREATE TABLE rounded (n NUMERIC OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))":                          "column option rounding_mode",
-		"CREATE TABLE labeled (id INT64) OPTIONS (labels = [('Env', 'prod')])":                                  "must start with a lowercase letter",
+		"CREATE TABLE rounded (n NUMERIC OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))": "column option rounding_mode",
+		"CREATE TABLE labeled (id INT64) OPTIONS (labels = [('Env', 'prod')])":         "must start with a lowercase letter",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
@@ -66,6 +67,7 @@ struct OptionUpdates {
   std::optional<std::string> description = {};
   std::optional<std::string> friendly_name = {};
   std::optional<std::map<std::string, std::string>> labels = {};
+  std::optional<std::optional<int64_t>> expiration_time = {};
 };
 
 // The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.

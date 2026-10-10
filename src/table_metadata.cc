@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <optional>
 #include <string>
@@ -88,7 +89,9 @@ std::string_view LabelTextProblem(const std::string& text) {
 // accepted too.
 int64_t Int64Member(const json& value, const char* key) {
   const auto it = value.find(key);
-  if (it != value.end() && it->is_number_integer()) {
+  if (it != value.end() && it->is_number_integer() &&
+      (!it->is_number_unsigned() ||
+       it->get<uint64_t>() <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))) {
     return it->get<int64_t>();
   }
   if (it != value.end() && it->is_string()) {
@@ -170,14 +173,6 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
   }
   if (Member(table, "requirePartitionFilter") == true) {
     throw Unsupported("requirePartitionFilter");
-  }
-}
-
-// Tables do not expire in the emulator, so a Table resource cannot set an expiration; a null one,
-// which clears it, is accepted.
-void RejectExpiration(const json& table) {
-  if (!Member(table, "expirationTime").is_null()) {
-    throw Unsupported("table expiration");
   }
 }
 
@@ -352,6 +347,9 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
+  if (expiration_time.has_value()) {
+    fields["expirationTime"] = std::to_string(*expiration_time);
+  }
   if (clone.has_value()) {
     fields["cloneDefinition"] = {
         {
@@ -384,14 +382,12 @@ json DatasetMetadata::ToJson() const {
 
 TableMetadata TableMetadataFromJson(const json& table) {
   TableMetadata metadata;
-  RejectExpiration(table);
   ParsePartitioning(table, metadata);
   UpdateTableMetadata(metadata, table, /*patch=*/false);
   return metadata;
 }
 
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
-  RejectExpiration(body);
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&
@@ -400,6 +396,13 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
     throw ApiError::Invalid("Cannot change the partitioning of an existing table");
   }
   UpdateDescriptiveFields(metadata, body, patch);
+  if (body.contains("expirationTime")) {
+    metadata.expiration_time = Member(body, "expirationTime").is_null()
+                                   ? std::nullopt
+                                   : std::optional(Int64Member(body, "expirationTime"));
+  } else if (!patch) {
+    metadata.expiration_time.reset();
+  }
   if (const auto it = body.find("clustering"); it != body.end()) {
     metadata.clustering = ParseClustering(*it);
   } else if (!patch) {

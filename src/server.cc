@@ -337,7 +337,10 @@ class Server::Impl {
             } else {
               emulator_.CreateTable(insert.table, insert.schema, insert.metadata);
             }
-            return TableResource(emulator_.GetTable(insert.table));
+            // Returning the mutation result is not a client read: a past expiration is
+            // applied on the next lookup, rather than turning successful creation into a 404.
+            return TableResource(emulator_.GetTable(insert.table, /*include_row_count=*/true,
+                                                    /*expire=*/false));
           }));
     Route("bigquery.tables.get", {"selectedFields", "view"},
           Json([this](const httplib::Request& request, httplib::Response&) {
@@ -355,7 +358,8 @@ class Server::Impl {
         TableMetadata metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
         UpdateTableMetadata(metadata, body, patch);
         emulator_.UpdateTable(table, update.schema, update.view, metadata);
-        return TableResource(emulator_.GetTable(table));
+        return TableResource(emulator_.GetTable(table, /*include_row_count=*/true,
+                                                /*expire=*/false));
       });
     };
     // Both ignore autodetect_schema.

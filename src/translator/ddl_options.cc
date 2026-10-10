@@ -1,10 +1,12 @@
 #include "src/translator/ddl_options.h"
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 
+#include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -15,6 +17,19 @@
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
+
+// TIMESTAMP options use the same millisecond precision as Table.expirationTime.
+bool ExpirationOption(const googlesql::Value& value, std::optional<int64_t>& into) {
+  if (value.is_null()) {
+    into.reset();
+    return true;
+  }
+  if (!value.type()->IsTimestamp()) {
+    return false;
+  }
+  into = absl::ToUnixMillis(value.ToUnixPicos().ToAbslTime());
+  return true;
+}
 
 // The labels option, an ARRAY<STRUCT<STRING, STRING>> of keys and values, into `into`.
 bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::string>& into) {
@@ -66,8 +81,7 @@ bool StringOption(const googlesql::Value& value, std::string& into) {
   return true;
 }
 
-// The description, friendly name and labels the OPTIONS of a CREATE TABLE or CREATE VIEW set on
-// `metadata`. Other options change table behavior and are unsupported.
+// The metadata the OPTIONS of a CREATE TABLE or CREATE VIEW set.
 std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
                                              const Scope& scope, TableMetadata metadata) {
   for (const auto& option : options) {
@@ -77,7 +91,8 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
         value != nullptr &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
-         (name == "labels" && LabelsOption(*value, metadata.labels)));
+         (name == "labels" && LabelsOption(*value, metadata.labels)) ||
+         (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)));
     if (!applied) {
       return Unsupported(scope, std::string(statement) + " option " + option->name());
     }
@@ -108,8 +123,8 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
   return metadata;
 }
 
-// The description, friendly name and labels SET OPTIONS of `statement` sets on `updates`. The
-// other options change how BigQuery stores, expires or reads the table or dataset, which the
+// The metadata SET OPTIONS of `statement` sets on `updates`. The
+// other options change how BigQuery stores or reads the table or dataset, which the
 // emulator does not emulate, so they are unsupported, and so are += and -=.
 bool SetOptions(const Options& options, std::string_view statement, const Scope& scope,
                 OptionUpdates& updates) {
@@ -120,7 +135,9 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
         value != nullptr &&
         ((name == "description" && StringOption(*value, updates.description.emplace())) ||
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
-         (name == "labels" && LabelsOption(*value, updates.labels.emplace())));
+         (name == "labels" && LabelsOption(*value, updates.labels.emplace())) ||
+         (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
+          ExpirationOption(*value, updates.expiration_time.emplace())));
     if (!applied) {
       Unsupported(scope, std::string(statement) + " option " + option->name());
       return false;

@@ -233,9 +233,8 @@ func TestAlterTableSetOptions(t *testing.T) {
 	}
 
 	for sql, want := range map[string]string{
-		"ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "ALTER TABLE option expiration_timestamp",
-		"ALTER TABLE t SET OPTIONS (require_partition_filter = TRUE)":                            "ALTER TABLE option require_partition_filter",
-		"ALTER TABLE t SET OPTIONS (labels = [('Env', 'prod')])":                                 "must start with a lowercase letter",
+		"ALTER TABLE t SET OPTIONS (require_partition_filter = TRUE)": "ALTER TABLE option require_partition_filter",
+		"ALTER TABLE t SET OPTIONS (labels = [('Env', 'prod')])":      "must start with a lowercase letter",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)

@@ -39,8 +39,8 @@ struct CloneDefinition {
 
 // What a table or view carries besides its schema: Table.description, friendlyName and labels,
 // and a table's partitioning and clustering, which only shape how BigQuery stores it, and the
-// cloneDefinition of a clone. An empty description or friendly name is unset, as BigQuery
-// reports it.
+// cloneDefinition of a clone, and its expiration. An empty description or friendly name is unset,
+// as BigQuery reports it.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -49,10 +49,11 @@ struct TableMetadata {
   std::optional<RangePartitioning> range_partitioning;
   std::vector<std::string> clustering;  // Clustering.fields.
   std::optional<CloneDefinition> clone;
+  std::optional<int64_t> expiration_time;  // Milliseconds since the Unix epoch.
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           clustering.empty() && !clone.has_value();
+           clustering.empty() && !clone.has_value() && !expiration_time.has_value();
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -79,15 +80,15 @@ struct DatasetMetadata {
 
 // The metadata of the Table resource `table`; a field it leaves out or sets to null is unset,
 // and cloneDefinition, which is output only, is ignored. Throws ApiError::Invalid for a field of
-// the wrong type, a label BigQuery rejects, or an expiration or partitioning the emulator does not
+// the wrong type, a label BigQuery rejects, or partitioning the emulator does not
 // support.
 TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
 // `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
-// tables.update replaces the description, friendly name, labels and clustering. Partitioning
-// cannot change, so both keep it and reject a different one, and both keep the cloneDefinition.
-// Throws as TableMetadataFromJson does.
+// tables.update replaces the description, friendly name, labels, clustering and expiration.
+// Partitioning cannot change, so both keep it and reject a different one, and both keep the
+// cloneDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // The metadata of the Dataset resource `dataset`. Every dataset is in the US, so a location
