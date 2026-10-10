@@ -1,5 +1,6 @@
 #include "src/server/requests.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -415,6 +416,59 @@ DatasetFilter ParseDatasetFilter(const httplib::Request& request) {
     }
   }
   return filters;
+}
+
+RoutineListRequest ParseRoutineList(const httplib::Request& request) {
+  RoutineListRequest result{.page = ParseListPage(request), .routine_type = {}, .read_mask = {}};
+  const std::string filter = request.get_param_value("filter");
+  if (!filter.empty()) {
+    constexpr std::string_view prefix = "routineType:";
+    if (!filter.starts_with(prefix)) {
+      throw ApiError::Invalid("Invalid routine filter: expected routineType:{RoutineType}");
+    }
+    result.routine_type = filter.substr(prefix.size());
+    const json& types = Discovery()["schemas"]["Routine"]["properties"]["routineType"]["enum"];
+    if (std::ranges::none_of(types,
+                             [&](const json& type) { return type == result.routine_type; })) {
+      throw ApiError::Invalid("Invalid routine type in filter: " + result.routine_type);
+    }
+  }
+  const std::string mask = request.get_param_value("readMask");
+  if (mask == "*") {
+    result.read_mask.all = true;
+    return result;
+  }
+  std::string_view remaining = mask.empty() ? "etag,routineReference,routineType,creationTime,"
+                                              "lastModifiedTime,language,remoteFunctionOptions"
+                                            : std::string_view(mask);
+  while (true) {
+    const size_t comma = remaining.find(',');
+    std::string_view path = remaining.substr(0, comma);
+    const json* schema = &Discovery()["schemas"]["Routine"];
+    ResourceMask* selection = &result.read_mask;
+    while (true) {
+      const size_t dot = path.find('.');
+      const std::string name(path.substr(0, dot));
+      if (!schema->contains("properties") || !(*schema)["properties"].contains(name)) {
+        throw ApiError::Invalid("Unknown field in readMask: " + std::string(path));
+      }
+      selection = &selection->fields[name];
+      if (dot == std::string_view::npos) {
+        selection->all = true;
+        break;
+      }
+      const json& field = (*schema)["properties"][name];
+      // A protobuf field mask permits a repeated field only at the end of a path.
+      if (!field.contains("$ref")) {
+        throw ApiError::Invalid("Not a message field in readMask: " + name);
+      }
+      schema = &Discovery()["schemas"][field["$ref"].get<std::string>()];
+      path.remove_prefix(dot + 1);
+    }
+    if (comma == std::string_view::npos) break;
+    remaining.remove_prefix(comma + 1);
+  }
+  return result;
 }
 
 TableGetRequest ParseTableGet(const httplib::Request& request) {

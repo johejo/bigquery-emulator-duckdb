@@ -45,7 +45,7 @@ struct JobListRequest {
   int64_t max_creation_time = INT64_MAX;
 };
 
-// A page of projects.list, datasets.list or tables.list, ordered by ID. The token is the ID of the
+// A page of resource listings, ordered by ID. The token is the ID of the
 // last entry of the previous page; pages stay consistent when entries are added or removed.
 struct ListPage {
   int64_t max_results = INT64_MAX;
@@ -54,6 +54,18 @@ struct ListPage {
 
 // A missing value matches any value of the label, including the empty string.
 using DatasetFilter = std::map<std::string, std::optional<std::string>>;
+
+// A JSON field mask, with whole fields taking precedence over their children.
+struct ResourceMask {
+  bool all = false;
+  std::map<std::string, ResourceMask> fields;
+};
+
+struct RoutineListRequest {
+  ListPage page;
+  std::string routine_type;
+  ResourceMask read_mask;
+};
 
 struct TableGetRequest {
   bool storage_stats = true;
@@ -114,9 +126,10 @@ JobRequest ParseJobInsert(const std::string& project_id, const nlohmann::json& b
 // jobs.insert with a job resource that has to be a load job, as media uploads do.
 LoadRequest ParseLoadInsert(const std::string& project_id, const nlohmann::json& body);
 JobListRequest ParseJobList(const httplib::Request& request);
-// datasets.list and tables.list.
+// Resource listings ordered by ID.
 ListPage ParseListPage(const httplib::Request& request);
 DatasetFilter ParseDatasetFilter(const httplib::Request& request);
+RoutineListRequest ParseRoutineList(const httplib::Request& request);
 TableGetRequest ParseTableGet(const httplib::Request& request);
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);

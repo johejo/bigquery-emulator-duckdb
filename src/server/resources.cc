@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <span>
@@ -73,6 +74,15 @@ SchemaSelection ParseSchemaSelection(const std::vector<FieldSchema>& schema,
     remaining.remove_prefix(comma + 1);
   }
   return selection;
+}
+
+json ProjectResource(const json& resource, const ResourceMask& mask) {
+  if (mask.all) return resource;
+  json result = json::object();
+  for (const auto& [name, child] : mask.fields) {
+    if (resource.contains(name)) result[name] = ProjectResource(resource[name], child);
+  }
+  return result;
 }
 
 // Project BigQuery's positional wire cells using the same indexes as the schema projection.
@@ -615,16 +625,18 @@ json RoutineResource(const Routine& routine) {
   return resource;
 }
 
-json RoutineList(const std::vector<Routine>& routines, const ListPage& page) {
+json RoutineList(const std::vector<Routine>& routines, const RoutineListRequest& request) {
   json response = json::object();
   json entries = json::array();
+  std::vector<Routine> filtered;
+  std::ranges::copy_if(routines, std::back_inserter(filtered), [&](const Routine& routine) {
+    return request.routine_type.empty() ||
+           routine.resource.value("routineType", "") == request.routine_type;
+  });
   const auto id = [](const Routine& routine) { return routine.reference.routine_id; };
-  for (const Routine& routine : ListPageItems(routines, page, id, response)) {
-    // A list entry carries only these fields of the routine unless a read mask asks for more.
-    json item{{"etag", kEtag}, {"routineReference", RoutineReferenceJson(routine.reference)}};
-    for (const char* field : {"routineType", "language", "creationTime", "lastModifiedTime"}) {
-      if (routine.resource.contains(field)) item[field] = routine.resource[field];
-    }
+  for (const Routine& routine : ListPageItems(filtered, request.page, id, response)) {
+    json item = ProjectResource(RoutineResource(routine), request.read_mask);
+    item["routineReference"] = RoutineReferenceJson(routine.reference);
     entries.push_back(std::move(item));
   }
   response["routines"] = std::move(entries);

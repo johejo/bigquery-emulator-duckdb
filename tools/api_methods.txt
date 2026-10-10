@@ -68,6 +68,9 @@ request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/
 request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?maxResults=1
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:SCALAR_FUNCTION
+request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?readMask=definitionBody,arguments,returnType
+request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:PROCEDURE&readMask=*
+note bigquery.routines.list | Supports `routineType:{RoutineType}` filters and `readMask` field projection; always returns the routine reference.
 note bigquery.routines.get | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. `routines.insert` and `routines.update` are unsupported, so DDL creates them.
 
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
