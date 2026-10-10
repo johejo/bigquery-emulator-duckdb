@@ -24,6 +24,11 @@ std::string ToLowerAscii(std::string_view text) {
 }
 
 std::string QuoteLiteral(std::string_view value) {
+  // The SQL parser treats NUL as the end of its input. Decode UTF-8 bytes instead
+  // so embedded NULs never appear in the statement text.
+  if (value.find('\0') != std::string_view::npos) {
+    return "decode(from_hex('" + ToHex(value) + "'))";
+  }
   std::string result = "'";
   for (const char c : value) {
     result += c;

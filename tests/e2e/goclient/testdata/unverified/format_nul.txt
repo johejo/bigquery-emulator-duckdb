@@ -1,0 +1,4 @@
+# GoogleSQL deliberately truncates %s at NUL (StringFormatEvaluator::CopyStringSetter).
+# Confirm whether BigQuery preserves that behavior before adapting the formatter.
+SELECT FORMAT('%s', x) FROM UNNEST(['a\x00b']) AS x
+?>
