@@ -72,7 +72,7 @@ jobs:
           echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/build.bep.json --profile=$RUNNER_TEMP/bazel-reports/build.profile.json.gz" >> .bazelrc.local
           nix develop --command bazelisk build //:compliance_test
       - name: Package tests and summary tool
-        run: nix develop --command .github/scripts/package-compliance.sh "$RUNNER_TEMP/compliance"
+        run: nix develop --command go run ./tools/complianceci package "$RUNNER_TEMP/compliance"
       # Bazel collects the disk cache once idle. Give it time, then stop the server so that it does
       # not delete entries while they are archived.
       - name: Stop Bazel
@@ -151,7 +151,7 @@ jobs:
         env:
           SHARD_GROUP: ${{ matrix.group }}
         run: >-
-          nix develop --command .github/scripts/run-compliance-shards.sh
+          nix develop --command "$RUNNER_TEMP/compliance/complianceci" run
           "$RUNNER_TEMP/compliance" "$RUNNER_TEMP/compliance-logs" "$SHARD_GROUP" 4
       - name: Upload shard logs
         if: success() || failure()
