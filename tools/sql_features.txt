@@ -95,6 +95,14 @@ query INTERVAL values | SELECT INTERVAL 2 DAY + INTERVAL 3 DAY
 query INTERVAL values | SELECT TO_JSON(INTERVAL 2 DAY)
 note INTERVAL values | Query values retain separate month, day and microsecond components. Literals, constructors, JUSTIFY functions, EXTRACT and CAST to STRING are supported. Stored columns, INTERVAL query parameters, casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are unsupported.
 
+query RANGE values | SELECT RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE(DATETIME '2020-01-01 00:00:00', NULL), CAST('[2020-01-01 00:00:00+00, 2021-01-01 00:00:00+00)' AS RANGE<TIMESTAMP>)
+query RANGE values | SELECT r FROM UNNEST([RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[UNBOUNDED, 2020-01-01)']) AS r WHERE r > RANGE<DATE> '[UNBOUNDED, UNBOUNDED)' GROUP BY r ORDER BY r
+query RANGE values | CREATE TABLE range_storage (r RANGE<DATE>) CLUSTER BY r
+query RANGE values | SELECT CAST(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS STRING), CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
+query RANGE values | SELECT SAFE_CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
+query RANGE values | SELECT TO_JSON(r) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
+note RANGE values | Values, stored columns, query parameters and tabledata.insertAll rows of RANGE<DATE>, RANGE<DATETIME> and RANGE<TIMESTAMP> are supported, with comparisons, ordering, grouping, COUNT, MIN, MAX and ANY_VALUE, ARRAY_AGG, navigation functions and casts to and from STRING. SAFE_CAST from STRING, JSON conversion, FORMAT, other functions over RANGE values, loads and extracts of RANGE columns are unsupported.
+
 section DML
 
 query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, 'c')

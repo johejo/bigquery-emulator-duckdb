@@ -415,6 +415,9 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
                       const json& config, const std::vector<FieldSchema>& schema,
                       const ParquetColumn& parquet) {
+  if (HasType(schema, FieldType::kRange)) {
+    throw ApiError::Invalid(std::string(kUnsupported) + "loading RANGE columns");
+  }
   std::string files;
   for (const std::string& path : paths) {
     files += (files.empty() ? "" : ", ") + QuoteLiteral(path);

@@ -69,6 +69,12 @@ FieldSchema ToFieldSchema(const std::string& name, const json& type) {
     throw ApiError::Invalid("Unsupported query parameter type: " + type_name);
   }
   FieldSchema field{.name = name, .type = *field_type};
+  if (field.type == FieldType::kRange) {
+    if (!type.contains("rangeElementType")) {
+      throw ApiError::Invalid("RANGE query parameter is missing rangeElementType");
+    }
+    field.range_element_type = ToFieldSchema(name, type["rangeElementType"]).type;
+  }
   if (field.type == FieldType::kRecord) {
     for (const json& child : type.value("structTypes", json::array())) {
       field.fields.push_back(ToFieldSchema(child.value("name", ""), child.at("type")));
@@ -125,12 +131,30 @@ std::string StructLiteral(const TypedValue& parameter) {
   return "struct_pack(" + fields + ")";
 }
 
+// A RANGE's bounds are values of its element type; a missing one is unbounded.
+std::string RangeLiteral(const TypedValue& parameter) {
+  const std::string type = ToDuckDbType(parameter.type);
+  const json& values = parameter.value["rangeValue"];
+  std::vector<std::string> bounds;
+  for (const char* name : {"start", "end"}) {
+    const auto value = values.find(name);
+    bounds.push_back(ToDuckDbLiteral({
+        .type = parameter.type["rangeElementType"],
+        .value = value == values.end() ? NoValue() : *value,
+    }));
+  }
+  return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
+}
+
 std::string ToDuckDbLiteral(const TypedValue& parameter) {
   const json& type = parameter.type;
   const json& value = parameter.value;
   const std::string name = CanonicalTypeName(type);
   if (name == "ARRAY" && value.contains("arrayValues")) {
     return ArrayLiteral(parameter);
+  }
+  if (name == "RANGE" && value.contains("rangeValue") && value["rangeValue"].is_object()) {
+    return RangeLiteral(parameter);
   }
   if (name == "STRUCT" && value.contains("structValues")) {
     return StructLiteral(parameter);

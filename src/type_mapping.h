@@ -5,6 +5,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -18,6 +19,24 @@ class TypeParameters;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
+
+// The DuckDB STRUCT field names of a RANGE, whose unbounded ends are -infinity and infinity, so
+// that DuckDB orders and compares RANGEs as BigQuery does. No struct field of a BigQuery column
+// can have these names, which tell a RANGE from a STRUCT in results.
+inline constexpr std::string_view kRangeStart = "$start";
+inline constexpr std::string_view kRangeEnd = "$end";
+
+// GoogleSQL's error for a RANGE whose start does not precede its end.
+inline constexpr std::string_view kRangeOrderError =
+    "Range start element must be smaller than range end element";
+
+// The DuckDB RANGE with the bounds `start` and `end`, DuckDB expressions of its element type, NULL
+// for an unbounded end. Where `start` does not precede `end` it is `raise`, by default the SQL
+// that raises kRangeOrderError. Each bound is evaluated more than once.
+std::string DuckDbRange(std::string_view start, std::string_view end, std::string_view raise = "");
+
+// Whether a type contains RANGE, including array elements and struct fields.
+bool HasRange(const googlesql::Type* type);
 
 // Whether a type contains INTERVAL, including array elements and struct fields.
 bool HasInterval(const googlesql::Type* type);
@@ -40,7 +59,8 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
 // nullopt for a type the translator does not support. DuckDB ignores lengths, so STRING(L) and
 // BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S) as
 // the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; empty structs are
-// unsupported. INTERVAL is available only for query values.
+// unsupported. INTERVAL is available only for query values. A RANGE is a STRUCT with the fields
+// kRangeStart and kRangeEnd.
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 

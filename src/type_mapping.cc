@@ -50,6 +50,8 @@ const googlesql::Type* ScalarType(FieldType type) {
       return googlesql::types::DatetimeType();
     case FieldType::kInterval:
       return googlesql::types::IntervalType();
+    case FieldType::kRange:
+      break;
     case FieldType::kGeography:
       return googlesql::types::GeographyType();
     case FieldType::kJson:
@@ -88,6 +90,8 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
       return FieldType::kJson;
     case googlesql::TYPE_INTERVAL:
       return FieldType::kInterval;
+    case googlesql::TYPE_RANGE:
+      return FieldType::kRange;
     case googlesql::TYPE_GEOGRAPHY:
       return FieldType::kGeography;
     case googlesql::TYPE_STRUCT:
@@ -155,6 +159,13 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       return "JSON";
     case googlesql::TYPE_INTERVAL:
       return column_type ? std::nullopt : std::optional<std::string>("INTERVAL");
+    case googlesql::TYPE_RANGE: {
+      const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, column_type);
+      return element ? std::optional<std::string>(
+                           std::format("STRUCT({} {}, {} {})", QuoteIdentifier(kRangeStart),
+                                       *element, QuoteIdentifier(kRangeEnd), *element))
+                     : std::nullopt;
+    }
     case googlesql::TYPE_GEOGRAPHY:
       // Stored as text; queries over it are not translated.
       return column_type ? std::optional<std::string>("VARCHAR") : std::nullopt;
@@ -203,7 +214,9 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
     if (!numeric && field.type != FieldType::kBigNumeric) {
       return absl::InvalidArgumentError(
           std::format("Field {} of type {} cannot have a precision or scale", field.name,
-                      ScalarType(field.type)->TypeName(googlesql::PRODUCT_EXTERNAL)));
+                      field.type == FieldType::kRange
+                          ? "RANGE"
+                          : ScalarType(field.type)->TypeName(googlesql::PRODUCT_EXTERNAL)));
     }
     if (!field.precision.has_value()) {
       return absl::InvalidArgumentError("Field " + field.name + " has a scale but no precision");
@@ -244,7 +257,9 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
   std::vector<std::string> names;
   bool positional = false;
   for (const auto& field : type->fields()) {
-    positional = positional || field.name.empty() || !seen.insert(ToLowerAscii(field.name)).second;
+    // A name starting with $ could pass for a RANGE's; BigQuery's column names cannot have one.
+    positional = positional || field.name.empty() || field.name.starts_with('$') ||
+                 !seen.insert(ToLowerAscii(field.name)).second;
     names.push_back(field.name);
   }
   if (positional) {
@@ -273,6 +288,16 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
       return status;
     }
     type = struct_type;
+  } else if (field.type == FieldType::kRange) {
+    const googlesql::Type* element =
+        field.range_element_type.has_value() ? ScalarType(*field.range_element_type) : nullptr;
+    if (element == nullptr) {
+      return absl::InvalidArgumentError("Field " + field.name +
+                                        " of type RANGE has no element type");
+    }
+    if (absl::Status status = type_factory->MakeRangeType(element, &type); !status.ok()) {
+      return status;
+    }
   } else {
     type = ScalarType(field.type);
   }
@@ -302,6 +327,13 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
     return field_type.status();
   }
   field.type = *field_type;
+  if (type->IsRange()) {
+    absl::StatusOr<FieldType> element = BigQueryFieldType(type->AsRange()->element_type());
+    if (!element.ok()) {
+      return element.status();
+    }
+    field.range_element_type = *element;
+  }
   if (type->IsStruct()) {
     const std::vector<googlesql::StructField>& struct_fields = type->AsStruct()->fields();
     for (size_t i = 0; i < struct_fields.size(); ++i) {
@@ -326,6 +358,25 @@ bool HasInterval(const googlesql::Type* type) {
                                [](const auto& field) { return HasInterval(field.type); });
   }
   return false;
+}
+
+bool HasRange(const googlesql::Type* type) {
+  if (type->IsRange()) return true;
+  if (type->IsArray()) return HasRange(type->AsArray()->element_type());
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(),
+                               [](const auto& field) { return HasRange(field.type); });
+  }
+  return false;
+}
+
+std::string DuckDbRange(std::string_view start, std::string_view end, std::string_view raise) {
+  return std::format(
+      "CASE WHEN {0} >= {1} THEN {2} ELSE struct_pack({3} := coalesce({0}, '-infinity'), {4} := "
+      "coalesce({1}, 'infinity')) END",
+      start, end,
+      raise.empty() ? "error(" + QuoteLiteral(kRangeOrderError) + ")" : std::string(raise),
+      QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd));
 }
 
 std::optional<std::string> DuckDbType(const googlesql::Type* type,

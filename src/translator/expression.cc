@@ -4,6 +4,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -130,6 +131,48 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     if (from->IsDouble()) {
       return "CAST(bq_bignumeric_from_double(" + sql + ", " + flag + ") AS BIGNUM)";
     }
+    return std::nullopt;
+  }
+  if (from->IsRange() && to->IsString()) {
+    // GoogleSQL casts each bound to STRING.
+    const std::string range = context.FreshName("_r");
+    std::vector<std::string> bounds;
+    for (const std::string_view name : {kRangeStart, kRangeEnd}) {
+      const std::string bound = "struct_extract(" + range + ", " + QuoteLiteral(name) + ")";
+      const auto text = CastValue(from->AsRange()->element_type(), to, bound, safe, context);
+      if (!text) {
+        return std::nullopt;
+      }
+      bounds.push_back("CASE WHEN isfinite(" + bound + ") THEN " + *text + " ELSE 'UNBOUNDED' END");
+    }
+    return "list_transform([" + sql + "], " + range + " -> CASE WHEN " + range +
+           " IS NULL THEN NULL ELSE '[' || " + bounds.at(0) + " || ', ' || " + bounds.at(1) +
+           " || ')' END)[1]";
+  }
+  if (from->IsString() && to->IsRange()) {
+    // GoogleSQL parses the bounds, then casts each to the element type. SAFE_CAST would have to
+    // tell a bound that fails from an unbounded one.
+    if (safe) {
+      return std::nullopt;
+    }
+    const std::string text = context.FreshName("_t");
+    const std::string parts = context.FreshName("_b");
+    std::vector<std::string> bounds;
+    for (const int index : {0, 1}) {
+      const auto bound =
+          CastValue(from, to->AsRange()->element_type(),
+                    "bq_range_bound(" + text + ", " + std::to_string(index) + ")", false, context);
+      if (!bound) {
+        return std::nullopt;
+      }
+      bounds.push_back(*bound);
+    }
+    return "list_transform([" + sql + "], " + text + " -> CASE WHEN " + text +
+           " IS NULL THEN NULL ELSE list_transform([struct_pack(s := " + bounds.at(0) +
+           ", e := " + bounds.at(1) + ")], " + parts + " -> " +
+           DuckDbRange(parts + ".s", parts + ".e") + ")[1] END)[1]";
+  }
+  if (HasRange(from) || HasRange(to)) {
     return std::nullopt;
   }
   if (HasInterval(from) || HasInterval(to)) {

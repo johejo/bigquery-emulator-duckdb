@@ -74,6 +74,10 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
                                           name, FieldTypeName(before.type),
                                           FieldTypeName(after.type)));
     }
+    if (after.range_element_type != before.range_element_type) {
+      throw ApiError::Invalid(
+          std::format("{} Field {} has changed its rangeElementType", mismatch, name));
+    }
     if (after.max_length != before.max_length || after.precision != before.precision ||
         after.scale != before.scale) {
       throw ApiError::Invalid(
@@ -153,6 +157,19 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   }
   if (field.type == FieldType::kRecord) {
     return InsertRecord(value, field, ignore_unknown_values);
+  }
+  if (field.type == FieldType::kRange) {
+    // {"start": ..., "end": ...}, where a missing or null bound is unbounded.
+    if (!value.is_object() || !field.range_element_type.has_value()) {
+      throw ApiError::Invalid("Expected an object for field " + field.name);
+    }
+    const FieldSchema element{.name = field.name, .type = *field.range_element_type};
+    std::vector<std::string> bounds;
+    for (const char* name : {"start", "end"}) {
+      const auto it = value.find(name);
+      bounds.push_back(InsertValue(it == value.end() ? json(nullptr) : *it, element, false));
+    }
+    return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
   }
   if (!value.is_primitive()) {
     throw ApiError::Invalid("Expected a scalar for field " + field.name);

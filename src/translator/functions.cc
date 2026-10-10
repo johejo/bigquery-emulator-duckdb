@@ -11,7 +11,9 @@
 #include <utility>
 #include <vector>
 
+#include "src/duckdb_sql.h"
 #include "src/translator/handlers.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
@@ -180,6 +182,77 @@ std::vector<Rule> RangeBucket() {
     });
   }
   return rules;
+}
+
+// A bound of the RANGE `range`, kRangeStart or kRangeEnd, which is infinite where unbounded.
+std::string RangeBound(std::string_view range, std::string_view bound) {
+  return "struct_extract(" + std::string(range) + ", " + QuoteLiteral(bound) + ")";
+}
+
+// RANGE_START and RANGE_END, which are NULL for an unbounded end.
+std::vector<Rule> BoundOrNull(std::string_view bound) {
+  const std::string value = RangeBound("$1", bound);
+  return {{1, "CASE WHEN isfinite(" + value + ") THEN " + value + " END"}};
+}
+
+// A NULL bound is unbounded, and a RANGE whose start does not precede its end an error.
+std::vector<Rule> RangeConstructor() {
+  return {{2, DuckDbRange("$1", "$2", "!1"), {}, {}, {QuoteLiteral(kRangeOrderError)}}};
+}
+
+// The text of a RANGE `range` in an error message, with its bounds as DuckDB writes them.
+std::string RangeMessage(std::string_view range) {
+  const auto bound = [range](std::string_view name) {
+    return "CASE WHEN isfinite(" + RangeBound(range, name) + ") THEN CAST(" +
+           RangeBound(range, name) + " AS VARCHAR) ELSE 'UNBOUNDED' END";
+  };
+  return "'[' || " + bound(kRangeStart) + " || ', ' || " + bound(kRangeEnd) + " || ')'";
+}
+
+// The RANGE functions compare the bounds, which DuckDB orders as BigQuery orders RANGE's: an
+// unbounded start before every value and an unbounded end after every value. A NULL argument
+// makes each comparison NULL, and so the result.
+std::string Overlap() {
+  return "(" + RangeBound("$1", kRangeStart) + " < " + RangeBound("$2", kRangeEnd) + " AND " +
+         RangeBound("$2", kRangeStart) + " < " + RangeBound("$1", kRangeEnd) + ")";
+}
+
+std::vector<Rule> RangeContains() {
+  return {
+      {
+          2,
+          "(" + RangeBound("$1", kRangeStart) + " <= " + RangeBound("$2", kRangeStart) + " AND " +
+              RangeBound("$2", kRangeEnd) + " <= " + RangeBound("$1", kRangeEnd) + ")",
+          {Is(2, {TYPE_RANGE})},
+      },
+      {
+          2,
+          "(" + RangeBound("$1", kRangeStart) + " <= $2 AND $2 < " + RangeBound("$1", kRangeEnd) +
+              ")",
+      },
+  };
+}
+
+// GoogleSQL's message, with the bounds as DuckDB writes them.
+std::vector<Rule> RangeIntersect() {
+  return {
+      {
+          2,
+          "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN NOT " + Overlap() +
+              " THEN !1 ELSE struct_pack(" + QuoteIdentifier(kRangeStart) + " := greatest(" +
+              RangeBound("$1", kRangeStart) + ", " + RangeBound("$2", kRangeStart) + "), " +
+              QuoteIdentifier(kRangeEnd) + " := least(" + RangeBound("$1", kRangeEnd) + ", " +
+              RangeBound("$2", kRangeEnd) + ")) END",
+          {},
+          {},
+          {
+              "'Provided RANGE inputs: ' || " + RangeMessage("$1") + " || ' and ' || " +
+                  RangeMessage("$2") +
+                  " || ' do not overlap. Please check RANGE_OVERLAPS before calling "
+                  "RANGE_INTERSECT'",
+          },
+      },
+  };
 }
 
 // ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
@@ -778,6 +851,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"ERROR", {{1, "!1", {}, {}, {"$1"}}}},
       {"ARRAY_REVERSE", {{1, "list_reverse($1)"}}},
       {"RANGE_BUCKET", RangeBucket()},
+      {"RANGE", RangeConstructor()},
+      {"RANGE_START", BoundOrNull(kRangeStart)},
+      {"RANGE_END", BoundOrNull(kRangeEnd)},
+      {"RANGE_CONTAINS", RangeContains()},
+      {"RANGE_OVERLAPS", {{2, Overlap()}}},
+      {"RANGE_INTERSECT", RangeIntersect()},
       // DuckDB's array_to_string() skips NULL elements and has no NULL text.
       {
           "ARRAY_TO_STRING",

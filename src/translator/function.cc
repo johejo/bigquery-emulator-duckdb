@@ -213,6 +213,51 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
+  // A RANGE is a STRUCT in DuckDB, which these compare and carry as BigQuery does a RANGE; others,
+  // such as JSON conversion and FORMAT, would see the STRUCT.
+  static constexpr std::string_view range_functions[] = {
+      "RANGE",
+      "RANGE_START",
+      "RANGE_END",
+      "RANGE_CONTAINS",
+      "RANGE_OVERLAPS",
+      "RANGE_INTERSECT",
+      "$EQUAL",
+      "$NOT_EQUAL",
+      "$LESS",
+      "$LESS_OR_EQUAL",
+      "$GREATER",
+      "$GREATER_OR_EQUAL",
+      "$BETWEEN",
+      "$IS_DISTINCT_FROM",
+      "$IS_NOT_DISTINCT_FROM",
+      "$IN",
+      "$IN_ARRAY",
+      "$CASE_WITH_VALUE",
+      "NULLIF",
+      "GREATEST",
+      "LEAST",
+      "$IS_NULL",
+      "$CASE_NO_VALUE",
+      "IF",
+      "IFNULL",
+      "COALESCE",
+      "ERROR",
+      "$MAKE_ARRAY",
+      "$ARRAY_AT_OFFSET",
+      "$ARRAY_AT_ORDINAL",
+      "$SAFE_ARRAY_AT_OFFSET",
+      "$SAFE_ARRAY_AT_ORDINAL",
+      "ARRAY_LENGTH",
+      "ARRAY_REVERSE",
+      "ARRAY_CONCAT",
+  };
+  if ((HasRange(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasRange(argument->type()); })) &&
+      std::ranges::find(range_functions, function) == std::end(range_functions)) {
+    return Unsupported(scope, "function " + name + " with RANGE");
+  }
   // Supporting a new physical STRUCT shape does not make DuckDB's composite comparisons
   // compatible: its equality treats NULL fields as values instead of propagating NULL. Keep
   // these newly representable forms unsupported, including the implicit comparisons in CASE,

@@ -20,6 +20,7 @@
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -42,8 +43,21 @@ LogicalType ElementType(duckdb_logical_type type) {
 
 FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type);
 
+// Whether `type` is the STRUCT that keeps a RANGE; see kRangeStart.
+bool IsRange(duckdb_logical_type type) {
+  if (duckdb_get_type_id(type) != DUCKDB_TYPE_STRUCT || duckdb_struct_type_child_count(type) != 2) {
+    return false;
+  }
+  DuckString start(duckdb_struct_type_child_name(type, 0));
+  DuckString end(duckdb_struct_type_child_name(type, 1));
+  return start.get() == kRangeStart && end.get() == kRangeEnd;
+}
+
 // Maps a DuckDB type to the BigQuery type of a TableFieldSchema.
 FieldType ToBigQueryType(duckdb_logical_type type) {
+  if (IsRange(type)) {
+    return FieldType::kRange;
+  }
   switch (duckdb_get_type_id(type)) {
     case DUCKDB_TYPE_BOOLEAN:
       return FieldType::kBoolean;
@@ -108,7 +122,10 @@ FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   field.mode = IsListLike(type) ? FieldMode::kRepeated : FieldMode::kNullable;
   LogicalType element(IsListLike(type) ? ElementType(type).release() : nullptr);
   duckdb_logical_type scalar_type = element.get() != nullptr ? element.get() : type;
-  if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
+  if (IsRange(scalar_type)) {
+    LogicalType bound(duckdb_struct_type_child_type(scalar_type, 0));
+    field.range_element_type = ToBigQueryType(bound.get());
+  } else if (duckdb_get_type_id(scalar_type) == DUCKDB_TYPE_STRUCT) {
     for (idx_t i = 0; i < duckdb_struct_type_child_count(scalar_type); ++i) {
       DuckString child_name(duckdb_struct_type_child_name(scalar_type, i));
       LogicalType child_type(duckdb_struct_type_child_type(scalar_type, i));
@@ -350,6 +367,27 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   }
 }
 
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays);
+
+// A RANGE as BigQuery writes it, "[start, end)", with each bound as its own cell would be, or
+// UNBOUNDED for an infinite or NULL one.
+std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
+  std::string text = "[";
+  for (idx_t i = 0; i < 2; ++i) {
+    duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
+    LogicalType bound(duckdb_struct_type_child_type(type, i));
+    const json cell = ToCell(child, bound.get(), row, false).at("v");
+    const bool finite =
+        !cell.is_null() &&
+        (duckdb_get_type_id(bound.get()) == DUCKDB_TYPE_DATE
+             ? duckdb_is_finite_date(VectorElement<duckdb_date>(child, row))
+             : duckdb_is_finite_timestamp(VectorElement<duckdb_timestamp>(child, row)));
+    text += i == 0 ? "" : ", ";
+    text += finite ? cell.get<std::string>() : "UNBOUNDED";
+  }
+  return text + ")";
+}
+
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
   const bool is_null = validity != nullptr && !duckdb_validity_row_is_valid(validity, row);
@@ -371,6 +409,9 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
   }
   if (is_null) {
     return json{{"v", nullptr}};
+  }
+  if (IsRange(type)) {
+    return json{{"v", RangeText(vector, type, row)}};
   }
   json value;
   switch (duckdb_get_type_id(type)) {
@@ -474,6 +515,15 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
   if (field.type == FieldType::kTimestamp) {
     return EpochSecondsString(std::stoll(value.get<std::string>()));
   }
+  if (field.type == FieldType::kRange && field.range_element_type == FieldType::kTimestamp) {
+    const std::string text = value.get<std::string>();
+    const size_t separator = text.find(", ");
+    const auto bound = [](const std::string& micros) {
+      return micros == "UNBOUNDED" ? micros : EpochSecondsString(std::stoll(micros));
+    };
+    return "[" + bound(text.substr(1, separator - 1)) + ", " +
+           bound(text.substr(separator + 2, text.size() - separator - 3)) + ")";
+  }
   if (field.type == FieldType::kRecord) {
     return json{{"f", CellsAsSeconds(field.fields, value.at("f"))}};
   }
@@ -524,7 +574,8 @@ json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::Schema
 
 bool HasTimestampField(const std::vector<FieldSchema>& schema) {
   return std::ranges::any_of(schema, [](const FieldSchema& field) {
-    return field.type == FieldType::kTimestamp || HasTimestampField(field.fields);
+    return field.type == FieldType::kTimestamp ||
+           field.range_element_type == FieldType::kTimestamp || HasTimestampField(field.fields);
   });
 }
 

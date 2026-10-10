@@ -253,3 +253,20 @@ cc_library(
     visibility = ["//:__pkg__"],
     deps = ["//third_party/duckdb"],
 )
+
+cc_library(
+    name = "range",
+    srcs = ["range.cc"],
+    hdrs = ["range.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":register",
+        ":scalar",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public/functions:range",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)
