@@ -73,10 +73,10 @@ compliance-summary *args:
 reference sql:
     bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{ quote(sql) }}
 
-# Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified.txt; for maintainers only,
+# Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified/*.txt; for maintainers only,
 # since queries on BigQuery are billed.
 bigquery-answers project:
-    go run ./tools/bqanswers {{ quote(project) }} {{ justfile_directory() }}/tests/e2e/goclient/testdata/unverified.txt
+    go run ./tools/bqanswers {{ quote(project) }} {{ justfile_directory() }}/tests/e2e/goclient/testdata/unverified
 
 [positional-arguments]
 run *args:

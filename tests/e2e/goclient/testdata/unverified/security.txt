@@ -1,0 +1,4 @@
+# SAFE.SESSION_USER() is rejected by BigQuery, but TYPEOF can erase its argument before
+# execution. Check whether BigQuery still rejects the prefix in this context.
+SELECT TYPEOF(SAFE.SESSION_USER())
+?>

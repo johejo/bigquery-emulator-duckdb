@@ -121,7 +121,7 @@ expected result from one layer to another.
 Take each expected value from BigQuery's documentation, from GoogleSQL's compliance test data
 where the reference implementation agrees with BigQuery, or from BigQuery itself. Never copy the
 emulator's output. Agents do not run queries on BigQuery: a case no source settles goes in
-`tests/e2e/goclient/testdata/unverified.txt`, whose answers maintainers fill in with
+`tests/e2e/goclient/testdata/unverified/*.txt`, split by feature, whose answers maintainers fill in with
 `just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
 lead for what to check, never as an expected value.
 
