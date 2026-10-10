@@ -126,7 +126,8 @@ func runShard(ctx context.Context, bundle, logs string, config testConfig, index
 	args := append([]string{"--kill-after=30s", "3600", filepath.Join(bundle, "compliance_test")}, config.Args...)
 	cmd := command(ctx, "timeout", args...)
 	cmd.Dir = filepath.Join(runfiles, "_main")
-	cmd.Env = slices.DeleteFunc(os.Environ(), func(s string) bool {
+	// Environ sets PWD to Dir, so the test sees the bundle's path rather than a resolved symlink.
+	cmd.Env = slices.DeleteFunc(cmd.Environ(), func(s string) bool {
 		return strings.HasPrefix(s, "RUNFILES_MANIFEST_FILE=") || strings.HasPrefix(s, "RUNFILES_MANIFEST_ONLY=")
 	})
 	cmd.Env = append(cmd.Env,
