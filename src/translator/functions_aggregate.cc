@@ -179,13 +179,18 @@ namespace {
 constexpr std::string_view kPercentileOrder = "$1 NULLS FIRST";
 constexpr std::string_view kFloatPercentileOrder = "NOT isnan($1) NULLS FIRST, $1 NULLS FIRST";
 
-// GoogleSQL's PERCENTILE_CONT over the sorted list `sql`, of FLOAT64 or, with `kNumeric`, of
-// NUMERIC values.
-template <bool kNumeric>
+// GoogleSQL's PERCENTILE_CONT over the sorted list `sql` of values of `kType`: FLOAT64, NUMERIC
+// or BIGNUMERIC, whose values and percentile cross as the VARCHAR of their units.
+template <googlesql::TypeKind kType>
 std::string PercentileCont(const std::string& sql, const std::vector<std::string>& arguments,
                            const std::string& /*tail*/) {
-  return std::string(kNumeric ? "bq_percentile_cont_numeric(" : "bq_percentile_cont(") + sql +
-         ", " + arguments.at(1) + ")";
+  if constexpr (kType == googlesql::TYPE_BIGNUMERIC) {
+    return "CAST(bq_percentile_cont_bignumeric(" + sql + ", CAST(" + arguments.at(1) +
+           " AS VARCHAR)) AS BIGNUM)";
+  }
+  return std::string(kType == googlesql::TYPE_NUMERIC ? "bq_percentile_cont_numeric("
+                                                      : "bq_percentile_cont(") +
+         sql + ", " + arguments.at(1) + ")";
 }
 
 // The element of the sorted list `sql` at the position GoogleSQL's PERCENTILE_DISC takes, for a
@@ -246,7 +251,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
                       .arguments = {"$1"},
                       .order = kFloatPercentileOrder,
                       .nulls = kFilterUnlessRespected,
-                      .finish = PercentileCont<false>,
+                      .finish = PercentileCont<googlesql::TYPE_DOUBLE>,
                   },
                   {
                       .function = "list",
@@ -254,7 +259,15 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
                       .arguments = {"$1"},
                       .order = kPercentileOrder,
                       .nulls = kFilterUnlessRespected,
-                      .finish = PercentileCont<true>,
+                      .finish = PercentileCont<googlesql::TYPE_NUMERIC>,
+                  },
+                  {
+                      .function = "list",
+                      .type = googlesql::TYPE_BIGNUMERIC,
+                      .arguments = {"CAST($1 AS VARCHAR)"},
+                      .order = kPercentileOrder,
+                      .nulls = kFilterUnlessRespected,
+                      .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
                   },
               },
           },

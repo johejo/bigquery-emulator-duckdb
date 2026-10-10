@@ -34,8 +34,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 15 |
-| Supported | 257 |
+| Partial | 14 |
+| Supported | 258 |
 | Unsupported | 121 |
 | Untested | 13 |
 
@@ -277,7 +277,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | graph-sql-functions | Untested |  | no sample for <graph_path> |
 | [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | graph-sql-functions | Untested |  | no sample for <graph_path> |
-| [`PERCENTILE_CONT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_cont) | aggregate-dp-functions, navigation_functions | Partial | DuckDB window function | function PERCENTILE_CONT with BIGNUMERIC |
+| [`PERCENTILE_CONT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_cont) | aggregate-dp-functions, navigation_functions | Supported | DuckDB window function |  |
 | [`PERCENTILE_DISC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#percentile_disc) | navigation_functions | Supported | DuckDB window function |  |
 | [`PERCENT_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#percent_rank) | numbering_functions | Supported | DuckDB window function |  |
 | [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | mathematical_functions | Supported | GoogleSQL function |  |

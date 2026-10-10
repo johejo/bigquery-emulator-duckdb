@@ -181,6 +181,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "FIRST_VALUE",
       "LAST_VALUE",
       "NTH_VALUE",
+      "PERCENTILE_CONT",
       "PERCENTILE_DISC",
   };
   return *kFunctions;
