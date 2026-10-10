@@ -59,7 +59,15 @@ cc_library(
 cc_library(
     name = "functions",
     srcs = [
+        "function_rule_builders.cc",
+        "function_rule_builders.h",
         "functions.cc",
+        "functions_aggregate.cc",
+        "functions_aggregate.h",
+        "functions_backend.cc",
+        "functions_backend.h",
+        "functions_template.cc",
+        "functions_template.h",
         "handlers.cc",
         "rules.cc",
     ],
@@ -103,12 +111,52 @@ cc_library(
     visibility = ["//:__pkg__"],
 )
 
+# DDL name resolution and metadata options do not depend on query translation.
+cc_library(
+    name = "ddl_names",
+    srcs = ["ddl_names.cc"],
+    hdrs = ["ddl_names.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        "//:catalog",
+        "//:references",
+        "//:translated_statement",
+    ],
+    linkstatic = True,
+)
+
+cc_library(
+    name = "ddl_options",
+    srcs = ["ddl_options.cc"],
+    hdrs = ["ddl_options.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":context",
+        "//:duckdb_sql",
+        "//:translated_statement",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
+    ],
+    linkstatic = True,
+    deps = ["//:table_metadata"],
+)
+
 cc_library(
     name = "ddl",
-    srcs = ["ddl.cc"],
+    srcs = [
+        "ddl.cc",
+        "ddl_routine.cc",
+        "ddl_schema.cc",
+        "ddl_table.cc",
+        "ddl_view.cc",
+    ],
     hdrs = ["ddl.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":ddl_names",
+        ":ddl_options",
         ":query",
         "//:catalog",
         "//:duckdb_sql",

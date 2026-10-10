@@ -4,4 +4,4 @@ uninitMemberVarNoCtor
 
 # Range-for extends the lifetime of QueryResult when iterating its rows member.
 # Cppcheck incorrectly treats the rows of the temporary result as dangling.
-danglingTempReference:src/emulator.cc
+danglingTempReference:src/emulator_catalog.cc

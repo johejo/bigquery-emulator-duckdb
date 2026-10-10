@@ -251,6 +251,8 @@ class Emulator {
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays = false,
                            Backend* session = nullptr);
+  // Rejects DDL targets in DuckDB's internal schemas.
+  static void CheckDdlTarget(const TranslatedStatement& translation);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
   // for any other statement.

@@ -20,7 +20,7 @@ class ResolvedDropStmt;
 
 namespace bigquery_emulator_duckdb::translator {
 
-// DDL, in ddl.cc.
+// DDL entry points, implemented by object kind in ddl_*.cc.
 
 std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt& create,
                                        const Scope& scope);
