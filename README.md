@@ -212,3 +212,14 @@ Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+## Server structure
+
+`Server` owns the API listener threads and shares one `Emulator` with its transports. `Start()`
+returns after the listener is ready, `Stop()` requests shutdown, and `Wait()` joins the serving
+threads. Destruction also stops and joins them before the emulator checkpoints its databases.
+Instances are single-use. The CLI announces its endpoint only after startup succeeds.
+
+The BigQuery v2 REST transport lives in `src/server/rest.{h,cc}` and the
+`//src/server:rest` target. Future Storage API gRPC services can use the same emulator while
+adding their listener startup, shutdown and join to `Server`; REST routing stays in its transport.

@@ -24,19 +24,86 @@ class ServerTest : public ::testing::Test {
     options.host = "127.0.0.1";
     options.port = 0;
     server_ = std::make_unique<Server>(emulator_, options);
-    ASSERT_TRUE(server_->Bind());
-    thread_ = std::thread([this] { server_->Serve(); });
+    ASSERT_TRUE(server_->Start());
   }
 
   void TearDown() override {
     server_->Stop();
-    thread_.join();
+    EXPECT_TRUE(server_->Wait());
   }
 
   Emulator emulator_{"", {{.project_id = "p"}}};
   std::unique_ptr<Server> server_;
-  std::thread thread_;
 };
+
+TEST(ServerLifecycleTest, StopImmediatelyAfterStart) {
+  Emulator emulator;
+  Server server(emulator, {.host = "127.0.0.1", .port = 0});
+  server.Stop();
+  ASSERT_TRUE(server.Start());
+  EXPECT_GT(server.port(), 0);
+  server.Stop();
+  EXPECT_TRUE(server.Wait());
+  server.Stop();
+  EXPECT_TRUE(server.Wait());
+  EXPECT_FALSE(server.Start());
+}
+
+TEST(ServerLifecycleTest, DestructorStopsAndReleasesListener) {
+  Emulator emulator;
+  int port = 0;
+  {
+    Server server(emulator, {.host = "127.0.0.1", .port = 0});
+    ASSERT_TRUE(server.Start());
+    port = server.port();
+  }
+  Server next(emulator, {.host = "127.0.0.1", .port = port});
+  ASSERT_TRUE(next.Start());
+}
+
+TEST(ServerLifecycleTest, BindFailureDoesNotAffectOtherServer) {
+  Emulator emulator;
+  Server first(emulator, {.host = "127.0.0.1", .port = 0});
+  ASSERT_TRUE(first.Start());
+  Server second(emulator, {.host = "127.0.0.1", .port = first.port()});
+  ASSERT_FALSE(second.Start());
+  EXPECT_FALSE(second.Wait());
+  httplib::Client client(first.root_url());
+  EXPECT_TRUE(client.Get("/bigquery/v2/projects"));
+}
+
+TEST(ServerLifecycleTest, RejectsOutOfRangePorts) {
+  Emulator emulator;
+  for (const int port : {-1, 65536}) {
+    Server server(emulator, {.host = "127.0.0.1", .port = port});
+    EXPECT_FALSE(server.Start());
+  }
+}
+
+TEST(ServerLifecycleTest, FormatsIPv6Endpoint) {
+  Emulator emulator;
+  const Server wildcard(emulator, {.host = "::", .port = 0});
+  EXPECT_EQ(wildcard.root_url(), "http://[::1]:0");
+  const Server loopback(emulator, {.host = "::1", .port = 0});
+  EXPECT_EQ(loopback.root_url(), "http://[::1]:0");
+}
+
+TEST_F(ServerTest, ConcurrentStop) {
+  constexpr int kCallers = 16;
+  std::latch start(kCallers);
+  std::vector<std::thread> callers;
+  callers.reserve(kCallers);
+  for (int i = 0; i < kCallers; ++i) {
+    callers.emplace_back([this, &start] {
+      start.arrive_and_wait();
+      server_->Stop();
+    });
+  }
+  for (std::thread& caller : callers) {
+    caller.join();
+  }
+  EXPECT_TRUE(server_->Wait());
+}
 
 // Clients such as test suites open many connections at once; with a short listen backlog the
 // kernel resets the ones that do not fit instead of queueing them.

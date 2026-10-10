@@ -1,0 +1,8 @@
+desc: server startup rejects invalid listeners and shutdown succeeds immediately after readiness
+steps:
+  server:
+    exec:
+      command: go test -count=1 ./tests/e2e/server
+    dump:
+      expr: current.stdout + current.stderr
+    test: current.exit_code == 0

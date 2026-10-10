@@ -12,7 +12,8 @@ struct ServerOptions {
   int port = 9050;
 };
 
-// HTTP server implementing the subset of the BigQuery v2 REST API that the emulator supports.
+// Owns API transports and their serving threads, sharing one Emulator.
+// The Emulator must outlive the Server.
 class Server {
  public:
   Server(Emulator& emulator, ServerOptions options);
@@ -21,22 +22,23 @@ class Server {
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
 
-  // Binds to the configured host and port. When `options.port` is 0, an ephemeral port is
-  // chosen and can be read back with `port()`. Returns false when binding fails.
-  bool Bind();
-  // Serves requests until `Stop()` is called. `Bind()` must have succeeded.
-  bool Serve();
+  // Starts serving and waits until the listener is ready. Port 0 chooses an ephemeral port.
+  // Returns false on bind failure or if Start() was already called; instances are single-use.
+  // Call Start() and Wait() from the owning thread. Stop() may be called by other threads
+  // after Start() returns. Destruction stops and joins all serving threads.
+  bool Start();
+  // Waits for serving to finish; returns false on transport failure and propagates exceptions.
+  bool Wait();
+  // Requests shutdown. Safe to call repeatedly, including from concurrent threads.
   void Stop();
 
-  [[nodiscard]] int port() const { return port_; }
+  [[nodiscard]] int port() const;
   // The URL clients should use as the API root, e.g. http://127.0.0.1:9050
   [[nodiscard]] std::string root_url() const;
 
  private:
   class Impl;
   std::unique_ptr<Impl> impl_;
-  ServerOptions options_;
-  int port_ = 0;
 };
 
 }  // namespace bigquery_emulator_duckdb
