@@ -37,6 +37,7 @@
                   fake-gcs-server
                   git
                   go
+                  go-tools
                   google-cloud-sdk
                   just
                   # GoogleSQL's Bazel launchers need /usr/bin/env python3 before switching to
