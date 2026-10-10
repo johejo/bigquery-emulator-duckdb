@@ -650,6 +650,7 @@ cc_library(
         ":api_error",
         ":emulator",
         ":httplib",
+        ":references",
         ":table_metadata",
         ":temporary_files",
         "//src/server:requests",

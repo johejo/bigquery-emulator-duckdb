@@ -11,6 +11,90 @@ steps:
             application/json:
               datasetReference: {datasetId: ds}
     test: current.res.status == 200
+  insert_javascript:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "language": "JAVASCRIPT"}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_procedure:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "PROCEDURE", "definitionBody": "1"}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_remote:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "remoteFunctionOptions": {"connection": "projects/p/locations/us/connections/c", "endpoint": "https://example.com"}}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_security:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "securityMode": "DEFINER"}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_determinism:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "determinismLevel": "DETERMINISTIC"}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_argument_mode:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "arguments": [{"name": "x", "mode": "OUT", "dataType": {"typeKind": "INT64"}}]}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_argument_kind:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "arguments": [{"name": "x", "argumentKind": "ANY_TABLE"}]}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_malformed_arguments:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "arguments": {}}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_malformed_type:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "returnType": {"typeKind": "ARRAY"}}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_extra_type_field:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1", "returnType": {"typeKind": "INT64", "arrayElementType": {"typeKind": "STRING"}}}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_missing_body:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "ds", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": null}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  insert_mismatched_reference:
+    req:
+      /projects/rest-routines/datasets/ds/routines:
+        post:
+          body:
+            application/json: {"routineReference": {"projectId": "rest-routines", "datasetId": "other", "routineId": "bad"}, "routineType": "SCALAR_FUNCTION", "definitionBody": "1"}
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
   invalid_mask_on_empty_dataset:
     req:
       /projects/rest-routines/datasets/ds/routines?readMask=unknown:
@@ -35,6 +119,28 @@ steps:
                 OPTIONS (description = 'adds one');
                 CREATE FUNCTION ds.b() RETURNS INT64 AS (2)
     test: current.res.status == 200
+  conditional_update:
+    req:
+      /projects/rest-routines/datasets/ds/routines/a:
+        put:
+          headers:
+            If-Match: stale
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: ds, routineId: a}
+              routineType: SCALAR_FUNCTION
+              definitionBody: "99"
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
+  mismatched_update:
+    req:
+      /projects/rest-routines/datasets/ds/routines/a:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: ds, routineId: b}
+              routineType: SCALAR_FUNCTION
+              definitionBody: "99"
+    test: current.res.status == 400 && current.res.body.error.errors[0].reason == "invalid"
   default:
     req:
       /projects/rest-routines/datasets/ds/routines:

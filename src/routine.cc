@@ -1,8 +1,11 @@
 #include "src/routine.h"
 
+#include <algorithm>
+#include <array>
 #include <format>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,7 +22,26 @@ using nlohmann::json;
 
 // The GoogleSQL spelling of the StandardSqlDataType `type`.
 std::string SqlTypeName(const json& type) {
-  std::string kind = type.value("typeKind", "");
+  if (!type.is_object() || !type.contains("typeKind") || !type["typeKind"].is_string()) {
+    throw ApiError::Invalid("Invalid routine data type");
+  }
+  std::string kind = type["typeKind"].get<std::string>();
+  constexpr std::array<std::string_view, 18> kinds = {
+      "INT64",      "BOOL", "FLOAT64",  "STRING",   "BYTES",     "TIMESTAMP",
+      "DATE",       "TIME", "DATETIME", "INTERVAL", "GEOGRAPHY", "NUMERIC",
+      "BIGNUMERIC", "JSON", "ARRAY",    "STRUCT",   "RANGE",     "UUID",
+      // No aliases: these are StandardSqlDataType's enum spellings.
+  };
+  if (std::ranges::find(kinds, kind) == kinds.end()) {
+    throw ApiError::Invalid("Invalid typeKind: " + kind);
+  }
+  for (const auto& [name, value] : type.items()) {
+    if (name != "typeKind" && !(kind == "ARRAY" && name == "arrayElementType") &&
+        !(kind == "RANGE" && name == "rangeElementType") &&
+        !(kind == "STRUCT" && name == "structType")) {
+      throw ApiError::Invalid("Invalid routine data type field: " + name);
+    }
+  }
   if (kind == "ARRAY") {
     return "ARRAY<" + SqlTypeName(type.value("arrayElementType", json::object())) + ">";
   }
@@ -27,8 +49,22 @@ std::string SqlTypeName(const json& type) {
     return "RANGE<" + SqlTypeName(type.value("rangeElementType", json::object())) + ">";
   }
   if (kind == "STRUCT") {
+    const json structure = type.value("structType", json::object());
+    if (!structure.is_object() || structure.size() != 1 || !structure.contains("fields") ||
+        !structure["fields"].is_array()) {
+      throw ApiError::Invalid("Invalid routine struct type");
+    }
     std::string fields;
-    for (const json& field : type.value("structType", json::object()).value("fields", json())) {
+    for (const json& field : structure["fields"]) {
+      if (!field.is_object() || !field.contains("type") ||
+          (field.contains("name") && !field["name"].is_string())) {
+        throw ApiError::Invalid("Invalid routine struct field");
+      }
+      for (const auto& [name, value] : field.items()) {
+        if (name != "name" && name != "type") {
+          throw ApiError::Invalid("Invalid routine struct field: " + name);
+        }
+      }
       if (!fields.empty()) fields += ", ";
       if (const std::string name = field.value("name", ""); !name.empty()) {
         fields += googlesql::ToIdentifierLiteral(name) + " ";
@@ -36,10 +72,6 @@ std::string SqlTypeName(const json& type) {
       fields += SqlTypeName(field.value("type", json::object()));
     }
     return "STRUCT<" + fields + ">";
-  }
-  if (kind.empty() ||
-      kind.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") != std::string::npos) {
-    throw ApiError::Invalid("Invalid typeKind: " + kind);
   }
   return kind;
 }

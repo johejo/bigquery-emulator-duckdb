@@ -66,12 +66,18 @@ note bigquery.jobs.query | Runs GoogleSQL only; an omitted `useLegacySql` runs a
 
 request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f
+request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"api"},"routineType":"SCALAR_FUNCTION","definitionBody":"x + 1","arguments":[{"name":"x","dataType":{"typeKind":"INT64"}}]}
+request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"api"},"routineType":"PROCEDURE","definitionBody":"SELECT 1"}
+request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","definitionBody":"1","description":"updated"}
+request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","language":"JAVASCRIPT","definitionBody":"return 1"}
+note bigquery.routines.insert | Supports SQL scalar UDFs with fixed or ANY TYPE arguments, optional return type and description; references to other routines require a project ID. Other routine kinds and options are unsupported.
+note bigquery.routines.update | Replaces SQL scalar UDF definitions, preserving creation time. Conditional updates with `If-Match` are unsupported.
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?maxResults=1
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:SCALAR_FUNCTION
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?readMask=definitionBody,arguments,returnType
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:PROCEDURE&readMask=*
 note bigquery.routines.list | Supports `routineType:{RoutineType}` filters and `readMask` field projection; always returns the routine reference.
-note bigquery.routines.get | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. `routines.insert` and `routines.update` are unsupported, so DDL creates them.
+note bigquery.routines.get | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description.
 
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}

@@ -11,6 +11,7 @@
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/references.h"
+#include "src/routine.h"
 #include "src/table_metadata.h"
 
 namespace httplib {
@@ -133,6 +134,7 @@ RoutineListRequest ParseRoutineList(const httplib::Request& request);
 TableGetRequest ParseTableGet(const httplib::Request& request);
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const nlohmann::json& body);
 TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const nlohmann::json& body);
+Routine ParseRoutine(const DatasetReference& dataset, const nlohmann::json& body);
 TableUpdateRequest ParseTableUpdate(const nlohmann::json& body);
 InsertAllRequest ParseInsertAll(const nlohmann::json& body);
 

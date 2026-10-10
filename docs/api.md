@@ -22,9 +22,9 @@ rejected as unsupported.
 
 | Status | Methods |
 | --- | --- |
-| Partial | 9 |
+| Partial | 11 |
 | Supported | 16 |
-| Unsupported | 22 |
+| Unsupported | 20 |
 
 ## datasets
 
@@ -71,13 +71,13 @@ rejected as unsupported.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`routines.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Supported |  |
-| [`routines.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/get) | `GET projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Supported | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. `routines.insert` and `routines.update` are unsupported, so DDL creates them. |
+| [`routines.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/get) | `GET projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Supported | Describes the persistent SQL UDFs that `CREATE FUNCTION` creates: their arguments, return type, body and description. |
 | [`routines.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:getIamPolicy` | Unsupported |  |
-| [`routines.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/routines` | Unsupported |  |
+| [`routines.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/routines` | Partial | Supports SQL scalar UDFs with fixed or ANY TYPE arguments, optional return type and description; references to other routines require a project ID. Other routine kinds and options are unsupported. Rejected as unsupported: routines other than SQL scalar functions. |
 | [`routines.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/list) | `GET projects/{projectsId}/datasets/{datasetsId}/routines` | Supported | Supports `routineType:{RoutineType}` filters and `readMask` field projection; always returns the routine reference. |
 | [`routines.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:setIamPolicy` | Unsupported |  |
 | [`routines.testIamPermissions`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/testIamPermissions) | `POST projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}:testIamPermissions` | Unsupported |  |
-| [`routines.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Unsupported |  |
+| [`routines.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/routines/update) | `PUT projects/{projectsId}/datasets/{datasetsId}/routines/{routinesId}` | Partial | Replaces SQL scalar UDF definitions, preserving creation time. Conditional updates with `If-Match` are unsupported. Rejected as unsupported: non-SQL routines. |
 
 ## rowAccessPolicies
 

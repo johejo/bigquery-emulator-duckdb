@@ -34,6 +34,7 @@ cc_library(
         "//:emulator",
         "//:field_schema",
         "//:references",
+        "//:routine",
         "//:table_metadata",
         "@nlohmann_json//:json",
     ],
