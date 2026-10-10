@@ -10,8 +10,8 @@ cc_library(
         "//:duckdb_sql",
         "//:query_parameters",
         "//:references",
+        "//:system_variables",
         "//:translated_statement",
-        "@googlesql//googlesql/public:analyzer",
     ],
 )
 

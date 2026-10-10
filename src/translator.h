@@ -7,15 +7,13 @@
 #include <vector>
 
 #include "src/query_parameters.h"
+#include "src/system_variables.h"
 #include "src/translated_statement.h"
 
 namespace googlesql {
 class ResolvedExpr;
 class ResolvedStatement;
 class Value;
-struct StringVectorCaseLess;
-// As googlesql/public/analyzer.h declares it, which takes seconds to parse.
-using SystemVariableValuesMap = std::map<std::vector<std::string>, Value, StringVectorCaseLess>;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {

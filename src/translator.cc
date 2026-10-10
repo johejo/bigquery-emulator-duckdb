@@ -16,6 +16,7 @@
 #include "src/analyzer.h"
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
+#include "src/system_variables.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
