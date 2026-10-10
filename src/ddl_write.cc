@@ -115,6 +115,15 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
   DdlWrite write{
       .metadata_statements = ColumnCommentStatements(definition.table, definition.schema),
   };
+  if (definition.as_select) {
+    for (const FieldSchema& field : definition.schema) {
+      if (field.mode == FieldMode::kRequired) {
+        write.metadata_statements.push_back("ALTER TABLE " + QualifiedName(definition.table) +
+                                            " ALTER COLUMN " + QuoteIdentifier(field.name) +
+                                            " SET NOT NULL");
+      }
+    }
+  }
   std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
                     std::back_inserter(write.metadata_statements));
   if (!definition.metadata.empty()) {

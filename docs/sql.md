@@ -97,7 +97,7 @@ the probe's own notes name what it rejected.
 | Collation | Unsupported | COLLATE |
 | Generated columns | Unsupported | generated columns |
 | `CREATE TEMP TABLE` | Supported | In multi-statement queries, whose end drops their temporary tables. |
-| `CREATE TABLE LIKE` | Partial | Copies the schema, partitioning, clustering, description, friendly name and labels of a table. Copying a view or a table with column defaults is unsupported; CREATE TABLE LIKE AS SELECT |
+| `CREATE TABLE LIKE` | Partial | Copies the schema, partitioning, clustering, description, friendly name and labels of a table; AS SELECT fills it with the query's rows. Copying a view or a table with column defaults is unsupported; AS SELECT with STRING/BYTES length parameters or nested NOT NULL is unsupported; CREATE TABLE LIKE AS SELECT with length parameters; CREATE TABLE LIKE AS SELECT with nested NOT NULL; CREATE TABLE LIKE a table with column defaults; CREATE TABLE LIKE a view |
 | `CREATE TABLE COPY` | Partial | Copies the rows of a table besides what `CREATE TABLE LIKE` copies. Copying a view or a table with column defaults is unsupported; CREATE TABLE COPY with FOR SYSTEM_TIME AS OF; CREATE TEMP TABLE COPY |
 | `CREATE TABLE CLONE` | Partial | Copies a table as `CREATE TABLE COPY` does, and records the table it was cloned from and when, which `tables.get` and `INFORMATION_SCHEMA.TABLES` report; CREATE OR REPLACE TABLE CLONE; CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF |
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |

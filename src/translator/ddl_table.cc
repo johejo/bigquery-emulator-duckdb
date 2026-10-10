@@ -354,11 +354,21 @@ std::optional<std::string> ColumnsSql(const std::vector<FieldSchema>& schema, co
   return Join(columns, ", ");
 }
 
+bool HasLengthParameters(const FieldSchema& field) {
+  return field.max_length.has_value() || std::ranges::any_of(field.fields, HasLengthParameters);
+}
+
+bool HasNestedNotNull(const FieldSchema& field) {
+  return std::ranges::any_of(field.fields, [](const FieldSchema& child) {
+    return child.mode == FieldMode::kRequired || HasNestedNotNull(child);
+  });
+}
+
 // CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
 // labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
 // SET OPTIONS does.
-std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableStmt& create,
-                                           const Scope& scope) {
+template <typename CreateTable>
+std::optional<TableDescription> LikeDescription(const CreateTable& create, const Scope& scope) {
   std::optional<TableDescription> description =
       SourceDescription(create.like_table(), "CREATE TABLE LIKE", scope);
   if (!description) {
@@ -372,11 +382,21 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   if (create.cluster_by_list_size() > 0) {
     inherited.clustering.clear();
   }
-  const auto head = CreateTableHead(create, scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
   auto metadata =
       OptionsMetadata(create.option_list(), "CREATE TABLE", scope, std::move(inherited));
-  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+  if (!metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+    return std::nullopt;
+  }
+  description->metadata = *std::move(metadata);
+  return description;
+}
+
+std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableStmt& create,
+                                           const Scope& scope) {
+  auto description = LikeDescription(create, scope);
+  const auto head = CreateTableHead(create, scope);
+  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  if (!description || !head || !target) {
     return std::nullopt;
   }
   const auto columns = ColumnsSql(description->schema, scope);
@@ -386,7 +406,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   scope.context.table = TableDefinition{
       .table = *target,
       .schema = std::move(description->schema),
-      .metadata = *std::move(metadata),
+      .metadata = std::move(description->metadata),
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
   };
@@ -607,14 +627,27 @@ std::optional<std::string> CreateTableAsSelect(
   if (create.output_column_list_size() != create.column_definition_list_size()) {
     return Unsupported(scope, "CREATE TABLE AS SELECT columns");
   }
-  if (create.like_table() != nullptr) {
-    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT");
-  }
+  const bool like = create.like_table() != nullptr;
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
-  auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
-  if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
+  std::optional<TableDescription> description;
+  if (like) {
+    description = LikeDescription(create, scope);
+  } else {
+    auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
+    if (metadata && PartitioningAndClustering(create, *metadata, scope)) {
+      description = TableDescription{.schema = {}, .metadata = *std::move(metadata)};
+    }
+  }
+  if (!head || !target || !description) {
     return std::nullopt;
+  }
+  // DuckDB does not enforce STRING/BYTES lengths, including in nested fields.
+  if (like && std::ranges::any_of(description->schema, HasLengthParameters)) {
+    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT with length parameters");
+  }
+  if (like && std::ranges::any_of(description->schema, HasNestedNotNull)) {
+    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT with nested NOT NULL");
   }
   const auto relation = Scan(*create.query(), scope);
   if (!relation) {
@@ -622,26 +655,41 @@ std::optional<std::string> CreateTableAsSelect(
   }
   TableDefinition table{
       .table = *target,
-      .metadata = *std::move(metadata),
+      .schema = std::move(description->schema),
+      .metadata = std::move(description->metadata),
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
+      .as_select = true,
   };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
     // DuckDB cannot declare constraints on a table created from a query.
-    if (definition.annotations() != nullptr && definition.annotations()->not_null()) {
+    if (!like && definition.annotations() != nullptr && definition.annotations()->not_null()) {
       return Unsupported(scope, "NOT NULL in CREATE TABLE AS SELECT");
     }
     const auto column = relation->columns.find(create.output_column_list(i)->column().column_id());
-    const auto type = ColumnDefinitionType(definition, scope);
-    auto field = ColumnField(definition, scope);
-    if (column == relation->columns.end() || !type || !field) {
+    if (column == relation->columns.end()) {
       return std::nullopt;
     }
-    table.schema.push_back(*std::move(field));
+    std::optional<std::string> type;
+    if (like) {
+      const auto inherited_type = DuckDbColumnType(table.schema.at(i));
+      if (!inherited_type.ok()) {
+        return Unsupported(scope, inherited_type.status().message());
+      }
+      type = *inherited_type;
+    } else {
+      type = ColumnDefinitionType(definition, scope);
+      auto field = ColumnField(definition, scope);
+      if (!type || !field) {
+        return std::nullopt;
+      }
+      table.schema.push_back(*std::move(field));
+    }
+    const FieldSchema& field = table.schema.at(i);
     projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
-                          QuoteIdentifier(definition.name()));
+                          QuoteIdentifier(field.name));
   }
   scope.context.table = std::move(table);
   return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();

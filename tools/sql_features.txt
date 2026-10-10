@@ -168,7 +168,12 @@ query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 10, 1)) CLUSTER BY name OPTIONS (description = 'x')
 query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t; INSERT n (id) VALUES (1); SELECT id FROM n
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t AS SELECT id, name, tags, s FROM t
-note `CREATE TABLE LIKE` | Copies the schema, partitioning, clustering, description, friendly name and labels of a table. Copying a view or a table with column defaults is unsupported
+query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t AS SELECT * FROM t; SELECT id FROM n
+query `CREATE TABLE LIKE` | CREATE TABLE lengths (s STRING(3)); CREATE TABLE n LIKE lengths AS SELECT 'abc' AS s
+query `CREATE TABLE LIKE` | CREATE TABLE required (s STRUCT<x INT64 NOT NULL>); CREATE TABLE n LIKE required AS SELECT STRUCT(1 AS x) AS s
+query `CREATE TABLE LIKE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n LIKE defaulted
+query `CREATE TABLE LIKE` | CREATE VIEW v AS SELECT id FROM t; CREATE TABLE n LIKE v
+note `CREATE TABLE LIKE` | Copies the schema, partitioning, clustering, description, friendly name and labels of a table; AS SELECT fills it with the query's rows. Copying a view or a table with column defaults is unsupported; AS SELECT with STRING/BYTES length parameters or nested NOT NULL is unsupported
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t
 query `CREATE TABLE COPY` | CREATE OR REPLACE TABLE n COPY t OPTIONS (description = 'x')
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
