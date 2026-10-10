@@ -12,7 +12,8 @@
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
-#include "src/translator/ddl_internal.h"
+#include "src/translator/ddl_names.h"
+#include "src/translator/ddl_options.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
@@ -56,7 +57,8 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
       .table = *target,
       .query = create.sql(),
       .metadata = *std::move(metadata),
-      .if_not_exists = IfNotExists(create),
+      .if_not_exists =
+          (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
   };
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {

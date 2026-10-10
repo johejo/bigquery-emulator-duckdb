@@ -17,7 +17,7 @@
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
-#include "src/translator/ddl_internal.h"
+#include "src/translator/ddl_options.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
@@ -133,7 +133,8 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
   }
   scope.context.routine = RoutineDefinition{
       .routine = {.reference = *target, .resource = std::move(resource)},
-      .if_not_exists = IfNotExists(create),
+      .if_not_exists =
+          (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
   };
   const bool replace =
       create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;

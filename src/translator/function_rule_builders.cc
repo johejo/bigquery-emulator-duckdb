@@ -1,4 +1,4 @@
-#include "src/translator/functions_internal.h"
+#include "src/translator/function_rule_builders.h"
 
 #include <cstddef>
 #include <initializer_list>
@@ -18,10 +18,6 @@ Condition Is(std::size_t argument, std::initializer_list<googlesql::TypeKind> ty
 
 Condition Part(std::size_t argument, std::initializer_list<std::string_view> date_parts) {
   return {.argument = argument, .date_parts = date_parts};
-}
-
-Condition Mode(std::size_t argument, std::string_view rounding_mode) {
-  return {.argument = argument, .rounding_mode = rounding_mode};
 }
 
 // The DuckDB function of the same name, called with each argument count in `arity`, when the

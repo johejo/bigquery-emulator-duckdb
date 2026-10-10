@@ -1,3 +1,5 @@
+#include "src/translator/functions_template.h"
+
 #include <cstddef>
 #include <initializer_list>
 #include <string>
@@ -7,14 +9,18 @@
 #include <vector>
 
 #include "src/duckdb_sql.h"
+#include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
-#include "src/translator/functions_internal.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
 using enum googlesql::TypeKind;
+
+Condition Mode(std::size_t argument, std::string_view rounding_mode) {
+  return {.argument = argument, .rounding_mode = rounding_mode};
+}
 
 Condition SubDay(std::size_t argument) {
   return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});

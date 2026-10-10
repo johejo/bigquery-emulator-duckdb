@@ -1,11 +1,13 @@
+#include "src/translator/functions_backend.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
-#include "src/translator/functions_internal.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {

@@ -7,7 +7,9 @@
 #include <unordered_set>
 #include <utility>
 
-#include "src/translator/functions_internal.h"
+#include "src/translator/functions_aggregate.h"
+#include "src/translator/functions_backend.h"
+#include "src/translator/functions_template.h"
 #include "src/translator/handlers.h"
 
 namespace bigquery_emulator_duckdb::translator {

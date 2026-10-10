@@ -8,10 +8,10 @@
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
-#include "src/translator/ddl_internal.h"
+#include "src/translator/ddl_names.h"
+#include "src/translator/ddl_options.h"
 
 namespace bigquery_emulator_duckdb::translator {
-namespace {}  // namespace
 
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
                                         const Scope& scope) {
@@ -33,7 +33,8 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   scope.context.dataset = DatasetDefinition{
       .dataset = *dataset,
       .metadata = *std::move(metadata),
-      .if_not_exists = IfNotExists(create),
+      .if_not_exists =
+          (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
   };
   switch (create.create_mode()) {
     case googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE:

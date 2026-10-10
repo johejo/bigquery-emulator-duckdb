@@ -1,3 +1,5 @@
+#include "src/translator/functions_aggregate.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -5,7 +7,6 @@
 #include <vector>
 
 #include "src/translator/functions.h"
-#include "src/translator/functions_internal.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
