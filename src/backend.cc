@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -135,8 +136,9 @@ FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   return field;
 }
 
-// BigQuery's default TIMESTAMP encoding: a decimal string of seconds since the Unix epoch.
-std::string EpochSecondsString(int64_t micros) {
+// BigQuery's default TIMESTAMP encoding: a decimal string of seconds since the Unix epoch. A
+// RANGE<TIMESTAMP> writes its bounds with every digit of the fraction, as `all_digits` does.
+std::string EpochSecondsString(int64_t micros, bool all_digits = false) {
   const bool negative = micros < 0;
   const uint64_t magnitude =
       negative ? static_cast<uint64_t>(-(micros + 1)) + 1 : static_cast<uint64_t>(micros);
@@ -144,10 +146,10 @@ std::string EpochSecondsString(int64_t micros) {
   const uint64_t fraction = magnitude % 1000000;
   std::string result = negative ? "-" : "";
   result += std::to_string(seconds);
-  if (fraction != 0) {
+  if (fraction != 0 || all_digits) {
     std::string digits = std::to_string(fraction);
     digits.insert(0, 6 - digits.size(), '0');
-    while (digits.back() == '0') {
+    while (!all_digits && digits.back() == '0') {
       digits.pop_back();
     }
     result += "." + digits;
@@ -519,7 +521,8 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
     const std::string text = value.get<std::string>();
     const size_t separator = text.find(", ");
     const auto bound = [](const std::string& micros) {
-      return micros == "UNBOUNDED" ? micros : EpochSecondsString(std::stoll(micros));
+      return micros == "UNBOUNDED" ? micros
+                                   : EpochSecondsString(std::stoll(micros), /*all_digits=*/true);
     };
     return "[" + bound(text.substr(1, separator - 1)) + ", " +
            bound(text.substr(separator + 2, text.size() - separator - 3)) + ")";
@@ -548,10 +551,21 @@ json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
   return result;
 }
 
+// DuckDB's message for a failed statement. DuckDB's error() raises the messages the translation
+// writes as BigQuery's, prefixed with the class of exception it raises, which is left out.
+std::string ErrorMessage(const char* error, std::string_view fallback) {
+  constexpr std::string_view kInvalidInput = "Invalid Input Error: ";
+  if (error == nullptr) {
+    return std::string(fallback);
+  }
+  std::string_view message = error;
+  message.remove_prefix(message.starts_with(kInvalidInput) ? kInvalidInput.size() : 0);
+  return std::string(message);
+}
+
 void Query(duckdb_connection connection, const std::string& sql, Result& result) {
   if (duckdb_query(connection, sql.c_str(), &result.result) == DuckDBError) {
-    const char* error = duckdb_result_error(&result.result);
-    throw BackendError(error != nullptr ? error : "DuckDB query failed");
+    throw BackendError(ErrorMessage(duckdb_result_error(&result.result), "DuckDB query failed"));
   }
 }
 
@@ -719,8 +733,8 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
   // written.
   Prepared prepared;
   if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
-    const char* error = duckdb_prepare_error(prepared.get());
-    throw BackendError(error != nullptr ? error : "DuckDB failed to prepare the query");
+    throw BackendError(
+        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
   }
 
   QueryResult query_result;

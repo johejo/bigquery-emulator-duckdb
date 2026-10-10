@@ -172,6 +172,11 @@ SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST(NULL AS ARRAY<IN
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', ARRAY<INT64>[], insert_each_element => FALSE))
 => "[[]]"
 
+# Unlike JSON_ARRAY_APPEND, inserting an empty SQL array at the end of an array extends it with
+# NULL; confirmed against BigQuery.
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', ARRAY<INT64>[]))
+=> "[null]"
+
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', JSON '[1,2]'))
 => "[[1,2]]"
 
@@ -211,8 +216,9 @@ SELECT SAFE.JSON_ARRAY_APPEND(JSON '[]', '$', BIGNUMERIC '123.123456981723189237
 SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST('nan' AS FLOAT64)))
 => "[\"NaN\"]"
 
-SELECT IEEE_DIVIDE(1, FLOAT64(JSON_ARRAY_APPEND(JSON '[]', '$', -0.0)[0])) > 0
-=> "true"
+# The sign of negative zero is kept; confirmed against BigQuery.
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', -0.0))
+=> "[-0.0]"
 
 SELECT JSON_TYPE(JSON_ARRAY_APPEND(JSON '[]', '$', 9007199254740993)[0])
 => "number"
@@ -226,8 +232,8 @@ SELECT SAFE.JSON_ARRAY_INSERT(JSON '[]', '$[0]', BIGNUMERIC '123.123456981723189
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST('nan' AS FLOAT64)))
 => "[\"NaN\"]"
 
-SELECT IEEE_DIVIDE(1, FLOAT64(JSON_ARRAY_INSERT(JSON '[]', '$[0]', -0.0)[0])) > 0
-=> "true"
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', -0.0))
+=> "[-0.0]"
 
 SELECT JSON_TYPE(JSON_ARRAY_INSERT(JSON '[]', '$[0]', 9007199254740993)[0])
 => "number"

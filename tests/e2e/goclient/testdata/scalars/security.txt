@@ -22,8 +22,12 @@ SELECT SESSION_USER()
 SELECT SESSION_USER('jdoe@example.com')
 => error:
 
-# Verified against BigQuery by a maintainer: SAFE. is rejected for SESSION_USER.
+# Verified against BigQuery by a maintainer: SAFE. is rejected for SESSION_USER, even where
+# TYPEOF does not evaluate its argument.
 SELECT SAFE.SESSION_USER() IS NOT NULL
+=> error: SAFE with function session_user is not supported.
+
+SELECT TYPEOF(SAFE.SESSION_USER())
 => error: SAFE with function session_user is not supported.
 
 DECLARE identity STRING DEFAULT SAFE.SESSION_USER();

@@ -15,6 +15,22 @@ SELECT RANGE<DATE> '[NULL, 2020-12-31)'
 SELECT RANGE<DATE> '[2020-01-01, UNBOUNDED)'
 => "[2020-01-01, UNBOUNDED)"
 
+# Without formatOptions.useInt64Timestamp, the bounds of a RANGE<TIMESTAMP> are seconds with six
+# fractional digits; confirmed against BigQuery.
+SELECT RANGE<TIMESTAMP> '[2020-01-01 00:00:00.5+00, UNBOUNDED)'
+=> "[1577836800.500000, UNBOUNDED)"
+
+# CAST to STRING writes each bound cast to STRING, and UNBOUNDED for a missing one; confirmed
+# against BigQuery.
+SELECT CAST(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS STRING)
+=> "[2020-01-01, UNBOUNDED)"
+
+SELECT CAST(RANGE<DATETIME> '[UNBOUNDED, 2021-01-01 12:30:00)' AS STRING)
+=> "[UNBOUNDED, 2021-01-01 12:30:00)"
+
+SELECT CAST(RANGE<TIMESTAMP> '[2020-01-01 01:02:03.5+00, 2021-01-01 00:00:00+00)' AS STRING)
+=> "[2020-01-01 01:02:03.500+00, 2021-01-01 00:00:00+00)"
+
 SELECT CAST(NULL AS RANGE<DATE>)
 => null
 
@@ -27,9 +43,10 @@ SELECT RANGE(NULL, DATE '2022-12-31')
 SELECT RANGE(DATE '2022-10-01', NULL)
 => "[2022-10-01, UNBOUNDED)"
 
-# The lower bound must be smaller than the upper bound; SAFE. returns NULL instead.
+# The lower bound must be smaller than the upper bound; SAFE. returns NULL instead. BigQuery's
+# message is confirmed against BigQuery.
 SELECT RANGE(DATE '2022-12-31', DATE '2022-12-01')
-=> error:
+=> error: Range start element must be smaller than range end element; error in RANGE expression
 
 SELECT RANGE(DATE '2022-12-01', DATE '2022-12-01')
 => error:
@@ -88,6 +105,10 @@ SELECT RANGE_INTERSECT(RANGE<DATE> '[2020-02-01, 2020-09-01)', RANGE<DATE> '[202
 
 SELECT SAFE.RANGE_INTERSECT(RANGE<DATE> '[2020-02-01, 2020-09-01)', RANGE<DATE> '[2021-06-15, 2022-04-15)')
 => null
+
+# BigQuery's message, confirmed against BigQuery, leaves out the ranges.
+SELECT RANGE_INTERSECT(RANGE<DATE> '[2020-02-01, 2020-09-01)', RANGE<DATE> '[2021-06-15, UNBOUNDED)')
+=> error: Provided RANGE inputs do not overlap. Please check RANGE_OVERLAPS before calling RANGE_INTERSECT; error in RANGE_INTERSECT expression
 
 SELECT RANGE_OVERLAPS(RANGE<DATE> '[2022-02-01, 2022-09-01)', RANGE<DATE> '[2021-06-15, 2022-04-15)')
 => "true"

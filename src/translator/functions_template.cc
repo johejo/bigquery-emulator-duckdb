@@ -150,18 +150,18 @@ std::vector<Rule> BoundOrNull(std::string_view bound) {
   return {{1, "CASE WHEN isfinite(" + value + ") THEN " + value + " END"}};
 }
 
-// A NULL bound is unbounded, and a RANGE whose start does not precede its end an error.
+// A NULL bound is unbounded, and a RANGE whose start does not precede its end an error, with
+// BigQuery's message.
 std::vector<Rule> RangeConstructor() {
-  return {{2, DuckDbRange("$1", "$2", "!1"), {}, {}, {QuoteLiteral(kRangeOrderError)}}};
-}
-
-// The text of a RANGE `range` in an error message, with its bounds as DuckDB writes them.
-std::string RangeMessage(std::string_view range) {
-  const auto bound = [range](std::string_view name) {
-    return "CASE WHEN isfinite(" + RangeBound(range, name) + ") THEN CAST(" +
-           RangeBound(range, name) + " AS VARCHAR) ELSE 'UNBOUNDED' END";
+  return {
+      {
+          2,
+          DuckDbRange("$1", "$2", "!1"),
+          {},
+          {},
+          {QuoteLiteral(std::string(kRangeOrderError) + "; error in RANGE expression")},
+      },
   };
-  return "'[' || " + bound(kRangeStart) + " || ', ' || " + bound(kRangeEnd) + " || ')'";
 }
 
 // The RANGE functions compare the bounds, which DuckDB orders as BigQuery orders RANGE's: an
@@ -188,7 +188,7 @@ std::vector<Rule> RangeContains() {
   };
 }
 
-// GoogleSQL's message, with the bounds as DuckDB writes them.
+// BigQuery's message, which unlike GoogleSQL's leaves out the ranges.
 std::vector<Rule> RangeIntersect() {
   return {
       {
@@ -201,10 +201,8 @@ std::vector<Rule> RangeIntersect() {
           {},
           {},
           {
-              "'Provided RANGE inputs: ' || " + RangeMessage("$1") + " || ' and ' || " +
-                  RangeMessage("$2") +
-                  " || ' do not overlap. Please check RANGE_OVERLAPS before calling "
-                  "RANGE_INTERSECT'",
+              "'Provided RANGE inputs do not overlap. Please check RANGE_OVERLAPS before calling "
+              "RANGE_INTERSECT; error in RANGE_INTERSECT expression'",
           },
       },
   };
