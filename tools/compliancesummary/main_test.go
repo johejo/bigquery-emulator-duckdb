@@ -53,7 +53,7 @@ func TestSummarize(t *testing.T) {
 	writeLog(t, dir, "shard_1_of_3", finishedLog, now)
 	writeLog(t, dir, "shard_2_of_3", unfinishedLog, now)
 
-	paths, err := latestShards(dir)
+	paths, err := latestShards(dir, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +117,31 @@ func TestGroup(t *testing.T) {
 	} {
 		if got := group(name); got != want {
 			t.Errorf("group(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// Artifact downloads can leave no logs, or logs from a different shard count. Neither should
+// make CI infer a smaller successful run.
+func TestExpectedShards(t *testing.T) {
+	for _, stale := range []bool{false, true} {
+		dir := filepath.Join(t.TempDir(), "logs")
+		if stale {
+			writeLog(t, dir, "shard_1_of_1", finishedLog, time.Now())
+		}
+		paths, err := latestShards(dir, 3)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := summarize(paths)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := []int{1, 2, 3}; !reflect.DeepEqual(s.unfinished, want) {
+			t.Errorf("unfinished = %v, want %v", s.unfinished, want)
+		}
+		if len(s.outcomes) != 0 {
+			t.Errorf("unexpected outcomes: %v", s.outcomes)
 		}
 	}
 }

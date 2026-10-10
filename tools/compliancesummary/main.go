@@ -5,9 +5,10 @@
 // statements are then missing, and when a statement that a known error lists as failing passes,
 // since the entry would then hide the statement failing again.
 //
-//	compliancesummary [-results FILE] LOGDIR
+//	compliancesummary [-results FILE] [-shards N] LOGDIR
 //
-// LOGDIR is the test's log directory, bazel-testlogs/compliance_test.
+// LOGDIR is the test's log directory, bazel-testlogs/compliance_test. With -shards, it may also
+// contain downloaded CI logs; missing logs are counted even when the directory does not exist.
 package main
 
 import (
@@ -91,13 +92,16 @@ func readShard(r io.Reader) (shard, error) {
 
 // latestShards returns the log paths of the shards of the latest run under dir, by shard number,
 // with an empty path for a shard that left no log. Logs of earlier runs with another shard count
-// stay in the directory, so the run is the one whose log was written last.
-func latestShards(dir string) ([]string, error) {
+// stay in the directory, so the run is the one whose log was written last. A positive count
+// selects that shard count explicitly instead, including when all logs are missing.
+func latestShards(dir string, count int) ([]string, error) {
+	if count > 0 {
+		return shardPaths(dir, count), nil
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	count := 0
 	var latest time.Time
 	for _, entry := range entries {
 		m := shardDir.FindStringSubmatch(entry.Name())
@@ -115,6 +119,11 @@ func latestShards(dir string) ([]string, error) {
 	if count == 0 {
 		return nil, fmt.Errorf("no shard logs in %s", dir)
 	}
+	return shardPaths(dir, count), nil
+}
+
+// shardPaths includes missing logs so CI can account for every expected shard, even when none ran.
+func shardPaths(dir string, count int) []string {
 	paths := make([]string, count)
 	for i := range paths {
 		path := filepath.Join(dir, fmt.Sprintf("shard_%d_of_%d", i+1, count), "test.log")
@@ -122,7 +131,7 @@ func latestShards(dir string) ([]string, error) {
 			paths[i] = path
 		}
 	}
-	return paths, nil
+	return paths
 }
 
 // group names the test a statement belongs to: the file of a file-based test, or the function of
@@ -275,12 +284,13 @@ func (s summary) writeResults(w io.Writer) error {
 
 func main() {
 	results := flag.String("results", "", "write each statement's outcome to this file")
+	shards := flag.Int("shards", 0, "expected shard count; 0 detects the latest local run")
 	flag.Parse()
-	if flag.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: compliancesummary [-results FILE] LOGDIR")
+	if flag.NArg() != 1 || *shards < 0 {
+		fmt.Fprintln(os.Stderr, "usage: compliancesummary [-results FILE] [-shards N] LOGDIR")
 		os.Exit(2)
 	}
-	paths, err := latestShards(flag.Arg(0))
+	paths, err := latestShards(flag.Arg(0), *shards)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
