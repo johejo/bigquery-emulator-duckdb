@@ -1,4 +1,11 @@
 Checks:
+  - abseil-duration-*
+  - abseil-no-internal-dependencies
+  - abseil-redundant-strcat-calls
+  - abseil-str-cat-append
+  - abseil-time-comparison
+  - abseil-time-subtraction
+  - abseil-upgrade-duration-conversions
   - bugprone-*
   - cert-*
   - clang-analyzer-*
@@ -30,7 +37,6 @@ Checks:
   - -cppcoreguidelines-pro-bounds-array-to-pointer-decay
   - -cppcoreguidelines-pro-bounds-constant-array-index
   - -cppcoreguidelines-pro-bounds-pointer-arithmetic
-  - -cppcoreguidelines-special-member-functions
   - -misc-const-correctness
   - -misc-no-recursion
   - -misc-non-private-member-variables-in-classes
@@ -59,6 +65,10 @@ Checks:
   - -readability-redundant-member-init
 HeaderFilterRegex: '^(src|tests|tools)/'
 CheckOptions:
+  # A deleted copy operation and a destructor already make a type non-movable. Abstract
+  # interfaces with only a defaulted destructor need no other special members either.
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
   # GoogleSQL's TYPE_* enumerators and umbrella headers, and nlohmann's json_fwd/json.hpp
   # split, produce false positives. glibc's sigset_t is provided by the public signal.h;
   # include-cleaner instead asks for its internal bits/types/sigset_t.h. On macOS it
