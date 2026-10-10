@@ -532,6 +532,9 @@ cc_library(
     name = "emulator",
     srcs = [
         "src/emulator.cc",
+        "src/emulator_catalog.cc",
+        "src/emulator_jobs.cc",
+        "src/emulator_query.cc",
         "src/emulator_script.cc",
     ],
     hdrs = ["src/emulator.h"],

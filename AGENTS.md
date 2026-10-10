@@ -59,9 +59,10 @@ requires rewriting the computation, use GoogleSQL. A guardable boundary differen
 override the GoogleSQL category, including for SIN and EXP. When an overload fits both categories,
 or neither clearly, use GoogleSQL.
 
-`src/translator/functions.cc` registers each function under one of these spellings; its rules may
-still spell overloads with different backends, such as a DuckDB function for STRING and
-GoogleSQL's for BYTES:
+`src/translator/functions.cc` assembles the registry; `functions_template.cc`,
+`functions_backend.cc` and `functions_aggregate.cc` hold the rule tables. Each function is
+registered under one of these spellings; its rules may still spell overloads with different
+backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 
 - **As is** (`PlainFunctions`) or **renamed** (`FunctionNames`): a DuckDB function with the same
   semantics.

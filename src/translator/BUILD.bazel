@@ -60,6 +60,11 @@ cc_library(
     name = "functions",
     srcs = [
         "functions.cc",
+        "functions_aggregate.cc",
+        "functions_backend.cc",
+        "functions_internal.cc",
+        "functions_internal.h",
+        "functions_template.cc",
         "handlers.cc",
         "rules.cc",
     ],
@@ -105,7 +110,15 @@ cc_library(
 
 cc_library(
     name = "ddl",
-    srcs = ["ddl.cc"],
+    srcs = [
+        "ddl.cc",
+        "ddl_internal.h",
+        "ddl_options.cc",
+        "ddl_routine.cc",
+        "ddl_schema.cc",
+        "ddl_table.cc",
+        "ddl_view.cc",
+    ],
     hdrs = ["ddl.h"],
     copts = ["-std=c++20"],
     implementation_deps = [

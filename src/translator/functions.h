@@ -1,7 +1,7 @@
 #pragma once
 
 // The registry of the BigQuery functions the translator supports. Each function is declared once,
-// in src/translator/functions.cc, with how it is implemented.
+// in the functions_*.cc rule tables or functions.cc, with how it is implemented.
 
 #include <cstddef>
 #include <cstdint>
