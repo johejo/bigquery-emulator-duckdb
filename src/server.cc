@@ -109,8 +109,11 @@ class Server::Impl {
       std::vector<std::string> accepted;
       httplib::Server::Handler handler;
     };
-    const auto route = std::make_shared<const CheckedRoute>(
-        CheckedRoute{std::move(method), std::move(accepted), handler});
+    const auto route = std::make_shared<const CheckedRoute>(CheckedRoute{
+        .method = std::move(method),
+        .accepted = std::move(accepted),
+        .handler = handler,
+    });
     const httplib::Server::Handler checked = [route, this](const httplib::Request& request,
                                                            httplib::Response& response) {
       try {
@@ -220,7 +223,7 @@ class Server::Impl {
             return StartResumableUpload(project, ParseBody(request), response);
           }
           if (IsMultipartUpload(request)) {
-            MediaUpload upload = ParseMultipartUpload(request);
+            MediaUpload const upload = ParseMultipartUpload(request);
             return RunUploadedLoad(ParseLoadInsert(project, upload.metadata), upload.content);
           }
           return std::visit([this](const auto& job) { return JobResource(*Run(job)); },
@@ -372,8 +375,9 @@ class Server::Impl {
               throw ApiError::Invalid("The emulator does not support conditional routine updates");
             }
             const RoutineReference reference = RoutineFromPath(request);
-            Routine routine =
-                ParseRoutine({reference.project_id, reference.dataset_id}, ParseBody(request));
+            Routine routine = ParseRoutine(
+                {.project_id = reference.project_id, .dataset_id = reference.dataset_id},
+                ParseBody(request));
             if (routine.reference.routine_id != reference.routine_id) {
               throw ApiError::Invalid("Routine reference does not match the request path");
             }
@@ -441,7 +445,7 @@ class Server::Impl {
     LoadRequest request = ParseLoadInsert(project, metadata);
     std::string id;
     {
-      std::scoped_lock lock(uploads_mutex_);
+      std::scoped_lock const lock(uploads_mutex_);
       id = std::to_string(next_upload_id_++);
       uploads_.emplace(id, std::move(request));
     }
@@ -454,7 +458,7 @@ class Server::Impl {
   LoadRequest TakeResumableUpload(const httplib::Request& request) {
     const std::string project = emulator_.ResolveProject(Param(request, "projectId"));
     const std::string id = Param(request, "upload");
-    std::scoped_lock lock(uploads_mutex_);
+    std::scoped_lock const lock(uploads_mutex_);
     const auto it = uploads_.find(id);
     if (it == uploads_.end() || it->second.project_id != project) {
       throw ApiError::NotFound("Upload session not found");

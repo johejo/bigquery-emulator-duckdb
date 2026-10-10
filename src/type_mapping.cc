@@ -351,8 +351,12 @@ absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
 }
 
 bool HasInterval(const googlesql::Type* type) {
-  if (type->IsInterval()) return true;
-  if (type->IsArray()) return HasInterval(type->AsArray()->element_type());
+  if (type->IsInterval()) {
+    return true;
+  }
+  if (type->IsArray()) {
+    return HasInterval(type->AsArray()->element_type());
+  }
   if (type->IsStruct()) {
     return std::ranges::any_of(type->AsStruct()->fields(),
                                [](const auto& field) { return HasInterval(field.type); });
@@ -361,8 +365,12 @@ bool HasInterval(const googlesql::Type* type) {
 }
 
 bool HasRange(const googlesql::Type* type) {
-  if (type->IsRange()) return true;
-  if (type->IsArray()) return HasRange(type->AsArray()->element_type());
+  if (type->IsRange()) {
+    return true;
+  }
+  if (type->IsArray()) {
+    return HasRange(type->AsArray()->element_type());
+  }
   if (type->IsStruct()) {
     return std::ranges::any_of(type->AsStruct()->fields(),
                                [](const auto& field) { return HasRange(field.type); });

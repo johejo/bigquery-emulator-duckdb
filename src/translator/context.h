@@ -90,8 +90,10 @@ struct Relation {
   // and emit ORDER BY there too, rather than relying on order surviving a subquery.
   std::vector<std::string> ordering = {};
 
-  std::string From() const { return " FROM (" + sql + ") AS q"; }
-  std::string Order() const { return ordering.empty() ? "" : " ORDER BY " + Join(ordering, ", "); }
+  [[nodiscard]] std::string From() const { return " FROM (" + sql + ") AS q"; }
+  [[nodiscard]] std::string Order() const {
+    return ordering.empty() ? "" : " ORDER BY " + Join(ordering, ", ");
+  }
 };
 
 }  // namespace bigquery_emulator_duckdb::translator

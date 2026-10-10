@@ -99,7 +99,9 @@ namespace {
 // Literal CASTs disappear during resolution. Check the source AST so unsupported interval
 // casts cannot become supported merely because GoogleSQL folded them into values.
 absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
-  if (ToUpperAscii(sql).find("INTERVAL") == std::string::npos) return absl::OkStatus();
+  if (ToUpperAscii(sql).find("INTERVAL") == std::string::npos) {
+    return absl::OkStatus();
+  }
   std::unique_ptr<googlesql::ParserOutput> parsed;
   const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
   GOOGLESQL_RETURN_IF_ERROR(expression ? googlesql::ParseExpression(sql, options, &parsed)
@@ -122,7 +124,9 @@ absl::Status CheckIntervalCasts(std::string_view sql, bool expression) {
             "literals");
       }
     }
-    for (int i = 0; i < node->num_children(); ++i) nodes.push_back(node->child(i));
+    for (int i = 0; i < node->num_children(); ++i) {
+      nodes.push_back(node->child(i));
+    }
   }
   return absl::OkStatus();
 }
@@ -249,7 +253,7 @@ absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(const AnalyzerS
 absl::StatusOr<googlesql::TypeWithParameters> AnalyzeScriptType(
     const googlesql::ScriptSegment& segment, googlesql::Catalog& catalog,
     googlesql::TypeFactory& type_factory, const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(googlesql::AnalyzerOptions options,
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
                              AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   googlesql::TypeWithParameters type;
   googlesql::TypeModifiers modifiers;
@@ -264,7 +268,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
                                                       googlesql::Catalog& catalog,
                                                       googlesql::TypeFactory& type_factory,
                                                       const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(googlesql::AnalyzerOptions options,
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
                              AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
@@ -282,7 +286,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
                                                        googlesql::TypeFactory& type_factory,
                                                        const AnalyzerSettings& settings) {
   GOOGLESQL_ASSIGN_OR_RETURN(
-      googlesql::AnalyzerOptions options,
+      const googlesql::AnalyzerOptions options,
       AnalyzerOptions(settings, segment != nullptr ? googlesql::ERROR_MESSAGE_WITH_PAYLOAD
                                                    : googlesql::ERROR_MESSAGE_ONE_LINE));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;

@@ -41,7 +41,7 @@ ObjectUri ParseUri(const std::string& uri) {
   if (uri.substr(5, slash - 5).find('*') != std::string::npos) {
     throw ApiError::Invalid("Wildcard is not allowed in a bucket name: " + uri);
   }
-  return {uri.substr(5, slash - 5), uri.substr(slash + 1)};
+  return {.bucket = uri.substr(5, slash - 5), .object = uri.substr(slash + 1)};
 }
 
 struct Endpoint {
@@ -53,15 +53,23 @@ Endpoint EndpointFromEnvironment() {
   // The SDK reads these itself and lets them override any configured endpoint, so they take
   // precedence here too.
   for (const char* name : {"CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
-    if (const char* value = std::getenv(name)) return {value, true};
+    if (const char* value = std::getenv(name)) {
+      return {.url = value, .emulator = true};
+    }
   }
   const char* host = std::getenv("STORAGE_EMULATOR_HOST");
-  if (host == nullptr || *host == '\0') return {"https://storage.googleapis.com", false};
+  if (host == nullptr || *host == '\0') {
+    return {.url = "https://storage.googleapis.com", .emulator = false};
+  }
   std::string url = host;
-  while (!url.empty() && url.back() == '/') url.pop_back();
+  while (!url.empty() && url.back() == '/') {
+    url.pop_back();
+  }
   // Like the Google client libraries, accept a bare "host:port" as an HTTP endpoint.
-  if (url.find("://") == std::string::npos) url = "http://" + url;
-  return {url, true};
+  if (url.find("://") == std::string::npos) {
+    url = "http://" + url;
+  }
+  return {.url = url, .emulator = true};
 }
 
 }  // namespace
@@ -86,10 +94,14 @@ struct GcsClient::Impl {
   // anonymous access otherwise. Without a credentials file ADC falls back to the metadata
   // server, so the check waits for the first download rather than delaying startup.
   storage::Client& client() {
-    if (emulator) return anonymous;
+    if (emulator) {
+      return anonymous;
+    }
     std::call_once(select_credentials, [this] {
       auto credentials = cloud::MakeGoogleDefaultCredentials();
-      if (!cloud::oauth2::MakeAccessTokenGenerator(*credentials)->GetToken()) return;
+      if (!cloud::oauth2::MakeAccessTokenGenerator(*credentials)->GetToken()) {
+        return;
+      }
       adc.emplace(
           cloud::Options(options).set<cloud::UnifiedCredentialsOption>(std::move(credentials)));
     });
@@ -118,7 +130,9 @@ const std::string& GcsClient::endpoint() const {
 }
 
 std::vector<std::string> GcsClient::Expand(const std::string& uri) {
-  if (FindGcsWildcard(uri) == std::string::npos) return {uri};
+  if (FindGcsWildcard(uri) == std::string::npos) {
+    return {uri};
+  }
   const auto [bucket, object] = ParseUri(uri);
   const size_t wildcard = object.find('*');
   const std::string prefix = object.substr(0, wildcard);
@@ -139,11 +153,15 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
     const std::string& name = entry->name();
     if (name.size() >= prefix.size() + suffix.size() && name.starts_with(prefix) &&
         name.ends_with(suffix)) {
-      if (filename_pattern && name.find('/', prefix.size()) != std::string::npos) continue;
+      if (filename_pattern && name.find('/', prefix.size()) != std::string::npos) {
+        continue;
+      }
       matches.push_back(bucket_uri + name);
     }
   }
-  if (matches.empty()) throw ApiError::Invalid("No GCS objects match: " + uri);
+  if (matches.empty()) {
+    throw ApiError::Invalid("No GCS objects match: " + uri);
+  }
   std::ranges::sort(matches);
   return matches;
 }

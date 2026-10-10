@@ -50,7 +50,7 @@ void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& 
   server.Stop();
 }
 
-int Run(int argc, char** argv) {
+int Run(int argc, char* const* argv) {
   bigquery_emulator_duckdb::ServerOptions options;
   std::string data_dir;
   std::optional<std::string> session_user;

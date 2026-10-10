@@ -40,8 +40,8 @@ void MakeInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
 // Resolved literals already carry validated components; this also validates the physical value.
 void IntervalParts(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
-    GOOGLESQL_ASSIGN_OR_RETURN(auto value, googlesql::IntervalValue::FromMonthsDaysMicros(
-                                               args.Int(0), args.Int(1), args.Int(2)));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, googlesql::IntervalValue::FromMonthsDaysMicros(
+                                                     args.Int(0), args.Int(1), args.Int(2)));
     return IntervalToDuckDb(value);
   });
 }
@@ -52,7 +52,7 @@ void IntervalConstructor(duckdb_function_info info, duckdb_data_chunk input, duc
     if (!googlesql::functions::DateTimestampPart_Parse(args.String(1), &part)) {
       return absl::InvalidArgumentError("Unsupported INTERVAL date part");
     }
-    GOOGLESQL_ASSIGN_OR_RETURN(auto value,
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value,
                                googlesql::IntervalValue::FromInteger(args.Int(0), part, false));
     return IntervalToDuckDb(value);
   });
@@ -61,15 +61,15 @@ void IntervalConstructor(duckdb_function_info info, duckdb_data_chunk input, duc
 template <auto Justify>
 void JustifyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
-    GOOGLESQL_ASSIGN_OR_RETURN(auto value, ReadInterval(args));
-    GOOGLESQL_ASSIGN_OR_RETURN(auto result, Justify(value));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result, Justify(value));
     return IntervalToDuckDb(result);
   });
 }
 
 void IntervalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::string> {
-    GOOGLESQL_ASSIGN_OR_RETURN(auto value, ReadInterval(args));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
     return value.ToString();
   });
 }

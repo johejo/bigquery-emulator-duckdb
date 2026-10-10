@@ -39,7 +39,12 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
   if (dynamic_cast<const SqlTable*>(table.table()) != nullptr) {
     return Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
   }
-  Target target{QuoteIdentifierPath(table.table()->FullName()), {}, {}, {}};
+  Target target{
+      .table = QuoteIdentifierPath(table.table()->FullName()),
+      .names = {},
+      .columns = {},
+      .column_types = {},
+  };
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
     if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
@@ -211,8 +216,8 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
     }
     names.push_back(name->second);
   }
-  std::string sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
-                    Join(names, ", ") + ") ";
+  std::string const sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
+                          Join(names, ", ") + ") ";
   if (insert.query() != nullptr) {
     const auto relation = Scan(*insert.query(), scope);
     if (!relation) {

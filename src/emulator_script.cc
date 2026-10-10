@@ -74,11 +74,13 @@ class RowIterator : public googlesql::EvaluatorTableIterator {
               std::vector<std::vector<googlesql::Value>> rows)
       : names_(std::move(names)), types_(std::move(types)), rows_(std::move(rows)) {}
 
-  int NumColumns() const override { return static_cast<int>(names_.size()); }
-  std::string GetColumnName(int i) const override { return names_.at(i); }
-  const googlesql::Type* GetColumnType(int i) const override { return types_.at(i); }
+  [[nodiscard]] int NumColumns() const override { return static_cast<int>(names_.size()); }
+  [[nodiscard]] std::string GetColumnName(int i) const override { return names_.at(i); }
+  [[nodiscard]] const googlesql::Type* GetColumnType(int i) const override { return types_.at(i); }
   bool NextRow() override { return ++next_ <= rows_.size(); }
-  const googlesql::Value& GetValue(int i) const override { return rows_.at(next_ - 1).at(i); }
+  [[nodiscard]] const googlesql::Value& GetValue(int i) const override {
+    return rows_.at(next_ - 1).at(i);
+  }
   absl::Status Status() const override { return absl::OkStatus(); }
   absl::Status Cancel() override { return absl::OkStatus(); }
 
@@ -212,7 +214,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       std::vector<std::string> names;
       std::vector<const googlesql::Type*> types;
       GOOGLESQL_ASSIGN_OR_RETURN(
-          QueryResult result,
+          const QueryResult result,
           RunStatement(executor, segment, true,
                        [&](const googlesql::ResolvedStatement& statement) -> absl::Status {
                          if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
@@ -479,12 +481,22 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                              googlesql::FunctionOptions(), create.function_expression(),
                              create.argument_name_list()));
       functions_.AddOwnedFunction(std::move(function));
-      definitions_.push_back({std::move(catalog), std::move(analyzed), nullptr, nullptr});
+      definitions_.push_back({
+          .catalog = std::move(catalog),
+          .analyzed = std::move(analyzed),
+          .functions = nullptr,
+          .body_catalog = nullptr,
+      });
       return absl::OkStatus();
     }
     // An ANY TYPE argument defers resolving the body to each call. Resolve it as a typed body
     // is resolved, without the script's variables or functions defined later, itself included.
-    FunctionDefinition definition{std::move(catalog), std::move(analyzed), nullptr, nullptr};
+    FunctionDefinition definition{
+        .catalog = std::move(catalog),
+        .analyzed = std::move(analyzed),
+        .functions = nullptr,
+        .body_catalog = nullptr,
+    };
     definition.functions = std::make_unique<googlesql::SimpleCatalog>("functions", &type_factory_);
     for (const googlesql::Function* function : functions_.functions()) {
       definition.functions->AddFunction(function);
@@ -617,10 +629,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const std::optional<TranslatedStatement> translation =
         TranslateStatement(analyzed.statement(), parameters,
                            DefaultDataset{
-                               settings.default_project,
-                               settings.default_dataset,
-                               catalog.temporary.get(),
-                               emulator_.has_session_user_,
+                               .project = settings.default_project,
+                               .dataset = settings.default_dataset,
+                               .temporary = catalog.temporary.get(),
+                               .has_session_user = emulator_.has_session_user_,
                            },
                            &unsupported, &executor.GetKnownSystemVariables());
     if (!translation.has_value()) {
@@ -641,17 +653,17 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
-    GOOGLESQL_ASSIGN_OR_RETURN(AnalyzerResult analyzed,
+    GOOGLESQL_ASSIGN_OR_RETURN(const AnalyzerResult analyzed,
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));
     std::string unsupported;
     const std::optional<std::string> query =
         TranslateExpression(analyzed.expression(), parameters,
                             DefaultDataset{
-                                settings.default_project,
-                                settings.default_dataset,
-                                catalog.temporary.get(),
-                                emulator_.has_session_user_,
+                                .project = settings.default_project,
+                                .dataset = settings.default_dataset,
+                                .temporary = catalog.temporary.get(),
+                                .has_session_user = emulator_.has_session_user_,
                             },
                             &unsupported, &executor.GetKnownSystemVariables());
     if (!query.has_value()) {

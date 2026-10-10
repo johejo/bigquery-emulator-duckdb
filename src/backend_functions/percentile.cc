@@ -172,13 +172,13 @@ void PercentileDiscPosition(duckdb_function_info info, duckdb_data_chunk input,
 }  // namespace
 
 void RegisterPercentileFunctions(duckdb_connection connection) {
-  LogicalType float64(duckdb_create_logical_type(kDouble));
-  LogicalType float64_list(duckdb_create_list_type(float64.get()));
-  LogicalType numeric(duckdb_create_decimal_type(38, 9));
-  LogicalType numeric_list(duckdb_create_list_type(numeric.get()));
-  LogicalType int64(duckdb_create_logical_type(kBigint));
-  LogicalType varchar(duckdb_create_logical_type(kVarchar));
-  LogicalType varchar_list(duckdb_create_list_type(varchar.get()));
+  LogicalType const float64(duckdb_create_logical_type(kDouble));
+  LogicalType const float64_list(duckdb_create_list_type(float64.get()));
+  LogicalType const numeric(duckdb_create_decimal_type(38, 9));
+  LogicalType const numeric_list(duckdb_create_list_type(numeric.get()));
+  LogicalType const int64(duckdb_create_logical_type(kBigint));
+  LogicalType const varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType const varchar_list(duckdb_create_list_type(varchar.get()));
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
   // constructor.
   using Types = std::vector<duckdb_logical_type>;

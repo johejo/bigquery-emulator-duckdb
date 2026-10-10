@@ -49,10 +49,14 @@ TEST_F(ServerTest, AcceptsBurstOfConnections) {
       httplib::Client client(server_->root_url());
       start.arrive_and_wait();
       const httplib::Result result = client.Get("/bigquery/v2/projects/p/datasets");
-      if (!result || result->status != 200) ++failures;
+      if (!result || result->status != 200) {
+        ++failures;
+      }
     });
   }
-  for (std::thread& client : clients) client.join();
+  for (std::thread& client : clients) {
+    client.join();
+  }
   EXPECT_EQ(failures, 0);
 }
 

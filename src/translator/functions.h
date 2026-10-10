@@ -43,7 +43,9 @@ struct ScalarCall {
   std::vector<FunctionArgument> arguments = {};
   bool safe = false;
 
-  std::string Raise(std::string_view message) const { return translator::Raise(message, safe); }
+  [[nodiscard]] std::string Raise(std::string_view message) const {
+    return translator::Raise(message, safe);
+  }
 };
 
 // Translates a call that templates cannot express, or returns nullopt when it is unsupported.

@@ -117,7 +117,7 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       }
       break;
     case DUCKDB_TYPE_LIST: {
-      LogicalType child(duckdb_list_type_child_type(type));
+      LogicalType const child(duckdb_list_type_child_type(type));
       const auto element = GoogleSqlTypeOf(child.get(), factory, names, next_name);
       if (!element.ok()) {
         return element.status();
@@ -131,7 +131,7 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
     case DUCKDB_TYPE_STRUCT: {
       std::vector<googlesql::StructField> fields;
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
-        LogicalType child(duckdb_struct_type_child_type(type, i));
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
         const std::string& name = names.at(next_name++);
         const auto field = GoogleSqlTypeOf(child.get(), factory, names, next_name);
         if (!field.ok()) {
@@ -218,7 +218,7 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
       return googlesql::Value::Json(*std::move(json));
     }
     case googlesql::TYPE_ARRAY: {
-      LogicalType child_type(duckdb_list_type_child_type(duck_type));
+      LogicalType const child_type(duckdb_list_type_child_type(duck_type));
       const auto entry = VectorElement<duckdb_list_entry>(vector, row);
       duckdb_vector child = duckdb_list_vector_get_child(vector);
       std::vector<googlesql::Value> elements;
@@ -235,7 +235,7 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
     case googlesql::TYPE_STRUCT: {
       std::vector<googlesql::Value> fields;
       for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
-        LogicalType child_type(duckdb_struct_type_child_type(duck_type, i));
+        LogicalType const child_type(duckdb_struct_type_child_type(duck_type, i));
         auto field = ValueOf(duckdb_struct_vector_get_child(vector, i), child_type.get(),
                              type->AsStruct()->field(i).type, row);
         if (!field.ok()) {
@@ -272,7 +272,8 @@ class AnyArguments {
         duck_types_.push_back(std::move(type));
       }
       size_t next_name = 0;
-      auto googlesql_type = GoogleSqlTypeOf(duck_types_.back().get(), factory_, names, next_name);
+      auto const googlesql_type =
+          GoogleSqlTypeOf(duck_types_.back().get(), factory_, names, next_name);
       if (!googlesql_type.ok()) {
         status_ = googlesql_type.status();
       }
@@ -539,6 +540,8 @@ void JsonExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
           [](const Arguments& arguments) -> absl::StatusOr<std::optional<Result>> {
             const std::string path = arguments.String(1);
             const bool standard = arguments.Bool(2);
+            // Assigned in the kJson branch, which const-correctness does not see.
+            // NOLINTNEXTLINE(misc-const-correctness)
             std::optional<googlesql::JSONValue> document;
             if constexpr (kJson) {
               auto parsed = ParseJson(arguments.String(0));
@@ -883,8 +886,8 @@ void RegisterJsonFunctions(duckdb_connection connection) {
   Register(connection, "bq_json_array", {}, kVarchar, JsonArray, /*nulls=*/false, kAny);
   Register(connection, "bq_json_object", {}, kVarchar, JsonObject, /*nulls=*/false, kAny);
   {
-    LogicalType varchar(duckdb_create_logical_type(kVarchar));
-    LogicalType list(duckdb_create_list_type(varchar.get()));
+    LogicalType const varchar(duckdb_create_logical_type(kVarchar));
+    LogicalType const list(duckdb_create_list_type(varchar.get()));
     Register(connection, "bq_json_flatten", {kVarchar}, list.get(), JsonFlatten);
     for (const auto& [name, function, array] :
          std::initializer_list<std::tuple<const char*, duckdb_scalar_function_t, bool>>{

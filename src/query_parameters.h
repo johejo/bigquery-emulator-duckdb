@@ -27,18 +27,20 @@ class QueryParameters {
   // has a type the emulator does not support.
   static QueryParameters Parse(const nlohmann::json& parameters);
 
-  bool empty() const { return by_name_.empty() && by_position_.empty(); }
+  [[nodiscard]] bool empty() const { return by_name_.empty() && by_position_.empty(); }
 
   // The literal for `@name` and for the `position`-th `?` (1-based). Both throw ApiError when
   // the query uses a parameter the request did not declare.
-  const std::string& ByName(const std::string& name) const;
-  const std::string& ByPosition(int position) const;
+  [[nodiscard]] const std::string& ByName(const std::string& name) const;
+  [[nodiscard]] const std::string& ByPosition(int position) const;
 
   // The declared types, in TableFieldSchema form: the named parameters with their names, in
   // request order, and the positional ones in position order. An ARRAY parameter is its
   // element type with mode REPEATED.
-  const std::vector<FieldSchema>& named_types() const { return named_types_; }
-  const std::vector<FieldSchema>& positional_types() const { return positional_types_; }
+  [[nodiscard]] const std::vector<FieldSchema>& named_types() const { return named_types_; }
+  [[nodiscard]] const std::vector<FieldSchema>& positional_types() const {
+    return positional_types_;
+  }
 
  private:
   std::unordered_map<std::string, std::string> by_name_;  // Keyed by the lower-cased name.

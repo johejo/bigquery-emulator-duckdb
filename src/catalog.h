@@ -87,7 +87,7 @@ class SqlTable : public googlesql::SimpleTable {
   SqlTable(const std::string& name, std::string sql)
       : googlesql::SimpleTable(name), sql_(std::move(sql)) {}
 
-  const std::string& sql() const { return sql_; }
+  [[nodiscard]] const std::string& sql() const { return sql_; }
 
  private:
   std::string sql_;
@@ -101,10 +101,12 @@ class BigQueryTable : public googlesql::SimpleTable {
   BigQueryTable(TableSource& source, std::vector<std::string> path)
       : googlesql::SimpleTable(path.back()), source_(source), path_(std::move(path)) {}
 
-  std::optional<TableDescription> Describe() const {
+  [[nodiscard]] std::optional<TableDescription> Describe() const {
     return source_.DescribeTable(path_.at(0), path_.at(1), path_.at(2));
   }
-  TableReference reference() const { return {path_.at(0), path_.at(1), path_.at(2)}; }
+  [[nodiscard]] TableReference reference() const {
+    return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
+  }
 
  private:
   TableSource& source_;
@@ -158,15 +160,15 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
                   const TemporaryTables* temporary = nullptr);
   ~BigQueryCatalog() override;
 
-  std::string FullName() const override { return "bigquery"; }
+  [[nodiscard]] std::string FullName() const override { return "bigquery"; }
 
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override;
 
  protected:
-  TableSource& source() const { return source_; }
-  googlesql::TypeFactory* type_factory() const { return type_factory_; }
-  const std::string& default_project() const { return default_project_; }
+  [[nodiscard]] TableSource& source() const { return source_; }
+  [[nodiscard]] googlesql::TypeFactory* type_factory() const { return type_factory_; }
+  [[nodiscard]] const std::string& default_project() const { return default_project_; }
 
  private:
   TableSource& source_;

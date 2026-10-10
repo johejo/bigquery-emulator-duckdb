@@ -110,13 +110,13 @@ void Distance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
   googlesql::TypeFactory factory;
   const googlesql::ArrayType* array = types::DoubleArrayType();
   duckdb_vector vector = duckdb_data_chunk_get_vector(input, 0);
-  LogicalType list_type(duckdb_vector_get_column_type(vector));
-  LogicalType element(duckdb_list_type_child_type(list_type.get()));
+  LogicalType const list_type(duckdb_vector_get_column_type(vector));
+  LogicalType const element(duckdb_list_type_child_type(list_type.get()));
   if (duckdb_get_type_id(element.get()) == DUCKDB_TYPE_STRUCT) {
-    LogicalType key(duckdb_struct_type_child_type(element.get(), 0));
+    LogicalType const key(duckdb_struct_type_child_type(element.get(), 0));
     const bool string_key = duckdb_get_type_id(key.get()) == kVarchar;
     const googlesql::StructType* structure = nullptr;
-    absl::Status status = factory.MakeStructType(
+    absl::Status const status = factory.MakeStructType(
         {{"", string_key ? types::StringType() : types::Int64Type()}, {"", types::DoubleType()}},
         &structure);
     if (!status.ok()) {
@@ -269,7 +269,7 @@ void ParseNumeric(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix) {
   namespace fn = googlesql::functions;
-  LogicalType type(duckdb_create_decimal_type(38, Decimal<T>::kScale));
+  LogicalType const type(duckdb_create_decimal_type(38, Decimal<T>::kScale));
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", DecimalMath<T, fn::Sqrt<T>>},
@@ -280,7 +280,7 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
        }) {
     Register(connection, (name + suffix).c_str(), {type.get()}, type.get(), function);
   }
-  LogicalType list(duckdb_create_list_type(type.get()));
+  LogicalType const list(duckdb_create_list_type(type.get()));
   Register(connection, "bq_generate_array_numeric", {type.get(), type.get(), type.get()},
            list.get(), GenerateArray<T>);
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
@@ -325,8 +325,8 @@ void RegisterMathFunctions(duckdb_connection connection) {
   }
   Register(connection, "bq_pow", {kDouble, kDouble}, kDouble, Math2<fn::Pow<double>>);
   Register(connection, "bq_log", {kDouble, kDouble}, kDouble, Math2<fn::Logarithm<double>>);
-  LogicalType float64(duckdb_create_logical_type(kDouble));
-  LogicalType list(duckdb_create_list_type(float64.get()));
+  LogicalType const float64(duckdb_create_logical_type(kDouble));
+  LogicalType const list(duckdb_create_list_type(float64.get()));
   Register(connection, "bq_generate_array", {kDouble, kDouble, kDouble}, list.get(),
            GenerateArray<double>);
   RegisterDecimalMath<googlesql::NumericValue>(connection, "_numeric");

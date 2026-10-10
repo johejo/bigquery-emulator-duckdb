@@ -69,7 +69,8 @@ class TranslatorTest : public ::testing::Test {
                                                const QueryParameters& parameters = {},
                                                const AnalyzerSettings& settings = {}) {
     const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
-    return TranslateStatement(analyzed.statement(), parameters, DefaultDataset{"p", "ds"});
+    return TranslateStatement(analyzed.statement(), parameters,
+                              DefaultDataset{.project = "p", .dataset = "ds"});
   }
 
   std::optional<std::string> Translate(const std::string& sql,
@@ -82,7 +83,8 @@ class TranslatorTest : public ::testing::Test {
   std::string Unsupported(const std::string& sql) {
     const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, {});
     std::string reason;
-    if (TranslateStatement(analyzed.statement(), {}, DefaultDataset{"p", "ds"}, &reason)
+    if (TranslateStatement(analyzed.statement(), {},
+                           DefaultDataset{.project = "p", .dataset = "ds"}, &reason)
             .has_value()) {
       throw std::runtime_error("Unexpected translation: " + sql);
     }
@@ -93,8 +95,8 @@ class TranslatorTest : public ::testing::Test {
                       const AnalyzerSettings& settings = {}) {
     const auto analyzed = AnalyzeGoogleSql(sql, catalog_, types_, settings);
     std::string reason;
-    const auto translated =
-        TranslateStatement(analyzed.statement(), parameters, DefaultDataset{"p", "ds"}, &reason);
+    const auto translated = TranslateStatement(
+        analyzed.statement(), parameters, DefaultDataset{.project = "p", .dataset = "ds"}, &reason);
     if (!translated) {
       throw std::runtime_error("Unexpected unsupported construct (" + reason + "): " + sql);
     }

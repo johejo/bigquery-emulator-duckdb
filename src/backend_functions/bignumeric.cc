@@ -456,7 +456,8 @@ bool CastFromPrecisionScale(duckdb_function_info /*info*/, idx_t count, duckdb_v
 void RegisterCast(duckdb_connection connection, duckdb_logical_type source,
                   duckdb_logical_type target, duckdb_cast_function_t function,
                   std::optional<PrecisionScale> parameters, int64_t implicit_cost) {
-  Handle<duckdb_cast_function, duckdb_destroy_cast_function> cast(duckdb_create_cast_function());
+  Handle<duckdb_cast_function, duckdb_destroy_cast_function> const cast(
+      duckdb_create_cast_function());
   duckdb_cast_function_set_source_type(cast.get(), source);
   duckdb_cast_function_set_target_type(cast.get(), target);
   duckdb_cast_function_set_function(cast.get(), function);
@@ -478,17 +479,17 @@ void RegisterCast(duckdb_connection connection, duckdb_logical_type source,
 // BIGNUMERIC(P, S) reads as a BIGNUM wherever DuckDB expects one; the translator casts columns
 // to BIGNUM, since DuckDB has no cast between two of these types.
 void RegisterBigNumericTypes(duckdb_connection connection) {
-  LogicalType bignum(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
-  LogicalType varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType const bignum(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
+  LogicalType const varchar(duckdb_create_logical_type(kVarchar));
   for (int64_t scale = 0; scale <= BigNumericValue::kMaxFractionalDigits; ++scale) {
     // DDL allows from 1, or the scale if greater, to 38 more digits than the scale.
     for (int64_t precision = std::max<int64_t>(1, scale); precision <= 38 + scale; ++precision) {
-      LogicalType type(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
+      LogicalType const type(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
       duckdb_logical_type_set_alias(type.get(), BigNumericTypeName(precision, scale).c_str());
       if (duckdb_register_logical_type(connection, type.get(), nullptr) == DuckDBError) {
         throw BackendError("DuckDB failed to register BIGNUMERIC(P, S)");
       }
-      const PrecisionScale parameters{precision, scale};
+      const PrecisionScale parameters{.precision = precision, .scale = scale};
       RegisterCast(connection, bignum.get(), type.get(), CastToPrecisionScale<false>, parameters,
                    -1);
       RegisterCast(connection, varchar.get(), type.get(), CastToPrecisionScale<true>, parameters,
@@ -549,9 +550,9 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
   Register(connection, "bq_bignumeric_log", {kVarchar, kVarchar}, kVarchar,
            Operator<fn::Logarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
-  LogicalType varchar(duckdb_create_logical_type(kVarchar));
-  LogicalType list(duckdb_create_list_type(varchar.get()));
-  LogicalType float64(duckdb_create_logical_type(kDouble));
+  LogicalType const varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType const list(duckdb_create_list_type(varchar.get()));
+  LogicalType const float64(duckdb_create_logical_type(kDouble));
   Register(connection, "bq_bignumeric_avg", {list.get()}, varchar.get(), Average);
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{

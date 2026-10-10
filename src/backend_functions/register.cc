@@ -14,14 +14,14 @@ void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
               bool volatile_result) {
-  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
+  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), name);
   for (duckdb_logical_type parameter : parameters) {
     duckdb_scalar_function_add_parameter(scalar.get(), parameter);
   }
   if (varargs) {
-    LogicalType type(duckdb_create_logical_type(*varargs));
+    LogicalType const type(duckdb_create_logical_type(*varargs));
     duckdb_scalar_function_set_varargs(scalar.get(), type.get());
   }
   duckdb_scalar_function_set_return_type(scalar.get(), result);
@@ -57,7 +57,7 @@ void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_type>& parameters, duckdb_type result,
               duckdb_scalar_function_t function, bool nulls, std::optional<duckdb_type> varargs,
               bool volatile_result) {
-  LogicalType type(duckdb_create_logical_type(result));
+  LogicalType const type(duckdb_create_logical_type(result));
   Register(connection, name, parameters, type.get(), function, nulls, varargs, volatile_result);
 }
 

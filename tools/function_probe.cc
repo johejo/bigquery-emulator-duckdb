@@ -238,7 +238,10 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
             ? std::optional("[" + element + "]")
             : Sample(argument);
     if (!sample) {
-      return Probe{Outcome::kUntested, "no sample for " + argument.DebugString()};
+      return Probe{
+          .outcome = Outcome::kUntested,
+          .detail = "no sample for " + argument.DebugString(),
+      };
     }
     element_used = element_used || argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1;
     arguments.push_back(*sample);
@@ -405,7 +408,8 @@ int Main(int argc, char** argv) {
         }
       }
     } else {
-      probes.push_back({Outcome::kUnsupported, "the analyzer does not know this function"});
+      probes.push_back(
+          {.outcome = Outcome::kUnsupported, .detail = "the analyzer does not know this function"});
     }
     if (list_signatures || probes.empty()) {
       continue;

@@ -70,17 +70,23 @@ SchemaSelection ParseSchemaSelection(const std::vector<FieldSchema>& schema,
   while (true) {
     const auto comma = remaining.find(',');
     SelectSchemaField(schema, remaining.substr(0, comma), selection);
-    if (comma == std::string_view::npos) break;
+    if (comma == std::string_view::npos) {
+      break;
+    }
     remaining.remove_prefix(comma + 1);
   }
   return selection;
 }
 
 json ProjectResource(const json& resource, const ResourceMask& mask) {
-  if (mask.all) return resource;
+  if (mask.all) {
+    return resource;
+  }
   json result = json::object();
   for (const auto& [name, child] : mask.fields) {
-    if (resource.contains(name)) result[name] = ProjectResource(resource[name], child);
+    if (resource.contains(name)) {
+      result[name] = ProjectResource(resource[name], child);
+    }
   }
   return result;
 }
@@ -207,7 +213,9 @@ json JobStatistics(const Job& job) {
     // A finished extract writes one file per destination URI.
     json counts = json::array();
     if (!job.error.has_value()) {
-      for (size_t i = 0; i < extract->destination_uris.size(); ++i) counts.push_back("1");
+      for (size_t i = 0; i < extract->destination_uris.size(); ++i) {
+        counts.push_back("1");
+      }
     }
     statistics["extract"] = {{"destinationUriFileCounts", std::move(counts)}};
     return statistics;
@@ -246,7 +254,9 @@ json JobStatistics(const Job& job) {
 // The configuration a job resource reports, with the defaults the request left out filled in.
 json JobConfiguration(const Job& job) {
   const auto complete = [&job](TableReference table) {
-    if (table.project_id.empty()) table.project_id = job.project_id;
+    if (table.project_id.empty()) {
+      table.project_id = job.project_id;
+    }
     return TableReferenceJson(table);
   };
   if (const auto* copy = std::get_if<CopyJob>(&job.configuration)) {
@@ -478,8 +488,12 @@ json ProjectList(const std::vector<Project>& projects, const ListPage& page) {
           {"id", project.project_id},
           {"projectReference", {{"projectId", project.project_id}}},
       };
-      if (project.numeric_id) entry["numericId"] = *project.numeric_id;
-      if (project.friendly_name) entry["friendlyName"] = *project.friendly_name;
+      if (project.numeric_id) {
+        entry["numericId"] = *project.numeric_id;
+      }
+      if (project.friendly_name) {
+        entry["friendlyName"] = *project.friendly_name;
+      }
       response["projects"].push_back(std::move(entry));
     }
   }
@@ -508,7 +522,10 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
     json item{
         {"kind", "bigquery#dataset"},
         {"id", project_id + ":" + entry.dataset_id},
-        {"datasetReference", DatasetReferenceJson({project_id, entry.dataset_id})},
+        {
+            "datasetReference",
+            DatasetReferenceJson({.project_id = project_id, .dataset_id = entry.dataset_id}),
+        },
         {"location", kLocation},
     };
     // A list entry carries the metadata but the description.
@@ -563,7 +580,11 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   json entries = json::array();
   for (const TableListEntry& entry :
        ListPageItems(tables, page, &TableListEntry::table_id, response)) {
-    const TableReference table{dataset.project_id, dataset.dataset_id, entry.table_id};
+    const TableReference table{
+        .project_id = dataset.project_id,
+        .dataset_id = dataset.dataset_id,
+        .table_id = entry.table_id,
+    };
     json item{
         {"kind", "bigquery#table"},
         {"id", TableId(table)},

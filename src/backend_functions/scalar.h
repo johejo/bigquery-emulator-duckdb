@@ -115,8 +115,8 @@ inline void SetResult(duckdb_vector output, idx_t row, double value) {
 // A DECIMAL(38, s) as its 128-bit integer of units of 10^-s.
 inline void SetResult(duckdb_vector output, idx_t row, __int128 value) {
   static_cast<duckdb_hugeint*>(duckdb_vector_get_data(output))[row] = {
-      static_cast<uint64_t>(value),
-      static_cast<int64_t>(static_cast<unsigned __int128>(value) >> 64U),
+      .lower = static_cast<uint64_t>(value),
+      .upper = static_cast<int64_t>(static_cast<unsigned __int128>(value) >> 64U),
   };
 }
 

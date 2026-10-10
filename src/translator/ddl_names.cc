@@ -23,7 +23,8 @@ std::optional<std::string> TargetTable(const std::vector<std::string>& path, con
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
-  scope.context.ddl_target_table = TableReference{parts.at(0), parts.at(1), parts.at(2)};
+  scope.context.ddl_target_table =
+      TableReference{.project_id = parts.at(0), .dataset_id = parts.at(1), .table_id = parts.at(2)};
   return QualifiedName(*scope.context.ddl_target_table);
 }
 
@@ -37,7 +38,8 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
-  scope.context.ddl_target_dataset = DatasetReference{parts.at(0), parts.at(1)};
+  scope.context.ddl_target_dataset =
+      DatasetReference{.project_id = parts.at(0), .dataset_id = parts.at(1)};
   return QualifiedName(*scope.context.ddl_target_dataset);
 }
 

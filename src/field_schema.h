@@ -57,7 +57,7 @@ struct FieldSchema {
   std::string default_value_expression = {};
   std::vector<std::string> policy_tags = {};  // policyTags.names.
 
-  nlohmann::json ToJson() const;
+  [[nodiscard]] nlohmann::json ToJson() const;
 };
 
 // Parses a TableFieldSchema object. Throws ApiError::Invalid for a field BigQuery would reject.

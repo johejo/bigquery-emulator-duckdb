@@ -50,16 +50,16 @@ struct TableMetadata {
   std::vector<std::string> clustering;  // Clustering.fields.
   std::optional<CloneDefinition> clone;
 
-  bool empty() const {
+  [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
            clustering.empty() && !clone.has_value();
   }
-  bool partitioned() const {
+  [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
   }
 
   // The fields of a Table resource that it sets.
-  nlohmann::json ToJson() const;
+  [[nodiscard]] nlohmann::json ToJson() const;
 };
 
 // What a dataset carries besides its reference: Dataset.description, friendlyName and labels. The
@@ -69,10 +69,12 @@ struct DatasetMetadata {
   std::string friendly_name;
   std::map<std::string, std::string> labels;
 
-  bool empty() const { return description.empty() && friendly_name.empty() && labels.empty(); }
+  [[nodiscard]] bool empty() const {
+    return description.empty() && friendly_name.empty() && labels.empty();
+  }
 
   // The fields of a Dataset resource that it sets.
-  nlohmann::json ToJson() const;
+  [[nodiscard]] nlohmann::json ToJson() const;
 };
 
 // The metadata of the Table resource `table`; a field it leaves out or sets to null is unset,

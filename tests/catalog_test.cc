@@ -37,7 +37,7 @@ class FakeTableSource : public TableSource {
                                                     const std::string& dataset,
                                                     const std::string& table) override {
     ++lookups;
-    auto it = tables_.find({project, dataset, table});
+    auto const it = tables_.find({project, dataset, table});
     if (it == tables_.end()) {
       return std::nullopt;
     }

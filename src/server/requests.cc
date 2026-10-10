@@ -44,18 +44,24 @@ int64_t QueryParamInt(const httplib::Request& request, const char* name, int64_t
 
 // The string `object[key]`, or "" when it is missing.
 std::string StringField(const json& object, const char* key, std::string_view what) {
-  if (!object.contains(key)) return "";
-  if (!object[key].is_string()) throw ApiError::Invalid("Invalid " + std::string(what));
+  if (!object.contains(key)) {
+    return "";
+  }
+  if (!object[key].is_string()) {
+    throw ApiError::Invalid("Invalid " + std::string(what));
+  }
   return object[key].get<std::string>();
 }
 
 // Reads a TableReference, whose project defaults to the job's. `what` names it in errors.
 TableReference ParseTableReference(const json& table, std::string_view what) {
-  if (!table.is_object()) throw ApiError::Invalid("Invalid " + std::string(what));
+  if (!table.is_object()) {
+    throw ApiError::Invalid("Invalid " + std::string(what));
+  }
   TableReference result{
-      StringField(table, "projectId", what),
-      StringField(table, "datasetId", what),
-      StringField(table, "tableId", what),
+      .project_id = StringField(table, "projectId", what),
+      .dataset_id = StringField(table, "datasetId", what),
+      .table_id = StringField(table, "tableId", what),
   };
   if (result.dataset_id.empty() || result.table_id.empty()) {
     throw ApiError::Invalid("Invalid " + std::string(what));
@@ -68,10 +74,12 @@ std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
     return std::nullopt;
   }
   const json& dataset = config["defaultDataset"];
-  if (!dataset.is_object()) throw ApiError::Invalid("Invalid default dataset");
+  if (!dataset.is_object()) {
+    throw ApiError::Invalid("Invalid default dataset");
+  }
   return DatasetReference{
-      StringField(dataset, "projectId", "default dataset"),
-      StringField(dataset, "datasetId", "default dataset"),
+      .project_id = StringField(dataset, "projectId", "default dataset"),
+      .dataset_id = StringField(dataset, "datasetId", "default dataset"),
   };
 }
 
@@ -101,20 +109,26 @@ void ParseDispositions(const json& config, T& job) {
   if (config.contains("createDisposition")) {
     const std::string name = StringField(config, "createDisposition", "create disposition");
     const std::optional<CreateDisposition> disposition = ParseCreateDisposition(name);
-    if (!disposition.has_value()) throw ApiError::Invalid("Invalid create disposition: " + name);
+    if (!disposition.has_value()) {
+      throw ApiError::Invalid("Invalid create disposition: " + name);
+    }
     job.create_disposition = *disposition;
   }
   if (config.contains("writeDisposition")) {
     const std::string name = StringField(config, "writeDisposition", "write disposition");
     const std::optional<WriteDisposition> disposition = ParseWriteDisposition(name);
-    if (!disposition.has_value()) throw ApiError::Invalid("Invalid write disposition: " + name);
+    if (!disposition.has_value()) {
+      throw ApiError::Invalid("Invalid write disposition: " + name);
+    }
     job.write_disposition = *disposition;
   }
 }
 
 std::string JobId(const json& body) {
   const json reference = body.value("jobReference", json::object());
-  if (!reference.is_object()) throw ApiError::Invalid("Invalid job reference");
+  if (!reference.is_object()) {
+    throw ApiError::Invalid("Invalid job reference");
+  }
   return StringField(reference, "jobId", "job ID");
 }
 
@@ -131,14 +145,18 @@ void RejectDestinationLayout(const json& config) {
 
 json Configuration(const json& body) {
   const json config = body.value("configuration", json::object());
-  if (!config.is_object()) throw ApiError::Invalid("Invalid job configuration");
+  if (!config.is_object()) {
+    throw ApiError::Invalid("Invalid job configuration");
+  }
   return config;
 }
 
 QueryRequest ParseQueryJob(const std::string& project_id, const json& body) {
   const json config = Configuration(body);
   const json& query = config["query"];
-  if (!query.is_object()) throw ApiError::Invalid("Invalid query configuration");
+  if (!query.is_object()) {
+    throw ApiError::Invalid("Invalid query configuration");
+  }
   QueryRequest request = ParseQueryConfiguration(project_id, query);
   request.job_id = JobId(body);
   request.dry_run = config.value("dryRun", false);
@@ -206,11 +224,15 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
 ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) {
   const json config = Configuration(body);
   const json& extract = config["extract"];
-  if (!extract.is_object()) throw ApiError::Invalid("Invalid extract configuration");
+  if (!extract.is_object()) {
+    throw ApiError::Invalid("Invalid extract configuration");
+  }
   if (extract.contains("sourceModel")) {
     throw ApiError::Invalid("The emulator does not support extracting models");
   }
-  if (!extract.contains("sourceTable")) throw ApiError::Invalid("Source table is required");
+  if (!extract.contains("sourceTable")) {
+    throw ApiError::Invalid("Source table is required");
+  }
   ExtractRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);
@@ -219,7 +241,9 @@ ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) 
   const json uris = extract.contains("destinationUris")
                         ? extract["destinationUris"]
                         : json::array({extract.value("destinationUri", json())});
-  if (!uris.is_array() || uris.empty()) throw ApiError::Invalid("destinationUris is required");
+  if (!uris.is_array() || uris.empty()) {
+    throw ApiError::Invalid("destinationUris is required");
+  }
   for (const json& uri : uris) {
     if (!uri.is_string() || uri.get<std::string>().empty()) {
       throw ApiError::Invalid("Invalid destination URI");
@@ -241,22 +265,25 @@ bool QueryParamBool(const httplib::Request& request, const char* name) {
 }
 
 DatasetReference DatasetFromPath(const httplib::Request& request) {
-  return DatasetReference{Param(request, "projectId"), Param(request, "datasetId")};
+  return DatasetReference{
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+  };
 }
 
 TableReference TableFromPath(const httplib::Request& request) {
   return TableReference{
-      Param(request, "projectId"),
-      Param(request, "datasetId"),
-      Param(request, "tableId"),
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+      .table_id = Param(request, "tableId"),
   };
 }
 
 RoutineReference RoutineFromPath(const httplib::Request& request) {
   return RoutineReference{
-      Param(request, "projectId"),
-      Param(request, "datasetId"),
-      Param(request, "routineId"),
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+      .routine_id = Param(request, "routineId"),
   };
 }
 
@@ -285,7 +312,9 @@ bool IsMultipartUpload(const httplib::Request& request) {
 MediaUpload ParseMultipartUpload(const httplib::Request& request) {
   const std::string content_type = request.get_header_value("Content-Type");
   const size_t boundary_position = content_type.find("boundary=");
-  if (boundary_position == std::string::npos) throw ApiError::Invalid("Missing upload boundary");
+  if (boundary_position == std::string::npos) {
+    throw ApiError::Invalid("Missing upload boundary");
+  }
   std::string boundary = content_type.substr(boundary_position + 9);
   if (const size_t semicolon = boundary.find(';'); semicolon != std::string::npos) {
     boundary.resize(semicolon);
@@ -298,18 +327,28 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
   size_t start = request.body.find(delimiter);
   while (start != std::string::npos) {
     start += delimiter.size();
-    if (request.body.compare(start, 2, "--") == 0) break;
-    if (request.body.compare(start, 2, "\r\n") == 0) start += 2;
+    if (request.body.compare(start, 2, "--") == 0) {
+      break;
+    }
+    if (request.body.compare(start, 2, "\r\n") == 0) {
+      start += 2;
+    }
     const size_t next = request.body.find("\r\n" + delimiter, start);
-    if (next == std::string::npos) break;
+    if (next == std::string::npos) {
+      break;
+    }
     const size_t content = request.body.find("\r\n\r\n", start);
-    if (content == std::string::npos || content > next) break;
+    if (content == std::string::npos || content > next) {
+      break;
+    }
     parts.push_back(request.body.substr(content + 4, next - content - 4));
     start = next + 2;
   }
-  if (parts.size() != 2) throw ApiError::Invalid("Invalid multipart upload");
+  if (parts.size() != 2) {
+    throw ApiError::Invalid("Invalid multipart upload");
+  }
   try {
-    return {json::parse(parts.at(0)), std::move(parts.at(1))};
+    return {.metadata = json::parse(parts.at(0)), .content = std::move(parts.at(1))};
   } catch (const json::exception& error) {
     throw ApiError::Invalid(std::string("Invalid upload metadata: ") + error.what());
   }
@@ -357,7 +396,9 @@ JobRequest ParseJobInsert(const std::string& project_id, const json& body) {
 
 LoadRequest ParseLoadInsert(const std::string& project_id, const json& body) {
   const json config = Configuration(body);
-  if (!config.contains("load")) throw ApiError::Invalid("Media upload requires a load job");
+  if (!config.contains("load")) {
+    throw ApiError::Invalid("Media upload requires a load job");
+  }
   return ParseLoadJob(project_id, body);
 }
 
@@ -387,7 +428,9 @@ ListPage ParseListPage(const httplib::Request& request) {
       .max_results = QueryParamInt(request, "maxResults", INT64_MAX),
       .page_token = request.get_param_value("pageToken"),
   };
-  if (result.max_results <= 0) throw ApiError::Invalid("Invalid value for maxResults");
+  if (result.max_results <= 0) {
+    throw ApiError::Invalid("Invalid value for maxResults");
+  }
   return result;
 }
 
@@ -466,7 +509,9 @@ RoutineListRequest ParseRoutineList(const httplib::Request& request) {
       schema = &Discovery()["schemas"][field["$ref"].get<std::string>()];
       path.remove_prefix(dot + 1);
     }
-    if (comma == std::string_view::npos) break;
+    if (comma == std::string_view::npos) {
+      break;
+    }
     remaining.remove_prefix(comma + 1);
   }
   return result;
@@ -481,13 +526,19 @@ TableGetRequest ParseTableGet(const httplib::Request& request) {
 }
 
 DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const json& body) {
-  if (!body.is_object()) throw ApiError::Invalid("Invalid dataset resource");
+  if (!body.is_object()) {
+    throw ApiError::Invalid("Invalid dataset resource");
+  }
   const json reference = body.value("datasetReference", json::object());
   if (!reference.is_object() || !reference.contains("datasetId")) {
     throw ApiError::Invalid("Required parameter is missing: datasetId");
   }
   return {
-      .dataset = DatasetReference{project_id, StringField(reference, "datasetId", "dataset ID")},
+      .dataset =
+          DatasetReference{
+              .project_id = project_id,
+              .dataset_id = StringField(reference, "datasetId", "dataset ID"),
+          },
       .metadata = DatasetMetadataFromJson(body),
   };
 }
@@ -499,9 +550,9 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   }
   TableInsertRequest request;
   request.table = TableReference{
-      dataset.project_id,
-      dataset.dataset_id,
-      StringField(reference, "tableId", "table ID"),
+      .project_id = dataset.project_id,
+      .dataset_id = dataset.dataset_id,
+      .table_id = StringField(reference, "tableId", "table ID"),
   };
   if (body.contains("view")) {
     request.view = body["view"];
@@ -513,16 +564,22 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
 }
 
 Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
-  if (!body.is_object()) throw ApiError::Invalid("Invalid routine resource");
+  if (!body.is_object()) {
+    throw ApiError::Invalid("Invalid routine resource");
+  }
   const json reference = body.value("routineReference", json::object());
-  if (!reference.is_object()) throw ApiError::Invalid("Invalid routine reference");
+  if (!reference.is_object()) {
+    throw ApiError::Invalid("Invalid routine reference");
+  }
   for (const auto& [name, value] : reference.items()) {
     if (name != "projectId" && name != "datasetId" && name != "routineId") {
       throw ApiError::Invalid("Invalid routine reference field: " + name);
     }
   }
   const std::string id = StringField(reference, "routineId", "routine ID");
-  if (id.empty()) throw ApiError::Invalid("Required parameter is missing: routineId");
+  if (id.empty()) {
+    throw ApiError::Invalid("Required parameter is missing: routineId");
+  }
   if (StringField(reference, "projectId", "project ID") != dataset.project_id ||
       StringField(reference, "datasetId", "dataset ID") != dataset.dataset_id) {
     throw ApiError::Invalid("Routine reference does not match the request path");
@@ -551,9 +608,15 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   if (StringField(resource, "definitionBody", "routine body").empty()) {
     throw ApiError::Invalid("Required parameter is missing: definitionBody");
   }
-  if (resource.contains("description")) StringField(resource, "description", "routine description");
-  if (!resource.contains("arguments")) resource["arguments"] = json::array();
-  if (!resource["arguments"].is_array()) throw ApiError::Invalid("Invalid routine arguments");
+  if (resource.contains("description")) {
+    StringField(resource, "description", "routine description");
+  }
+  if (!resource.contains("arguments")) {
+    resource["arguments"] = json::array();
+  }
+  if (!resource["arguments"].is_array()) {
+    throw ApiError::Invalid("Invalid routine arguments");
+  }
   for (const json& argument : resource["arguments"]) {
     if (!argument.is_object() || StringField(argument, "name", "argument name").empty()) {
       throw ApiError::Invalid("Invalid routine argument");
@@ -572,19 +635,28 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
     }
   }
   return {
-      .reference = {dataset.project_id, dataset.dataset_id, id},
+      .reference =
+          {
+              .project_id = dataset.project_id,
+              .dataset_id = dataset.dataset_id,
+              .routine_id = id,
+          },
       .resource = std::move(resource),
   };
 }
 
 TableUpdateRequest ParseTableUpdate(const json& body) {
-  if (!body.is_object()) throw ApiError::Invalid("Invalid table resource");
+  if (!body.is_object()) {
+    throw ApiError::Invalid("Invalid table resource");
+  }
   TableUpdateRequest request;
   if (body.contains("schema") && !body["schema"].is_null()) {
     request.schema = SchemaFromJson(body["schema"]);
   }
   if (body.contains("view") && !body["view"].is_null()) {
-    if (!body["view"].is_object()) throw ApiError::Invalid("Invalid view definition");
+    if (!body["view"].is_object()) {
+      throw ApiError::Invalid("Invalid view definition");
+    }
     request.view = body["view"];
   }
   return request;

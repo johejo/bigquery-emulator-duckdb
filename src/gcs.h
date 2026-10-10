@@ -29,7 +29,7 @@ class GcsClient {
   ~GcsClient();
 
   // The Storage API endpoint downloads read from.
-  const std::string& endpoint() const;
+  [[nodiscard]] const std::string& endpoint() const;
 
   // Expands one object-name wildcard; exact URIs do not require listing permission.
   // Throws ApiError for malformed patterns, listing failures, or no matches.

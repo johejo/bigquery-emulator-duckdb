@@ -37,12 +37,16 @@ constexpr std::string_view kUnsupported = "The emulator does not support ";
 
 template <typename T>
 T Checked(absl::StatusOr<T> value) {
-  if (!value.ok()) throw ApiError::Invalid(std::string(value.status().message()));
+  if (!value.ok()) {
+    throw ApiError::Invalid(std::string(value.status().message()));
+  }
   return *std::move(value);
 }
 
 void Check(const absl::Status& status) {
-  if (!status.ok()) throw ApiError::Invalid(std::string(status.message()));
+  if (!status.ok()) {
+    throw ApiError::Invalid(std::string(status.message()));
+  }
 }
 
 // The text CAST(value AS STRING) gives a scalar, or for TIMESTAMP the spelling BigQuery exports,
@@ -122,8 +126,12 @@ void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells,
   for (size_t i = 0; i < fields.size(); ++i) {
     const FieldSchema& field = fields.at(i);
     const json& value = cells.at(i).at("v");
-    if (value.is_null()) continue;
-    if (!first) out += ',';
+    if (value.is_null()) {
+      continue;
+    }
+    if (!first) {
+      out += ',';
+    }
     first = false;
     out += googlesql::JSONValue(field.name).GetConstRef().ToString();
     out += ':';
@@ -133,7 +141,9 @@ void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells,
     }
     out += '[';
     for (size_t j = 0; j < value.size(); ++j) {
-      if (j > 0) out += ',';
+      if (j > 0) {
+        out += ',';
+      }
       AppendJsonValue(field, value[j].at("v"), out);
     }
     out += ']';
@@ -167,14 +177,20 @@ void WriteFile(const std::string& path, std::string_view contents, bool gzip) {
   if (!gzip) {
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-    if (!output) throw ApiError::Invalid("Could not write " + path);
+    if (!output) {
+      throw ApiError::Invalid("Could not write " + path);
+    }
     return;
   }
   gzFile output = gzopen(path.c_str(), "wb");
-  if (output == nullptr) throw ApiError::Invalid("Could not write " + path);
+  if (output == nullptr) {
+    throw ApiError::Invalid("Could not write " + path);
+  }
   const bool written = contents.empty() ||
                        gzwrite(output, contents.data(), static_cast<unsigned>(contents.size())) > 0;
-  if (gzclose(output) != Z_OK || !written) throw ApiError::Invalid("Could not write " + path);
+  if (gzclose(output) != Z_OK || !written) {
+    throw ApiError::Invalid("Could not write " + path);
+  }
 }
 
 // A copy of `field` whose DuckDB type is the one Parquet export writes it as, except that a
@@ -195,7 +211,9 @@ FieldSchema ParquetField(FieldSchema field) {
       field.type = FieldType::kString;
       break;
     case FieldType::kRecord:
-      for (FieldSchema& child : field.fields) child = ParquetField(std::move(child));
+      for (FieldSchema& child : field.fields) {
+        child = ParquetField(std::move(child));
+      }
       break;
     default:
       break;
@@ -230,7 +248,9 @@ bool HasBigNumeric(const FieldSchema& field) {
 // DECIMAL(76, 38), which AnnotateParquetBigNumerics then declares in the footer. A lambda takes
 // the name _e and its `depth`.
 std::string ParquetValue(const std::string& sql, const FieldSchema& field, int depth) {
-  if (!HasBigNumeric(field)) return std::format("CAST({} AS {})", sql, ParquetType(field));
+  if (!HasBigNumeric(field)) {
+    return std::format("CAST({} AS {})", sql, ParquetType(field));
+  }
   if (field.mode == FieldMode::kRepeated) {
     FieldSchema element = field;
     element.mode = FieldMode::kNullable;
@@ -272,10 +292,10 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
     element.SetField(pq::kElementLogicalType,
                      ThriftValue::Struct({
                          {
-                             pq::kLogicalDecimal,
-                             ThriftValue::Struct({
-                                 {pq::kDecimalScale, ThriftValue::Int32(38)},
-                                 {pq::kDecimalPrecision, ThriftValue::Int32(76)},
+                             .id = pq::kLogicalDecimal,
+                             .value = ThriftValue::Struct({
+                                 {.id = pq::kDecimalScale, .value = ThriftValue::Int32(38)},
+                                 {.id = pq::kDecimalPrecision, .value = ThriftValue::Int32(76)},
                              }),
                          },
                      }));
@@ -306,7 +326,9 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
     const std::string& delimiter = options.field_delimiter;
     if (options.print_header) {
       for (size_t i = 0; i < schema.size(); ++i) {
-        if (i > 0) contents += delimiter;
+        if (i > 0) {
+          contents += delimiter;
+        }
         AppendCsvField(schema.at(i).name, delimiter, contents);
       }
       contents += '\n';
@@ -314,7 +336,9 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
     for (const json& row : rows) {
       const json& cells = row.at("f");
       for (size_t i = 0; i < schema.size(); ++i) {
-        if (i > 0) contents += delimiter;
+        if (i > 0) {
+          contents += delimiter;
+        }
         const json& value = cells.at(i).at("v");
         if (!value.is_null()) {
           AppendCsvField(ScalarText(schema.at(i), value.get<std::string>()), delimiter, contents);
@@ -330,14 +354,18 @@ std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema) {
   std::string columns;
   for (const FieldSchema& field : schema) {
     const std::string name = QuoteIdentifier(field.name);
-    if (!columns.empty()) columns += ", ";
+    if (!columns.empty()) {
+      columns += ", ";
+    }
     columns += std::format("{} AS {}", ParquetValue(name, ParquetField(field), 0), name);
   }
   return columns;
 }
 
 void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema) {
-  if (std::ranges::none_of(schema, HasBigNumeric)) return;
+  if (std::ranges::none_of(schema, HasBigNumeric)) {
+    return;
+  }
   ThriftValue metadata = ReadParquetMetadata(path);
   const ParquetColumn columns = ParquetColumns(metadata);
   std::vector<ThriftValue>& elements = metadata.Field(parquet::kSchema)->elements;
@@ -352,8 +380,12 @@ void AnnotateParquetBigNumerics(const std::string& path, const std::vector<Field
   size_t leaf = 0;
   for (size_t i = 0; i < elements.size(); ++i) {
     const ThriftValue* children = elements.at(i).Field(parquet::kElementChildren);
-    if (children != nullptr && children->integer > 0) continue;
-    if (std::ranges::find(leaves, i) != leaves.end()) chunks.push_back(leaf);
+    if (children != nullptr && children->integer > 0) {
+      continue;
+    }
+    if (std::ranges::find(leaves, i) != leaves.end()) {
+      chunks.push_back(leaf);
+    }
     ++leaf;
   }
   if (ThriftValue* groups = metadata.Field(parquet::kRowGroups)) {

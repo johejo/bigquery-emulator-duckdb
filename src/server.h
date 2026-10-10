@@ -28,9 +28,9 @@ class Server {
   bool Serve();
   void Stop();
 
-  int port() const { return port_; }
+  [[nodiscard]] int port() const { return port_; }
   // The URL clients should use as the API root, e.g. http://127.0.0.1:9050
-  std::string root_url() const;
+  [[nodiscard]] std::string root_url() const;
 
  private:
   class Impl;

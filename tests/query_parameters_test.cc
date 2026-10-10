@@ -89,7 +89,7 @@ TEST(QueryParametersTest, NumbersParametersWithoutANameByPosition) {
       {"parameterType": {"type": "INT64"}, "parameterValue": {"value": "2"}}])");
   EXPECT_EQ(parameters.ByPosition(1), "CAST('1' AS BIGINT)");
   EXPECT_EQ(parameters.ByPosition(2), "CAST('2' AS BIGINT)");
-  EXPECT_THROW(parameters.ByPosition(3), ApiError);
+  EXPECT_THROW(static_cast<void>(parameters.ByPosition(3)), ApiError);
 }
 
 TEST(QueryParametersTest, KeepsTheDeclaredTypes) {
@@ -121,8 +121,8 @@ TEST(QueryParametersTest, KeepsTheDeclaredTypes) {
 TEST(QueryParametersTest, ReportsUndeclaredParameters) {
   const QueryParameters parameters;
   EXPECT_TRUE(parameters.empty());
-  EXPECT_THROW(parameters.ByName("missing"), ApiError);
-  EXPECT_THROW(parameters.ByPosition(1), ApiError);
+  EXPECT_THROW(static_cast<void>(parameters.ByName("missing")), ApiError);
+  EXPECT_THROW(static_cast<void>(parameters.ByPosition(1)), ApiError);
 }
 
 TEST(QueryParametersTest, RejectsMalformedParameters) {

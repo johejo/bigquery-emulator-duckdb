@@ -76,7 +76,9 @@ std::string_view DispositionName(WriteDisposition disposition) {
 std::optional<CreateDisposition> ParseCreateDisposition(std::string_view name) {
   for (const CreateDisposition disposition :
        {CreateDisposition::kCreateIfNeeded, CreateDisposition::kCreateNever}) {
-    if (DispositionName(disposition) == name) return disposition;
+    if (DispositionName(disposition) == name) {
+      return disposition;
+    }
   }
   return std::nullopt;
 }
@@ -88,7 +90,9 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
            WriteDisposition::kWriteTruncate,
            WriteDisposition::kWriteTruncateData,
        }) {
-    if (DispositionName(disposition) == name) return disposition;
+    if (DispositionName(disposition) == name) {
+      return disposition;
+    }
   }
   return std::nullopt;
 }
@@ -97,7 +101,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
                                             const std::function<void(Job&)>& body) {
   job->creation_time_ms = NowMillis();
   {
-    std::scoped_lock lock(mutex_);
+    std::scoped_lock const lock(mutex_);
     if (job->job_id.empty()) {
       while (job->job_id.empty() || jobs_.contains(JobKey(job->project_id, job->job_id)) ||
              running_jobs_.contains(JobKey(job->project_id, job->job_id))) {
@@ -126,7 +130,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
   if (job->dry_run()) {
     return job;
   }
-  std::scoped_lock lock(mutex_);
+  std::scoped_lock const lock(mutex_);
   const std::string key = JobKey(job->project_id, job->job_id);
   running_jobs_.erase(key);
   jobs_[key] = job;
@@ -156,11 +160,15 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty()) {
       TableReference destination = load.destination_table;
-      if (destination.project_id.empty()) destination.project_id = job.project_id;
+      if (destination.project_id.empty()) {
+        destination.project_id = job.project_id;
+      }
       try {
         requested_schema = GetTable(destination).schema;
       } catch (const ApiError& error) {
-        if (error.http_status() != 404) throw;
+        if (error.http_status() != 404) {
+          throw;
+        }
       }
     }
     ParquetColumn parquet;
@@ -210,11 +218,15 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       }
     }
 
-    if (copy.source_tables.empty()) throw ApiError::Invalid("Source table is required");
+    if (copy.source_tables.empty()) {
+      throw ApiError::Invalid("Source table is required");
+    }
     std::vector<FieldSchema> schema;
     std::string sql;
     for (TableReference source : copy.source_tables) {
-      if (source.project_id.empty()) source.project_id = job.project_id;
+      if (source.project_id.empty()) {
+        source.project_id = job.project_id;
+      }
       source.project_id = ResolveProject(source.project_id);
       const TableInfo table = GetTable(source);
       if (table.view_query) {
@@ -252,7 +264,9 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     const json& config = extract.configuration;
     const std::string format = config.value("destinationFormat", "CSV");
     const std::string compression = config.value("compression", "NONE");
-    if (format == "AVRO") throw ApiError::Invalid("The emulator does not support Avro extracts");
+    if (format == "AVRO") {
+      throw ApiError::Invalid("The emulator does not support Avro extracts");
+    }
     if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
       throw ApiError::Invalid("Unsupported destination format: " + format);
     }
@@ -282,10 +296,14 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     }
 
     TableReference source = extract.source_table;
-    if (source.project_id.empty()) source.project_id = job.project_id;
+    if (source.project_id.empty()) {
+      source.project_id = job.project_id;
+    }
     source.project_id = ResolveProject(source.project_id);
     const TableInfo table = GetTable(source);
-    if (table.view_query) throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
+    if (table.view_query) {
+      throw ApiError::Invalid("Cannot extract a view: " + TableName(source));
+    }
     if (parquet) {
       Execute(std::format("COPY (SELECT {} FROM {}) TO {} (FORMAT parquet, COMPRESSION {})",
                           ParquetExtractColumns(table.schema), QualifiedName(source),
@@ -302,7 +320,9 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
                        },
                        path);
     }
-    if (uri.starts_with("gs://")) gcs_client_.Upload(path, uri);
+    if (uri.starts_with("gs://")) {
+      gcs_client_.Upload(path, uri);
+    }
     job.result = QueryResult{};
   });
 }
@@ -331,7 +351,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     destination.project_id = project_id;
   }
   destination.project_id = ResolveProject(destination.project_id);
-  GetDataset(DatasetReference{destination.project_id, destination.dataset_id});
+  GetDataset(
+      DatasetReference{.project_id = destination.project_id, .dataset_id = destination.dataset_id});
   std::optional<TableInfo> existing;
   try {
     existing = GetTable(destination);
@@ -399,7 +420,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
 
 std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock lock(mutex_);
+  std::scoped_lock const lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
   if (it == jobs_.end()) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
@@ -409,7 +430,7 @@ std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::s
 
 std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_id) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock lock(mutex_);
+  std::scoped_lock const lock(mutex_);
   std::vector<std::shared_ptr<const Job>> result;
   for (const auto& entry : jobs_) {
     const auto& job = entry.second;
@@ -428,7 +449,7 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_i
 
 void Emulator::DeleteJob(std::string project_id, const std::string& job_id) {
   project_id = ResolveProject(project_id);
-  std::scoped_lock lock(mutex_);
+  std::scoped_lock const lock(mutex_);
   if (jobs_.erase(JobKey(project_id, job_id)) == 0) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
   }

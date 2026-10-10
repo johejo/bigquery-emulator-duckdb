@@ -180,14 +180,15 @@ TEST_F(EmulatorTest, AliasesUnnestedElements) {
 }
 
 TEST_F(EmulatorTest, AnalyzesQueriesAgainstTheTablesInDuckDb) {
-  emulator_.CreateDataset({"test", "ds"});
-  emulator_.CreateTable({"test", "ds", "t"}, {
-                                                 {.name = "a", .type = FieldType::kInteger},
-                                                 {.name = "b", .type = FieldType::kString},
-                                             });
+  emulator_.CreateDataset({.project_id = "test", .dataset_id = "ds"});
+  emulator_.CreateTable({.project_id = "test", .dataset_id = "ds", .table_id = "t"},
+                        {
+                            {.name = "a", .type = FieldType::kInteger},
+                            {.name = "b", .type = FieldType::kString},
+                        });
   QueryRequest request;
   request.project_id = "test";
-  request.default_dataset = DatasetReference{"test", "ds"};
+  request.default_dataset = DatasetReference{.project_id = "test", .dataset_id = "ds"};
   request.query = "INSERT INTO t (a, b) VALUES (1, 'x'), (2, 'y')";
   ASSERT_FALSE(emulator_.RunQuery(request)->error.has_value());
   request.query = "SELECT SUM(a) FROM t";
@@ -230,11 +231,11 @@ TEST_F(EmulatorTest, TypesQueryParameters) {
 // A table the statement itself creates need not exist yet, and unqualified names in DDL go to
 // the default dataset the way they do in queries.
 TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
-  emulator_.CreateDataset({"test", "ddl"});
+  emulator_.CreateDataset({.project_id = "test", .dataset_id = "ddl"});
   EXPECT_EQ(ErrorStatus("CREATE TABLE ddl.t (a INT64)"), 0);
   QueryRequest request;
   request.project_id = "test";
-  request.default_dataset = DatasetReference{"test", "ddl"};
+  request.default_dataset = DatasetReference{.project_id = "test", .dataset_id = "ddl"};
   request.query = "CREATE TABLE u AS SELECT 'x' AS b";
   EXPECT_EQ(ErrorMessage(*emulator_.RunQuery(request)), "");
   request.query = "SELECT b FROM u";
@@ -253,8 +254,8 @@ TEST_F(EmulatorTest, RunsDdlAgainstTheDefaultDataset) {
 }
 
 TEST_F(EmulatorTest, WritesQueryResultsToADestinationTable) {
-  emulator_.CreateDataset({"test", "ds"});
-  const TableReference destination{"test", "ds", "dest"};
+  emulator_.CreateDataset({.project_id = "test", .dataset_id = "ds"});
+  const TableReference destination{.project_id = "test", .dataset_id = "ds", .table_id = "dest"};
   const auto write = [&](const std::string& sql, WriteDisposition write_disposition,
                          CreateDisposition create_disposition =
                              CreateDisposition::kCreateIfNeeded) {
@@ -353,9 +354,9 @@ TEST(EmulatorPersistenceTest, StoresEachProjectInItsOwnFile) {
   {
     Emulator emulator(data_dir.string(),
                       {{.project_id = "proj"}, {.project_id = "example.com:proj"}});
-    emulator.CreateDataset({"proj", "ds"});
+    emulator.CreateDataset({.project_id = "proj", .dataset_id = "ds"});
     // A domain-scoped id checks that ':' and '.' are encoded into a single file name.
-    emulator.CreateDataset({"example.com:proj", "scoped"});
+    emulator.CreateDataset({.project_id = "example.com:proj", .dataset_id = "scoped"});
   }
   EXPECT_TRUE(std::filesystem::exists(data_dir / "proj.duckdb"));
   EXPECT_TRUE(std::filesystem::exists(data_dir / "example%2Ecom%3Aproj.duckdb"));
@@ -374,12 +375,13 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
     backend.Execute("CREATE VIEW proj.ds.v AS SELECT 1 AS x");
   }
   Emulator emulator(data_dir.string(), {{.project_id = "proj"}});
-  const std::vector<TableListEntry> entries = emulator.ListTableEntries({"proj", "ds"});
+  const std::vector<TableListEntry> entries =
+      emulator.ListTableEntries({.project_id = "proj", .dataset_id = "ds"});
   ASSERT_EQ(entries.size(), 1);
   EXPECT_EQ(entries.at(0).table_id, "v");
   EXPECT_EQ(entries.at(0).type, TableType::kView);
   try {
-    emulator.GetTable({"proj", "ds", "v"});
+    emulator.GetTable({.project_id = "proj", .dataset_id = "ds", .table_id = "v"});
     ADD_FAILURE() << "GetTable succeeded";
   } catch (const ApiError& error) {
     EXPECT_EQ(error.http_status(), 400);
@@ -403,7 +405,7 @@ TEST(EmulatorPersistenceTest, HandlesViewsWithoutMetadata) {
   EXPECT_EQ(result.rows.at(0)["f"][0]["v"], "VIEW");
   EXPECT_EQ(result.rows.at(0)["f"][1]["v"], "true");
 
-  emulator.DeleteTable({"proj", "ds", "v"});
+  emulator.DeleteTable({.project_id = "proj", .dataset_id = "ds", .table_id = "v"});
   EXPECT_TRUE(emulator.ListTables({"proj", "ds"}).empty());
 }
 
