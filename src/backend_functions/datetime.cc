@@ -14,6 +14,7 @@
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/parse_date_time.h"
 #include "googlesql/public/functions/string_format.h"
+#include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/value.h"
 #include "src/backend_functions/register.h"
@@ -312,6 +313,16 @@ absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_
         return bignumeric.status();
       }
       return googlesql::Value::BigNumeric(*bignumeric);
+    }
+    case DUCKDB_TYPE_DECIMAL: {
+      if (null) {
+        return googlesql::Value::NullNumeric();
+      }
+      const auto numeric = googlesql::NumericValue::FromPackedInt(arguments.Decimal(column));
+      if (!numeric.ok()) {
+        return numeric.status();
+      }
+      return googlesql::Value::Numeric(*numeric);
     }
     default:
       return absl::UnimplementedError("Unsupported argument type for FORMAT");

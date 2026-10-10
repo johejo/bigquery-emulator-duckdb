@@ -8,7 +8,7 @@ namespace bigquery_emulator_duckdb {
 std::string ToUpperAscii(std::string_view text);
 std::string ToLowerAscii(std::string_view text);
 
-// '...' with the DuckDB escaping rules: a single quote is doubled and nothing else is special.
+// A DuckDB string expression: quotes are doubled; embedded NULs use UTF-8 decoding.
 std::string QuoteLiteral(std::string_view value);
 
 // "..." with the DuckDB escaping rules: a double quote is doubled.

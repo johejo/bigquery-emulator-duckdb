@@ -66,9 +66,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | array_functions | Supported | DuckDB SQL |  |
 | [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | string_functions | Supported | GoogleSQL function |  |
 | [`ASIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asin) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported | DuckDB function |  |
-| [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | DuckDB function |  |
-| [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | DuckDB function |  |
+| [`ASINH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#asinh) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`ATAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan) | mathematical_functions | Supported | GoogleSQL function |  |
+| [`ATAN2`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atan2) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`ATANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#atanh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | aggregate or analytic function AVG with INTERVAL |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
@@ -146,7 +146,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | NUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT; function FORMAT with INTERVAL; function FORMAT with RANGE; type STRUCT<> |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | GoogleSQL function |  |
@@ -409,7 +409,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | string_functions | Supported | GoogleSQL function | starts at the first character for a position of 0 or before the start |
 | [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | aggregate-dp-functions, aggregate_functions | Partial | DuckDB aggregate | aggregate or analytic function SUM with INTERVAL |
 | [`TAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tan) | mathematical_functions | Supported | GoogleSQL function |  |
-| [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported | DuckDB function |  |
+| [`TANH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#tanh) | mathematical_functions | Supported | GoogleSQL function |  |
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | text-analysis-functions | Unsupported |  | the analyzer does not know this function |
 | [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | time_functions | Supported | DuckDB SQL |  |

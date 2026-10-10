@@ -1,0 +1,77 @@
+# Expected values: GoogleSQL compliance functions_testlib_math_trig.cc,
+# and the special-value tables in BigQuery's mathematical function documentation.
+# UNNEST prevents constant folding by the analyzer. Integral special values are cast
+# to INT64 so their checks do not depend on the REST spelling of FLOAT64.
+
+SELECT CAST(ATAN(x) AS INT64) FROM UNNEST([0.0]) AS x
+=> "0"
+
+SELECT IS_NAN(ATAN(x)) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT ATAN(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(ATAN2(x, 0.0) AS INT64) FROM UNNEST([0.0]) AS x
+=> "0"
+
+SELECT CAST(ATAN2(x, CAST('inf' AS FLOAT64)) AS INT64) FROM UNNEST([1.0]) AS x
+=> "0"
+
+SELECT IS_NAN(ATAN2(x, 0.0)) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT IS_NAN(ATAN2(0.0, x)) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT ATAN2(x, 1.0) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT ATAN2(1.0, x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(ASINH(x) AS INT64) FROM UNNEST([0.0]) AS x
+=> "0"
+
+SELECT IS_INF(ASINH(x)) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT ASINH(x) < 0 FROM UNNEST([CAST('-inf' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT IS_NAN(ASINH(x)) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT ASINH(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(TANH(x) AS INT64) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "1"
+
+SELECT CAST(TANH(x) AS INT64) FROM UNNEST([CAST('-inf' AS FLOAT64)]) AS x
+=> "-1"
+
+SELECT IS_NAN(TANH(x)) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "true"
+
+SELECT TANH(x) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+# Round the documented pi-based results to avoid depending on JSON float spelling.
+SELECT CAST(ATAN(x) * 1000 AS INT64) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> "1571"
+
+SELECT CAST(ATAN(x) * 1000 AS INT64) FROM UNNEST([CAST('-inf' AS FLOAT64)]) AS x
+=> "-1571"
+
+SELECT CAST(ATAN2(x, -1.0) * 1000 AS INT64) FROM UNNEST([1.0]) AS x
+=> "2356"
+
+SELECT CAST(ASINH(x) * 1000 AS INT64) FROM UNNEST([1.7976931348623157e308]) AS x
+=> "710476"
+
+SELECT CAST(ASINH(x) * 1000 AS INT64) FROM UNNEST([-1.7976931348623157e308]) AS x
+=> "-710476"
+
+SELECT CAST(TANH(x) AS INT64) FROM UNNEST([NUMERIC '0']) AS x
+=> "0"

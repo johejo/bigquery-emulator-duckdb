@@ -212,6 +212,7 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                                 const googlesql::FunctionSignature& signature,
                                                 const std::string& element = "") {
   const bool json_mutator = name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT";
+  const bool format = name == "FORMAT";
   // A RANGE of `element` starts at it, and is unbounded where a second element would end it.
   const bool range = IsRangeSignature(signature);
   bool element_used = false;
@@ -224,9 +225,12 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
       continue;
     }
     const auto sample =
-        json_mutator && argument.type() != nullptr && argument.type()->IsString()
+        format && argument.type() != nullptr && argument.type()->IsString()
+            ? std::optional<std::string>("'%t'")
+        : json_mutator && argument.type() != nullptr && argument.type()->IsString()
             ? std::optional<std::string>(name == "JSON_ARRAY_INSERT" ? "'$[0]'" : "'$'")
-        : json_mutator && !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_ARBITRARY
+        : (json_mutator || format) && !element.empty() &&
+                argument.kind() == googlesql::ARG_KIND_EXPR_ARBITRARY
             ? std::optional(element)
         : range && !element.empty() && argument.kind() == googlesql::ARG_KIND_EXPR_RANGE_ANY_1
             ? std::optional("RANGE(" + element + ", NULL)")
@@ -339,10 +343,10 @@ int Main(int argc, char** argv) {
           continue;
         }
         std::vector<std::string> elements = {""};
-        // These mutators take independently typed values, including containers. Probe the
-        // supported JSON encoding types rather than declaring the arbitrary signature supported
-        // from INT64 alone. GeneratedQuery supplies valid paths for both operations.
-        if (name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT") {
+        // These functions take independently typed values, including containers. Probe their
+        // argument types rather than declaring the arbitrary signature supported from INT64
+        // alone. GeneratedQuery supplies valid paths or a format specifier.
+        if (name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT" || name == "FORMAT") {
           elements = {
               "2",
               "2.0",

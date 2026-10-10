@@ -96,6 +96,7 @@ cc_library(
         "//:duckdb_handle",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
