@@ -44,12 +44,9 @@ build:macos --features=-parse_headers
 build:macos --linkopt=-Wl,-no_warn_duplicate_libraries
 build:macos --host_linkopt=-Wl,-no_warn_duplicate_libraries
 
-# Keep this build setting shared so switching to the aspect preserves the analysis cache.
-build --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config
-
-# clang-tidy, run as a Bazel aspect so it sees the same toolchain flags as the build.
-build:clang-tidy --aspects=@bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
-build:clang-tidy --output_groups=report
+# clang-tidy uses the build's C++ toolchain and target parsing settings; see tools/clang_tidy/.
+build:clang-tidy --aspects=//tools/clang_tidy:clang_tidy.bzl%clang_tidy
+build:clang-tidy --output_groups=clang_tidy
 # Report every file's findings in one run instead of stopping at the first failure.
 build:clang-tidy --keep_going
 

@@ -41,6 +41,7 @@ cc_library(
         "//:type_mapping",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:constant",
         "@googlesql//googlesql/public:function",

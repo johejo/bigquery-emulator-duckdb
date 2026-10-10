@@ -67,7 +67,6 @@ CheckOptions:
   # JSON's subscript inserts missing object keys and grows arrays, just as map's inserts keys.
   # at() would change that behavior. Keep the standard map exclusions as well.
   cppcoreguidelines-pro-bounds-avoid-unchecked-container-access.ExcludeClasses: '::std::map;::std::unordered_map;::std::flat_map;::nlohmann::.*basic_json'
-# The aspect runner only prints clang-tidy's log when it exits non-zero, so findings
-# have to be errors to be visible at all.
+# Findings must fail the Bazel action rather than cache a successful lint result.
 WarningsAsErrors: '*'
 FormatStyle: file

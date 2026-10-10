@@ -1,0 +1,26 @@
+# `just fmt` formats and `just fmt-check` checks the files that git lists, minus ignored ones.
+# In these globs, * also matches /.
+
+[formatter.buildifier]
+command = "buildifier"
+includes = ["BUILD", "BUILD.bazel", "*/BUILD", "*/BUILD.bazel", "*.bzl", "MODULE.bazel"]
+
+[formatter.clang-format]
+command = "clang-format"
+options = ["-i"]
+includes = ["src/*.cc", "src/*.h", "tests/*.cc", "tests/*.h", "tools/*.cc", "tools/*.h"]
+
+[formatter.gofmt]
+command = "gofmt"
+options = ["-w"]
+includes = ["*.go"]
+
+[formatter.just]
+command = "just"
+options = ["--fmt", "--justfile"]
+includes = ["Justfile"]
+
+[formatter.tombi]
+command = "tombi"
+options = ["format"]
+includes = ["*.toml"]

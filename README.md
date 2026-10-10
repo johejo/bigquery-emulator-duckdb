@@ -202,6 +202,8 @@ These differences are deliberate exceptions, kept for convenience:
 See [AGENTS.md](AGENTS.md) for building and testing, and
 [docs/architecture.md](docs/architecture.md) for how a request is processed.
 
+Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.md).
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.

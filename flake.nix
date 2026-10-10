@@ -44,6 +44,8 @@
                   python3
                   runn
                   cppcheck
+                  tombi
+                  treefmt
                 ]
                 # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.
                 # Bazel's toolchain detection links with lld when clang finds ld.lld, and with
@@ -55,6 +57,9 @@
                 ];
 
               TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+              # Repository rules may have a restricted PATH for toolchain detection. Resolve
+              # clang-tidy independently so its executable is also an input to lint actions.
+              CLANG_TIDY = "${pkgs.llvmPackages_23.clang-tools}/bin/clang-tidy";
             }
             # Linux's Clang package sets CC and CXX through its setup hook.
             // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {

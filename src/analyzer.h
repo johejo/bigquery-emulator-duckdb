@@ -8,11 +8,10 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
-#include "googlesql/public/analyzer_options.h"
-#include "googlesql/scripting/type_aliases.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
+class AnalyzerOptions;
 class AnalyzerOutput;
 class Catalog;
 class ResolvedExpr;
@@ -21,6 +20,7 @@ class ScriptExecutor;
 class ScriptSegment;
 class Type;
 class TypeFactory;
+struct TypeWithParameters;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
