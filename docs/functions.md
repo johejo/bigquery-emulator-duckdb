@@ -146,7 +146,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FIRST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#first_value) | navigation_functions | Supported | DuckDB window function |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | json_functions | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type |
 | [`FLOOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#floor) | mathematical_functions | Supported | DuckDB SQL |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | NUMERIC, JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | string_functions | Partial | DuckDB SQL, in code | JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported; function FORMAT; function FORMAT with INTERVAL; function FORMAT with RANGE; type STRUCT<> |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | date_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | datetime_functions | Supported | GoogleSQL function |  |
 | [`FORMAT_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#format_time) | time_functions | Supported | GoogleSQL function |  |
