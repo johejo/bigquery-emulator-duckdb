@@ -12,7 +12,6 @@
 #include "absl/status/statusor.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/type.h"
-#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"

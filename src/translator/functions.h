@@ -13,7 +13,9 @@
 #include "googlesql/public/type.pb.h"
 
 namespace googlesql {
+class ResolvedExpr;
 class ResolvedFunctionCall;
+class Type;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb::translator {
@@ -42,6 +44,11 @@ struct ScalarCall {
   std::string_view name;
   std::vector<FunctionArgument> arguments = {};
   bool safe = false;
+
+  // Access resolved arguments and types without including the AST definitions in handlers.
+  [[nodiscard]] const googlesql::ResolvedExpr& Argument(std::size_t i) const;
+  [[nodiscard]] const googlesql::Type* ArgumentType(std::size_t i) const;
+  [[nodiscard]] const googlesql::Type* ResultType() const;
 
   [[nodiscard]] std::string Raise(std::string_view message) const {
     return translator::Raise(message, safe);
