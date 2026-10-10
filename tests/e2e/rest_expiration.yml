@@ -1,0 +1,77 @@
+desc: expirationTime wire validation and tables.update replacement semantics
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_expiration}
+    test: current.res.status == 200
+  table:
+    req:
+      /projects/test/datasets/rest_expiration/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+              expirationTime: '4070908800123'
+              schema: {fields: [{name: id, type: INTEGER}]}
+    test: current.res.status == 200 && current.res.body.expirationTime == '4070908800123'
+  list:
+    req:
+      /projects/test/datasets/rest_expiration/tables:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.tables[0].expirationTime == '4070908800123'
+  invalid:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        patch:
+          body:
+            application/json: {expirationTime: 'invalid'}
+    test: current.res.status == 400
+  overflow:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        patch:
+          body:
+            application/json: {expirationTime: '9223372036854775808'}
+    test: current.res.status == 400
+  numeric_overflow:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        patch:
+          body:
+            application/json: {expirationTime: 9223372036854775808}
+    test: current.res.status == 400
+  replace:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        put:
+          body:
+            application/json:
+              tableReference: {tableId: t}
+    test: current.res.status == 200 && !("expirationTime" in current.res.body)
+  integer:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        patch:
+          body:
+            application/json: {expirationTime: 4070908800000}
+    test: current.res.status == 200 && current.res.body.expirationTime == '4070908800000'
+  clear:
+    req:
+      /projects/test/datasets/rest_expiration/tables/t:
+        patch:
+          body:
+            application/json: {expirationTime: null}
+    test: current.res.status == 200 && !("expirationTime" in current.res.body)
+  cleanup:
+    req:
+      /projects/test/datasets/rest_expiration?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

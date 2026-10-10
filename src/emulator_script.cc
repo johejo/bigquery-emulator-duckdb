@@ -278,7 +278,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
-    std::unique_ptr<TableSource> source = emulator_.NewTableSource(backend_.get());
+    std::unique_ptr<TableSource> source =
+        emulator_.NewTableSource(backend_.get(), /*expire=*/false);
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset);
     return AnalyzeScriptType(segment, catalog, type_factory_, settings);
@@ -405,7 +406,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   absl::StatusOr<ScriptCatalog> Catalog(const googlesql::ScriptExecutor& executor,
                                         bool list_temporary = true) {
     ScriptCatalog catalog;
-    catalog.source = emulator_.NewTableSource(backend_.get());
+    catalog.source = emulator_.NewTableSource(backend_.get(), /*expire=*/list_temporary);
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
     if (list_temporary) {
       for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {

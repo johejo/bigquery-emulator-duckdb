@@ -130,6 +130,10 @@ What the emulator supports is listed in generated pages:
 Behavior that applies across them:
 
 - Jobs complete synchronously, before the request that starts them returns.
+- Table and view expiration is stored through REST `expirationTime` or DDL
+  `expiration_timestamp` (TIMESTAMP literals or NULL). Expired tables and views are deleted lazily when the catalog is read,
+  including before query analysis, and are treated as missing. Dataset default expiration and
+  partition expiration remain unsupported.
 - Only GoogleSQL is supported, not legacy SQL.
 - Every statement is analyzed against the existing tables and parameter types first, so unknown
   names and type errors fail as in BigQuery. Constructs the translator does not handle fail as

@@ -869,8 +869,10 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":emulator",
+        ":field_schema",
         ":httplib",
         ":server",
+        ":table_metadata",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ],

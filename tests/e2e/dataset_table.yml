@@ -105,7 +105,7 @@ steps:
     exec:
       command: BQ_EMULATOR_PROJECT=bq-dataset-table tests/e2e/bq.sh update --expiration 3600 e2e.users
     test: |
-      current.exit_code != 0 && current.stdout contains 'does not support table'
+      current.exit_code == 0
   update:
     exec:
       command: >-

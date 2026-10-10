@@ -214,7 +214,7 @@ class Emulator {
   std::vector<std::string> ListTables(DatasetReference dataset);
   // The tables of ListTables, each with its type.
   std::vector<TableListEntry> ListTableEntries(DatasetReference dataset);
-  TableInfo GetTable(TableReference table, bool include_row_count = true);
+  TableInfo GetTable(TableReference table, bool include_row_count = true, bool expire = true);
   void CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
                    const TableMetadata& metadata = {});
   void CreateView(TableReference table, const nlohmann::json& definition,
@@ -260,7 +260,7 @@ class Emulator {
   std::optional<std::vector<std::string>> AlterationStatements(
       const TranslatedStatement& translation);
   // A catalog source for the tables, views and datasets the emulator holds.
-  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr);
+  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true);
   // The script that `query` is, or null when it is a single statement or does not parse, which
   // RunQuery then reports as it does for a single statement.
   static std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query);

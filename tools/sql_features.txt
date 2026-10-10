@@ -147,8 +147,9 @@ query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELEC
 query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (id INT64 NOT NULL) AS SELECT id FROM t
 query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', friendly_name = 'z', labels = [('k', 'v')])
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
+query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
 query Table and column options | CREATE TABLE n (a INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))
-note Table and column options | Stores the description, friendly name and labels of tables and the description of columns
+note Table and column options | Stores the description, friendly name, labels and expiration of tables and the description of columns. Expiration accepts TIMESTAMP literals or NULL; expired tables are deleted lazily when read
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
@@ -193,10 +194,11 @@ query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name, DROP COLUMN IF EXISTS miss
 query `ALTER TABLE` | ALTER TABLE t RENAME TO n
 query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x', friendly_name = 'T', labels = [('k', 'v')])
 query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
+query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), ALTER COLUMN IF EXISTS missing SET OPTIONS (description = NULL)
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN id SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, DROP COLUMN name
-note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name and labels, and ALTER COLUMN SET OPTIONS the column's description; other options and ALTER COLUMN actions are unsupported. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
+note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; other options and ALTER COLUMN actions are unsupported. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
@@ -217,8 +219,9 @@ query `CREATE VIEW` | CREATE VIEW IF NOT EXISTS n AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n (renamed) AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (description = 'x', labels = [('k', 'v')]) AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC') AS SELECT id FROM t
+query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)) AS SELECT id FROM t
 query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
-note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name and labels; other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
+note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name, labels and expiration (TIMESTAMP literals or NULL); other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1) OPTIONS (description = 'x'); SELECT d.f(1)

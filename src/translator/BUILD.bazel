@@ -135,6 +135,7 @@ cc_library(
         ":context",
         "//:duckdb_sql",
         "//:translated_statement",
+        "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",

@@ -107,7 +107,6 @@ func TestCreateTableLike(t *testing.T) {
 		"CREATE TABLE n LIKE v":                          "CREATE TABLE LIKE a view",
 		"CREATE TABLE n LIKE defaulted":                  "CREATE TABLE LIKE a table with column defaults",
 		"CREATE TABLE n LIKE copy AS SELECT * FROM copy": "CREATE TABLE LIKE AS SELECT",
-		"CREATE TABLE n LIKE copy OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "CREATE TABLE option expiration_timestamp",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)

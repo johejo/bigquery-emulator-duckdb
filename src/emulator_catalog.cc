@@ -1,10 +1,12 @@
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <format>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -120,6 +122,53 @@ std::string TablesQuery(const DatasetReference& dataset) {
       "SELECT table_name FROM information_schema.tables WHERE table_catalog = {}"
       " AND table_schema = {} ORDER BY table_name",
       QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
+}
+
+// Expiration is lazy: catalog reads remove expired relations before exposing them. Sweep
+// before analysis too, so DDL targets, wildcards and INFORMATION_SCHEMA see the same catalog.
+void ExpireTables(Backend& backend, const std::optional<DatasetReference>& dataset = std::nullopt) {
+  // Multiple HTTP requests can discover the same expired relation concurrently. Serialize
+  // drops so that their transactions do not conflict with each other.
+  static std::mutex sweep_mutex;
+  const std::string where =
+      dataset.has_value()
+          ? std::format(" AND database_name = {} AND schema_name = {}",
+                        QuoteLiteral(dataset->project_id), QuoteLiteral(dataset->dataset_id))
+          : "";
+  const QueryResult relations = backend.Execute(std::format(
+      "SELECT database_name, schema_name, table_name, comment, 'TABLE' FROM duckdb_tables()"
+      " WHERE comment IS NOT NULL{}"
+      " UNION ALL SELECT database_name, schema_name, view_name, comment, 'VIEW' FROM duckdb_views()"
+      " WHERE comment IS NOT NULL{}",
+      where, where));
+  const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          std::chrono::system_clock::now().time_since_epoch())
+                          .count();
+  for (const json& row : relations.rows) {
+    const json& comment = row["f"][3]["v"];
+    const auto expiration = CommentMetadata(comment).expiration_time;
+    if (!expiration.has_value() || *expiration > now) {
+      continue;
+    }
+    const TableReference table{
+        .project_id = row["f"][0]["v"].get<std::string>(),
+        .dataset_id = row["f"][1]["v"].get<std::string>(),
+        .table_id = row["f"][2]["v"].get<std::string>(),
+    };
+    const bool view = row["f"][4]["v"] == "VIEW";
+    // Recheck the comment in the drop's transaction: a concurrent update may have extended
+    // the expiration, or another request may have replaced the table since the sweep.
+    const std::string skip = std::format(
+        "SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM {} WHERE database_name = {}"
+        " AND schema_name = {} AND {} = {} AND comment = {})",
+        view ? "duckdb_views()" : "duckdb_tables()", QuoteLiteral(table.project_id),
+        QuoteLiteral(table.dataset_id), view ? "view_name" : "table_name",
+        QuoteLiteral(table.table_id), QuoteLiteral(comment.get<std::string>()));
+    std::scoped_lock const lock(sweep_mutex);
+    backend.ExecuteDdl(
+        std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),
+        {}, skip);
+  }
 }
 
 // The comment of `table` in `relations`, duckdb_tables() or duckdb_views(), whose `name` column
@@ -304,8 +353,12 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
   return std::nullopt;
 }
 
-std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session) {
-  return std::make_unique<DuckDbTableSource>(session != nullptr ? *session : backend_);
+std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire) {
+  Backend& backend = session != nullptr ? *session : backend_;
+  if (expire) {
+    ExpireTables(backend);
+  }
+  return std::make_unique<DuckDbTableSource>(backend);
 }
 
 std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
@@ -381,12 +434,14 @@ void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
 std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
+  ExpireTables(backend_, dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
 std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
+  ExpireTables(backend_, dataset);
   const std::string where =
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
                   QuoteLiteral(dataset.dataset_id));
@@ -408,10 +463,13 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
   return entries;
 }
 
-TableInfo Emulator::GetTable(TableReference table, bool include_row_count) {
+TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool expire) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   GetDataset(dataset);
+  if (expire) {
+    ExpireTables(backend_, dataset);
+  }
   TableInfo info;
   info.reference = table;
   if (const std::optional<json> comment = ViewComment(backend_, table); comment.has_value()) {
@@ -444,6 +502,8 @@ void Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>&
                            const TableMetadata& metadata) {
   table.project_id = ResolveProject(table.project_id);
   GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+  ExpireTables(backend_,
+               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
     columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
@@ -550,6 +610,8 @@ void Emulator::WriteView(TableReference table, const json& definition,
 
 void Emulator::DeleteTable(TableReference table) {
   table.project_id = ResolveProject(table.project_id);
+  ExpireTables(backend_,
+               DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   // Views the emulator did not create have no metadata for GetTable, but can still be dropped.
   if (ViewComment(backend_, table).has_value()) {
     Execute("DROP VIEW " + QualifiedName(table));

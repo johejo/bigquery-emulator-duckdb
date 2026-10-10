@@ -205,12 +205,11 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 	for sql, want := range map[string]string{
 		"CREATE TABLE n COPY v":          "CREATE TABLE COPY a view",
 		"CREATE TABLE n CLONE defaulted": "CREATE TABLE CLONE a table with column defaults",
-		"CREATE TABLE n COPY source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()":                            "CREATE TABLE COPY with FOR SYSTEM_TIME AS OF",
-		"CREATE TABLE n CLONE source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()":                           "CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF",
-		"CREATE OR REPLACE TABLE copied CLONE source":                                                     "CREATE OR REPLACE TABLE CLONE",
-		"CREATE OR REPLACE TABLE copied COPY copied":                                                      "CREATE OR REPLACE TABLE COPY of itself",
-		"CREATE TEMP TABLE n COPY source; SELECT 1":                                                       "CREATE TEMP TABLE COPY",
-		"CREATE TABLE n COPY source OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "CREATE TABLE option expiration_timestamp",
+		"CREATE TABLE n COPY source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()":  "CREATE TABLE COPY with FOR SYSTEM_TIME AS OF",
+		"CREATE TABLE n CLONE source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()": "CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF",
+		"CREATE OR REPLACE TABLE copied CLONE source":                           "CREATE OR REPLACE TABLE CLONE",
+		"CREATE OR REPLACE TABLE copied COPY copied":                            "CREATE OR REPLACE TABLE COPY of itself",
+		"CREATE TEMP TABLE n COPY source; SELECT 1":                             "CREATE TEMP TABLE COPY",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
