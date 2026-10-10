@@ -137,7 +137,8 @@ FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
 }
 
 // BigQuery's default TIMESTAMP encoding: a decimal string of seconds since the Unix epoch. A
-// RANGE<TIMESTAMP> writes its bounds with every digit of the fraction, as `all_digits` does.
+// RANGE<TIMESTAMP> writes its bounds with all six digits of the fraction, even for a whole
+// second, as `all_digits` does.
 std::string EpochSecondsString(int64_t micros, bool all_digits = false) {
   const bool negative = micros < 0;
   const uint64_t magnitude =

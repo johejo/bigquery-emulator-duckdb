@@ -16,9 +16,15 @@ SELECT RANGE<DATE> '[2020-01-01, UNBOUNDED)'
 => "[2020-01-01, UNBOUNDED)"
 
 # Without formatOptions.useInt64Timestamp, the bounds of a RANGE<TIMESTAMP> are seconds with six
-# fractional digits; confirmed against BigQuery.
+# fractional digits, even for a whole second; confirmed against BigQuery.
 SELECT RANGE<TIMESTAMP> '[2020-01-01 00:00:00.5+00, UNBOUNDED)'
 => "[1577836800.500000, UNBOUNDED)"
+
+SELECT RANGE<TIMESTAMP> '[2020-01-01 00:00:00+00, 2021-01-01 00:00:00+00)'
+=> "[1577836800.000000, 1609459200.000000)"
+
+SELECT RANGE<TIMESTAMP> '[1969-12-31 23:59:59.5+00, UNBOUNDED)'
+=> "[-0.500000, UNBOUNDED)"
 
 # CAST to STRING writes each bound cast to STRING, and UNBOUNDED for a missing one; confirmed
 # against BigQuery.

@@ -1,7 +1,0 @@
-# A RANGE<TIMESTAMP> bound with a fractional second is written with six fractional digits.
-# Whether a whole-second bound, and one before the epoch, also is.
-SELECT RANGE<TIMESTAMP> '[2020-01-01 00:00:00+00, 2021-01-01 00:00:00+00)'
-?>
-
-SELECT RANGE<TIMESTAMP> '[1969-12-31 23:59:59.5+00, UNBOUNDED)'
-?>
