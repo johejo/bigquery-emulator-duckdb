@@ -643,18 +643,7 @@ cc_library(
     srcs = ["src/server.cc"],
     hdrs = ["src/server.h"],
     copts = ["-std=c++20"],
-    implementation_deps = [
-        ":api_error",
-        ":emulator",
-        ":httplib",
-        ":references",
-        ":table_metadata",
-        ":temporary_files",
-        "//src/server:requests",
-        "//src/server:resources",
-        "//src/server:routes",
-        "@nlohmann_json//:json",
-    ],
+    implementation_deps = ["//src/server:rest"],
 )
 
 cc_binary(

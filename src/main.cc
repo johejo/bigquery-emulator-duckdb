@@ -42,7 +42,7 @@ sigset_t BlockShutdownSignals() {
   return signals;
 }
 
-// Stops the server on the first shutdown signal. Serve() then returns and the emulator is
+// Stops the server on the first shutdown signal. Wait() then returns and the emulator is
 // destroyed normally, which checkpoints every project file so that no WAL is left behind.
 void WaitForShutdown(const sigset_t& signals, bigquery_emulator_duckdb::Server& server) {
   int signal = 0;
@@ -72,7 +72,8 @@ int Run(int argc, char* const* argv) {
       const std::string_view value = argv[++i];
       const auto [end, error] =
           std::from_chars(value.data(), value.data() + value.size(), options.port);
-      if (error != std::errc() || end != value.data() + value.size()) {
+      if (error != std::errc() || end != value.data() + value.size() || options.port < 0 ||
+          options.port > 65535) {
         PrintUsage();
         return 2;
       }
@@ -90,17 +91,27 @@ int Run(int argc, char* const* argv) {
   const sigset_t signals = BlockShutdownSignals();
   bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user);
   bigquery_emulator_duckdb::Server server(emulator, options);
-  if (!server.Bind()) {
+  if (!server.Start()) {
     std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';
     return 1;
   }
   std::thread shutdown([&] { WaitForShutdown(signals, server); });
-  std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
-  std::cerr << "Reading gs:// objects from " << emulator.storage_endpoint() << '\n';
-  const bool served = server.Serve();
-  // Wakes the shutdown thread when Serve() returned on its own rather than through a signal.
+  bool served = false;
+  std::exception_ptr failure;
+  try {
+    std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
+    std::cerr << "Reading gs:// objects from " << emulator.storage_endpoint() << '\n';
+    served = server.Wait();
+  } catch (...) {
+    failure = std::current_exception();
+    server.Stop();
+  }
+  // Wakes the shutdown thread when Wait() returned on its own rather than through a signal.
   kill(getpid(), SIGTERM);
   shutdown.join();
+  if (failure) {
+    std::rethrow_exception(failure);
+  }
   return served ? 0 : 1;
 }
 

@@ -60,3 +60,23 @@ cc_library(
     visibility = ["//:__pkg__"],
     deps = ["@nlohmann_json//:json"],
 )
+
+cc_library(
+    name = "rest",
+    srcs = ["rest.cc"],
+    hdrs = ["rest.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":requests",
+        ":resources",
+        ":routes",
+        "//:api_error",
+        "//:emulator",
+        "//:httplib",
+        "//:references",
+        "//:table_metadata",
+        "//:temporary_files",
+        "@nlohmann_json//:json",
+    ],
+    visibility = ["//:__pkg__"],
+)
