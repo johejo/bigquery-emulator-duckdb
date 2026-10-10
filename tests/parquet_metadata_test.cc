@@ -72,10 +72,10 @@ TEST(ParquetMetadataTest, RewritesAndReadsBackAFooter) {
   // Field 40 is past the deltas of the short form of a field header, and a list of 19 elements
   // past the short form of a list header.
   ThriftValue metadata = ThriftValue::Struct({
-      {1, ThriftValue::Int32(2)},
-      {parquet::kSchema, List(schema)},
-      {9, flag},
-      {40, Binary("x")},
+      {.id = 1, .value = ThriftValue::Int32(2)},
+      {.id = parquet::kSchema, .value = List(schema)},
+      {.id = 9, .value = flag},
+      {.id = 40, .value = Binary("x")},
   });
   const std::string path = EmptyParquetFile();
   RewriteParquetMetadata(path, metadata);
@@ -126,7 +126,7 @@ TEST(ParquetMetadataTest, ColumnsTakeDuckDbsShape) {
       Element("x", kOptional, 0),
   };
   const ParquetColumn columns =
-      ParquetColumns(ThriftValue::Struct({{parquet::kSchema, List(schema)}}));
+      ParquetColumns(ThriftValue::Struct({{.id = parquet::kSchema, .value = List(schema)}}));
   using Kind = ParquetColumn::Kind;
   ASSERT_EQ(columns.kind, Kind::kStruct);
   ASSERT_EQ(columns.children.size(), 6);
@@ -169,7 +169,7 @@ TEST(ParquetMetadataTest, TellsWideDecimals) {
       Element("schema", 0, 3), Element("s", kOptional, 1), wide, narrow, Element("i", kOptional, 0),
   };
   const ParquetColumn columns =
-      ParquetColumns(ThriftValue::Struct({{parquet::kSchema, List(schema)}}));
+      ParquetColumns(ThriftValue::Struct({{.id = parquet::kSchema, .value = List(schema)}}));
   EXPECT_TRUE(columns.HasWideDecimal());
   const ParquetColumn& w = columns.children.at(0).children.at(0);
   EXPECT_TRUE(w.IsWideDecimal());

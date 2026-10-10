@@ -80,7 +80,8 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
     return absl::InvalidArgumentError("Recursive calls of function " + absl::StrJoin(key, ".") +
                                       " are not allowed");
   }
-  std::optional<Routine> routine = source().FindRoutine({key.at(0), key.at(1), key.at(2)});
+  std::optional<Routine> routine = source().FindRoutine(
+      {.project_id = key.at(0), .dataset_id = key.at(1), .routine_id = key.at(2)});
   if (!routine.has_value()) {
     return builtin;
   }

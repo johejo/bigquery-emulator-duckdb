@@ -22,15 +22,20 @@ std::vector<Rule> Substr() {
       "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -length($1) THEN 1 ELSE length($1) + $2 + 1 "
       "END";
   return {
-      {2, "substr($1, " + start + ")", {Is(1, {TYPE_STRING})}},
+      {.arity = 2, .spelling = "substr($1, " + start + ")", .conditions = {Is(1, {TYPE_STRING})}},
       {
-          3,
-          "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
-          {Is(1, {TYPE_STRING})},
-          {},
-          {"'Third argument in SUBSTR() cannot be negative'"},
+          .arity = 3,
+          .spelling = "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
+          .conditions = {Is(1, {TYPE_STRING})},
+          .defaults = {},
+          .errors = {"'Third argument in SUBSTR() cannot be negative'"},
       },
-      {{2, 3}, "bq_substr_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"9223372036854775807"}},
+      {
+          .arity = {2, 3},
+          .spelling = "bq_substr_bytes($1, $2, $3)",
+          .conditions = {Is(1, {TYPE_BYTES})},
+          .defaults = {"9223372036854775807"},
+      },
   };
 }
 
@@ -38,9 +43,18 @@ std::vector<Rule> Substr() {
 // formatted in the given time zone, by default UTC.
 std::vector<Rule> FormatDateTime() {
   return {
-      {2, "bq_format_date($1, $2)", {Is(2, {TYPE_DATE})}},
-      {2, "bq_format_datetime($1, $2)", {Is(2, {TYPE_DATETIME})}},
-      {{2, 3}, "bq_format_timestamp($1, $2, $3)", {Is(2, {TYPE_TIMESTAMP})}, {"'UTC'"}},
+      {.arity = 2, .spelling = "bq_format_date($1, $2)", .conditions = {Is(2, {TYPE_DATE})}},
+      {
+          .arity = 2,
+          .spelling = "bq_format_datetime($1, $2)",
+          .conditions = {Is(2, {TYPE_DATETIME})},
+      },
+      {
+          .arity = {2, 3},
+          .spelling = "bq_format_timestamp($1, $2, $3)",
+          .conditions = {Is(2, {TYPE_TIMESTAMP})},
+          .defaults = {"'UTC'"},
+      },
   };
 }
 
@@ -56,8 +70,18 @@ std::vector<Rule> JsonExtract(std::string_view function, bool standard, bool jso
   const std::string of_json =
       std::string(function) + "_json(CAST($1 AS VARCHAR), $2, " + flag + ")";
   return {
-      {{1, 2}, json_result ? "json(" + of_json + ")" : of_json, {Is(1, {TYPE_JSON})}, {"'$'"}},
-      {{1, 2}, std::string(function) + "($1, $2, " + flag + ")", {Is(1, {TYPE_STRING})}, {"'$'"}},
+      {
+          .arity = {1, 2},
+          .spelling = json_result ? "json(" + of_json + ")" : of_json,
+          .conditions = {Is(1, {TYPE_JSON})},
+          .defaults = {"'$'"},
+      },
+      {
+          .arity = {1, 2},
+          .spelling = std::string(function) + "($1, $2, " + flag + ")",
+          .conditions = {Is(1, {TYPE_STRING})},
+          .defaults = {"'$'"},
+      },
   };
 }
 
@@ -86,17 +110,27 @@ std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
 // DuckDB's trim() only trims spaces.
 std::vector<Rule> Trim(const std::string& function) {
   return {
-      {1, function + "($1)", {Is(1, {TYPE_STRING})}},
-      {2, function + "_chars($1, $2)", {Is(1, {TYPE_STRING})}},
-      {2, function + "_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+      {.arity = 1, .spelling = function + "($1)", .conditions = {Is(1, {TYPE_STRING})}},
+      {.arity = 2, .spelling = function + "_chars($1, $2)", .conditions = {Is(1, {TYPE_STRING})}},
+      {.arity = 2, .spelling = function + "_bytes($1, $2)", .conditions = {Is(1, {TYPE_BYTES})}},
   };
 }
 
 // LPAD and RPAD, which pad with spaces by default.
 std::vector<Rule> Pad(const std::string& function) {
   return {
-      {{2, 3}, function + "($1, $2, $3)", {Is(1, {TYPE_STRING})}, {"' '"}},
-      {{2, 3}, function + "_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}, {"encode(' ')"}},
+      {
+          .arity = {2, 3},
+          .spelling = function + "($1, $2, $3)",
+          .conditions = {Is(1, {TYPE_STRING})},
+          .defaults = {"' '"},
+      },
+      {
+          .arity = {2, 3},
+          .spelling = function + "_bytes($1, $2, $3)",
+          .conditions = {Is(1, {TYPE_BYTES})},
+          .defaults = {"encode(' ')"},
+      },
   };
 }
 
@@ -111,30 +145,31 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
           "$INTERVAL",
           {
               {
-                  2,
-                  "bq_interval($1, upper(#2))",
-                  {
-                      Part(2,
-                           {
-                               "year",
-                               "quarter",
-                               "month",
-                               "week",
-                               "day",
-                               "hour",
-                               "minute",
-                               "second",
-                               "millisecond",
-                               "microsecond",
-                           }),
-                  },
+                  .arity = 2,
+                  .spelling = "bq_interval($1, upper(#2))",
+                  .conditions =
+                      {
+                          Part(2,
+                               {
+                                   "year",
+                                   "quarter",
+                                   "month",
+                                   "week",
+                                   "day",
+                                   "hour",
+                                   "minute",
+                                   "second",
+                                   "millisecond",
+                                   "microsecond",
+                               }),
+                      },
               },
           },
       },
-      {"MAKE_INTERVAL", {{6, "bq_make_interval($1, $2, $3, $4, $5, $6)"}}},
-      {"JUSTIFY_HOURS", {{1, "bq_justify_hours($1)"}}},
-      {"JUSTIFY_DAYS", {{1, "bq_justify_days($1)"}}},
-      {"JUSTIFY_INTERVAL", {{1, "bq_justify_interval($1)"}}},
+      {"MAKE_INTERVAL", {{.arity = 6, .spelling = "bq_make_interval($1, $2, $3, $4, $5, $6)"}}},
+      {"JUSTIFY_HOURS", {{.arity = 1, .spelling = "bq_justify_hours($1)"}}},
+      {"JUSTIFY_DAYS", {{.arity = 1, .spelling = "bq_justify_days($1)"}}},
+      {"JUSTIFY_INTERVAL", {{.arity = 1, .spelling = "bq_justify_interval($1)"}}},
       // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
       // infinities where BigQuery raises errors, such as EXP(1000).
       {"SQRT", Numbers("sqrt")},
@@ -145,8 +180,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"LN", Numbers("ln")},
       {"LOG10", Numbers("log10")},
       {"LOG", Concat({Numbers("ln"), Numbers("log", 2)})},
-      {"PARSE_NUMERIC", {{1, "bq_parse_numeric($1)"}}},
-      {"PARSE_BIGNUMERIC", {{1, "CAST(bq_parse_bignumeric($1) AS BIGNUM)"}}},
+      {"PARSE_NUMERIC", {{.arity = 1, .spelling = "bq_parse_numeric($1)"}}},
+      {"PARSE_BIGNUMERIC", {{.arity = 1, .spelling = "CAST(bq_parse_bignumeric($1) AS BIGNUM)"}}},
       {"SIN", Float64("bq_sin")},
       {"COS", Float64("bq_cos")},
       {"TAN", Float64("bq_tan")},
@@ -162,8 +197,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"CSCH", Float64("bq_csch")},
       {"SECH", Float64("bq_sech")},
       {"COTH", Float64("bq_coth")},
-      {"COSINE_DISTANCE", {{2, "bq_cosine_distance($1, $2)"}}},
-      {"EUCLIDEAN_DISTANCE", {{2, "bq_euclidean_distance($1, $2)"}}},
+      {"COSINE_DISTANCE", {{.arity = 2, .spelling = "bq_cosine_distance($1, $2)"}}},
+      {"EUCLIDEAN_DISTANCE", {{.arity = 2, .spelling = "bq_euclidean_distance($1, $2)"}}},
       // Strings. DuckDB's BLOB has almost no functions, its case mapping is simple rather than
       // full, it reverses grapheme clusters rather than characters, it trims spaces rather than
       // whitespace, and it neither raises BigQuery's errors nor has its output limit. Where it
@@ -185,29 +220,51 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {
           "INSTR",
           {
-              {{2, 4}, "bq_instr($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
-              {{2, 4}, "bq_instr_bytes($1, $2, $3, $4)", {Is(1, {TYPE_BYTES})}, {"1", "1"}},
+              {
+                  .arity = {2, 4},
+                  .spelling = "bq_instr($1, $2, $3, $4)",
+                  .conditions = {Is(1, {TYPE_STRING})},
+                  .defaults = {"1", "1"},
+              },
+              {
+                  .arity = {2, 4},
+                  .spelling = "bq_instr_bytes($1, $2, $3, $4)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+                  .defaults = {"1", "1"},
+              },
           },
       },
       {
           "STRPOS",
           {
-              {2, "strpos($1, $2)", {Is(1, {TYPE_STRING})}},
-              {2, "bq_instr_bytes($1, $2, 1, 1)", {Is(1, {TYPE_BYTES})}},
+              {.arity = 2, .spelling = "strpos($1, $2)", .conditions = {Is(1, {TYPE_STRING})}},
+              {
+                  .arity = 2,
+                  .spelling = "bq_instr_bytes($1, $2, 1, 1)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
           },
       },
       {
           "STARTS_WITH",
           {
-              {2, "starts_with($1, $2)", {Is(1, {TYPE_STRING})}},
-              {2, "bq_starts_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+              {.arity = 2, .spelling = "starts_with($1, $2)", .conditions = {Is(1, {TYPE_STRING})}},
+              {
+                  .arity = 2,
+                  .spelling = "bq_starts_with_bytes($1, $2)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
           },
       },
       {
           "ENDS_WITH",
           {
-              {2, "ends_with($1, $2)", {Is(1, {TYPE_STRING})}},
-              {2, "bq_ends_with_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+              {.arity = 2, .spelling = "ends_with($1, $2)", .conditions = {Is(1, {TYPE_STRING})}},
+              {
+                  .arity = 2,
+                  .spelling = "bq_ends_with_bytes($1, $2)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
           },
       },
       {"SUBSTR", Substr()},
@@ -215,8 +272,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {
           "SPLIT",
           {
-              {{1, 2}, "split($1, $2)", {Is(1, {TYPE_STRING})}, {"','"}},
-              {2, "bq_split_bytes($1, $2)", {Is(1, {TYPE_BYTES})}},
+              {
+                  .arity = {1, 2},
+                  .spelling = "split($1, $2)",
+                  .conditions = {Is(1, {TYPE_STRING})},
+                  .defaults = {"','"},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_split_bytes($1, $2)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
           },
       },
       // The mode is passed by its name.
@@ -226,24 +292,55 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"FORMAT_DATE", FormatDateTime()},
       {"FORMAT_DATETIME", FormatDateTime()},
       {"FORMAT_TIMESTAMP", FormatDateTime()},
-      {"FORMAT_TIME", {{2, "bq_format_time($1, $2)"}}},
-      {"PARSE_DATE", {{2, "bq_parse_date($1, $2)"}}},
-      {"PARSE_DATETIME", {{2, "bq_parse_datetime($1, $2)"}}},
-      {"PARSE_TIME", {{2, "bq_parse_time($1, $2)"}}},
+      {"FORMAT_TIME", {{.arity = 2, .spelling = "bq_format_time($1, $2)"}}},
+      {"PARSE_DATE", {{.arity = 2, .spelling = "bq_parse_date($1, $2)"}}},
+      {"PARSE_DATETIME", {{.arity = 2, .spelling = "bq_parse_datetime($1, $2)"}}},
+      {"PARSE_TIME", {{.arity = 2, .spelling = "bq_parse_time($1, $2)"}}},
       // A string without a time zone is in the given one, by default UTC.
-      {"PARSE_TIMESTAMP", {{{2, 3}, "bq_parse_timestamp($1, $2, $3)", {}, {"'UTC'"}}}},
-      {"NORMALIZE", {{{1, 2}, "bq_normalize($1, $2)", {}, {"'NFC'"}}}},
-      {"NORMALIZE_AND_CASEFOLD", {{{1, 2}, "bq_normalize_and_casefold($1, $2)", {}, {"'NFC'"}}}},
+      {
+          "PARSE_TIMESTAMP",
+          {
+              {
+                  .arity = {2, 3},
+                  .spelling = "bq_parse_timestamp($1, $2, $3)",
+                  .conditions = {},
+                  .defaults = {"'UTC'"},
+              },
+          },
+      },
+      {
+          "NORMALIZE",
+          {
+              {
+                  .arity = {1, 2},
+                  .spelling = "bq_normalize($1, $2)",
+                  .conditions = {},
+                  .defaults = {"'NFC'"},
+              },
+          },
+      },
+      {
+          "NORMALIZE_AND_CASEFOLD",
+          {
+              {
+                  .arity = {1, 2},
+                  .spelling = "bq_normalize_and_casefold($1, $2)",
+                  .conditions = {},
+                  .defaults = {"'NFC'"},
+              },
+          },
+      },
       // BigQuery compares the NFKC normal forms, case folded. Only the STRING overload is
       // declared.
       {
           "CONTAINS_SUBSTR",
           {
               {
-                  2,
-                  "contains(bq_normalize_and_casefold($1, 'NFKC'), bq_normalize_and_casefold($2, "
-                  "'NFKC'))",
-                  {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})},
+                  .arity = 2,
+                  .spelling = "contains(bq_normalize_and_casefold($1, 'NFKC'), "
+                              "bq_normalize_and_casefold($2, "
+                              "'NFKC'))",
+                  .conditions = {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})},
               },
           },
       },
@@ -251,69 +348,109 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {
           "SHA512",
           {
-              {1, "bq_sha512(encode($1))", {Is(1, {TYPE_STRING})}},
-              {1, "bq_sha512($1)", {Is(1, {TYPE_BYTES})}},
+              {
+                  .arity = 1,
+                  .spelling = "bq_sha512(encode($1))",
+                  .conditions = {Is(1, {TYPE_STRING})},
+              },
+              {.arity = 1, .spelling = "bq_sha512($1)", .conditions = {Is(1, {TYPE_BYTES})}},
           },
       },
       // GoogleSQL leaves base32 out of its open source; src/backend_functions/string.cc
       // implements RFC 4648's.
-      {"TO_BASE32", {{1, "bq_to_base32($1)"}}},
-      {"FROM_BASE32", {{1, "bq_from_base32($1)"}}},
+      {"TO_BASE32", {{.arity = 1, .spelling = "bq_to_base32($1)"}}},
+      {"FROM_BASE32", {{.arity = 1, .spelling = "bq_from_base32($1)"}}},
       {
           "FARM_FINGERPRINT",
           {
-              {1, "bq_farm_fingerprint(encode($1))", {Is(1, {TYPE_STRING})}},
-              {1, "bq_farm_fingerprint($1)", {Is(1, {TYPE_BYTES})}},
+              {
+                  .arity = 1,
+                  .spelling = "bq_farm_fingerprint(encode($1))",
+                  .conditions = {Is(1, {TYPE_STRING})},
+              },
+              {
+                  .arity = 1,
+                  .spelling = "bq_farm_fingerprint($1)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
           },
       },
-      {"INITCAP", {{1, "bq_initcap($1)"}, {2, "bq_initcap_delimiters($1, $2)"}}},
-      {"SOUNDEX", {{1, "bq_soundex($1)"}}},
-      {"SAFE_CONVERT_BYTES_TO_STRING", {{1, "bq_safe_convert_bytes_to_string($1)"}}},
+      {
+          "INITCAP",
+          {
+              {.arity = 1, .spelling = "bq_initcap($1)"},
+              {.arity = 2, .spelling = "bq_initcap_delimiters($1, $2)"},
+          },
+      },
+      {"SOUNDEX", {{.arity = 1, .spelling = "bq_soundex($1)"}}},
+      {
+          "SAFE_CONVERT_BYTES_TO_STRING",
+          {{.arity = 1, .spelling = "bq_safe_convert_bytes_to_string($1)"}},
+      },
       // NET functions. HOST, REG_DOMAIN and PUBLIC_SUFFIX follow GoogleSQL's copy of the public
       // suffix list.
-      {"IPV4_FROM_INT64", {{1, "bq_net_ipv4_from_int64($1)"}}},
-      {"IPV4_TO_INT64", {{1, "bq_net_ipv4_to_int64($1)"}}},
-      {"IP_FROM_STRING", {{1, "bq_net_ip_from_string($1)"}}},
-      {"SAFE_IP_FROM_STRING", {{1, "bq_net_safe_ip_from_string($1)"}}},
-      {"IP_TO_STRING", {{1, "bq_net_ip_to_string($1)"}}},
-      {"IP_NET_MASK", {{2, "bq_net_ip_net_mask($1, $2)"}}},
-      {"IP_TRUNC", {{2, "bq_net_ip_trunc($1, $2)"}}},
-      {"HOST", {{1, "bq_net_host($1)"}}},
-      {"REG_DOMAIN", {{1, "bq_net_reg_domain($1)"}}},
-      {"PUBLIC_SUFFIX", {{1, "bq_net_public_suffix($1)"}}},
+      {"IPV4_FROM_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_from_int64($1)"}}},
+      {"IPV4_TO_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_to_int64($1)"}}},
+      {"IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_ip_from_string($1)"}}},
+      {"SAFE_IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_safe_ip_from_string($1)"}}},
+      {"IP_TO_STRING", {{.arity = 1, .spelling = "bq_net_ip_to_string($1)"}}},
+      {"IP_NET_MASK", {{.arity = 2, .spelling = "bq_net_ip_net_mask($1, $2)"}}},
+      {"IP_TRUNC", {{.arity = 2, .spelling = "bq_net_ip_trunc($1, $2)"}}},
+      {"HOST", {{.arity = 1, .spelling = "bq_net_host($1)"}}},
+      {"REG_DOMAIN", {{.arity = 1, .spelling = "bq_net_reg_domain($1)"}}},
+      {"PUBLIC_SUFFIX", {{.arity = 1, .spelling = "bq_net_public_suffix($1)"}}},
       // AEAD with Tink keysets of AES-GCM keys, where a STRING is its UTF-8 bytes. The keyset
       // chain of KEYS.KEYSET_CHAIN needs Cloud KMS.
       {
           "ENCRYPT",
           {
               {
-                  3,
-                  "bq_aead_encrypt($1, encode($2), encode($3))",
-                  {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})},
+                  .arity = 3,
+                  .spelling = "bq_aead_encrypt($1, encode($2), encode($3))",
+                  .conditions = {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})},
               },
-              {3, "bq_aead_encrypt($1, $2, $3)", {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})}},
+              {
+                  .arity = 3,
+                  .spelling = "bq_aead_encrypt($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})},
+              },
           },
       },
-      {"DECRYPT_BYTES", {{3, "bq_aead_decrypt_bytes($1, $2, $3)", {Is(1, {TYPE_BYTES})}}}},
+      {
+          "DECRYPT_BYTES",
+          {
+              {
+                  .arity = 3,
+                  .spelling = "bq_aead_decrypt_bytes($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
+          },
+      },
       {
           "DECRYPT_STRING",
-          {{3, "bq_aead_decrypt_string($1, $2, encode($3))", {Is(1, {TYPE_BYTES})}}},
+          {
+              {
+                  .arity = 3,
+                  .spelling = "bq_aead_decrypt_string($1, $2, encode($3))",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
+          },
       },
       // Without max_distance, the distance is not capped.
       {
           "EDIT_DISTANCE",
           {
               {
-                  {2, 3},
-                  "bq_edit_distance($1, $2, $3)",
-                  {Is(1, {TYPE_STRING})},
-                  {"9223372036854775807"},
+                  .arity = {2, 3},
+                  .spelling = "bq_edit_distance($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_STRING})},
+                  .defaults = {"9223372036854775807"},
               },
               {
-                  {2, 3},
-                  "bq_edit_distance_bytes($1, $2, $3)",
-                  {Is(1, {TYPE_BYTES})},
-                  {"9223372036854775807"},
+                  .arity = {2, 3},
+                  .spelling = "bq_edit_distance_bytes($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+                  .defaults = {"9223372036854775807"},
               },
           },
       },
@@ -324,12 +461,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {
           "REGEXP_EXTRACT",
           {
-              {{2, 4}, "bq_regexp_extract($1, $2, $3, $4)", {Is(1, {TYPE_STRING})}, {"1", "1"}},
               {
-                  {2, 4},
-                  "bq_regexp_extract_bytes($1, $2, $3, $4)",
-                  {Is(1, {TYPE_BYTES})},
-                  {"1", "1"},
+                  .arity = {2, 4},
+                  .spelling = "bq_regexp_extract($1, $2, $3, $4)",
+                  .conditions = {Is(1, {TYPE_STRING})},
+                  .defaults = {"1", "1"},
+              },
+              {
+                  .arity = {2, 4},
+                  .spelling = "bq_regexp_extract_bytes($1, $2, $3, $4)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+                  .defaults = {"1", "1"},
               },
           },
       },
@@ -338,67 +480,121 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
           "REGEXP_INSTR",
           {
               {
-                  {2, 5},
-                  "bq_regexp_instr($1, $2, $3, $4, $5)",
-                  {Is(1, {TYPE_STRING})},
-                  {"1", "1", "0"},
+                  .arity = {2, 5},
+                  .spelling = "bq_regexp_instr($1, $2, $3, $4, $5)",
+                  .conditions = {Is(1, {TYPE_STRING})},
+                  .defaults = {"1", "1", "0"},
               },
               {
-                  {2, 5},
-                  "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
-                  {Is(1, {TYPE_BYTES})},
-                  {"1", "1", "0"},
+                  .arity = {2, 5},
+                  .spelling = "bq_regexp_instr_bytes($1, $2, $3, $4, $5)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+                  .defaults = {"1", "1", "0"},
               },
           },
       },
       // JSON goes to GoogleSQL as its text; see src/backend_functions.cc.
-      {"PARSE_JSON", {{{1, 2}, "json(bq_parse_json($1, $2))", {}, {"'exact'"}}}},
-      {"BOOL", {{1, "bq_json_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {
+          "PARSE_JSON",
+          {
+              {
+                  .arity = {1, 2},
+                  .spelling = "json(bq_parse_json($1, $2))",
+                  .conditions = {},
+                  .defaults = {"'exact'"},
+              },
+          },
+      },
+      {
+          "BOOL",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_json_bool(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
       {
           "STRING",
           {
-              {1, "bq_json_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}},
-              {{1, 2}, "bq_timestamp_string($1, $2)", {Is(1, {TYPE_TIMESTAMP})}, {"'UTC'"}},
+              {
+                  .arity = 1,
+                  .spelling = "bq_json_string(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+              {
+                  .arity = {1, 2},
+                  .spelling = "bq_timestamp_string($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                  .defaults = {"'UTC'"},
+              },
           },
       },
-      {"INT64", {{1, "bq_json_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {
+          "INT64",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_json_int64(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
       {
           "FLOAT64",
-          {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}},
+          {
+              {
+                  .arity = {1, 2},
+                  .spelling = "bq_json_float64(CAST($1 AS VARCHAR), $2)",
+                  .conditions = {Is(1, {TYPE_JSON})},
+                  .defaults = {"'round'"},
+              },
+          },
       },
       {
           "DOUBLE",
-          {{{1, 2}, "bq_json_float64(CAST($1 AS VARCHAR), $2)", {Is(1, {TYPE_JSON})}, {"'round'"}}},
-      },
-      {"JSON_TYPE", {{1, "bq_json_type(CAST($1 AS VARCHAR))"}}},
-      {
-          "$SUBSCRIPT",
           {
               {
-                  2,
-                  "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
-                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
-              },
-              {
-                  2,
-                  "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
-                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
+                  .arity = {1, 2},
+                  .spelling = "bq_json_float64(CAST($1 AS VARCHAR), $2)",
+                  .conditions = {Is(1, {TYPE_JSON})},
+                  .defaults = {"'round'"},
               },
           },
       },
-      {"JSON_FLATTEN", {{1, "CAST(bq_json_flatten(CAST($1 AS VARCHAR)) AS JSON[])"}}},
+      {"JSON_TYPE", {{.arity = 1, .spelling = "bq_json_type(CAST($1 AS VARCHAR))"}}},
       {
           "$SUBSCRIPT",
           {
               {
-                  2,
-                  "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
-                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
+                  .arity = 2,
+                  .spelling = "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
+                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
               },
               {
-                  2,
-                  "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
-                  {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
+                  .arity = 2,
+                  .spelling = "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
+                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
+              },
+          },
+      },
+      {
+          "JSON_FLATTEN",
+          {{.arity = 1, .spelling = "CAST(bq_json_flatten(CAST($1 AS VARCHAR)) AS JSON[])"}},
+      },
+      {
+          "$SUBSCRIPT",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
+                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
+                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
               },
           },
       },
@@ -410,24 +606,75 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"JSON_EXTRACT_ARRAY", JsonExtract("bq_json_query_array", false, false)},
       {"JSON_VALUE_ARRAY", JsonExtract("bq_json_value_array", true, false)},
       {"JSON_EXTRACT_STRING_ARRAY", JsonExtract("bq_json_value_array", false, false)},
-      {"LAX_BOOL", {{1, "bq_lax_bool(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"LAX_INT64", {{1, "bq_lax_int64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"LAX_FLOAT64", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"LAX_DOUBLE", {{1, "bq_lax_float64(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
-      {"LAX_STRING", {{1, "bq_lax_string(CAST($1 AS VARCHAR))", {Is(1, {TYPE_JSON})}}}},
+      {
+          "LAX_BOOL",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_lax_bool(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
+      {
+          "LAX_INT64",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_lax_int64(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
+      {
+          "LAX_FLOAT64",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_lax_float64(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
+      {
+          "LAX_DOUBLE",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_lax_float64(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
+      {
+          "LAX_STRING",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "bq_lax_string(CAST($1 AS VARCHAR))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
+      },
       {
           "JSON_KEYS",
           {
               {
-                  3,
-                  "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
-                  {Is(1, {TYPE_JSON})},
+                  .arity = 3,
+                  .spelling = "CAST(json(bq_json_keys(CAST($1 AS VARCHAR), $2, $3)) AS VARCHAR[])",
+                  .conditions = {Is(1, {TYPE_JSON})},
               },
           },
       },
       {
           "JSON_STRIP_NULLS",
-          {{4, "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))", {Is(1, {TYPE_JSON})}}},
+          {
+              {
+                  .arity = 4,
+                  .spelling = "json(bq_json_strip_nulls(CAST($1 AS VARCHAR), $2, $3, $4))",
+                  .conditions = {Is(1, {TYPE_JSON})},
+              },
+          },
       },
   };
   return *kRules;

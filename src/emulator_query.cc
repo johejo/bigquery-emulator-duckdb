@@ -152,10 +152,10 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   std::optional<TranslatedStatement> translated =
       TranslateStatement(analyzed.statement(), parameters,
                          DefaultDataset{
-                             settings.default_project,
-                             settings.default_dataset,
-                             nullptr,
-                             has_session_user_,
+                             .project = settings.default_project,
+                             .dataset = settings.default_dataset,
+                             .temporary = nullptr,
+                             .has_session_user = has_session_user_,
                          },
                          &unsupported);
   if (!translated.has_value()) {
@@ -189,8 +189,8 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
                                                              ? request.project_id
                                                              : request.default_dataset->project_id);
       setup.push_back("USE " + QualifiedName(DatasetReference{
-                                   dataset_project,
-                                   request.default_dataset->dataset_id,
+                                   .project_id = dataset_project,
+                                   .dataset_id = request.default_dataset->dataset_id,
                                }));
       settings.default_project = dataset_project;
       settings.default_dataset = request.default_dataset->dataset_id;

@@ -508,7 +508,10 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
     json item{
         {"kind", "bigquery#dataset"},
         {"id", project_id + ":" + entry.dataset_id},
-        {"datasetReference", DatasetReferenceJson({project_id, entry.dataset_id})},
+        {
+            "datasetReference",
+            DatasetReferenceJson({.project_id = project_id, .dataset_id = entry.dataset_id}),
+        },
         {"location", kLocation},
     };
     // A list entry carries the metadata but the description.
@@ -563,7 +566,11 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   json entries = json::array();
   for (const TableListEntry& entry :
        ListPageItems(tables, page, &TableListEntry::table_id, response)) {
-    const TableReference table{dataset.project_id, dataset.dataset_id, entry.table_id};
+    const TableReference table{
+        .project_id = dataset.project_id,
+        .dataset_id = dataset.dataset_id,
+        .table_id = entry.table_id,
+    };
     json item{
         {"kind", "bigquery#table"},
         {"id", TableId(table)},

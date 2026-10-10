@@ -132,7 +132,7 @@ std::optional<Relation> WithScan(const googlesql::ResolvedWithScan& with, const 
     for (int i = 0; i < subquery->column_list_size(); ++i) {
       names.push_back(QuoteIdentifier("_p" + std::to_string(i)));
     }
-    const WithQuery query{scope.context.FreshName("_w"), names.size()};
+    const WithQuery query{.name = scope.context.FreshName("_w"), .width = names.size()};
     std::optional<std::string> body;
     if (subquery->Is<googlesql::ResolvedRecursiveScan>()) {
       body =
@@ -320,7 +320,8 @@ std::optional<Relation> ZippedArrayScan(const googlesql::ResolvedArrayScan& arra
 
 std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, const Scope& scope) {
   auto result = array.input_scan() == nullptr
-                    ? std::optional<Relation>(Relation{"SELECT 1 AS _unit", {}, {}})
+                    ? std::optional<Relation>(
+                          Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}})
                     : Scan(*array.input_scan(), scope);
   if (!result) {
     return std::nullopt;
@@ -339,7 +340,7 @@ std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, con
 
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
-    return Relation{"SELECT 1 AS _unit", {}, {}};
+    return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
   }
   if (scan.Is<googlesql::ResolvedTableScan>()) {
     const auto* table = scan.GetAs<googlesql::ResolvedTableScan>();

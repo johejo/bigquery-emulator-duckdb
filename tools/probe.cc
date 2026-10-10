@@ -88,9 +88,9 @@ Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql) 
     static const std::string kInvalid = "INVALID_ARGUMENT: ";
     if (const size_t end = message.find(" is not supported"); end != std::string::npos) {
       const size_t start = message.starts_with(kInvalid) ? kInvalid.size() : 0;
-      return {Outcome::kUnsupported, message.substr(start, end - start)};
+      return {.outcome = Outcome::kUnsupported, .detail = message.substr(start, end - start)};
     }
-    return {Outcome::kUntested, "`" + sql + "`: " + message};
+    return {.outcome = Outcome::kUntested, .detail = "`" + sql + "`: " + message};
   }
 
   QueryRequest request;
@@ -98,18 +98,18 @@ Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql) 
   request.query = sql;
   const std::shared_ptr<const Job> job = emulator.RunQuery(request);
   if (!job->error.has_value()) {
-    return {Outcome::kRuns, ""};
+    return {.outcome = Outcome::kRuns, .detail = ""};
   }
   std::string message = FirstLine(job->error->what());
   static const std::string kUnsupported = "The emulator does not support ";
   if (message.starts_with(kUnsupported)) {
-    return {Outcome::kUnsupported, message.substr(kUnsupported.size())};
+    return {.outcome = Outcome::kUnsupported, .detail = message.substr(kUnsupported.size())};
   }
   // DuckDB's hint to add casts is noise in a report.
   if (const auto hint = message.find(". You might need"); hint != std::string::npos) {
     message.resize(hint);
   }
-  return {Outcome::kFailsOnDuckDb, "`" + sql + "`: " + message};
+  return {.outcome = Outcome::kFailsOnDuckDb, .detail = "`" + sql + "`: " + message};
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -28,16 +28,26 @@ struct TypeName {
 
 // The reported name of each type comes first.
 constexpr std::array kTypeNames = {
-    TypeName{"STRING", FieldType::kString},       TypeName{"BYTES", FieldType::kBytes},
-    TypeName{"INTEGER", FieldType::kInteger},     TypeName{"INT64", FieldType::kInteger},
-    TypeName{"FLOAT", FieldType::kFloat},         TypeName{"FLOAT64", FieldType::kFloat},
-    TypeName{"NUMERIC", FieldType::kNumeric},     TypeName{"BIGNUMERIC", FieldType::kBigNumeric},
-    TypeName{"BOOLEAN", FieldType::kBoolean},     TypeName{"BOOL", FieldType::kBoolean},
-    TypeName{"TIMESTAMP", FieldType::kTimestamp}, TypeName{"DATE", FieldType::kDate},
-    TypeName{"TIME", FieldType::kTime},           TypeName{"DATETIME", FieldType::kDatetime},
-    TypeName{"INTERVAL", FieldType::kInterval},   TypeName{"RANGE", FieldType::kRange},
-    TypeName{"GEOGRAPHY", FieldType::kGeography}, TypeName{"JSON", FieldType::kJson},
-    TypeName{"RECORD", FieldType::kRecord},       TypeName{"STRUCT", FieldType::kRecord},
+    TypeName{.name = "STRING", .type = FieldType::kString},
+    TypeName{.name = "BYTES", .type = FieldType::kBytes},
+    TypeName{.name = "INTEGER", .type = FieldType::kInteger},
+    TypeName{.name = "INT64", .type = FieldType::kInteger},
+    TypeName{.name = "FLOAT", .type = FieldType::kFloat},
+    TypeName{.name = "FLOAT64", .type = FieldType::kFloat},
+    TypeName{.name = "NUMERIC", .type = FieldType::kNumeric},
+    TypeName{.name = "BIGNUMERIC", .type = FieldType::kBigNumeric},
+    TypeName{.name = "BOOLEAN", .type = FieldType::kBoolean},
+    TypeName{.name = "BOOL", .type = FieldType::kBoolean},
+    TypeName{.name = "TIMESTAMP", .type = FieldType::kTimestamp},
+    TypeName{.name = "DATE", .type = FieldType::kDate},
+    TypeName{.name = "TIME", .type = FieldType::kTime},
+    TypeName{.name = "DATETIME", .type = FieldType::kDatetime},
+    TypeName{.name = "INTERVAL", .type = FieldType::kInterval},
+    TypeName{.name = "RANGE", .type = FieldType::kRange},
+    TypeName{.name = "GEOGRAPHY", .type = FieldType::kGeography},
+    TypeName{.name = "JSON", .type = FieldType::kJson},
+    TypeName{.name = "RECORD", .type = FieldType::kRecord},
+    TypeName{.name = "STRUCT", .type = FieldType::kRecord},
 };
 
 struct ModeName {
@@ -46,9 +56,9 @@ struct ModeName {
 };
 
 constexpr std::array kModeNames = {
-    ModeName{"NULLABLE", FieldMode::kNullable},
-    ModeName{"REQUIRED", FieldMode::kRequired},
-    ModeName{"REPEATED", FieldMode::kRepeated},
+    ModeName{.name = "NULLABLE", .mode = FieldMode::kNullable},
+    ModeName{.name = "REQUIRED", .mode = FieldMode::kRequired},
+    ModeName{.name = "REPEATED", .mode = FieldMode::kRepeated},
 };
 
 bool EqualsIgnoringCase(std::string_view a, std::string_view b) {

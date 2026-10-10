@@ -87,7 +87,11 @@ std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
       !metadata.contains("fields") || !metadata["fields"].is_array()) {
     return std::nullopt;
   }
-  ViewMetadata view{metadata["query"].get<std::string>(), {}, CommentMetadata(comment)};
+  ViewMetadata view{
+      .query = metadata["query"].get<std::string>(),
+      .schema = {},
+      .metadata = CommentMetadata(comment),
+  };
   try {
     for (const json& field : metadata["fields"]) {
       view.schema.push_back(FieldSchemaFromJson(field));

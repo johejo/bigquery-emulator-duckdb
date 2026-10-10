@@ -331,7 +331,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     destination.project_id = project_id;
   }
   destination.project_id = ResolveProject(destination.project_id);
-  GetDataset(DatasetReference{destination.project_id, destination.dataset_id});
+  GetDataset(
+      DatasetReference{.project_id = destination.project_id, .dataset_id = destination.dataset_id});
   std::optional<TableInfo> existing;
   try {
     existing = GetTable(destination);

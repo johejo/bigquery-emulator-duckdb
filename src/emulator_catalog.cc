@@ -177,8 +177,9 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     try {
-      std::vector<FieldSchema> schema =
-          TableSchema(backend_, TableReference{project, dataset, table});
+      std::vector<FieldSchema> schema = TableSchema(
+          backend_,
+          TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
       GeographyAsString(schema);
       return schema;
     } catch (const BackendError&) {
@@ -189,7 +190,7 @@ class DuckDbTableSource : public TableSource {
   std::optional<TableDescription> DescribeTable(const std::string& project,
                                                 const std::string& dataset,
                                                 const std::string& table) override {
-    const TableReference reference{project, dataset, table};
+    const TableReference reference{.project_id = project, .dataset_id = dataset, .table_id = table};
     if (IsDuckDbSchema(dataset)) {
       return std::nullopt;
     }
@@ -214,13 +215,14 @@ class DuckDbTableSource : public TableSource {
 
   std::vector<std::string> ListTables(const std::string& project,
                                       const std::string& dataset) override {
-    return FirstColumnStrings(backend_.Execute(TablesQuery(DatasetReference{project, dataset})));
+    return FirstColumnStrings(backend_.Execute(
+        TablesQuery(DatasetReference{.project_id = project, .dataset_id = dataset})));
   }
 
   std::optional<std::string> FindViewQuery(const std::string& project, const std::string& dataset,
                                            const std::string& table) override {
-    const std::optional<json> comment =
-        ViewComment(backend_, TableReference{project, dataset, table});
+    const std::optional<json> comment = ViewComment(
+        backend_, TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
     if (!comment.has_value()) {
       return std::nullopt;
     }
@@ -402,7 +404,7 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
 
 TableInfo Emulator::GetTable(TableReference table, bool include_row_count) {
   table.project_id = ResolveProject(table.project_id);
-  const DatasetReference dataset{table.project_id, table.dataset_id};
+  const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   GetDataset(dataset);
   TableInfo info;
   info.reference = table;
@@ -435,7 +437,7 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count) {
 void Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
                            const TableMetadata& metadata) {
   table.project_id = ResolveProject(table.project_id);
-  GetDataset(DatasetReference{table.project_id, table.dataset_id});
+  GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
     columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
@@ -477,7 +479,8 @@ void Emulator::UpdateTable(TableReference table,
       definition.update(*view);
       WriteView(table, definition, metadata.value_or(info.metadata), /*replace=*/true);
     } else if (metadata.has_value()) {
-      Execute(ViewCommentStatement(table, {*info.view_query, info.schema, *metadata}));
+      Execute(ViewCommentStatement(
+          table, {.query = *info.view_query, .schema = info.schema, .metadata = *metadata}));
     }
     return;
   }
@@ -505,7 +508,7 @@ void Emulator::UpdateTable(TableReference table,
 void Emulator::WriteView(TableReference table, const json& definition,
                          const TableMetadata& metadata, bool replace) {
   table.project_id = ResolveProject(table.project_id);
-  GetDataset(DatasetReference{table.project_id, table.dataset_id});
+  GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   if (definition.value("useLegacySql", true)) {
     throw ApiError::Invalid("The emulator does not support legacy SQL views");
   }
@@ -556,9 +559,9 @@ std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
   std::vector<Routine> routines;
   for (const json& row : Execute(RoutinesQuery(dataset)).rows) {
     const RoutineReference reference{
-        dataset.project_id,
-        dataset.dataset_id,
-        row["f"][0]["v"].get<std::string>(),
+        .project_id = dataset.project_id,
+        .dataset_id = dataset.dataset_id,
+        .routine_id = row["f"][0]["v"].get<std::string>(),
     };
     if (std::optional<Routine> routine = ParseRoutineComment(reference, row["f"][1]["v"])) {
       routines.push_back(*std::move(routine));
@@ -569,7 +572,7 @@ std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
 
 Routine Emulator::GetRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
-  GetDataset(DatasetReference{routine.project_id, routine.dataset_id});
+  GetDataset(DatasetReference{.project_id = routine.project_id, .dataset_id = routine.dataset_id});
   const QueryResult result = Execute(RoutineQuery(routine));
   std::optional<Routine> found = result.rows.empty()
                                      ? std::nullopt
@@ -584,7 +587,7 @@ Routine Emulator::GetRoutine(RoutineReference routine) {
 Routine Emulator::WriteRoutine(Routine routine, bool update) {
   routine.reference.project_id = ResolveProject(routine.reference.project_id);
   const RoutineReference& reference = routine.reference;
-  GetDataset({reference.project_id, reference.dataset_id});
+  GetDataset({.project_id = reference.project_id, .dataset_id = reference.dataset_id});
   std::optional<Routine> previous;
   if (update) previous = GetRoutine(reference);
   try {
@@ -678,7 +681,7 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
       statements.push_back(std::move(statement));
       indexes.push_back(i);
     } catch (const ApiError& error) {
-      errors.push_back({i, error.what()});
+      errors.push_back({.index = i, .message = error.what()});
     }
   }
   if (!skip_invalid_rows && !errors.empty()) {
@@ -686,7 +689,7 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
   }
   try {
     for (const auto& [index, message] : backend_.InsertRows(statements, skip_invalid_rows)) {
-      errors.push_back({indexes.at(index), message});
+      errors.push_back({.index = indexes.at(index), .message = message});
     }
   } catch (const BackendError& error) {
     throw ApiError::Invalid(error.what());

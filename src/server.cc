@@ -109,8 +109,11 @@ class Server::Impl {
       std::vector<std::string> accepted;
       httplib::Server::Handler handler;
     };
-    const auto route = std::make_shared<const CheckedRoute>(
-        CheckedRoute{std::move(method), std::move(accepted), handler});
+    const auto route = std::make_shared<const CheckedRoute>(CheckedRoute{
+        .method = std::move(method),
+        .accepted = std::move(accepted),
+        .handler = handler,
+    });
     const httplib::Server::Handler checked = [route, this](const httplib::Request& request,
                                                            httplib::Response& response) {
       try {
@@ -372,8 +375,9 @@ class Server::Impl {
               throw ApiError::Invalid("The emulator does not support conditional routine updates");
             }
             const RoutineReference reference = RoutineFromPath(request);
-            Routine routine =
-                ParseRoutine({reference.project_id, reference.dataset_id}, ParseBody(request));
+            Routine routine = ParseRoutine(
+                {.project_id = reference.project_id, .dataset_id = reference.dataset_id},
+                ParseBody(request));
             if (routine.reference.routine_id != reference.routine_id) {
               throw ApiError::Invalid("Routine reference does not match the request path");
             }

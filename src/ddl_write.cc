@@ -102,7 +102,8 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
-      ViewCommentStatement(table, {view.query, view.schema, view.metadata}),
+      ViewCommentStatement(table,
+                           {.query = view.query, .schema = view.schema, .metadata = view.metadata}),
   };
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);

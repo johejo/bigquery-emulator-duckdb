@@ -33,7 +33,11 @@ std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& pa
   if (parts.empty()) {
     return Unsupported(scope, "function name " + Join(path, "."));
   }
-  scope.context.ddl_target_routine = RoutineReference{parts.at(0), parts.at(1), parts.at(2)};
+  scope.context.ddl_target_routine = RoutineReference{
+      .project_id = parts.at(0),
+      .dataset_id = parts.at(1),
+      .routine_id = parts.at(2),
+  };
   return scope.context.ddl_target_routine;
 }
 

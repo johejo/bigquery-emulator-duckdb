@@ -53,9 +53,9 @@ std::string StringField(const json& object, const char* key, std::string_view wh
 TableReference ParseTableReference(const json& table, std::string_view what) {
   if (!table.is_object()) throw ApiError::Invalid("Invalid " + std::string(what));
   TableReference result{
-      StringField(table, "projectId", what),
-      StringField(table, "datasetId", what),
-      StringField(table, "tableId", what),
+      .project_id = StringField(table, "projectId", what),
+      .dataset_id = StringField(table, "datasetId", what),
+      .table_id = StringField(table, "tableId", what),
   };
   if (result.dataset_id.empty() || result.table_id.empty()) {
     throw ApiError::Invalid("Invalid " + std::string(what));
@@ -70,8 +70,8 @@ std::optional<DatasetReference> ParseDefaultDataset(const json& config) {
   const json& dataset = config["defaultDataset"];
   if (!dataset.is_object()) throw ApiError::Invalid("Invalid default dataset");
   return DatasetReference{
-      StringField(dataset, "projectId", "default dataset"),
-      StringField(dataset, "datasetId", "default dataset"),
+      .project_id = StringField(dataset, "projectId", "default dataset"),
+      .dataset_id = StringField(dataset, "datasetId", "default dataset"),
   };
 }
 
@@ -241,22 +241,25 @@ bool QueryParamBool(const httplib::Request& request, const char* name) {
 }
 
 DatasetReference DatasetFromPath(const httplib::Request& request) {
-  return DatasetReference{Param(request, "projectId"), Param(request, "datasetId")};
+  return DatasetReference{
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+  };
 }
 
 TableReference TableFromPath(const httplib::Request& request) {
   return TableReference{
-      Param(request, "projectId"),
-      Param(request, "datasetId"),
-      Param(request, "tableId"),
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+      .table_id = Param(request, "tableId"),
   };
 }
 
 RoutineReference RoutineFromPath(const httplib::Request& request) {
   return RoutineReference{
-      Param(request, "projectId"),
-      Param(request, "datasetId"),
-      Param(request, "routineId"),
+      .project_id = Param(request, "projectId"),
+      .dataset_id = Param(request, "datasetId"),
+      .routine_id = Param(request, "routineId"),
   };
 }
 
@@ -309,7 +312,7 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
   }
   if (parts.size() != 2) throw ApiError::Invalid("Invalid multipart upload");
   try {
-    return {json::parse(parts.at(0)), std::move(parts.at(1))};
+    return {.metadata = json::parse(parts.at(0)), .content = std::move(parts.at(1))};
   } catch (const json::exception& error) {
     throw ApiError::Invalid(std::string("Invalid upload metadata: ") + error.what());
   }
@@ -487,7 +490,11 @@ DatasetInsertRequest ParseDatasetInsert(const std::string& project_id, const jso
     throw ApiError::Invalid("Required parameter is missing: datasetId");
   }
   return {
-      .dataset = DatasetReference{project_id, StringField(reference, "datasetId", "dataset ID")},
+      .dataset =
+          DatasetReference{
+              .project_id = project_id,
+              .dataset_id = StringField(reference, "datasetId", "dataset ID"),
+          },
       .metadata = DatasetMetadataFromJson(body),
   };
 }
@@ -499,9 +506,9 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
   }
   TableInsertRequest request;
   request.table = TableReference{
-      dataset.project_id,
-      dataset.dataset_id,
-      StringField(reference, "tableId", "table ID"),
+      .project_id = dataset.project_id,
+      .dataset_id = dataset.dataset_id,
+      .table_id = StringField(reference, "tableId", "table ID"),
   };
   if (body.contains("view")) {
     request.view = body["view"];
@@ -572,7 +579,12 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
     }
   }
   return {
-      .reference = {dataset.project_id, dataset.dataset_id, id},
+      .reference =
+          {
+              .project_id = dataset.project_id,
+              .dataset_id = dataset.dataset_id,
+              .routine_id = id,
+          },
       .resource = std::move(resource),
   };
 }

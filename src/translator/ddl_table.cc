@@ -186,7 +186,11 @@ std::optional<std::string> TemporaryTargetTable(const std::vector<std::string>& 
   if (temporary == nullptr || !name) {
     return Unsupported(scope, "temporary table " + Join(path, "."));
   }
-  scope.context.ddl_target_table = TableReference{temporary->project, temporary->dataset, *name};
+  scope.context.ddl_target_table = TableReference{
+      .project_id = temporary->project,
+      .dataset_id = temporary->dataset,
+      .table_id = *name,
+  };
   return QualifiedName(*scope.context.ddl_target_table);
 }
 

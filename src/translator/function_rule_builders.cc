@@ -30,7 +30,7 @@ std::vector<Rule> Same(std::string_view function, Arity arity,
     for (std::size_t i = 1; i <= count; ++i) {
       spelling += (i == 1 ? "$" : ", $") + std::to_string(i);
     }
-    rules.push_back({count, spelling + ")", conditions});
+    rules.push_back({.arity = count, .spelling = spelling + ")", .conditions = conditions});
   }
   return rules;
 }
@@ -58,7 +58,11 @@ std::string BigNumericCall(std::string_view function, std::size_t bignumerics, s
 
 // An operator on BIGNUMERIC, all of whose `arity` arguments are BIGNUMERIC.
 Rule BigNumericOperator(std::string_view function, std::size_t arity) {
-  return {arity, BigNumericCall(function, arity), {Is(1, {TYPE_BIGNUMERIC})}};
+  return {
+      .arity = arity,
+      .spelling = BigNumericCall(function, arity),
+      .conditions = {Is(1, {TYPE_BIGNUMERIC})},
+  };
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

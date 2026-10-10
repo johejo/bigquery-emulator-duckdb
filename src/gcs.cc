@@ -41,7 +41,7 @@ ObjectUri ParseUri(const std::string& uri) {
   if (uri.substr(5, slash - 5).find('*') != std::string::npos) {
     throw ApiError::Invalid("Wildcard is not allowed in a bucket name: " + uri);
   }
-  return {uri.substr(5, slash - 5), uri.substr(slash + 1)};
+  return {.bucket = uri.substr(5, slash - 5), .object = uri.substr(slash + 1)};
 }
 
 struct Endpoint {
@@ -53,15 +53,16 @@ Endpoint EndpointFromEnvironment() {
   // The SDK reads these itself and lets them override any configured endpoint, so they take
   // precedence here too.
   for (const char* name : {"CLOUD_STORAGE_EMULATOR_ENDPOINT", "CLOUD_STORAGE_TESTBENCH_ENDPOINT"}) {
-    if (const char* value = std::getenv(name)) return {value, true};
+    if (const char* value = std::getenv(name)) return {.url = value, .emulator = true};
   }
   const char* host = std::getenv("STORAGE_EMULATOR_HOST");
-  if (host == nullptr || *host == '\0') return {"https://storage.googleapis.com", false};
+  if (host == nullptr || *host == '\0')
+    return {.url = "https://storage.googleapis.com", .emulator = false};
   std::string url = host;
   while (!url.empty() && url.back() == '/') url.pop_back();
   // Like the Google client libraries, accept a bare "host:port" as an HTTP endpoint.
   if (url.find("://") == std::string::npos) url = "http://" + url;
-  return {url, true};
+  return {.url = url, .emulator = true};
 }
 
 }  // namespace

@@ -238,24 +238,27 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
       switch (duckdb_decimal_internal_type(type)) {
         case DUCKDB_TYPE_SMALLINT: {
           const int64_t value = VectorElement<int16_t>(vector, row);
-          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          number = {.lower = static_cast<uint64_t>(value), .upper = value < 0 ? -1 : 0};
           break;
         }
         case DUCKDB_TYPE_INTEGER: {
           const int64_t value = VectorElement<int32_t>(vector, row);
-          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          number = {.lower = static_cast<uint64_t>(value), .upper = value < 0 ? -1 : 0};
           break;
         }
         case DUCKDB_TYPE_BIGINT: {
           const auto value = VectorElement<int64_t>(vector, row);
-          number = {static_cast<uint64_t>(value), value < 0 ? -1 : 0};
+          number = {.lower = static_cast<uint64_t>(value), .upper = value < 0 ? -1 : 0};
           break;
         }
         default:
           number = VectorElement<duckdb_hugeint>(vector, row);
       }
-      return Value(
-          duckdb_create_decimal({duckdb_decimal_width(type), duckdb_decimal_scale(type), number}));
+      return Value(duckdb_create_decimal({
+          .width = duckdb_decimal_width(type),
+          .scale = duckdb_decimal_scale(type),
+          .value = number,
+      }));
     }
     case DUCKDB_TYPE_ENUM: {
       uint64_t index = 0;
@@ -273,8 +276,10 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
     }
     case DUCKDB_TYPE_UUID: {
       const auto uuid = VectorElement<duckdb_hugeint>(vector, row);
-      return Value(duckdb_create_uuid(
-          {uuid.lower, static_cast<uint64_t>(uuid.upper) ^ (uint64_t{1} << 63U)}));
+      return Value(duckdb_create_uuid({
+          .lower = uuid.lower,
+          .upper = static_cast<uint64_t>(uuid.upper) ^ (uint64_t{1} << 63U),
+      }));
     }
     case DUCKDB_TYPE_VARCHAR: {
       const std::string text = VectorString(vector, row);
@@ -291,8 +296,9 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
     case DUCKDB_TYPE_ARRAY: {
       const bool array = duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
       const idx_t size = array ? duckdb_array_type_array_size(type) : 0;
-      const duckdb_list_entry entry = array ? duckdb_list_entry{row * size, size}
-                                            : VectorElement<duckdb_list_entry>(vector, row);
+      const duckdb_list_entry entry = array
+                                          ? duckdb_list_entry{.offset = row * size, .length = size}
+                                          : VectorElement<duckdb_list_entry>(vector, row);
       duckdb_vector child =
           array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
       LogicalType const child_type = ElementType(type);
@@ -357,12 +363,16 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
           return static_cast<char>(~static_cast<unsigned char>(byte));
         });
       }
-      return Value(
-          duckdb_create_bignum({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size(), negative}));
+      return Value(duckdb_create_bignum({
+          .data = reinterpret_cast<uint8_t*>(bytes.data()),
+          .size = bytes.size(),
+          .is_negative = negative,
+      }));
     }
     case DUCKDB_TYPE_BIT: {
       std::string bytes = VectorString(vector, row);
-      return Value(duckdb_create_bit({reinterpret_cast<uint8_t*>(bytes.data()), bytes.size()}));
+      return Value(duckdb_create_bit(
+          {.data = reinterpret_cast<uint8_t*>(bytes.data()), .size = bytes.size()}));
     }
     default:
       throw BackendError("Unsupported DuckDB result type: " +
@@ -400,8 +410,9 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
       LogicalType const child_type = ElementType(type);
       const bool array = duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
       const idx_t size = array ? duckdb_array_type_array_size(type) : 0;
-      const duckdb_list_entry entry = array ? duckdb_list_entry{row * size, size}
-                                            : VectorElement<duckdb_list_entry>(vector, row);
+      const duckdb_list_entry entry = array
+                                          ? duckdb_list_entry{.offset = row * size, .length = size}
+                                          : VectorElement<duckdb_list_entry>(vector, row);
       duckdb_vector child =
           array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
       for (idx_t i = 0; i < entry.length; ++i) {

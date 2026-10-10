@@ -489,7 +489,7 @@ void RegisterBigNumericTypes(duckdb_connection connection) {
       if (duckdb_register_logical_type(connection, type.get(), nullptr) == DuckDBError) {
         throw BackendError("DuckDB failed to register BIGNUMERIC(P, S)");
       }
-      const PrecisionScale parameters{precision, scale};
+      const PrecisionScale parameters{.precision = precision, .scale = scale};
       RegisterCast(connection, bignum.get(), type.get(), CastToPrecisionScale<false>, parameters,
                    -1);
       RegisterCast(connection, varchar.get(), type.get(), CastToPrecisionScale<true>, parameters,

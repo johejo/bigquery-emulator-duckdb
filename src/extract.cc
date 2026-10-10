@@ -272,10 +272,10 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
     element.SetField(pq::kElementLogicalType,
                      ThriftValue::Struct({
                          {
-                             pq::kLogicalDecimal,
-                             ThriftValue::Struct({
-                                 {pq::kDecimalScale, ThriftValue::Int32(38)},
-                                 {pq::kDecimalPrecision, ThriftValue::Int32(76)},
+                             .id = pq::kLogicalDecimal,
+                             .value = ThriftValue::Struct({
+                                 {.id = pq::kDecimalScale, .value = ThriftValue::Int32(38)},
+                                 {.id = pq::kDecimalPrecision, .value = ThriftValue::Int32(76)},
                              }),
                          },
                      }));

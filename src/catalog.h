@@ -104,7 +104,9 @@ class BigQueryTable : public googlesql::SimpleTable {
   [[nodiscard]] std::optional<TableDescription> Describe() const {
     return source_.DescribeTable(path_.at(0), path_.at(1), path_.at(2));
   }
-  [[nodiscard]] TableReference reference() const { return {path_.at(0), path_.at(1), path_.at(2)}; }
+  [[nodiscard]] TableReference reference() const {
+    return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
+  }
 
  private:
   TableSource& source_;
