@@ -2365,18 +2365,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "SAFE.CEIL on NUMERIC fails on an out-of-range result instead of returning NULL"
-  label: "code:safe_error_mode__safe_ceil_NUMERIC_99999999999999999999999999999.999999999"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE.CEILING on NUMERIC fails on an out-of-range result instead of returning NULL"
-  label: "code:safe_error_mode__safe_ceiling_NUMERIC_99999999999999999999999999999.999999999"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "SAFE.DATE fails on a date outside BigQuery's range instead of returning NULL"
   label: "code:safe_error_mode__safe_date_TIMESTAMP_-62135596046000000_STRING_<PST8PDT>"
   label: "code:safe_error_mode__safe_date_TIMESTAMP_253402279954000000_STRING_<Asia/Shanghai>"

@@ -26,6 +26,30 @@ Condition SubDay(std::size_t argument) {
   return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});
 }
 
+// DuckDB rounds DECIMAL to scale zero; converting that result back to NUMERIC
+// can overflow. Check the input first so SAFE. also handles that error.
+std::vector<Rule> IntegralRound(std::string_view function) {
+  const bool ceiling = function == "ceil";
+  const std::string name(function);
+  const std::string bound =
+      ceiling ? "99999999999999999999999999999" : "-99999999999999999999999999999";
+  return {
+      BigNumericOperator("bq_bignumeric_" + name, 1),
+      {
+          .arity = 1,
+          .spelling = "CASE WHEN $1 " + std::string(ceiling ? ">" : "<") + " CAST('" + bound +
+                      "' AS DECIMAL(38, 9)) THEN !1 ELSE " + name + "($1) END",
+          .conditions = {Is(1, {TYPE_NUMERIC})},
+          .defaults = {},
+          .errors =
+              {
+                  "'numeric overflow: " + ToUpperAscii(name) + "(' || bq_format('%t', $1) || ')'",
+              },
+      },
+      {.arity = 1, .spelling = name + "($1)"},
+  };
+}
+
 // BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
 std::string WeekStart(const std::string& value, bool iso) {
   return iso ? "date_trunc('week', " + value + ")"
@@ -661,15 +685,9 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           }),
       },
       {"ABS", {BigNumericOperator("bq_bignumeric_abs", 1), {.arity = 1, .spelling = "abs($1)"}}},
-      {"CEIL", {BigNumericOperator("bq_bignumeric_ceil", 1), {.arity = 1, .spelling = "ceil($1)"}}},
-      {
-          "CEILING",
-          {BigNumericOperator("bq_bignumeric_ceil", 1), {.arity = 1, .spelling = "ceil($1)"}},
-      },
-      {
-          "FLOOR",
-          {BigNumericOperator("bq_bignumeric_floor", 1), {.arity = 1, .spelling = "floor($1)"}},
-      },
+      {"CEIL", IntegralRound("ceil")},
+      {"CEILING", IntegralRound("ceil")},
+      {"FLOOR", IntegralRound("floor")},
       // DuckDB cannot cast an empty BLOB to BIT.
       {
           "BIT_COUNT",
