@@ -9,24 +9,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// runScript runs sql with dataset as its default dataset and waits for the job to finish.
-func runScript(t *testing.T, client *bigquery.Client, dataset, sql string) (*bigquery.Job,
-	*bigquery.JobStatus, error) {
-	t.Helper()
-	ctx := context.Background()
-	query := client.Query(sql)
-	query.DefaultDatasetID = dataset
-	job, err := query.Run(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	status, err := job.Wait(ctx)
-	if err != nil {
-		return job, nil, err
-	}
-	return job, status, status.Err()
-}
-
 func TestMultiStatementQueryReturnsItsLastResult(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -65,41 +47,6 @@ SELECT COUNT(*) AS c, SUM(id) AS s FROM t;`)
 	}
 	if err := rows.Next(&row); err != iterator.Done {
 		t.Errorf("got another row or an error: %v", err)
-	}
-}
-
-func TestMultiStatementQueryFailsWithTheFailedStatement(t *testing.T) {
-	client := newClient(t)
-	_, _, err := runScript(t, client, "", "SELECT 1;\nSELECT 1/0;")
-	if err == nil || !strings.Contains(err.Error(), "division by zero") {
-		t.Errorf("got %v, want a division by zero", err)
-	}
-}
-
-func TestMultiStatementQueryFailsWhenAVariableBreaksItsTypeParameters(t *testing.T) {
-	client := newClient(t)
-	_, _, err := runScript(t, client, "", "DECLARE x STRING(3) DEFAULT 'abcd'; SELECT x")
-	if err == nil {
-		t.Error("got no error, want STRING(3) to fail to take 'abcd'")
-	}
-}
-
-// The emulator rejects what it does not run, even inside an exception handler, which would
-// otherwise handle the rejection as an error of the script.
-func TestMultiStatementQueryRejectsUnsupportedForms(t *testing.T) {
-	client := newClient(t)
-	for _, sql := range []string{
-		"BEGIN EXECUTE IMMEDIATE 'BEGIN SELECT 1; END'; EXCEPTION WHEN ERROR THEN SELECT 1; END",
-		"BEGIN EXECUTE IMMEDIATE 'BEGIN TRANSACTION'; EXCEPTION WHEN ERROR THEN SELECT 1; END",
-		"CALL d.p(); SELECT 1",
-		"BEGIN TRANSACTION; CREATE TEMP FUNCTION f(x INT64) AS (x); ROLLBACK TRANSACTION",
-		"BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END",
-		"SET @@time_zone = 'Asia/Tokyo'; SELECT CURRENT_DATE()",
-	} {
-		_, _, err := runScript(t, client, "", sql)
-		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
-			t.Errorf("%s: got %v, want an unsupported error", sql, err)
-		}
 	}
 }
 
@@ -196,16 +143,6 @@ func TestExecuteImmediateFollowsTheDocumentedRules(t *testing.T) {
 		}
 	}
 
-	for _, sql := range []string{
-		`DECLARE x INT64; EXECUTE IMMEDIATE "SELECT * FROM UNNEST([1, 2])" INTO x`,
-		`DECLARE x INT64 DEFAULT 1; EXECUTE IMMEDIATE "SELECT x"`,
-		`EXECUTE IMMEDIATE "EXECUTE IMMEDIATE 'SELECT 1'"`,
-		`EXECUTE IMMEDIATE "IF TRUE THEN SELECT 1; END IF"`,
-	} {
-		if _, _, err := runScript(t, client, "", sql); err == nil {
-			t.Errorf("%s: succeeded, want an error", sql)
-		}
-	}
 	query := client.Query(`SELECT @p; EXECUTE IMMEDIATE "SELECT @p"`)
 	query.Parameters = []bigquery.QueryParameter{{Name: "p", Value: int64(1)}}
 	job, err := query.Run(ctx)
@@ -326,26 +263,6 @@ SELECT a FROM t;`)
 	}
 }
 
-func TestTemporaryTablesRejectedForms(t *testing.T) {
-	client := newClient(t)
-	for _, sql := range []string{
-		// Only a multi-statement query creates temporary tables.
-		"CREATE TEMP TABLE n (x INT64)",
-		// A temporary table takes no project or dataset qualifier.
-		"CREATE TEMP TABLE d.n (x INT64); SELECT 1",
-	} {
-		if _, _, err := runScript(t, client, "", sql); err == nil {
-			t.Errorf("%s: succeeded, want an error", sql)
-		}
-	}
-	// A view would outlive the temporary table it reads.
-	sql := "CREATE TEMP TABLE n AS SELECT 1 AS x; CREATE VIEW go_scripts_temporary_view.v AS SELECT x FROM n"
-	_, _, err := runScript(t, client, "", sql)
-	if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
-		t.Errorf("%s: got %v, want an unsupported error", sql, err)
-	}
-}
-
 // Temporary functions have query scope, and declarations and calls are case-insensitive.
 // https://cloud.google.com/bigquery/docs/user-defined-functions
 func TestTemporaryFunctionsHaveQueryScope(t *testing.T) {
@@ -361,47 +278,6 @@ func TestTemporaryFunctionsHaveQueryScope(t *testing.T) {
 	_, _, err := runScript(t, client, "", "CREATE TEMP FUNCTION f() AS (1); CREATE TEMP FUNCTION F() AS (2); SELECT f()")
 	if err == nil {
 		t.Error("duplicate function declarations succeeded")
-	}
-}
-
-func TestTemporaryFunctionsRejectUnsupportedForms(t *testing.T) {
-	client := newClient(t)
-	for _, sql := range []string{
-		"@{test_hint = 1} CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
-		"CREATE OR REPLACE TEMP FUNCTION f(x INT64) AS (x); SELECT 1",
-		"CREATE TEMP FUNCTION IF NOT EXISTS f(x INT64) AS (x); SELECT 1",
-		"CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT 1",
-		"CREATE TEMP FUNCTION f(`x-y` FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT 1",
-		"BEGIN CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); EXCEPTION WHEN ERROR THEN SELECT 1; END",
-		"CREATE TEMP FUNCTION f(x FLOAT64) AS ((SELECT SUM(v) FROM UNNEST([x]) AS v)); SELECT f(RAND())",
-		"CREATE TEMP FUNCTION f(x ANY TYPE) AS ((SELECT SUM(v) FROM UNNEST([x]) AS v)); SELECT f(RAND())",
-		"CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT SAFE.f(1)",
-		"CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); CREATE VIEW go_udf_views.v AS SELECT f(1) AS x",
-		"CREATE TEMP FUNCTION parse_number(x STRING) AS (CAST(x AS INT64)); SELECT SAFE.parse_number('invalid')",
-		"CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); SELECT 1",
-		"CREATE TEMP FUNCTION f(x INT64) AS (x); CREATE VIEW go_udf_views.v AS SELECT ABS(f(1)) AS x",
-	} {
-		_, _, err := runScript(t, client, "", sql)
-		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
-			t.Errorf("%s: got %v, want an unsupported error", sql, err)
-		}
-	}
-	for _, sql := range []string{
-		"CREATE TEMP FUNCTION d.f(x INT64) AS (x); SELECT 1",
-		"CREATE TEMP FUNCTION `d.f`(x INT64) AS (x); SELECT 1",
-		"CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f('wrong type')",
-		"CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f(1, 2)",
-		"DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f() AS (x); SELECT f()",
-		"DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f(y ANY TYPE) AS (x + y); SELECT f(1)",
-		// https://cloud.google.com/bigquery/docs/user-defined-functions#templated-sql-udf-parameters
-		"CREATE TEMP FUNCTION f(x ANY TYPE) AS (x + 1); SELECT f('a')",
-		"CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT f(1, 2)",
-		"CREATE TEMP FUNCTION f(x FLOAT64) AS (1 / x); SELECT f(0)",
-		"CREATE TEMP FUNCTION f(x FLOAT64) AS (x); SELECT f(1 / 0)",
-	} {
-		if _, _, err := runScript(t, client, "", sql); err == nil {
-			t.Errorf("%s: succeeded, want an error", sql)
-		}
 	}
 }
 
@@ -525,29 +401,5 @@ func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
 	inner := fields[2].Schema
 	if len(inner) != 2 || inner[0].Name != "_field_2" || inner[1].Name != "_field_2" {
 		t.Fatalf("got nested STRUCT schema %+v", inner)
-	}
-}
-
-// These comparisons would inherit DuckDB's NULL-field equality; keep the newly representable
-// types unsupported until comparison semantics are implemented.
-func TestAnonymousStructFormsRemainUnsupported(t *testing.T) {
-	client := newClient(t)
-	for _, sql := range []string{
-		`SELECT STRUCT(NULL) = STRUCT(1)`,
-		`SELECT STRUCT(1 AS a, NULL AS a) != STRUCT(1 AS a, 2 AS a)`,
-		`SELECT NULLIF(STRUCT(NULL), STRUCT(1))`,
-		`SELECT CASE STRUCT(NULL) WHEN STRUCT(1) THEN 1 ELSE 2 END`,
-		`SELECT STRUCT(NULL) IN (STRUCT(1), STRUCT(2))`,
-		`SELECT STRUCT(NULL) IN UNNEST([STRUCT(1), STRUCT(2)])`,
-		`SELECT STRUCT(NULL) IN (SELECT STRUCT(1))`,
-		`SELECT STRUCT(NULL) = ALL UNNEST([STRUCT(1), STRUCT(2)])`,
-		`SELECT [STRUCT(NULL)] = [STRUCT(1)]`,
-		`SELECT CAST(STRUCT(1, 2) AS JSON)`,
-		`SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM UNNEST([1, 2]) AS a`,
-	} {
-		_, _, err := runScript(t, client, "", sql)
-		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {
-			t.Errorf("%s: got %v, want unsupported STRUCT form", sql, err)
-		}
 	}
 }

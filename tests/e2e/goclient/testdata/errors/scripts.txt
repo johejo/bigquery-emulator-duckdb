@@ -1,0 +1,27 @@
+# Scripts reject unsupported forms even inside exception handlers.
+# Parameterized types follow the BigQuery data types reference.
+
+BEGIN EXECUTE IMMEDIATE 'BEGIN SELECT 1; END'; EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+BEGIN EXECUTE IMMEDIATE 'BEGIN TRANSACTION'; EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+CALL d.p(); SELECT 1
+=> error contains: The emulator does not support
+
+BEGIN TRANSACTION; CREATE TEMP FUNCTION f(x INT64) AS (x); ROLLBACK TRANSACTION
+=> error contains: The emulator does not support
+
+BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
+=> error contains: The emulator does not support
+
+SET @@time_zone = 'Asia/Tokyo'; SELECT CURRENT_DATE()
+=> error contains: The emulator does not support
+
+SELECT 1;
+SELECT 1/0;
+=> error contains: division by zero
+
+DECLARE x STRING(3) DEFAULT 'abcd'; SELECT x
+=> error:

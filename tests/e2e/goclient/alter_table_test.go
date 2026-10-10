@@ -19,17 +19,8 @@ func TestAlterTableAddColumn(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
+		_, _, err := runScript(t, client, dataset.DatasetID, sql)
+		return err
 	}
 	for _, sql := range []string{
 		"CREATE TABLE users (id INT64)",
@@ -126,17 +117,8 @@ func TestAlterTableDropColumnAndRename(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
+		_, _, err := runScript(t, client, dataset.DatasetID, sql)
+		return err
 	}
 	for _, sql := range []string{
 		`CREATE TABLE events (id INT64, day DATE, name STRING, note STRING, extra STRING)
@@ -212,17 +194,8 @@ func TestAlterTableSetOptions(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
+		_, _, err := runScript(t, client, dataset.DatasetID, sql)
+		return err
 	}
 	type metadata struct {
 		Description, Name string
@@ -281,17 +254,8 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	run := func(sql string) error {
-		query := client.Query(sql)
-		query.DefaultDatasetID = dataset.DatasetID
-		job, err := query.Run(ctx)
-		if err != nil {
-			return err
-		}
-		status, err := job.Wait(ctx)
-		if err != nil {
-			return err
-		}
-		return status.Err()
+		_, _, err := runScript(t, client, dataset.DatasetID, sql)
+		return err
 	}
 	check := func(want bigquery.Schema) {
 		t.Helper()
