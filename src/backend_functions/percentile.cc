@@ -66,12 +66,15 @@ NumericValue Numeric(duckdb_hugeint units) {
       .value_or(NumericValue());
 }
 
-// PERCENTILE_CONT of the sorted list in argument 0, a list of DOUBLE or of DECIMAL(38, 9), at
-// the percentile in argument 1. A NULL list has no values.
+// PERCENTILE_CONT of the sorted list in argument 0, a list of DOUBLE, of DECIMAL(38, 9) or of the
+// VARCHAR of BIGNUMERIC units, at the percentile in argument 1, of the same type as the elements.
+// A NULL list has no values.
 template <typename T>
 void PercentileCont(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  // DuckDB takes a DECIMAL(38, 9) as its units.
-  using Result = std::conditional_t<std::is_same_v<T, double>, double, __int128>;
+  // DuckDB takes a DECIMAL(38, 9) as its units, and a BIGNUMERIC crosses as the VARCHAR of its.
+  using Result = std::conditional_t<
+      std::is_same_v<T, double>, double,
+      std::conditional_t<std::is_same_v<T, NumericValue>, __int128, std::string>>;
   EachRow(
       info, input, output,
       [](const Arguments& arguments) -> absl::StatusOr<std::optional<Result>> {
@@ -104,6 +107,18 @@ void PercentileCont(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
               entry.length - nulls);
           found = evaluator->template ComputePercentileCont<true>(values.begin(), values.end(),
                                                                   nulls, &result);
+        } else if constexpr (std::is_same_v<T, BigNumericValue>) {
+          std::vector<BigNumericValue> values;
+          values.reserve(entry.length - nulls);
+          for (std::size_t i = nulls; i < entry.length; ++i) {
+            const auto value = BigNumericFromUnits(VectorString(child, entry.offset + i));
+            if (!value.ok()) {
+              return value.status();
+            }
+            values.push_back(*value);
+          }
+          found = evaluator->template ComputePercentileCont<true>(values.begin(), values.end(),
+                                                                  nulls, &result);
         } else {
           const auto values =
               std::span(static_cast<const duckdb_hugeint*>(duckdb_vector_get_data(child)) +
@@ -118,6 +133,8 @@ void PercentileCont(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
         }
         if constexpr (std::is_same_v<T, double>) {
           return result;
+        } else if constexpr (std::is_same_v<T, BigNumericValue>) {
+          return BigNumericUnits(result);
         } else {
           return result.as_packed_int();
         }
@@ -161,6 +178,7 @@ void RegisterPercentileFunctions(duckdb_connection connection) {
   LogicalType numeric_list(duckdb_create_list_type(numeric.get()));
   LogicalType int64(duckdb_create_logical_type(kBigint));
   LogicalType varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType varchar_list(duckdb_create_list_type(varchar.get()));
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
   // constructor.
   using Types = std::vector<duckdb_logical_type>;
@@ -168,6 +186,8 @@ void RegisterPercentileFunctions(duckdb_connection connection) {
            float64.get(), PercentileCont<double>, /*nulls=*/false);
   Register(connection, "bq_percentile_cont_numeric", Types{numeric_list.get(), numeric.get()},
            numeric.get(), PercentileCont<NumericValue>, /*nulls=*/false);
+  Register(connection, "bq_percentile_cont_bignumeric", Types{varchar_list.get(), varchar.get()},
+           varchar.get(), PercentileCont<BigNumericValue>, /*nulls=*/false);
   Register(connection, "bq_percentile_disc_position", Types{int64.get(), float64.get()},
            int64.get(), PercentileDiscPosition<double>, /*nulls=*/false);
   Register(connection, "bq_percentile_disc_position_numeric", Types{int64.get(), numeric.get()},
