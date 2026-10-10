@@ -37,6 +37,9 @@ duckdb-version-check:
 go-vet:
     go vet ./...
 
+go-staticcheck:
+    staticcheck ./...
+
 # Tool and subprocess tests; client-visible tests run through just e2e.
 [positional-arguments]
 go-test *args:

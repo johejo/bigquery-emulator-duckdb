@@ -61,7 +61,7 @@ func writeParquet(t *testing.T, fields []arrow.Field, columns []arrow.Array) str
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := array.NewRecord(s, columns, int64(columns[0].Len()))
+	record := array.NewRecordBatch(s, columns, int64(columns[0].Len()))
 	defer record.Release()
 	if err := writer.Write(record); err != nil {
 		t.Fatal(err)
