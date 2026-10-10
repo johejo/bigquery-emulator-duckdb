@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/references.h"
 #include "src/translated_statement.h"

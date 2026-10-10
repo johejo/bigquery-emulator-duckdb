@@ -6,12 +6,19 @@
 #include <string_view>
 #include <vector>
 
-#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/table_metadata.h"
-#include "src/translated_statement.h"
-#include "src/translator/context.h"
+
+namespace googlesql {
+class ResolvedOption;
+class Value;
+}  // namespace googlesql
+
+namespace bigquery_emulator_duckdb {
+struct OptionUpdates;
+}  // namespace bigquery_emulator_duckdb
 
 namespace bigquery_emulator_duckdb::translator {
+struct Scope;
 
 using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
 
