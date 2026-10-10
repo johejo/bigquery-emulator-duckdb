@@ -2,16 +2,20 @@ package goclient
 
 import (
 	"context"
+	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 	"google.golang.org/api/iterator"
 )
 
 // CREATE TABLE LIKE copies only the metadata of the source table: its schema, partitioning,
 // clustering and options, which the statement's own clauses replace.
+// With AS SELECT, the data comes from the query, as documented at:
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like
 func TestCreateTableLike(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -47,6 +51,18 @@ func TestCreateTableLike(t *testing.T) {
 		`CREATE TABLE copy LIKE source`,
 		`CREATE TABLE custom LIKE source PARTITION BY DATE_TRUNC(day, MONTH) CLUSTER BY day
 		 OPTIONS (description = 'custom')`,
+		`CREATE TABLE filled LIKE source AS SELECT
+		   7 AS query_id, DATE '2024-02-03' AS query_day, NUMERIC '12.34' AS query_amount,
+		   ['query'] AS query_tags, STRUCT(9 AS x) AS query_point`,
+		`CREATE TABLE filled_custom LIKE source
+		 PARTITION BY DATE_TRUNC(day, MONTH) CLUSTER BY day OPTIONS (description = 'custom')
+		 AS SELECT * FROM filled`,
+		`CREATE TABLE empty LIKE source AS SELECT * FROM source WHERE FALSE`,
+		`CREATE TABLE text_source (s STRING(3) OPTIONS (description = 'short'))`,
+		`CREATE TABLE nested_required (s STRUCT<x INT64 NOT NULL>)`,
+		// IF NOT EXISTS does not evaluate the query or change the existing metadata.
+		`CREATE TABLE IF NOT EXISTS filled LIKE source OPTIONS (description = 'ignored')
+		 AS SELECT ERROR('must not run'), day, amount, tags, point FROM source`,
 		// The new table has no relationship to the source table after creation.
 		`ALTER TABLE source ADD COLUMN later STRING`,
 		`CREATE VIEW v AS SELECT id FROM source`,
@@ -103,10 +119,85 @@ func TestCreateTableLike(t *testing.T) {
 		t.Errorf("clustering = %+v, want %+v", got, want)
 	}
 
+	for _, tc := range []struct {
+		name string
+		want *bigquery.TableMetadata
+	}{
+		{"filled", copied},
+		{"filled_custom", custom},
+	} {
+		got, err := dataset.Table(tc.name).Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.Schema, tc.want.Schema) || got.Description != tc.want.Description ||
+			got.Name != tc.want.Name || !reflect.DeepEqual(got.Labels, tc.want.Labels) ||
+			!reflect.DeepEqual(got.TimePartitioning, tc.want.TimePartitioning) ||
+			!reflect.DeepEqual(got.Clustering, tc.want.Clustering) {
+			t.Errorf("%s: inherited metadata = %+v, want %+v", tc.name, got, tc.want)
+		}
+		rows := dataset.Table(tc.name).Read(ctx)
+		var row struct {
+			ID     int64
+			Day    civil.Date
+			Amount *big.Rat
+			Tags   []string
+			Point  struct{ X int64 }
+		}
+		if err := rows.Next(&row); err != nil {
+			t.Fatal(err)
+		}
+		if row.ID != 7 || row.Day != (civil.Date{Year: 2024, Month: 2, Day: 3}) ||
+			row.Amount == nil || row.Amount.Cmp(big.NewRat(1234, 100)) != 0 ||
+			!reflect.DeepEqual(row.Tags, []string{"query"}) || row.Point.X != 9 {
+			t.Errorf("%s: row = %+v, want {7 2024-02-03 12.34 [query] {9}}", tc.name, row)
+		}
+		if err := rows.Next(&row); err != iterator.Done {
+			t.Errorf("%s: extra row = %+v, err %v", tc.name, row, err)
+		}
+	}
+	// Inherited constraints apply both to the query and to later writes. A failed replacement
+	// leaves the previous table intact, including its rows and metadata.
+	for _, sql := range []string{
+		`INSERT filled (day) VALUES (DATE '2024-01-02')`,
+		`CREATE TABLE invalid LIKE copy AS SELECT NULL, day, amount, tags, point FROM filled`,
+		`CREATE OR REPLACE TABLE filled LIKE copy AS SELECT NULL, day, amount, tags, point FROM filled`,
+		`CREATE TABLE invalid LIKE copy AS SELECT id, day, NUMERIC '100000000', tags, point FROM filled`,
+		`CREATE TABLE invalid LIKE copy AS SELECT id FROM filled`,
+		`CREATE TABLE invalid LIKE copy AS SELECT 'wrong type', day, amount, tags, point FROM filled`,
+	} {
+		if err := run(sql); err == nil {
+			t.Errorf("%s: succeeded, want an error", sql)
+		}
+	}
+	if _, err := dataset.Table("invalid").Metadata(ctx); err == nil {
+		t.Error("failed AS SELECT left a table behind")
+	}
+	if empty, err := dataset.Table("empty").Metadata(ctx); err != nil {
+		t.Fatal(err)
+	} else if empty.NumRows != 0 || !reflect.DeepEqual(empty.Schema, copied.Schema) {
+		t.Errorf("empty query did not preserve schema: %+v", empty)
+	}
+	if err := run(`CREATE OR REPLACE TABLE filled LIKE filled AS SELECT * FROM filled`); err != nil {
+		t.Fatal(err)
+	}
+	filled, err := dataset.Table("filled").Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filled.NumRows != 1 || filled.Description != copied.Description || !reflect.DeepEqual(filled.Schema, copied.Schema) {
+		t.Errorf("replacement did not preserve rows and metadata: %+v", filled)
+	}
+
 	for sql, want := range map[string]string{
+		"CREATE TABLE n LIKE nested_required AS SELECT STRUCT(1 AS x) AS s": "CREATE TABLE LIKE AS SELECT with nested NOT NULL",
+		"CREATE TABLE n LIKE text_source AS SELECT 'abc' AS s":              "CREATE TABLE LIKE AS SELECT with length parameters",
 		"CREATE TABLE n LIKE v":                          "CREATE TABLE LIKE a view",
+		"CREATE TABLE n LIKE v AS SELECT id FROM v":      "CREATE TABLE LIKE a view",
 		"CREATE TABLE n LIKE defaulted":                  "CREATE TABLE LIKE a table with column defaults",
 		"CREATE TABLE n LIKE copy AS SELECT * FROM copy": "CREATE TABLE LIKE AS SELECT",
+		"CREATE TABLE n LIKE copy OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')": "CREATE TABLE option expiration_timestamp",
+		"CREATE TABLE n LIKE defaulted AS SELECT 1 AS a":                                                "CREATE TABLE LIKE a table with column defaults",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)

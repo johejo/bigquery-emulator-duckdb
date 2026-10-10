@@ -24,6 +24,7 @@ func TestJobStatisticsDescribeTheStatement(t *testing.T) {
 	}{
 		{"CREATE TABLE t AS SELECT 1 AS id", "CREATE_TABLE_AS_SELECT", "t"},
 		{"CREATE TABLE u (id INT64)", "CREATE_TABLE", "u"},
+		{"CREATE TABLE w LIKE u AS SELECT id FROM t", "CREATE_TABLE_AS_SELECT", "w"},
 		{"ALTER TABLE u ADD COLUMN name STRING", "ALTER_TABLE", "u"},
 		{"ALTER TABLE u SET OPTIONS (description = 'users')", "ALTER_TABLE", "u"},
 		{"ALTER SCHEMA go_statement_type SET OPTIONS (description = 'types')", "ALTER_SCHEMA", ""},

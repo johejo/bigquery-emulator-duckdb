@@ -51,6 +51,8 @@ struct TableDefinition {
   TableMetadata metadata;
   bool if_not_exists = false;
   std::optional<TableReference> rows_from = {};
+  // DuckDB's CREATE TABLE AS SELECT cannot declare NOT NULL; apply it after creating the table.
+  bool as_select = false;
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS
