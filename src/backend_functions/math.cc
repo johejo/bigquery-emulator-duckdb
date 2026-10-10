@@ -310,6 +310,9 @@ void RegisterMathFunctions(duckdb_connection connection) {
            {"bq_tan", Math<fn::Tan<double>>},
            {"bq_asin", Math<fn::Asin<double>>},
            {"bq_acos", Math<fn::Acos<double>>},
+           {"bq_atan", Math<fn::Atan<double>>},
+           {"bq_asinh", Math<fn::Asinh<double>>},
+           {"bq_tanh", Math<fn::Tanh<double>>},
            {"bq_sinh", Math<fn::Sinh<double>>},
            {"bq_cosh", Math<fn::Cosh<double>>},
            {"bq_acosh", Math<fn::Acosh<double>>},
@@ -324,6 +327,7 @@ void RegisterMathFunctions(duckdb_connection connection) {
     Register(connection, name, {kDouble}, kDouble, function);
   }
   Register(connection, "bq_pow", {kDouble, kDouble}, kDouble, Math2<fn::Pow<double>>);
+  Register(connection, "bq_atan2", {kDouble, kDouble}, kDouble, Math2<fn::Atan2<double>>);
   Register(connection, "bq_log", {kDouble, kDouble}, kDouble, Math2<fn::Logarithm<double>>);
   LogicalType const float64(duckdb_create_logical_type(kDouble));
   LogicalType const list(duckdb_create_list_type(float64.get()));
