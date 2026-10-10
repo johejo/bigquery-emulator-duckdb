@@ -74,11 +74,13 @@ class RowIterator : public googlesql::EvaluatorTableIterator {
               std::vector<std::vector<googlesql::Value>> rows)
       : names_(std::move(names)), types_(std::move(types)), rows_(std::move(rows)) {}
 
-  int NumColumns() const override { return static_cast<int>(names_.size()); }
-  std::string GetColumnName(int i) const override { return names_.at(i); }
-  const googlesql::Type* GetColumnType(int i) const override { return types_.at(i); }
+  [[nodiscard]] int NumColumns() const override { return static_cast<int>(names_.size()); }
+  [[nodiscard]] std::string GetColumnName(int i) const override { return names_.at(i); }
+  [[nodiscard]] const googlesql::Type* GetColumnType(int i) const override { return types_.at(i); }
   bool NextRow() override { return ++next_ <= rows_.size(); }
-  const googlesql::Value& GetValue(int i) const override { return rows_.at(next_ - 1).at(i); }
+  [[nodiscard]] const googlesql::Value& GetValue(int i) const override {
+    return rows_.at(next_ - 1).at(i);
+  }
   absl::Status Status() const override { return absl::OkStatus(); }
   absl::Status Cancel() override { return absl::OkStatus(); }
 

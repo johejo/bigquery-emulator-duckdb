@@ -137,8 +137,8 @@ struct Job {
   std::optional<ApiError> error;
 
   // The query configuration, or null for other job types.
-  const QueryJob* query() const { return std::get_if<QueryJob>(&configuration); }
-  bool dry_run() const { return query() != nullptr && query()->dry_run; }
+  [[nodiscard]] const QueryJob* query() const { return std::get_if<QueryJob>(&configuration); }
+  [[nodiscard]] bool dry_run() const { return query() != nullptr && query()->dry_run; }
 };
 
 // A query to run as a job.

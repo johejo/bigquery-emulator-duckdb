@@ -42,7 +42,6 @@ Checks:
   - -misc-non-private-member-variables-in-classes
   - -modernize-avoid-c-arrays
   - -modernize-use-designated-initializers
-  - -modernize-use-nodiscard
   - -modernize-use-trailing-return-type
   - -readability-braces-around-statements
   - -readability-function-cognitive-complexity

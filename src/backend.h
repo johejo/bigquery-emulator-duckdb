@@ -21,7 +21,7 @@ struct QueryResult {
   bool has_rows = false;       // False for statements that produce no result set (DDL, SET, ...).
   int64_t affected_rows = -1;  // Rows changed by a DML statement, -1 when not applicable.
 
-  nlohmann::json SchemaToJson() const;
+  [[nodiscard]] nlohmann::json SchemaToJson() const;
 };
 
 // Whether `schema` has a TIMESTAMP field anywhere, including inside a RECORD.

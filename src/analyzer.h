@@ -56,11 +56,11 @@ class AnalyzerResult {
   ~AnalyzerResult();
 
   // The statement, or the expression, that was analyzed.
-  const googlesql::ResolvedStatement& statement() const;
-  const googlesql::ResolvedExpr& expression() const;
+  [[nodiscard]] const googlesql::ResolvedStatement& statement() const;
+  [[nodiscard]] const googlesql::ResolvedExpr& expression() const;
 
   // ResultSchema of the statement.
-  std::optional<std::vector<FieldSchema>> result_schema() const;
+  [[nodiscard]] std::optional<std::vector<FieldSchema>> result_schema() const;
 
  private:
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output_;

@@ -613,7 +613,7 @@ struct Backend::Database {
     RegisterBackendFunctions(handle.get(), session_user);
   }
 
-  Connection Connect() const {
+  [[nodiscard]] Connection Connect() const {
     Connection connection;
     if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
       throw BackendError("DuckDB failed to connect");
