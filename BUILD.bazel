@@ -348,6 +348,14 @@ cc_library(
     ],
 )
 
+# GoogleSQL's SystemVariableValuesMap, without its header.
+cc_library(
+    name = "system_variables",
+    hdrs = ["src/system_variables.h"],
+    copts = ["-std=c++20"],
+    deps = ["@googlesql//googlesql/public:analyzer"],
+)
+
 cc_library(
     name = "translator",
     srcs = ["src/translator.cc"],
@@ -366,8 +374,8 @@ cc_library(
     ],
     deps = [
         ":query_parameters",
+        ":system_variables",
         ":translated_statement",
-        "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:value",
     ],
 )
