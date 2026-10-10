@@ -270,3 +270,78 @@ func TestAlterTableSetOptions(t *testing.T) {
 	}
 	check(metadata{"", "", map[string]string{"env": "prod"}})
 }
+
+func TestAlterTableAlterColumnSetOptions(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_alter_column_options")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) error {
+		query := client.Query(sql)
+		query.DefaultDatasetID = dataset.DatasetID
+		job, err := query.Run(ctx)
+		if err != nil {
+			return err
+		}
+		status, err := job.Wait(ctx)
+		if err != nil {
+			return err
+		}
+		return status.Err()
+	}
+	check := func(want bigquery.Schema) {
+		t.Helper()
+		got, err := dataset.Table("t").Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.Schema, want) {
+			t.Fatalf("schema = %#v, want %#v", got.Schema, want)
+		}
+	}
+	for _, sql := range []string{
+		`CREATE TABLE t (id INT64 NOT NULL OPTIONS (description = 'old'), name STRING,
+		 s STRUCT<a INT64 OPTIONS (description = 'field')>)`,
+		"INSERT t (id, name) VALUES (1, 'a')",
+		"ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'name'), ALTER COLUMN S SET OPTIONS (description = 'record')",
+		"ALTER TABLE t ALTER COLUMN id SET OPTIONS (description = NULL)",
+		"ALTER TABLE t ALTER COLUMN IF EXISTS missing SET OPTIONS (description = 'x')",
+		"ALTER TABLE IF EXISTS missing ALTER COLUMN id SET OPTIONS (description = 'x')",
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	want := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType, Required: true},
+		{Name: "name", Type: bigquery.StringFieldType, Description: "name"},
+		{Name: "s", Type: bigquery.RecordFieldType, Description: "record", Schema: bigquery.Schema{
+			{Name: "a", Type: bigquery.IntegerFieldType, Description: "field"},
+		}},
+	}
+	check(want)
+
+	for sql, want := range map[string]string{
+		"ALTER TABLE t ALTER COLUMN id SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')":                                         "column option rounding_mode",
+		"ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), DROP COLUMN id":                                       "different kinds of actions",
+		"ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), ALTER COLUMN missing SET OPTIONS (description = 'x')": "missing",
+		"ALTER TABLE missing ALTER COLUMN id SET OPTIONS (description = 'x')":                                                   "missing",
+	} {
+		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
+		}
+	}
+	check(want)
+	rows, err := client.Query("SELECT id, name FROM go_alter_column_options.t").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil || !reflect.DeepEqual(row, []bigquery.Value{int64(1), "a"}) {
+		t.Fatalf("row = %#v, error = %v", row, err)
+	}
+}

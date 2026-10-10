@@ -91,8 +91,16 @@ struct RenameTableAction {
   std::string table_id;
 };
 
-using TableAlterAction =
-    std::variant<AddColumnAction, DropColumnAction, RenameTableAction, OptionUpdates>;
+// ALTER TABLE ALTER COLUMN [IF EXISTS] SET OPTIONS, which sets the column's description; NULL
+// clears it.
+struct ColumnOptionsAction {
+  std::string name;
+  std::optional<std::string> description = {};
+  bool if_exists = false;
+};
+
+using TableAlterAction = std::variant<AddColumnAction, DropColumnAction, RenameTableAction,
+                                      ColumnOptionsAction, OptionUpdates>;
 
 // The actions of an ALTER TABLE, in order. DuckDB takes one action per ALTER and keeps neither
 // the BigQuery schema nor the metadata they change, so the emulator applies them to what the table

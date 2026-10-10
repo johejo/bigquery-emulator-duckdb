@@ -135,7 +135,8 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                               TableMetadata metadata) {
   TableReference table = alteration.table;
   std::vector<std::string> statements;
-  std::vector<std::string> added;
+  // The columns whose comments the actions change, which are written once the schema is final.
+  std::vector<std::string> commented;
   bool set_options = false;
   for (const TableAlterAction& action : alteration.actions) {
     if (const auto* add = std::get_if<AddColumnAction>(&action)) {
@@ -151,7 +152,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
           "ALTER TABLE {} ADD COLUMN {}{}", QualifiedName(table), ColumnDefinition(add->field),
           add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
       schema.push_back(add->field);
-      added.push_back(add->field.name);
+      commented.push_back(add->field.name);
     } else if (const auto* drop = std::get_if<DropColumnAction>(&action)) {
       const auto column = FindColumn(schema, drop->name);
       if (column == schema.end()) {
@@ -177,12 +178,24 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       statements.push_back(std::format("ALTER TABLE {} RENAME TO {}", QualifiedName(table),
                                        QuoteIdentifier(rename->table_id)));
       table.table_id = rename->table_id;
+    } else if (const auto* options = std::get_if<ColumnOptionsAction>(&action)) {
+      const auto column = FindColumn(schema, options->name);
+      if (column == schema.end()) {
+        if (options->if_exists) {
+          continue;
+        }
+        throw ApiError::Invalid("Column not found: " + options->name);
+      }
+      if (options->description.has_value()) {
+        column->description = *options->description;
+      }
+      commented.push_back(column->name);
     } else {
       ApplyOptionUpdates(std::get<OptionUpdates>(action), metadata);
       set_options = true;
     }
   }
-  for (const std::string& name : added) {
+  for (const std::string& name : commented) {
     if (const auto column = FindColumn(schema, name); column != schema.end()) {
       std::ranges::move(ColumnCommentStatements(table, {*column}), std::back_inserter(statements));
     }
