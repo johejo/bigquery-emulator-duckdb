@@ -14,6 +14,7 @@
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "googlesql/public/numeric_value.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 
 // PERCENTILE_CONT and PERCENTILE_DISC. The translator collects each partition's values with
@@ -27,6 +28,7 @@
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
 
+using googlesql::BigNumericValue;
 using googlesql::NumericValue;
 
 // The percentile of argument `column`, which has to be non-NULL.
@@ -40,6 +42,13 @@ absl::StatusOr<googlesql::PercentileEvaluator<T>> Evaluator(const Arguments& arg
   }
   if constexpr (std::is_same_v<T, double>) {
     return googlesql::PercentileEvaluator<double>::Create(arguments.Double(column));
+  } else if constexpr (std::is_same_v<T, BigNumericValue>) {
+    // The translator passes a BIGNUMERIC as the VARCHAR of its units.
+    const auto percentile = BigNumericFromUnits(arguments.String(column));
+    if (!percentile.ok()) {
+      return percentile.status();
+    }
+    return googlesql::PercentileEvaluator<BigNumericValue>::Create(*percentile);
   } else {
     const auto percentile = NumericValue::FromPackedInt(arguments.Decimal(column));
     if (!percentile.ok()) {
@@ -117,7 +126,8 @@ void PercentileCont(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 }
 
 // The position, counted from 1, of PERCENTILE_DISC in a sorted list of argument 0 elements, at
-// the percentile in argument 1, a DOUBLE or a DECIMAL(38, 9); NULL for an empty list.
+// the percentile in argument 1, a DOUBLE, a DECIMAL(38, 9) or the VARCHAR of a BIGNUMERIC's
+// units; NULL for an empty list.
 template <typename T>
 void PercentileDiscPosition(duckdb_function_info info, duckdb_data_chunk input,
                             duckdb_vector output) {
@@ -150,6 +160,7 @@ void RegisterPercentileFunctions(duckdb_connection connection) {
   LogicalType numeric(duckdb_create_decimal_type(38, 9));
   LogicalType numeric_list(duckdb_create_list_type(numeric.get()));
   LogicalType int64(duckdb_create_logical_type(kBigint));
+  LogicalType varchar(duckdb_create_logical_type(kVarchar));
   // Spelled out: a braced pair of pointers would also match vector<duckdb_type>'s iterator range
   // constructor.
   using Types = std::vector<duckdb_logical_type>;
@@ -161,6 +172,9 @@ void RegisterPercentileFunctions(duckdb_connection connection) {
            int64.get(), PercentileDiscPosition<double>, /*nulls=*/false);
   Register(connection, "bq_percentile_disc_position_numeric", Types{int64.get(), numeric.get()},
            int64.get(), PercentileDiscPosition<NumericValue>, /*nulls=*/false);
+  Register(connection, "bq_percentile_disc_position_bignumeric", Types{int64.get(), varchar.get()},
+           int64.get(), PercentileDiscPosition<BigNumericValue>,
+           /*nulls=*/false);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

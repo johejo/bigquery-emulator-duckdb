@@ -1399,27 +1399,33 @@ std::string PercentileCont(const std::string& sql, const std::vector<std::string
 }
 
 // The element of the sorted list `sql` at the position GoogleSQL's PERCENTILE_DISC takes, for a
-// FLOAT64 or, with `kNumeric`, a NUMERIC percentile.
-template <bool kNumeric>
+// percentile of type `kPercentile`: FLOAT64, NUMERIC or BIGNUMERIC, which crosses as the VARCHAR
+// of its units.
+template <googlesql::TypeKind kPercentile>
 std::string PercentileDisc(const std::string& sql, const std::vector<std::string>& arguments,
                            const std::string& /*tail*/) {
-  return "list_extract(" + sql + ", " +
-         (kNumeric ? "bq_percentile_disc_position_numeric(len("
-                   : "bq_percentile_disc_position(len(") +
-         sql + "), " + arguments.at(1) + "))";
+  const std::string percentile = kPercentile == googlesql::TYPE_BIGNUMERIC
+                                     ? "CAST(" + arguments.at(1) + " AS VARCHAR)"
+                                     : arguments.at(1);
+  const std::string_view position =
+      kPercentile == googlesql::TYPE_NUMERIC      ? "bq_percentile_disc_position_numeric"
+      : kPercentile == googlesql::TYPE_BIGNUMERIC ? "bq_percentile_disc_position_bignumeric"
+                                                  : "bq_percentile_disc_position";
+  return "list_extract(" + sql + ", " + std::string(position) + "(len(" + sql + "), " + percentile +
+         "))";
 }
 
-// PERCENTILE_DISC of values of `type`, for a percentile of `percentile`.
-AggregateRule PercentileDiscRule(googlesql::TypeKind type, googlesql::TypeKind percentile) {
-  const bool numeric = percentile == googlesql::TYPE_NUMERIC;
+// PERCENTILE_DISC of values of `type`, for a percentile of `kPercentile`.
+template <googlesql::TypeKind kPercentile>
+AggregateRule PercentileDiscRule(googlesql::TypeKind type) {
   return {
       .function = "list",
       .type = type,
-      .conditions = {{.argument = 2, .types = {percentile}}},
+      .conditions = {{.argument = 2, .types = {kPercentile}}},
       .arguments = {"$1"},
       .order = type == googlesql::TYPE_DOUBLE ? kFloatPercentileOrder : kPercentileOrder,
       .nulls = AggregateRule::Nulls::kFilterUnlessRespected,
-      .finish = numeric ? PercentileDisc<true> : PercentileDisc<false>,
+      .finish = PercentileDisc<kPercentile>,
   };
 }
 
@@ -1463,10 +1469,12 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
           {
               "PERCENTILE_DISC",
               {
-                  PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_DOUBLE),
-                  PercentileDiscRule(googlesql::TYPE_DOUBLE, googlesql::TYPE_NUMERIC),
-                  PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_DOUBLE),
-                  PercentileDiscRule(googlesql::TYPE_UNKNOWN, googlesql::TYPE_NUMERIC),
+                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
+                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
+                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
+                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
+                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
+                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
               },
           },
   };
@@ -1574,6 +1582,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "FIRST_VALUE",
       "LAST_VALUE",
       "NTH_VALUE",
+      "PERCENTILE_DISC",
   };
   return *kFunctions;
 }
