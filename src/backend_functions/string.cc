@@ -442,8 +442,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
     Register(connection, name, parameters, result, function);
   }
   {
-    LogicalType blob(duckdb_create_logical_type(kBlob));
-    LogicalType list(duckdb_create_list_type(blob.get()));
+    LogicalType const blob(duckdb_create_logical_type(kBlob));
+    LogicalType const list(duckdb_create_list_type(blob.get()));
     Register(
         connection, "bq_split_bytes", {kBlob, kBlob}, list.get(),
         Apply<static_cast<bool (*)(absl::string_view, absl::string_view, std::vector<std::string>*,
@@ -480,8 +480,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_regexp_extract_all", kVarchar, RegexpExtractAll<false>},
            {"bq_regexp_extract_all_bytes", kBlob, RegexpExtractAll<true>},
        }) {
-    LogicalType element(duckdb_create_logical_type(type));
-    LogicalType list(duckdb_create_list_type(element.get()));
+    LogicalType const element(duckdb_create_logical_type(type));
+    LogicalType const list(duckdb_create_list_type(element.get()));
     Register(connection, name, {type, type}, list.get(), function);
   }
 }

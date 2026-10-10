@@ -214,7 +214,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       std::vector<std::string> names;
       std::vector<const googlesql::Type*> types;
       GOOGLESQL_ASSIGN_OR_RETURN(
-          QueryResult result,
+          const QueryResult result,
           RunStatement(executor, segment, true,
                        [&](const googlesql::ResolvedStatement& statement) -> absl::Status {
                          if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
@@ -643,7 +643,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
-    GOOGLESQL_ASSIGN_OR_RETURN(AnalyzerResult analyzed,
+    GOOGLESQL_ASSIGN_OR_RETURN(const AnalyzerResult analyzed,
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));
     std::string unsupported;

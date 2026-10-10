@@ -211,8 +211,8 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
     }
     names.push_back(name->second);
   }
-  std::string sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
-                    Join(names, ", ") + ") ";
+  std::string const sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
+                          Join(names, ", ") + ") ";
   if (insert.query() != nullptr) {
     const auto relation = Scan(*insert.query(), scope);
     if (!relation) {

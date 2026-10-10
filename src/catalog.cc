@@ -197,7 +197,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
     // Keyed with an empty first part, which no normalized table path has.
     std::vector<std::string> key = {""};
     key.insert(key.end(), parts.begin(), parts.end());
-    if (auto it = tables_.find(key); it != tables_.end()) {
+    if (auto const it = tables_.find(key); it != tables_.end()) {
       *table = it->second.get();
       return absl::OkStatus();
     }
@@ -215,7 +215,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
   if (normalized.empty()) {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(path, "."));
   }
-  if (auto it = tables_.find(normalized); it != tables_.end()) {
+  if (auto const it = tables_.find(normalized); it != tables_.end()) {
     *table = it->second.get();
     return absl::OkStatus();
   }

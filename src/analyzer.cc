@@ -249,7 +249,7 @@ absl::StatusOr<googlesql::AnalyzerOptions> ScriptAnalyzerOptions(const AnalyzerS
 absl::StatusOr<googlesql::TypeWithParameters> AnalyzeScriptType(
     const googlesql::ScriptSegment& segment, googlesql::Catalog& catalog,
     googlesql::TypeFactory& type_factory, const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(googlesql::AnalyzerOptions options,
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
                              AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   googlesql::TypeWithParameters type;
   googlesql::TypeModifiers modifiers;
@@ -264,7 +264,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
                                                       googlesql::Catalog& catalog,
                                                       googlesql::TypeFactory& type_factory,
                                                       const AnalyzerSettings& settings) {
-  GOOGLESQL_ASSIGN_OR_RETURN(googlesql::AnalyzerOptions options,
+  GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::AnalyzerOptions options,
                              AnalyzerOptions(settings, googlesql::ERROR_MESSAGE_WITH_PAYLOAD));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   GOOGLESQL_RETURN_IF_ERROR(googlesql::AnalyzeStatement(segment.GetSegmentText(), options, &catalog,
@@ -282,7 +282,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
                                                        googlesql::TypeFactory& type_factory,
                                                        const AnalyzerSettings& settings) {
   GOOGLESQL_ASSIGN_OR_RETURN(
-      googlesql::AnalyzerOptions options,
+      const googlesql::AnalyzerOptions options,
       AnalyzerOptions(settings, segment != nullptr ? googlesql::ERROR_MESSAGE_WITH_PAYLOAD
                                                    : googlesql::ERROR_MESSAGE_ONE_LINE));
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;

@@ -83,12 +83,12 @@ absl::StatusOr<googlesql::Value> CellValue(const googlesql::Type* type, const js
       return Value::Double(number);
     }
     case googlesql::TYPE_NUMERIC: {
-      GOOGLESQL_ASSIGN_OR_RETURN(googlesql::NumericValue number,
+      GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::NumericValue number,
                                  googlesql::NumericValue::FromString(text));
       return Value::Numeric(number);
     }
     case googlesql::TYPE_BIGNUMERIC: {
-      GOOGLESQL_ASSIGN_OR_RETURN(googlesql::BigNumericValue number,
+      GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::BigNumericValue number,
                                  googlesql::BigNumericValue::FromString(text));
       return Value::BigNumeric(number);
     }
@@ -119,7 +119,7 @@ absl::StatusOr<googlesql::Value> CellValue(const googlesql::Type* type, const js
       return Value::Time(time);
     }
     case googlesql::TYPE_INTERVAL: {
-      GOOGLESQL_ASSIGN_OR_RETURN(googlesql::IntervalValue interval,
+      GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::IntervalValue interval,
                                  googlesql::IntervalValue::ParseFromString(text, false));
       return Value::Interval(interval);
     }

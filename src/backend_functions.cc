@@ -47,10 +47,10 @@ void DeleteSessionUser(void* data) { delete static_cast<std::optional<std::strin
 
 void RegisterSessionUser(duckdb_connection connection,
                          const std::optional<std::string>& session_user) {
-  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
+  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), "bq_session_user");
-  LogicalType result(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
+  LogicalType const result(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
   duckdb_scalar_function_set_return_type(scalar.get(), result.get());
   duckdb_scalar_function_set_bind(scalar.get(), BindSessionUser);
   duckdb_scalar_function_set_function(scalar.get(), SessionUser);

@@ -79,7 +79,7 @@ class Engine {
     Start();
     JSValue result = JS_Call(context_, function, JS_UNDEFINED, static_cast<int>(arguments.size()),
                              arguments.data());
-    for (JSValue argument : arguments) {
+    for (JSValue const argument : arguments) {
       JS_FreeValue(context_, argument);
     }
     if (JS_IsException(result)) {
@@ -98,9 +98,9 @@ class Engine {
     if (state == JS_PROMISE_FULFILLED) {
       return settled;
     }
-    std::string message = state == JS_PROMISE_PENDING
-                              ? "JavaScript UDF Promise never settled"
-                              : "JavaScript UDF Promise rejected: " + String(settled).value_or("");
+    std::string const message = state == JS_PROMISE_PENDING ? "JavaScript UDF Promise never settled"
+                                                            : "JavaScript UDF Promise rejected: " +
+                                                                  String(settled).value_or("");
     JS_FreeValue(context_, settled);
     return absl::OutOfRangeError(message);
   }
@@ -147,8 +147,8 @@ class Engine {
       JS_FreeValue(context_, JS_GetException(context_));
       return absl::OutOfRangeError("JavaScript UDF timed out");
     }
-    JSValue exception = JS_GetException(context_);
-    std::string message = String(exception).value_or("JavaScript exception");
+    JSValue const exception = JS_GetException(context_);
+    std::string const message = String(exception).value_or("JavaScript exception");
     JS_FreeValue(context_, exception);
     return absl::OutOfRangeError(message);
   }
@@ -176,7 +176,7 @@ absl::StatusOr<JSValue> Argument(JSContext* context, const Arguments& arguments,
   if (arguments.IsNull(column)) {
     return JS_NULL;
   }
-  LogicalType type(duckdb_vector_get_column_type(arguments.Vector(column)));
+  LogicalType const type(duckdb_vector_get_column_type(arguments.Vector(column)));
   switch (duckdb_get_type_id(type.get())) {
     case DUCKDB_TYPE_BOOLEAN:
       return JS_NewBool(context, arguments.Bool(column));
@@ -288,7 +288,7 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
         for (idx_t column = 1; column < columns; ++column) {
           auto value = Argument(engine.context(), arguments, column);
           if (!value.ok()) {
-            for (JSValue converted : values) {
+            for (JSValue const converted : values) {
               JS_FreeValue(engine.context(), converted);
             }
             return value.status();
@@ -310,14 +310,14 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 
 void RegisterJavaScriptFunctions(duckdb_connection connection, const JavaScriptLimits& limits) {
   const auto add = [&](const char* name, duckdb_type result, duckdb_scalar_function_t function) {
-    Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
+    Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
         duckdb_create_scalar_function());
     duckdb_scalar_function_set_name(scalar.get(), name);
-    LogicalType source(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
+    LogicalType const source(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
     duckdb_scalar_function_add_parameter(scalar.get(), source.get());
-    LogicalType any(duckdb_create_logical_type(DUCKDB_TYPE_ANY));
+    LogicalType const any(duckdb_create_logical_type(DUCKDB_TYPE_ANY));
     duckdb_scalar_function_set_varargs(scalar.get(), any.get());
-    LogicalType type(duckdb_create_logical_type(result));
+    LogicalType const type(duckdb_create_logical_type(result));
     duckdb_scalar_function_set_return_type(scalar.get(), type.get());
     duckdb_scalar_function_set_function(scalar.get(), function);
     duckdb_scalar_function_set_init(scalar.get(), InitEngine);

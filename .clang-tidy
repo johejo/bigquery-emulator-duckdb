@@ -37,7 +37,6 @@ Checks:
   - -cppcoreguidelines-pro-bounds-array-to-pointer-decay
   - -cppcoreguidelines-pro-bounds-constant-array-index
   - -cppcoreguidelines-pro-bounds-pointer-arithmetic
-  - -misc-const-correctness
   - -misc-no-recursion
   - -misc-non-private-member-variables-in-classes
   - -modernize-avoid-c-arrays
@@ -68,6 +67,9 @@ CheckOptions:
   # interfaces with only a defaulted destructor need no other special members either.
   cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true
   cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  # Pointer analysis misses uses in dependent template branches, such as QuickJS calls that
+  # require a mutable JSContext. Keep const suggestions for values and references.
+  misc-const-correctness.AnalyzePointers: false
   # GoogleSQL's TYPE_* enumerators and umbrella headers, and nlohmann's json_fwd/json.hpp
   # split, produce false positives. glibc's sigset_t is provided by the public signal.h;
   # include-cleaner instead asks for its internal bits/types/sigset_t.h. On macOS it

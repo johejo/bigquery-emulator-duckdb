@@ -50,7 +50,7 @@ std::string FirstLine(const std::string& text) { return text.substr(0, text.find
 
 std::string Escape(const std::string& text) {
   std::string out;
-  for (char c : text) {
+  for (char const c : text) {
     if (c == '|') {
       out += "\\|";
     } else {
@@ -84,7 +84,7 @@ Probe RunProbe(Emulator& emulator, TableSource& tables, const std::string& sql) 
   } catch (const std::exception& error) {
     // A feature whose language option the emulator leaves off, such as COLLATE, is one it does
     // not support rather than a query the probe got wrong.
-    std::string message = FirstLine(error.what());
+    std::string const message = FirstLine(error.what());
     static const std::string kInvalid = "INVALID_ARGUMENT: ";
     if (const size_t end = message.find(" is not supported"); end != std::string::npos) {
       const size_t start = message.starts_with(kInvalid) ? kInvalid.size() : 0;

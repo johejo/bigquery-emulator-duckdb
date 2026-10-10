@@ -56,7 +56,8 @@ namespace {
 std::vector<duckdb_type> ColumnTypes(duckdb_data_chunk input) {
   std::vector<duckdb_type> types;
   for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(input); ++column) {
-    LogicalType type(duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
+    LogicalType const type(
+        duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
     types.push_back(duckdb_get_type_id(type.get()));
   }
   return types;
