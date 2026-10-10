@@ -1,0 +1,12 @@
+# Temporary tables require a multi-statement query and no dataset qualifier.
+# A view must not outlive the temporary table it reads.
+# https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables
+
+CREATE TEMP TABLE n (x INT64)
+=> error:
+
+CREATE TEMP TABLE d.n (x INT64); SELECT 1
+=> error:
+
+CREATE TEMP TABLE n AS SELECT 1 AS x; CREATE VIEW go_scripts_temporary_view.v AS SELECT x FROM n
+=> error contains: The emulator does not support

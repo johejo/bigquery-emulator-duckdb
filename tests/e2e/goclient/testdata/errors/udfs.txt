@@ -1,0 +1,72 @@
+# Temporary UDF validation and deliberately unsupported forms.
+# https://cloud.google.com/bigquery/docs/user-defined-functions
+
+@{test_hint = 1} CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT 1
+=> error contains: The emulator does not support
+
+CREATE OR REPLACE TEMP FUNCTION f(x INT64) AS (x); SELECT 1
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION IF NOT EXISTS f(x INT64) AS (x); SELECT 1
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT 1
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(`x-y` FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT 1
+=> error contains: The emulator does not support
+
+BEGIN CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x FLOAT64) AS ((SELECT SUM(v) FROM UNNEST([x]) AS v)); SELECT f(RAND())
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x ANY TYPE) AS ((SELECT SUM(v) FROM UNNEST([x]) AS v)); SELECT f(RAND())
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT SAFE.f(1)
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); CREATE VIEW go_udf_views.v AS SELECT f(1) AS x
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION parse_number(x STRING) AS (CAST(x AS INT64)); SELECT SAFE.parse_number('invalid')
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); SELECT 1
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION f(x INT64) AS (x); CREATE VIEW go_udf_views.v AS SELECT ABS(f(1)) AS x
+=> error contains: The emulator does not support
+
+CREATE TEMP FUNCTION d.f(x INT64) AS (x); SELECT 1
+=> error:
+
+CREATE TEMP FUNCTION `d.f`(x INT64) AS (x); SELECT 1
+=> error:
+
+CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f('wrong type')
+=> error:
+
+CREATE TEMP FUNCTION f(x INT64) AS (x); SELECT f(1, 2)
+=> error:
+
+DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f() AS (x); SELECT f()
+=> error:
+
+DECLARE x INT64 DEFAULT 1; CREATE TEMP FUNCTION f(y ANY TYPE) AS (x + y); SELECT f(1)
+=> error:
+
+# https://cloud.google.com/bigquery/docs/user-defined-functions#templated-sql-udf-parameters
+CREATE TEMP FUNCTION f(x ANY TYPE) AS (x + 1); SELECT f('a')
+=> error:
+
+CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT f(1, 2)
+=> error:
+
+CREATE TEMP FUNCTION f(x FLOAT64) AS (1 / x); SELECT f(0)
+=> error:
+
+CREATE TEMP FUNCTION f(x FLOAT64) AS (x); SELECT f(1 / 0)
+=> error:

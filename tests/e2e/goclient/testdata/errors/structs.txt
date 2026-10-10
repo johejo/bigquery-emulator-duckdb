@@ -1,0 +1,35 @@
+# STRUCT comparisons remain unsupported until NULL-field equality is implemented.
+# Other forms below also remain deliberately unsupported.
+
+SELECT STRUCT(NULL) = STRUCT(1)
+=> error contains: The emulator does not support
+
+SELECT STRUCT(1 AS a, NULL AS a) != STRUCT(1 AS a, 2 AS a)
+=> error contains: The emulator does not support
+
+SELECT NULLIF(STRUCT(NULL), STRUCT(1))
+=> error contains: The emulator does not support
+
+SELECT CASE STRUCT(NULL) WHEN STRUCT(1) THEN 1 ELSE 2 END
+=> error contains: The emulator does not support
+
+SELECT STRUCT(NULL) IN (STRUCT(1), STRUCT(2))
+=> error contains: The emulator does not support
+
+SELECT STRUCT(NULL) IN UNNEST([STRUCT(1), STRUCT(2)])
+=> error contains: The emulator does not support
+
+SELECT STRUCT(NULL) IN (SELECT STRUCT(1))
+=> error contains: The emulator does not support
+
+SELECT STRUCT(NULL) = ALL UNNEST([STRUCT(1), STRUCT(2)])
+=> error contains: The emulator does not support
+
+SELECT [STRUCT(NULL)] = [STRUCT(1)]
+=> error contains: The emulator does not support
+
+SELECT CAST(STRUCT(1, 2) AS JSON)
+=> error contains: The emulator does not support
+
+SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM UNNEST([1, 2]) AS a
+=> error contains: The emulator does not support

@@ -1,7 +1,6 @@
 package goclient
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -19,69 +17,6 @@ var scalarFixture = []string{
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",
 	"INSERT INTO scalars.t VALUES (3, 'あ', FROM_HEX('00ff')), (1, 'x', FROM_HEX('61')), " +
 		"(2, 'yy', NULL), (NULL, NULL, NULL)",
-}
-
-type scalarCase struct {
-	path      string
-	line      int
-	sql       string
-	want      any
-	wantError *string
-	// A known bug: want is BigQuery's answer, which the emulator does not give yet.
-	knownBug bool
-}
-
-// readScalarCases reads cases written as one query, possibly over several lines, followed by
-// "=> " and the JSON of the cell's "v" as jobs.query returns it: a string, or null for NULL.
-// A known bug is written with "!> " instead, followed by BigQuery's answer; the case passes while
-// the emulator answers otherwise, and fails once it is fixed, to be turned into a "=> " case.
-// Blank lines and lines starting with # between cases are ignored.
-// "=> error:" expects a query error, optionally followed by BigQuery's exact message.
-func readScalarCases(t *testing.T, path string) []scalarCase {
-	t.Helper()
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer file.Close()
-
-	var cases []scalarCase
-	var sql []string
-	start := 0
-	scanner := bufio.NewScanner(file)
-	for line := 1; scanner.Scan(); line++ {
-		text := scanner.Text()
-		switch {
-		case strings.HasPrefix(text, "=> "), strings.HasPrefix(text, "!> "):
-			if len(sql) == 0 {
-				t.Fatalf("%s:%d: expected value without a query", path, line)
-			}
-			var want any
-			var wantError *string
-			if strings.HasPrefix(text[len("=> "):], "error:") {
-				message := strings.TrimSpace(strings.TrimPrefix(text[len("=> "):], "error:"))
-				wantError = &message
-			} else if err := json.Unmarshal([]byte(text[len("=> "):]), &want); err != nil {
-				t.Fatalf("%s:%d: %v", path, line, err)
-			}
-			cases = append(cases, scalarCase{path: path, line: start, sql: strings.Join(sql, "\n"),
-				want: want, wantError: wantError, knownBug: strings.HasPrefix(text, "!> ")})
-			sql = nil
-		case len(sql) > 0:
-			sql = append(sql, text)
-		case text == "" || strings.HasPrefix(text, "#"):
-		default:
-			start = line
-			sql = append(sql, text)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		t.Fatalf("Scan: %v", err)
-	}
-	if len(sql) > 0 {
-		t.Fatalf("%s:%d: query without an expected value", path, start)
-	}
-	return cases
 }
 
 type queryResponse struct {
@@ -150,7 +85,7 @@ func TestScalars(t *testing.T) {
 		t.Fatalf("no cases in testdata/scalars: %v", err)
 	}
 	for _, path := range paths {
-		for _, c := range readScalarCases(t, path) {
+		for _, c := range readQueryCases(t, path) {
 			t.Run(fmt.Sprintf("%s:%d", filepath.Base(c.path), c.line), func(t *testing.T) {
 				t.Parallel()
 				response, err := runQuery(endpoint, project, "scalars", c.sql)
@@ -159,7 +94,7 @@ func TestScalars(t *testing.T) {
 					matches := err == nil && len(response.Rows) == 1 && len(response.Rows[0].F) == 1 &&
 						reflect.DeepEqual(response.Rows[0].F[0].V, c.want)
 					if c.wantError != nil {
-						matches = queryFailed && err != nil && (*c.wantError == "" || err.Error() == *c.wantError)
+						matches = queryFailed && c.matchesError(err)
 					}
 					if matches {
 						t.Errorf("%s:%d: %s: known bug is fixed; write the case with => instead of !>",
@@ -168,7 +103,7 @@ func TestScalars(t *testing.T) {
 					return
 				}
 				if c.wantError != nil {
-					if !queryFailed || err == nil || (*c.wantError != "" && err.Error() != *c.wantError) {
+					if !queryFailed || !c.matchesError(err) {
 						t.Errorf("%s:%d: %s: got error %v, want a query error with message %q", c.path, c.line, c.sql, err, *c.wantError)
 					}
 					return
