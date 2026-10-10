@@ -3,16 +3,20 @@
 // "error: " and the message. It authenticates as `gcloud auth print-access-token` does. Only a
 // maintainer runs it, since queries on BigQuery are billed.
 //
-//	bqanswers PROJECT FILE
+// A directory processes each of its *.txt files.
+//
+//	bqanswers PROJECT FILE_OR_DIRECTORY
 package main
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -64,7 +68,7 @@ func answer(token, project, sql string) (string, error) {
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: bqanswers PROJECT FILE")
+		fmt.Fprintln(os.Stderr, "usage: bqanswers PROJECT FILE_OR_DIRECTORY")
 		os.Exit(2)
 	}
 	project, path := os.Args[1], os.Args[2]
@@ -73,21 +77,49 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gcloud auth print-access-token: %v\n", err)
 		os.Exit(1)
 	}
-	content, err := os.ReadFile(path)
-	if err != nil {
+	if err := fillAnswers(path, func(sql string) (string, error) {
+		return answer(strings.TrimSpace(string(token)), project, sql)
+	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func fillAnswers(path string, query func(string) (string, error)) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	paths := []string{path}
+	if info.IsDir() {
+		paths, err = filepath.Glob(filepath.Join(path, "*.txt"))
+		if err != nil {
+			return err
+		}
+	}
+	var failures []error
+	for _, file := range paths {
+		if err := fillFile(file, query); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
+}
+
+func fillFile(path string, query func(string) (string, error)) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
 	lines := strings.Split(string(content), "\n")
-	failed := false
+	var failures []error
 	var sql []string
 	for i, text := range lines {
 		switch {
 		case text == "?>":
-			got, err := answer(strings.TrimSpace(string(token)), project, strings.Join(sql, "\n"))
+			got, err := query(strings.Join(sql, "\n"))
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s:%d: %v\n", path, i+1, err)
-				failed = true
+				failures = append(failures, fmt.Errorf("%s:%d: %w", path, i+1, err))
 			} else {
 				lines[i] = "?> " + got
 			}
@@ -103,10 +135,7 @@ func main() {
 		}
 	}
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		failures = append(failures, err)
 	}
-	if failed {
-		os.Exit(1)
-	}
+	return errors.Join(failures...)
 }
