@@ -1,0 +1,8 @@
+desc: BigQuery Storage Read and Write clients share tables with the REST API
+steps:
+  storage:
+    exec:
+      command: go test -count=1 ./tests/e2e/storage
+    dump:
+      expr: current.stdout + current.stderr
+    test: current.exit_code == 0

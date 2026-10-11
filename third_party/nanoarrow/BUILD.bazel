@@ -1,0 +1,4 @@
+exports_files([
+    "BUILD.nanoarrow.bazel",
+    "public_headers.patch",
+])

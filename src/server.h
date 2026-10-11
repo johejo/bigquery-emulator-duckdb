@@ -10,6 +10,7 @@ class Emulator;
 struct ServerOptions {
   std::string host = "0.0.0.0";
   int port = 9050;
+  int grpc_port = 9060;
 };
 
 // Owns API transports and their serving threads, sharing one Emulator.
@@ -35,6 +36,8 @@ class Server {
   [[nodiscard]] int port() const;
   // The URL clients should use as the API root, e.g. http://127.0.0.1:9050
   [[nodiscard]] std::string root_url() const;
+  [[nodiscard]] int grpc_port() const;
+  [[nodiscard]] std::string grpc_endpoint() const;
 
  private:
   class Impl;

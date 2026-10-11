@@ -1,0 +1,35 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+genrule(
+    name = "config",
+    srcs = ["src/nanoarrow/nanoarrow_config.h.in"],
+    outs = ["src/nanoarrow/nanoarrow_config.h"],
+    cmd = "sed -e 's/@NANOARROW_VERSION_MAJOR@/0/g' -e 's/@NANOARROW_VERSION_MINOR@/7/g' -e 's/@NANOARROW_VERSION_PATCH@/0/g' -e 's/@NANOARROW_VERSION@/0.7.0/g' -e 's/@NANOARROW_NAMESPACE_DEFINE@//g' $(location src/nanoarrow/nanoarrow_config.h.in) > $@",
+)
+
+# IPC uses nanoarrow's vendored flatcc runtime and generated Arrow flatbuffers.
+cc_library(
+    name = "flatcc",
+    srcs = ["thirdparty/flatcc/src/runtime/" + f + ".c" for f in ["builder", "emitter", "refmap", "verifier"]],
+    hdrs = glob(["thirdparty/flatcc/include/**/*.h"]),
+    includes = ["thirdparty/flatcc/include"],
+)
+
+cc_library(
+    name = "nanoarrow",
+    srcs = glob(["src/nanoarrow/common/*.c", "src/nanoarrow/ipc/*.c"]),
+    hdrs = glob([
+        "src/nanoarrow/common/*.h",
+        "src/nanoarrow/hpp/*.hpp",
+        "src/nanoarrow/ipc/*.h",
+    ]) + [
+        "src/nanoarrow/nanoarrow.h",
+        "src/nanoarrow/nanoarrow.hpp",
+        "src/nanoarrow/nanoarrow_ipc.h",
+        "src/nanoarrow/nanoarrow_ipc.hpp",
+        ":config",
+    ],
+    includes = ["src"],
+    visibility = ["//visibility:public"],
+    deps = [":flatcc"],
+)

@@ -50,10 +50,13 @@ struct TableMetadata {
   std::vector<std::string> clustering;  // Clustering.fields.
   std::optional<CloneDefinition> clone;
   std::optional<int64_t> expiration_time;  // Milliseconds since the Unix epoch.
+  // Output only and persisted with the table; the Storage API's default stream uses it.
+  int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old tables.
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           clustering.empty() && !clone.has_value() && !expiration_time.has_value();
+           clustering.empty() && !clone.has_value() && !expiration_time.has_value() &&
+           creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();

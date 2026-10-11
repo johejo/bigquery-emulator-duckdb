@@ -55,6 +55,9 @@ TableMetadata CommentMetadata(const json& comment) {
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
     metadata.clone = ParseCloneDefinition(object);
+    if (object.contains("creationTime") && object["creationTime"].is_string()) {
+      metadata.creation_time = std::stoll(object["creationTime"].get<std::string>());
+    }
     return metadata;
   } catch (const ApiError&) {
     return {};

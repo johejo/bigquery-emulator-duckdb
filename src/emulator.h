@@ -59,6 +59,7 @@ struct TableInfo {
   std::vector<FieldSchema> schema;
   TableMetadata metadata;
   int64_t num_rows = 0;
+  int64_t storage_id = 0;  // DuckDB table OID; distinguishes a dropped/recreated destination.
   std::optional<std::string> view_query;
 };
 
@@ -232,6 +233,15 @@ class Emulator {
   Routine WriteRoutine(Routine routine, bool update);
   void DeleteRoutine(RoutineReference routine);
   QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
+  // Materializes a Storage Read snapshot, without creating a query job. The restriction is
+  // parsed as one GoogleSQL expression before it is included in the SELECT.
+  QueryResult ReadStorageTable(TableReference table, const std::string& restriction);
+  // Validates and inserts the whole Storage Write batch in one transaction. With validate_only,
+  // rolls it back, for pending/buffered appends. Checks the schema in that same transaction.
+  std::vector<InsertError> WriteStorageRows(TableReference table,
+                                            const std::vector<FieldSchema>& schema,
+                                            const nlohmann::json& rows, int64_t storage_id,
+                                            bool validate_only = false);
   std::vector<InsertError> InsertTableData(TableReference table, const nlohmann::json& rows,
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 

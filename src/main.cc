@@ -21,12 +21,14 @@ namespace {
 
 void PrintUsage() {
   std::cerr
-      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--data-dir DIR] [--project "
+      << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--grpc-port PORT] "
+         "[--data-dir DIR] [--project "
          "JSON|@FILE]... [--session-user ID]\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
          "  --host HOST     Address to listen on (default: 0.0.0.0)\n"
          "  --port PORT     Port to listen on (default: 9050)\n"
+         "  --grpc-port PORT  BigQuery Storage gRPC port (default: 9060; 0 chooses a free port)\n"
          "  --data-dir DIR  Store each project in DIR/<project>.duckdb so that data survives\n"
          "                  restarts (default: keep everything in memory)\n";
 }
@@ -68,12 +70,11 @@ int Run(int argc, char* const* argv) {
       session_user = arg.substr(15);
     } else if (arg == "--host" && has_value) {
       options.host = argv[++i];
-    } else if (arg == "--port" && has_value) {
+    } else if ((arg == "--port" || arg == "--grpc-port") && has_value) {
       const std::string_view value = argv[++i];
-      const auto [end, error] =
-          std::from_chars(value.data(), value.data() + value.size(), options.port);
-      if (error != std::errc() || end != value.data() + value.size() || options.port < 0 ||
-          options.port > 65535) {
+      int& port = arg == "--port" ? options.port : options.grpc_port;
+      const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), port);
+      if (error != std::errc() || end != value.data() + value.size() || port < 0 || port > 65535) {
         PrintUsage();
         return 2;
       }
@@ -92,13 +93,15 @@ int Run(int argc, char* const* argv) {
   bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Start()) {
-    std::cerr << "Failed to bind to " << options.host << ":" << options.port << '\n';
+    std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "
+              << options.host << ":" << options.grpc_port << '\n';
     return 1;
   }
   std::thread shutdown([&] { WaitForShutdown(signals, server); });
   bool served = false;
   std::exception_ptr failure;
   try {
+    std::cerr << "BigQuery Storage gRPC listening on " << server.grpc_endpoint() << '\n';
     std::cerr << "bigquery-emulator-duckdb listening on " << server.root_url() << '\n';
     std::cerr << "Reading gs:// objects from " << emulator.storage_endpoint() << '\n';
     served = server.Wait();

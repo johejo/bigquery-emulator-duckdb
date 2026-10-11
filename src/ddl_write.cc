@@ -1,6 +1,7 @@
 #include "src/ddl_write.h"
 
 #include <algorithm>
+#include <chrono>
 #include <format>
 #include <iterator>
 #include <optional>
@@ -112,6 +113,10 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
 }
 
 DdlWrite CreateTableWrite(const TableDefinition& definition) {
+  TableMetadata metadata = definition.metadata;
+  metadata.creation_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
   DdlWrite write{
       .metadata_statements = ColumnCommentStatements(definition.table, definition.schema),
   };
@@ -126,9 +131,9 @@ DdlWrite CreateTableWrite(const TableDefinition& definition) {
   }
   std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
                     std::back_inserter(write.metadata_statements));
-  if (!definition.metadata.empty()) {
+  if (!metadata.empty()) {
     write.metadata_statements.push_back(
-        TableCommentStatement(definition.table, definition.metadata, definition.schema));
+        TableCommentStatement(definition.table, metadata, definition.schema));
   }
   if (definition.rows_from.has_value()) {
     write.metadata_statements.push_back("INSERT INTO " + QualifiedName(definition.table) +

@@ -66,6 +66,10 @@ func startEmulator(ctx context.Context, binary, dataDir string, projects []strin
 		_ = p.Stop()
 		return nil, err
 	}
+	if err := os.Setenv("BQ_EMULATOR_GRPC", p.GRPC); err != nil {
+		_ = p.Stop()
+		return nil, err
+	}
 	return p, nil
 }
 
