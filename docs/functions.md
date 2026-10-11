@@ -6,12 +6,14 @@ This page lists every function in the [BigQuery function list](https://cloud.goo
 and whether the emulator runs it. The list comes from `tools/bigquery_functions.txt`, which
 `tools/update_bigquery_functions.sh` scrapes from the BigQuery documentation.
 
-`//:function_probe` calls each function once for every signature the analyzer knows, with sample
+`//:function_probe` calls each function for every signature the analyzer knows, with sample
 arguments of the signature's types. A function whose valid arguments the types do not describe
 is called with the queries in `tools/function_probe_hints.txt` instead. A probe checks only that
 a call translates and runs on DuckDB, not that it returns what BigQuery would. The notes the
 hints file gives describe how the emulator follows BigQuery where DuckDB would differ, and the
 probe's own notes name what it rejected.
+
+Optional date parts and time zones are probed both omitted and explicitly supplied.
 
 - **Supported**: every call runs.
 - **Partial**: some calls run, and the emulator rejects the others as unsupported.
@@ -34,8 +36,8 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 14 |
-| Supported | 258 |
+| Partial | 18 |
+| Supported | 254 |
 | Unsupported | 121 |
 | Untested | 13 |
 
@@ -114,15 +116,15 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | datetime_functions | Supported | DuckDB SQL |  |
 | [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | datetime_functions | Supported | DuckDB SQL |  |
 | [`DATETIME_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#datetime_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
-| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries |
+| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | datetime_functions | Supported | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; parts below a day count whole units rather than boundaries |
 | [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | datetime_functions | Supported | DuckDB SQL |  |
-| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | datetime_functions | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; function DATETIME_TRUNC |
 | [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | date_functions | Supported | DuckDB SQL |  |
 | [`DATE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#date_bucket) | time-series-functions | Supported | DuckDB SQL, in code |  |
-| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | date_functions | Supported | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday |
 | [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | date_functions | Supported | DuckDB SQL |  |
 | [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | date_functions | Supported | DuckDB SQL |  |
-| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | date_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | date_functions | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; function DATE_TRUNC |
 | [`DENSE_RANK`](https://cloud.google.com/bigquery/docs/reference/standard-sql/numbering_functions#dense_rank) | numbering_functions | Supported | DuckDB window function |  |
 | [`DESTINATION_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#destination_node_id) | graph-sql-functions | Untested |  | no sample for <graph_edge> |
 | [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | aead_encryption_functions | Unsupported |  | function DETERMINISTIC_DECRYPT_BYTES |
@@ -156,7 +158,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | string_functions | Supported | DuckDB SQL |  |
 | [`GAP_FILL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time-series-functions#gap_fill) | time-series-functions | Unsupported |  | the analyzer does not know this function |
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | array_functions | Supported | DuckDB SQL |  |
-| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Supported | DuckDB SQL | takes only a DAY or WEEK step |
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | array_functions | Partial | DuckDB SQL | takes only a DAY or WEEK step; function GENERATE_DATE_ARRAY |
 | [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | range-functions | Unsupported |  | function GENERATE_RANGE_ARRAY |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | array_functions | Supported | DuckDB SQL |  |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | utility-functions | Supported | DuckDB function, renamed |  |
@@ -221,7 +223,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`KLL_QUANTILES.MERGE_POINT_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions#kll_quantilesmerge_point_int64) | kll_functions | Unsupported |  | aggregate or analytic function INIT_INT64 |
 | [`LABELS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#labels) | graph-sql-functions | Untested |  | no sample for <graph_element> |
 | [`LAG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#lag) | navigation_functions | Supported | DuckDB window function |  |
-| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported | DuckDB SQL |  |
+| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | date_functions, datetime_functions | Supported | DuckDB SQL | supports MONTH, QUARTER, YEAR, ISOYEAR, WEEK, ISOWEEK and WEEK(weekday); out-of-range results are errors |
 | [`LAST_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions#last_value) | navigation_functions | Supported | DuckDB window function |  |
 | [`LAX_BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_bool) | json_functions | Supported | GoogleSQL function |  |
 | [`LAX_FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_double) | json_functions | Supported | GoogleSQL function |  |
@@ -421,7 +423,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | timestamp_functions | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | timestamp_functions | Supported | DuckDB function, renamed |  |
 | [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | timestamp_functions | Supported | DuckDB SQL |  |
-| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | timestamp_functions | Supported | DuckDB SQL | WEEK starts on Sunday and ISOWEEK on Monday |
+| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | timestamp_functions | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; function TIMESTAMP_TRUNC |
 | [`TIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add) | time_functions | Supported | DuckDB SQL |  |
 | [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | time_functions | Supported | DuckDB SQL | counts whole units rather than boundaries |
 | [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | time_functions | Supported | DuckDB SQL |  |
