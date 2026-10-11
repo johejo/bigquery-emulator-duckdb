@@ -133,13 +133,13 @@ func run(ctx context.Context, binary string) error {
 		return err
 	}
 	if unsupported.GetError().GetCode() != int32(codes.Unimplemented) {
-		return fmt.Errorf("Arrow write probe: %v", unsupported)
+		return fmt.Errorf("arrow write probe: %v", unsupported)
 	}
 	if err := arrow.CloseSend(); err != nil {
 		return err
 	}
 	if _, err := arrow.Recv(); err != io.EOF {
-		return fmt.Errorf("Arrow probe close: %v", err)
+		return fmt.Errorf("arrow probe close: %v", err)
 	}
 	for _, format := range []storagepb.DataFormat{storagepb.DataFormat_ARROW, storagepb.DataFormat_AVRO} {
 		session, err := read.CreateReadSession(ctx, &storagepb.CreateReadSessionRequest{Parent: "projects/storage-probe", ReadSession: &storagepb.ReadSession{Table: path, DataFormat: format}})
