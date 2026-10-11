@@ -47,12 +47,14 @@ This page lists every function in the [BigQuery function list](https://cloud.goo
 and whether the emulator runs it. The list comes from `tools/bigquery_functions.txt`, which
 `tools/update_bigquery_functions.sh` scrapes from the BigQuery documentation.
 
-`//:function_probe` calls each function once for every signature the analyzer knows, with sample
+`//:function_probe` calls each function for every signature the analyzer knows, with sample
 arguments of the signature's types. A function whose valid arguments the types do not describe
 is called with the queries in `tools/function_probe_hints.txt` instead. A probe checks only that
 a call translates and runs on DuckDB, not that it returns what BigQuery would. The notes the
 hints file gives describe how the emulator follows BigQuery where DuckDB would differ, and the
 probe's own notes name what it rejected.
+
+Optional date parts and time zones are probed both omitted and explicitly supplied.
 
 - **Supported**: every call runs.
 - **Partial**: some calls run, and the emulator rejects the others as unsupported.
@@ -210,22 +212,30 @@ bool IsRangeSignature(const googlesql::FunctionSignature& signature) {
 std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
                                                 const googlesql::Function& function,
                                                 const googlesql::FunctionSignature& signature,
-                                                const std::string& element = "") {
+                                                const std::string& element = "",
+                                                bool include_optional = false) {
   const bool json_mutator = name == "JSON_ARRAY_APPEND" || name == "JSON_ARRAY_INSERT";
   const bool format = name == "FORMAT";
   // A RANGE of `element` starts at it, and is unbounded where a second element would end it.
   const bool range = IsRangeSignature(signature);
   bool element_used = false;
   std::vector<std::string> arguments;
+  const googlesql::Type* previous_type = nullptr;
   for (const googlesql::FunctionArgumentType& argument : signature.arguments()) {
-    if (argument.optional() && !argument.has_argument_name()) {
+    if (argument.optional() && !argument.has_argument_name() && !include_optional) {
       break;  // Probe the shortest form.
     }
-    if (argument.optional()) {
+    if (argument.optional() && argument.has_argument_name()) {
       continue;
     }
     const auto sample =
-        format && argument.type() != nullptr && argument.type()->IsString()
+        include_optional && argument.optional() && argument.type() != nullptr &&
+                argument.type()->IsEnum()
+            ? std::optional<std::string>("MONTH")
+        : include_optional && argument.optional() && argument.type() != nullptr &&
+                argument.type()->IsString()
+            ? std::optional<std::string>("'UTC'")
+        : format && argument.type() != nullptr && argument.type()->IsString()
             ? std::optional<std::string>("'%t'")
         : json_mutator && argument.type() != nullptr && argument.type()->IsString()
             ? std::optional<std::string>(name == "JSON_ARRAY_INSERT" ? "'$[0]'" : "'$'")
@@ -248,7 +258,15 @@ std::variant<std::string, Probe> GeneratedQuery(const std::string& name,
       };
     }
     element_used = element_used || argument.kind() == googlesql::ARG_KIND_EXPR_ANY_1;
-    arguments.push_back(*sample);
+    // Optional INT64/date-part pairs spell one INTERVAL expression, such as
+    // GENERATE_DATE_ARRAY's step, rather than two comma-separated arguments.
+    if (include_optional && argument.optional() && argument.type() != nullptr &&
+        argument.type()->IsEnum() && previous_type != nullptr && previous_type->IsInt64()) {
+      arguments.back() = "INTERVAL " + arguments.back() + " " + *sample;
+    } else {
+      arguments.push_back(*sample);
+    }
+    previous_type = argument.type();
   }
   std::string call = name + "(";
   for (size_t i = 0; i < arguments.size(); ++i) {
@@ -398,6 +416,29 @@ int Main(int argc, char** argv) {
         }
         for (const std::string& element : elements) {
           const auto query = GeneratedQuery(name, *function, signature, element);
+          if (list_signatures) {
+            std::cout << signature.DebugString(name) << "\n  "
+                      << (std::holds_alternative<std::string>(query)
+                              ? std::get<std::string>(query)
+                              : std::get<Probe>(query).detail)
+                      << "\n";
+            continue;
+          }
+          probes.push_back(std::holds_alternative<std::string>(query)
+                               ? RunProbe(emulator, tables, std::get<std::string>(query))
+                               : std::get<Probe>(query));
+        }
+        // Date-part signatures can also take an optional period or time zone. Probe
+        // the longest form so rejecting those arguments makes support Partial.
+        const bool date_part = std::ranges::any_of(signature.arguments(), [](const auto& argument) {
+          return argument.type() != nullptr && argument.type()->IsEnum() &&
+                 argument.type()->DebugString().find("DateTimestampPart") != std::string::npos;
+        });
+        const bool optional = std::ranges::any_of(signature.arguments(), [](const auto& argument) {
+          return argument.optional() && !argument.has_argument_name();
+        });
+        if (date_part && optional) {
+          const auto query = GeneratedQuery(name, *function, signature, "", true);
           if (list_signatures) {
             std::cout << signature.DebugString(name) << "\n  "
                       << (std::holds_alternative<std::string>(query)

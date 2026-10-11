@@ -148,11 +148,11 @@ note TO_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open 
 note FROM_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open source; accepts either case, padded or not
 note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
 note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
-note DATE_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
-note DATETIME_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
-note TIMESTAMP_TRUNC WEEK starts on Sunday and ISOWEEK on Monday
-note DATE_DIFF WEEK starts on Sunday and ISOWEEK on Monday
-note DATETIME_DIFF WEEK starts on Sunday and ISOWEEK on Monday; parts below a day count whole units rather than boundaries
+note DATE_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
+note DATETIME_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
+note TIMESTAMP_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
+note DATE_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
+note DATETIME_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; parts below a day count whole units rather than boundaries
 note TIMESTAMP_DIFF counts whole units rather than boundaries
 note TIME_DIFF counts whole units rather than boundaries
 note INT64 from JSON, fails when the value has another JSON type
@@ -164,3 +164,5 @@ note JSON_ARRAY_APPEND RANGE and empty STRUCT values are unsupported
 note JSON_ARRAY_INSERT RANGE and empty STRUCT values are unsupported
 
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
+
+note LAST_DAY supports MONTH, QUARTER, YEAR, ISOYEAR, WEEK, ISOWEEK and WEEK(weekday); out-of-range results are errors

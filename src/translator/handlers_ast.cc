@@ -35,8 +35,10 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   }
   const std::string part = ToLowerAscii(value.EnumDisplayName());
   static const std::set<std::string> supported = {
-      "year",   "quarter",     "month",       "week",    "day",     "hour",      "minute",
-      "second", "millisecond", "microsecond", "isoyear", "isoweek", "dayofweek", "dayofyear",
+      "year",         "quarter",        "month",         "week",        "day",
+      "hour",         "minute",         "second",        "millisecond", "microsecond",
+      "isoyear",      "isoweek",        "dayofweek",     "dayofyear",   "week_monday",
+      "week_tuesday", "week_wednesday", "week_thursday", "week_friday", "week_saturday",
   };
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
 }
