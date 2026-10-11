@@ -104,7 +104,7 @@ std::vector<Rule> WeekDiff() {
 // LAST_DAY always returns DATE, even for a DATETIME input. Compute the first day of
 // the next period before subtracting a day so the final year remains representable.
 std::vector<Rule> LastDay() {
-  return {
+  std::vector<Rule> rules = {
       {.arity = {1, 2}, .spelling = "last_day($1)", .conditions = {Part(2, {"month"})}},
       {
           .arity = 2,
@@ -117,6 +117,25 @@ std::vector<Rule> LastDay() {
           .conditions = {Part(2, {"year"})},
       },
   };
+  const auto append = [&rules](const std::string& result, Condition condition) {
+    rules.push_back({
+        .arity = 2,
+        .spelling = "CASE WHEN " + result + " > DATE '9999-12-31' THEN !1 ELSE " + result + " END",
+        .conditions = {std::move(condition)},
+        .defaults = {},
+        .errors = {"'LAST_DAY produces an out-of-range date'"},
+    });
+  };
+  for (const auto& [part, shift] : WeekParts()) {
+    append("CAST(" + WeekStart("$1", shift) + " + INTERVAL 6 DAY AS DATE)", Part(2, {part}));
+  }
+  // January 4 always belongs to its calendar year's ISO year. Truncating January 4
+  // of the next ISO year gives the following year's first Monday.
+  append(
+      "CAST(date_trunc('week', make_date(CAST(date_part('isoyear', $1) + 1 AS INTEGER), 1, 4)) "
+      "- INTERVAL 1 DAY AS DATE)",
+      Part(2, {"isoyear"}));
+  return rules;
 }
 
 // A cast to a civil type, where a time zone argument moves a TIMESTAMP to the civil time there.
