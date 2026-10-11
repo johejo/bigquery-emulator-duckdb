@@ -48,7 +48,9 @@ TEST(FunctionsTest, MatchesDateParts) {
   EXPECT_EQ(TranslateFunction("DATETIME_TRUNC", {Sql("d"), Part("month")}),
             "date_trunc('month', d)");
   EXPECT_EQ(TranslateFunction("DATETIME_TRUNC", {Sql("d"), Part("isoweek")}),
-            "date_trunc('week', d)");
+            "CASE WHEN date_trunc('week', d) < DATE '0001-01-01' THEN "
+            "error('Truncating date or time to week produces an out-of-range result') ELSE "
+            "date_trunc('week', d) END");
   EXPECT_EQ(TranslateFunction("DATE_DIFF", {Sql("a"), Sql("b"), Part("hour")}),
             "date_sub('hour', b, a)");
   EXPECT_EQ(TranslateFunction("DATE_DIFF", {Sql("a"), Sql("b"), Part("day")}),

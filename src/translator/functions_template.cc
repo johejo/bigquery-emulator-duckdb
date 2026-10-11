@@ -50,21 +50,38 @@ std::vector<Rule> IntegralRound(std::string_view function) {
   };
 }
 
-// BigQuery weeks start on Sunday. DuckDB's week is the ISO week, which starts on Monday.
-std::string WeekStart(const std::string& value, bool iso) {
-  return iso ? "date_trunc('week', " + value + ")"
-             : "(date_trunc('week', " + value + " + INTERVAL 1 DAY) - INTERVAL 1 DAY)";
+// Shift the requested weekday to Monday, DuckDB's week boundary, then shift back.
+const std::vector<std::pair<std::string_view, int>>& WeekParts() {
+  static const std::vector<std::pair<std::string_view, int>> parts = {
+      {"week", 1},           {"isoweek", 0},       {"week_monday", 0}, {"week_tuesday", 6},
+      {"week_wednesday", 5}, {"week_thursday", 4}, {"week_friday", 3}, {"week_saturday", 2},
+  };
+  return parts;
+}
+
+std::string WeekStart(const std::string& value, int shift) {
+  if (shift == 0) {
+    return "date_trunc('week', " + value + ")";
+  }
+  const std::string interval = "INTERVAL " + std::to_string(shift) + " DAY";
+  return "(date_trunc('week', " + value + " + " + interval + ") - " + interval + ")";
 }
 
 // *_TRUNC to a week, with the result cast to `target` when date_trunc() would widen it.
 std::vector<Rule> WeekTrunc(std::string_view target = "") {
   std::vector<Rule> rules;
-  for (const bool iso : {false, true}) {
-    const std::string start = WeekStart("$1", iso);
+  for (const auto& [part, shift] : WeekParts()) {
+    const std::string start = WeekStart("$1", shift);
     rules.push_back({
         .arity = 2,
-        .spelling = target.empty() ? start : "CAST(" + start + " AS " + std::string(target) + ")",
-        .conditions = {Part(2, {iso ? "isoweek" : "week"})},
+        .spelling =
+            "CASE WHEN " + start + " < DATE '0001-01-01' THEN !1 ELSE " +
+            (target.empty() ? start : "CAST(" + start + " AS " + std::string(target) + ")") +
+            " END",
+        .conditions = target == "DATE" ? std::vector<Condition>{Is(1, {TYPE_DATE}), Part(2, {part})}
+                                       : std::vector<Condition>{Part(2, {part})},
+        .defaults = {},
+        .errors = {"'Truncating date or time to week produces an out-of-range result'"},
     });
   }
   return rules;
@@ -73,12 +90,12 @@ std::vector<Rule> WeekTrunc(std::string_view target = "") {
 // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
 std::vector<Rule> WeekDiff() {
   std::vector<Rule> rules;
-  for (const bool iso : {false, true}) {
+  for (const auto& [part, shift] : WeekParts()) {
     rules.push_back({
         .arity = 3,
-        .spelling =
-            "(date_diff('day', " + WeekStart("$2", iso) + ", " + WeekStart("$1", iso) + ") // 7)",
-        .conditions = {Part(3, {iso ? "isoweek" : "week"})},
+        .spelling = "(date_diff('day', " + WeekStart("$2", shift) + ", " + WeekStart("$1", shift) +
+                    ") // 7)",
+        .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME}), Part(3, {part})},
     });
   }
   return rules;
@@ -365,7 +382,22 @@ std::vector<Rule> Extract() {
     rules.push_back({
         .arity = arity,
         .spelling = "date_part(#2, " + value + ")",
-        .conditions = {Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP})},
+        .conditions =
+            {
+                Is(1, {TYPE_DATE, TYPE_TIME, TYPE_DATETIME, TYPE_TIMESTAMP}),
+                Part(2,
+                     {
+                         "year",
+                         "quarter",
+                         "month",
+                         "day",
+                         "hour",
+                         "minute",
+                         "second",
+                         "isoyear",
+                         "dayofyear",
+                     }),
+            },
     });
   }
   return rules;
@@ -739,8 +771,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // date_trunc() widens a DATE to a TIMESTAMP, which DATE_TRUNC does not.
       {
           "DATE_TRUNC",
-          Concat(
-              {WeekTrunc("DATE"), {{.arity = 2, .spelling = "CAST(date_trunc(#2, $1) AS DATE)"}}}),
+          Concat({
+              WeekTrunc("DATE"),
+              WeekTrunc(),
+              {{.arity = 2, .spelling = "CAST(date_trunc(#2, $1) AS DATE)"}},
+          }),
       },
       {"DATETIME_TRUNC", Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}})},
       {"TIMESTAMP_TRUNC", Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}})},
