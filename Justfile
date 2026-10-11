@@ -48,7 +48,7 @@ go-test *args:
 go-tidy:
     go mod tidy
 
-lint: fmt-check duckdb-version-check go-vet cppcheck tidy
+lint: fmt-check duckdb-version-check go-vet go-staticcheck cppcheck tidy
 
 test: go-test
     bazelisk test //...
