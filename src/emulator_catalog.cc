@@ -487,6 +487,15 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
     info.schema = TableSchema(backend_, table);
     info.metadata = CommentMetadata(
         RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(nullptr));
+    const QueryResult identity =
+        backend_.Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
+                                     "{} AND schema_name = {} AND table_name = {}",
+                                     QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+                                     QuoteLiteral(table.table_id)));
+    if (identity.rows.empty()) {
+      throw ApiError::NotFound("Table not found: " + table.table_id);
+    }
+    info.storage_id = std::stoll(FirstColumnStrings(identity).at(0));
     if (include_row_count) {
       const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
       info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
@@ -559,7 +568,9 @@ void Emulator::UpdateTable(TableReference table,
     std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
   }
   if (metadata.has_value()) {
-    statements.push_back(TableCommentStatement(table, *metadata, schema.value_or(info.schema)));
+    TableMetadata updated = *metadata;
+    updated.creation_time = info.metadata.creation_time;
+    statements.push_back(TableCommentStatement(table, updated, schema.value_or(info.schema)));
   }
   if (statements.empty()) {
     return;
@@ -703,6 +714,63 @@ QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
   }
   return Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT " + std::to_string(max_results) +
                  " OFFSET " + std::to_string(start_index));
+}
+
+std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
+                                                    const std::vector<FieldSchema>& schema,
+                                                    const json& rows, int64_t storage_id,
+                                                    bool validate_only) {
+  table.project_id = ResolveProject(table.project_id);
+  if (GetTable(table, false).view_query) {
+    throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
+  }
+  try {
+    const auto session = backend_.NewSession();
+    session->Transaction("BEGIN TRANSACTION");
+    const QueryResult identity =
+        session->Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
+                                     "{} AND schema_name = {} AND table_name = {}",
+                                     QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
+                                     QuoteLiteral(table.table_id)));
+    if (identity.rows.empty() || std::stoll(FirstColumnStrings(identity).at(0)) != storage_id) {
+      throw ApiError::NotFound("The Storage Write destination table was dropped or replaced");
+    }
+    if (SchemaToJson(TableSchema(*session, table)) != SchemaToJson(schema)) {
+      throw ApiError::Invalid("Storage Write does not support destination schema changes");
+    }
+    std::vector<std::string> statements;
+    for (size_t index = 0; index < rows.size(); ++index) {
+      const auto& row = rows.at(index);
+      std::string columns;
+      std::string values;
+      for (const auto& field : schema) {
+        if (!columns.empty()) {
+          columns += ", ";
+          values += ", ";
+        }
+        columns += QuoteIdentifier(field.name);
+        const auto value = row.find(field.name);
+        try {
+          values += InsertValue(value == row.end() ? json(nullptr) : *value, field, false);
+        } catch (const ApiError& error) {
+          return {{.index = index, .message = error.what()}};
+        }
+      }
+      statements.push_back(
+          std::format("INSERT INTO {} ({}) VALUES ({})", QualifiedName(table), columns, values));
+    }
+    for (size_t index = 0; index < statements.size(); ++index) {
+      try {
+        session->Execute(statements.at(index));
+      } catch (const BackendError& error) {
+        return {{.index = index, .message = error.what()}};
+      }
+    }
+    session->Transaction(validate_only ? "ROLLBACK" : "COMMIT");
+    return {};
+  } catch (const BackendError& error) {
+    throw ApiError::Invalid(error.what());
+  }
 }
 
 std::vector<InsertError> Emulator::InsertTableData(TableReference table, const json& rows,

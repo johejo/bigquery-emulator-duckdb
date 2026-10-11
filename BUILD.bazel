@@ -643,7 +643,10 @@ cc_library(
     srcs = ["src/server.cc"],
     hdrs = ["src/server.h"],
     copts = ["-std=c++20"],
-    implementation_deps = ["//src/server:rest"],
+    implementation_deps = [
+        "//src/server:rest",
+        "//src/server:storage",
+    ],
 )
 
 cc_binary(
@@ -861,6 +864,9 @@ cc_test(
         ":table_metadata",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+        "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_grpc",
+        "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_proto",
+        "@grpc//:grpc++",
     ],
 )
 

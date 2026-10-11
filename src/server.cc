@@ -8,15 +8,18 @@
 #include <utility>
 
 #include "src/server/rest.h"
+#include "src/server/storage.h"
 
 namespace bigquery_emulator_duckdb {
 
 class Server::Impl {
  public:
   Impl(Emulator& emulator, ServerOptions options)
-      : rest(emulator, std::move(options.host), options.port) {}
+      : rest(emulator, options.host, options.port),
+        storage(emulator, std::move(options.host), options.grpc_port) {}
 
   RestServer rest;
+  StorageServer storage;
   std::thread worker;
   std::mutex stop_mutex;
   bool started = false;
@@ -40,7 +43,14 @@ bool Server::Start() {
     return false;
   }
   impl_->started = true;
+  // httplib cannot close a bound socket through stop() until its serving loop starts.
+  // Start gRPC first so a failed gRPC bind cannot leave an unserved REST socket behind.
+  if (!impl_->storage.Start()) {
+    return false;
+  }
   if (!impl_->rest.Bind()) {
+    impl_->storage.Stop();
+    impl_->storage.Wait();
     return false;
   }
   impl_->worker = std::thread([this] {
@@ -61,6 +71,8 @@ bool Server::Wait() {
   if (impl_->worker.joinable()) {
     impl_->worker.join();
   }
+  impl_->storage.Stop();
+  impl_->storage.Wait();
   if (impl_->failure) {
     std::rethrow_exception(impl_->failure);
   }
@@ -74,10 +86,14 @@ void Server::Stop() {
   }
   impl_->stopped = true;
   impl_->rest.Stop();
+  impl_->storage.Stop();
 }
 
 int Server::port() const { return impl_->rest.port(); }
 
 std::string Server::root_url() const { return impl_->rest.root_url(); }
+
+int Server::grpc_port() const { return impl_->storage.port(); }
+std::string Server::grpc_endpoint() const { return impl_->storage.endpoint(); }
 
 }  // namespace bigquery_emulator_duckdb

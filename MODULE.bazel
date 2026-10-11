@@ -7,6 +7,8 @@ bazel_dep(name = "abseil-cpp", version = "20260526.0")
 bazel_dep(name = "boringssl", version = "0.20260327.0")
 bazel_dep(name = "cpp-httplib", version = "0.46.0")
 bazel_dep(name = "google_cloud_cpp", version = "3.10.0")
+bazel_dep(name = "googleapis", version = "0.0.0-20260825-d10ac924")
+bazel_dep(name = "grpc", version = "1.84.0")
 bazel_dep(name = "googlesql", version = "2026.10.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 
@@ -18,7 +20,16 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "35.1")
 bazel_dep(name = "quickjs-ng", version = "0.15.1.bcr.1")
 bazel_dep(name = "rules_cc", version = "0.2.19")
+bazel_dep(name = "rules_go", version = "0.60.0")
 bazel_dep(name = "zlib", version = "1.3.1.bcr.6")
+
+# Gazelle must use a recent host Go too: gRPC's transitive Envoy module otherwise selects
+# Go 1.24, which cannot fetch GoogleSQL's textmapper (requires Go 1.25 or newer).
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.from_file(
+    name = "storage_host_go",
+    go_mod = "//:go.mod",
+)
 
 clang_tidy_repository = use_repo_rule("//tools/clang_tidy:repository.bzl", "clang_tidy_repository")
 
@@ -49,6 +60,16 @@ archive_override(
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "nanoarrow",
+    build_file = "//third_party/nanoarrow:BUILD.nanoarrow.bazel",
+    patch_args = ["-p1"],
+    patches = ["//third_party/nanoarrow:public_headers.patch"],
+    sha256 = "bb422ce7ed486abd95eb027a1ac092bbc1b5ed44955e89c098f0a1cb75109d5c",
+    strip_prefix = "arrow-nanoarrow-apache-arrow-nanoarrow-0.7.0",
+    urls = ["https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.7.0.tar.gz"],
+)
 
 # Prebuilt static libduckdb per platform, linked into the binary; //third_party/duckdb selects the
 # one for the target platform, so only that archive is downloaded.

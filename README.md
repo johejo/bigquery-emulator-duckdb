@@ -51,6 +51,41 @@ query.Parameters = []bigquery.QueryParameter{{Name: "name", Value: "alice"}}
 rows, err := query.Read(ctx)
 ```
 
+### BigQuery Storage API (gRPC)
+
+The same process exposes Storage Read and Write v1 on `127.0.0.1:9060`, sharing tables
+with the REST API. Set `--grpc-port` to change the port (`0` chooses an available port).
+Both listeners use `--host`. Local gRPC connections use insecure transport and no credentials.
+
+Enable Storage Read on the Go BigQuery client:
+
+```go
+err = client.EnableStorageReadClient(ctx,
+	option.WithEndpoint("127.0.0.1:9060"), option.WithoutAuthentication(),
+	option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+```
+
+For Write, connect `storage/managedwriter.NewClient` or the generated Storage v1 client
+to the same gRPC endpoint with these options. Supply a self-contained protobuf writer
+descriptor and serialized rows; Arrow input is unsupported. The default stream and COMMITTED
+streams publish immediately. BUFFERED streams publish through `FlushRows`; PENDING streams
+publish atomically through `BatchCommitWriteStreams` after finalization. Explicit streams retain
+offsets across connections within the process.
+
+Read sessions materialize a snapshot in memory and expire after six hours. Arrow and Avro
+output support scalar types, STRUCTs and arrays, including decimals and temporal types.
+INTERVAL and RANGE, parameterized decimals, Arrow JSON/GEOGRAPHY, historical snapshots,
+sampling, compression and custom serialization options are unsupported. Write supports protobuf scalar fields, STRUCTs and repeated fields;
+column defaults, parameterized columns, custom protobuf annotations, JSON/GEOGRAPHY input
+and schema evolution are unsupported. Create a new stream after changing a table schema. Default streams established
+before a schema change require restarting the process. Legacy persisted tables without creation
+metadata cannot return default-stream creation metadata.
+Decimal writer strings must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
+
+Storage session and stream state, offsets, and unpublished BUFFERED/PENDING rows are
+process-local and are discarded at shutdown, including with `--data-dir`. Published rows
+persist normally. Storage stream expiration and production quotas are not emulated.
+
 ## Projects
 
 Register projects before using them. `--project` is repeatable and accepts either a JSON object
@@ -124,12 +159,16 @@ compressed and uncompressed files can be loaded together.
 What the emulator supports is listed in generated pages:
 
 - [docs/api.md](docs/api.md): REST API methods
+- [docs/storage.md](docs/storage.md): Storage v1 gRPC methods
 - [docs/sql.md](docs/sql.md): statements and clauses
 - [docs/functions.md](docs/functions.md): built-in functions
 
 Behavior that applies across them:
 
 - Jobs complete synchronously, before the request that starts them returns.
+- Storage sessions, write-stream offsets and unpublished BUFFERED/PENDING rows are
+  discarded at process exit, even with `--data-dir`; published rows persist. Read snapshots
+  are materialized in memory, and production stream expiration and quotas are not emulated.
 - Table and view expiration is stored through REST `expirationTime` or DDL
   `expiration_timestamp` (TIMESTAMP literals or NULL). Expired tables and views are deleted lazily when the catalog is read,
   including before query analysis, and are treated as missing. Dataset default expiration and

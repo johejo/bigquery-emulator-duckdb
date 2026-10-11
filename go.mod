@@ -3,13 +3,16 @@ module github.com/johejo/bigquery-emulator-duckdb
 go 1.26.0
 
 require (
+	cloud.google.com/go v0.123.0
 	cloud.google.com/go/bigquery v1.84.0
 	github.com/apache/arrow-go/v18 v18.8.0
+	github.com/linkedin/goavro/v2 v2.14.1
 	google.golang.org/api v0.299.0
+	google.golang.org/grpc v1.84.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
-	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.23.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.1 // indirect
@@ -22,6 +25,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/s2a-go v0.1.10 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -31,6 +35,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.67.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
@@ -52,6 +57,4 @@ require (
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 )

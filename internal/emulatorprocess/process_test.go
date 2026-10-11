@@ -3,6 +3,7 @@ package emulatorprocess
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,6 +13,11 @@ import (
 	"testing"
 	"time"
 )
+
+func init() {
+	// Start chooses an ephemeral gRPC listener; the helper models that emulator flag.
+	flag.Int("grpc-port", 0, "helper gRPC port")
+}
 
 // Re-execute the test binary to exercise real subprocess startup and termination.
 func TestProcessHelper(t *testing.T) {
@@ -23,6 +29,7 @@ func TestProcessHelper(t *testing.T) {
 	case "ready":
 		stopped := make(chan os.Signal, 1)
 		signal.Notify(stopped, syscall.SIGTERM)
+		fmt.Fprintln(os.Stderr, "BigQuery Storage gRPC listening on 127.0.0.1:1235")
 		fmt.Fprint(os.Stderr, "diagnostic before startup\nbigquery-emulator-duckdb listening ")
 		fmt.Fprintln(os.Stderr, "on http://127.0.0.1:1234")
 		<-stopped
@@ -45,8 +52,8 @@ func TestStartAndStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = p.Stop() })
-	if p.URL != "http://127.0.0.1:1234" {
-		t.Fatalf("URL = %q", p.URL)
+	if p.URL != "http://127.0.0.1:1234" || p.GRPC != "127.0.0.1:1235" {
+		t.Fatalf("URL = %q, GRPC = %q", p.URL, p.GRPC)
 	}
 	for range 2 {
 		if err := p.Stop(); err != nil {
