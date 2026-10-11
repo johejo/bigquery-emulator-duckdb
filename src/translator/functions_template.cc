@@ -101,6 +101,24 @@ std::vector<Rule> WeekDiff() {
   return rules;
 }
 
+// LAST_DAY always returns DATE, even for a DATETIME input. Compute the first day of
+// the next period before subtracting a day so the final year remains representable.
+std::vector<Rule> LastDay() {
+  return {
+      {.arity = {1, 2}, .spelling = "last_day($1)", .conditions = {Part(2, {"month"})}},
+      {
+          .arity = 2,
+          .spelling = "CAST(date_trunc('quarter', $1) + INTERVAL 3 MONTH - INTERVAL 1 DAY AS DATE)",
+          .conditions = {Part(2, {"quarter"})},
+      },
+      {
+          .arity = 2,
+          .spelling = "CAST(date_trunc('year', $1) + INTERVAL 1 YEAR - INTERVAL 1 DAY AS DATE)",
+          .conditions = {Part(2, {"year"})},
+      },
+  };
+}
+
 // A cast to a civil type, where a time zone argument moves a TIMESTAMP to the civil time there.
 std::vector<Rule> Civil(const std::string& target) {
   // DuckDB cannot cast a TIMESTAMPTZ to TIME, so it goes through the civil time in UTC, the
@@ -783,10 +801,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           "TIME_TRUNC",
           {{.arity = 2, .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"}},
       },
-      {
-          "LAST_DAY",
-          {{.arity = {1, 2}, .spelling = "last_day($1)", .conditions = {Part(2, {"month"})}}},
-      },
+      {"LAST_DAY", LastDay()},
 
       // Constructors and conversions between the civil types and TIMESTAMP.
       {"CURRENT_DATE", {{.arity = 0, .spelling = "CURRENT_DATE"}}},

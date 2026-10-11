@@ -59,7 +59,7 @@ TEST(FunctionsTest, MatchesDateParts) {
   EXPECT_EQ(TranslateFunction("DATE_DIFF", {Sql("a"), Sql("b"), Sql("c")}), std::nullopt);
   EXPECT_EQ(TranslateFunction("LAST_DAY", {Sql("d")}), "last_day(d)");
   EXPECT_EQ(TranslateFunction("LAST_DAY", {Sql("d"), Part("month")}), "last_day(d)");
-  EXPECT_EQ(TranslateFunction("LAST_DAY", {Sql("d"), Part("year")}), std::nullopt);
+  EXPECT_EQ(TranslateFunction("LAST_DAY", {Sql("d"), Part("day")}), std::nullopt);
 }
 
 TEST(FunctionsTest, MatchesRoundingModes) {
