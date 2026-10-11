@@ -1,0 +1,27 @@
+diff --git a/src/nanoarrow/nanoarrow.h b/src/nanoarrow/nanoarrow.h
+--- a/src/nanoarrow/nanoarrow.h
++++ b/src/nanoarrow/nanoarrow.h
+@@ -25 +25 @@
+-#include "nanoarrow/common/inline_types.h"
++#include "nanoarrow/common/inline_types.h"  // IWYU pragma: export
+@@ -1271,2 +1271,2 @@
+-#include "nanoarrow/common/inline_array.h"
+-#include "nanoarrow/common/inline_buffer.h"
++#include "nanoarrow/common/inline_array.h"  // IWYU pragma: export
++#include "nanoarrow/common/inline_buffer.h"  // IWYU pragma: export
+diff --git a/src/nanoarrow/nanoarrow.hpp b/src/nanoarrow/nanoarrow.hpp
+--- a/src/nanoarrow/nanoarrow.hpp
++++ b/src/nanoarrow/nanoarrow.hpp
+@@ -25,6 +25,6 @@
+-#include "nanoarrow/hpp/array_stream.hpp"
+-#include "nanoarrow/hpp/buffer.hpp"
+-#include "nanoarrow/hpp/exception.hpp"
+-#include "nanoarrow/hpp/operators.hpp"
+-#include "nanoarrow/hpp/unique.hpp"
+-#include "nanoarrow/hpp/view.hpp"
++#include "nanoarrow/hpp/array_stream.hpp"  // IWYU pragma: export
++#include "nanoarrow/hpp/buffer.hpp"  // IWYU pragma: export
++#include "nanoarrow/hpp/exception.hpp"  // IWYU pragma: export
++#include "nanoarrow/hpp/operators.hpp"  // IWYU pragma: export
++#include "nanoarrow/hpp/unique.hpp"  // IWYU pragma: export
++#include "nanoarrow/hpp/view.hpp"  // IWYU pragma: export

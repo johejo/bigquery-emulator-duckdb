@@ -10,7 +10,9 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
+#include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
@@ -130,6 +132,52 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   } catch (const BackendError& error) {
     throw ApiError::InvalidQuery(error.what());
   }
+}
+
+QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& restriction) {
+  table.project_id = ResolveProject(table.project_id);
+  const TableInfo info = GetTable(table, false);
+  if (info.view_query) {
+    throw ApiError::Invalid("Storage Read does not support logical views");
+  }
+  std::string query =
+      "SELECT * FROM " + googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
+                                                        "." + table.table_id);
+  if (!restriction.empty()) {
+    if (restriction.size() > size_t{1024} * 1024) {
+      throw ApiError::Invalid("row_restriction exceeds 1 MB");
+    }
+    std::unique_ptr<googlesql::ParserOutput> parsed;
+    const auto status = googlesql::ParseExpression(
+        restriction, googlesql::ParserOptions(GoogleSqlLanguageOptions()), &parsed);
+    if (!status.ok()) {
+      throw ApiError::Invalid(std::string(status.message()));
+    }
+    std::vector<const googlesql::ASTNode*> nodes{parsed->expression()};
+    while (!nodes.empty()) {
+      const auto* node = nodes.back();
+      nodes.pop_back();
+      if (node->GetAsOrNull<googlesql::ASTExpressionSubquery>() != nullptr ||
+          node->GetAsOrNull<googlesql::ASTQuery>() != nullptr) {
+        throw ApiError::Invalid("Storage Read does not support subqueries in row_restriction");
+      }
+      for (int i = 0; i < node->num_children(); ++i) {
+        nodes.push_back(node->child(i));
+      }
+    }
+    query += " WHERE (" + restriction + ")";
+  }
+  const TranslatedStatement translated = Translate(query, {}, table.project_id, table.dataset_id);
+  QueryResult result = Execute(translated.sql);
+  const TableInfo after = GetTable(table, false);
+  if (after.storage_id != info.storage_id ||
+      SchemaToJson(after.schema) != SchemaToJson(info.schema) ||
+      result.schema.size() != info.schema.size()) {
+    throw ApiError::Invalid("Table changed while creating the Storage Read snapshot");
+  }
+  // SELECT * preserves the table's field order and its stored modes and logical types.
+  result.schema = info.schema;
+  return result;
 }
 
 TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,

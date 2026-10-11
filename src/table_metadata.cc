@@ -316,6 +316,9 @@ void ValidateClustering(const std::vector<std::string>& clustering,
 
 json TableMetadata::ToJson() const {
   json fields = json::object();
+  if (creation_time != 0) {
+    fields["creationTime"] = std::to_string(creation_time);
+  }
   if (!description.empty()) {
     fields["description"] = description;
   }

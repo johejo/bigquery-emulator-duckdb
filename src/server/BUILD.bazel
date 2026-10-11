@@ -3,6 +3,53 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(features = ["layering_check"])
 
 cc_library(
+    name = "storage_codec",
+    srcs = ["storage_codec.cc"],
+    hdrs = ["storage_codec.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//:api_error",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/common:utf_util",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@nanoarrow",
+    ],
+    deps = [
+        "//:field_schema",
+        "@nlohmann_json//:json",
+        "@protobuf",
+    ],
+)
+
+cc_library(
+    name = "storage",
+    srcs = ["storage.cc"],
+    hdrs = ["storage.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":storage_codec",
+        "//:api_error",
+        "//:backend",
+        "//:duckdb_sql",
+        "//:emulator",
+        "//:field_schema",
+        "//:references",
+        "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_grpc",
+        "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_proto",
+        "@grpc//:channel_arg_names",
+        "@grpc//:grpc++",
+        "@nlohmann_json//:json",
+        "@protobuf",
+        "@protobuf//:timestamp_cc_proto",
+    ],
+    visibility = ["//:__pkg__"],
+)
+
+cc_library(
     name = "routes",
     srcs = ["routes.cc"],
     hdrs = ["routes.h"],

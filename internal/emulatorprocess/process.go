@@ -13,11 +13,13 @@ import (
 )
 
 const listening = "bigquery-emulator-duckdb listening on "
+const grpcListening = "BigQuery Storage gRPC listening on "
 
 // Process is an emulator whose startup URL has been read from stderr.
 // Stop must be called before removing its data directory.
 type Process struct {
 	URL  string
+	GRPC string
 	cmd  *exec.Cmd
 	log  *startupLog
 	done chan struct{}
@@ -28,6 +30,7 @@ type startupLog struct {
 	sync.Mutex
 	buffer bytes.Buffer
 	ready  chan string
+	grpc   string
 }
 
 func (l *startupLog) Write(data []byte) (int, error) {
@@ -41,6 +44,9 @@ func (l *startupLog) Write(data []byte) (int, error) {
 				break
 			}
 			rest = tail
+			if endpoint, ok := strings.CutPrefix(line, grpcListening); ok {
+				l.grpc = endpoint
+			}
 			if url, ok := strings.CutPrefix(line, listening); ok {
 				l.ready <- url
 				l.ready = nil
@@ -63,7 +69,9 @@ func (l *startupLog) text() string {
 func Start(ctx context.Context, binary, dir string, args ...string) (*Process, error) {
 	ready := make(chan string, 1)
 	p := &Process{
-		cmd:  exec.Command(binary, args...),
+		// Each isolated process also needs its own Storage listener. Explicit caller
+		// arguments later in the list override this default.
+		cmd:  exec.Command(binary, append([]string{"--grpc-port", "0"}, args...)...),
 		log:  &startupLog{ready: ready},
 		done: make(chan struct{}),
 	}
@@ -78,6 +86,9 @@ func Start(ctx context.Context, binary, dir string, args ...string) (*Process, e
 	}()
 	select {
 	case p.URL = <-ready:
+		p.log.Lock()
+		p.GRPC = p.log.grpc
+		p.log.Unlock()
 		return p, nil
 	case <-p.done:
 		return nil, fmt.Errorf("%s exited before listening (%v):\n%s", binary, p.err, p.log.text())
