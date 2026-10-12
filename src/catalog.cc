@@ -87,7 +87,7 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // they are turned off again: BigQuery has no MAP, UUID or FLOAT32, and its timestamps hold
     // microseconds, not nanoseconds or picoseconds. BigQuery also rejects explicit casts between
     // arrays with different element types, including SAFE_CAST and arrays inside structs, and
-    // comparing arrays for equality, including arrays inside structs.
+    // comparing or ordering arrays, including arrays inside structs.
     for (const googlesql::LanguageFeature feature : {
              googlesql::FEATURE_MAP_TYPE,
              googlesql::FEATURE_UUID_TYPE,
@@ -95,6 +95,7 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
              googlesql::FEATURE_TIMESTAMP_PICOS,
              googlesql::FEATURE_CAST_DIFFERENT_ARRAY_TYPES,
              googlesql::FEATURE_ARRAY_EQUALITY,
+             googlesql::FEATURE_ARRAY_ORDERING,
          }) {
       options->DisableLanguageFeature(feature);
     }
