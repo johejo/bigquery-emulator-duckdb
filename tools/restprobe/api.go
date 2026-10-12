@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
 )
 
 //go:embed api_preamble.md
@@ -88,70 +90,70 @@ func generatedRequest(m *apiMethod) apiRequest {
 }
 
 // sendProbe sends request to the emulator at url and classifies the outcome.
-func sendProbe(url string, request apiRequest) (probe, error) {
+func sendProbe(url string, request apiRequest) (probereport.Probe, error) {
 	result, err := send(url, request.method, request.path, request.body)
 	if err != nil {
-		return probe{}, err
+		return probereport.Probe{}, err
 	}
 	sent := "`" + request.method + " " + request.path + "`: "
 	// An unmatched route gets cpp-httplib's empty 404, never a BigQuery error.
 	if result.status == 404 && len(result.body) == 0 {
-		return probe{unsupported, ""}, nil
+		return probereport.Probe{Outcome: probereport.Unsupported, Detail: ""}, nil
 	}
 	// Deletes succeed with an empty body.
 	if result.status/100 == 2 && len(result.body) == 0 {
-		return probe{runs, ""}, nil
+		return probereport.Probe{Outcome: probereport.Runs, Detail: ""}, nil
 	}
 	var body map[string]json.RawMessage
 	if err := json.Unmarshal(result.body, &body); err != nil {
-		return probe{untested, sent + "the response is not JSON"}, nil
+		return probereport.Probe{Outcome: probereport.Untested, Detail: sent + "the response is not JSON"}, nil
 	}
 	message, failed := responseError(body)
 	if !failed {
 		if result.status/100 == 2 {
-			return probe{runs, ""}, nil
+			return probereport.Probe{Outcome: probereport.Runs, Detail: ""}, nil
 		}
-		return probe{untested, sent + "HTTP " + strconv.Itoa(result.status)}, nil
+		return probereport.Probe{Outcome: probereport.Untested, Detail: sent + "HTTP " + strconv.Itoa(result.status)}, nil
 	}
 	message = firstLine(message)
 	if feature, ok := strings.CutPrefix(message, unsupportedPrefix); ok {
 		// The feature, without a hint such as "; set useLegacySql to false".
 		feature, _, _ = strings.Cut(feature, "; ")
-		return probe{unsupported, feature}, nil
+		return probereport.Probe{Outcome: probereport.Unsupported, Detail: feature}, nil
 	}
 	if result.status >= 500 {
-		return probe{broken, sent + message}, nil
+		return probereport.Probe{Outcome: probereport.Broken, Detail: sent + message}, nil
 	}
-	return probe{untested, sent + message}, nil
+	return probereport.Probe{Outcome: probereport.Untested, Detail: sent + message}, nil
 }
 
 // probeRequest sends request to a fresh emulator holding the fixture, with the files the methods
 // file writes in a directory of its own.
 func probeRequest(binary string, files map[string]string, setup []apiRequest,
-	request apiRequest) (probe, error) {
+	request apiRequest) (probereport.Probe, error) {
 	dir, err := os.MkdirTemp("", "restprobe")
 	if err != nil {
-		return probe{}, err
+		return probereport.Probe{}, err
 	}
 	defer os.RemoveAll(dir)
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-			return probe{}, err
+			return probereport.Probe{}, err
 		}
 	}
 	emulator, err := startEmulator(binary)
 	if err != nil {
-		return probe{}, err
+		return probereport.Probe{}, err
 	}
 	defer emulator.Stop()
 	for _, step := range setup {
 		step = step.in(dir)
 		p, err := sendProbe(emulator.URL, step)
 		if err != nil {
-			return probe{}, err
+			return probereport.Probe{}, err
 		}
-		if p.outcome != runs {
-			return probe{}, fmt.Errorf("setup failed: %s %s: %s", step.method, step.path, p.detail)
+		if p.Outcome != probereport.Runs {
+			return probereport.Probe{}, fmt.Errorf("setup failed: %s %s: %s", step.method, step.path, p.Detail)
 		}
 	}
 	return sendProbe(emulator.URL, request.in(dir))
@@ -183,16 +185,16 @@ func readDiscovery(path string) ([]*apiResource, map[string]*apiMethod, error) {
 	// Resources and their methods in alphabetical order.
 	var resources []*apiResource
 	methods := map[string]*apiMethod{}
-	for _, name := range sortedNames(discovery.Resources) {
+	for _, name := range probereport.SortedNames(discovery.Resources) {
 		resource := &apiResource{name: name}
 		entries := discovery.Resources[name].Methods
-		for _, methodName := range sortedNames(entries) {
+		for _, methodName := range probereport.SortedNames(entries) {
 			entry := entries[methodName]
 			m := &apiMethod{id: entry.ID, httpMethod: entry.HTTPMethod, flatPath: entry.FlatPath,
 				hasBody: entry.Request != nil}
 			m.patterns = append(m.patterns, pathPattern(apiPrefix+m.flatPath))
 			if entry.MediaUpload != nil {
-				for _, protocol := range sortedNames(entry.MediaUpload.Protocols) {
+				for _, protocol := range probereport.SortedNames(entry.MediaUpload.Protocols) {
 					m.patterns = append(m.patterns, pathPattern(entry.MediaUpload.Protocols[protocol].Path))
 				}
 			}
@@ -271,59 +273,50 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 			}
 		}
 	}
-	probes := make([]probe, len(jobs))
+	probes := make([]probereport.Probe, len(jobs))
 	if err := parallel(len(jobs), func(i int) (err error) {
 		probes[i], err = probeRequest(binary, files, setup, jobs[i].request)
 		return err
 	}); err != nil {
 		return err
 	}
-	results := map[*apiMethod][]probe{}
+	results := map[*apiMethod][]probereport.Probe{}
 	for i, j := range jobs {
 		results[j.method] = append(results[j.method], probes[i])
 	}
 
-	totals := map[string]int{}
+	var tallies []probereport.Tally
 	var failed []string
 	var body bytes.Buffer
 	for _, resource := range resources {
 		fmt.Fprintf(&body, "## %s\n\n| Method | HTTP request | Status | Notes |\n"+
 			"| --- | --- | --- | --- |\n", resource.name)
+		t := probereport.Tally{Title: resource.name, Counts: map[string]int{}}
 		for _, m := range resource.methods {
 			generated := len(m.requests) == 0
-			counts := map[outcome]int{}
-			// The features the emulator rejected as unsupported, and the requests that failed.
+			counts := map[probereport.Outcome]int{}
 			rejected := map[string]bool{}
 			failures := map[string]bool{}
 			for _, p := range results[m] {
-				counts[p.outcome]++
+				counts[p.Outcome]++
 				switch {
-				case p.outcome == untested && !generated:
-					failed = append(failed, m.id+": "+p.detail)
-				case p.outcome == unsupported && p.detail != "":
-					rejected[p.detail] = true
-				case p.outcome != runs && p.outcome != unsupported:
-					failures[p.detail] = true
+				case p.Outcome == probereport.Untested && !generated:
+					failed = append(failed, m.id+": "+p.Detail)
+				case p.Outcome == probereport.Unsupported && p.Detail != "":
+					rejected[p.Detail] = true
+				case p.Outcome != probereport.Runs && p.Outcome != probereport.Unsupported:
+					failures[p.Detail] = true
 				}
 			}
-			st := status(counts)
-			totals[st]++
-			var note []string
-			if m.note != "" {
-				note = append(note, m.note)
-			}
-			if len(rejected) > 0 {
-				note = append(note, "Rejected as unsupported: "+strings.Join(sortedNames(rejected), ", ")+".")
-			}
-			for _, failure := range sortedNames(failures) {
-				note = append(note, "Fails: "+failure+".")
-			}
+			st := probereport.Status(counts)
+			t.Counts[st]++
 			// bigquery.jobs.query is documented at jobs/query.
 			_, name, _ := strings.Cut(m.id, ".")
 			_, page, _ := strings.Cut(name, ".")
 			fmt.Fprintf(&body, "| [`%s`](%s/%s/%s) | `%s %s` | %s | %s |\n", name, apiDocs,
-				resource.name, page, m.httpMethod, m.flatPath, st, escape(strings.Join(note, " ")))
+				resource.name, page, m.httpMethod, m.flatPath, st, probereport.Notes(m.note, st, rejected, failures))
 		}
+		tallies = append(tallies, t)
 		body.WriteString("\n")
 	}
 	// Every request in the methods file is written by hand, so one that fails for a reason other
@@ -332,7 +325,7 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 		return fmt.Errorf("requests failed:\n%s", strings.Join(failed, "\n"))
 	}
 	fmt.Fprint(w, apiPreamble)
-	writeTotals(w, "Methods", totals)
+	probereport.WriteSummary(w, "Resource", tallies)
 	fmt.Fprint(w, "\n", strings.TrimSuffix(body.String(), "\n"))
 	return nil
 }

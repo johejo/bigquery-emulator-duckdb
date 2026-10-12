@@ -438,8 +438,6 @@ bool ProtoType(const FieldSchema& field, const FieldDescriptor& descriptor) {
     case FieldType::kRecord:
       return type == FieldDescriptor::CPPTYPE_MESSAGE;
     case FieldType::kString:
-    case FieldType::kGeography:
-    case FieldType::kJson:
       return string;
     default:
       return false;
@@ -480,6 +478,9 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
              .empty() ||
         std::ranges::any_of(options, [](const auto* option) { return option->is_extension(); })) {
       throw ApiError::Invalid("Storage Write does not support protobuf field annotations");
+    }
+    if (field.type == FieldType::kJson || field.type == FieldType::kGeography) {
+      throw ApiError::Invalid("Storage Write does not support JSON or GEOGRAPHY input");
     }
     if (input.is_repeated() != (field.mode == FieldMode::kRepeated) || !ProtoType(field, input)) {
       throw ApiError::Invalid("Writer schema type does not match field: " + field.name);
@@ -536,9 +537,6 @@ json ProtoValue(const Message& message, const FieldDescriptor& input, const Fiel
               timestamp, googlesql::functions::kMicroseconds, absl::UTCTimeZone(), &canonical));
           return canonical;
         }
-        case FieldType::kJson:
-        case FieldType::kGeography:
-          throw ApiError::Invalid("Storage Write does not support JSON or GEOGRAPHY input");
         case FieldType::kNumeric: {
           const auto value = googlesql::NumericValue::FromStringStrict(text);
           Check(value.status());

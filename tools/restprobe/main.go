@@ -14,30 +14,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 )
-
-type outcome int
-
-const (
-	runs outcome = iota
-	broken
-	unsupported
-	untested
-)
-
-type probe struct {
-	outcome outcome
-	detail  string
-}
 
 type line struct {
 	number          int
@@ -75,44 +59,6 @@ func splitNamed(text string) (name, value string, ok bool) {
 func firstLine(text string) string {
 	first, _, _ := strings.Cut(text, "\n")
 	return first
-}
-
-// escape escapes the pipes that would end a Markdown table cell.
-func escape(text string) string { return strings.ReplaceAll(text, "|", `\|`) }
-
-// status is Supported, Partial, Unsupported, Broken or Untested, from how many probes had each
-// outcome.
-func status(counts map[outcome]int) string {
-	tested := counts[runs] + counts[unsupported] + counts[broken]
-	switch {
-	case counts[broken] > 0:
-		return "Broken"
-	case tested == 0:
-		return "Untested"
-	case counts[runs] == tested:
-		return "Supported"
-	case counts[runs] == 0:
-		return "Unsupported"
-	}
-	return "Partial"
-}
-
-// writeTotals prints how many rows have each status, in the order of the status names.
-func writeTotals(w io.Writer, heading string, totals map[string]int) {
-	fmt.Fprintf(w, "| Status | %s |\n| --- | --- |\n", heading)
-	for _, name := range sortedNames(totals) {
-		fmt.Fprintf(w, "| %s | %d |\n", name, totals[name])
-	}
-}
-
-// sortedNames returns the keys of entries in order.
-func sortedNames[V any](entries map[string]V) []string {
-	names := make([]string, 0, len(entries))
-	for name := range entries {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }
 
 func startEmulator(binary string, args ...string) (*emulatorprocess.Process, error) {
