@@ -74,6 +74,7 @@ cc_library(
         "//:api_error",
         "//:httplib",
         "//:query_parameters",
+        "@abseil-cpp//absl/time",
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],

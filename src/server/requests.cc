@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/time/time.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/emulator.h"
@@ -222,8 +223,16 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
     }
   }
   ParseDispositions(copy, request.copy);
-  if (copy.contains("destinationExpirationTime") && !copy["destinationExpirationTime"].is_null()) {
-    throw ApiError::Invalid("The emulator does not support destinationExpirationTime");
+  // An RFC 3339 timestamp, as Timestamp is in JSON.
+  if (const json expiration = copy.value("destinationExpirationTime", json());
+      !expiration.is_null()) {
+    absl::Time time;
+    std::string error;
+    if (!expiration.is_string() ||
+        !absl::ParseTime(absl::RFC3339_full, expiration.get<std::string>(), &time, &error)) {
+      throw ApiError::Invalid("Invalid destinationExpirationTime: " + expiration.dump());
+    }
+    request.copy.destination_expiration_time = absl::ToUnixMillis(time);
   }
   request.copy.configuration = copy;
   return request;

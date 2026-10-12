@@ -417,6 +417,55 @@ steps:
                   createDisposition: CREATE_NEVER
     test: |
       current.res.status == 200 && current.res.body.status.errorResult.reason == "notFound"
+  # destinationExpirationTime is a Timestamp, which JSON spells in RFC 3339, and the table the
+  # copy creates expires then.
+  copy_expiration:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: expiring}
+                  destinationExpirationTime: '2099-01-01T00:00:00.123+09:00'
+    test: |
+      current.res.status == 200 && !("errorResult" in current.res.body.status) &&
+      current.res.body.configuration.copy.destinationExpirationTime == '2099-01-01T00:00:00.123+09:00'
+  copy_expiration_table:
+    req:
+      /projects/rest-copy/datasets/ds/tables/expiring:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.expirationTime == '4070876400123'
+  copy_expiration_invalid:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: invalid_expiration}
+                  destinationExpirationTime: '4070908800000'
+    test: current.res.status == 400
+  # Whether BigQuery sets the expiration of a table that already exists is not known.
+  copy_expiration_existing:
+    req:
+      /projects/rest-copy/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {datasetId: ds, tableId: source}
+                  destinationTable: {datasetId: ds, tableId: target}
+                  writeDisposition: WRITE_TRUNCATE
+                  destinationExpirationTime: '2099-01-01T00:00:00Z'
+    test: |
+      current.res.status == 200 && current.res.body.status.errorResult.reason == "invalid"
 
   # Every job type reads table references the same way, so a malformed one is a bad request
   # rather than an internal error, and the job is never run.
