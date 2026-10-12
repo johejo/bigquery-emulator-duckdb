@@ -4,7 +4,8 @@
 #   section TITLE         Starts a table in the report.
 #   query NAME | SQL      A query for the feature NAME, run with `test.d` as the default dataset.
 #                         Repeat it to probe several forms of one feature.
-#   note NAME | TEXT      How the emulator differs from BigQuery where a probe cannot observe it.
+#   note NAME | TEXT      What a probe cannot observe, in a sentence or a link to a section of
+#                         docs/compatibility.md, which holds the details.
 #
 # Every query must be valid GoogleSQL against the fixture; the probe fails on one that is not.
 # List only forms BigQuery documents, not GoogleSQL syntax that BigQuery rejects.
@@ -39,7 +40,7 @@ query Subqueries | SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t
 query Subqueries | SELECT ARRAY(SELECT v FROM u ORDER BY v) AS a
 query Subqueries | SELECT id FROM (SELECT id FROM t) AS sub
 query Correlated subqueries | SELECT (SELECT AS STRUCT k, SUM(id) FROM (SELECT 1 AS k) GROUP BY k) FROM t
-note Correlated subqueries | Aggregate subqueries returning anonymous or duplicate STRUCT fields are unsupported when correlated.
+note Correlated subqueries | See [STRUCT values](compatibility.md#struct-values).
 query Correlated subqueries | SELECT id, (SELECT COUNT(*) FROM UNNEST(tags)) AS n FROM t
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*), SUM(id) FROM t GROUP BY name
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*) FROM t GROUP BY 1 HAVING COUNT(*) > 0
@@ -78,7 +79,7 @@ query STRUCT constructors and casts | SELECT CAST(STRUCT(1 AS x, 'y' AS y) AS ST
 query STRUCT constructors and casts | SELECT STRUCT()
 query STRUCT constructors and casts | SELECT STRUCT(NULL) = STRUCT(1)
 query STRUCT constructors and casts | SELECT CAST(STRUCT(1, 2) AS JSON)
-note STRUCT constructors and casts | Nonempty structs may have anonymous or duplicate field names; casts match fields by position. Empty structs, comparisons and casts to JSON involving anonymous or duplicate fields are unsupported.
+note STRUCT constructors and casts | See [STRUCT values](compatibility.md#struct-values).
 query Struct field and array element access | SELECT s.a, tags[SAFE_OFFSET(0)], tags[SAFE_ORDINAL(1)] FROM t
 query Struct field and array element access | SELECT [1, 2][OFFSET(0)], [1, 2][ORDINAL(1)], [1, 2][0]
 query `PIVOT` | SELECT * FROM (SELECT id, name FROM t) PIVOT (COUNT(*) FOR name IN ('a', 'b'))
@@ -93,7 +94,7 @@ query INTERVAL values | CREATE TABLE interval_storage (i INTERVAL)
 query INTERVAL values | SELECT CAST('0-0 2 0:0:0' AS INTERVAL)
 query INTERVAL values | SELECT INTERVAL 2 DAY + INTERVAL 3 DAY
 query INTERVAL values | SELECT TO_JSON(INTERVAL 2 DAY)
-note INTERVAL values | Query values retain separate month, day and microsecond components. Literals, constructors, JUSTIFY functions, EXTRACT and CAST to STRING are supported. Stored columns, INTERVAL query parameters, casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are unsupported.
+note INTERVAL values | See [INTERVAL values](compatibility.md#interval-values).
 
 query RANGE values | SELECT RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE(DATETIME '2020-01-01 00:00:00', NULL), CAST('[2020-01-01 00:00:00+00, 2021-01-01 00:00:00+00)' AS RANGE<TIMESTAMP>)
 query RANGE values | SELECT r FROM UNNEST([RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[UNBOUNDED, 2020-01-01)']) AS r WHERE r > RANGE<DATE> '[UNBOUNDED, UNBOUNDED)' GROUP BY r ORDER BY r
@@ -101,7 +102,7 @@ query RANGE values | CREATE TABLE range_storage (r RANGE<DATE>) CLUSTER BY r
 query RANGE values | SELECT CAST(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS STRING), CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
 query RANGE values | SELECT SAFE_CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
 query RANGE values | SELECT TO_JSON(r) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
-note RANGE values | Values, stored columns, query parameters and tabledata.insertAll rows of RANGE<DATE>, RANGE<DATETIME> and RANGE<TIMESTAMP> are supported, with comparisons, ordering, grouping, COUNT, MIN, MAX and ANY_VALUE, ARRAY_AGG, navigation functions and casts to and from STRING. SAFE_CAST from STRING, JSON conversion, FORMAT, other functions over RANGE values, loads and extracts of RANGE columns are unsupported.
+note RANGE values | See [RANGE values](compatibility.md#range-values).
 
 section DML
 
@@ -113,7 +114,7 @@ query `UPDATE` | UPDATE t SET name = 'z' WHERE id = 1
 query `UPDATE` | UPDATE t SET name = DEFAULT WHERE TRUE
 query `UPDATE` of a struct field | UPDATE t SET s.a = 5 WHERE id = 1
 query `UPDATE ... FROM` | UPDATE t SET name = CAST(u.v AS STRING) FROM u WHERE t.id = u.id
-note `UPDATE ... FROM` | Rejects multiple source matches per target row before applying any updates
+note `UPDATE ... FROM` | See [Writes](compatibility.md#writes).
 query `UPDATE` rebuilding an array | UPDATE t SET tags = ARRAY(SELECT IF(i = 0, 'y', tag) FROM UNNEST(tags) AS tag WITH OFFSET AS i ORDER BY i) WHERE id = 1
 query `DELETE` | DELETE t WHERE id = 1
 query `DELETE` | DELETE FROM t WHERE id IN (SELECT id FROM u)
@@ -122,7 +123,7 @@ query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED THEN UPDATE SET name
 query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED AND u.v > 10 THEN DELETE WHEN NOT MATCHED BY SOURCE THEN DELETE
 query `MERGE` | MERGE u USING (SELECT 5 AS id, 50 AS v) AS s ON u.id = s.id WHEN NOT MATCHED THEN INSERT ROW
 query `MERGE` | MERGE t USING u ON FALSE WHEN NOT MATCHED BY TARGET THEN INSERT (id) VALUES (u.id) WHEN NOT MATCHED BY SOURCE AND t.id = 2 THEN UPDATE SET name = 'gone'
-note `MERGE` | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies
+note `MERGE` | See [Writes](compatibility.md#writes).
 
 section DDL
 
@@ -131,7 +132,7 @@ query `CREATE TABLE` | CREATE TABLE IF NOT EXISTS t (a INT64)
 query `CREATE TABLE` | CREATE OR REPLACE TABLE t (a INT64)
 query `CREATE TABLE` | CREATE TABLE `test.d.n` (a INT64)
 query Column types with parameters | CREATE TABLE n (a STRING(10), b BYTES(5), c NUMERIC(10, 2))
-note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length
+note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length.
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC)
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC(40, 10))
 query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
@@ -142,20 +143,20 @@ query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
 query Table and column options | CREATE TABLE n (a INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))
-note Table and column options | Stores the description, friendly name, labels and expiration of tables and the description of columns. Expiration accepts TIMESTAMP literals or NULL; expired tables are deleted lazily when read
+note Table and column options | See [Options and expiration](compatibility.md#options-and-expiration).
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE)
-note Partitioning and clustering | Stores the partitioning and clustering of tables. Ingestion-time partitioning (`_PARTITIONDATE`, `_PARTITIONTIME`) is unsupported, and partitions do not expire
+note Partitioning and clustering | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
 query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
-note Primary and foreign keys | Accepted and dropped; BigQuery does not enforce them either
+note Primary and foreign keys | Accepted and dropped.
 query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n
 query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM t; SELECT id FROM _SESSION.n
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t; SELECT id FROM t
-note `CREATE TEMP TABLE` | In multi-statement queries, whose end drops their temporary tables.
+note `CREATE TEMP TABLE` | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 10, 1)) CLUSTER BY name OPTIONS (description = 'x')
 query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t; INSERT n (id) VALUES (1); SELECT id FROM n
@@ -165,17 +166,17 @@ query `CREATE TABLE LIKE` | CREATE TABLE lengths (s STRING(3)); CREATE TABLE n L
 query `CREATE TABLE LIKE` | CREATE TABLE required (s STRUCT<x INT64 NOT NULL>); CREATE TABLE n LIKE required AS SELECT STRUCT(1 AS x) AS s
 query `CREATE TABLE LIKE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n LIKE defaulted
 query `CREATE TABLE LIKE` | CREATE VIEW v AS SELECT id FROM t; CREATE TABLE n LIKE v
-note `CREATE TABLE LIKE` | Copies the schema, partitioning, clustering, description, friendly name and labels of a table; AS SELECT fills it with the query's rows. Copying a view or a table with column defaults is unsupported; AS SELECT with STRING/BYTES length parameters or nested NOT NULL is unsupported
+note `CREATE TABLE LIKE` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t
 query `CREATE TABLE COPY` | CREATE OR REPLACE TABLE n COPY t OPTIONS (description = 'x')
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
 query `CREATE TABLE COPY` | CREATE TEMP TABLE n COPY t; SELECT id FROM n
-note `CREATE TABLE COPY` | Copies the rows of a table besides what `CREATE TABLE LIKE` copies. Copying a view or a table with column defaults is unsupported
+note `CREATE TABLE COPY` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t
 query `CREATE TABLE CLONE` | CREATE TABLE IF NOT EXISTS n CLONE t OPTIONS (labels = [('env', 'dev')])
 query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
 query `CREATE TABLE CLONE` | CREATE OR REPLACE TABLE n CLONE t
-note `CREATE TABLE CLONE` | Copies a table as `CREATE TABLE COPY` does, and records the table it was cloned from and when, which `tables.get` and `INFORMATION_SCHEMA.TABLES` report
+note `CREATE TABLE CLONE` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE SNAPSHOT TABLE` | CREATE SNAPSHOT TABLE n CLONE t
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])
 query `DROP TABLE` | DROP TABLE t
@@ -203,20 +204,20 @@ query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id SET DEFAULT 
 query `ALTER TABLE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); ALTER TABLE defaulted ALTER COLUMN id DROP DEFAULT
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN IF EXISTS missing DROP DEFAULT
 query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id DROP DEFAULT
-note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description and top-level NOT NULL are unsupported.
+note `ALTER TABLE` | See [ALTER TABLE](compatibility.md#alter-table).
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (description = 'x', friendly_name = 'E', labels = [('k', 'v')])
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (default_table_expiration_days = 1)
-note `CREATE SCHEMA` | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.
+note `CREATE SCHEMA` | See [Datasets](compatibility.md#datasets).
 query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
 query `DROP SCHEMA` | DROP SCHEMA d CASCADE
 query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x', friendly_name = 'D', labels = [('k', 'v')])
 query `ALTER SCHEMA` | ALTER SCHEMA IF EXISTS missing SET OPTIONS (description = 'x')
 query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (default_table_expiration_days = 1)
-note `ALTER SCHEMA` | Supports SET OPTIONS, which stores the description, friendly name and labels; other options and actions are unsupported.
+note `ALTER SCHEMA` | See [Datasets](compatibility.md#datasets).
 query `CREATE VIEW` | CREATE VIEW n AS SELECT id FROM t
 query `CREATE VIEW` | CREATE OR REPLACE VIEW n AS SELECT name FROM t
 query `CREATE VIEW` | CREATE VIEW IF NOT EXISTS n AS SELECT id FROM t
@@ -225,7 +226,7 @@ query `CREATE VIEW` | CREATE VIEW n OPTIONS (description = 'x', labels = [('k', 
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC') AS SELECT id FROM t
 query `CREATE VIEW` | CREATE VIEW n OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)) AS SELECT id FROM t
 query `DROP VIEW` | DROP VIEW IF EXISTS missing_view
-note `CREATE VIEW` | Stores the GoogleSQL definition, schema, description, friendly name, labels and expiration (TIMESTAMP literals or NULL); other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
+note `CREATE VIEW` | See [Views](compatibility.md#views).
 query `CREATE MATERIALIZED VIEW` | CREATE MATERIALIZED VIEW n AS SELECT id FROM t
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x + 1)
 query `CREATE FUNCTION` | CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1) OPTIONS (description = 'x'); SELECT d.f(1)
@@ -244,7 +245,7 @@ query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE) AS (x); SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE, y ANY TYPE) RETURNS FLOAT64 AS (x + y); SELECT f(id, 1.5) FROM t
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'; SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT f(CURRENT_DATE())
-note `CREATE FUNCTION` | SQL UDFs, typed or templated with `ANY TYPE`, are inlined into each query that calls them. A persistent UDF keeps its definition and description in its dataset; each call resolves its body against the UDF's project, so the body names tables and other UDFs with their datasets. Persistent function names must name their dataset. Temporary JavaScript UDFs run in QuickJS and take BOOL, FLOAT64 and STRING arguments and return those or INT64; other types, argument names that are not JavaScript identifiers and the `library` option are unsupported. A call fails after 5 minutes. Persistent JavaScript UDFs, aggregate UDFs, `OR REPLACE` and `IF NOT EXISTS` for temporary UDFs, `SAFE.` calls, options other than a persistent UDF's description, views that call SQL UDFs, and volatile arguments with subquery bodies are unsupported. Dry runs, destination tables and positional parameters are unsupported for queries with temporary UDF declarations.
+note `CREATE FUNCTION` | See [User-defined functions](compatibility.md#user-defined-functions).
 query `DROP FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x); DROP FUNCTION d.f
 query `DROP FUNCTION` | DROP FUNCTION IF EXISTS d.missing
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
@@ -254,7 +255,7 @@ section Multi-statement queries
 
 query Statement lists | SELECT 1; SELECT id FROM t
 query Statement lists | INSERT u (id, v) VALUES (5, 50); DELETE FROM u WHERE id = 5
-note Statement lists | Returns the result of the last statement that ran. Creates no child jobs, so `jobs.list` rejects `parentJobId` of a multi-statement query.
+note Statement lists | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `DECLARE`, `SET` | DECLARE x INT64 DEFAULT 1; SET x = x + 1; SELECT x
 query `DECLARE`, `SET` | DECLARE x DEFAULT (SELECT MAX(id) FROM t); SELECT x
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (1, 'x'); SELECT a, b
@@ -262,11 +263,10 @@ query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT 1, 'x'); SELECT a, b
 query `DECLARE`, `SET` | DECLARE s STRUCT<INT64, STRING> DEFAULT (1, 'x'); SET s = (2, 'y'); SELECT s
 query `DECLARE`, `SET` | DECLARE s STRUCT<> DEFAULT STRUCT(); SELECT s
-note `DECLARE`, `SET` | Empty structs are unsupported.
 query `DECLARE`, `SET` | DECLARE s STRING(3) DEFAULT 'a'; SELECT s
 query `BEGIN ... END` | BEGIN DECLARE x INT64 DEFAULT 1; SELECT x; END
 query `BEGIN ... EXCEPTION ... END` | BEGIN SELECT 1 / 0; EXCEPTION WHEN ERROR THEN SELECT @@error.message, @@error.statement_text; END
-note `BEGIN ... EXCEPTION ... END` | An error the emulator reports as unsupported is never handled.
+note `BEGIN ... EXCEPTION ... END` | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `IF` | DECLARE x INT64 DEFAULT 1; IF x > 0 THEN SELECT 'p'; ELSEIF x < 0 THEN SELECT 'n'; ELSE SELECT 'z'; END IF
 query `CASE` | DECLARE x INT64 DEFAULT 1; CASE x WHEN 1 THEN SELECT 'a'; ELSE SELECT 'b'; END CASE
 query `CASE` | CASE WHEN EXISTS(SELECT 1 FROM t) THEN SELECT 'a'; END CASE
@@ -282,18 +282,18 @@ query System variables | SET @@time_zone = 'Asia/Tokyo'; SELECT 1
 query `EXECUTE IMMEDIATE` | DECLARE y INT64; EXECUTE IMMEDIATE 'SELECT ? * (? + 2)' INTO y USING 1, 3; SELECT y
 query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE 'INSERT u (id, v) VALUES (@id, @v)' USING 7 AS id, 70 AS v
 query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE 'BEGIN SELECT 1; END'
-note `EXECUTE IMMEDIATE` | Scripting statements such as `BEGIN ... END`, and transactions, are unsupported in the dynamic statement.
+note `EXECUTE IMMEDIATE` | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query Transactions | BEGIN TRANSACTION; INSERT u (id, v) VALUES (6, 60); COMMIT TRANSACTION
 query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; ROLLBACK TRANSACTION
 query Transactions | BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
-note Transactions | Multi-statement queries only. Transaction modes, SQL UDF declarations inside transactions, writes to multiple DuckDB databases, and committing after a handled error are unsupported.
+note Transactions | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `CALL` | CALL d.p(); SELECT 1
 
 section INFORMATION_SCHEMA
 
 query `SCHEMATA` | SELECT schema_name, ddl FROM INFORMATION_SCHEMA.SCHEMATA
 query `SCHEMATA` | SELECT schema_name FROM `test.region-us.INFORMATION_SCHEMA.SCHEMATA`
-note `SCHEMATA` | Creation times and options other than the location are NULL; every dataset is in the US.
+note `SCHEMATA` | See [Datasets](compatibility.md#datasets).
 query `TABLES` | SELECT table_name, table_type, ddl FROM d.INFORMATION_SCHEMA.TABLES
 query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
 note `TABLES` | Creation times are NULL.

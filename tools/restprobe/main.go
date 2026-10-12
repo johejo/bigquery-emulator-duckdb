@@ -98,6 +98,23 @@ func status(counts map[outcome]int) string {
 	return "Partial"
 }
 
+// notes builds a row's Notes cell from its handwritten note and what its probes found. The forms
+// rejected as unsupported are listed only when others run, since the status says the rest; the
+// failures of a Broken or Untested row say what to fix.
+func notes(note, st string, rejected, failures map[string]bool) string {
+	var parts []string
+	if note != "" {
+		parts = append(parts, note)
+	}
+	switch {
+	case st == "Partial" && len(rejected) > 0:
+		parts = append(parts, "Unsupported: "+strings.Join(sortedNames(rejected), "; ")+".")
+	case st == "Broken" || st == "Untested":
+		parts = append(parts, sortedNames(failures)...)
+	}
+	return escape(strings.Join(parts, " "))
+}
+
 // statuses lists the statuses in the order summaries show them.
 var statuses = []string{"Supported", "Partial", "Unsupported", "Broken", "Untested"}
 

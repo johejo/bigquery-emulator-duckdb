@@ -166,23 +166,23 @@ func probeSQL(w io.Writer, binary, path string) error {
 		t := tally{s.title, map[string]int{}}
 		for _, f := range s.features {
 			counts := map[outcome]int{}
-			notes := map[string]bool{}
+			rejected := map[string]bool{}
+			failures := map[string]bool{}
 			for _, p := range results[f] {
 				counts[p.outcome]++
-				if p.outcome == untested {
+				switch p.outcome {
+				case untested:
 					invalid = append(invalid, f.name+": "+p.detail)
-				} else if p.outcome != runs {
-					notes[p.detail] = true
+				case unsupported:
+					rejected[p.detail] = true
+				case broken:
+					failures[p.detail] = true
 				}
 			}
 			st := status(counts)
 			t.counts[st]++
-			all := []string{}
-			if f.note != "" {
-				all = append(all, f.note)
-			}
-			all = append(all, sortedNames(notes)...)
-			fmt.Fprintf(&body, "| %s | %s | %s |\n", escape(f.name), st, escape(strings.Join(all, "; ")))
+			fmt.Fprintf(&body, "| %s | %s | %s |\n", escape(f.name), st,
+				notes(f.note, st, rejected, failures))
 		}
 		tallies = append(tallies, t)
 		body.WriteString("\n")

@@ -293,7 +293,6 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 		for _, m := range resource.methods {
 			generated := len(m.requests) == 0
 			counts := map[outcome]int{}
-			// The features the emulator rejected as unsupported, and the requests that failed.
 			rejected := map[string]bool{}
 			failures := map[string]bool{}
 			for _, p := range results[m] {
@@ -309,21 +308,11 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 			}
 			st := status(counts)
 			t.counts[st]++
-			var note []string
-			if m.note != "" {
-				note = append(note, m.note)
-			}
-			if len(rejected) > 0 {
-				note = append(note, "Rejected as unsupported: "+strings.Join(sortedNames(rejected), ", ")+".")
-			}
-			for _, failure := range sortedNames(failures) {
-				note = append(note, "Fails: "+failure+".")
-			}
 			// bigquery.jobs.query is documented at jobs/query.
 			_, name, _ := strings.Cut(m.id, ".")
 			_, page, _ := strings.Cut(name, ".")
 			fmt.Fprintf(&body, "| [`%s`](%s/%s/%s) | `%s %s` | %s | %s |\n", name, apiDocs,
-				resource.name, page, m.httpMethod, m.flatPath, st, escape(strings.Join(note, " ")))
+				resource.name, page, m.httpMethod, m.flatPath, st, notes(m.note, st, rejected, failures))
 		}
 		tallies = append(tallies, t)
 		body.WriteString("\n")

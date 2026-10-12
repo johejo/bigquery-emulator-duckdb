@@ -214,33 +214,32 @@ query KLL_QUANTILES.MERGE_POINT_FLOAT64 SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64
 query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 0.5) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1, 2]) AS x)
 
 # Behavior that follows BigQuery where DuckDB would differ.
-note BYTE_LENGTH counts the bytes of a STRING's UTF-8 encoding
-note LENGTH counts characters of a STRING and bytes of a BYTES
-note ARRAY_CONCAT returns NULL when any array is NULL
-note SUBSTR starts at the first character for a position of 0 or before the start
-note SUBSTRING starts at the first character for a position of 0 or before the start
-note LPAD pads with spaces by default
-note CONTAINS_SUBSTR compares NFKC normal forms, case folded; takes STRING only
-note RPAD pads with spaces by default
-note TO_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open source
-note FROM_BASE32 implements RFC 4648 in C++, since GoogleSQL's base32 is not open source; accepts either case, padded or not
-note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery
-note GENERATE_DATE_ARRAY takes only a DAY or WEEK step
-note DATE_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
-note DATETIME_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
-note TIMESTAMP_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
-note DATE_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday
-note DATETIME_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; parts below a day count whole units rather than boundaries
-note TIMESTAMP_DIFF counts whole units rather than boundaries
-note TIME_DIFF counts whole units rather than boundaries
-note INT64 from JSON, fails when the value has another JSON type
-note FLOAT64 from JSON, fails when the value has another JSON type
-note BOOL from JSON, fails when the value has another JSON type
-note STRING from JSON, fails when the value has another JSON type
-note FORMAT JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported
-note JSON_ARRAY_APPEND RANGE and empty STRUCT values are unsupported
-note JSON_ARRAY_INSERT RANGE and empty STRUCT values are unsupported
+note BYTE_LENGTH counts the bytes of a STRING's UTF-8 encoding.
+note LENGTH counts characters of a STRING and bytes of a BYTES.
+note ARRAY_CONCAT returns NULL when any array is NULL.
+note SUBSTR starts at the first character for a position of 0 or before the start.
+note SUBSTRING starts at the first character for a position of 0 or before the start.
+note LPAD pads with spaces by default.
+note CONTAINS_SUBSTR compares NFKC normal forms, case folded; takes STRING only.
+note RPAD pads with spaces by default.
+note FROM_BASE32 accepts either case, padded or not.
+note EXTRACT DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery.
+note GENERATE_DATE_ARRAY takes only a DAY or WEEK step.
+note DATE_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday.
+note DATETIME_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday.
+note TIMESTAMP_TRUNC WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday.
+note DATE_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday.
+note DATETIME_DIFF WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; parts below a day count whole units rather than boundaries.
+note TIMESTAMP_DIFF counts whole units rather than boundaries.
+note TIME_DIFF counts whole units rather than boundaries.
+note INT64 from JSON, fails when the value has another JSON type.
+note FLOAT64 from JSON, fails when the value has another JSON type.
+note BOOL from JSON, fails when the value has another JSON type.
+note STRING from JSON, fails when the value has another JSON type.
+note FORMAT JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported.
+note JSON_ARRAY_APPEND RANGE and empty STRUCT values are unsupported.
+note JSON_ARRAY_INSERT RANGE and empty STRUCT values are unsupported.
 
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
 
-note LAST_DAY supports MONTH, QUARTER, YEAR, ISOYEAR, WEEK, ISOWEEK and WEEK(weekday); out-of-range results are errors
+note LAST_DAY supports MONTH, QUARTER, YEAR, ISOYEAR, WEEK, ISOWEEK and WEEK(weekday); out-of-range results are errors.

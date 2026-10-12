@@ -153,11 +153,15 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 			continue
 		}
 		outcomes := map[outcome]int{}
-		notes := map[string]bool{}
+		rejected := map[string]bool{}
+		failures := map[string]bool{}
 		for _, p := range all {
 			outcomes[p.outcome]++
-			if p.outcome != runs {
-				notes[p.detail] = true
+			switch p.outcome {
+			case unsupported:
+				rejected[p.detail] = true
+			case broken, untested:
+				failures[p.detail] = true
 			}
 		}
 		st := status(outcomes)
@@ -166,10 +170,8 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 			counts[c] = map[string]int{}
 		}
 		counts[c][st]++
-		note := slices.DeleteFunc([]string{f.Note}, func(s string) bool { return s == "" })
-		note = append(note, sortedNames(notes)...)
 		rows[c] = append(rows[c], fmt.Sprintf("| [`%s`](%s/%s) | %s | %s | %s |\n", f.Name,
-			functionDocs, mainDoc(f), st, f.Implementation, escape(strings.Join(note, "; "))))
+			functionDocs, mainDoc(f), st, f.Implementation, notes(f.Note, st, rejected, failures)))
 	}
 	// Sort categories as words, so that "Date functions" precedes "DLP functions".
 	categories := sortedNames(rows)

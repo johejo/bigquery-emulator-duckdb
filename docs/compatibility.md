@@ -1,56 +1,139 @@
 # Query and API behavior
 
-These limits supplement the generated [SQL](sql.md), [function](functions.md) and
-[REST](api.md) support tables. Deliberate differences from BigQuery are listed in the
-[README](../README.md#compatibility); Storage behavior is covered in its [guide](storage-api.md).
+This page describes behavior that the generated [SQL](sql.md), [function](functions.md) and
+[REST](api.md) tables cannot show, since they check only that a form runs. Deliberate differences
+from BigQuery are listed in the [README](../README.md#compatibility), and Storage API behavior in
+its [guide](storage-api.md).
 
-## Jobs and query analysis
+## Jobs
 
-Jobs complete synchronously. Only GoogleSQL is supported. Statements are analyzed against the
-existing tables and parameter types; unsupported SQL constructs fail as `invalidQuery`, naming
-the construct.
+Jobs finish before `jobs.insert` or `jobs.query` returns, so `jobs.cancel` returns the finished
+job, and `jobs.list` returns no jobs for a `stateFilter` of `pending` or `running`. Only
+GoogleSQL is supported. Statements are analyzed against the existing tables and parameter types;
+unsupported SQL constructs fail as `invalidQuery`, naming the construct.
 
-## Tables and views
+Multi-statement queries create no child jobs: `jobs.list` leaves out the ones BigQuery lists and
+rejects the `parentJobId` of a multi-statement query.
 
-Table and view expiration is stored through REST `expirationTime`, DDL
-`expiration_timestamp` (TIMESTAMP literals or NULL), or a copy job's `destinationExpirationTime`,
-which applies only when the job creates its destination; a copy with one to an existing table is
-rejected. Expired tables and views are deleted lazily
-when the catalog is read, including before query analysis, and are treated as missing. Dataset
-default expiration and partition expiration remain unsupported.
+### Loads, extracts and copies
+
+Loads and extracts also accept local paths. Loads read CSV, newline-delimited JSON and Parquet. A
+Parquet DECIMAL wider than 38 digits loads only into BIGNUMERIC, which schema detection picks only
+when `decimalTargetTypes` includes it. Query and load jobs cannot partition or cluster their
+destination table, and loads reject `destinationTableProperties`.
+
+Extracts write the whole table to one file and reject INTERVAL and GEOGRAPHY columns. They write a
+BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than
+`FIXED_LEN_BYTE_ARRAY`.
+
+A copy job's `destinationExpirationTime` applies only when the job creates its destination; a
+copy with one to an existing table is rejected.
+
+## Datasets
+
+Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier
+`` `region-us` `` covers every dataset of the project, and any other region none.
+
+Datasets keep a description, friendly name and labels, which `CREATE SCHEMA`,
+`ALTER SCHEMA SET OPTIONS` and the `datasets` methods set. Other options and fields, such as
+default table expiration and access controls, are unsupported. `INFORMATION_SCHEMA.SCHEMATA`
+returns NULL creation times and NULL for options other than the location.
+
+## Tables
+
+### Options and expiration
+
+Tables keep a description, friendly name, labels and expiration, and columns a description, which
+DDL `OPTIONS` and the `tables` methods set; other options are unsupported. Expiration comes from
+REST `expirationTime`, DDL `expiration_timestamp` (TIMESTAMP literals or NULL), or a copy job's
+`destinationExpirationTime`. Expired tables and views are deleted lazily when the catalog is read,
+including before query analysis, and are treated as missing. Dataset default expiration and
+partition expiration are unsupported.
+
+### Partitioning and clustering
+
+Tables keep partitioning on a column or an integer range, and clustering. Ingestion-time
+partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) is unsupported, and partitions do not expire.
+
+### Column defaults
 
 Column defaults from DDL `DEFAULT` or a schema's `defaultValueExpression` apply alike to tables
 created by DDL, `tables.insert`, and load and copy jobs, and `INFORMATION_SCHEMA.COLUMNS` reports
-them as `column_default`. `tables.update` and `tables.patch` cannot add or change a default, the
-Storage Write API cannot write to a table with defaults, and `CREATE TABLE COPY` and `CLONE`
-cannot copy one.
+them as `column_default`. Defaults accept literals, ARRAY and STRUCT constructors and the
+supported forms of BigQuery's documented default functions; NULL arrays and NULL array elements
+are rejected. Parameterized columns accept literal defaults only, checked against their
+constraints. `tables.update` and `tables.patch` cannot add or change a default, and the Storage
+Write API cannot write to a table with defaults.
 
-`ALTER TABLE ... ALTER COLUMN [IF EXISTS] SET DEFAULT` changes the default for future
-writes and the column's `defaultValueExpression`. Existing rows are unchanged.
-`DROP DEFAULT` removes it and fails if the column has no declared default. Both support
-`ALTER TABLE IF EXISTS`; a missing table or column is left alone. Repeated columns whose
-default is removed again use an empty array when omitted. Defaults accept literals,
-ARRAY/STRUCT constructors and supported forms of BigQuery's documented default functions;
-NULL arrays and NULL array elements are rejected. `SET DEFAULT NULL` removes a nullable
-column's default. Parameterized columns support literal defaults only, checked against
-their constraints; NULL defaults for required columns are rejected.
-`ADD COLUMN ... DEFAULT` remains unsupported.
+### ALTER TABLE
 
-Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
-and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
-cannot read them. Temporary, recursive and value-table views, and views that read temporary
-tables, are unsupported.
+`ALTER TABLE` supports `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS` and
+`ALTER COLUMN` with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`, with `IF EXISTS` and
+`IF NOT EXISTS`; a missing table or column is left alone. One statement may list several
+`ADD COLUMN`, `DROP COLUMN` or `ALTER COLUMN SET OPTIONS` actions. `ALTER COLUMN SET OPTIONS`
+sets the column's description only. `ADD COLUMN` with a default or with top-level `NOT NULL`, and
+other actions, are unsupported.
 
-## Approximate aggregates
+`SET DEFAULT` changes the default for future writes and the column's `defaultValueExpression`;
+existing rows are unchanged. `SET DEFAULT NULL` removes a nullable column's default, and a NULL
+default for a required column is rejected. `DROP DEFAULT` removes the default and fails if the
+column has none. A repeated column whose default is removed again uses an empty array when
+omitted.
 
-`APPROX_TOP_SUM` computes exact per-value sums and returns the highest sums, retaining NULL
-values and groups whose weights are all NULL. It supports INT64, NUMERIC, BIGNUMERIC and FLOAT64
-weights. The implementation collects the input rows before grouping them, so its memory use
-grows with the input size rather than only with the requested number of results. Equal sums
-have no guaranteed order.
+### Copies and clones
 
-INTERVAL and RANGE keys are unsupported. Requested counts above 10000 and overflowing sums of
-finite FLOAT64 weights raise errors, as in BigQuery.
+`CREATE TABLE LIKE` copies a table's schema, partitioning, clustering, description, friendly
+name and labels; with `AS SELECT`, it fills the new table with the query's rows.
+`CREATE TABLE COPY` also copies the rows, and `CREATE TABLE CLONE` also records the table it was
+cloned from and when, which `tables.get` and `INFORMATION_SCHEMA.TABLES` return. None of them
+copies a view or a table with column defaults.
+
+### Schema changes
+
+`tables.patch` and `tables.update` change the schema, view definition, description, friendly
+name, labels, clustering and expiration, and ignore other fields; partitioning cannot change. A
+schema may add NULLABLE and REPEATED fields after the existing ones, records included, relax
+REQUIRED to NULLABLE and change descriptions; existing fields keep their order. A view's schema
+cannot change. `tables.update` replaces the description, friendly name, labels, clustering and
+expiration, but keeps a schema or view definition that the request leaves out.
+
+### Views
+
+Logical views keep their GoogleSQL definition, schema, description, friendly name, labels and
+expiration; other view options are unsupported. Query views with SQL; `tabledata.list` cannot
+read them. Temporary, recursive and value-table views, and views that read temporary tables, are
+unsupported.
+
+## Types
+
+### STRUCT values
+
+Query values may have anonymous or duplicate STRUCT field names; stored table columns require
+distinct nonempty names. Casts between STRUCT types match fields by position, and JSON functions
+preserve the original field names, including in nested arrays and structs. Comparisons involving
+anonymous or duplicate fields are unsupported, because DuckDB's composite equality has different
+NULL semantics. Casts of these values to JSON, and correlated aggregate subqueries returning them,
+are also unsupported; use JSON functions for JSON conversion. Empty structs are unsupported.
+
+### INTERVAL values
+
+INTERVAL values keep separate month, day and microsecond components. Literals, constructors,
+`JUSTIFY` functions, `EXTRACT` and casts to STRING are supported. Stored columns, query parameters,
+casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are
+unsupported.
+
+### RANGE values
+
+`RANGE<DATE>`, `RANGE<DATETIME>` and `RANGE<TIMESTAMP>` values are supported in queries, stored
+columns, query parameters and `tabledata.insertAll` rows, with comparisons, ordering, grouping,
+`COUNT`, `MIN`, `MAX`, `ANY_VALUE`, `ARRAY_AGG`, navigation functions and casts to and from STRING.
+`SAFE_CAST` from STRING, JSON conversion, `FORMAT`, other functions over RANGE values, and loads
+and extracts of RANGE columns are unsupported.
+
+## Writes
+
+`UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it has a
+matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
 
 ## User-defined functions
 
@@ -58,7 +141,8 @@ finite FLOAT64 weights raise errors, as in BigQuery.
 
 `CREATE TEMP FUNCTION` defines a query-local SQL UDF. Persistent SQL UDFs use
 `CREATE [OR REPLACE] FUNCTION [IF NOT EXISTS] dataset.name` or `routines.insert`/`routines.update`,
-and remain available until `DROP FUNCTION` or `routines.delete`.
+and remain available until `DROP FUNCTION` or `routines.delete`. Each query that calls a SQL UDF
+inlines its body.
 
 Persistent UDF definitions and descriptions are returned by `routines.get` and `routines.list`.
 Bodies resolve on each call against the UDF's project: table and UDF names need datasets, and
@@ -69,7 +153,8 @@ temporary UDF bodies resolve against previously declared UDFs.
 
 Temporary JavaScript UDFs run in embedded QuickJS. They take BOOL, FLOAT64 and STRING arguments,
 named by JavaScript identifiers, and return those or INT64. State is query-local, with a
-5-minute call timeout and a 256 MiB allocation limit per query per thread.
+5-minute call timeout and a 256 MiB allocation limit per query per thread. The `library` option
+is unsupported.
 
 ### Unsupported forms
 
@@ -81,11 +166,11 @@ destination tables or positional parameters.
 
 ## Scripts and transactions
 
-Multi-statement queries return the last executed statement's result, create no child jobs and
-cannot be dry runs. Temporary tables belong to no dataset and are dropped when the script ends.
-`EXECUTE IMMEDIATE` runs one SQL statement, but no scripting statements or transaction control. `CALL` and assignments to system variables are
-unsupported, and an error the emulator reports as unsupported is never handled by an
-`EXCEPTION` clause.
+Multi-statement queries return the result of the last statement that ran and cannot be dry runs.
+Temporary tables belong to no dataset and are dropped when the script ends. `EXECUTE IMMEDIATE`
+runs one SQL statement, but no scripting statements or transaction control. `CALL` and
+assignments to system variables are unsupported, and an `EXCEPTION` clause never handles an error
+that the emulator reports as unsupported.
 
 Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION`
 within a multi-statement query. Unfinished transactions roll back when the script ends.
@@ -93,10 +178,16 @@ Transaction modes, SQL UDF declarations inside transactions, writes to multiple 
 (or both permanent and temporary tables), and committing after a handled error are unsupported;
 roll back a failed transaction.
 
-## Writes
+## Approximate aggregates
 
-`UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
-has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
+`APPROX_TOP_SUM` computes exact per-value sums and returns the highest sums, retaining NULL
+values and groups whose weights are all NULL. It supports INT64, NUMERIC, BIGNUMERIC and FLOAT64
+weights. The implementation collects the input rows before grouping them, so its memory use
+grows with the input size rather than only with the requested number of results. Equal sums
+have no guaranteed order.
+
+INTERVAL and RANGE keys are unsupported. Requested counts above 10000 and overflowing sums of
+finite FLOAT64 weights raise errors, as in BigQuery.
 
 ## Result schemas and values
 
@@ -110,17 +201,3 @@ Timestamps are encoded as epoch seconds, or epoch microseconds with
 
 The `SAFE.` prefix returns NULL for the function's own errors while argument errors still
 propagate. It is unsupported on volatile functions.
-
-## STRUCT values
-
-Query values may have anonymous or duplicate STRUCT field names; stored table columns require
-distinct nonempty names. JSON functions preserve the original field names, including in nested
-arrays and structs. Comparisons involving anonymous or duplicate fields are unsupported because
-DuckDB's composite equality has different NULL semantics. Casts of these values to JSON and
-correlated aggregate subqueries returning them are also unsupported; use JSON functions for
-JSON conversion.
-
-## Locations
-
-Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier
-`` `region-us` `` covers every dataset of the project and any other region none.
