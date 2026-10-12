@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <format>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -114,6 +116,37 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
     }
   }
   return duckdb_schema;
+}
+
+// A query without a destination table returns each duplicate column after the first renamed:
+// SELECT 1 AS a, 2 AS a returns a and a_1.
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
+// The names BigQuery takes for a name repeated more than twice, names that differ only in case
+// or a renamed column that would collide with another are not documented, so those are
+// unsupported.
+std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
+  const auto folded = [](std::string name) {
+    std::ranges::transform(name, name.begin(), [](unsigned char c) { return std::tolower(c); });
+    return name;
+  };
+  std::map<std::string, std::vector<size_t>> columns;
+  for (size_t i = 0; i < schema.size(); ++i) {
+    columns[folded(schema.at(i).name)].push_back(i);
+  }
+  for (const auto& [name, indexes] : columns) {
+    if (indexes.size() == 1) {
+      continue;
+    }
+    FieldSchema& duplicate = schema.at(indexes.at(1));
+    if (indexes.size() > 2 || duplicate.name != schema.at(indexes.at(0)).name ||
+        columns.contains(name + "_1")) {
+      throw ApiError::InvalidQuery(
+          "The emulator does not support these duplicate column names in a query result: " +
+          duplicate.name);
+    }
+    duplicate.name += "_1";
+  }
+  return schema;
 }
 
 }  // namespace
@@ -323,7 +356,10 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
       result = Prepare(translation.sql, setup);
     }
     if (translation.result_schema.has_value()) {
-      result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
+      result.schema = ReconcileSchema(std::move(result.schema),
+                                      request.destination_table.has_value()
+                                          ? *translation.result_schema
+                                          : UniqueResultNames(*translation.result_schema));
     }
     job.result = std::move(result);
   });
@@ -334,6 +370,10 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    Backend* session) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
+  std::optional<std::vector<FieldSchema>> schema;
+  if (translation.result_schema.has_value()) {
+    schema = UniqueResultNames(*translation.result_schema);
+  }
   QueryResult result;
   if (const std::optional<std::vector<std::string>> statements =
           AlterationStatements(translation)) {
@@ -358,8 +398,8 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
   } else {
     result = backend.Execute(translation.sql, setup, null_arrays);
   }
-  if (translation.result_schema.has_value()) {
-    result.schema = ReconcileSchema(std::move(result.schema), *translation.result_schema);
+  if (schema.has_value()) {
+    result.schema = ReconcileSchema(std::move(result.schema), *schema);
   }
   return result;
 }

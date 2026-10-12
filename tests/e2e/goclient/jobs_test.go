@@ -148,7 +148,9 @@ func TestQueryToADestinationTable(t *testing.T) {
 
 // A destination table takes the result's names and types, and a query can read the table it
 // replaces. CREATE_NEVER fails for a table that does not exist, and a result with column names that
-// differ only in case, or a DDL statement, cannot be written to a table.
+// differ only in case, or a DDL statement, cannot be written to a table. Neither can a table or
+// view be defined with duplicate column names:
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
 func TestQueryDestinationTableEdges(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -196,6 +198,15 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 	}
 	if got := p.read("SELECT * FROM dest"); !reflect.DeepEqual(got, rows) {
 		t.Errorf("rows after failed writes = %v, want %v", got, rows)
+	}
+
+	for _, sql := range []string{
+		"CREATE TABLE go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
+		"CREATE VIEW go_destination_edges.duplicates AS (SELECT 1 AS a, 2 AS a)",
+	} {
+		if err := p.wait(client.Query(sql).Run(ctx)); err == nil {
+			t.Errorf("%s: succeeded", sql)
+		}
 	}
 }
 

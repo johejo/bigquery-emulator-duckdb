@@ -35,3 +35,13 @@ CREATE TEMP TABLE c (x INT64 NOT NULL) AS SELECT 1 AS x; SELECT 1
 
 CREATE OR REPLACE SCHEMA errors_statements
 => error contains: The emulator does not support CREATE OR REPLACE SCHEMA
+
+# BigQuery renames a duplicate column of a query result, but not documented how for these names.
+SELECT 1 AS a, 2 AS A
+=> error contains: The emulator does not support these duplicate column names in a query result: A
+
+SELECT 1 AS a, 2 AS a, 3 AS a
+=> error contains: The emulator does not support these duplicate column names in a query result: a
+
+SELECT 1 AS a, 2 AS a, 3 AS a_1
+=> error contains: The emulator does not support these duplicate column names in a query result: a

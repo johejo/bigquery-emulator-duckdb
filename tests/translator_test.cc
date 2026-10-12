@@ -100,6 +100,7 @@ TEST_F(TranslatorTest, SubstitutesParametersAndSafeCasts) {
   EXPECT_TRUE(Translate("SELECT BYTE_LENGTH(?)", positional, settings).has_value());
 }
 
+// The translated SQL keeps duplicate aliases; the emulator renames them in the result schema.
 TEST_F(TranslatorTest, MatchesDuplicateAliasesByColumnId) {
   const auto sql = Translate("SELECT 1 AS same, 2 AS same, 3 AS `a.b`");
   if (!sql.has_value()) {
