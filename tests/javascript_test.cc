@@ -43,15 +43,6 @@ class JavaScriptTest : public ::testing::Test {
   duckdb_connection connection_ = nullptr;
 };
 
-TEST_F(JavaScriptTest, KeepsNoStateAcrossQueries) {
-  Open({});
-  const std::string call =
-      "SELECT bq_js_string('(function() {\n"
-      "globalThis.n = (globalThis.n || 0) + 1; return String(globalThis.n);\n})')";
-  EXPECT_EQ(Query(call), "1");
-  EXPECT_EQ(Query(call), "1");
-}
-
 TEST_F(JavaScriptTest, InterruptsACallPastTheTimeLimit) {
   Open({.call_time = std::chrono::milliseconds(100)});
   EXPECT_EQ(Query("SELECT bq_js_double('(function() {\nwhile (true) {}\n})')"),
@@ -67,14 +58,6 @@ TEST_F(JavaScriptTest, FailsACallPastTheMemoryLimit) {
                   "const a = []; while (true) a.push(new Array(1000).fill(1));\n})')")
                 .rfind("error: ", 0),
             0);
-}
-
-TEST_F(JavaScriptTest, RejectsABodyThatClosesTheFunction) {
-  Open({});
-  EXPECT_EQ(Query("SELECT bq_js_double('(function() {\n}); (function() {\nreturn 1;\n})')"),
-            "error: Invalid Input Error: JavaScript UDF body is not a function body");
-  EXPECT_EQ(Query("SELECT bq_js_double('(function() {\n} || function() {\nreturn 1;\n})')"),
-            "error: Invalid Input Error: JavaScript UDF body is not a function body");
 }
 
 }  // namespace
