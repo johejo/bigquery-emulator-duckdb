@@ -1792,6 +1792,17 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "FORMAT preserves FLOAT64 negative zero as BigQuery does; GoogleSQL canonicalizes it"
+  label: "code:format_STRING_<%@e>_FLOAT64_-0"
+  label: "code:format_STRING_<%@f>_FLOAT64_-0"
+  label: "code:format_STRING_<%@g>_FLOAT64_-0"
+  label: "code:format_STRING_<%e>_FLOAT64_-0"
+  label: "code:format_STRING_<%f>_FLOAT64_-0"
+  label: "code:format_STRING_<%g>_FLOAT64_-0"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "CHR(0), SPLIT of NULL and other string functions differ"
   label: "strings_test:format_utf8"
   label: "strings_test:format_with_utf8"

@@ -93,6 +93,10 @@ SELECT FORMAT('%t|%T', DATETIME '2024-01-02 03:04:05.5', TIMESTAMP '2024-01-02 0
 SELECT FORMAT('%t|%T|%T|%t', CAST('nan' AS FLOAT64), CAST('-inf' AS FLOAT64), 1.0, true)
 => "nan|CAST(\"-inf\" AS FLOAT64)|1.0|true"
 
+# BigQuery documents unsigned NaN output; GoogleSQL format floating-point compliance data.
+SELECT FORMAT('%f|%F', -x, -x) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> "nan|NAN"
+
 SELECT FORMAT('%t|%T', NULL, NULL)
 => "NULL|NULL"
 

@@ -1,0 +1,26 @@
+# Expected values confirmed against BigQuery.
+# Grouped integer precision counts separators, with signs and prefixes outside it.
+
+# Sign handling at separator boundaries.
+SELECT FORMAT("%'.5d|%'.6d|%'+.6d|%' .6d", x, x, -x, -x) FROM UNNEST([-1234]) AS x
+=> "-1,234|-01,234|+01,234| 01,234"
+
+# The shared implementation also handles %i.
+SELECT FORMAT("%'.5i|%'.6i|%'.8i", x, x, x) FROM UNNEST([1234]) AS x
+=> "1,234|01,234|0,001,234"
+
+# Octal uses four-digit groups and counts commas toward precision.
+SELECT FORMAT("%'.5o|%'.6o|%'#.6o", x, x, x) FROM UNNEST([668]) AS x
+=> "0,1234|0,1234|0,1234"
+
+# Hexadecimal uses four-digit groups and takes a different precision path.
+SELECT FORMAT("%'.6x|%'.7X|%'#.7x", x, x, x) FROM UNNEST([74565]) AS x
+=> "1:2345|01:2345|0x01:2345"
+
+# Width, zero padding and left alignment together with grouped precision.
+SELECT FORMAT("%'010.6d|%'10.6d|%'-10.6d", x, x, x) FROM UNNEST([1234]) AS x
+=> "    01,234|    01,234|01,234    "
+
+# Zero at precision zero, including alternate octal form.
+SELECT FORMAT("%'.0d|%'.0o|%'#.0o|%'.0x", x, x, x, x) FROM UNNEST([0]) AS x
+=> "|||"
