@@ -64,6 +64,11 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 
+// The numeric type parameters in a schema, including nested fields. Include STRING/BYTES
+// lengths for default validation; storage omits them because DuckDB does not enforce them.
+absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema& field,
+                                                              bool include_lengths = false);
+
 // The DuckDB type of a column described by a BigQuery TableFieldSchema, as DuckDbType maps its
 // GoogleSQL type and the precision and scale the schema gives, except that GEOGRAPHY is stored as
 // its text. Stored structs still require distinct nonempty field names.

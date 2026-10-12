@@ -818,8 +818,7 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
         }
         columns += QuoteIdentifier(field.name);
         const auto it = values.find(field.name);
-        literals +=
-            InsertValue(it == values.end() ? json(nullptr) : *it, field, ignore_unknown_values);
+        literals += it == values.end() ? "DEFAULT" : InsertValue(*it, field, ignore_unknown_values);
       }
       std::string statement = "INSERT INTO ";
       statement += QualifiedName(table);

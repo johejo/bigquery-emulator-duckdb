@@ -194,21 +194,33 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
   }
 }
 
+}  // namespace
+
 // The type parameters of a column that `field` describes: the precision and scale of NUMERIC and
 // BIGNUMERIC, at any depth, within the ranges DDL allows and failing with GoogleSQL's messages
-// outside them. Lengths are left out, as DuckDbType drops them.
-absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema& field) {
+// outside them. Storage leaves lengths out; default validation includes them.
+absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema& field,
+                                                              bool include_lengths) {
   googlesql::TypeParameters parameters;
   if (field.type == FieldType::kRecord) {
     std::vector<googlesql::TypeParameters> children;
     for (const FieldSchema& child : field.fields) {
-      absl::StatusOr<googlesql::TypeParameters> child_parameters = FieldTypeParameters(child);
+      absl::StatusOr<googlesql::TypeParameters> child_parameters =
+          FieldTypeParameters(child, include_lengths);
       if (!child_parameters.ok()) {
         return child_parameters.status();
       }
       children.push_back(*std::move(child_parameters));
     }
     parameters = googlesql::TypeParameters::MakeTypeParametersWithChildList(std::move(children));
+  } else if (include_lengths && field.max_length.has_value()) {
+    googlesql::StringTypeParametersProto proto;
+    proto.set_max_length(*field.max_length);
+    auto string_parameters = googlesql::TypeParameters::MakeStringTypeParameters(proto);
+    if (!string_parameters.ok()) {
+      return string_parameters.status();
+    }
+    parameters = *std::move(string_parameters);
   } else if (field.precision.has_value() || field.scale.has_value()) {
     const bool numeric = field.type == FieldType::kNumeric;
     if (!numeric && field.type != FieldType::kBigNumeric) {
@@ -249,8 +261,6 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
   }
   return parameters;
 }
-
-}  // namespace
 
 std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* type) {
   std::set<std::string> seen;

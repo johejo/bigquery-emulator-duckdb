@@ -202,8 +202,17 @@ query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAM
 query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), ALTER COLUMN IF EXISTS missing SET OPTIONS (description = NULL)
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN id SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')
+query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN id SET DEFAULT 5
+query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN id SET DEFAULT -5
+query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN name SET DEFAULT NULL
+query `ALTER TABLE` | CREATE TABLE defaulted (token STRING, ts TIMESTAMP); ALTER TABLE defaulted ALTER COLUMN token SET DEFAULT GENERATE_UUID(); ALTER TABLE defaulted ALTER COLUMN ts SET DEFAULT CURRENT_TIMESTAMP()
+query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN IF EXISTS missing SET DEFAULT 'x'
+query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id SET DEFAULT 5
+query `ALTER TABLE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); ALTER TABLE defaulted ALTER COLUMN id DROP DEFAULT
+query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN IF EXISTS missing DROP DEFAULT
+query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id DROP DEFAULT
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, DROP COLUMN name
-note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; other options and ALTER COLUMN actions are unsupported. Column options other than the description, defaults, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
+note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
