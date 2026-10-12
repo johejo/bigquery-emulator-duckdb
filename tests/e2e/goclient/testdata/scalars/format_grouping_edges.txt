@@ -24,3 +24,11 @@ SELECT FORMAT("%'010.6d|%'10.6d|%'-10.6d", x, x, x) FROM UNNEST([1234]) AS x
 # Zero at precision zero, including alternate octal form.
 SELECT FORMAT("%'.0d|%'.0o|%'#.0o|%'.0x", x, x, x, x) FROM UNNEST([0]) AS x
 => "|||"
+
+# Octal keeps its alternate prefix when precision exceeds the digits only by its separators.
+SELECT FORMAT("%'#.6o", x) FROM UNNEST([5349]) AS x
+=> "01,2345"
+
+# Sign flags still print on a grouped zero at precision zero.
+SELECT FORMAT("%'+.0d|%' .0d|%'+5.0x", x, x, x) FROM UNNEST([0]) AS x
+=> "+| |    +"

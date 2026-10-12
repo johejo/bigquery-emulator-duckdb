@@ -1,9 +1,14 @@
 #include "src/backend_functions/datetime.h"
 
+#include <charconv>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -185,9 +190,16 @@ absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_
                   : googlesql::Value::Bytes(arguments.String(column));
     case DUCKDB_TYPE_BIGINT:
       return null ? googlesql::Value::NullInt64() : googlesql::Value::Int64(arguments.Int(column));
-    case DUCKDB_TYPE_DOUBLE:
-      return null ? googlesql::Value::NullDouble()
-                  : googlesql::Value::Double(arguments.Double(column));
+    case DUCKDB_TYPE_DOUBLE: {
+      if (null) {
+        return googlesql::Value::NullDouble();
+      }
+      // GoogleSQL prints the sign of a negative NaN when it preserves the sign of zero; BigQuery
+      // does not.
+      const double value = arguments.Double(column);
+      return googlesql::Value::Double(std::isnan(value) ? std::numeric_limits<double>::quiet_NaN()
+                                                        : value);
+    }
     case DUCKDB_TYPE_BOOLEAN:
       return null ? googlesql::Value::NullBool() : googlesql::Value::Bool(arguments.Bool(column));
     case DUCKDB_TYPE_DATE:
@@ -233,6 +245,140 @@ absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_
   }
 }
 
+// A FORMAT pattern and its values, rewritten by AdaptFormat.
+struct AdaptedFormat {
+  std::string pattern;
+  std::vector<googlesql::Value> values;
+};
+
+// Rewrites the specifiers whose output from GoogleSQL differs from BigQuery's, and their values,
+// so that GoogleSQL prints BigQuery's result; nullopt when nothing changes. The scan follows
+// GoogleSQL's "%[flags][width][.precision]specifier" and assigns arguments as it does. A
+// specifier GoogleSQL rejects, or whose arguments are missing, is copied as is so that GoogleSQL
+// reports it.
+std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
+                                         const std::vector<googlesql::Value>& values) {
+  // GoogleSQL's limit on the output width, which also caps an integer's precision.
+  constexpr int64_t kMaxPrecision = 1048576;
+  constexpr std::string_view kDigits = "0123456789";
+  AdaptedFormat adapted{.pattern = "", .values = values};
+  bool changed = false;
+  size_t next_arg = 0;
+  size_t position = 0;
+  while (position < pattern.size()) {
+    const size_t percent = pattern.find('%', position);
+    if (percent == std::string_view::npos) {
+      adapted.pattern.append(pattern.substr(position));
+      break;
+    }
+    adapted.pattern.append(pattern.substr(position, percent - position));
+    size_t cursor = percent + 1;
+    const auto span = [&](std::string_view chars) {
+      const size_t begin = cursor;
+      while (cursor < pattern.size() && chars.find(pattern.at(cursor)) != std::string_view::npos) {
+        ++cursor;
+      }
+      return std::string(pattern.substr(begin, cursor - begin));
+    };
+    const auto star = [&] {
+      const bool found = cursor < pattern.size() && pattern.at(cursor) == '*';
+      cursor += found ? 1 : 0;
+      return found;
+    };
+    std::string flags = span("-+ #'0");
+    const std::string width = star() ? "*" : span(kDigits);
+    std::optional<std::string> precision;
+    if (cursor < pattern.size() && pattern.at(cursor) == '.') {
+      ++cursor;
+      precision = star() ? "*" : span(kDigits);
+    }
+    if (cursor == pattern.size() || pattern.at(cursor) == '\n') {
+      adapted.pattern.append(pattern.substr(percent));
+      break;
+    }
+    char conversion = pattern.at(cursor++);
+    position = cursor;
+    std::optional<size_t> precision_arg;
+    if (conversion != '%') {
+      next_arg += width == "*" ? 1 : 0;
+      if (precision == "*") {
+        precision_arg = next_arg++;
+      }
+    }
+    const size_t value_arg = next_arg++;
+    if (conversion == '%' || value_arg >= values.size() || values.at(value_arg).is_null()) {
+      adapted.pattern.append(pattern.substr(percent, cursor - percent));
+      continue;
+    }
+    const googlesql::Value& value = values.at(value_arg);
+    if (conversion == 't' && value.type_kind() == googlesql::TYPE_STRING &&
+        value.string_value().find('\0') != std::string::npos) {
+      // BigQuery truncates a STRING at NUL for %t, as GoogleSQL does for %s.
+      const std::string& text = value.string_value();
+      adapted.values.at(value_arg) = googlesql::Value::String(text.substr(0, text.find('\0')));
+      changed = true;
+    } else if (std::string_view("dioxX").find(conversion) != std::string_view::npos &&
+               value.type_kind() == googlesql::TYPE_INT64) {
+      // The explicit precision, or nullopt when it is absent, negative, NULL or above the limit.
+      std::optional<int64_t> digits;
+      if (precision_arg.has_value()) {
+        const googlesql::Value& argument = values.at(*precision_arg);
+        if (argument.type_kind() == googlesql::TYPE_INT64 && !argument.is_null() &&
+            argument.int64_value() >= 0 && argument.int64_value() <= kMaxPrecision) {
+          digits = argument.int64_value();
+        }
+      } else if (precision.has_value()) {
+        int64_t parsed = 0;
+        const auto [end, error] =
+            std::from_chars(precision->data(), precision->data() + precision->size(), parsed);
+        if (error == std::errc() && parsed <= kMaxPrecision) {
+          digits = parsed;
+        }
+      }
+      if (digits.has_value()) {
+        // An explicit precision disables zero padding.
+        std::erase(flags, '0');
+        const bool grouping = flags.find('\'') != std::string::npos;
+        if (grouping && value.int64_value() == 0 && *digits == 0) {
+          // A grouped zero at precision zero prints only its sign, without digits or prefix.
+          const std::string sign = flags.find('+') != std::string::npos   ? "+"
+                                   : flags.find(' ') != std::string::npos ? " "
+                                                                          : "";
+          flags = flags.find('-') != std::string::npos ? "-" : "";
+          conversion = 's';
+          adapted.values.at(value_arg) = googlesql::Value::String(sign);
+          if (precision_arg.has_value()) {
+            adapted.values.at(*precision_arg) = googlesql::Value::Int64(1);
+          } else {
+            precision.reset();
+          }
+          changed = true;
+        } else if (grouping) {
+          // BigQuery counts grouping separators toward the precision; each group after the
+          // first takes one more character than it has digits.
+          const int64_t group = conversion == 'd' || conversion == 'i' ? 3 : 4;
+          const int64_t counted = *digits - ((*digits - 1) / (group + 1));
+          if (precision_arg.has_value()) {
+            adapted.values.at(*precision_arg) = googlesql::Value::Int64(counted);
+            changed = true;
+          } else {
+            precision = std::to_string(counted);
+          }
+        }
+      }
+    }
+    adapted.pattern.append("%").append(flags).append(width);
+    if (precision.has_value()) {
+      adapted.pattern.append(".").append(*precision);
+    }
+    adapted.pattern.push_back(conversion);
+  }
+  if (!changed && adapted.pattern == pattern) {
+    return std::nullopt;
+  }
+  return adapted;
+}
+
 // FORMAT(format, values...), which is NULL for a NULL format and where GoogleSQL says so for
 // a NULL value.
 void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -251,12 +397,26 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
           }
           values.push_back(*std::move(value));
         }
+        const std::string pattern = arguments.String(0);
+        const std::optional<AdaptedFormat> adapted = AdaptFormat(pattern, values);
         std::string out;
         bool is_null = false;
-        // BigQuery preserves the sign of floating-point zero in FORMAT.
-        absl::Status status = googlesql::functions::StringFormatUtf8(
-            arguments.String(0), values, googlesql::PRODUCT_EXTERNAL, &out, &is_null,
-            /*canonicalize_zero=*/false, /*use_external_float32=*/true);
+        const auto format = [&](const std::string& format_pattern,
+                                const std::vector<googlesql::Value>& format_values) {
+          // BigQuery preserves the sign of floating-point zero in FORMAT.
+          return googlesql::functions::StringFormatUtf8(
+              format_pattern, format_values, googlesql::PRODUCT_EXTERNAL, &out, &is_null,
+              /*canonicalize_zero=*/false, /*use_external_float32=*/true);
+        };
+        absl::Status status = adapted.has_value() ? format(adapted->pattern, adapted->values)
+                                                  : format(pattern, values);
+        if (!status.ok() && adapted.has_value()) {
+          // Report an error as for the format the query gave, whose text the message quotes.
+          const absl::Status original = format(pattern, values);
+          if (!original.ok()) {
+            status = original;
+          }
+        }
         if (!status.ok()) {
           return status;
         }
