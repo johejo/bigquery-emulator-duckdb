@@ -844,7 +844,6 @@ cc_test(
     copts = ["-std=c++20"],
     deps = [
         ":analyzer",
-        ":backend",
         ":catalog",
         ":field_schema",
         ":query_parameters",

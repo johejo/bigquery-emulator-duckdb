@@ -117,9 +117,10 @@ func TestQueryRuntimeError(t *testing.T) {
 }
 
 // Result columns take the names and types GoogleSQL resolves, rather than DuckDB's: a column
-// without a name is f0_, f1_ and so on, and a value table of structs comes back as their fields.
-// A dry run reports the same schema.
+// without a name is f0_, f1_ and so on, a duplicate column after the first is renamed, and a
+// value table of structs comes back as their fields. A dry run reports the same schema.
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#implicit_aliases
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
 func TestResultSchema(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -141,6 +142,11 @@ func TestResultSchema(t *testing.T) {
 			sql:    `SELECT SUM(x) AS s, ANY_VALUE('a'), 2.5, NULL, b'\x00\xff' FROM UNNEST([1, 2]) AS x`,
 			schema: "s INTEGER, f0_ STRING, f1_ FLOAT, f2_ INTEGER, f3_ BYTES",
 			rows:   [][]bigquery.Value{{int64(3), "a", 2.5, nil, []byte{0, 0xff}}},
+		},
+		{
+			sql:    "SELECT 1 AS a, 2 AS a",
+			schema: "a INTEGER, a_1 INTEGER",
+			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
 		},
 		{
 			sql:    "SELECT AS STRUCT 1 AS a, 'x' AS b",

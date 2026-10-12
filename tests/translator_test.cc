@@ -1,6 +1,5 @@
 #include "src/translator.h"
 
-#include <cstddef>
 #include <exception>
 #include <optional>
 #include <string>
@@ -11,7 +10,6 @@
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
-#include "src/backend.h"
 #include "src/catalog.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
@@ -20,7 +18,7 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-// Translation needs only the tables' schemas; tests that run SQL query no table.
+// Translation needs only the tables' schemas.
 class TestTableSource : public TableSource {
  public:
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
@@ -54,7 +52,6 @@ class TranslatorTest : public ::testing::Test {
     return statement ? std::optional<std::string>(statement->sql) : std::nullopt;
   }
 
-  Backend backend_;
   googlesql::TypeFactory types_;
   TestTableSource source_;
   BigQueryCatalog catalog_{source_, &types_, "p", "ds"};
@@ -98,22 +95,6 @@ TEST_F(TranslatorTest, SubstitutesParametersAndSafeCasts) {
     {"parameterType":{"type":"STRING"},"parameterValue":{"value":"abc"}}
   ])"));
   EXPECT_TRUE(Translate("SELECT BYTE_LENGTH(?)", positional, settings).has_value());
-}
-
-TEST_F(TranslatorTest, MatchesDuplicateAliasesByColumnId) {
-  const auto sql = Translate("SELECT 1 AS same, 2 AS same, 3 AS `a.b`");
-  if (!sql.has_value()) {
-    FAIL() << "Expected translation";
-  }
-  const auto result = backend_.Execute(*sql);
-  ASSERT_EQ(result.schema.size(), 3);
-  ASSERT_EQ(result.rows.size(), 1);
-  EXPECT_EQ(result.schema.at(0).name, "same");
-  EXPECT_EQ(result.schema.at(1).name, "same");
-  EXPECT_EQ(result.schema.at(2).name, "a.b");
-  for (size_t i = 0; i < 3; ++i) {
-    EXPECT_EQ(result.rows.at(0)["f"][i]["v"], std::to_string(i + 1));
-  }
 }
 
 TEST_F(TranslatorTest, TranslatesDdlPaths) {

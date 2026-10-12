@@ -173,6 +173,11 @@ Query result schemas come from the GoogleSQL analyzer, so anonymous columns are 
 `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`,
 except the structs that keep `RANGE` values → `RANGE`.
 
+Without a destination table, a second column with the same name as another is renamed with `_1`,
+as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`. BigQuery does not document how it renames a name
+repeated more than twice, names that differ only in case, or a column that would collide with a
+renamed one, so the emulator rejects those results.
+
 Timestamps are encoded as epoch seconds, or epoch microseconds with
 `formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`.
 
