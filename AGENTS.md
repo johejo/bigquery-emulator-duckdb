@@ -147,9 +147,10 @@ Keep setup and deliberate compatibility exceptions in [README.md](README.md). Pu
 query and API behavior in [docs/compatibility.md](docs/compatibility.md), Storage client usage
 and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
 [docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
-the REST, SQL and function preambles under `tools/restprobe/` are their handwritten inputs. A
-`note` in a probe's input file is a sentence or a link to a section of `docs/compatibility.md`;
-describe a behavior in one place and link to it, and leave the forms a probe rejects to the probe.
+the preambles under `tools/restprobe/` and `tools/storageprobe/` are their handwritten inputs. A
+probe's note is a sentence or a link to a section of `docs/compatibility.md` or
+`docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
+probe rejects to the probe.
 
 ## Before committing
 

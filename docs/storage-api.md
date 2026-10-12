@@ -16,8 +16,8 @@ finalization. Explicit streams retain offsets across connections within the proc
 
 Read sessions materialize a snapshot in memory and expire after six hours. Arrow and Avro
 output support scalar types, STRUCTs and arrays, including decimals and temporal types.
-INTERVAL and RANGE, parameterized decimals, Arrow JSON/GEOGRAPHY, historical snapshots,
-sampling, compression and custom serialization options are unsupported.
+INTERVAL and RANGE columns, parameterized decimals, and JSON and GEOGRAPHY columns in Arrow are
+unsupported. The [support table](storage.md) lists the request options the emulator rejects.
 
 ## Write limitations
 
