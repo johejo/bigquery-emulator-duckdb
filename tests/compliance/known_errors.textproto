@@ -1774,12 +1774,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "CASE and NULLIF compare a struct with a NULL field as equal"
-  label: "struct_queries_test:struct_equality_null_field"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "CHR(0) returns an empty string instead of a NUL character"
   label: "code:chr_INT64_0"
 }
@@ -2094,12 +2088,6 @@ known_errors {
   label: "aggregation_having_modifier_queries_test:aggregate_max_id_having_double_include_nan_inf"
   label: "any_value_aggregation_test:aggregate_any_value_having_nan_having_modifier"
   label: "any_value_aggregation_test:aggregate_any_value_having_with_group_by"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "IN UNNEST matches a struct with a NULL field"
-  label: "in_queries_test:in_unnest_structs_with_different_field_names"
 }
 
 # BigQuery TO_JSON encoding rejects lossy decimals. GoogleSQL without

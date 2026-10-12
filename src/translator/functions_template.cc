@@ -542,14 +542,6 @@ std::vector<Rule> BigNumericRounding(std::string_view function, bool modes) {
   return rules;
 }
 
-// `left` `op` `right`, where a NaN FLOAT64 compares unequal to everything, itself included, and
-// neither less nor greater. DuckDB takes NaN as equal to itself and greater than every number.
-std::string FloatCompare(const std::string& left, std::string_view op, const std::string& right) {
-  return "CASE WHEN " + left + " IS NULL OR " + right + " IS NULL THEN NULL WHEN isnan(" + left +
-         ") OR isnan(" + right + ") THEN " + (op == "<>" ? "true" : "false") + " ELSE (" + left +
-         " " + std::string(op) + " " + right + ") END";
-}
-
 // A comparison `op`, with FloatCompare's NaN for FLOAT64.
 std::vector<Rule> Compare(std::string_view op) {
   return {

@@ -114,3 +114,94 @@ SELECT TO_JSON_STRING(CASE a WHEN 1 THEN STRUCT(1, 2) ELSE STRUCT(3, 4) END) FRO
 # Metadata is constant across a chunk, while field values vary by row or remain constant.
 SELECT ARRAY_TO_STRING(ARRAY(SELECT TO_JSON_STRING(STRUCT(x + 0, 'fixed')) FROM UNNEST([1, 2, 3]) AS x ORDER BY x), '|')
 => "{\"\":1,\"\":\"fixed\"}|{\"\":2,\"\":\"fixed\"}|{\"\":3,\"\":\"fixed\"}"
+
+# Equality compares fields by position: FALSE when non-NULL fields differ, otherwise NULL when a
+# field is NULL. IN is TRUE on a match, otherwise NULL when a comparison is NULL, and FALSE for an
+# empty set.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#comparison_operators
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#in_operators
+SELECT STRUCT(1, NULL) = STRUCT(1, NULL)
+=> null
+
+SELECT STRUCT(1, NULL) = STRUCT(2, NULL)
+=> "false"
+
+SELECT STRUCT(1, 2) = STRUCT(1, NULL)
+=> null
+
+SELECT STRUCT(a + 0, CAST(NULL AS INT64)) = STRUCT(1, CAST(NULL AS INT64)) FROM t WHERE a = 1
+=> null
+
+SELECT STRUCT(a AS x, CAST(NULL AS STRING) AS y) = STRUCT(1 AS x, CAST(NULL AS STRING) AS y) FROM t WHERE a = 1
+=> null
+
+SELECT STRUCT(a AS x, CAST(NULL AS STRING) AS y) = STRUCT(2 AS x, CAST(NULL AS STRING) AS y) FROM t WHERE a = 1
+=> "false"
+
+SELECT STRUCT(a AS x, b AS y) = STRUCT(1 AS x, 'x' AS y) FROM t WHERE a = 1
+=> "true"
+
+SELECT STRUCT(a AS x, b AS x) != STRUCT(1 AS x, 'x' AS x) FROM t WHERE a = 1
+=> "false"
+
+SELECT STRUCT(a AS x, CAST(NULL AS INT64) AS y) != STRUCT(1 AS x, 2 AS y) FROM t WHERE a = 1
+=> null
+
+SELECT STRUCT(STRUCT(a + 0, CAST(NULL AS INT64)) AS n) = STRUCT(STRUCT(1, CAST(NULL AS INT64)) AS n) FROM t WHERE a = 1
+=> null
+
+SELECT CAST(NULL AS STRUCT<x INT64>) = STRUCT(a AS x) FROM t WHERE a = 1
+=> null
+
+# A NaN field is unequal to itself, as a NaN FLOAT64 is.
+SELECT STRUCT(CAST('NaN' AS FLOAT64) + a) = STRUCT(CAST('NaN' AS FLOAT64)) FROM t WHERE a = 1
+=> "false"
+
+SELECT (NULL, 1) IN UNNEST([(NULL, 1)])
+=> null
+
+SELECT (NULL, 2) IN UNNEST([(NULL, 1)])
+=> "false"
+
+SELECT (NULL, 2) NOT IN UNNEST([(NULL, 1)])
+=> "true"
+
+SELECT (a, 2) IN UNNEST(CAST([] AS ARRAY<STRUCT<INT64, INT64>>)) FROM t WHERE a = 1
+=> "false"
+
+SELECT (a, 2) IN UNNEST([STRUCT(1, NULL), (1, 2)]) FROM t WHERE a = 1
+=> "true"
+
+SELECT (a, 2) IN ((1, NULL), (3, 4)) FROM t WHERE a = 1
+=> null
+
+SELECT (a, 2) IN ((3, NULL), (1, 3)) FROM t WHERE a = 1
+=> "false"
+
+SELECT (a, 2) IN (SELECT AS STRUCT 1, NULL) FROM t WHERE a = 1
+=> null
+
+SELECT (a, 2) IN (SELECT AS STRUCT x, 2 FROM UNNEST([3, 1]) AS x) FROM t WHERE a = 1
+=> "true"
+
+SELECT (a, 2) IN (SELECT AS STRUCT x, 2 FROM UNNEST(CAST([] AS ARRAY<INT64>)) AS x) FROM t WHERE a = 1
+=> "false"
+
+# CASE and NULLIF compare with equality, so a NULL field matches nothing. Values follow GoogleSQL
+# compliance testdata/struct_queries.test, struct_equality_null_field.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case_expr
+SELECT CASE STRUCT(CAST(NULL AS INT64) AS x, a + 1 AS y) WHEN STRUCT(1, 2) THEN 1 WHEN STRUCT(NULL, 2) THEN 2 ELSE 3 END FROM t WHERE a = 1
+=> "3"
+
+SELECT CASE STRUCT(a AS x, 2 AS y) WHEN STRUCT(1, 2) THEN 1 WHEN STRUCT(NULL, 2) THEN 2 ELSE 3 END FROM t WHERE a = 1
+=> "1"
+
+SELECT NULLIF(STRUCT(CAST(NULL AS INT64) AS x, a + 1 AS y), (NULL, 2)) FROM t WHERE a = 1
+=> {"f":[{"v":null},{"v":"2"}]}
+
+SELECT NULLIF(STRUCT(a AS x, 2 AS y), (1, 2)) FROM t WHERE a = 1
+=> null
+
+# CASE evaluates only the result it returns.
+SELECT CASE (a, 2) WHEN (1, 2) THEN 'match' ELSE ERROR('unreachable') END FROM t WHERE a = 1
+=> "match"

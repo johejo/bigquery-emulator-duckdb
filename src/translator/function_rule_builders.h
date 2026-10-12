@@ -18,5 +18,8 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups);
 std::string BigNumericCall(std::string_view function, std::size_t bignumerics,
                            std::size_t others = 0);
 Rule BigNumericOperator(std::string_view function, std::size_t arity);
+// `left` `op` `right`, where a NaN FLOAT64 compares unequal to everything, itself included, and
+// neither less nor greater. DuckDB takes NaN as equal to itself and greater than every number.
+std::string FloatCompare(const std::string& left, std::string_view op, const std::string& right);
 
 }  // namespace bigquery_emulator_duckdb::translator

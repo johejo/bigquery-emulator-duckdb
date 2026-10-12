@@ -68,6 +68,13 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
         .rounding_mode = RoundingMode(argument),
     });
   }
+  static constexpr std::array<std::string_view, 6> struct_comparisons = {
+      "$EQUAL", "$NOT_EQUAL", "$IN", "$IN_ARRAY", "$CASE_WITH_VALUE", "NULLIF",
+  };
+  if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
+      std::ranges::find(struct_comparisons, name) != struct_comparisons.end()) {
+    return StructComparison(call);
+  }
   if (entry->implementation == Implementation::kHandler) {
     return entry->handler(call);
   }
@@ -258,31 +265,19 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::find(range_functions, function) == std::end(range_functions)) {
     return Unsupported(scope, "function " + name + " with RANGE");
   }
-  // Supporting a new physical STRUCT shape does not make DuckDB's composite comparisons
-  // compatible: its equality treats NULL fields as values instead of propagating NULL. Keep
-  // these newly representable forms unsupported, including the implicit comparisons in CASE,
-  // NULLIF and IN, until their semantics are implemented.
-  static constexpr std::array<std::string_view, 12> comparisons = {
-      "$EQUAL",         "$NOT_EQUAL",        "$LESS",
-      "$LESS_OR_EQUAL", "$GREATER",          "$GREATER_OR_EQUAL",
-      "$BETWEEN",       "$IS_DISTINCT_FROM", "$IN",
-      "$IN_ARRAY",      "$CASE_WITH_VALUE",  "NULLIF",
+  // Call gives equality of STRUCTs to StructComparison. DuckDB would compare these others, the
+  // STRUCTs of IS DISTINCT FROM and ARRAYs of STRUCTs, by their internal names, with NULL fields
+  // taken as values.
+  static constexpr std::array<std::string_view, 7> comparisons = {
+      "$EQUAL", "$NOT_EQUAL", "$IS_DISTINCT_FROM", "$IN", "$IN_ARRAY", "$CASE_WITH_VALUE", "NULLIF",
   };
-  const auto compares_internal_struct = [&] {
-    for (int i = 0; i < call.argument_list_size(); ++i) {
-      // CASE's THEN and ELSE values are results, not operands of its comparison.
-      if (function == "$CASE_WITH_VALUE" &&
-          (i == call.argument_list_size() - 1 || (i > 0 && i % 2 == 0))) {
-        continue;
-      }
-      if (HasInternalStructNames(call.argument_list(i)->type())) {
-        return true;
-      }
+  if (std::ranges::find(comparisons, function) != comparisons.end() &&
+      call.argument_list_size() > 0) {
+    const googlesql::Type* operand = call.argument_list(0)->type();
+    if (HasInternalStructNames(operand) &&
+        (!operand->IsStruct() || function == "$IS_DISTINCT_FROM")) {
+      return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
     }
-    return false;
-  };
-  if (std::ranges::find(comparisons, function) != comparisons.end() && compares_internal_struct()) {
-    return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
   }
   const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;

@@ -8,6 +8,7 @@
 
 namespace googlesql {
 class ResolvedExpr;
+class Type;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb::translator {
@@ -42,5 +43,12 @@ std::optional<std::string> ArrayConcat(const ScalarCall& call);
 std::optional<std::string> ConcatStrings(const ScalarCall& call);
 std::optional<std::string> Format(const ScalarCall& call);
 std::optional<std::string> Extremum(const ScalarCall& call);
+
+// Equality, IN, CASE with a value and NULLIF over STRUCTs, which BigQuery compares field by field
+// with NULL fields propagating NULL; Call in function.cc takes these calls from their rules.
+std::optional<std::string> StructComparison(const ScalarCall& call);
+// `value` IN UNNEST(`array`) for a STRUCT `type`.
+std::string StructInArray(const googlesql::Type* type, const std::string& value,
+                          const std::string& array);
 
 }  // namespace bigquery_emulator_duckdb::translator
