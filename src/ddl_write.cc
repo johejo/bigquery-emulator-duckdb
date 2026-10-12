@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/column_metadata.h"
@@ -20,6 +21,7 @@
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -68,6 +70,11 @@ std::vector<FieldSchema>::iterator FindColumn(std::vector<FieldSchema>& schema,
   return std::ranges::find_if(schema, [&](const FieldSchema& field) {
     return ToLowerAscii(field.name) == ToLowerAscii(name);
   });
+}
+
+bool HasDefaultTypeConstraints(const FieldSchema& field) {
+  return field.max_length.has_value() || field.precision.has_value() || field.scale.has_value() ||
+         std::ranges::any_of(field.fields, HasDefaultTypeConstraints);
 }
 
 }  // namespace
@@ -204,6 +211,47 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       if (options->description.has_value()) {
         column->description = *options->description;
       }
+      commented.push_back(column->name);
+    } else if (const auto* value = std::get_if<ColumnDefaultAction>(&action)) {
+      const auto column = FindColumn(schema, value->name);
+      if (column == schema.end()) {
+        if (value->if_exists) {
+          continue;
+        }
+        throw ApiError::Invalid("Column not found: " + value->name);
+      }
+      if (!value->drop) {
+        const auto parameters = FieldTypeParameters(*column, /*include_lengths=*/true);
+        if (!parameters.ok()) {
+          throw ApiError::Invalid(std::string(parameters.status().message()));
+        }
+        if (HasDefaultTypeConstraints(*column) && !value->literal.has_value()) {
+          throw ApiError::Invalid(
+              "The emulator does not support non-literal defaults on parameterized columns");
+        }
+        if (value->literal.has_value()) {
+          auto literal = *value->literal;
+          if (literal.is_null() && column->mode == FieldMode::kRequired) {
+            throw ApiError::Invalid("NULL default for required column " + column->name);
+          }
+          const auto status =
+              googlesql::ApplyConstraints(*parameters, googlesql::PRODUCT_EXTERNAL, literal);
+          if (!status.ok()) {
+            throw ApiError::Invalid(std::string(status.message()));
+          }
+        }
+      }
+      if (value->drop && column->default_value_expression.empty()) {
+        throw ApiError::Invalid("Column has no default value: " + column->name);
+      }
+      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} {}", QualifiedName(table),
+                                       QuoteIdentifier(column->name),
+                                       value->drop ? "DROP DEFAULT" : "SET DEFAULT " + value->sql));
+      column->default_value_expression =
+          value->literal.has_value() && value->literal->is_null() ? "" : value->expression;
+      // REPEATED columns without a declared default still default to an empty array.
+      std::ranges::move(RepeatedColumnDefaultStatements(table, {*column}),
+                        std::back_inserter(statements));
       commented.push_back(column->name);
     } else {
       const auto& updates = std::get<OptionUpdates>(action);

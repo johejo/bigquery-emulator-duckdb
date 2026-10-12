@@ -345,6 +345,7 @@ cc_library(
         ":references",
         ":routine",
         ":table_metadata",
+        "@googlesql//googlesql/public:value",
     ],
 )
 
@@ -477,6 +478,10 @@ cc_library(
     srcs = ["src/ddl_write.cc"],
     hdrs = ["src/ddl_write.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [
+        ":type_mapping",
+        "@googlesql//googlesql/reference_impl:type_parameter_constraints",
+    ],
     deps = [
         ":api_error",
         ":column_metadata",

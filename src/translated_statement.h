@@ -7,6 +7,7 @@
 #include <variant>
 #include <vector>
 
+#include "googlesql/public/value.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
@@ -103,8 +104,19 @@ struct ColumnOptionsAction {
   bool if_exists = false;
 };
 
+// ALTER TABLE ALTER COLUMN [IF EXISTS] SET/DROP DEFAULT. Literal values allow constraint
+// validation.
+struct ColumnDefaultAction {
+  std::string name;
+  std::string expression = {};
+  std::string sql = {};
+  std::optional<googlesql::Value> literal = {};
+  bool drop = false;
+  bool if_exists = false;
+};
+
 using TableAlterAction = std::variant<AddColumnAction, DropColumnAction, RenameTableAction,
-                                      ColumnOptionsAction, OptionUpdates>;
+                                      ColumnOptionsAction, ColumnDefaultAction, OptionUpdates>;
 
 // The actions of an ALTER TABLE, in order. DuckDB takes one action per ALTER and keeps neither
 // the BigQuery schema nor the metadata they change, so the emulator applies them to what the table

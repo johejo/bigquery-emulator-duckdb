@@ -308,3 +308,162 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 		t.Fatalf("row = %#v, error = %v", row, err)
 	}
 }
+
+// Expected behavior follows BigQuery's ALTER COLUMN SET/DROP DEFAULT documentation:
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_column_set_default_statement
+func TestAlterTableColumnDefault(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_alter_default")
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) {
+		t.Helper()
+		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	check := func(defaults ...string) {
+		t.Helper()
+		metadata, err := dataset.Table("t").Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, want := range defaults {
+			if got := metadata.Schema[i].DefaultValueExpression; got != want {
+				t.Errorf("column %s default = %q, want %q", metadata.Schema[i].Name, got, want)
+			}
+		}
+		if metadata.Schema[1].Description != "name" || metadata.Schema[1].MaxLength != 8 {
+			t.Fatalf("column metadata lost: %+v", metadata.Schema[1])
+		}
+		rows, err := client.Query(`SELECT column_default FROM go_alter_default.INFORMATION_SCHEMA.COLUMNS
+			WHERE table_name = 't' ORDER BY ordinal_position`).Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, expression := range defaults {
+			var want bigquery.Value
+			if expression != "" {
+				want = expression
+			}
+			var row []bigquery.Value
+			if err := rows.Next(&row); err != nil || !reflect.DeepEqual(row, []bigquery.Value{want}) {
+				t.Fatalf("column_default = %#v, want %#v; error = %v", row, want, err)
+			}
+		}
+	}
+	run("CREATE TABLE t (id INT64, name STRING(8) OPTIONS (description = 'name'), tags ARRAY<STRING>)")
+	run("INSERT t (id, name) VALUES (1, 'old')")
+	run("ALTER TABLE t ALTER COLUMN NAME SET DEFAULT 'new'")
+	run("ALTER TABLE t ALTER COLUMN tags SET DEFAULT ['x']")
+	check("", "'new'", "['x']")
+	if _, _, err := runScript(t, client, dataset.DatasetID,
+		"ALTER TABLE t ALTER COLUMN name DROP DEFAULT, ALTER COLUMN id DROP DEFAULT"); err == nil {
+		t.Fatal("DROP DEFAULT on a column without a default unexpectedly succeeded")
+	}
+	check("", "'new'", "['x']")
+	insert := func(id int64) {
+		t.Helper()
+		row := &struct {
+			ID int64 `bigquery:"id"`
+		}{id}
+		if err := dataset.Table("t").Uploader().Put(ctx, row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert(8)
+	run("INSERT t (id) VALUES (2)")
+	run("ALTER TABLE t ALTER COLUMN name SET DEFAULT 'later'")
+	run("INSERT t (id, name) VALUES (3, DEFAULT), (4, NULL), (7, NULL)")
+	run("UPDATE t SET name = DEFAULT WHERE id = 4")
+	run("ALTER TABLE t ALTER COLUMN name DROP DEFAULT")
+	run("ALTER TABLE t ALTER COLUMN tags DROP DEFAULT")
+	check("", "", "")
+	run("INSERT t (id) VALUES (5)")
+	insert(9)
+	run("ALTER TABLE t ALTER COLUMN name SET DEFAULT NULL")
+	check("", "", "")
+	run("INSERT t (id) VALUES (6)")
+
+	for _, sql := range []string{
+		"ALTER TABLE t ALTER COLUMN IF EXISTS missing SET DEFAULT 1",
+		"ALTER TABLE t ALTER COLUMN IF EXISTS missing DROP DEFAULT",
+		"ALTER TABLE IF EXISTS missing ALTER COLUMN name SET DEFAULT 'x'",
+		"ALTER TABLE IF EXISTS missing ALTER COLUMN name DROP DEFAULT",
+	} {
+		run(sql)
+	}
+	for _, sql := range []string{
+		"ALTER TABLE t ALTER COLUMN name DROP DEFAULT",
+		"ALTER TABLE t ALTER COLUMN id DROP DEFAULT",
+		"ALTER TABLE t ALTER COLUMN missing SET DEFAULT 1",
+		"ALTER TABLE t ALTER COLUMN missing DROP DEFAULT",
+		"ALTER TABLE t ALTER COLUMN id SET DEFAULT 'wrong type'",
+		"ALTER TABLE t ALTER COLUMN id SET DEFAULT name",
+		"ALTER TABLE t ALTER COLUMN id SET DEFAULT ABS(-1)",
+		"CREATE TEMP FUNCTION default_value() AS (1); ALTER TABLE t ALTER COLUMN id SET DEFAULT default_value()",
+		"ALTER TABLE t ALTER COLUMN name SET DEFAULT 'too long for the column'",
+		"ALTER TABLE t ALTER COLUMN tags SET DEFAULT NULL",
+		"ALTER TABLE t ALTER COLUMN tags SET DEFAULT ['x', NULL]",
+		"ALTER TABLE t ALTER COLUMN name SET DEFAULT 'x', ALTER COLUMN missing SET DEFAULT 'y'",
+	} {
+		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err == nil {
+			t.Errorf("%s unexpectedly succeeded", sql)
+		}
+	}
+	dryRun := client.Query("ALTER TABLE go_alter_default.t ALTER COLUMN name SET DEFAULT 'dry'")
+	dryRun.DryRun = true
+	if _, err := dryRun.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	check("", "", "")
+	run("CREATE TABLE composite (s STRUCT<n INT64, label STRING>, n NUMERIC(5, 2), token STRING NOT NULL)")
+	run("ALTER TABLE composite ALTER COLUMN s SET DEFAULT STRUCT(7, 'label')")
+	run("ALTER TABLE composite ALTER COLUMN n SET DEFAULT NUMERIC '1.25'")
+	run("ALTER TABLE composite ALTER COLUMN token SET DEFAULT GENERATE_UUID()")
+	for _, sql := range []string{
+		"ALTER TABLE composite ALTER COLUMN n SET DEFAULT NUMERIC '1000'",
+		"ALTER TABLE composite ALTER COLUMN token SET DEFAULT NULL",
+	} {
+		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err == nil {
+			t.Errorf("%s unexpectedly succeeded", sql)
+		}
+	}
+	run("INSERT composite (s) VALUES (DEFAULT)")
+	run("INSERT composite (s) VALUES (DEFAULT)")
+	composite, err := client.Query(`SELECT LOGICAL_AND(s.n = 7 AND s.label = 'label' AND n = NUMERIC '1.25'),
+		COUNT(DISTINCT token) = 2 FROM go_alter_default.composite`).Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result []bigquery.Value
+	if err := composite.Next(&result); err != nil || !reflect.DeepEqual(result, []bigquery.Value{true, true}) {
+		t.Fatalf("composite defaults = %#v, error = %v", result, err)
+	}
+	rows, err := client.Query("SELECT id, name, ARRAY_LENGTH(tags) FROM go_alter_default.t ORDER BY id").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range [][]bigquery.Value{
+		{int64(1), "old", int64(0)},
+		{int64(2), "new", int64(1)},
+		{int64(3), "later", int64(1)},
+		{int64(4), "later", int64(1)},
+		{int64(5), nil, int64(0)},
+		{int64(6), nil, int64(0)},
+		{int64(7), nil, int64(1)},
+		{int64(8), "new", int64(1)},
+		{int64(9), nil, int64(0)},
+	} {
+		var got []bigquery.Value
+		if err := rows.Next(&got); err != nil || !reflect.DeepEqual(got, want) {
+			t.Fatalf("row = %#v, want %#v; error = %v", got, want, err)
+		}
+	}
+	if err := rows.Next(new([]bigquery.Value)); err != iterator.Done {
+		t.Fatalf("end of rows: %v", err)
+	}
+}

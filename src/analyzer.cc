@@ -143,10 +143,12 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   }
   // A view keeps its original GoogleSQL text, which cannot call a job-local function once
   // that job ends, while the DuckDB view would keep the body of a persistent one as it was when
-  // the view was created. Check before inlining erases the function calls.
+  // the view was created. ALTER COLUMN defaults cannot call UDFs either. Check before
+  // inlining erases the function calls.
   options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) {
     const auto* statement = output.resolved_statement();
-    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateViewStmt>()) {
+    if (statement != nullptr && (statement->Is<googlesql::ResolvedCreateViewStmt>() ||
+                                 statement->Is<googlesql::ResolvedAlterTableStmt>())) {
       std::vector<const googlesql::ResolvedNode*> calls;
       statement->GetDescendantsSatisfying(
           &googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCall>, &calls);
@@ -156,7 +158,10 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
             return function->template Is<googlesql::SQLFunction>() ||
                    function->template Is<googlesql::TemplatedSQLFunction>();
           })) {
-        return absl::UnimplementedError("The emulator does not support views that call SQL UDFs");
+        return absl::UnimplementedError(
+            statement->Is<googlesql::ResolvedCreateViewStmt>()
+                ? "The emulator does not support views that call SQL UDFs"
+                : "The emulator does not support ALTER TABLE expressions that call SQL UDFs");
       }
     }
     return absl::OkStatus();

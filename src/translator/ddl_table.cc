@@ -9,6 +9,7 @@
 #include "absl/status/statusor.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_parameters.h"
@@ -152,6 +153,81 @@ bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsA
     }
   }
   return true;
+}
+
+// Array defaults, including arrays within structs, cannot contain NULL elements.
+bool ValidDefaultValue(const googlesql::Value& value, bool array_element) {
+  if (value.is_null()) {
+    return !array_element && !value.type()->IsArray();
+  }
+  if (value.type()->IsArray()) {
+    for (int i = 0; i < value.num_elements(); ++i) {
+      if (!ValidDefaultValue(value.element(i), true)) {
+        return false;
+      }
+    }
+  } else if (value.type()->IsStruct()) {
+    for (int i = 0; i < value.num_fields(); ++i) {
+      if (!ValidDefaultValue(value.field(i), false)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// GoogleSQL resolves more expressions than BigQuery allows for defaults. Restrict SET
+// DEFAULT to literals, constructors and the documented functions, including non-NULL arrays.
+bool SupportedDefaultExpression(const googlesql::ResolvedExpr& expression, const Scope& scope,
+                                bool array_element = false) {
+  if (expression.Is<googlesql::ResolvedLiteral>()) {
+    const auto& value = expression.GetAs<googlesql::ResolvedLiteral>()->value();
+    if (!ValidDefaultValue(value, array_element)) {
+      Unsupported(scope, "NULL array default or element");
+      return false;
+    }
+    return true;
+  }
+  if (expression.Is<googlesql::ResolvedCast>()) {
+    const auto& cast = *expression.GetAs<googlesql::ResolvedCast>();
+    if (cast.format() == nullptr && cast.time_zone() == nullptr &&
+        cast.extended_cast() == nullptr && !cast.return_null_on_error()) {
+      return SupportedDefaultExpression(*cast.expr(), scope,
+                                        array_element || cast.type()->IsArray());
+    }
+  } else if (expression.Is<googlesql::ResolvedMakeStruct>()) {
+    const auto& record = *expression.GetAs<googlesql::ResolvedMakeStruct>();
+    return std::ranges::all_of(record.field_list(), [&](const auto& field) {
+      return SupportedDefaultExpression(*field, scope);
+    });
+  } else if (expression.Is<googlesql::ResolvedFunctionCall>()) {
+    const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
+    const std::string name = ToLowerAscii(call.function()->Name());
+    if (call.function()->IsGoogleSQLBuiltin() &&
+        (name == "$make_array" || name == "current_date" || name == "current_datetime" ||
+         name == "current_time" || name == "current_timestamp" || name == "generate_uuid" ||
+         name == "rand" || name == "session_user" || name == "st_geogpoint")) {
+      return std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
+        return SupportedDefaultExpression(*argument, scope, name == "$make_array");
+      });
+    }
+  }
+  Unsupported(scope, "column default expression");
+  return false;
+}
+
+// Translate the expression, leaving parameterized column constraints to storage.
+std::optional<std::string> ColumnDefaultSql(const googlesql::ResolvedColumnDefaultValue& value,
+                                            const Scope& scope) {
+  const googlesql::ResolvedExpr* expression = value.expression();
+  if (expression->Is<googlesql::ResolvedCast>()) {
+    const auto* cast = expression->GetAs<googlesql::ResolvedCast>();
+    if (cast->format() == nullptr && cast->time_zone() == nullptr &&
+        cast->extended_cast() == nullptr && !cast->return_null_on_error()) {
+      expression = cast->expr();
+    }
+  }
+  return Expression(*expression, scope, {});
 }
 
 // The TableFieldSchema BigQuery reports for a column a DDL statement defines.
@@ -478,8 +554,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 
 }  // namespace
 
-// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS and SET OPTIONS, which
-// the emulator applies to the table as it is when the statement runs.
+// ALTER TABLE ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT
+// and SET OPTIONS, applied to the table as it is when the statement runs.
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
@@ -528,6 +604,34 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
         return std::nullopt;
       }
       alteration.actions.emplace_back(std::move(column_options));
+    } else if (action->Is<googlesql::ResolvedAlterColumnSetDefaultAction>()) {
+      const auto& set = *action->GetAs<googlesql::ResolvedAlterColumnSetDefaultAction>();
+      if (!SupportedDefaultExpression(*set.default_value()->expression(), scope)) {
+        return std::nullopt;
+      }
+      const auto sql = ColumnDefaultSql(*set.default_value(), scope);
+      if (!sql) {
+        return std::nullopt;
+      }
+      alteration.actions.emplace_back(ColumnDefaultAction{
+          .name = set.column(),
+          .expression = set.default_value()->sql(),
+          .sql = *sql,
+          .literal = set.default_value()->expression()->Is<googlesql::ResolvedLiteral>()
+                         ? std::optional(set.default_value()
+                                             ->expression()
+                                             ->GetAs<googlesql::ResolvedLiteral>()
+                                             ->value())
+                         : std::nullopt,
+          .if_exists = set.is_if_exists(),
+      });
+    } else if (action->Is<googlesql::ResolvedAlterColumnDropDefaultAction>()) {
+      const auto& drop = *action->GetAs<googlesql::ResolvedAlterColumnDropDefaultAction>();
+      alteration.actions.emplace_back(ColumnDefaultAction{
+          .name = drop.column(),
+          .drop = true,
+          .if_exists = drop.is_if_exists(),
+      });
     } else if (action->Is<googlesql::ResolvedSetOptionsAction>()) {
       OptionUpdates updates;
       if (!SetOptions(action->GetAs<googlesql::ResolvedSetOptionsAction>()->option_list(),
@@ -596,17 +700,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
       sql += " NOT NULL";
     }
     if (column->default_value() != nullptr) {
-      // A parameterized column's default is cast to its type with the parameters, which the
-      // column itself applies when the default is stored.
-      const googlesql::ResolvedExpr* expression = column->default_value()->expression();
-      if (expression->Is<googlesql::ResolvedCast>()) {
-        const auto* cast = expression->GetAs<googlesql::ResolvedCast>();
-        if (cast->format() == nullptr && cast->time_zone() == nullptr &&
-            cast->extended_cast() == nullptr && !cast->return_null_on_error()) {
-          expression = cast->expr();
-        }
-      }
-      const auto value = Expression(*expression, scope, {});
+      const auto value = ColumnDefaultSql(*column->default_value(), scope);
       if (!value) {
         return std::nullopt;
       }

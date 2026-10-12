@@ -23,6 +23,17 @@ them as `column_default`. `tables.update` and `tables.patch` cannot add or chang
 Storage Write API cannot write to a table with defaults, and `CREATE TABLE COPY` and `CLONE`
 cannot copy one.
 
+`ALTER TABLE ... ALTER COLUMN [IF EXISTS] SET DEFAULT` changes the default for future
+writes and the column's `defaultValueExpression`. Existing rows are unchanged.
+`DROP DEFAULT` removes it and fails if the column has no declared default. Both support
+`ALTER TABLE IF EXISTS`; a missing table or column is left alone. Repeated columns whose
+default is removed again use an empty array when omitted. Defaults accept literals,
+ARRAY/STRUCT constructors and supported forms of BigQuery's documented default functions;
+NULL arrays and NULL array elements are rejected. `SET DEFAULT NULL` removes a nullable
+column's default. Parameterized columns support literal defaults only, checked against
+their constraints; NULL defaults for required columns are rejected.
+`ADD COLUMN ... DEFAULT` remains unsupported.
+
 Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
 and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
 cannot read them. Temporary, recursive and value-table views, and views that read temporary
