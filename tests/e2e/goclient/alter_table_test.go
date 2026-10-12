@@ -423,11 +423,17 @@ func TestAlterTableColumnDefault(t *testing.T) {
 	run("ALTER TABLE composite ALTER COLUMN s SET DEFAULT STRUCT(7, 'label')")
 	run("ALTER TABLE composite ALTER COLUMN n SET DEFAULT NUMERIC '1.25'")
 	run("ALTER TABLE composite ALTER COLUMN token SET DEFAULT GENERATE_UUID()")
-	for _, sql := range []string{
-		"ALTER TABLE composite ALTER COLUMN token SET DEFAULT NULL",
+	if _, _, err := runScript(t, client, dataset.DatasetID,
+		"ALTER TABLE composite ALTER COLUMN token SET DEFAULT NULL"); err == nil {
+		t.Error("NULL default on a REQUIRED column unexpectedly succeeded")
+	}
+	// BigQuery checks a default against the column's type parameters when it is set.
+	for sql, want := range map[string]string{
+		"ALTER TABLE t ALTER COLUMN name SET DEFAULT 'too long for the column'": "Invalid value: Field name: STRING(8) has maximum length 8 but got a value with length 23",
+		"ALTER TABLE composite ALTER COLUMN n SET DEFAULT NUMERIC '1000'":       "Invalid value: Field n: NUMERIC(5, 2) has precision 5 and scale 2 but got a value that is not in range of [-999.99, 999.99]",
 	} {
-		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err == nil {
-			t.Errorf("%s unexpectedly succeeded", sql)
+		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error = %v, want %q", sql, err, want)
 		}
 	}
 	run("INSERT composite (s) VALUES (DEFAULT)")

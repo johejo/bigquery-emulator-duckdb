@@ -237,7 +237,8 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
           const auto status =
               googlesql::ApplyConstraints(*parameters, googlesql::PRODUCT_EXTERNAL, literal);
           if (!status.ok()) {
-            throw ApiError::Invalid(std::string(status.message()));
+            throw ApiError::Invalid(
+                std::format("Invalid value: Field {}: {}", column->name, status.message()));
           }
         }
       }
