@@ -1,0 +1,29 @@
+# ALTER COLUMN SET DEFAULT on parameterized columns: the emulator checks a literal default
+# against the column's type parameters and rejects it when they do not hold. BigQuery's
+# documentation does not say whether it checks them when the default is set. Each script
+# reports "ok" or the error, and drops the dataset it creates.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_alter_default_string;
+CREATE TABLE bqanswers_alter_default_string.t (name STRING(8));
+BEGIN
+  ALTER TABLE bqanswers_alter_default_string.t ALTER COLUMN name SET DEFAULT 'too long for the column';
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_alter_default_string CASCADE;
+SELECT result
+?>
+
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_alter_default_numeric;
+CREATE TABLE bqanswers_alter_default_numeric.t (n NUMERIC(5, 2));
+BEGIN
+  ALTER TABLE bqanswers_alter_default_numeric.t ALTER COLUMN n SET DEFAULT NUMERIC '1000';
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_alter_default_numeric CASCADE;
+SELECT result
+?>
