@@ -30,6 +30,7 @@
 // takes one back, as the VARCHAR of its units; see src/bignumeric.h. A conversion's last argument
 // is true under SAFE_CAST, which makes its errors NULL.
 
+#include "src/backend_functions/apply.h"
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
@@ -40,78 +41,9 @@ namespace {
 namespace fn = googlesql::functions;
 using googlesql::BigNumericValue;
 
-// Turns a GoogleSQL function's out parameter and error into a StatusOr, with an error as NULL
-// when `safe` is true.
-template <typename T>
-absl::StatusOr<std::optional<T>> OrNull(bool ok, T value, const absl::Status& error, bool safe) {
-  if (ok) {
-    return value;
-  }
-  if (safe) {
-    return std::nullopt;
-  }
-  return error;
-}
-
 // The BIGNUMERIC of argument `column`, which holds the units of a BIGNUM.
 absl::StatusOr<BigNumericValue> Units(const Arguments& arguments, idx_t column) {
   return BigNumericFromUnits(arguments.String(column));
-}
-
-// A BIGNUMERIC function of two BIGNUMERIC arguments, such as *. Unless `kSafe`, its errors
-// fail the query rather than being NULL, as SAFE_DIVIDE's are.
-template <bool (*kFunction)(BigNumericValue, BigNumericValue, BigNumericValue*, absl::Status*),
-          bool kSafe = false>
-void Operator(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output,
-          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
-            const auto in1 = Units(arguments, 0);
-            if (!in1.ok()) {
-              return in1.status();
-            }
-            const auto in2 = Units(arguments, 1);
-            if (!in2.ok()) {
-              return in2.status();
-            }
-            BigNumericValue out;
-            absl::Status error;
-            const bool ok = kFunction(*in1, *in2, &out, &error);
-            return OrNull(ok, BigNumericUnits(out), error, kSafe);
-          });
-}
-
-// A BIGNUMERIC function of one BIGNUMERIC argument, such as ABS.
-template <bool (*kFunction)(BigNumericValue, BigNumericValue*, absl::Status*)>
-void Unary(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto in = Units(arguments, 0);
-    if (!in.ok()) {
-      return in.status();
-    }
-    BigNumericValue out;
-    absl::Status error;
-    if (!kFunction(*in, &out, &error)) {
-      return error;
-    }
-    return BigNumericUnits(out);
-  });
-}
-
-// A BIGNUMERIC function of a BIGNUMERIC and a number of digits, such as ROUND(x, 2).
-template <bool (*kFunction)(BigNumericValue, int64_t, BigNumericValue*, absl::Status*)>
-void WithDigits(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto in = Units(arguments, 0);
-    if (!in.ok()) {
-      return in.status();
-    }
-    BigNumericValue out;
-    absl::Status error;
-    if (!kFunction(*in, arguments.Int(1), &out, &error)) {
-      return error;
-    }
-    return BigNumericUnits(out);
-  });
 }
 
 // ROUND with a rounding mode.
@@ -245,131 +177,33 @@ void Correlation(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
 // as DuckDB's generate_series() does for INT64.
 constexpr int kMaxGeneratedArraySize = std::numeric_limits<int>::max();
 
-// GENERATE_ARRAY(start, end, step), as the units of its elements.
-void GenerateArray(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(
-      info, input, output,
-      [](const Arguments& arguments) -> absl::StatusOr<std::vector<std::optional<std::string>>> {
-        std::vector<BigNumericValue> bounds;
-        for (idx_t column = 0; column < 3; ++column) {
-          const auto bound = Units(arguments, column);
-          if (!bound.ok()) {
-            return bound.status();
-          }
-          bounds.push_back(*bound);
-        }
-        std::vector<BigNumericValue> values;
-        if (absl::Status status =
-                fn::GenerateArrayHelper<fn::ArrayGenTrait<BigNumericValue, BigNumericValue>,
-                                        kMaxGeneratedArraySize>(bounds.at(0), bounds.at(1),
-                                                                bounds.at(2), &values);
-            !status.ok()) {
-          return status;
-        }
-        std::vector<std::optional<std::string>> units(values.size());
-        std::ranges::transform(values, units.begin(),
-                               [](const BigNumericValue& value) { return BigNumericUnits(value); });
-        return units;
-      });
+// GENERATE_ARRAY(start, end, step).
+absl::Status GenerateArray(BigNumericValue start, BigNumericValue end, BigNumericValue step,
+                           std::vector<BigNumericValue>* out) {
+  return fn::GenerateArrayHelper<fn::ArrayGenTrait<BigNumericValue, BigNumericValue>,
+                                 kMaxGeneratedArraySize>(start, end, step, out);
 }
 
-void Parse(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    BigNumericValue out;
-    absl::Status error;
-    if (!fn::ParseBigNumeric(arguments.String(0), &out, &error)) {
-      return error;
-    }
-    return BigNumericUnits(out);
-  });
+bool FromString(std::string_view text, BigNumericValue* out, absl::Status* error) {
+  return fn::StringToNumeric(text, out, error);
 }
 
-void FromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    BigNumericValue out;
-    absl::Status error;
-    const bool ok = fn::StringToNumeric(arguments.String(0), &out, &error);
-    return OrNull(ok, BigNumericUnits(out), error, arguments.Bool(1));
-  });
+bool FromDouble(double value, BigNumericValue* out, absl::Status* error) {
+  return fn::Convert(value, out, error);
 }
 
-void FromDouble(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    BigNumericValue out;
-    absl::Status error;
-    const bool ok = fn::Convert(arguments.Double(0), &out, &error);
-    return OrNull(ok, BigNumericUnits(out), error, arguments.Bool(1));
-  });
-}
-
-void ToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto in = Units(arguments, 0);
-    if (!in.ok()) {
-      return in.status();
-    }
-    std::string out;
-    absl::Status error;
-    if (!fn::NumericToString(*in, &out, &error, /*canonicalize_zero=*/true)) {
-      return error;
-    }
-    return out;
-  });
-}
-
-// A Parquet DECIMAL, its bytes and scale, as the units of a BIGNUMERIC; see src/load.cc.
-void FromDecimalBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto value = BigNumericFromDecimalBytes(arguments.String(0), arguments.Int(1));
-    if (!value.ok()) {
-      return value.status();
-    }
-    return BigNumericUnits(*value);
-  });
-}
-
-// A BIGNUMERIC as the bytes of a Parquet DECIMAL(76, 38); see src/extract.cc.
-void ToDecimalBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto in = Units(arguments, 0);
-    if (!in.ok()) {
-      return in.status();
-    }
-    return BigNumericDecimalBytes(*in);
-  });
-}
-
-// The conversion of argument 0, a BIGNUMERIC, to `T`.
-template <typename T>
-absl::StatusOr<std::optional<T>> Convert(const Arguments& arguments) {
-  const auto in = Units(arguments, 0);
-  if (!in.ok()) {
-    return in.status();
-  }
-  T out{};
-  absl::Status error;
-  const bool ok = fn::Convert(*in, &out, &error);
-  return OrNull(ok, out, error, arguments.Bool(1));
-}
-
-template <typename T>
-void ToNumber(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, Convert<T>);
+bool ToString(BigNumericValue value, std::string* out, absl::Status* error) {
+  return fn::NumericToString(value, out, error, /*canonicalize_zero=*/true);
 }
 
 // A NUMERIC as its text, which the translator casts to DECIMAL(38, 9).
-void ToNumeric(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output,
-          [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
-            const auto out = Convert<googlesql::NumericValue>(arguments);
-            if (!out.ok()) {
-              return out.status();
-            }
-            if (!out->has_value()) {
-              return std::nullopt;
-            }
-            return (*out)->ToString();
-          });
+bool ToNumeric(BigNumericValue value, std::string* out, absl::Status* error) {
+  googlesql::NumericValue numeric;
+  if (!fn::Convert(value, &numeric, error)) {
+    return false;
+  }
+  *out = numeric.ToString();
+  return true;
 }
 
 // The precision and scale of a BIGNUMERIC(P, S) column, as GoogleSQL's reference implementation
@@ -502,53 +336,53 @@ void RegisterBigNumericTypes(duckdb_connection connection) {
 }  // namespace
 
 void RegisterBigNumericFunctions(duckdb_connection connection) {
-  Register(connection, "bq_parse_bignumeric", {kVarchar}, kVarchar, Parse);
+  Register(connection, "bq_parse_bignumeric", {kVarchar}, kVarchar, Apply<fn::ParseBigNumeric>);
   Register(connection, "bq_bignumeric_add", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Add<BigNumericValue>>);
+           Apply<fn::Add<BigNumericValue>>);
   Register(connection, "bq_bignumeric_subtract", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Subtract<BigNumericValue>>);
+           Apply<fn::Subtract<BigNumericValue>>);
   Register(connection, "bq_bignumeric_multiply", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Multiply<BigNumericValue>>);
+           Apply<fn::Multiply<BigNumericValue>>);
   Register(connection, "bq_bignumeric_divide", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Divide<BigNumericValue>>);
+           Apply<fn::Divide<BigNumericValue>>);
   Register(connection, "bq_bignumeric_safe_divide", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Divide<BigNumericValue>, true>);
+           Apply<fn::Divide<BigNumericValue>, Errors::kNull>);
   Register(connection, "bq_bignumeric_div", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::DivideToIntegralValue<BigNumericValue>>);
+           Apply<fn::DivideToIntegralValue<BigNumericValue>>);
   Register(connection, "bq_bignumeric_mod", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Modulo<BigNumericValue>>);
+           Apply<fn::Modulo<BigNumericValue>>);
   Register(connection, "bq_bignumeric_negate", {kVarchar}, kVarchar,
-           Unary<fn::UnaryMinus<BigNumericValue, BigNumericValue>>);
-  Register(connection, "bq_bignumeric_abs", {kVarchar}, kVarchar, Unary<fn::Abs<BigNumericValue>>);
+           Apply<fn::UnaryMinus<BigNumericValue, BigNumericValue>>);
+  Register(connection, "bq_bignumeric_abs", {kVarchar}, kVarchar, Apply<fn::Abs<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sign", {kVarchar}, kVarchar,
-           Unary<fn::Sign<BigNumericValue>>);
+           Apply<fn::Sign<BigNumericValue>>);
   Register(connection, "bq_bignumeric_round", {kVarchar}, kVarchar,
-           Unary<fn::Round<BigNumericValue>>);
+           Apply<fn::Round<BigNumericValue>>);
   Register(connection, "bq_bignumeric_round_digits", {kVarchar, kBigint}, kVarchar,
-           WithDigits<fn::RoundDecimal<BigNumericValue>>);
+           Apply<fn::RoundDecimal<BigNumericValue>>);
   Register(connection, "bq_bignumeric_round_half_even", {kVarchar, kBigint}, kVarchar,
-           WithDigits<RoundWithMode<fn::ROUND_HALF_EVEN>>);
+           Apply<RoundWithMode<fn::ROUND_HALF_EVEN>>);
   Register(connection, "bq_bignumeric_trunc", {kVarchar}, kVarchar,
-           Unary<fn::Trunc<BigNumericValue>>);
+           Apply<fn::Trunc<BigNumericValue>>);
   Register(connection, "bq_bignumeric_trunc_digits", {kVarchar, kBigint}, kVarchar,
-           WithDigits<fn::TruncDecimal<BigNumericValue>>);
+           Apply<fn::TruncDecimal<BigNumericValue>>);
   Register(connection, "bq_bignumeric_ceil", {kVarchar}, kVarchar,
-           Unary<fn::Ceil<BigNumericValue>>);
+           Apply<fn::Ceil<BigNumericValue>>);
   Register(connection, "bq_bignumeric_floor", {kVarchar}, kVarchar,
-           Unary<fn::Floor<BigNumericValue>>);
+           Apply<fn::Floor<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sqrt", {kVarchar}, kVarchar,
-           Unary<fn::Sqrt<BigNumericValue>>);
+           Apply<fn::Sqrt<BigNumericValue>>);
   Register(connection, "bq_bignumeric_cbrt", {kVarchar}, kVarchar,
-           Unary<fn::Cbrt<BigNumericValue>>);
-  Register(connection, "bq_bignumeric_exp", {kVarchar}, kVarchar, Unary<fn::Exp<BigNumericValue>>);
+           Apply<fn::Cbrt<BigNumericValue>>);
+  Register(connection, "bq_bignumeric_exp", {kVarchar}, kVarchar, Apply<fn::Exp<BigNumericValue>>);
   Register(connection, "bq_bignumeric_ln", {kVarchar}, kVarchar,
-           Unary<fn::NaturalLogarithm<BigNumericValue>>);
+           Apply<fn::NaturalLogarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_log10", {kVarchar}, kVarchar,
-           Unary<fn::DecimalLogarithm<BigNumericValue>>);
+           Apply<fn::DecimalLogarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_pow", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Pow<BigNumericValue>>);
+           Apply<fn::Pow<BigNumericValue>>);
   Register(connection, "bq_bignumeric_log", {kVarchar, kVarchar}, kVarchar,
-           Operator<fn::Logarithm<BigNumericValue>>);
+           Apply<fn::Logarithm<BigNumericValue>>);
   Register(connection, "bq_bignumeric_sum", {kVarchar}, kVarchar, Sum);
   LogicalType const varchar(duckdb_create_logical_type(kVarchar));
   LogicalType const list(duckdb_create_list_type(varchar.get()));
@@ -567,16 +401,22 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
     Register(connection, name, {list.get()}, float64.get(), function);
   }
   Register(connection, "bq_bignumeric_generate_array", {kVarchar, kVarchar, kVarchar}, list.get(),
-           GenerateArray);
-  Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar, FromString);
-  Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar, FromDouble);
-  Register(connection, "bq_bignumeric_to_string", {kVarchar}, kVarchar, ToString);
+           Apply<GenerateArray>);
+  Register(connection, "bq_bignumeric_from_string", {kVarchar, kBoolean}, kVarchar,
+           Apply<FromString, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_bignumeric_from_double", {kDouble, kBoolean}, kVarchar,
+           Apply<FromDouble, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_bignumeric_to_string", {kVarchar}, kVarchar, Apply<ToString>);
   Register(connection, "bq_bignumeric_from_decimal_bytes", {kBlob, kBigint}, kVarchar,
-           FromDecimalBytes);
-  Register(connection, "bq_bignumeric_to_decimal_bytes", {kVarchar}, kBlob, ToDecimalBytes);
-  Register(connection, "bq_bignumeric_to_numeric", {kVarchar, kBoolean}, kVarchar, ToNumeric);
-  Register(connection, "bq_bignumeric_to_int64", {kVarchar, kBoolean}, kBigint, ToNumber<int64_t>);
-  Register(connection, "bq_bignumeric_to_double", {kVarchar, kBoolean}, kDouble, ToNumber<double>);
+           Apply<BigNumericFromDecimalBytes>);
+  Register(connection, "bq_bignumeric_to_decimal_bytes", {kVarchar}, kBlob,
+           Apply<BigNumericDecimalBytes>);
+  Register(connection, "bq_bignumeric_to_numeric", {kVarchar, kBoolean}, kVarchar,
+           Apply<ToNumeric, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_bignumeric_to_int64", {kVarchar, kBoolean}, kBigint,
+           Apply<fn::Convert<BigNumericValue, int64_t>, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_bignumeric_to_double", {kVarchar, kBoolean}, kDouble,
+           Apply<fn::Convert<BigNumericValue, double>, Errors::kNullUnderSafeCast>);
   RegisterBigNumericTypes(connection);
 }
 

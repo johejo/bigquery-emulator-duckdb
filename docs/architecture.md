@@ -61,7 +61,9 @@ selection and compatibility requirements.
 [DuckDB](https://duckdb.org/) executes translated SQL through its C++ API. Each project is a
 catalog and each dataset a schema. Results are encoded in BigQuery's `{"f": [{"v": ...}]}` format.
 [src/backend_functions/](../src/backend_functions/) registers functions using GoogleSQL's
-implementations. GCS load jobs download objects with
+implementations. Most register a GoogleSQL function, or a small adapter of one, through `Apply` in
+[apply.h](../src/backend_functions/apply.h), which reads its arguments and writes its result by
+their C++ types. GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files for DuckDB.
 
 Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.

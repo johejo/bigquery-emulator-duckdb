@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "duckdb.h"
+#include "googlesql/base/status_macros.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/parse_date_time.h"
@@ -17,6 +19,7 @@
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/value.h"
+#include "src/backend_functions/apply.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
@@ -64,208 +67,109 @@ std::vector<duckdb_type> ColumnTypes(duckdb_data_chunk input) {
   return types;
 }
 
+namespace fn = googlesql::functions;
+
 // BigQuery expands %Q to the quarter and %J to the ISO day of the year.
-constexpr googlesql::functions::FormatDateTimestampOptions kFormatOptions = {
+constexpr fn::FormatDateTimestampOptions kFormatOptions = {
     .expand_Q = true,
     .expand_J = true,
 };
 
 // FORMAT_DATE(format, date).
-void FormatDate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    std::string out;
-    const absl::Status status = googlesql::functions::FormatDateToString(
-        arguments.String(0), int64_t{arguments.Date(1)}, kFormatOptions, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status FormatDate(std::string_view format, int32_t date, std::string* out) {
+  return fn::FormatDateToString(format, date, kFormatOptions, out);
 }
 
 // FORMAT_DATETIME(format, datetime).
-void FormatDatetime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto datetime = DatetimeFromMicros(arguments.Int(1));
-    if (!datetime.ok()) {
-      return datetime.status();
-    }
-    std::string out;
-    const absl::Status status = googlesql::functions::FormatDatetimeToStringWithOptions(
-        arguments.String(0), *datetime, kFormatOptions, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status FormatDatetime(std::string_view format, int64_t micros, std::string* out) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+  return fn::FormatDatetimeToStringWithOptions(format, datetime, kFormatOptions, out);
 }
 
 // FORMAT_TIME(format, time).
-void FormatTime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    std::string out;
-    const absl::Status status = googlesql::functions::FormatTimeToString(
-        arguments.String(0), TimeFromMicros(arguments.Int(1)), &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status FormatTime(std::string_view format, int64_t micros, std::string* out) {
+  return fn::FormatTimeToString(format, TimeFromMicros(micros), out);
 }
 
 // FORMAT_TIMESTAMP(format, timestamp, time_zone).
-void FormatTimestamp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    std::string out;
-    const absl::Status status = googlesql::functions::FormatTimestampToString(
-        arguments.String(0), arguments.Int(1), arguments.String(2), kFormatOptions, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status FormatTimestamp(std::string_view format, int64_t micros, std::string_view time_zone,
+                             std::string* out) {
+  return fn::FormatTimestampToString(format, micros, time_zone, kFormatOptions, out);
 }
 
 // PARSE_DATE(format, string).
-void ParseDate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    int32_t out = 0;
-    const absl::Status status = googlesql::functions::ParseStringToDate(
-        arguments.String(0), arguments.String(1), /*parse_version2=*/true, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status ParseDate(std::string_view format, std::string_view text, int32_t* out) {
+  return fn::ParseStringToDate(format, text, /*parse_version2=*/true, out);
 }
 
 // PARSE_DATETIME(format, string).
-void ParseDatetime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
-    googlesql::DatetimeValue out;
-    absl::Status status = googlesql::functions::ParseStringToDatetime(
-        arguments.String(0), arguments.String(1), googlesql::functions::kMicroseconds,
-        /*parse_version2=*/true, &out);
-    if (!status.ok()) {
-      return status;
-    }
-    return MicrosFromDatetime(out);
-  });
+absl::StatusOr<int64_t> ParseDatetime(std::string_view format, std::string_view text) {
+  googlesql::DatetimeValue out;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ParseStringToDatetime(format, text, fn::kMicroseconds,
+                                                      /*parse_version2=*/true, &out));
+  return MicrosFromDatetime(out);
 }
 
 // PARSE_TIME(format, string).
-void ParseTime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<int64_t> {
-    googlesql::TimeValue out;
-    absl::Status status = googlesql::functions::ParseStringToTime(
-        arguments.String(0), arguments.String(1), googlesql::functions::kMicroseconds, &out);
-    if (!status.ok()) {
-      return status;
-    }
-    return MicrosFromTime(out);
-  });
+absl::StatusOr<int64_t> ParseTime(std::string_view format, std::string_view text) {
+  googlesql::TimeValue out;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ParseStringToTime(format, text, fn::kMicroseconds, &out));
+  return MicrosFromTime(out);
 }
 
 // PARSE_TIMESTAMP(format, string, time_zone), with the time zone for a string without one.
-void ParseTimestamp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    int64_t out = 0;
-    const absl::Status status = googlesql::functions::ParseStringToTimestamp(
-        arguments.String(0), arguments.String(1), arguments.String(2), /*parse_version2=*/true,
-        &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
-}
-
-// Turns a conversion's error into NULL when `safe`, its last argument, is true under SAFE_CAST.
-template <typename T>
-absl::StatusOr<std::optional<T>> OrNull(const absl::Status& status, T value, bool safe) {
-  if (status.ok()) {
-    return value;
-  }
-  if (safe) {
-    return std::nullopt;
-  }
-  return status;
+absl::Status ParseTimestamp(std::string_view format, std::string_view text,
+                            std::string_view time_zone, int64_t* out) {
+  return fn::ParseStringToTimestamp(format, text, time_zone, /*parse_version2=*/true, out);
 }
 
 // CAST(string AS DATE), which accepts only BigQuery's canonical format, where DuckDB accepts more.
-void StringToDate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    int32_t out = 0;
-    const absl::Status status =
-        googlesql::functions::ConvertStringToDate(arguments.String(0), &out);
-    return OrNull(status, out, arguments.Bool(1));
-  });
+absl::Status StringToDate(std::string_view text, int32_t* out) {
+  return fn::ConvertStringToDate(text, out);
 }
 
 // CAST(string AS DATETIME).
-void StringToDatetime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    googlesql::DatetimeValue datetime;
-    absl::Status status = googlesql::functions::ConvertStringToDatetime(
-        arguments.String(0), googlesql::functions::kMicroseconds, &datetime);
-    int64_t out = 0;
-    if (status.ok()) {
-      const auto micros = MicrosFromDatetime(datetime);
-      status = micros.status();
-      out = micros.value_or(0);
-    }
-    return OrNull(status, out, arguments.Bool(1));
-  });
+absl::StatusOr<int64_t> StringToDatetime(std::string_view text) {
+  googlesql::DatetimeValue out;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ConvertStringToDatetime(text, fn::kMicroseconds, &out));
+  return MicrosFromDatetime(out);
 }
 
 // CAST(string AS TIME).
-void StringToTime(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    googlesql::TimeValue time;
-    const absl::Status status = googlesql::functions::ConvertStringToTime(
-        arguments.String(0), googlesql::functions::kMicroseconds, &time);
-    return OrNull(status, status.ok() ? MicrosFromTime(time) : 0, arguments.Bool(1));
-  });
+absl::StatusOr<int64_t> StringToTime(std::string_view text) {
+  googlesql::TimeValue out;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ConvertStringToTime(text, fn::kMicroseconds, &out));
+  return MicrosFromTime(out);
 }
 
 // CAST(string AS TIMESTAMP), in UTC for a string without a time zone.
-void StringToTimestamp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    int64_t out = 0;
-    const absl::Status status = googlesql::functions::ConvertStringToTimestamp(
-        arguments.String(0), absl::UTCTimeZone(), googlesql::functions::kMicroseconds,
-        /*allow_tz_in_str=*/true, &out);
-    return OrNull(status, out, arguments.Bool(1));
-  });
+absl::Status StringToTimestamp(std::string_view text, int64_t* out) {
+  return fn::ConvertStringToTimestamp(text, absl::UTCTimeZone(), fn::kMicroseconds,
+                                      /*allow_tz_in_str=*/true, out);
 }
 
 // TIMESTAMP(string, time_zone), whose string may not have a time zone of its own.
-void StringToTimestampIn(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    int64_t out = 0;
-    const absl::Status status = googlesql::functions::ConvertStringToTimestamp(
-        arguments.String(0), arguments.String(1), googlesql::functions::kMicroseconds,
-        /*allow_tz_in_str=*/false, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status StringToTimestampIn(std::string_view text, std::string_view time_zone, int64_t* out) {
+  return fn::ConvertStringToTimestamp(text, time_zone, fn::kMicroseconds,
+                                      /*allow_tz_in_str=*/false, out);
 }
 
 // CAST(datetime AS STRING), whose fractional seconds have three or six digits, where DuckDB
 // leaves out trailing zeros.
-void DatetimeToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) -> absl::StatusOr<std::string> {
-    const auto datetime = DatetimeFromMicros(arguments.Int(0));
-    if (!datetime.ok()) {
-      return datetime.status();
-    }
-    std::string out;
-    const absl::Status status = googlesql::functions::ConvertDatetimeToString(
-        *datetime, googlesql::functions::kMicroseconds, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status DatetimeToString(int64_t micros, std::string* out) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+  return fn::ConvertDatetimeToString(datetime, fn::kMicroseconds, out);
 }
 
 // CAST(time AS STRING).
-void TimeToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    std::string out;
-    const absl::Status status = googlesql::functions::ConvertTimeToString(
-        TimeFromMicros(arguments.Int(0)), googlesql::functions::kMicroseconds, &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status TimeToString(int64_t micros, std::string* out) {
+  return fn::ConvertTimeToString(TimeFromMicros(micros), fn::kMicroseconds, out);
 }
 
 // CAST(timestamp AS STRING) and STRING(timestamp, time_zone), in the given time zone.
-void TimestampToString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    std::string out;
-    const absl::Status status = googlesql::functions::ConvertTimestampToString(
-        absl::FromUnixMicros(arguments.Int(0)), googlesql::functions::kMicroseconds,
-        arguments.String(1), &out);
-    return ToStatusOr(status.ok(), out, status);
-  });
+absl::Status TimestampToString(int64_t micros, std::string_view time_zone, std::string* out) {
+  return fn::ConvertTimestampToString(absl::FromUnixMicros(micros), fn::kMicroseconds, time_zone,
+                                      out);
 }
 
 // A FORMAT argument as the GoogleSQL value of the type its DuckDB type stands for.
@@ -364,26 +268,31 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
 }  // namespace
 
 void RegisterDatetimeFunctions(duckdb_connection connection) {
-  Register(connection, "bq_format_date", {kVarchar, kDate}, kVarchar, FormatDate);
-  Register(connection, "bq_format_datetime", {kVarchar, kDatetime}, kVarchar, FormatDatetime);
-  Register(connection, "bq_format_time", {kVarchar, kTime}, kVarchar, FormatTime);
+  Register(connection, "bq_format_date", {kVarchar, kDate}, kVarchar, Apply<FormatDate>);
+  Register(connection, "bq_format_datetime", {kVarchar, kDatetime}, kVarchar,
+           Apply<FormatDatetime>);
+  Register(connection, "bq_format_time", {kVarchar, kTime}, kVarchar, Apply<FormatTime>);
   Register(connection, "bq_format_timestamp", {kVarchar, kTimestamp, kVarchar}, kVarchar,
-           FormatTimestamp);
-  Register(connection, "bq_parse_date", {kVarchar, kVarchar}, kDate, ParseDate);
-  Register(connection, "bq_parse_datetime", {kVarchar, kVarchar}, kDatetime, ParseDatetime);
-  Register(connection, "bq_parse_time", {kVarchar, kVarchar}, kTime, ParseTime);
+           Apply<FormatTimestamp>);
+  Register(connection, "bq_parse_date", {kVarchar, kVarchar}, kDate, Apply<ParseDate>);
+  Register(connection, "bq_parse_datetime", {kVarchar, kVarchar}, kDatetime, Apply<ParseDatetime>);
+  Register(connection, "bq_parse_time", {kVarchar, kVarchar}, kTime, Apply<ParseTime>);
   Register(connection, "bq_parse_timestamp", {kVarchar, kVarchar, kVarchar}, kTimestamp,
-           ParseTimestamp);
-  Register(connection, "bq_string_to_date", {kVarchar, kBoolean}, kDate, StringToDate);
-  Register(connection, "bq_string_to_datetime", {kVarchar, kBoolean}, kDatetime, StringToDatetime);
-  Register(connection, "bq_string_to_time", {kVarchar, kBoolean}, kTime, StringToTime);
+           Apply<ParseTimestamp>);
+  Register(connection, "bq_string_to_date", {kVarchar, kBoolean}, kDate,
+           Apply<StringToDate, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_string_to_datetime", {kVarchar, kBoolean}, kDatetime,
+           Apply<StringToDatetime, Errors::kNullUnderSafeCast>);
+  Register(connection, "bq_string_to_time", {kVarchar, kBoolean}, kTime,
+           Apply<StringToTime, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_string_to_timestamp", {kVarchar, kBoolean}, kTimestamp,
-           StringToTimestamp);
+           Apply<StringToTimestamp, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_string_to_timestamp_in", {kVarchar, kVarchar}, kTimestamp,
-           StringToTimestampIn);
-  Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, DatetimeToString);
-  Register(connection, "bq_time_string", {kTime}, kVarchar, TimeToString);
-  Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar, TimestampToString);
+           Apply<StringToTimestampIn>);
+  Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, Apply<DatetimeToString>);
+  Register(connection, "bq_time_string", {kTime}, kVarchar, Apply<TimeToString>);
+  Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar,
+           Apply<TimestampToString>);
   Register(connection, "bq_format", {kVarchar}, kVarchar, Format, /*nulls=*/false, DUCKDB_TYPE_ANY);
 }
 

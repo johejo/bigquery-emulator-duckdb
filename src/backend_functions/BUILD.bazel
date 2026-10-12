@@ -8,6 +8,7 @@ cc_library(
     hdrs = ["bignumeric.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":apply",
         ":register",
         ":scalar",
         "//:backend_error",
@@ -36,6 +37,7 @@ cc_library(
     hdrs = ["math.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":apply",
         ":register",
         ":scalar",
         "//:duckdb_handle",
@@ -62,6 +64,7 @@ cc_library(
     hdrs = ["string.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":apply",
         ":register",
         ":scalar",
         "//:duckdb_handle",
@@ -90,6 +93,7 @@ cc_library(
     hdrs = ["datetime.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":apply",
         ":register",
         ":scalar",
         "//:bignumeric",
@@ -203,6 +207,19 @@ cc_library(
     ],
     linkstatic = True,
     deps = ["//third_party/duckdb"],
+)
+
+cc_library(
+    name = "apply",
+    hdrs = ["apply.h"],
+    deps = [
+        ":scalar",
+        "//:bignumeric",
+        "//third_party/duckdb",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:numeric_value",
+    ],
 )
 
 cc_library(
