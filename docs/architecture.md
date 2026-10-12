@@ -1,95 +1,74 @@
 # Architecture
 
-A request passes through the server, frontend, translator and backend in turn.
+SQL requests pass through the server, frontend, translator and backend. REST metadata operations
+and Storage RPCs share the same emulator.
 
 ## Server
 
-The HTTP server handles BigQuery REST requests and returns BigQuery-compatible responses. It is
-built on [cpp-httplib](https://github.com/yhirose/cpp-httplib) with
-[nlohmann/json](https://github.com/nlohmann/json). It serves the v2 discovery document in
-`third_party/bigquery/discovery.json`, the one bundled with `bq`, and routes requests by it:
-[src/server/routes.cc](../src/server/routes.cc) reads each served method's paths, which accept both
-`/bigquery/v2` and root paths, and its query parameters. A request with a query parameter the
-method does not take, or a value its type does not allow, fails as in BigQuery, and one with a
-parameter the method's handler does not handle is rejected as unsupported.
+[`Server`](../src/server.h) manages the [REST](../src/server/rest.cc) and
+[Storage gRPC](../src/server/storage.cc) transports. The `Emulator` must outlive it.
+`Start()` waits for listeners to become ready; `Stop()` requests shutdown; `Wait()` joins serving
+threads. Destruction also stops and joins them. Instances are single-use, and the CLI announces
+endpoints only after startup succeeds.
+
+REST uses [cpp-httplib](https://github.com/yhirose/cpp-httplib) and
+[nlohmann/json](https://github.com/nlohmann/json).
+[src/server/routes.cc](../src/server/routes.cc) builds routes from the bundled
+[BigQuery v2 discovery document](../third_party/bigquery/discovery.json), accepting both
+`/bigquery/v2` and root paths. It validates query parameter names and types; handlers reject
+valid parameters they cannot implement.
 
 ## Frontend
 
-[GoogleSQL](https://github.com/google/googlesql) parses each query and resolves it into a
-resolved AST, with every name bound and every expression typed. The frontend stays independent
-of DuckDB execution details.
+[GoogleSQL](https://github.com/google/googlesql) parses and analyzes queries into a resolved AST
+with names bound and expressions typed. The frontend is independent of DuckDB execution details.
 
-[src/catalog.cc](../src/catalog.cc) looks tables up lazily through a `TableSource`, completes
-`table` and `dataset.table` paths from the default project and dataset.
-[src/type_mapping.cc](../src/type_mapping.cc) maps column types between BigQuery's
-TableFieldSchema, GoogleSQL and DuckDB; every DuckDB column type, of a table, a query parameter
-or a translated expression, is derived from the GoogleSQL type. Functions and types come from
-GoogleSQL's built-ins, plus BigQuery functions GoogleSQL lacks. [src/information_schema.cc](../src/information_schema.cc) serves
-`INFORMATION_SCHEMA` views as tables whose rows are computed when the query is analyzed; the
-translator reads such a table from the DuckDB query that carries its rows.
+- [catalog.cc](../src/catalog.cc) loads tables lazily through `TableSource` and completes table
+  paths from the default project and dataset. Functions and types come from GoogleSQL's built-ins
+  plus BigQuery functions it lacks.
+- [type_mapping.cc](../src/type_mapping.cc) maps TableFieldSchema, GoogleSQL and DuckDB types.
+  DuckDB column, parameter and expression types are derived from GoogleSQL types.
+- [information_schema.cc](../src/information_schema.cc) computes view rows during analysis;
+  the translated query carries those rows to DuckDB.
+- [analyzer.cc](../src/analyzer.cc) uses the parser's language options, reports analysis failures
+  as `invalidQuery`, and supplies query result schemas from resolved output columns.
 
-[src/analyzer.cc](../src/analyzer.cc) runs the analyzer with the same language options as the
-parser; a statement that fails analysis is reported as `invalidQuery`. For a query, the resolved
-output columns supply the result schema.
-
-A request with more than one statement, or with a procedural statement such as `DECLARE` or
-`IF`, is a multi-statement query. GoogleSQL's `ScriptExecutor` runs its control flow and keeps
-its variables, and [src/emulator_script.cc](../src/emulator_script.cc) evaluates each statement
-and expression the executor reaches: it analyzes them against a catalog that holds the variables
-as constants ahead of the tables, translates them like any other statement, and decodes the
-value of an expression from the row DuckDB returns.
+For multi-statement queries, GoogleSQL's `ScriptExecutor` manages control flow and variables.
+[emulator_script.cc](../src/emulator_script.cc) analyzes and translates each statement or
+expression it reaches, exposing script variables as catalog constants and decoding expression
+results from DuckDB rows.
 
 ## Translator
 
-[src/translator.cc](../src/translator.cc) translates the resolved AST into DuckDB SQL. Each scan
-becomes a derived table whose columns are named after resolved column IDs, and user-facing names
-are applied only at the output boundary, so duplicate or shadowed aliases never collide. Where
-DuckDB differs from BigQuery, the translator spells out BigQuery's semantics, such as default
-NULL ordering and result types.
+[translator.cc](../src/translator.cc) translates the resolved AST into DuckDB SQL. Scans become
+derived tables with columns named by resolved IDs; output names are applied at the boundary to
+avoid alias collisions. Translation accounts for differences such as NULL ordering and result types.
 
-Nonempty STRUCT query values keep their GoogleSQL field names in the resolved type. DuckDB
-preserves distinct nonempty names and uses positional internal names for structs with anonymous
-or duplicate names, through `DuckDbStructFieldNames`. Construction and casts use the same mapping;
-field access and casts address fields by position. JSON functions receive the value together with
-its original field names, including names in nested arrays and structs, so internal names do not
-change JSON keys. Stored table columns continue to require distinct nonempty field names. Comparisons involving
-anonymous or duplicate fields remain unsupported because DuckDB's composite equality has
-different NULL semantics. Casts of these values to JSON and correlated aggregate subqueries
-returning them also remain unsupported; use the JSON functions for JSON conversion.
+The sources in [src/translator/](../src/translator/) share a statement-wide `Context` and a
+`Scope` describing what each scan can see. `DuckDbStructFieldNames` maps anonymous or duplicate
+STRUCT names to positional internal names. Construction, casts and field access use that mapping;
+JSON functions receive the original names separately so they preserve JSON keys. User-visible
+limits are documented in [compatibility.md](compatibility.md#struct-values).
 
-The translator's sources in [src/translator/](../src/translator) share
-[context.h](../src/translator/context.h): a `Context` for the whole statement, and the `Scope`
-of what a scan can see besides its input. Expressions, scalar functions, scans, aggregation, DML,
-DDL, and types and literals each have a file of their own.
-
-[src/translator/functions.cc](../src/translator/functions.cc) is the registry of the functions the
-emulator supports, each under one implementation: a DuckDB function of the same or another name,
-DuckDB SQL templates, GoogleSQL's own implementation, code in
-[src/translator/handlers.cc](../src/translator/handlers.cc), or a DuckDB aggregate or window
-function. A **template** rewrites the call using `$n` for the n-th argument and `#n` for that
-argument as a lowercase string literal, so `DATE_DIFF(a, b, DAY)` becomes
-`date_diff('day', b, a)`; the rules are chosen by argument count, types, date parts, rounding
-modes and STRING literal values. AGENTS.md says which implementation to choose.
+[functions.cc](../src/translator/functions.cc) assembles DuckDB names, SQL templates, GoogleSQL
+backend calls, handlers, and aggregate/window rules. Templates use `$n` for argument n, `#n`
+for a date-part string, and `!n` for a rule-defined error; for example, `DATE_DIFF(a, b, DAY)`
+becomes `date_diff('day', b, a)`. See [AGENTS.md](../AGENTS.md#implementing-functions) for backend
+selection and compatibility requirements.
 
 ## Backend
 
-[DuckDB](https://duckdb.org/) executes translated statements through libduckdb's C++ API; each
-project is a DuckDB catalog and each dataset a schema. The backend derives result schemas and
-encodes rows in BigQuery's `{"f": [{"v": ...}]}` format. Functions DuckDB lacks are registered
-from GoogleSQL's own implementations in [src/backend_functions/](../src/backend_functions/), one
-source per area.
-GCS load jobs download objects with
-[google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files, which
-DuckDB then reads.
+[DuckDB](https://duckdb.org/) executes translated SQL through its C++ API. Each project is a
+catalog and each dataset a schema. Results are encoded in BigQuery's `{"f": [{"v": ...}]}` format.
+[src/backend_functions/](../src/backend_functions/) registers functions using GoogleSQL's
+implementations. GCS load jobs download objects with
+[google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files for DuckDB.
 
-Logical views are native DuckDB views with translated SQL and explicit GoogleSQL output types.
-Their DuckDB comments hold the original GoogleSQL query and result schema as JSON. Creation and
-metadata writes share a transaction, so replacement failures preserve the previous definition.
-This metadata survives restarts and serves the REST API without executing the view.
+Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.
+Their comments hold the original query and result schema as JSON. Creation and metadata writes
+share a transaction, preserving the previous definition on replacement failure.
 
-BigQuery metadata that DuckDB types cannot carry lives in DuckDB comments as JSON: each column's
-TableFieldSchema in its column comment, and a table's description, friendly name, labels,
-partitioning and clustering in its table comment, or in its view comment next to the query. DuckDB
-cannot comment on a schema, so a dataset's description, friendly name and labels live as JSON in
-the `emulator_datasets` table of the project's `main` schema, which is not a dataset; the same
-transaction that creates or drops the schema writes them.
+Column comments hold TableFieldSchema metadata; table comments hold descriptions, friendly names,
+labels, partitioning and clustering. View comments also hold this metadata alongside the query.
+Dataset metadata lives in the project's `main.emulator_datasets` table because DuckDB cannot
+comment on schemas. Schema creation or deletion and its metadata update share a transaction.

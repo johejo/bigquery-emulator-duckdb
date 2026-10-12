@@ -7,6 +7,8 @@ header. To check one target and its dependencies:
 nix develop --command bazelisk build --config=clang-tidy //:translator
 ```
 
+## Tool resolution
+
 The tool is resolved by `repository.bzl` from `CLANG_TIDY` (set by the development shell), or
 from PATH. Outside the shell, `--repo_env=CLANG_TIDY=/absolute/path/to/clang-tidy` overrides it.
 Without either, the tool is a stub that fails each lint action, so builds and tests that only
@@ -14,6 +16,8 @@ analyze the aspect, such as `//:clang_tidy_test`, do not need clang-tidy.
 The executable is a declared action input, so changing it invalidates cached results. This uses
 the local development toolchain, including its SDK and immutable Nix store paths; it does not
 provide a portable remote-execution toolchain.
+
+## Files and compiler flags
 
 The aspect checks the repository's checked-in `.cc` and `.h` files, including headers as standalone
 translation units. Generated and external files are not linted, but dependency headers and the
@@ -28,11 +32,15 @@ Builtin include directories stay `-isystem`, with C++ directories placed ahead o
 and the order preserved within each group. Apple's SDK reports C headers before libc++, which
 breaks libc++'s `#include_next`. Using `-idirafter` instead mixes Nix and Apple headers.
 
+## Configuration and caching
+
 clang-tidy discovers each file's nearest `.clang-tidy` and any inherited configuration. Add every
 new configuration to `//:clang_tidy_config`, so sandboxed actions can read it. Each action includes
 only the configurations in the source file's ancestor directories, so changes invalidate the
 affected files' cache. `WarningsAsErrors: '*'` makes findings fail the action; failed actions cannot
 produce the success marker.
+
+## Tests
 
 `//:clang_tidy_test` inspects the real `query_parameters_test`, `query_parameters` and `httplib`
 targets. It checks configuration and executable inputs, C++20 flags, httplib's public settings

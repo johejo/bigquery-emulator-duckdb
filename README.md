@@ -1,15 +1,16 @@
 # bigquery-emulator-duckdb
 
-A BigQuery Emulator using DuckDB as the backend.
+A BigQuery emulator using DuckDB as the backend.
 
 Queries are parsed and analyzed as GoogleSQL, then translated to and executed by DuckDB, so
 accepting a query does not guarantee BigQuery-identical results.
 
 ## Quick start
 
-Build the binary:
+Enter the development shell, which provides Bazel, `just` and `bq`, then build the binary:
 
 ```bash
+nix develop
 bazelisk build //:bigquery-emulator-duckdb
 # -> bazel-bin/bigquery-emulator-duckdb
 ```
@@ -23,10 +24,8 @@ bazel-bin/bigquery-emulator-duckdb --host 0.0.0.0 --port 9050 \
 
 ### Connect with `bq`
 
-`bq` normally obtains credentials from `gcloud`; a dummy `--oauth_access_token` together with
-`--nouse_google_auth` skips that. The emulator runs a query that does not set
-`--use_legacy_sql` as GoogleSQL, so `--nouse_legacy_sql` is unnecessary, although BigQuery itself
-may run such a query as legacy SQL.
+A dummy `--oauth_access_token` with `--nouse_google_auth` skips `bq`'s credential lookup.
+Queries run as GoogleSQL by default.
 
 ```bash
 alias bqe='bq --api http://127.0.0.1:9050 --project_id test --oauth_access_token=dummy --nouse_google_auth'
@@ -55,9 +54,7 @@ rows, err := query.Read(ctx)
 
 The same process exposes Storage Read and Write v1 on `127.0.0.1:9060`, sharing tables
 with the REST API. Set `--grpc-port` to change the port (`0` chooses an available port).
-Both listeners use `--host`. Local gRPC connections use insecure transport and no credentials.
-
-Enable Storage Read on the Go BigQuery client:
+Both listeners use `--host`. Enable Storage Read with insecure transport and no credentials:
 
 ```go
 err = client.EnableStorageReadClient(ctx,
@@ -65,26 +62,7 @@ err = client.EnableStorageReadClient(ctx,
 	option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
 ```
 
-For Write, connect `storage/managedwriter.NewClient` or the generated Storage v1 client
-to the same gRPC endpoint with these options. Supply a self-contained protobuf writer
-descriptor and serialized rows; Arrow input is unsupported. The default stream and COMMITTED
-streams publish immediately. BUFFERED streams publish through `FlushRows`; PENDING streams
-publish atomically through `BatchCommitWriteStreams` after finalization. Explicit streams retain
-offsets across connections within the process.
-
-Read sessions materialize a snapshot in memory and expire after six hours. Arrow and Avro
-output support scalar types, STRUCTs and arrays, including decimals and temporal types.
-INTERVAL and RANGE, parameterized decimals, Arrow JSON/GEOGRAPHY, historical snapshots,
-sampling, compression and custom serialization options are unsupported. Write supports protobuf scalar fields, STRUCTs and repeated fields;
-column defaults, parameterized columns, custom protobuf annotations, JSON/GEOGRAPHY input
-and schema evolution are unsupported. Create a new stream after changing a table schema. Default streams established
-before a schema change require restarting the process. Legacy persisted tables without creation
-metadata cannot return default-stream creation metadata.
-Decimal writer strings must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
-
-Storage session and stream state, offsets, and unpublished BUFFERED/PENDING rows are
-process-local and are discarded at shutdown, including with `--data-dir`. Published rows
-persist normally. Storage stream expiration and production quotas are not emulated.
+See the [Storage API guide](docs/storage-api.md) for writing rows, limits and stream lifetime.
 
 ## Projects
 
@@ -97,17 +75,13 @@ just run --project='{"projectId":"test","numericId":"123456789012","friendlyName
   --project=@./another-project.json
 ```
 
-Each object has a required, nonempty `projectId` without `/`, and optional `numericId` and
-`friendlyName` strings. Domain-scoped project IDs are accepted. `numericId` must be a positive
-uint64 in decimal, without leading zeros. `friendlyName` may be empty. Unknown fields, invalid
-values, duplicate project IDs, duplicate numbers and numbers that identify a different project
+Each object requires a nonempty `projectId` without `/`; domain-scoped IDs are accepted.
+Optional fields are `friendlyName` and `numericId`, both strings. Numbers must be positive
+uint64 decimals without leading zeros. Invalid or unknown fields and conflicting registrations
 are startup errors.
 
-`projects.list` returns registered projects, including those with no datasets. Unconfigured
-numbers and friendly names are omitted. REST project references accept the configured number
-as an alias of the project ID; response references use the project ID. Unregistered projects
-return 404 rather than being created by an API request. `projects.getServiceAccount` remains
-unsupported.
+`projects.list` includes registered projects without datasets. REST references accept configured
+numbers as aliases, but responses use project IDs. Unregistered projects return 404.
 
 With `--data-dir`, registrations are stored in `projects.json` and restored at startup without
 `--project`. Explicit registrations replace the same project's saved metadata, clearing optional
@@ -117,9 +91,8 @@ files from before explicit registration must be registered once with `--project`
 ## Execution identity
 
 With `--session-user ID`, `SESSION_USER()` returns that identity as a `STRING` for every
-client and project. Supply an email address or a principal identifier; the value must be nonempty
-and is returned unchanged. Without this option, the function is unsupported. The identity is not
-persisted: stored views use the identity configured for the process executing them.
+client and project. The value must be nonempty and is returned unchanged. Without this option,
+the function is unsupported. Stored views use the executing process's identity; it is not persisted.
 
 ```sh
 just run --project='{"projectId":"test"}' --session-user='alice@example.com'
@@ -130,8 +103,8 @@ just run --project='{"projectId":"test"}' --session-user='alice@example.com'
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
 each project is stored in `DIR/<project>.duckdb` (characters outside `[A-Za-z0-9_-]` are
 percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its registration,
-datasets and tables come back after a restart. Logical views, including their GoogleSQL definitions and
-schemas, are persisted too. Jobs are kept in memory only.
+datasets, tables and logical views survive restarts. Jobs and Storage session/stream state remain
+in memory only.
 
 On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project file. A
 project file can be open in only one process at a time, and a file written by a newer DuckDB
@@ -163,83 +136,29 @@ What the emulator supports is listed in generated pages:
 - [docs/sql.md](docs/sql.md): statements and clauses
 - [docs/functions.md](docs/functions.md): built-in functions
 
-Behavior that applies across them:
+These tables check execution, not agreement with BigQuery's results or metadata. See
+[query and API behavior](docs/compatibility.md) for details on jobs, views, UDFs, scripts,
+transactions and result encoding, and the [Storage API guide](docs/storage-api.md) for sessions
+and write streams.
 
-- Jobs complete synchronously, before the request that starts them returns.
-- Storage sessions, write-stream offsets and unpublished BUFFERED/PENDING rows are
-  discarded at process exit, even with `--data-dir`; published rows persist. Read snapshots
-  are materialized in memory, and production stream expiration and quotas are not emulated.
-- Table and view expiration is stored through REST `expirationTime` or DDL
-  `expiration_timestamp` (TIMESTAMP literals or NULL). Expired tables and views are deleted lazily when the catalog is read,
-  including before query analysis, and are treated as missing. Dataset default expiration and
-  partition expiration remain unsupported.
-- Only GoogleSQL is supported, not legacy SQL.
-- Every statement is analyzed against the existing tables and parameter types first, so unknown
-  names and type errors fail as in BigQuery. Constructs the translator does not handle fail as
-  `invalidQuery`, naming the construct.
-- Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
-  and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
-  cannot read them. Temporary, recursive and value-table views, and views that read temporary
-  tables, are unsupported.
-- SQL UDFs created with `CREATE TEMP FUNCTION` are available within their query, and persistent
-  ones created with `CREATE [OR REPLACE] FUNCTION [IF NOT EXISTS] dataset.name` in every query
-  until `DROP FUNCTION` or `routines.delete` removes them; GoogleSQL expands both before
-  translation. `routines.insert` and `routines.update` also define persistent SQL UDFs.
-  A persistent UDF keeps its definition and description, which `routines.get` and
-  `routines.list` return, and each call resolves its body anew against the UDF's project, so the
-  body names tables and other UDFs with their datasets and cannot call temporary UDFs. The body of
-  a UDF with `ANY TYPE` parameters is resolved for the argument types of each call, a temporary
-  one against the UDFs declared before it. Temporary JavaScript UDFs run in an embedded QuickJS
-  and so far take BOOL, FLOAT64 and STRING arguments, named by JavaScript identifiers, and return
-  those or INT64. No JavaScript state outlives a query, a call fails after 5 minutes, and the calls
-  of a query may allocate 256 MiB on each thread; BigQuery documents neither limit exactly.
-  Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `OR REPLACE`
-  and `IF NOT EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent
-  UDF's description, and views that call SQL UDFs are unsupported. Subquery bodies do not support
-  volatile arguments. Queries with TEMP function declarations do not support dry runs,
-  destination tables or positional parameters.
-- Multi-statement queries return the result of the last statement that ran. They create no
-  child jobs and cannot be dry runs. Their temporary tables are dropped when they end, and no
-  dataset holds them. `EXECUTE IMMEDIATE` runs one SQL statement, but no scripting statement such
-  as `BEGIN ... END` and no transaction control. `CALL` and assignments to system variables are
-  unsupported, and an error the emulator reports as unsupported is never handled by an
-  `EXCEPTION` clause.
-- Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION`
-  within a multi-statement query. Unfinished transactions roll back when the script ends.
-  Transaction modes, SQL UDF declarations inside transactions, writes to multiple projects (or both permanent and temporary tables),
-  and committing after a handled error are unsupported; roll back a failed transaction.
-- `UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
-  has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
-- Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,
-  `f1_`, … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from
-  DuckDB types: `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`,
-  structs → `RECORD`, except the structs that keep `RANGE` values → `RANGE`.
-- Timestamps are encoded as epoch seconds, or epoch microseconds with
-  `formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`.
-- The `SAFE.` prefix returns NULL for the function's own errors while argument errors still
-  propagate. It is unsupported on volatile functions.
-- Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier
-  `` `region-us` `` covers every dataset of the project and any other region none.
-
-The emulator rejects what it cannot emulate rather than accepting it and behaving differently.
-These differences are deliberate exceptions, kept for convenience:
+Unsupported behavior is rejected, with these deliberate exceptions:
 
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
-  SQL. Legacy SQL itself is unsupported.
+  SQL.
 - `formatOptions.timestampOutputFormat` of `jobs.getQueryResults` and `tabledata.list` is ignored;
-  timestamps are encoded as above.
+  timestamps use the documented
+  [result encoding](docs/compatibility.md#result-schemas-and-values).
 - The `fields` query parameter is ignored, so responses carry every field rather than the
-  partial response asked for. Clients such as the Go client send it on every `jobs.get`.
+  partial response asked for.
 - `updateMode` of `datasets.patch` and `datasets.update` is ignored; they change the metadata
   that the emulator keeps, since it keeps no access controls.
 - JavaScript UDFs run in QuickJS rather than V8, which BigQuery uses. The language is the same,
   but built-ins differ: QuickJS has no `Intl`, so `toLocaleString` and similar methods ignore
-  locales, and the formats `Date.parse` accepts beyond the standard one differ. A thrown error's
-  message lacks the line and column that BigQuery reports.
+  locales, and nonstandard `Date.parse` formats differ. Errors omit BigQuery's line and column.
 
 ## Development
 
@@ -251,14 +170,3 @@ Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
-
-## Server structure
-
-`Server` owns the API listener threads and shares one `Emulator` with its transports. `Start()`
-returns after the listener is ready, `Stop()` requests shutdown, and `Wait()` joins the serving
-threads. Destruction also stops and joins them before the emulator checkpoints its databases.
-Instances are single-use. The CLI announces its endpoint only after startup succeeds.
-
-The BigQuery v2 REST transport lives in `src/server/rest.{h,cc}` and the
-`//src/server:rest` target. Future Storage API gRPC services can use the same emulator while
-adding their listener startup, shutdown and join to `Server`; REST routing stays in its transport.

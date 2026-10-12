@@ -1,7 +1,7 @@
 # AGENTS.md
 
 C++20 built with Bazel; prefer the standard library. `nix develop` provides the toolchain,
-including `bq`. Use `just` recipes (see the `Justfile`) for building, testing, formatting and
+including `bq`. Use `just` recipes (see the [Justfile](Justfile)) for building, testing, formatting and
 generating docs.
 
 Bazel rejects cyclic dependencies; do not break a cycle with a target that holds only headers.
@@ -18,12 +18,13 @@ from BigQuery. Decide each one by what a client can observe:
   request's `timeoutMs`, since jobs run synchronously.
 - **Store and return** it when it is only metadata, such as a table's description or labels;
   storing it is the whole implementation, and DDL and the REST API should agree.
-- **Reject** anything that changes behavior, such as a required partition filter or an
-  expiration, as unsupported until it is implemented. Never accept a form and silently drop what
-  it does, even to let more queries run.
+- **Reject** anything that changes behavior, such as a required partition filter or
+  partition expiration, as unsupported until it is implemented. Never accept a form and silently
+  drop what it does, even to let more queries run.
 
 A feature that rejects some of its forms is Partial in the probes under `tools/`, not Supported.
-Deliberate exceptions, kept for convenience, are listed in the README's Compatibility section.
+Deliberate exceptions, kept for convenience, are listed in the
+[README Compatibility section](README.md#compatibility).
 
 ## Implementing functions
 
@@ -33,6 +34,8 @@ it; a call no rule or handler matches stays unsupported. Existing registrations 
 of compatibility, and a successful probe alone does not establish it; revisit one only when the
 current task requires it. Keep conditional expressions such as IF and COALESCE as SQL expressions
 so they can short-circuit.
+
+### Choosing a backend
 
 For other scalar functions, choose the backend by what the function does, not by which one to try
 first:
@@ -53,11 +56,12 @@ first:
   speeding up a slow backend function; a move to DuckDB requires evidence of compatibility for
   the affected overloads, not speed alone.
 
-Choose the backend by these categories; then, for an overload assigned to DuckDB, close gaps
-with guards and errors, such as for a negative argument or an out-of-range result; if compatibility
-requires rewriting the computation, use GoogleSQL. A guardable boundary difference alone does not
-override the GoogleSQL category, including for SIN and EXP. When an overload fits both categories,
-or neither clearly, use GoogleSQL.
+For DuckDB overloads, guard boundary differences such as negative arguments or out-of-range
+results; use GoogleSQL if compatibility requires rewriting the computation. Guards do not justify
+moving a GoogleSQL-category function to DuckDB. Use GoogleSQL when the categories overlap or
+neither clearly applies.
+
+### Registering a function
 
 `src/translator/functions.cc` assembles the registry; `functions_template.cc`,
 `functions_backend.cc` and `functions_aggregate.cc` hold the rule tables. Each function is
@@ -77,6 +81,8 @@ backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 
 Aggregate and window functions map to DuckDB ones through `AggregateRule`. A function its fields
 cannot express stays unsupported unless it is common enough to justify a custom aggregate.
+
+### Checking compatibility
 
 Check each overload against BigQuery's documentation for:
 
@@ -104,16 +110,18 @@ expected result from one layer to another.
   each uses datasets of its own, and a project of its own where it lists a whole project. REST
   details no client surfaces are checked with runn's HTTP runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
-  `docs/api.md`, `docs/sql.md` and `docs/functions.md`; never edit those by hand, and commit them
-  regenerated. `//:function_probe` builds calls from GoogleSQL's signatures: write a hint only for
-  a form it cannot build, and extend it rather than writing hints for a whole class of forms.
+  `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by
+  hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
+  from GoogleSQL's signatures: write a hint only for a form it cannot build, and extend it rather
+  than writing hints for a whole class of forms.
 - **GoogleSQL's compliance tests** (`just compliance`) check query results broadly against
-  GoogleSQL's reference implementation, which is not BigQuery. CI fails on a statement that
-  fails unless `tests/compliance/known_errors.textproto`, or the file for a platform it fails on
-  only, lists it by name, and on a listed one that passes, so a change that fixes a statement
-  removes it from the list and one that newly fails a statement, such as by supporting a function,
-  lists it with the reason; `just compliance-summary` names both. The bugs they found are `!>`
-  cases of `scalars/known_bugs.txt`, each to be fixed and turned into a `=>` case.
+  GoogleSQL's reference implementation, which is not BigQuery. CI fails on both an unlisted
+  failure and a listed failure that passes; `just compliance-summary` names both. Remove fixed
+  statements from `tests/compliance/known_errors.textproto`, or the platform-specific file.
+  List newly failing statements by name with the reason, including failures exposed by adding
+  function support. Use the platform-specific file only for failures confined to that platform.
+  The bugs these tests found are `!>` cases of `scalars/known_bugs.txt`; fix each and turn it
+  into a `=>` case.
 - **C++ tests** (`just test`) check what clients cannot observe, such as translation edge cases,
   or runn cannot drive, such as many concurrent connections.
 
@@ -129,6 +137,14 @@ lead for what to check, never as an expected value.
 Until an independent source settles a case, do not rely on a guessed answer to support the
 behavior that case covers; the rest of the function can still be supported. An unverified case
 alone does not require removing existing support.
+
+## Documentation
+
+Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
+query and API behavior in [docs/compatibility.md](docs/compatibility.md), Storage client usage
+and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
+[docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
+the REST and SQL preambles under `tools/restprobe/` are their handwritten inputs.
 
 ## Before committing
 
