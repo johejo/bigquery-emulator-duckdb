@@ -178,6 +178,24 @@ SELECT BYTE_LENGTH(CAST(NULL AS BYTES))
 SELECT LEFT('abc', -1)
 => error:
 
+SELECT REGEXP_CONTAINS('abc', 'b')
+=> "true"
+
+SELECT REGEXP_REPLACE('aaa', 'a', 'b')
+=> "bbb"
+
+SELECT ARRAY_TO_STRING(SPLIT('a,b'), '|')
+=> "a|b"
+
+SELECT FORMAT('%s-%d', 'x', 3)
+=> "x-3"
+
+SELECT CONTAINS_SUBSTR('abcdef', 'cd')
+=> "true"
+
+SELECT ARRAY_TO_STRING(['a', 'b', 'c'], ',')
+=> "a,b,c"
+
 ## SUBSTR at BigQuery positions
 
 SELECT SUBSTR('abc', 0, 2)

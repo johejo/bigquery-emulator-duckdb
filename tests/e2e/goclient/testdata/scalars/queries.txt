@@ -281,6 +281,11 @@ SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, COUNT(DISTINCT MOD(a, 2)) OVER (
   WHERE a IS NOT NULL ORDER BY a))
 => "[{\"a\":1,\"c\":1,\"s\":6},{\"a\":1,\"c\":1,\"s\":6},{\"a\":2,\"c\":2,\"s\":6},{\"a\":2,\"c\":2,\"s\":6},{\"a\":3,\"c\":2,\"s\":6},{\"a\":3,\"c\":2,\"s\":6}]"
 
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT name, score FROM UNNEST([STRUCT(1 AS id, 'a' AS name,
+  10 AS score), (2, 'b', 30), (3, 'a', 20)]) QUALIFY ROW_NUMBER() OVER (PARTITION BY name ORDER BY
+  score DESC) = 1 ORDER BY name))
+=> "[{\"name\":\"a\",\"score\":20},{\"name\":\"b\",\"score\":30}]"
+
 ## Subqueries
 
 SELECT (SELECT MAX(a) FROM t)

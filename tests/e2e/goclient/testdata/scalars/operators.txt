@@ -30,6 +30,26 @@ SELECT 2 IN (1, 2, NULL)
 SELECT 'abc' LIKE 'a%'
 => "true"
 
+# SAFE_DIVIDE returns NULL where division fails.
+SELECT SAFE_DIVIDE(1, 0)
+=> null
+
+SELECT SAFE_DIVIDE(3, 2)
+=> "1.5"
+
+SELECT DIV(7, 2)
+=> "3"
+
+SELECT ARRAY_LENGTH(GENERATE_ARRAY(1, 5, 2))
+=> "3"
+
+# LOG(X, Y) is the logarithm of X to base Y, and LOG(X) the natural logarithm.
+SELECT CAST(LOG(8, 2) AS INT64)
+=> "3"
+
+SELECT CAST(ROUND(LOG(EXP(1))) AS INT64)
+=> "1"
+
 ## NaN compares unequal to everything, itself included
 # Inputs come from UNNEST so that the analyzer cannot fold the expression into a constant.
 
