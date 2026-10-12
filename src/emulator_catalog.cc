@@ -126,10 +126,10 @@ std::string TablesQuery(const DatasetReference& dataset) {
 
 // Expiration is lazy: catalog reads remove expired relations before exposing them. Sweep
 // before analysis too, so DDL targets, wildcards and INFORMATION_SCHEMA see the same catalog.
-void ExpireTables(Backend& backend, const std::optional<DatasetReference>& dataset = std::nullopt) {
+void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
+                  const std::optional<DatasetReference>& dataset = std::nullopt) {
   // Multiple HTTP requests can discover the same expired relation concurrently. Serialize
   // drops so that their transactions do not conflict with each other.
-  static std::mutex sweep_mutex;
   const std::string where =
       dataset.has_value()
           ? std::format(" AND database_name = {} AND schema_name = {}",
@@ -164,7 +164,7 @@ void ExpireTables(Backend& backend, const std::optional<DatasetReference>& datas
         view ? "duckdb_views()" : "duckdb_tables()", QuoteLiteral(table.project_id),
         QuoteLiteral(table.dataset_id), view ? "view_name" : "table_name",
         QuoteLiteral(table.table_id), QuoteLiteral(comment.get<std::string>()));
-    std::scoped_lock const lock(sweep_mutex);
+    std::scoped_lock const lock(expiration_mutex);
     backend.ExecuteDdl(
         std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),
         {}, skip);
@@ -356,7 +356,7 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
 std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
-    ExpireTables(backend);
+    ExpireTables(backend, expiration_mutex_);
   }
   return std::make_unique<DuckDbTableSource>(backend);
 }
@@ -434,14 +434,14 @@ void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
 std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
-  ExpireTables(backend_, dataset);
+  ExpireTables(backend_, expiration_mutex_, dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
 std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
-  ExpireTables(backend_, dataset);
+  ExpireTables(backend_, expiration_mutex_, dataset);
   const std::string where =
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
                   QuoteLiteral(dataset.dataset_id));
@@ -468,7 +468,7 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   GetDataset(dataset);
   if (expire) {
-    ExpireTables(backend_, dataset);
+    ExpireTables(backend_, expiration_mutex_, dataset);
   }
   TableInfo info;
   info.reference = table;
@@ -507,11 +507,12 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   return info;
 }
 
-void Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
-                           const TableMetadata& metadata) {
+TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+                                const TableMetadata& metadata) {
+  std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
-  ExpireTables(backend_,
+  ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
@@ -529,18 +530,22 @@ void Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>&
     }
     throw ApiError::Invalid(error.what());
   }
+  return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-void Emulator::CreateView(TableReference table, const json& definition,
-                          const TableMetadata& metadata) {
+TableInfo Emulator::CreateView(TableReference table, const json& definition,
+                               const TableMetadata& metadata) {
+  std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   WriteView(table, definition, metadata, /*replace=*/false);
+  return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-void Emulator::UpdateTable(TableReference table,
-                           const std::optional<std::vector<FieldSchema>>& schema,
-                           const std::optional<json>& view,
-                           const std::optional<TableMetadata>& metadata) {
+TableInfo Emulator::UpdateTable(TableReference table,
+                                const std::optional<std::vector<FieldSchema>>& schema,
+                                const std::optional<json>& view,
+                                const std::optional<TableMetadata>& metadata) {
+  std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
@@ -557,7 +562,7 @@ void Emulator::UpdateTable(TableReference table,
       Execute(ViewCommentStatement(
           table, {.query = *info.view_query, .schema = info.schema, .metadata = *metadata}));
     }
-    return;
+    return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
   }
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
@@ -573,13 +578,14 @@ void Emulator::UpdateTable(TableReference table,
     statements.push_back(TableCommentStatement(table, updated, schema.value_or(info.schema)));
   }
   if (statements.empty()) {
-    return;
+    return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
   }
   try {
     backend_.ExecuteDdl(statements.front(), {statements.begin() + 1, statements.end()}, "");
   } catch (const BackendError& error) {
     throw ApiError::Invalid(error.what());
   }
+  return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
 void Emulator::WriteView(TableReference table, const json& definition,
@@ -621,7 +627,7 @@ void Emulator::WriteView(TableReference table, const json& definition,
 
 void Emulator::DeleteTable(TableReference table) {
   table.project_id = ResolveProject(table.project_id);
-  ExpireTables(backend_,
+  ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   // Views the emulator did not create have no metadata for GetTable, but can still be dropped.
   if (ViewComment(backend_, table).has_value()) {
