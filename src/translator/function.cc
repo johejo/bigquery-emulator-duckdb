@@ -265,19 +265,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::find(range_functions, function) == std::end(range_functions)) {
     return Unsupported(scope, "function " + name + " with RANGE");
   }
-  // Call gives equality of STRUCTs to StructComparison. DuckDB would compare these others, the
-  // STRUCTs of IS DISTINCT FROM and ARRAYs of STRUCTs, by their internal names, with NULL fields
+  // Call gives equality of STRUCTs to StructComparison, and BigQuery does not compare ARRAYs.
+  // DuckDB would compare the STRUCTs of IS DISTINCT FROM by their internal names, with NULL fields
   // taken as values.
-  static constexpr std::array<std::string_view, 7> comparisons = {
-      "$EQUAL", "$NOT_EQUAL", "$IS_DISTINCT_FROM", "$IN", "$IN_ARRAY", "$CASE_WITH_VALUE", "NULLIF",
-  };
-  if (std::ranges::find(comparisons, function) != comparisons.end() &&
-      call.argument_list_size() > 0) {
-    const googlesql::Type* operand = call.argument_list(0)->type();
-    if (HasInternalStructNames(operand) &&
-        (!operand->IsStruct() || function == "$IS_DISTINCT_FROM")) {
-      return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
-    }
+  if (function == "$IS_DISTINCT_FROM" && HasInternalStructNames(call.argument_list(0)->type())) {
+    return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
   }
   const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;
