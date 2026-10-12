@@ -164,6 +164,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "APPROX_COUNT_DISTINCT",
       "APPROX_QUANTILES",
       "APPROX_TOP_COUNT",
+      "APPROX_TOP_SUM",
       "SUM",
       "AVG",
       "STDDEV",

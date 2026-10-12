@@ -24,6 +24,66 @@ std::string TopCount(const std::string& sql, const std::vector<std::string>& arg
          arguments.at(1) + "), lambda e: {'value': e.value, 'count': e.count}) END";
 }
 
+// Collect each argument once, then let DuckDB group the original values (including NULL,
+// NaN, arrays and structs). Exact sums and top values need no approximation algorithm.
+// Validation precedes the top-N selection, including weights of values outside the result.
+template <googlesql::TypeKind kWeight>
+std::string TopSum(const std::string& sql, const std::vector<std::string>& arguments,
+                   const std::string& /*tail*/) {
+  const std::string weight = "r.weight";
+  const std::string invalid =
+      weight + " < 0" + (kWeight == googlesql::TYPE_DOUBLE ? " OR isnan(" + weight + ")" : "");
+  const std::string display = kWeight == googlesql::TYPE_BIGNUMERIC
+                                  ? "bq_bignumeric_to_string(CAST(" + weight + " AS VARCHAR))"
+                                  : "lower(CAST(" + weight + " AS VARCHAR))";
+  const std::string checked = "CASE WHEN " + invalid + " THEN " +
+                              Raise(
+                                  "'APPROX_TOP_SUM does not support negative or NaN weights in the "
+                                  "second argument; got ' || " +
+                                      display,
+                                  false) +
+                              " ELSE " + weight + " END";
+  std::string sum = "sum(" + checked + ")";
+  if constexpr (kWeight == googlesql::TYPE_INT64) {
+    sum = "CAST(" + sum + " AS BIGINT)";
+  } else if constexpr (kWeight == googlesql::TYPE_NUMERIC) {
+    sum = "CASE WHEN " + sum +
+          " > CAST('99999999999999999999999999999.999999999' AS DECIMAL(38, 9)) THEN " +
+          Raise("'numeric overflow: APPROX_TOP_SUM'", false) + " ELSE " + sum + " END";
+  } else if constexpr (kWeight == googlesql::TYPE_BIGNUMERIC) {
+    sum = "CAST(bq_bignumeric_sum(CAST(" + sum + " AS VARCHAR)) AS BIGNUM)";
+  } else {
+    sum = "CASE WHEN isinf(" + sum + ") AND NOT bool_or(isinf(" + weight + ")) THEN " +
+          Raise("'double overflow; error in APPROX_TOP_SUM'", false) + " ELSE " + sum + " END";
+  }
+  const std::string& count = arguments.at(2);
+  const std::string limit =
+      "CASE WHEN " + count + " IS NULL THEN " +
+      Raise("'The second argument to APPROX_TOP_SUM function must not be NULL'", false) + " WHEN " +
+      count + " <= 0 THEN " +
+      Raise("'The second argument to APPROX_TOP_SUM function must be positive'", false) + " WHEN " +
+      count + " > 10000 THEN " +
+      Raise("'The last argument to approx_top_sum_shard cannot be greater than 10000'", false) +
+      " ELSE " + count + " END";
+  return "(SELECT list_slice(list({'value': v, 'sum': s} ORDER BY s DESC NULLS LAST), 1, " + limit +
+         ") FROM "
+         "(SELECT r.value AS v, " +
+         sum + " AS s FROM unnest(" + sql +
+         ") AS bq_top_sum_rows(r) GROUP BY r.value) AS bq_top_sum_groups)";
+}
+
+template <googlesql::TypeKind kWeight>
+AggregateRule TopSumRule() {
+  return {
+      .function = "list",
+      .conditions = {{.argument = 2, .types = {kWeight}}},
+      .arguments = {"{'value': $1, 'weight': $2}"},
+      .distinct = AggregateRule::Distinct::kUnsupported,
+      .finish = TopSum<kWeight>,
+      .finish_after_scan = true,
+  };
+}
+
 std::string Unhex(const std::string& sql, const std::vector<std::string>& /*arguments*/,
                   const std::string& /*tail*/) {
   return "unhex(" + sql + ")";
@@ -123,6 +183,15 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                       .distinct = AggregateRule::Distinct::kUnsupported,
                       .finish = TopCount,
                   },
+              },
+          },
+          {
+              "APPROX_TOP_SUM",
+              {
+                  TopSumRule<googlesql::TYPE_INT64>(),
+                  TopSumRule<googlesql::TYPE_NUMERIC>(),
+                  TopSumRule<googlesql::TYPE_BIGNUMERIC>(),
+                  TopSumRule<googlesql::TYPE_DOUBLE>(),
               },
           },
           // The _null variants return a NULL x instead of skipping its row.

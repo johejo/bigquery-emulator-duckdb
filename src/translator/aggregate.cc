@@ -29,7 +29,8 @@ namespace {
 std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunctionCallBase& call,
                                          const googlesql::ResolvedAggregateFunctionCall* aggregate,
                                          const std::string& over, const Scope& scope,
-                                         const Columns& columns, const std::string& having = "") {
+                                         const Columns& columns, const std::string& having = "",
+                                         std::vector<std::string>* intermediates = nullptr) {
   const std::string name = ToUpperAscii(call.function()->Name());
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
@@ -95,6 +96,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   }
   const std::vector<std::string> args = AggregateArguments(*rule, arguments);
   const auto finish = [&](const std::string& sql, const std::string& tail) {
+    if (rule->finish_after_scan && intermediates != nullptr) {
+      const std::string column = scope.context.FreshName("_agg");
+      intermediates->push_back(sql + " AS " + column);
+      return rule->finish("q." + column, arguments, "");
+    }
     return rule->finish == nullptr ? sql : rule->finish(sql, arguments, tail);
   };
   if (call.distinct() && rule->distinct == AggregateRule::Distinct::kUnsupported) {
@@ -318,6 +324,21 @@ std::optional<std::string> GroupingSet(const googlesql::ResolvedGroupingSetBase&
   return std::nullopt;
 }
 
+// Project finishes only after the aggregates have been computed, and expose only resolved
+// columns so intermediate lists cannot collide with later scans or escape into results.
+void ApplyFinishes(Relation& result, const std::map<int, std::string>& finishes) {
+  if (finishes.empty()) {
+    return;
+  }
+  std::vector<std::string> projections;
+  for (const auto& [id, column] : result.columns) {
+    const auto finish = finishes.find(id);
+    projections.push_back((finish == finishes.end() ? column : finish->second) + " AS " +
+                          ColumnName(id));
+  }
+  result.sql = "SELECT " + Join(projections, ", ") + result.From();
+}
+
 }  // namespace
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
@@ -335,6 +356,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   }
   Relation result;
   std::vector<std::string> projections;
+  std::vector<std::string> intermediates;
+  std::map<int, std::string> finishes;
   std::vector<std::string> keys;
   // The rows each HAVING MAX/MIN modifier keeps, keyed by the aggregate call it modifies.
   std::map<const googlesql::ResolvedAggregateFunctionCall*, std::string> havings;
@@ -450,20 +473,28 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       return std::nullopt;
     }
     const auto having = havings.find(call);
+    const std::size_t previous = intermediates.size();
     const auto sql = NonScalarCall(*call, call, "", scope, input->columns,
-                                   having == havings.end() ? "" : having->second);
+                                   having == havings.end() ? "" : having->second, &intermediates);
     if (!sql) {
       return std::nullopt;
     }
     const int id = computed->column().column_id();
-    projections.push_back("CAST(" + *sql + " AS " + *type + ") AS " + ColumnName(id));
+    const std::string cast = "CAST(" + *sql + " AS " + *type + ")";
+    if (intermediates.size() == previous) {
+      projections.push_back(cast + " AS " + ColumnName(id));
+    } else {
+      finishes.emplace(id, cast);
+    }
     result.columns.emplace(id, "q." + ColumnName(id));
   }
+  projections.insert(projections.end(), intermediates.begin(), intermediates.end());
   if (projections.empty()) {
     return std::nullopt;
   }
   result.sql = "SELECT " + Join(projections, ", ") + input->From() +
                (keys.empty() ? "" : " GROUP BY " + Join(keys, ", "));
+  ApplyFinishes(result, finishes);
   return result;
 }
 
@@ -475,6 +506,8 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
   }
   const Columns input_columns = result->columns;
   std::vector<std::string> projections = {"q.*"};
+  std::vector<std::string> intermediates;
+  std::map<int, std::string> finishes;
   for (const auto& group : analytic.function_group_list()) {
     for (const auto& computed : group->analytic_function_list()) {
       if (!computed->expr()->Is<googlesql::ResolvedAnalyticFunctionCall>()) {
@@ -486,16 +519,25 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
       if (!type || !over) {
         return std::nullopt;
       }
-      const auto sql = NonScalarCall(*call, nullptr, *over, scope, input_columns);
+      const std::size_t previous = intermediates.size();
+      const auto sql =
+          NonScalarCall(*call, nullptr, *over, scope, input_columns, "", &intermediates);
       if (!sql) {
         return std::nullopt;
       }
       const int id = computed->column().column_id();
-      projections.push_back("CAST(" + *sql + " AS " + *type + ") AS " + ColumnName(id));
+      const std::string cast = "CAST(" + *sql + " AS " + *type + ")";
+      if (intermediates.size() == previous) {
+        projections.push_back(cast + " AS " + ColumnName(id));
+      } else {
+        finishes.emplace(id, cast);
+      }
       result->columns.emplace(id, "q." + ColumnName(id));
     }
   }
+  projections.insert(projections.end(), intermediates.begin(), intermediates.end());
   result->sql = "SELECT " + Join(projections, ", ") + result->From();
+  ApplyFinishes(*result, finishes);
   return result;
 }
 

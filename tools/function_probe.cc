@@ -385,6 +385,27 @@ int Main(int argc, char** argv) {
               "RANGE<DATE> '[2024-01-01, 2024-02-01)'",
           };
         }
+        // TOP_SUM preserves arbitrary grouping keys, independently of its weight overload.
+        // Include the grouping types the translator rejects, so the report remains Partial.
+        if (name == "APPROX_TOP_SUM") {
+          elements = {
+              "2",
+              "2.0",
+              "NUMERIC '2'",
+              "BIGNUMERIC '2'",
+              "TRUE",
+              "'abc'",
+              "b'abc'",
+              "DATE '2024-01-15'",
+              "TIME '10:20:30'",
+              "DATETIME '2024-01-15 10:20:30'",
+              "TIMESTAMP '2024-01-15 10:20:30+00'",
+              "INTERVAL 1 SECOND",
+              "[1, NULL]",
+              "STRUCT(BIGNUMERIC '2' AS b)",
+              "RANGE<DATE> '[2024-01-01, 2024-02-01)'",
+          };
+        }
         // Probe a point and same-typed boundaries across orderable scalar types,
         // rather than declaring the generic signature supported from INT64 alone.
         if (signature.arguments().size() == 2 &&
