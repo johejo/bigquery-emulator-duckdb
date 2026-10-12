@@ -72,11 +72,11 @@ rejected.
 | `INSERT ... SELECT` | Supported |  |
 | `UPDATE` | Supported |  |
 | `UPDATE` of a struct field | Supported |  |
-| `UPDATE ... FROM` | Supported | See [Writes](compatibility.md#writes). |
+| `UPDATE ... FROM` | Supported |  |
 | `UPDATE` rebuilding an array | Supported |  |
 | `DELETE` | Supported |  |
 | `TRUNCATE TABLE` | Supported |  |
-| `MERGE` | Supported | See [Writes](compatibility.md#writes). |
+| `MERGE` | Supported |  |
 
 ## DDL
 

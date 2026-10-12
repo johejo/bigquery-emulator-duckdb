@@ -128,7 +128,7 @@ rewrites into others.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | Supported |  |  |
-| [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | Supported | DuckDB SQL, in code | returns NULL when any array is NULL. |
+| [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | Supported | DuckDB SQL, in code |  |
 | [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | Supported |  |  |
 | [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | Supported |  |  |
 | [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | Supported | DuckDB function |  |
@@ -136,7 +136,7 @@ rewrites into others.
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | Supported |  |  |
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | Supported | DuckDB SQL |  |
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | Supported | DuckDB SQL |  |
-| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Partial | DuckDB SQL | takes only a DAY or WEEK step. Unsupported: function GENERATE_DATE_ARRAY. |
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Partial | DuckDB SQL | Takes only a DAY or WEEK step. Unsupported: function GENERATE_DATE_ARRAY. |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | Supported | DuckDB SQL |  |
 
 ## Bit functions
@@ -177,13 +177,13 @@ rewrites into others.
 | [`CURRENT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#current_date) | Supported | DuckDB SQL |  |
 | [`DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date) | Supported | DuckDB SQL |  |
 | [`DATE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_add) | Supported | DuckDB SQL |  |
-| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | Supported | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday. |
+| [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | Supported | DuckDB SQL |  |
 | [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | Supported | DuckDB SQL |  |
 | [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | Supported | DuckDB SQL |  |
-| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday. Unsupported: function DATE_TRUNC. |
-| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | Supported | DuckDB SQL | DAYOFWEEK and WEEK count from Sunday, ISOWEEK from Monday; sub-second parts, AT TIME ZONE and DATE / TIME / DATETIME parts follow BigQuery. |
+| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | Partial | DuckDB SQL | Unsupported: function DATE_TRUNC. |
+| [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | Supported | DuckDB SQL |  |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | Supported | GoogleSQL function |  |
-| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | Supported | DuckDB SQL | supports MONTH, QUARTER, YEAR, ISOYEAR, WEEK, ISOWEEK and WEEK(weekday); out-of-range results are errors. |
+| [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | Supported | DuckDB SQL |  |
 | [`PARSE_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#parse_date) | Supported | GoogleSQL function |  |
 | [`UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#unix_date) | Supported | DuckDB SQL |  |
 
@@ -194,9 +194,9 @@ rewrites into others.
 | [`CURRENT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#current_datetime) | Supported | DuckDB SQL |  |
 | [`DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime) | Supported | DuckDB SQL |  |
 | [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | Supported | DuckDB SQL |  |
-| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | Supported | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday; parts below a day count whole units rather than boundaries. |
+| [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | Supported | DuckDB SQL |  |
 | [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | Supported | DuckDB SQL |  |
-| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday. Unsupported: function DATETIME_TRUNC. |
+| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | Partial | DuckDB SQL | Unsupported: function DATETIME_TRUNC. |
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | Supported | GoogleSQL function |  |
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | Supported | GoogleSQL function |  |
 
@@ -345,12 +345,12 @@ rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type. |
-| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type. |
-| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type. |
+| [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | Supported | GoogleSQL function |  |
+| [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | Supported | GoogleSQL function |  |
+| [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | Supported | GoogleSQL function |  |
 | [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported. Unsupported: function JSON_ARRAY_APPEND with RANGE; type STRUCT<>. |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Partial | DuckDB SQL, in code | RANGE and empty STRUCT values are unsupported. Unsupported: function JSON_ARRAY_INSERT with RANGE; type STRUCT<>. |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Partial | DuckDB SQL, in code | Unsupported: function JSON_ARRAY_APPEND with RANGE; type STRUCT<>. |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Partial | DuckDB SQL, in code | Unsupported: function JSON_ARRAY_INSERT with RANGE; type STRUCT<>. |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | Supported | GoogleSQL function |  |
@@ -537,7 +537,7 @@ rewrites into others.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`ASCII`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ascii) | Supported | GoogleSQL function |  |
-| [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | Supported | DuckDB SQL | counts the bytes of a STRING's UTF-8 encoding. |
+| [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | Supported | DuckDB SQL |  |
 | [`CHARACTER_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#character_length) | Supported | DuckDB function |  |
 | [`CHAR_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#char_length) | Supported | DuckDB function |  |
 | [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | Supported | DuckDB SQL |  |
@@ -545,19 +545,19 @@ rewrites into others.
 | [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | Supported | DuckDB SQL |  |
 | [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | Unsupported |  |  |
 | [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | Supported | DuckDB SQL, in code |  |
-| [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | compares NFKC normal forms, case folded; takes STRING only. |
+| [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | Supported | GoogleSQL function |  |
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | Supported | GoogleSQL function |  |
 | [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported. Unsupported: function FORMAT; function FORMAT with INTERVAL; function FORMAT with RANGE; type STRUCT<>. |
-| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function | accepts either case, padded or not. |
+| [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | Supported | DuckDB SQL |  |
 | [`INITCAP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#initcap) | Supported | GoogleSQL function |  |
 | [`INSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#instr) | Supported | GoogleSQL function |  |
 | [`LEFT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#left) | Supported | GoogleSQL function |  |
-| [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | Supported | DuckDB SQL | counts characters of a STRING and bytes of a BYTES. |
+| [`LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#length) | Supported | DuckDB SQL |  |
 | [`LOWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lower) | Supported | GoogleSQL function |  |
-| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | Supported | GoogleSQL function | pads with spaces by default. |
+| [`LPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#lpad) | Supported | GoogleSQL function |  |
 | [`LTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ltrim) | Supported | GoogleSQL function |  |
 | [`NORMALIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize) | Supported | GoogleSQL function |  |
 | [`NORMALIZE_AND_CASEFOLD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#normalize_and_casefold) | Supported | GoogleSQL function |  |
@@ -572,15 +572,15 @@ rewrites into others.
 | [`REPLACE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#replace) | Supported | GoogleSQL function |  |
 | [`REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#reverse) | Supported | GoogleSQL function |  |
 | [`RIGHT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#right) | Supported | GoogleSQL function |  |
-| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | Supported | GoogleSQL function | pads with spaces by default. |
+| [`RPAD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rpad) | Supported | GoogleSQL function |  |
 | [`RTRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#rtrim) | Supported | GoogleSQL function |  |
 | [`SAFE_CONVERT_BYTES_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#safe_convert_bytes_to_string) | Supported | GoogleSQL function |  |
 | [`SOUNDEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#soundex) | Supported | GoogleSQL function |  |
 | [`SPLIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#split) | Supported | GoogleSQL function |  |
 | [`STARTS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#starts_with) | Supported | GoogleSQL function |  |
 | [`STRPOS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#strpos) | Supported | GoogleSQL function |  |
-| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | Supported | GoogleSQL function | starts at the first character for a position of 0 or before the start. |
-| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | Supported | GoogleSQL function | starts at the first character for a position of 0 or before the start. |
+| [`SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr) | Supported | GoogleSQL function |  |
+| [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | Supported | GoogleSQL function |  |
 | [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | Supported | GoogleSQL function |  |
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | Supported | DuckDB SQL |  |
 | [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | Supported | DuckDB SQL |  |
@@ -607,7 +607,7 @@ rewrites into others.
 | [`PARSE_TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#parse_time) | Supported | GoogleSQL function |  |
 | [`TIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time) | Supported | DuckDB SQL |  |
 | [`TIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_add) | Supported | DuckDB SQL |  |
-| [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | Supported | DuckDB SQL | counts whole units rather than boundaries. |
+| [`TIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_diff) | Supported | DuckDB SQL |  |
 | [`TIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_sub) | Supported | DuckDB SQL |  |
 | [`TIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/time_functions#time_trunc) | Supported | DuckDB SQL |  |
 
@@ -629,15 +629,15 @@ rewrites into others.
 | [`CURRENT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#current_timestamp) | Supported | DuckDB SQL |  |
 | [`FORMAT_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#format_timestamp) | Supported | GoogleSQL function |  |
 | [`PARSE_TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp) | Supported | GoogleSQL function |  |
-| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | Supported | GoogleSQL function | from JSON, fails when the value has another JSON type. |
+| [`STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#string) | Supported | GoogleSQL function |  |
 | [`TIMESTAMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_add) | Supported | DuckDB SQL |  |
-| [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | Supported | DuckDB SQL | counts whole units rather than boundaries. |
+| [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | Supported | DuckDB function, renamed |  |
 | [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | Supported | DuckDB SQL |  |
-| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | Partial | DuckDB SQL | WEEK starts on Sunday, ISOWEEK on Monday, and WEEK(weekday) on the specified weekday. Unsupported: function TIMESTAMP_TRUNC. |
+| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | Partial | DuckDB SQL | Unsupported: function TIMESTAMP_TRUNC. |
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | Supported | DuckDB function, renamed |  |
 | [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | Supported | DuckDB SQL |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | Supported | DuckDB SQL |  |

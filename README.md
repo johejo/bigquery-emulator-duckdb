@@ -136,10 +136,9 @@ What the emulator supports is listed in generated pages:
 - [docs/sql.md](docs/sql.md): statements and clauses
 - [docs/functions.md](docs/functions.md): built-in functions
 
-These tables check execution, not agreement with BigQuery's results or metadata. See
-[query and API behavior](docs/compatibility.md) for details on jobs, views, UDFs, scripts,
-transactions and result encoding, and the [Storage API guide](docs/storage-api.md) for sessions
-and write streams.
+These tables check execution, not agreement with BigQuery's results or metadata.
+[Query and API behavior](docs/compatibility.md) describes what they cannot show, and the
+[Storage API guide](docs/storage-api.md) covers sessions and write streams.
 
 Unsupported behavior is rejected, with these deliberate exceptions:
 

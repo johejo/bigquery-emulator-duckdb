@@ -9,8 +9,8 @@ Use `storage/managedwriter.NewClient` or the generated Storage v1 client with a 
 protobuf writer descriptor and serialized rows. Arrow input is unsupported.
 
 The default stream and COMMITTED streams publish immediately. BUFFERED streams publish through
-`FlushRows`; PENDING streams publish atomically through `BatchCommitWriteStreams` after finalization. Explicit streams retain
-offsets across connections within the process.
+`FlushRows`; PENDING streams publish atomically through `BatchCommitWriteStreams` after
+finalization. Explicit streams retain offsets across connections within the process.
 
 ## Reading rows
 
@@ -25,8 +25,8 @@ Protobuf scalar fields, STRUCTs and repeated fields are supported. Column defaul
 columns, custom protobuf annotations, JSON/GEOGRAPHY input and schema evolution are unsupported.
 
 Create a new stream after changing a table schema. Default streams established before a schema
-change require restarting the process. Legacy persisted tables without creation
-metadata cannot return default-stream creation metadata.
+change require restarting the process. Tables persisted without creation metadata cannot return
+default-stream creation metadata.
 
 Decimal writer strings must fit NUMERIC's scale of 9 or BIGNUMERIC's scale of 38 exactly.
 
