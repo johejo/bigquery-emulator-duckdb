@@ -40,8 +40,8 @@ rewrites into others.
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
 | [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
 | [Conversion functions](#conversion-functions) | 2 | 2 | 0 | 0 |
-| [Date functions](#date-functions) | 11 | 1 | 0 | 0 |
-| [Datetime functions](#datetime-functions) | 7 | 1 | 0 | 0 |
+| [Date functions](#date-functions) | 12 | 0 | 0 | 0 |
+| [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 0 | 1 | 0 |
@@ -65,7 +65,7 @@ rewrites into others.
 | [Text analysis functions](#text-analysis-functions) | 0 | 0 | 3 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
 | [Time series functions](#time-series-functions) | 3 | 0 | 3 | 0 |
-| [Timestamp functions](#timestamp-functions) | 14 | 1 | 0 | 0 |
+| [Timestamp functions](#timestamp-functions) | 15 | 0 | 0 | 0 |
 | [Utility functions](#utility-functions) | 2 | 0 | 0 | 0 |
 | [Vector index functions](#vector-index-functions) | 0 | 0 | 1 | 0 |
 
@@ -180,7 +180,7 @@ rewrites into others.
 | [`DATE_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_diff) | Supported | DuckDB SQL |  |
 | [`DATE_FROM_UNIX_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_from_unix_date) | Supported | DuckDB SQL |  |
 | [`DATE_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_sub) | Supported | DuckDB SQL |  |
-| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | Partial | DuckDB SQL | Unsupported: function DATE_TRUNC. |
+| [`DATE_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#date_trunc) | Supported | DuckDB SQL |  |
 | [`EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#extract) | Supported | DuckDB SQL |  |
 | [`FORMAT_DATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#format_date) | Supported | GoogleSQL function |  |
 | [`LAST_DAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/date_functions#last_day) | Supported | DuckDB SQL |  |
@@ -196,7 +196,7 @@ rewrites into others.
 | [`DATETIME_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_add) | Supported | DuckDB SQL |  |
 | [`DATETIME_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_diff) | Supported | DuckDB SQL |  |
 | [`DATETIME_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_sub) | Supported | DuckDB SQL |  |
-| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | Partial | DuckDB SQL | Unsupported: function DATETIME_TRUNC. |
+| [`DATETIME_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#datetime_trunc) | Supported | DuckDB SQL |  |
 | [`FORMAT_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#format_datetime) | Supported | GoogleSQL function |  |
 | [`PARSE_DATETIME`](https://cloud.google.com/bigquery/docs/reference/standard-sql/datetime_functions#parse_datetime) | Supported | GoogleSQL function |  |
 
@@ -637,7 +637,7 @@ rewrites into others.
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | Supported | DuckDB function, renamed |  |
 | [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | Supported | DuckDB SQL |  |
-| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | Partial | DuckDB SQL | Unsupported: function TIMESTAMP_TRUNC. |
+| [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | Supported | DuckDB SQL |  |
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | Supported | DuckDB function, renamed |  |
 | [`UNIX_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_millis) | Supported | DuckDB SQL |  |
 | [`UNIX_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_seconds) | Supported | DuckDB SQL |  |

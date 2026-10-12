@@ -1,0 +1,83 @@
+# TIMESTAMP_TRUNC, DATE_TRUNC and DATETIME_TRUNC of a TIMESTAMP in a time zone.
+
+# Expected values: BigQuery timestamp_functions#timestamp_trunc examples.
+SELECT CAST(TIMESTAMP_TRUNC(t, DAY, 'UTC') AS STRING) FROM UNNEST([TIMESTAMP '2008-12-25 15:30:00+00']) t
+=> "2008-12-25 00:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(t, DAY, 'America/Los_Angeles') AS STRING) FROM UNNEST([TIMESTAMP '2008-12-25 15:30:00+00']) t
+=> "2008-12-25 08:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(t, WEEK(MONDAY), 'UTC') AS STRING) FROM UNNEST([TIMESTAMP '2017-11-06 00:00:00+12']) t
+=> "2017-10-30 00:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(t, WEEK(MONDAY), 'Pacific/Auckland') AS STRING) FROM UNNEST([TIMESTAMP '2017-11-06 00:00:00+12']) t
+=> "2017-11-05 11:00:00+00"
+
+# Expected values: BigQuery's answers. MINUTE and HOUR subtract the civil time's leftover minutes
+# and seconds; coarser parts take the offset before a transition for a civil time that is
+# missing or repeated.
+
+# America/Los_Angeles falls back at 02:00 PDT to 01:00 PST on 2024-11-03; 09:30 UTC is the second
+# 01:30.
+SELECT CAST(TIMESTAMP_TRUNC(t, HOUR, 'America/Los_Angeles') AS STRING) FROM UNNEST([TIMESTAMP '2024-11-03 09:30:00+00']) t
+=> "2024-11-03 09:00:00+00"
+
+# Australia/Lord_Howe springs forward 30 minutes, at 02:00 +10:30 to 02:30 +11, on 2024-10-06;
+# 15:45 UTC is 02:45 +11, and 02:00 does not exist that day.
+SELECT CAST(TIMESTAMP_TRUNC(t, HOUR, 'Australia/Lord_Howe') AS STRING) FROM UNNEST([TIMESTAMP '2024-10-05 15:45:00+00']) t
+=> "2024-10-05 15:00:00+00"
+
+# Australia/Lord_Howe falls back 30 minutes, at 02:00 +11 to 01:30 +10:30, on 2024-04-07;
+# 15:15 UTC is the second 01:45.
+SELECT CAST(TIMESTAMP_TRUNC(t, HOUR, 'Australia/Lord_Howe') AS STRING) FROM UNNEST([TIMESTAMP '2024-04-06 15:15:00+00']) t
+=> "2024-04-06 14:30:00+00"
+
+# The same instant truncated to MINUTE keeps the minute it falls in.
+SELECT CAST(TIMESTAMP_TRUNC(t, MINUTE, 'Australia/Lord_Howe') AS STRING) FROM UNNEST([TIMESTAMP '2024-04-06 15:15:30+00']) t
+=> "2024-04-06 15:15:00+00"
+
+# Asia/Kolkata was +05:21:10 in 1900, so the civil time of 00:00:30 UTC is 05:21:40 and MINUTE
+# truncation subtracts 40 seconds.
+SELECT CAST(TIMESTAMP_TRUNC(t, MINUTE, 'Asia/Kolkata') AS STRING) FROM UNNEST([TIMESTAMP '1900-01-01 00:00:30+00']) t
+=> "1899-12-31 23:59:50+00"
+
+# America/Santiago springs forward at midnight, 00:00 -04 to 01:00 -03, on 2024-09-08, so that
+# day has no 00:00.
+SELECT CAST(TIMESTAMP_TRUNC(t, DAY, 'America/Santiago') AS STRING) FROM UNNEST([TIMESTAMP '2024-09-08 15:00:00+00']) t
+=> "2024-09-08 04:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(t, MONTH, 'America/Santiago') AS STRING) FROM UNNEST([TIMESTAMP '2024-09-08 15:00:00+00']) t
+=> "2024-09-01 04:00:00+00"
+
+# America/Havana falls back at 01:00 -04 to 00:00 -05 on 2024-11-03, so that day's 00:00 occurs
+# twice, at 04:00 and 05:00 UTC.
+SELECT CAST(TIMESTAMP_TRUNC(t, DAY, 'America/Havana') AS STRING) FROM UNNEST([TIMESTAMP '2024-11-03 18:00:00+00']) t
+=> "2024-11-03 04:00:00+00"
+
+SELECT CAST(DATE_TRUNC(t, DAY, 'America/Havana') AS STRING) FROM UNNEST([TIMESTAMP '2024-11-03 18:00:00+00']) t
+=> "2024-11-03 04:00:00+00"
+
+SELECT CAST(DATETIME_TRUNC(t, DAY, 'America/Havana') AS STRING) FROM UNNEST([TIMESTAMP '2024-11-03 18:00:00+00']) t
+=> "2024-11-03 04:00:00+00"
+
+# The documentation says the time zone does not apply to SECOND, MILLISECOND and MICROSECOND,
+# and passing one with them is not an error.
+SELECT CAST(TIMESTAMP_TRUNC(t, SECOND, 'Asia/Kolkata') AS STRING) FROM UNNEST([TIMESTAMP '2024-01-01 00:00:00.5+00']) t
+=> "2024-01-01 00:00:00+00"
+
+SELECT CAST(TIMESTAMP_TRUNC(t, MILLISECOND, 'Asia/Kolkata') AS STRING) FROM UNNEST([TIMESTAMP '2024-01-01 00:00:00.5005+00']) t
+=> "2024-01-01 00:00:00.500+00"
+
+# An unknown or NULL time zone, with the time zone not a literal so it is checked at run time.
+SELECT CAST(TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, z) AS STRING) FROM UNNEST(['Invalid/Zone']) z
+=> error: Invalid time zone: Invalid/Zone
+
+SELECT CAST(SAFE.TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, z) AS STRING) FROM UNNEST(['Invalid/Zone']) z
+=> null
+
+SELECT CAST(TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, z) AS STRING) FROM UNNEST([CAST(NULL AS STRING)]) z
+=> null
+
+# A literal unknown time zone.
+SELECT CAST(TIMESTAMP_TRUNC(TIMESTAMP '2024-01-01 12:00:00+00', DAY, 'Invalid/Zone') AS STRING)
+=> error: Invalid time zone: Invalid/Zone
