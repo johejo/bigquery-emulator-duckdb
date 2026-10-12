@@ -14,6 +14,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/time/time.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
@@ -157,6 +158,18 @@ absl::Status StringToTimestamp(std::string_view text, int64_t* out) {
 absl::Status StringToTimestampIn(std::string_view text, std::string_view time_zone, int64_t* out) {
   return fn::ConvertStringToTimestamp(text, time_zone, fn::kMicroseconds,
                                       /*allow_tz_in_str=*/false, out);
+}
+
+// TIMESTAMP_TRUNC, DATE_TRUNC and DATETIME_TRUNC of a TIMESTAMP to a date part in a time zone,
+// such as 'day' or 'week_monday'.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the date part and the time zone.
+absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_view time_zone,
+                            int64_t* out) {
+  fn::DateTimestampPart value = fn::DATE;
+  if (!fn::DateTimestampPart_Parse(absl::AsciiStrToUpper(part), &value)) {
+    return absl::InvalidArgumentError("Unsupported date part");
+  }
+  return fn::TimestampTrunc(micros, time_zone, value, out);
 }
 
 // CAST(datetime AS STRING), whose fractional seconds have three or six digits, where DuckDB
@@ -449,6 +462,8 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
            Apply<StringToTimestamp, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_string_to_timestamp_in", {kVarchar, kVarchar}, kTimestamp,
            Apply<StringToTimestampIn>);
+  Register(connection, "bq_timestamp_trunc", {kTimestamp, kVarchar, kVarchar}, kTimestamp,
+           Apply<TimestampTrunc>);
   Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, Apply<DatetimeToString>);
   Register(connection, "bq_time_string", {kTime}, kVarchar, Apply<TimeToString>);
   Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar,

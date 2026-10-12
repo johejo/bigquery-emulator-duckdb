@@ -87,6 +87,18 @@ std::vector<Rule> WeekTrunc(std::string_view target = "") {
   return rules;
 }
 
+// *_TRUNC of a TIMESTAMP in a time zone. DuckDB's timezone() takes the later of a repeated civil
+// time, where BigQuery takes the earlier.
+std::vector<Rule> ZonedTrunc() {
+  return {
+      {
+          .arity = 3,
+          .spelling = "bq_timestamp_trunc($1, #2, $3)",
+          .conditions = {Is(1, {TYPE_TIMESTAMP})},
+      },
+  };
+}
+
 // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
 std::vector<Rule> WeekDiff() {
   std::vector<Rule> rules;
@@ -804,10 +816,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               WeekTrunc("DATE"),
               WeekTrunc(),
               {{.arity = 2, .spelling = "CAST(date_trunc(#2, $1) AS DATE)"}},
+              ZonedTrunc(),
           }),
       },
-      {"DATETIME_TRUNC", Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}})},
-      {"TIMESTAMP_TRUNC", Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}})},
+      {
+          "DATETIME_TRUNC",
+          Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+      },
+      {
+          "TIMESTAMP_TRUNC",
+          Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+      },
       {
           "TIME_TRUNC",
           {{.arity = 2, .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"}},
