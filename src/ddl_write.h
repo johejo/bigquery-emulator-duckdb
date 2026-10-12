@@ -34,7 +34,9 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
 // What DROP SCHEMA of `dataset` runs besides itself: it forgets the dataset's metadata.
 DdlWrite DropDatasetWrite(const DatasetReference& dataset);
 
-// What CREATE TABLE of `definition` runs besides itself.
+// What table creation runs besides CREATE TABLE: column metadata and defaults, table metadata
+// with a fresh creation time, and any rows to copy. DDL, REST and destination jobs execute these
+// statements in the same transaction as creation; their callers decide what to inherit or replace.
 DdlWrite CreateTableWrite(const TableDefinition& definition);
 
 // What CREATE VIEW of `view` runs besides itself.
