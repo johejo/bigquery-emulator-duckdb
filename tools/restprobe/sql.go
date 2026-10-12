@@ -8,6 +8,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
 )
 
 //go:embed sql_preamble.md
@@ -53,45 +55,45 @@ func query(url, sql, dataset string) (string, bool, error) {
 }
 
 // probeQuery runs sql on a fresh emulator holding the fixture and classifies the outcome.
-func probeQuery(binary string, setup []string, sql string) (probe, error) {
+func probeQuery(binary string, setup []string, sql string) (probereport.Probe, error) {
 	emulator, err := startEmulator(binary)
 	if err != nil {
-		return probe{}, err
+		return probereport.Probe{}, err
 	}
 	defer emulator.Stop()
 	for _, statement := range setup {
 		message, failed, err := query(emulator.URL, statement, "")
 		if err != nil {
-			return probe{}, err
+			return probereport.Probe{}, err
 		}
 		if failed {
-			return probe{}, fmt.Errorf("setup failed: %s: %s", statement, message)
+			return probereport.Probe{}, fmt.Errorf("setup failed: %s: %s", statement, message)
 		}
 	}
 	message, failed, err := query(emulator.URL, sql, sqlDataset)
 	if err != nil || !failed {
-		return probe{runs, ""}, err
+		return probereport.Probe{Outcome: probereport.Runs, Detail: ""}, err
 	}
 	return classify(sql, message), nil
 }
 
 // classify names the outcome of sql from the error message jobs.query reported for it.
-func classify(sql, message string) probe {
+func classify(sql, message string) probereport.Probe {
 	message = firstLine(message)
 	if feature, ok := strings.CutPrefix(message, unsupportedPrefix); ok {
-		return probe{unsupported, feature}
+		return probereport.Probe{Outcome: probereport.Unsupported, Detail: feature}
 	}
 	if prefix := analyzerError.FindString(message); prefix != "" {
 		// A feature whose language option the emulator leaves off, such as COLLATE, is one it does
 		// not support rather than a query the probe got wrong.
 		if feature, _, ok := strings.Cut(message[len(prefix):], " is not supported"); ok {
-			return probe{unsupported, feature}
+			return probereport.Probe{Outcome: probereport.Unsupported, Detail: feature}
 		}
-		return probe{untested, "`" + sql + "`: " + message}
+		return probereport.Probe{Outcome: probereport.Untested, Detail: "`" + sql + "`: " + message}
 	}
 	// DuckDB's hint to add casts is noise in a report.
 	message, _, _ = strings.Cut(message, ". You might need")
-	return probe{broken, "`" + sql + "`: " + message}
+	return probereport.Probe{Outcome: probereport.Broken, Detail: "`" + sql + "`: " + message}
 }
 
 func probeSQL(w io.Writer, binary, path string) error {
@@ -146,43 +148,43 @@ func probeSQL(w io.Writer, binary, path string) error {
 			}
 		}
 	}
-	probes := make([]probe, len(jobs))
+	probes := make([]probereport.Probe, len(jobs))
 	if err := parallel(len(jobs), func(i int) (err error) {
 		probes[i], err = probeQuery(binary, setup, jobs[i].sql)
 		return err
 	}); err != nil {
 		return err
 	}
-	results := map[*feature][]probe{}
+	results := map[*feature][]probereport.Probe{}
 	for i, j := range jobs {
 		results[j.feature] = append(results[j.feature], probes[i])
 	}
 
-	var tallies []tally
+	var tallies []probereport.Tally
 	var invalid []string
 	var body bytes.Buffer
 	for _, s := range sections {
 		fmt.Fprintf(&body, "## %s\n\n| Feature | Status | Notes |\n| --- | --- | --- |\n", s.title)
-		t := tally{s.title, map[string]int{}}
+		t := probereport.Tally{Title: s.title, Counts: map[string]int{}}
 		for _, f := range s.features {
-			counts := map[outcome]int{}
+			counts := map[probereport.Outcome]int{}
 			rejected := map[string]bool{}
 			failures := map[string]bool{}
 			for _, p := range results[f] {
-				counts[p.outcome]++
-				switch p.outcome {
-				case untested:
-					invalid = append(invalid, f.name+": "+p.detail)
-				case unsupported:
-					rejected[p.detail] = true
-				case broken:
-					failures[p.detail] = true
+				counts[p.Outcome]++
+				switch p.Outcome {
+				case probereport.Untested:
+					invalid = append(invalid, f.name+": "+p.Detail)
+				case probereport.Unsupported:
+					rejected[p.Detail] = true
+				case probereport.Broken:
+					failures[p.Detail] = true
 				}
 			}
-			st := status(counts)
-			t.counts[st]++
-			fmt.Fprintf(&body, "| %s | %s | %s |\n", escape(f.name), st,
-				notes(f.note, st, rejected, failures))
+			st := probereport.Status(counts)
+			t.Counts[st]++
+			fmt.Fprintf(&body, "| %s | %s | %s |\n", probereport.Escape(f.name), st,
+				probereport.Notes(f.note, st, rejected, failures))
 		}
 		tallies = append(tallies, t)
 		body.WriteString("\n")
@@ -192,7 +194,7 @@ func probeSQL(w io.Writer, binary, path string) error {
 		return fmt.Errorf("not valid GoogleSQL:\n%s", strings.Join(invalid, "\n"))
 	}
 	fmt.Fprint(w, sqlPreamble)
-	writeSummary(w, "Section", tallies)
+	probereport.WriteSummary(w, "Section", tallies)
 	fmt.Fprint(w, "\n", strings.TrimSuffix(body.String(), "\n"))
 	return nil
 }

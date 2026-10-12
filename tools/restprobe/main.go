@@ -14,31 +14,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 )
-
-type outcome int
-
-const (
-	runs outcome = iota
-	broken
-	unsupported
-	untested
-)
-
-type probe struct {
-	outcome outcome
-	detail  string
-}
 
 type line struct {
 	number          int
@@ -76,99 +59,6 @@ func splitNamed(text string) (name, value string, ok bool) {
 func firstLine(text string) string {
 	first, _, _ := strings.Cut(text, "\n")
 	return first
-}
-
-// escape escapes the pipes that would end a Markdown table cell.
-func escape(text string) string { return strings.ReplaceAll(text, "|", `\|`) }
-
-// status is Supported, Partial, Unsupported, Broken or Untested, from how many probes had each
-// outcome.
-func status(counts map[outcome]int) string {
-	tested := counts[runs] + counts[unsupported] + counts[broken]
-	switch {
-	case counts[broken] > 0:
-		return "Broken"
-	case tested == 0:
-		return "Untested"
-	case counts[runs] == tested:
-		return "Supported"
-	case counts[runs] == 0:
-		return "Unsupported"
-	}
-	return "Partial"
-}
-
-// notes builds a row's Notes cell from its handwritten note and what its probes found. The forms
-// rejected as unsupported are listed only when others run, since the status says the rest; the
-// failures of a Broken or Untested row say what to fix.
-func notes(note, st string, rejected, failures map[string]bool) string {
-	var parts []string
-	if note != "" {
-		parts = append(parts, note)
-	}
-	switch {
-	case st == "Partial" && len(rejected) > 0:
-		parts = append(parts, "Unsupported: "+strings.Join(sortedNames(rejected), "; ")+".")
-	case st == "Broken" || st == "Untested":
-		parts = append(parts, sortedNames(failures)...)
-	}
-	return escape(strings.Join(parts, " "))
-}
-
-// statuses lists the statuses in the order summaries show them.
-var statuses = []string{"Supported", "Partial", "Unsupported", "Broken", "Untested"}
-
-// tally counts the rows of a section by status.
-type tally struct {
-	title  string
-	counts map[string]int
-}
-
-// writeSummary prints a table of how many rows of each section have each status. Each section has
-// a row of its own, so changes to different sections do not conflict.
-func writeSummary(w io.Writer, heading string, tallies []tally) {
-	var columns []string
-	for _, st := range statuses {
-		for _, t := range tallies {
-			if t.counts[st] > 0 {
-				columns = append(columns, st)
-				break
-			}
-		}
-	}
-	fmt.Fprintf(w, "| %s | %s |\n|%s\n", heading, strings.Join(columns, " | "),
-		strings.Repeat(" --- |", len(columns)+1))
-	for _, t := range tallies {
-		fmt.Fprintf(w, "| [%s](#%s) |", t.title, anchor(t.title))
-		for _, st := range columns {
-			fmt.Fprintf(w, " %d |", t.counts[st])
-		}
-		fmt.Fprintln(w)
-	}
-}
-
-// anchor is the fragment GitHub links a Markdown heading with.
-func anchor(heading string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(heading) {
-		switch {
-		case r == ' ':
-			b.WriteRune('-')
-		case r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r):
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-// sortedNames returns the keys of entries in order.
-func sortedNames[V any](entries map[string]V) []string {
-	names := make([]string, 0, len(entries))
-	for name := range entries {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }
 
 func startEmulator(binary string, args ...string) (*emulatorprocess.Process, error) {

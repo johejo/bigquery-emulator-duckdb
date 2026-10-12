@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
 )
 
 //go:embed functions_preamble.md
@@ -122,7 +123,7 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	}); err != nil {
 		return err
 	}
-	probes := make([]probe, len(jobs))
+	probes := make([]probereport.Probe, len(jobs))
 	if err := parallel(len(jobs), func(i int) error {
 		emulator := <-emulators
 		defer func() { emulators <- emulator }()
@@ -134,7 +135,7 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	}); err != nil {
 		return err
 	}
-	results := map[*function][]probe{}
+	results := map[*function][]probereport.Probe{}
 	for i, j := range jobs {
 		results[j.function] = append(results[j.function], probes[i])
 	}
@@ -144,46 +145,46 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	for _, f := range functions {
 		all := results[f]
 		for _, detail := range f.Untested {
-			all = append(all, probe{untested, detail})
+			all = append(all, probereport.Probe{Outcome: probereport.Untested, Detail: detail})
 		}
 		for _, detail := range f.Unsupported {
-			all = append(all, probe{unsupported, detail})
+			all = append(all, probereport.Probe{Outcome: probereport.Unsupported, Detail: detail})
 		}
 		if len(all) == 0 {
 			continue
 		}
-		outcomes := map[outcome]int{}
+		outcomes := map[probereport.Outcome]int{}
 		rejected := map[string]bool{}
 		failures := map[string]bool{}
 		for _, p := range all {
-			outcomes[p.outcome]++
-			switch p.outcome {
-			case unsupported:
-				rejected[p.detail] = true
-			case broken, untested:
-				failures[p.detail] = true
+			outcomes[p.Outcome]++
+			switch p.Outcome {
+			case probereport.Unsupported:
+				rejected[p.Detail] = true
+			case probereport.Broken, probereport.Untested:
+				failures[p.Detail] = true
 			}
 		}
-		st := status(outcomes)
+		st := probereport.Status(outcomes)
 		c := category(f)
 		if counts[c] == nil {
 			counts[c] = map[string]int{}
 		}
 		counts[c][st]++
 		rows[c] = append(rows[c], fmt.Sprintf("| [`%s`](%s/%s) | %s | %s | %s |\n", f.Name,
-			functionDocs, mainDoc(f), st, f.Implementation, notes(f.Note, st, rejected, failures)))
+			functionDocs, mainDoc(f), st, f.Implementation, probereport.Notes(f.Note, st, rejected, failures)))
 	}
 	// Sort categories as words, so that "Date functions" precedes "DLP functions".
-	categories := sortedNames(rows)
+	categories := probereport.SortedNames(rows)
 	slices.SortFunc(categories, func(a, b string) int {
 		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 	})
-	var tallies []tally
+	var tallies []probereport.Tally
 	for _, c := range categories {
-		tallies = append(tallies, tally{c, counts[c]})
+		tallies = append(tallies, probereport.Tally{Title: c, Counts: counts[c]})
 	}
 	fmt.Fprint(w, functionsPreamble)
-	writeSummary(w, "Category", tallies)
+	probereport.WriteSummary(w, "Category", tallies)
 	for _, c := range categories {
 		fmt.Fprintf(w, "\n## %s\n\n| Function | Status | Implementation | Notes |\n| --- | --- | --- | --- |\n", c)
 		for _, row := range rows[c] {
