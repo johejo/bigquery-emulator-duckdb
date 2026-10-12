@@ -47,7 +47,9 @@ avoid alias collisions. Translation accounts for differences such as NULL orderi
 The sources in [src/translator/](../src/translator/) share a statement-wide `Context` and a
 `Scope` describing what each scan can see. `DuckDbStructFieldNames` maps anonymous or duplicate
 STRUCT names to positional internal names. Construction, casts and field access use that mapping;
-JSON functions receive the original names separately so they preserve JSON keys. User-visible
+JSON functions receive the original names separately so they preserve JSON keys. Comparisons of
+STRUCTs access fields by position instead, since DuckDB's composite equality takes NULL fields as
+equal. User-visible
 limits are documented in [compatibility.md](compatibility.md#struct-values).
 
 [functions.cc](../src/translator/functions.cc) assembles DuckDB names, SQL templates, GoogleSQL

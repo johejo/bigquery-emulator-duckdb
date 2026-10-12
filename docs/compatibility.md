@@ -101,9 +101,10 @@ views that read temporary tables, are unsupported.
 Query values may have anonymous or duplicate STRUCT field names, but at least one field; stored
 table columns require distinct nonempty names. Casts between STRUCT types match fields by position,
 and JSON functions preserve the original field names, including in nested arrays and structs.
-Comparisons involving anonymous or duplicate fields are unsupported, because DuckDB's composite
-equality has different NULL semantics. Casts of these values to JSON, and correlated aggregate
-subqueries returning them, are also unsupported; use JSON functions for JSON conversion.
+Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
+NULL semantics. `IS DISTINCT FROM` and equality of ARRAYs of STRUCTs with anonymous or duplicate
+fields are unsupported, as are casts of these values to JSON and correlated aggregate subqueries
+returning them; use JSON functions for JSON conversion.
 
 ### INTERVAL values
 

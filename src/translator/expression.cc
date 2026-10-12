@@ -18,6 +18,7 @@
 #include "src/duckdb_sql.h"
 #include "src/translator/context.h"
 #include "src/translator/function.h"
+#include "src/translator/handlers.h"
 #include "src/translator/literal.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
@@ -246,15 +247,15 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
       if (HasInterval(subquery.in_expr()->type())) {
         return Unsupported(scope, "IN subquery with INTERVAL");
       }
-      if (HasInternalStructNames(subquery.in_expr()->type())) {
-        return Unsupported(scope, "IN subquery with anonymous or duplicate STRUCT fields");
-      }
       if (!subquery.in_collation().Empty()) {
         return std::nullopt;
       }
       const auto value = Expression(*subquery.in_expr(), scope, columns);
       if (!value) {
         return std::nullopt;
+      }
+      if (subquery.in_expr()->type()->IsStruct()) {
+        return StructInArray(subquery.in_expr()->type(), *value, "ARRAY(" + select + ")");
       }
       return "(" + *value + " IN (" + select + "))";
     }

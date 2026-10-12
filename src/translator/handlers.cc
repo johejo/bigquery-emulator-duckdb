@@ -14,6 +14,7 @@
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/translator/context.h"
+#include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
 #include "src/type_mapping.h"
 
@@ -66,6 +67,97 @@ std::optional<std::string> Case(const ScalarCall& call) {
     sql += "WHEN " + args.at(i) + " THEN " + args.at(i + 1) + " ";
   }
   return "(" + sql + "ELSE " + args.back() + " END)";
+}
+
+namespace {
+
+// Whether `left` = `right`, two values of `type`. BigQuery compares STRUCTs field by field by
+// position: FALSE when a pair of fields differs, otherwise NULL when a field is NULL. DuckDB's
+// composite equality takes NULL fields, and NaN, as equal values.
+std::string Equal(const googlesql::Type* type, const std::string& left, const std::string& right) {
+  if (type->IsStruct()) {
+    std::vector<std::string> fields;
+    for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+      const auto field = [&](const std::string& value) {
+        return "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ")";
+      };
+      fields.push_back(Equal(type->AsStruct()->field(i).type, field(left), field(right)));
+    }
+    return "(" + Join(fields, " AND ") + ")";
+  }
+  if (type->IsDouble()) {
+    return FloatCompare(left, "=", right);
+  }
+  return "(" + left + " = " + right + ")";
+}
+
+// `body` over the arguments `args` that `indexes` name, each bound once as _sc.aN.
+std::string Bind(const std::vector<std::string>& args, const std::vector<size_t>& indexes,
+                 const std::string& body) {
+  std::vector<std::string> fields;
+  std::ranges::transform(indexes, std::back_inserter(fields), [&](size_t i) {
+    return "a" + std::to_string(i + 1) + " := " + args.at(i);
+  });
+  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _sc -> " + body + ")[1]";
+}
+
+std::string Bound(size_t i) { return "_sc.a" + std::to_string(i + 1); }
+
+}  // namespace
+
+std::string StructInArray(const googlesql::Type* type, const std::string& value,
+                          const std::string& array) {
+  // TRUE when an element is equal, otherwise NULL when a comparison is NULL; FALSE for an empty
+  // or NULL array.
+  return Bind({value, array}, {0, 1},
+              "list_transform([list_transform(_sc.a2, _e -> " + Equal(type, "_sc.a1", "_e") +
+                  ")], _b -> CASE WHEN list_contains(_b, true) THEN true WHEN len(_b) > "
+                  "list_count(_b) THEN NULL ELSE false END)[1]");
+}
+
+std::optional<std::string> StructComparison(const ScalarCall& call) {
+  const std::vector<std::string> args = Sqls(call);
+  const googlesql::Type* type = call.ArgumentType(0);
+  const size_t n = args.size();
+  if (call.name == "$EQUAL" || call.name == "$NOT_EQUAL") {
+    const std::string equal = Equal(type, Bound(0), Bound(1));
+    return Bind(args, {0, 1}, call.name == "$EQUAL" ? equal : "(NOT " + equal + ")");
+  }
+  if (call.name == "NULLIF") {
+    return Bind(
+        args, {0, 1},
+        "CASE WHEN " + Equal(type, Bound(0), Bound(1)) + " THEN NULL ELSE " + Bound(0) + " END");
+  }
+  if (call.name == "$IN") {
+    std::vector<size_t> indexes;
+    std::vector<std::string> equals;
+    for (size_t i = 0; i < n; ++i) {
+      indexes.push_back(i);
+      if (i > 0) {
+        equals.push_back(Equal(type, Bound(0), Bound(i)));
+      }
+    }
+    return Bind(args, indexes, "(" + Join(equals, " OR ") + ")");
+  }
+  if (call.name == "$IN_ARRAY") {
+    return StructInArray(type, args.at(0), args.at(1));
+  }
+  if (call.name == "$CASE_WITH_VALUE" && n >= 4 && n % 2 == 0) {
+    // The value and the WHEN values are bound to find the matching WHEN, while the results stay
+    // in a CASE that evaluates only the one it returns. DuckDB has no subqueries in a lambda.
+    std::vector<size_t> indexes = {0};
+    std::string match;
+    std::string results;
+    for (size_t i = 1; i + 1 < n; i += 2) {
+      const std::string when = std::to_string(indexes.size());
+      indexes.push_back(i);
+      match += "WHEN " + Equal(type, Bound(0), Bound(i)) + " THEN " + when + " ";
+      results += "WHEN " + when + " THEN " + args.at(i + 1) + " ";
+    }
+    return "(CASE " + Bind(args, indexes, "CASE " + match + "ELSE 0 END") + " " + results +
+           "ELSE " + args.back() + " END)";
+  }
+  return std::nullopt;
 }
 
 // The width is already a count of months, days or microseconds, see BucketWidthOf. Months count

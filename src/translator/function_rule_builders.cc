@@ -65,4 +65,10 @@ Rule BigNumericOperator(std::string_view function, std::size_t arity) {
   };
 }
 
+std::string FloatCompare(const std::string& left, std::string_view op, const std::string& right) {
+  return "CASE WHEN " + left + " IS NULL OR " + right + " IS NULL THEN NULL WHEN isnan(" + left +
+         ") OR isnan(" + right + ") THEN " + (op == "<>" ? "true" : "false") + " ELSE (" + left +
+         " " + std::string(op) + " " + right + ") END";
+}
+
 }  // namespace bigquery_emulator_duckdb::translator
