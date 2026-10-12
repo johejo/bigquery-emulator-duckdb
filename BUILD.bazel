@@ -657,6 +657,14 @@ cc_binary(
     name = "bigquery-emulator-duckdb",
     srcs = ["src/main.cc"],
     copts = ["-std=c++20"],
+    # A Mach-O executable exports its global symbols, so dyld would look up each of its weak
+    # definitions, such as inline functions and template instances, in its exports trie at every
+    # start: most of a second in an unoptimized build, paid by each emulator the probes and tests
+    # start. Nothing loads code that refers back to the executable.
+    linkopts = select({
+        "@platforms//os:macos": ["-Wl,-no_exported_symbols"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":emulator",
         ":project",
