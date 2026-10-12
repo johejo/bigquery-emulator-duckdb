@@ -98,13 +98,6 @@ roll back a failed transaction.
 `UPDATE ... FROM` rejects multiple source matches for a target row. `MERGE` does so when it
 has a matched `UPDATE` clause and a matched action applies. Failed writes leave no changes.
 
-To update elements of a repeated field, replace the array with `SET column = ARRAY(SELECT ...)`.
-Use `WITH OFFSET` and `ORDER BY` in the subquery when element order must be preserved.
-BigQuery rejects both `SET column[OFFSET(...)] = ...` and nested
-`SET (UPDATE column ... SET ... WHERE ...)`, including arrays of STRUCTs; the emulator
-rejects these forms too. GoogleSQL's reference implementation supports them, so its
-results do not establish BigQuery compatibility.
-
 ## Result schemas and values
 
 Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`,

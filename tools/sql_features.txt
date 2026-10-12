@@ -7,6 +7,7 @@
 #   note NAME | TEXT      How the emulator differs from BigQuery where a probe cannot observe it.
 #
 # Every query must be valid GoogleSQL against the fixture; the probe fails on one that is not.
+# List only forms BigQuery documents, not GoogleSQL syntax that BigQuery rejects.
 
 setup CREATE SCHEMA d
 setup CREATE TABLE d.t (id INT64, name STRING, tags ARRAY<STRING>, s STRUCT<a INT64, b STRING>)
@@ -32,7 +33,6 @@ query `UNNEST` | SELECT id, tag FROM t LEFT JOIN UNNEST(t.tags) AS tag
 query `UNNEST ... WITH OFFSET` | SELECT x, o FROM UNNEST(['a', 'b']) AS x WITH OFFSET AS o
 query `WITH` | WITH a AS (SELECT id FROM t), b AS (SELECT id FROM a) SELECT id FROM b
 query `WITH RECURSIVE` | WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM r WHERE n < 3) SELECT n FROM r
-query `WITH RECURSIVE ... WITH DEPTH` | WITH RECURSIVE r AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM r WHERE n < 3) WITH DEPTH SELECT n FROM r
 query Subqueries | SELECT (SELECT MAX(v) FROM u) AS m
 query Subqueries | SELECT id FROM t WHERE id IN (SELECT id FROM u)
 query Subqueries | SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t.id)
@@ -109,19 +109,12 @@ query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, 'c')
 query `INSERT ... VALUES` | INSERT INTO t VALUES (3, 'c', ['y'], STRUCT(2, 'q'))
 query `INSERT ... VALUES` | INSERT t (id, name) VALUES (3, DEFAULT)
 query `INSERT ... SELECT` | INSERT u (id, v) SELECT id, id * 10 FROM t
-query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR IGNORE u (id, v) VALUES (1, 10)
-query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR REPLACE u (id, v) VALUES (1, 10)
-query `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | INSERT OR UPDATE u (id, v) VALUES (1, 10)
 query `UPDATE` | UPDATE t SET name = 'z' WHERE id = 1
 query `UPDATE` | UPDATE t SET name = DEFAULT WHERE TRUE
 query `UPDATE` of a struct field | UPDATE t SET s.a = 5 WHERE id = 1
 query `UPDATE ... FROM` | UPDATE t SET name = CAST(u.v AS STRING) FROM u WHERE t.id = u.id
 note `UPDATE ... FROM` | Rejects multiple source matches per target row before applying any updates
 query `UPDATE` rebuilding an array | UPDATE t SET tags = ARRAY(SELECT IF(i = 0, 'y', tag) FROM UNNEST(tags) AS tag WITH OFFSET AS i ORDER BY i) WHERE id = 1
-query `UPDATE` of array elements | UPDATE t SET tags[OFFSET(0)] = 'y' WHERE id = 1
-query Nested `UPDATE` | UPDATE t SET (UPDATE tags AS tag SET tag = 'y' WHERE TRUE) WHERE id = 1
-note Nested `UPDATE` | BigQuery rejects nested UPDATE; rebuild the array with SET column = ARRAY(SELECT ...) instead
-query Nested DML | UPDATE t SET (INSERT tags VALUES ('y')) WHERE id = 1
 query `DELETE` | DELETE t WHERE id = 1
 query `DELETE` | DELETE FROM t WHERE id IN (SELECT id FROM u)
 query `TRUNCATE TABLE` | TRUNCATE TABLE t
@@ -130,9 +123,6 @@ query `MERGE` | MERGE t USING u ON t.id = u.id WHEN MATCHED AND u.v > 10 THEN DE
 query `MERGE` | MERGE u USING (SELECT 5 AS id, 50 AS v) AS s ON u.id = s.id WHEN NOT MATCHED THEN INSERT ROW
 query `MERGE` | MERGE t USING u ON FALSE WHEN NOT MATCHED BY TARGET THEN INSERT (id) VALUES (u.id) WHEN NOT MATCHED BY SOURCE AND t.id = 2 THEN UPDATE SET name = 'gone'
 note `MERGE` | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies
-query `ASSERT_ROWS_MODIFIED` | UPDATE t SET name = 'z' WHERE id = 1 ASSERT_ROWS_MODIFIED 1
-query `THEN RETURN` | DELETE t WHERE id = 1 THEN RETURN id
-query `THEN RETURN` | INSERT u (id, v) VALUES (5, 50) THEN RETURN *
 
 section DDL
 
@@ -162,7 +152,6 @@ query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT EN
 query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)
 note Primary and foreign keys | Accepted and dropped; BigQuery does not enforce them either
 query Collation | CREATE TABLE n (a STRING COLLATE 'und:ci')
-query Generated columns | CREATE TABLE n (a INT64, b INT64 AS (a + 1))
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE n (a INT64); INSERT n (a) VALUES (1); SELECT a FROM n
 query `CREATE TEMP TABLE` | CREATE TEMPORARY TABLE _SESSION.n AS SELECT id FROM t; SELECT id FROM _SESSION.n
 query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t; SELECT id FROM t
@@ -214,8 +203,7 @@ query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id SET DEFAULT 
 query `ALTER TABLE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); ALTER TABLE defaulted ALTER COLUMN id DROP DEFAULT
 query `ALTER TABLE` | ALTER TABLE t ALTER COLUMN IF EXISTS missing DROP DEFAULT
 query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ALTER COLUMN id DROP DEFAULT
-query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, DROP COLUMN name
-note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.
+note `ALTER TABLE` | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description and top-level NOT NULL are unsupported.
 query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
@@ -223,7 +211,6 @@ query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (description = 'x', friendly_nam
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (default_table_expiration_days = 1)
 note `CREATE SCHEMA` | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.
-query `CREATE OR REPLACE SCHEMA` | CREATE OR REPLACE SCHEMA e
 query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
 query `DROP SCHEMA` | DROP SCHEMA d CASCADE
 query `ALTER SCHEMA` | ALTER SCHEMA d SET OPTIONS (description = 'x', friendly_name = 'D', labels = [('k', 'v')])

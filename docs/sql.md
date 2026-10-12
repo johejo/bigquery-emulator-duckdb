@@ -21,7 +21,7 @@ the probe's own notes name what it rejected.
 | --- | --- |
 | Partial | 19 |
 | Supported | 60 |
-| Unsupported | 18 |
+| Unsupported | 9 |
 
 ## Queries
 
@@ -36,7 +36,6 @@ the probe's own notes name what it rejected.
 | `UNNEST ... WITH OFFSET` | Supported |  |
 | `WITH` | Supported |  |
 | `WITH RECURSIVE` | Supported |  |
-| `WITH RECURSIVE ... WITH DEPTH` | Unsupported | WITH RECURSIVE depth modifier |
 | Subqueries | Supported |  |
 | Correlated subqueries | Partial | Aggregate subqueries returning anonymous or duplicate STRUCT fields are unsupported when correlated.; correlated aggregate subquery with anonymous or duplicate STRUCT fields |
 | Aggregates and `GROUP BY` | Supported |  |
@@ -69,19 +68,13 @@ the probe's own notes name what it rejected.
 | --- | --- | --- |
 | `INSERT ... VALUES` | Supported |  |
 | `INSERT ... SELECT` | Supported |  |
-| `INSERT OR IGNORE`, `OR REPLACE`, `OR UPDATE` | Unsupported | INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, ON CONFLICT or generated columns |
 | `UPDATE` | Supported |  |
 | `UPDATE` of a struct field | Supported |  |
 | `UPDATE ... FROM` | Supported | Rejects multiple source matches per target row before applying any updates |
 | `UPDATE` rebuilding an array | Supported |  |
-| `UPDATE` of array elements | Unsupported | array element assignment in UPDATE ... SET |
-| Nested `UPDATE` | Unsupported | BigQuery rejects nested UPDATE; rebuild the array with SET column = ARRAY(SELECT ...) instead; nested UPDATE |
-| Nested DML | Unsupported | nested INSERT or DELETE |
 | `DELETE` | Supported |  |
 | `TRUNCATE TABLE` | Supported |  |
 | `MERGE` | Supported | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies |
-| `ASSERT_ROWS_MODIFIED` | Unsupported | UPDATE with ASSERT_ROWS_MODIFIED, THEN RETURN or generated columns |
-| `THEN RETURN` | Unsupported | DELETE with ASSERT_ROWS_MODIFIED, THEN RETURN or USING; INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, ON CONFLICT or generated columns |
 
 ## DDL
 
@@ -97,7 +90,6 @@ the probe's own notes name what it rejected.
 | Partitioning and clustering | Partial | Stores the partitioning and clustering of tables. Ingestion-time partitioning (`_PARTITIONDATE`, `_PARTITIONTIME`) is unsupported, and partitions do not expire; CREATE TABLE option require_partition_filter |
 | Primary and foreign keys | Supported | Accepted and dropped; BigQuery does not enforce them either |
 | Collation | Unsupported | COLLATE |
-| Generated columns | Unsupported | generated columns |
 | `CREATE TEMP TABLE` | Supported | In multi-statement queries, whose end drops their temporary tables. |
 | `CREATE TABLE LIKE` | Partial | Copies the schema, partitioning, clustering, description, friendly name and labels of a table; AS SELECT fills it with the query's rows. Copying a view or a table with column defaults is unsupported; AS SELECT with STRING/BYTES length parameters or nested NOT NULL is unsupported; CREATE TABLE LIKE AS SELECT with length parameters; CREATE TABLE LIKE AS SELECT with nested NOT NULL; CREATE TABLE LIKE a table with column defaults; CREATE TABLE LIKE a view |
 | `CREATE TABLE COPY` | Partial | Copies the rows of a table besides what `CREATE TABLE LIKE` copies. Copying a view or a table with column defaults is unsupported; CREATE TABLE COPY with FOR SYSTEM_TIME AS OF; CREATE TEMP TABLE COPY |
@@ -105,9 +97,8 @@ the probe's own notes name what it rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported | statement CreateSnapshotTableStmt |
 | `CREATE EXTERNAL TABLE` | Unsupported | statement CreateExternalTableStmt |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description, generated columns and top-level NOT NULL are unsupported, and so are statements that mix kinds of actions, which BigQuery does not document.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE option expiration_timestamp; ALTER TABLE with different kinds of actions; column option rounding_mode |
+| `ALTER TABLE` | Partial | Supports ADD COLUMN, DROP COLUMN, RENAME TO, ALTER COLUMN SET OPTIONS, SET/DROP DEFAULT and SET OPTIONS, including IF EXISTS and IF NOT EXISTS, and lists of ADD COLUMN, DROP COLUMN or ALTER COLUMN SET OPTIONS actions. SET OPTIONS stores the description, friendly name, labels and expiration (TIMESTAMP literals or NULL), and ALTER COLUMN SET OPTIONS the column's description; SET/DROP DEFAULT updates the default used by future writes and the column metadata; other options and ALTER COLUMN actions are unsupported. ADD COLUMN with defaults, column options other than the description and top-level NOT NULL are unsupported.; ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE option expiration_timestamp; column option rounding_mode |
 | `CREATE SCHEMA` | Partial | Stores the description, friendly name and labels; every dataset is in the US, and other options are unsupported.; CREATE SCHEMA option default_table_expiration_days; CREATE SCHEMA option location |
-| `CREATE OR REPLACE SCHEMA` | Unsupported | CREATE OR REPLACE SCHEMA |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Partial | Supports SET OPTIONS, which stores the description, friendly name and labels; other options and actions are unsupported.; ALTER SCHEMA option default_table_expiration_days |
 | `CREATE VIEW` | Partial | Stores the GoogleSQL definition, schema, description, friendly name, labels and expiration (TIMESTAMP literals or NULL); other view options are unsupported. Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.; CREATE VIEW option expiration_timestamp |
