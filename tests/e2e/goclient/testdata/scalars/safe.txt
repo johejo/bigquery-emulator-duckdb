@@ -29,3 +29,7 @@ SELECT SAFE.SUBSTR(b'abc', 2, -1)
 
 SELECT SAFE.DIV(1, 0)
 => null
+
+# Only the function's own errors become NULL, not those of its arguments.
+SELECT SAFE.ABS(1 / 0)
+=> error:

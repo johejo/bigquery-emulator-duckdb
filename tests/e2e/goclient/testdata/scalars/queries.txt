@@ -3,6 +3,284 @@
 SELECT COUNT(*) FROM (SELECT AS VALUE a FROM t)
 => "4"
 
+SELECT AS VALUE 7
+=> "7"
+
+SELECT AS VALUE STRUCT(a AS x) FROM t WHERE a = 1
+=> "1"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b AS name FROM t WHERE a IS NOT NULL ORDER BY a DESC))
+=> "[{\"a\":3,\"name\":\"あ\"},{\"a\":2,\"name\":\"yy\"},{\"a\":1,\"name\":\"x\"}]"
+
+## Table reads, ordering and limits
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT BYTE_LENGTH(b) AS bytes, BYTE_LENGTH(raw) AS raw_bytes
+  FROM t WHERE a >= 1 AND a < 4 ORDER BY a DESC LIMIT 2 OFFSET 1))
+=> "[{\"bytes\":2,\"raw_bytes\":null},{\"bytes\":1,\"raw_bytes\":1}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT q.a AS x, q.b AS y, q.a + 10 AS `_c1`
+  FROM (SELECT a + 1 AS a, b FROM t WHERE a IS NOT NULL) AS q WHERE q.a > 2 ORDER BY q.a DESC))
+=> "[{\"x\":4,\"y\":\"あ\",\"_c1\":14},{\"x\":3,\"y\":\"yy\",\"_c1\":13}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * EXCEPT (raw) REPLACE (a * 10 AS a) FROM t
+  WHERE a IS NOT NULL ORDER BY a DESC LIMIT 1))
+=> "[{\"a\":30,\"b\":\"あ\"}]"
+
+# A select list that reads no column of the table keeps its rows.
+SELECT TO_JSON_STRING(ARRAY(SELECT 42 FROM t))
+=> "[42,42,42,42]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT 42 FROM t LIMIT 2))
+=> "[42,42]"
+
+SELECT ARRAY_LENGTH(ARRAY(SELECT 42 FROM t WHERE FALSE))
+=> "0"
+
+SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t LIMIT 0))
+=> "0"
+
+# NULLs sort first in ascending order and last in descending order.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#order_by_clause
+SELECT a FROM t ORDER BY a LIMIT 1
+=> null
+
+SELECT a FROM t ORDER BY a ASC NULLS FIRST LIMIT 1
+=> null
+
+SELECT a FROM t ORDER BY a DESC NULLS FIRST LIMIT 1
+=> null
+
+SELECT a FROM t ORDER BY a DESC LIMIT 1
+=> "3"
+
+SELECT a FROM t ORDER BY a DESC NULLS LAST LIMIT 1
+=> "3"
+
+SELECT a FROM t ORDER BY a ASC NULLS LAST LIMIT 1
+=> "1"
+
+SELECT a FROM (SELECT a FROM t ORDER BY a DESC LIMIT 2) ORDER BY a LIMIT 1
+=> "2"
+
+SELECT a FROM t WHERE a IS NOT NULL ORDER BY -a LIMIT 1
+=> "3"
+
+SELECT -a AS a FROM t WHERE a IS NOT NULL ORDER BY 1 LIMIT 1
+=> "-3"
+
+SELECT nope FROM t
+=> error contains: Unrecognized name: nope
+
+## Conditions
+
+SELECT STRING_AGG(CASE WHEN a IS NULL THEN 'null' WHEN a = 1 THEN 'one' ELSE 'other' END, ','
+  ORDER BY a)
+FROM t
+=> "null,one,other,other"
+
+SELECT TO_JSON_STRING(ARRAY_AGG(CASE a WHEN 1 THEN 10 WHEN 2 THEN 20 ELSE 0 END ORDER BY a)) FROM t
+=> "[0,10,20,0]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT IF(a IS NULL, 0, a) AS i, COALESCE(a, 5) AS c,
+  IFNULL(a, 6) AS n, NULLIF(a, 1) AS z FROM t ORDER BY a))
+=> "[{\"i\":0,\"c\":5,\"n\":6,\"z\":null},{\"i\":1,\"c\":1,\"n\":1,\"z\":null},{\"i\":2,\"c\":2,\"n\":2,\"z\":2},{\"i\":3,\"c\":3,\"n\":3,\"z\":3}]"
+
+# IF evaluates only the branch it returns.
+SELECT IF(a = 1, 42, 1 / (a - 1)) FROM t WHERE a = 1
+=> "42.0"
+
+SELECT IF(FALSE, 1 / 0, 42)
+=> "42.0"
+
+## Joins and WITH clauses
+
+SELECT TO_JSON_STRING(ARRAY(SELECT l.a + r.a FROM t AS l JOIN t AS r ON l.a = r.a ORDER BY 1))
+=> "[2,4,6]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT r.b FROM t AS l LEFT JOIN t AS r ON l.a = r.a + 1
+  ORDER BY l.a NULLS LAST))
+=> "[null,\"x\",\"yy\",null]"
+
+SELECT COUNT(*) FROM t AS l CROSS JOIN t AS r
+=> "16"
+
+# NULL keys match nothing, so the row with a NULL appears on each side unmatched.
+SELECT COUNT(*) FROM t AS l FULL JOIN t AS r ON l.a = r.a
+=> "5"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t JOIN (SELECT 2 AS a) USING (a)))
+=> "[2]"
+
+SELECT TO_JSON_STRING(ARRAY(WITH c AS (SELECT a * 10 AS x FROM t), d AS (SELECT x FROM c WHERE x > 10)
+  SELECT x FROM d ORDER BY x DESC))
+=> "[30,20]"
+
+WITH c AS (SELECT 1 AS x) SELECT l.x + r.x FROM c AS l, c AS r
+=> "2"
+
+## Aggregates and grouping
+
+SELECT SUM(a) FROM t
+=> "6"
+
+SELECT COUNT(a) FROM t
+=> "3"
+
+SELECT COUNT(DISTINCT a) FROM t
+=> "3"
+
+SELECT AVG(a) FROM t
+=> "2.0"
+
+SELECT MIN(b) FROM t
+=> "x"
+
+SELECT MAX(b) FROM t
+=> "あ"
+
+SELECT STRING_AGG(b, ',' ORDER BY a DESC) FROM t
+=> "あ,yy,x"
+
+SELECT ARRAY_LENGTH(ARRAY_AGG(a IGNORE NULLS)) FROM t
+=> "3"
+
+SELECT COUNTIF(a > 1) FROM t
+=> "2"
+
+SELECT LOGICAL_AND(a > 0) FROM t
+=> "true"
+
+SELECT LOGICAL_AND(a) FROM UNNEST([TRUE, FALSE]) AS a
+=> "false"
+
+SELECT LOGICAL_OR(a) FROM UNNEST([TRUE, FALSE]) AS a
+=> "true"
+
+SELECT MOD(a, 2) AS k FROM t WHERE a IS NOT NULL GROUP BY k HAVING COUNT(*) > 1
+=> "1"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT DISTINCT a > 1 AS big FROM t ORDER BY big))
+=> "[null,false,true]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT ANY_VALUE(b HAVING MIN a) FROM t WHERE a IS NOT NULL
+  GROUP BY MOD(a, 2) ORDER BY MOD(a, 2)))
+=> "[\"yy\",\"x\"]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a > 1 AS big, COUNT(*) AS n, GROUPING(a > 1) AS g
+  FROM t WHERE a IS NOT NULL GROUP BY ROLLUP(big) ORDER BY g, big))
+=> "[{\"big\":false,\"n\":1,\"g\":0},{\"big\":true,\"n\":2,\"g\":0},{\"big\":null,\"n\":3,\"g\":1}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b, COUNT(*) AS n FROM t WHERE a < 3
+  GROUP BY CUBE(a, b) ORDER BY a NULLS LAST, b NULLS LAST))
+=> "[{\"a\":1,\"b\":\"x\",\"n\":1},{\"a\":1,\"b\":null,\"n\":1},{\"a\":2,\"b\":\"yy\",\"n\":1},{\"a\":2,\"b\":null,\"n\":1},{\"a\":null,\"b\":\"x\",\"n\":1},{\"a\":null,\"b\":\"yy\",\"n\":1},{\"a\":null,\"b\":null,\"n\":2}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b, SUM(a) AS s FROM t WHERE a < 3
+  GROUP BY GROUPING SETS ((a, b), a, ()) ORDER BY 3, 1, 2))
+=> "[{\"a\":1,\"b\":null,\"s\":1},{\"a\":1,\"b\":\"x\",\"s\":1},{\"a\":2,\"b\":null,\"s\":2},{\"a\":2,\"b\":\"yy\",\"s\":2},{\"a\":null,\"b\":null,\"s\":3}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b, COUNT(*) AS n FROM t WHERE a < 3
+  GROUP BY a, ROLLUP(b) ORDER BY a, b NULLS LAST))
+=> "[{\"a\":1,\"b\":\"x\",\"n\":1},{\"a\":1,\"b\":null,\"n\":1},{\"a\":2,\"b\":\"yy\",\"n\":1},{\"a\":2,\"b\":null,\"n\":1}]"
+
+SELECT GROUPING(a) FROM t WHERE a = 1 GROUP BY a
+=> "0"
+
+## Recursive WITH clauses
+
+SELECT TO_JSON_STRING(ARRAY(WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM c
+  WHERE n < 3) SELECT n FROM c ORDER BY n))
+=> "[1,2,3]"
+
+# UNION DISTINCT stops once an iteration adds no new row.
+SELECT TO_JSON_STRING(ARRAY(WITH RECURSIVE c AS (SELECT 0 AS n UNION DISTINCT
+  SELECT MOD(n + 1, 3) FROM c) SELECT n FROM c ORDER BY n))
+=> "[0,1,2]"
+
+# A plain entry next to a recursive one, and a recursive term that joins a table and filters
+# through a subquery.
+SELECT TO_JSON_STRING(ARRAY(WITH RECURSIVE base AS (SELECT a FROM t WHERE a IS NOT NULL),
+  c AS (SELECT MIN(a) AS n, 1 AS depth FROM base UNION ALL
+    SELECT base.a, depth + 1 FROM c JOIN base ON base.a = c.n + 1
+    WHERE EXISTS (SELECT 1 FROM base WHERE a > c.n))
+  SELECT AS STRUCT n, depth FROM c ORDER BY depth))
+=> "[{\"n\":1,\"depth\":1},{\"n\":2,\"depth\":2},{\"n\":3,\"depth\":3}]"
+
+## Set operations
+
+SELECT TO_JSON_STRING(ARRAY(SELECT 1 AS x UNION ALL SELECT 1 UNION ALL SELECT 2 ORDER BY x))
+=> "[1,1,2]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t UNION DISTINCT SELECT a FROM t ORDER BY a))
+=> "[null,1,2,3]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t INTERSECT DISTINCT SELECT 2))
+=> "[2]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t WHERE a IS NOT NULL EXCEPT DISTINCT SELECT 2
+  ORDER BY 1))
+=> "[1,3]"
+
+# CORRESPONDING matches columns by name.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#corresponding
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM (SELECT 1 AS a, 2 AS b
+  UNION ALL CORRESPONDING SELECT 3 AS b, 4 AS a) ORDER BY a))
+=> "[{\"a\":1,\"b\":2},{\"a\":4,\"b\":3}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM (SELECT 1 AS a, 2 AS b
+  FULL UNION ALL CORRESPONDING SELECT 3 AS c, 4 AS a) ORDER BY a))
+=> "[{\"a\":1,\"b\":2,\"c\":null},{\"a\":4,\"b\":null,\"c\":3}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM (SELECT 1 AS a, 2 AS b
+  LEFT UNION ALL CORRESPONDING SELECT 3 AS c, 4 AS a) ORDER BY a))
+=> "[{\"a\":1,\"b\":2},{\"a\":4,\"b\":null}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM (SELECT 1 AS a, 2 AS b
+  INNER UNION ALL CORRESPONDING SELECT 3 AS c, 4 AS a) ORDER BY a))
+=> "[{\"a\":1},{\"a\":4}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM (SELECT 1 AS a, 2 AS b, 5 AS c
+  UNION ALL CORRESPONDING BY (c, a) SELECT 3 AS c, 4 AS a) ORDER BY a))
+=> "[{\"c\":5,\"a\":1},{\"c\":3,\"a\":4}]"
+
+SELECT a FROM (SELECT a, b FROM t INTERSECT DISTINCT CORRESPONDING SELECT 'x' AS b, 1 AS a)
+=> "1"
+
+## Lateral joins
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT t.a, s.m FROM t, LATERAL (SELECT MAX(u.a) AS m
+  FROM t AS u WHERE u.a < t.a) AS s ORDER BY t.a))
+=> "[{\"a\":null,\"m\":null},{\"a\":1,\"m\":null},{\"a\":2,\"m\":1},{\"a\":3,\"m\":2}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT t.a, s.b FROM t LEFT JOIN LATERAL (SELECT u.b
+  FROM t AS u WHERE u.a = t.a + 1) AS s ON s.b != 'yy' ORDER BY t.a))
+=> "[{\"a\":null,\"b\":null},{\"a\":1,\"b\":null},{\"a\":2,\"b\":\"あ\"},{\"a\":3,\"b\":null}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT s.n FROM t JOIN LATERAL (SELECT COUNT(*) AS n FROM t AS u
+  WHERE u.a <= t.a) AS s ON s.n > 1 ORDER BY t.a))
+=> "[2,3]"
+
+# The lateral side also sees columns of the query enclosing the join.
+SELECT TO_JSON_STRING(ARRAY(SELECT (SELECT SUM(s.x) FROM UNNEST([10, 20]) AS o,
+  LATERAL (SELECT o + t.a AS x) AS s) FROM t ORDER BY t.a))
+=> "[null,32,34,36]"
+
+## Analytic functions and QUALIFY
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT ROW_NUMBER() OVER (ORDER BY a) AS r,
+  SUM(a) OVER (ORDER BY a ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS s,
+  LAG(a) OVER (ORDER BY a) AS l,
+  FIRST_VALUE(a IGNORE NULLS) OVER (ORDER BY a ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS f
+  FROM t ORDER BY a))
+=> "[{\"r\":1,\"s\":null,\"l\":null,\"f\":1},{\"r\":2,\"s\":1,\"l\":null,\"f\":1},{\"r\":3,\"s\":3,\"l\":1,\"f\":1},{\"r\":4,\"s\":5,\"l\":2,\"f\":1}]"
+
+SELECT b FROM t WHERE a IS NOT NULL QUALIFY ROW_NUMBER() OVER (ORDER BY a DESC) = 1
+=> "あ"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, COUNT(DISTINCT MOD(a, 2)) OVER (PARTITION BY a > 1) AS c,
+  SUM(DISTINCT a) OVER () AS s FROM (SELECT a FROM t UNION ALL SELECT a FROM t)
+  WHERE a IS NOT NULL ORDER BY a))
+=> "[{\"a\":1,\"c\":1,\"s\":6},{\"a\":1,\"c\":1,\"s\":6},{\"a\":2,\"c\":2,\"s\":6},{\"a\":2,\"c\":2,\"s\":6},{\"a\":3,\"c\":2,\"s\":6},{\"a\":3,\"c\":2,\"s\":6}]"
+
 ## Subqueries
 
 SELECT (SELECT MAX(a) FROM t)
@@ -16,6 +294,17 @@ SELECT ARRAY_TO_STRING(ARRAY(SELECT b FROM t WHERE b IS NOT NULL ORDER BY a DESC
 
 SELECT ARRAY_LENGTH(ARRAY(SELECT a FROM t WHERE FALSE))
 => "0"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t WHERE a IN (SELECT a + 1 FROM t) ORDER BY a))
+=> "[2,3]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT (SELECT COUNT(*) FROM t AS i WHERE i.a < o.a) FROM t AS o
+  WHERE o.a IS NOT NULL ORDER BY o.a))
+=> "[0,1,2]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t AS o WHERE EXISTS (SELECT 1 FROM (SELECT a FROM t
+  WHERE a > o.a)) ORDER BY a))
+=> "[1,2]"
 
 ## Unnest structs and arrays
 
@@ -33,3 +322,90 @@ SELECT [10, 20, 30][ORDINAL(1)]
 
 SELECT [10, 20, 30][SAFE_OFFSET(3)]
 => null
+
+SELECT [10, 20, 30][OFFSET(3)]
+=> error:
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT x, o FROM UNNEST(['a', 'b']) AS x WITH OFFSET AS o
+  ORDER BY o DESC))
+=> "[{\"x\":\"b\",\"o\":1},{\"x\":\"a\",\"o\":0}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT x FROM t LEFT JOIN UNNEST(GENERATE_ARRAY(1, a - 1)) AS x
+  WHERE a IS NOT NULL ORDER BY a, x))
+=> "[null,1,1,2]"
+
+# Unnesting several arrays pads the shorter ones with NULLs, or truncates the longer ones.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#unnest_operator
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT x, y, o FROM UNNEST([1, 2, 3] AS x, ['a'] AS y)
+  WITH OFFSET AS o ORDER BY o))
+=> "[{\"x\":1,\"y\":\"a\",\"o\":0},{\"x\":2,\"y\":null,\"o\":1},{\"x\":3,\"y\":null,\"o\":2}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT x, y FROM UNNEST([1, 2, 3] AS x, ['a', 'b'] AS y,
+  mode => 'TRUNCATE') ORDER BY x))
+=> "[{\"x\":1,\"y\":\"a\"},{\"x\":2,\"y\":\"b\"}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, x, y FROM t, UNNEST([a] AS x,
+  CAST(NULL AS ARRAY<STRING>) AS y) WHERE a IS NOT NULL ORDER BY a))
+=> "[{\"a\":1,\"x\":1,\"y\":null},{\"a\":2,\"x\":2,\"y\":null},{\"a\":3,\"x\":3,\"y\":null}]"
+
+SELECT x FROM UNNEST([1, 2] AS x, [3] AS y, mode => 'STRICT')
+=> error:
+
+## DML
+# Each script changes a temporary copy of t, since the cases share t.
+
+CREATE TEMP TABLE t AS SELECT * FROM scalars.t;
+INSERT INTO t VALUES (10, 'v', b'\x01'), (11, CONCAT('w', 'x'), NULL);
+INSERT INTO t (b, a, raw) VALUES ('reordered', 12, DEFAULT);
+INSERT t (a) SELECT a + 100 FROM t WHERE a IN (1, 2) ORDER BY a;
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b, TO_HEX(raw) AS raw FROM t WHERE a >= 10 ORDER BY a))
+=> "[{\"a\":10,\"b\":\"v\",\"raw\":\"01\"},{\"a\":11,\"b\":\"wx\",\"raw\":null},{\"a\":12,\"b\":\"reordered\",\"raw\":null},{\"a\":101,\"b\":null,\"raw\":null},{\"a\":102,\"b\":null,\"raw\":null}]"
+
+CREATE TEMP TABLE t AS SELECT * FROM scalars.t;
+UPDATE t SET b = CONCAT(b, '!'), raw = DEFAULT WHERE a = 1;
+UPDATE t AS x SET a = x.a * 10 WHERE x.a > 1;
+UPDATE t SET b = s.b FROM (SELECT 30 AS a, 'from' AS b) AS s WHERE t.a = s.a;
+DELETE t WHERE a IS NULL;
+DELETE FROM t WHERE EXISTS (SELECT 1 FROM UNNEST([20]) AS v WHERE v = t.a);
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b, raw IS NULL AS n FROM t ORDER BY a))
+=> "[{\"a\":1,\"b\":\"x!\",\"n\":true},{\"a\":30,\"b\":\"from\",\"n\":false}]"
+
+# A struct field assignment rebuilds the struct around it, keeping the fields it leaves alone, and
+# fails where the struct is NULL.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#update_statement
+CREATE TEMP TABLE st AS SELECT id, s FROM UNNEST([
+  STRUCT(1 AS id, STRUCT(1 AS x, STRUCT('a' AS z, 10 AS w) AS y) AS s),
+  (2, STRUCT(2, NULL)), (3, NULL)]);
+UPDATE st SET s.x = s.x + 100, s.y.z = 'b' WHERE id = 1;
+UPDATE st SET s.y = STRUCT('c', 20) WHERE id = 2;
+SELECT TO_JSON_STRING(ARRAY(SELECT s FROM st WHERE id < 3 ORDER BY id))
+=> "[{\"x\":101,\"y\":{\"z\":\"b\",\"w\":10}},{\"x\":2,\"y\":{\"z\":\"c\",\"w\":20}}]"
+
+CREATE TEMP TABLE st AS SELECT 3 AS id, CAST(NULL AS STRUCT<x INT64>) AS s;
+UPDATE st SET s.x = 1 WHERE id = 3
+=> error:
+
+CREATE TEMP TABLE t AS SELECT * FROM scalars.t;
+MERGE t USING (SELECT 1 AS a, 'one' AS b UNION ALL SELECT 5, 'five') AS s ON t.a = s.a
+WHEN MATCHED THEN UPDATE SET b = s.b
+WHEN NOT MATCHED BY TARGET THEN INSERT (a, b) VALUES (s.a, s.b)
+WHEN NOT MATCHED BY SOURCE AND t.a = 2 THEN DELETE
+WHEN NOT MATCHED BY SOURCE THEN UPDATE SET b = 'gone';
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a, b FROM t ORDER BY a))
+=> "[{\"a\":null,\"b\":\"gone\"},{\"a\":1,\"b\":\"one\"},{\"a\":3,\"b\":\"gone\"},{\"a\":5,\"b\":\"five\"}]"
+
+CREATE TEMP TABLE t AS SELECT * FROM scalars.t;
+MERGE INTO t AS d USING (SELECT 5 AS a, 'five' AS b, CAST(NULL AS BYTES) AS raw
+  UNION ALL SELECT 1, 'new', NULL UNION ALL SELECT 7, 'new', b'z') AS s ON d.a = s.a
+WHEN MATCHED AND d.b = 'x' THEN DELETE
+WHEN NOT MATCHED THEN INSERT ROW;
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t WHERE a IS NOT NULL ORDER BY a))
+=> "[2,3,5,7]"
+
+## CREATE TABLE AS SELECT
+# A column list names the query's columns in order.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_statement
+
+CREATE TEMP TABLE c (n INT64, label STRING) AS SELECT a * 10, b FROM scalars.t WHERE a IS NOT NULL;
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT * FROM c ORDER BY n))
+=> "[{\"n\":10,\"label\":\"x\"},{\"n\":20,\"label\":\"yy\"},{\"n\":30,\"label\":\"あ\"}]"

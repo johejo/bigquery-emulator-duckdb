@@ -159,6 +159,25 @@ SELECT SAFE_NEGATE(1)
 SELECT SAFE_SUBTRACT(1, 2)
 => "-1"
 
+SELECT BYTE_LENGTH('あ')
+=> "3"
+
+SELECT BYTE_LENGTH(b'\x00\xff')
+=> "2"
+
+SELECT BYTE_LENGTH('')
+=> "0"
+
+SELECT BYTE_LENGTH(CAST(NULL AS STRING))
+=> null
+
+SELECT BYTE_LENGTH(CAST(NULL AS BYTES))
+=> null
+
+# A negative length is an error.
+SELECT LEFT('abc', -1)
+=> error:
+
 ## SUBSTR at BigQuery positions
 
 SELECT SUBSTR('abc', 0, 2)
@@ -175,6 +194,9 @@ SELECT SUBSTRING('あいう', 2, 1)
 
 SELECT SUBSTR('abc', 4)
 => ""
+
+SELECT SUBSTR('abc', 1, -1)
+=> error:
 
 ## String functions on bytes
 # A byte that is not valid UTF-8 must stay whole.
@@ -301,6 +323,16 @@ SELECT SHA512(b'\xff') = SHA512(FROM_HEX('ff'))
 
 SELECT INITCAP('hello WORLD-everyone!')
 => "Hello World-Everyone!"
+
+# The position must be positive, the return option 0 or 1, and the pattern valid.
+SELECT REGEXP_INSTR('abc', 'b', 0)
+=> error:
+
+SELECT REGEXP_INSTR('abc', 'b', 1, 1, 2)
+=> error:
+
+SELECT REGEXP_INSTR('abc', '(')
+=> error:
 
 ## GoogleSQL string functions
 # Each case is an edge where DuckDB's counterpart answers differently from BigQuery.
