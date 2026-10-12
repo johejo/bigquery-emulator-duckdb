@@ -349,9 +349,10 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
         }
         std::string out;
         bool is_null = false;
+        // BigQuery preserves the sign of floating-point zero in FORMAT.
         absl::Status status = googlesql::functions::StringFormatUtf8(
             arguments.String(0), values, googlesql::PRODUCT_EXTERNAL, &out, &is_null,
-            /*canonicalize_zero=*/true, /*use_external_float32=*/true);
+            /*canonicalize_zero=*/false, /*use_external_float32=*/true);
         if (!status.ok()) {
           return status;
         }

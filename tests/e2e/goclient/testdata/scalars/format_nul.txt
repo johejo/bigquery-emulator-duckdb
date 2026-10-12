@@ -1,0 +1,4 @@
+# Expected values confirmed against BigQuery.
+# BigQuery truncates %s at the first NUL.
+SELECT FORMAT('%s', x) FROM UNNEST(['a\x00b']) AS x
+=> "a"

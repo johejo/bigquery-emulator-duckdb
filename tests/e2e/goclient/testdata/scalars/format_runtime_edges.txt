@@ -1,0 +1,37 @@
+# Expected values confirmed against BigQuery.
+# Runtime formatting boundaries confirmed against BigQuery.
+
+# Negative dynamic width and precision share code with the formatting library.
+SELECT FORMAT('%*.*f', w, p, 1.25) FROM UNNEST([STRUCT(-8 AS w, -1 AS p)])
+=> "1.250000"
+
+# NULL width must interact correctly with %t, whose NULL value prints as text.
+SELECT FORMAT('%*t', w, CAST(NULL AS STRING)) FROM UNNEST([CAST(NULL AS INT64)]) AS w
+=> null
+
+# A NULL conversion returns NULL before an invalid dynamic width later in the format.
+SELECT FORMAT(f, CAST(NULL AS INT64), 1048577, 1) FROM UNNEST(['%d|%*d']) AS f
+=> null
+
+# BigQuery preserves negative floating-point zero for every conversion.
+SELECT FORMAT('%f|%e|%g|%t|%T', x, x, x, x, x) FROM UNNEST([IEEE_DIVIDE(-1.0, CAST('inf' AS FLOAT64))]) AS x
+=> "-0.000000|-0.000000e+00|-0|-0.0|-0.0"
+
+# %g accepts a precision above 1074 when the resulting string is short.
+SELECT FORMAT('%.*g', p, 1.25) FROM UNNEST([1075]) AS p
+=> "1.25"
+
+# Check the backend's 1 MiB output boundary without returning a huge cell.
+SELECT LENGTH(FORMAT('%*s', w, 'x')) FROM UNNEST([1048576]) AS w
+=> "1048576"
+
+SELECT LENGTH(FORMAT('%*s', w, 'x')) FROM UNNEST([1048577]) AS w
+=> error: Output string too long while evaluating FORMAT; limit 1048576
+
+# REPEAT rejects a string over 1 MiB of UTF-8 bytes before FORMAT is called.
+SELECT LENGTH(FORMAT('%s', x)) FROM UNNEST([REPEAT('あ', 349526)]) AS x
+=> error: Output of REPEAT exceeds max allowed output size of 1MB
+
+# Ensure SAFE. catches an output-limit error at runtime.
+SELECT SAFE.FORMAT('%*s', w, 'x') FROM UNNEST([1048577]) AS w
+=> null

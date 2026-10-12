@@ -1,0 +1,22 @@
+# Expected values confirmed against BigQuery.
+# Follow up the confirmed %s NUL truncation with precision, width and %t/%T.
+# Keep arguments in UNNEST so the emulator must use its runtime formatter.
+
+SELECT FORMAT('%5s|%-5s|%.3s', x, x, x) FROM UNNEST(['a\x00b']) AS x
+=> "    a|a    |a"
+
+# A leading NUL behaves like an empty string for padding.
+SELECT FORMAT('[%3s]', x) FROM UNNEST(['\x00ab']) AS x
+=> "[   ]"
+
+# %t truncates STRING at NUL; %T escapes NUL and the following hex digit.
+SELECT FORMAT('%t|%T', x, x) FROM UNNEST(['a\x00b']) AS x
+=> "a|\"a\\x00\\x62\""
+
+# BYTES formatting also has to preserve or escape non-UTF-8 bytes.
+SELECT FORMAT('%t|%T', x, x) FROM UNNEST([b'a\x00\xffb']) AS x
+=> "a\\x00\\xffb|b\"a\\x00\\xffb\""
+
+# A NUL in the format preserves subsequent specifiers.
+SELECT FORMAT(f, 'a', 'b') FROM UNNEST(['%s\x00%s']) AS f
+=> "a\u0000b"
