@@ -2,11 +2,138 @@ package goclient
 
 import (
 	"context"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
 )
+
+// Tables expose their creation time regardless of how they are created (tables resource's
+// creationTime), and omitted repeated columns read as empty arrays.
+func TestJobTableCreation(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_job_table_creation")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	schema := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		{Name: "tags", Type: bigquery.StringFieldType, Repeated: true},
+	}
+	for _, name := range []string{"api", "ddl", "query", "load", "copy"} {
+		t.Run(name, func(t *testing.T) {
+			wait := func(job *bigquery.Job, err error) {
+				t.Helper()
+				if err != nil {
+					t.Fatal(err)
+				}
+				status, err := job.Wait(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := status.Err(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			run := func(sql string) {
+				t.Helper()
+				query := client.Query(sql)
+				query.DefaultDatasetID = dataset.DatasetID
+				wait(query.Run(ctx))
+			}
+			table := dataset.Table(name)
+			before := time.Now().Truncate(time.Millisecond)
+			switch name {
+			case "api":
+				if err := table.Create(ctx, &bigquery.TableMetadata{
+					Schema: schema, Description: "keep on failure", Labels: map[string]string{"origin": "api"},
+				}); err != nil {
+					t.Fatal(err)
+				}
+			case "ddl":
+				run("CREATE TABLE ddl (id INT64, tags ARRAY<STRING>)")
+			case "query":
+				query := client.Query("SELECT 0 AS id, ['a'] AS tags")
+				query.Dst = table
+				wait(query.Run(ctx))
+			case "load":
+				source := bigquery.NewReaderSource(strings.NewReader("{\"id\":0,\"tags\":[\"a\"]}\n"))
+				source.SourceFormat = bigquery.JSON
+				source.Schema = schema
+				wait(table.LoaderFrom(source).Run(ctx))
+			case "copy":
+				wait(table.CopierFrom(dataset.Table("api")).Run(ctx))
+			}
+			metadata, err := table.Metadata(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if metadata.CreationTime.Before(before) || metadata.CreationTime.After(time.Now()) {
+				t.Fatalf("creation time = %v, want a time during creation", metadata.CreationTime)
+			}
+			if !reflect.DeepEqual(metadata.Schema, schema) {
+				t.Fatalf("schema = %v, want %v", metadata.Schema, schema)
+			}
+			id := "1"
+			if name == "copy" {
+				id = "2" // Distinguish this row from the one copied from api.
+			}
+			run("INSERT " + name + " (id) VALUES (" + id + ")")
+			query := client.Query("SELECT ARRAY_LENGTH(tags) AS n FROM " + name + " WHERE id = " + id)
+			query.DefaultDatasetID = dataset.DatasetID
+			rows, err := query.Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var row struct{ N int64 }
+			if err := rows.Next(&row); err != nil || row.N != 0 {
+				t.Fatalf("omitted repeated column: row = %+v, error = %v", row, err)
+			}
+		})
+	}
+
+	// A failed load must roll back both a new table and a replacement, including metadata.
+	for _, name := range []string{"failed", "api"} {
+		table := dataset.Table(name)
+		var before *bigquery.TableMetadata
+		if name == "api" {
+			var err error
+			before, err = table.Metadata(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		source := bigquery.NewReaderSource(strings.NewReader("{\"id\":null}\n"))
+		source.SourceFormat = bigquery.JSON
+		source.Schema = bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType, Required: true}}
+		loader := table.LoaderFrom(source)
+		loader.WriteDisposition = bigquery.WriteTruncate
+		job, err := loader.Run(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		status, err := job.Wait(ctx)
+		if err != nil || status.Err() == nil {
+			t.Fatalf("failed load: status = %v, error = %v", status, err)
+		}
+		after, err := table.Metadata(ctx)
+		if before == nil {
+			if err == nil {
+				t.Fatal("failed load left a table behind")
+			}
+		} else if err != nil || !after.CreationTime.Equal(before.CreationTime) ||
+			!reflect.DeepEqual(after.Schema, before.Schema) || after.NumRows != before.NumRows ||
+			after.Description != before.Description || !reflect.DeepEqual(after.Labels, before.Labels) {
+			t.Fatalf("failed replacement changed table: before = %+v, after = %+v, error = %v", before, after, err)
+		}
+	}
+}
 
 func TestQueryToADestinationTable(t *testing.T) {
 	ctx := context.Background()
@@ -20,8 +147,9 @@ func TestQueryToADestinationTable(t *testing.T) {
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 
 	table := dataset.Table("results")
+	var creationTime time.Time
 	for _, disposition := range []bigquery.TableWriteDisposition{
-		bigquery.WriteEmpty, bigquery.WriteAppend,
+		bigquery.WriteEmpty, bigquery.WriteTruncate, bigquery.WriteAppend,
 	} {
 		query := client.Query("SELECT 1 AS n")
 		query.Dst = table
@@ -34,6 +162,17 @@ func TestQueryToADestinationTable(t *testing.T) {
 		if err := it.Next(&row); err != nil || row.N != 1 {
 			t.Errorf("got row %+v (%v) with %s, want {1}", row, err, disposition)
 		}
+		metadata, err := table.Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !metadata.CreationTime.After(time.Unix(0, 0)) {
+			t.Fatal("destination table has no creation time")
+		}
+		if disposition == bigquery.WriteAppend && !metadata.CreationTime.Equal(creationTime) {
+			t.Fatalf("append changed creation time from %v to %v", creationTime, metadata.CreationTime)
+		}
+		creationTime = metadata.CreationTime
 	}
 
 	metadata, err := table.Metadata(ctx)

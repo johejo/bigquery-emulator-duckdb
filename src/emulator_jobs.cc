@@ -20,7 +20,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
-#include "src/column_metadata.h"
+#include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/extract.h"
@@ -31,6 +31,7 @@
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/temporary_files.h"
+#include "src/translated_statement.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -394,14 +395,17 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // schema rather than as whatever DuckDB computed.
     if (const std::optional<std::string> columns = ColumnDefinitions(schema)) {
       statements.push_back(std::format("CREATE TABLE {} ({})", target, *columns));
-      std::ranges::move(ColumnCommentStatements(destination, schema),
-                        std::back_inserter(statements));
-      std::ranges::move(RepeatedColumnDefaultStatements(destination, schema),
-                        std::back_inserter(statements));
-      statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
     } else {
-      statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table);
+      statements.push_back("CREATE TABLE " + target + " AS SELECT * FROM " + result_table +
+                           " LIMIT 0");
     }
+    // Creation and its schema, defaults and table metadata commit together, as for DDL and REST.
+    // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
+    std::ranges::move(
+        CreateTableWrite(TableDefinition{.table = destination, .schema = schema, .metadata = {}})
+            .metadata_statements,
+        std::back_inserter(statements));
+    statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
   } else {
     if (write == WriteDisposition::kWriteTruncateData) {
       statements.push_back("DELETE FROM " + target);
