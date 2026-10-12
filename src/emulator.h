@@ -216,16 +216,17 @@ class Emulator {
   // The tables of ListTables, each with its type.
   std::vector<TableListEntry> ListTableEntries(DatasetReference dataset);
   TableInfo GetTable(TableReference table, bool include_row_count = true, bool expire = true);
-  void CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
-                   const TableMetadata& metadata = {});
-  void CreateView(TableReference table, const nlohmann::json& definition,
-                  const TableMetadata& metadata = {});
+  // Return the mutation result before another request can expire the relation.
+  TableInfo CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+                        const TableMetadata& metadata = {});
+  TableInfo CreateView(TableReference table, const nlohmann::json& definition,
+                       const TableMetadata& metadata = {});
   // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
   // `view`, and either the metadata `metadata`. What is left out is kept, including the fields
   // of `view` it omits.
-  void UpdateTable(TableReference table, const std::optional<std::vector<FieldSchema>>& schema,
-                   const std::optional<nlohmann::json>& view,
-                   const std::optional<TableMetadata>& metadata = std::nullopt);
+  TableInfo UpdateTable(TableReference table, const std::optional<std::vector<FieldSchema>>& schema,
+                        const std::optional<nlohmann::json>& view,
+                        const std::optional<TableMetadata>& metadata = std::nullopt);
   void DeleteTable(TableReference table);
   // The persistent UDFs of `dataset`, sorted by id.
   std::vector<Routine> ListRoutines(DatasetReference dataset);
@@ -299,6 +300,9 @@ class Emulator {
                                const std::string& sql, const std::vector<FieldSchema>& schema,
                                const std::vector<std::string>& setup, bool count_only = false);
 
+  // Mutations also hold this while reading their response. Recursive because their catalog
+  // lookups may expire other relations on the same thread.
+  std::recursive_mutex expiration_mutex_;
   Backend backend_;
   bool has_session_user_;
   GcsClient gcs_client_;
