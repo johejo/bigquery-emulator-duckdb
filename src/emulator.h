@@ -256,6 +256,12 @@ class Emulator {
   TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
                                 const std::string& default_project,
                                 const std::string& default_dataset);
+  // What gives the columns of `table`, created with `schema` rather than by CREATE TABLE, the
+  // defaults of their defaultValueExpression, translated as CREATE TABLE ... DEFAULT translates
+  // them. Throws ApiError::Invalid for an expression BigQuery would reject or the emulator cannot
+  // translate.
+  std::vector<std::string> ColumnDefaultStatements(const TableReference& table,
+                                                   const std::vector<FieldSchema>& schema);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
                       bool null_arrays = false);
   // Runs `translation` as a query job without a destination table does, recording the metadata

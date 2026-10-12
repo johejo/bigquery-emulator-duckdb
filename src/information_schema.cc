@@ -50,6 +50,9 @@ Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 constexpr const char* kEmptyArray = "[]";
 
+// An unset description or default, which the table resource omits, is NULL.
+Cell OptionalString(const std::string& value) { return value.empty() ? kNull : String(value); }
+
 const std::vector<ViewColumn>& SchemataColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
       {.name = "catalog_name", .type = FieldType::kString},
@@ -245,7 +248,7 @@ absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& t
       String(column),
       String(path),
       String(*type),
-      kNull,
+      OptionalString(field.description),
       kNull,
       kNull,
       kEmptyArray,
@@ -353,7 +356,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
             String("NO"),
             kNull,
             kNull,
-            kNull,
+            OptionalString(field.default_value_expression),
             kNull,
             kEmptyArray,
             String("NO"),

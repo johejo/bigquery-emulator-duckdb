@@ -241,6 +241,28 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       sql += (sql.empty() ? "" : " UNION ALL ") + std::string("SELECT * FROM ") +
              QualifiedName(source);
     }
+    // BigQuery cannot append a copy to a table whose additional columns have defaults
+    // (https://cloud.google.com/bigquery/docs/default-values#limitations).
+    if (copy.write_disposition == WriteDisposition::kWriteAppend) {
+      std::vector<FieldSchema> destination;
+      try {
+        destination = GetTable(copy.destination_table).schema;
+      } catch (const ApiError& error) {
+        if (error.http_status() != 404) {
+          throw;
+        }
+      }
+      for (const FieldSchema& field : destination) {
+        const bool copied = std::ranges::any_of(schema, [&](const FieldSchema& column) {
+          return ToLowerAscii(column.name) == ToLowerAscii(field.name);
+        });
+        if (!copied && !field.default_value_expression.empty()) {
+          throw ApiError::Invalid("Cannot append a copy to " + TableName(copy.destination_table) +
+                                  ": column " + field.name +
+                                  " has a default value and is not in the source table");
+        }
+      }
+    }
     const QueryResult result =
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
                          copy.write_disposition, sql, schema, {}, true);
@@ -405,6 +427,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
         CreateTableWrite(TableDefinition{.table = destination, .schema = schema, .metadata = {}})
             .metadata_statements,
         std::back_inserter(statements));
+    std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
     statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
   } else {
     if (write == WriteDisposition::kWriteTruncateData) {

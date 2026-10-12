@@ -17,6 +17,12 @@ Table and view expiration is stored through REST `expirationTime` or DDL
 when the catalog is read, including before query analysis, and are treated as missing. Dataset
 default expiration and partition expiration remain unsupported.
 
+Column defaults from DDL `DEFAULT` or a schema's `defaultValueExpression` apply alike to tables
+created by DDL, `tables.insert`, and load and copy jobs, and `INFORMATION_SCHEMA.COLUMNS` reports
+them as `column_default`. `tables.update` and `tables.patch` cannot add or change a default, the
+Storage Write API cannot write to a table with defaults, and `CREATE TABLE COPY` and `CLONE`
+cannot copy one.
+
 Logical views support `CREATE [OR REPLACE] VIEW`, `CREATE VIEW IF NOT EXISTS`, `DROP VIEW`
 and REST table creation, lookup, listing and deletion. Query views with SQL; `tabledata.list`
 cannot read them. Temporary, recursive and value-table views, and views that read temporary

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <format>
 #include <memory>
 #include <optional>
 #include <set>
@@ -210,6 +211,50 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   }
   CheckRoutine(*translated, catalog);
   return *std::move(translated);
+}
+
+std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference& table,
+                                                           const std::vector<FieldSchema>& schema) {
+  std::vector<std::string> statements;
+  for (const FieldSchema& field : schema) {
+    if (field.default_value_expression.empty()) {
+      continue;
+    }
+    googlesql::TypeFactory type_factory;
+    const absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+    if (!type.ok()) {
+      throw ApiError::Invalid(std::string(type.status().message()));
+    }
+    const AnalyzerSettings settings{.default_project = table.project_id};
+    // A default cannot read tables, so they need not be expired first.
+    const auto source = NewTableSource(nullptr, /*expire=*/false);
+    RoutineCatalog catalog(*source, &type_factory, table.project_id, "");
+    const absl::StatusOr<AnalyzerResult> analyzed = AnalyzeScriptExpression(
+        field.default_value_expression, nullptr, *type, catalog, type_factory, settings);
+    if (!analyzed.ok()) {
+      throw ApiError::Invalid("Invalid default value for field " + field.name + ": " +
+                              std::string(analyzed.status().message()));
+    }
+    std::string unsupported;
+    const std::optional<std::string> query =
+        TranslateExpression(analyzed->expression(), {},
+                            DefaultDataset{
+                                .project = table.project_id,
+                                .dataset = {},
+                                .temporary = nullptr,
+                                .has_session_user = has_session_user_,
+                            },
+                            &unsupported, nullptr);
+    if (!query.has_value()) {
+      throw ApiError::Invalid("The emulator does not support " + unsupported +
+                              " in the default value of field " + field.name);
+    }
+    // TranslateExpression returns the expression as a query, "SELECT <expression>".
+    statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
+                                     QualifiedName(table), QuoteIdentifier(field.name),
+                                     query->substr(std::string_view("SELECT ").size())));
+  }
+  return statements;
 }
 
 std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
