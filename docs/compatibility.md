@@ -12,8 +12,10 @@ the construct.
 
 ## Tables and views
 
-Table and view expiration is stored through REST `expirationTime` or DDL
-`expiration_timestamp` (TIMESTAMP literals or NULL). Expired tables and views are deleted lazily
+Table and view expiration is stored through REST `expirationTime`, DDL
+`expiration_timestamp` (TIMESTAMP literals or NULL), or a copy job's `destinationExpirationTime`,
+which applies only when the job creates its destination; a copy with one to an existing table is
+rejected. Expired tables and views are deleted lazily
 when the catalog is read, including before query analysis, and are treated as missing. Dataset
 default expiration and partition expiration remain unsupported.
 

@@ -30,6 +30,7 @@
 #include "src/parquet_metadata.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
+#include "src/table_metadata.h"
 #include "src/temporary_files.h"
 #include "src/translated_statement.h"
 
@@ -263,9 +264,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         }
       }
     }
+    TableMetadata metadata;
+    metadata.expiration_time = copy.destination_expiration_time;
     const QueryResult result =
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
-                         copy.write_disposition, sql, schema, {}, true);
+                         copy.write_disposition, sql, schema, {}, true, metadata);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job.result = QueryResult{};
   });
@@ -354,7 +357,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                                        CreateDisposition create, WriteDisposition write,
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
-                                       const std::vector<std::string>& setup, bool count_only) {
+                                       const std::vector<std::string>& setup, bool count_only,
+                                       const TableMetadata& metadata) {
   std::set<std::string> names;
   std::string duplicates;
   for (const FieldSchema& field : schema) {
@@ -393,6 +397,12 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
     throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
   }
+  // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
+  if (existing.has_value() && !metadata.empty()) {
+    throw ApiError::Invalid(
+        "The emulator does not support setting the expiration of an existing destination table " +
+        TableName(destination));
+  }
 
   // The result is materialized first, which runs the query once even when it reads the
   // destination itself. DuckDB lets a transaction write to a single database, so the temporary
@@ -424,7 +434,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // Creation and its schema, defaults and table metadata commit together, as for DDL and REST.
     // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
     std::ranges::move(
-        CreateTableWrite(TableDefinition{.table = destination, .schema = schema, .metadata = {}})
+        CreateTableWrite(
+            TableDefinition{.table = destination, .schema = schema, .metadata = metadata})
             .metadata_statements,
         std::back_inserter(statements));
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));

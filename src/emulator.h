@@ -112,6 +112,8 @@ struct CopyJob {
   TableReference destination_table;
   CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
   WriteDisposition write_disposition = WriteDisposition::kWriteEmpty;
+  // destinationExpirationTime, in milliseconds since the Unix epoch.
+  std::optional<int64_t> destination_expiration_time;
   // The request's configuration.copy.
   nlohmann::json configuration;
 };
@@ -300,11 +302,13 @@ class Emulator {
   std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,
                                     const std::function<void(Job&)>& body);
   // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`
-  // with the given dispositions. Returns the query's result.
+  // with the given dispositions. A table the write creates takes `metadata`; a write to an
+  // existing table rejects metadata. Returns the query's result.
   QueryResult WriteDestination(const std::string& project_id, TableReference destination,
                                CreateDisposition create, WriteDisposition write,
                                const std::string& sql, const std::vector<FieldSchema>& schema,
-                               const std::vector<std::string>& setup, bool count_only = false);
+                               const std::vector<std::string>& setup, bool count_only = false,
+                               const TableMetadata& metadata = {});
 
   // Mutations also hold this while reading their response. Recursive because their catalog
   // lookups may expire other relations on the same thread.

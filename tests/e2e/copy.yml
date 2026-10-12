@@ -1,4 +1,4 @@
-desc: bq cp copies tables and applies append and replace dispositions
+desc: bq cp copies tables, applies append and replace dispositions and sets an expiration
 steps:
   mk_dataset:
     exec:
@@ -32,6 +32,15 @@ steps:
     exec:
       command: tests/e2e/bq.sh head --format=json copy_e2e.target
     test: current.exit_code == 0 && trim(current.stdout) == '[{"id":"1"}]'
+  # bq cp --expiration sends destinationExpirationTime, which the new table takes.
+  copy_expiring:
+    exec:
+      command: tests/e2e/bq.sh cp --expiration 3600 copy_e2e.source copy_e2e.expiring
+    test: current.exit_code == 0
+  expiring_table:
+    exec:
+      command: tests/e2e/bq.sh show --format=json copy_e2e.expiring
+    test: current.exit_code == 0 && current.stdout contains '"expirationTime"'
   rm_dataset:
     exec:
       command: tests/e2e/bq.sh rm -r -f -d copy_e2e
