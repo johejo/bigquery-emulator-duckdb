@@ -16,6 +16,13 @@ CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT
 CREATE TEMP FUNCTION f(`x-y` FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT 1
 => error contains: The emulator does not support
 
+# LANGUAGE js takes a function body, not code that closes it and supplies another function.
+CREATE TEMP FUNCTION f() RETURNS FLOAT64 LANGUAGE js AS "}); (function() { return 1;"; SELECT f()
+=> error:
+
+CREATE TEMP FUNCTION f() RETURNS FLOAT64 LANGUAGE js AS "} || function() { return 1;"; SELECT f()
+=> error:
+
 BEGIN CREATE TEMP FUNCTION f(x INT64) OPTIONS (description = 'ignored') AS (x); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support
 
