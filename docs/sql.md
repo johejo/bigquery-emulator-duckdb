@@ -20,8 +20,8 @@ the probe's own notes name what it rejected.
 | Status | Features |
 | --- | --- |
 | Partial | 19 |
-| Supported | 59 |
-| Unsupported | 17 |
+| Supported | 60 |
+| Unsupported | 18 |
 
 ## Queries
 
@@ -73,8 +73,10 @@ the probe's own notes name what it rejected.
 | `UPDATE` | Supported |  |
 | `UPDATE` of a struct field | Supported |  |
 | `UPDATE ... FROM` | Supported | Rejects multiple source matches per target row before applying any updates |
-| `UPDATE` of array elements | Unsupported | UPDATE of array elements or nested DML |
-| Nested DML | Unsupported | UPDATE of array elements or nested DML |
+| `UPDATE` rebuilding an array | Supported |  |
+| `UPDATE` of array elements | Unsupported | array element assignment in UPDATE ... SET |
+| Nested `UPDATE` | Unsupported | BigQuery rejects nested UPDATE; rebuild the array with SET column = ARRAY(SELECT ...) instead; nested UPDATE |
+| Nested DML | Unsupported | nested INSERT or DELETE |
 | `DELETE` | Supported |  |
 | `TRUNCATE TABLE` | Supported |  |
 | `MERGE` | Supported | Rejects multiple source matches when a matched UPDATE clause exists and a matched action applies |

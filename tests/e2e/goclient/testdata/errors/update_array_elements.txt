@@ -1,0 +1,32 @@
+# BigQuery answers collected with bqanswers on 2026-10-12. GoogleSQL resolves these
+# forms, but BigQuery rejects them before inspecting the array or its offset.
+# BigQuery reports "UPDATE ... SET does not support array modification with []"
+# and "Nested UPDATE not yet supported."; check the emulator's unsupported diagnostic.
+
+CREATE TEMP TABLE ua AS SELECT [1, 2] AS a;
+UPDATE ua SET a[OFFSET(0)] = 9 WHERE TRUE;
+=> error contains: The emulator does not support array element assignment in UPDATE ... SET
+
+CREATE TEMP TABLE ua AS SELECT ARRAY<INT64>[] AS a;
+UPDATE ua SET a[OFFSET(0)] = 9 WHERE TRUE;
+=> error contains: The emulator does not support array element assignment in UPDATE ... SET
+
+CREATE TEMP TABLE ua AS SELECT [1, 2] AS a;
+UPDATE ua SET a[OFFSET(NULL)] = 9 WHERE TRUE;
+=> error contains: The emulator does not support array element assignment in UPDATE ... SET
+
+CREATE TEMP TABLE ua AS SELECT [1, 2] AS a;
+UPDATE ua SET a[ORDINAL(0)] = 9 WHERE TRUE;
+=> error contains: The emulator does not support array element assignment in UPDATE ... SET
+
+CREATE TEMP TABLE ua AS SELECT [STRUCT(1 AS x, 2 AS y)] AS a;
+UPDATE ua SET a[OFFSET(0)].x = 9, a[OFFSET(0)].y = 8 WHERE TRUE;
+=> error contains: The emulator does not support array element assignment in UPDATE ... SET
+
+CREATE TEMP TABLE nu AS SELECT [1, 2] AS a;
+UPDATE nu SET (UPDATE a AS e SET e = 9 WHERE TRUE) WHERE TRUE;
+=> error contains: The emulator does not support nested UPDATE
+
+CREATE TEMP TABLE nu AS SELECT [STRUCT(1 AS value, 'a' AS label), (2, 'b')] AS items;
+UPDATE nu SET (UPDATE items AS item SET item.value = item.value + 10 WHERE item.value = 1) WHERE TRUE;
+=> error contains: The emulator does not support nested UPDATE

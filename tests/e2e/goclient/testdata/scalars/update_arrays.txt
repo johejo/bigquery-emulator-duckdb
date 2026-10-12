@@ -1,0 +1,29 @@
+# UPDATE replaces a repeated field with a rebuilt array. Expected values follow
+# the documented UPDATE repeated-record examples and ARRAY/UNNEST semantics:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#update_repeated_records
+# https://cloud.google.com/bigquery/docs/arrays#filtering_arrays
+# WITH OFFSET and ORDER BY preserve element order explicitly.
+
+CREATE TEMP TABLE ua AS SELECT [1, 2, 3] AS a;
+UPDATE ua SET a = ARRAY(SELECT IF(i = 1, e + 10, e) FROM UNNEST(a) AS e WITH OFFSET AS i ORDER BY i) WHERE TRUE;
+SELECT TO_JSON_STRING(a) FROM ua;
+=> "[1,12,3]"
+
+CREATE TEMP TABLE ua AS SELECT [STRUCT(1 AS value, 'a' AS label), (2, 'b')] AS items;
+UPDATE ua SET items = ARRAY(
+  SELECT AS STRUCT IF(item.value = 1, item.value + 10, item.value) AS value, item.label
+  FROM UNNEST(items) AS item WITH OFFSET AS i ORDER BY i
+) WHERE TRUE;
+SELECT TO_JSON_STRING(items) FROM ua;
+=> "[{\"value\":11,\"label\":\"a\"},{\"value\":2,\"label\":\"b\"}]"
+
+CREATE TEMP TABLE ua AS SELECT ARRAY<INT64>[] AS a;
+UPDATE ua SET a = ARRAY(SELECT e + 10 FROM UNNEST(a) AS e WITH OFFSET AS i ORDER BY i) WHERE TRUE;
+SELECT TO_JSON_STRING(a) FROM ua;
+=> "[]"
+
+# RHS expressions read the original row, including the original scalar column.
+CREATE TEMP TABLE ua AS SELECT 10 AS delta, [1, 2] AS a;
+UPDATE ua SET delta = 20, a = ARRAY(SELECT e + delta FROM UNNEST(a) AS e WITH OFFSET AS i ORDER BY i) WHERE TRUE;
+SELECT TO_JSON_STRING(STRUCT(delta, a)) FROM ua;
+=> "{\"delta\":20,\"a\":[11,12]}"

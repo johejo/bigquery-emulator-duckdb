@@ -118,10 +118,17 @@ std::optional<std::string> UpdateItems(
   std::vector<int> order;
   std::map<int, UpdateNode> nodes;
   for (const auto& item : items) {
+    // GoogleSQL resolves these forms, but BigQuery rejects them. Keep the rejection
+    // explicit rather than treating reference implementation support as BigQuery support.
+    if (!item->update_item_element_list().empty()) {
+      return Unsupported(scope, "array element assignment in UPDATE ... SET");
+    }
+    if (!item->update_list().empty()) {
+      return Unsupported(scope, "nested UPDATE");
+    }
     if (item->set_value() == nullptr || item->element_column() != nullptr ||
-        !item->update_item_element_list().empty() || !item->delete_list().empty() ||
-        !item->update_list().empty() || !item->insert_list().empty()) {
-      return Unsupported(scope, "UPDATE of array elements or nested DML");
+        !item->delete_list().empty() || !item->insert_list().empty()) {
+      return Unsupported(scope, "nested INSERT or DELETE");
     }
     std::vector<int> path;
     const googlesql::ResolvedExpr* target_expr = item->target();
