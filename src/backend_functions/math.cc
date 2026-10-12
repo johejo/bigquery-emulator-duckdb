@@ -171,6 +171,10 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
   const std::vector<duckdb_logical_type> two = {type.get(), type.get()};
   Register(connection, ("bq_pow" + suffix).c_str(), two, type.get(), Apply<fn::Pow<T>>);
   Register(connection, "bq_div_numeric", two, type.get(), Apply<fn::DivideToIntegralValue<T>>);
+  Register(connection, "bq_multiply_numeric", two, type.get(), Apply<fn::Multiply<T>>);
+  Register(connection, "bq_divide_numeric", two, type.get(), Apply<fn::Divide<T>>);
+  Register(connection, "bq_safe_divide_numeric", two, type.get(),
+           Apply<fn::Divide<T>, Errors::kNull>);
   Register(connection, ("bq_log" + suffix).c_str(), two, type.get(), Apply<fn::Logarithm<T>>);
   Register(connection, "bq_parse_numeric", {kVarchar}, type.get(), Apply<fn::ParseNumeric>);
 }
