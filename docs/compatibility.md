@@ -36,9 +36,8 @@ weights. The implementation collects the input rows before grouping them, so its
 grows with the input size rather than only with the requested number of results. Equal sums
 have no guaranteed order.
 
-INTERVAL and RANGE keys, requested counts above 100000, and overflowing sums of finite FLOAT64
-weights are unsupported. BigQuery answers for the latter two boundaries are pending under
-`tests/e2e/goclient/testdata/unverified/approx_top_sum.txt`.
+INTERVAL and RANGE keys are unsupported. Requested counts above 10000 and overflowing sums of
+finite FLOAT64 weights raise errors, as in BigQuery.
 
 ## User-defined functions
 

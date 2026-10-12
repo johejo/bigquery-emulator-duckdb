@@ -163,3 +163,17 @@ SELECT TO_JSON_STRING(APPROX_TOP_SUM('a', 2, 2)) FROM UNNEST([1, 2]) x WHERE FAL
 
 SELECT APPROX_TOP_SUM('a', 2, 1)[OFFSET(0)].sum + COUNT(*) FROM UNNEST([1, 2]) x
 => "6"
+
+# BigQuery answers supplied for finite FLOAT64 overflow and the count limit.
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT("a" AS x, 1e308 AS w), ("a", 1e308)])
+=> error contains: double overflow
+
+SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 100001)) FROM UNNEST([1]) x
+=> error contains: The last argument to approx_top_sum_shard cannot be greater than 10000
+
+# The reported upper bound is inclusive.
+SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 10000)) FROM UNNEST([1]) x
+=> "1"
+
+SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 10001)) FROM UNNEST([1]) x
+=> error contains: The last argument to approx_top_sum_shard cannot be greater than 10000

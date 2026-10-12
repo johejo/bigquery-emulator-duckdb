@@ -45,6 +45,8 @@ func TestApproxTopSumInvalidCountParameter(t *testing.T) {
 	for _, count := range []bigquery.NullInt64{
 		{Int64: 0, Valid: true},
 		{Int64: -1, Valid: true},
+		{Int64: 10001, Valid: true},
+		{Int64: 100001, Valid: true},
 		{Valid: false},
 	} {
 		query := client.Query("SELECT APPROX_TOP_SUM(x, 1, @n) FROM UNNEST(@input) x")
@@ -53,7 +55,7 @@ func TestApproxTopSumInvalidCountParameter(t *testing.T) {
 			{Name: "input", Value: []int64{1, 2}},
 		}
 		if _, err := query.Read(context.Background()); err == nil {
-			t.Errorf("count %+v: want an error for a NULL or nonpositive count", count)
+			t.Errorf("count %+v: want an error for an invalid count", count)
 		}
 	}
 }

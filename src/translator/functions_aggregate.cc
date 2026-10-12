@@ -54,11 +54,7 @@ std::string TopSum(const std::string& sql, const std::vector<std::string>& argum
     sum = "CAST(bq_bignumeric_sum(CAST(" + sum + " AS VARCHAR)) AS BIGNUM)";
   } else {
     sum = "CASE WHEN isinf(" + sum + ") AND NOT bool_or(isinf(" + weight + ")) THEN " +
-          Raise(
-              "'The emulator does not support APPROX_TOP_SUM with overflowing finite FLOAT64 "
-              "weights'",
-              false) +
-          " ELSE " + sum + " END";
+          Raise("'double overflow; error in APPROX_TOP_SUM'", false) + " ELSE " + sum + " END";
   }
   const std::string& count = arguments.at(2);
   const std::string limit =
@@ -66,9 +62,8 @@ std::string TopSum(const std::string& sql, const std::vector<std::string>& argum
       Raise("'The second argument to APPROX_TOP_SUM function must not be NULL'", false) + " WHEN " +
       count + " <= 0 THEN " +
       Raise("'The second argument to APPROX_TOP_SUM function must be positive'", false) + " WHEN " +
-      count + " > 100000 THEN " +
-      Raise("'The emulator does not support APPROX_TOP_SUM with number greater than 100000'",
-            false) +
+      count + " > 10000 THEN " +
+      Raise("'The last argument to approx_top_sum_shard cannot be greater than 10000'", false) +
       " ELSE " + count + " END";
   return "(SELECT list_slice(list({'value': v, 'sum': s} ORDER BY s DESC NULLS LAST), 1, " + limit +
          ") FROM "
