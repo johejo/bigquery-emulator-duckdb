@@ -17,11 +17,13 @@ the probe's own notes name what it rejected.
 - **Unsupported**: the emulator rejects every query as unsupported.
 - **Broken**: a query translates but fails on DuckDB, which is a bug.
 
-| Status | Features |
-| --- | --- |
-| Partial | 19 |
-| Supported | 60 |
-| Unsupported | 9 |
+| Section | Supported | Partial | Unsupported |
+| --- | --- | --- | --- |
+| [Queries](#queries) | 28 | 5 | 1 |
+| [DML](#dml) | 9 | 0 | 0 |
+| [DDL](#ddl) | 11 | 10 | 7 |
+| [Multi-statement queries](#multi-statement-queries) | 8 | 4 | 1 |
+| [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
 ## Queries
 

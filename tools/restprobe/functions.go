@@ -45,14 +45,33 @@ func mainDoc(f *function) string {
 	return f.Docs[0]
 }
 
-// categories names the pages that document the function, which name its categories.
-func categories(f *function) string {
-	pages := map[string]bool{}
-	for _, doc := range f.Docs {
-		page, _, _ := strings.Cut(doc, "#")
-		pages[page] = true
+// categoryTitles names the pages whose titles words do not spell.
+var categoryTitles = map[string]string{
+	"aggregate-dp-functions":   "Differentially private aggregate functions",
+	"objectref_functions":      "ObjectRef functions",
+	"table-functions-built-in": "Built-in table functions",
+	"vectorindex_functions":    "Vector index functions",
+}
+
+// acronyms are the words of page names that titles spell in capitals.
+var acronyms = map[string]bool{"aead": true, "dlp": true, "hll": true, "json": true, "kll": true,
+	"sql": true}
+
+// category titles the page that documents the function, such as "String functions" for
+// string_functions.
+func category(f *function) string {
+	page, _, _ := strings.Cut(mainDoc(f), "#")
+	if title, ok := categoryTitles[page]; ok {
+		return title
 	}
-	return strings.Join(sortedNames(pages), ", ")
+	words := strings.FieldsFunc(page, func(r rune) bool { return r == '_' || r == '-' })
+	for i, word := range words {
+		if acronyms[word] {
+			words[i] = strings.ToUpper(word)
+		}
+	}
+	title := strings.Join(words, " ")
+	return strings.ToUpper(title[:1]) + title[1:]
 }
 
 // probeFunctions runs the calls that the function probe at path builds from args on emulators
@@ -120,8 +139,8 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 		results[j.function] = append(results[j.function], probes[i])
 	}
 
-	totals := map[string]int{}
-	var body bytes.Buffer
+	rows := map[string][]string{}
+	counts := map[string]map[string]int{}
 	for _, f := range functions {
 		all := results[f]
 		for _, detail := range f.Untested {
@@ -133,24 +152,41 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 		if len(all) == 0 {
 			continue
 		}
-		counts := map[outcome]int{}
+		outcomes := map[outcome]int{}
 		notes := map[string]bool{}
 		for _, p := range all {
-			counts[p.outcome]++
+			outcomes[p.outcome]++
 			if p.outcome != runs {
 				notes[p.detail] = true
 			}
 		}
-		st := status(counts)
-		totals[st]++
+		st := status(outcomes)
+		c := category(f)
+		if counts[c] == nil {
+			counts[c] = map[string]int{}
+		}
+		counts[c][st]++
 		note := slices.DeleteFunc([]string{f.Note}, func(s string) bool { return s == "" })
 		note = append(note, sortedNames(notes)...)
-		fmt.Fprintf(&body, "| [`%s`](%s/%s) | %s | %s | %s | %s |\n", f.Name, functionDocs, mainDoc(f),
-			categories(f), st, f.Implementation, escape(strings.Join(note, "; ")))
+		rows[c] = append(rows[c], fmt.Sprintf("| [`%s`](%s/%s) | %s | %s | %s |\n", f.Name,
+			functionDocs, mainDoc(f), st, f.Implementation, escape(strings.Join(note, "; "))))
+	}
+	// Sort categories as words, so that "Date functions" precedes "DLP functions".
+	categories := sortedNames(rows)
+	slices.SortFunc(categories, func(a, b string) int {
+		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	})
+	var tallies []tally
+	for _, c := range categories {
+		tallies = append(tallies, tally{c, counts[c]})
 	}
 	fmt.Fprint(w, functionsPreamble)
-	writeTotals(w, "Functions", totals)
-	fmt.Fprint(w, "\n| Function | Category | Status | Implementation | Notes |\n| --- | --- | --- | --- | --- |\n")
-	_, err = body.WriteTo(w)
-	return err
+	writeSummary(w, "Category", tallies)
+	for _, c := range categories {
+		fmt.Fprintf(w, "\n## %s\n\n| Function | Status | Implementation | Notes |\n| --- | --- | --- | --- |\n", c)
+		for _, row := range rows[c] {
+			fmt.Fprint(w, row)
+		}
+	}
+	return nil
 }

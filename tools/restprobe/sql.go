@@ -158,11 +158,12 @@ func probeSQL(w io.Writer, binary, path string) error {
 		results[j.feature] = append(results[j.feature], probes[i])
 	}
 
-	totals := map[string]int{}
+	var tallies []tally
 	var invalid []string
 	var body bytes.Buffer
 	for _, s := range sections {
 		fmt.Fprintf(&body, "## %s\n\n| Feature | Status | Notes |\n| --- | --- | --- |\n", s.title)
+		t := tally{s.title, map[string]int{}}
 		for _, f := range s.features {
 			counts := map[outcome]int{}
 			notes := map[string]bool{}
@@ -175,7 +176,7 @@ func probeSQL(w io.Writer, binary, path string) error {
 				}
 			}
 			st := status(counts)
-			totals[st]++
+			t.counts[st]++
 			all := []string{}
 			if f.note != "" {
 				all = append(all, f.note)
@@ -183,6 +184,7 @@ func probeSQL(w io.Writer, binary, path string) error {
 			all = append(all, sortedNames(notes)...)
 			fmt.Fprintf(&body, "| %s | %s | %s |\n", escape(f.name), st, escape(strings.Join(all, "; ")))
 		}
+		tallies = append(tallies, t)
 		body.WriteString("\n")
 	}
 	// Every query is written by hand, so one the analyzer rejects is a mistake in the file.
@@ -190,7 +192,7 @@ func probeSQL(w io.Writer, binary, path string) error {
 		return fmt.Errorf("not valid GoogleSQL:\n%s", strings.Join(invalid, "\n"))
 	}
 	fmt.Fprint(w, sqlPreamble)
-	writeTotals(w, "Features", totals)
+	writeSummary(w, "Section", tallies)
 	fmt.Fprint(w, "\n", strings.TrimSuffix(body.String(), "\n"))
 	return nil
 }

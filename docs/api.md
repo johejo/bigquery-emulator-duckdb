@@ -20,11 +20,16 @@ rejected as unsupported.
 - **Broken**: a request fails with an internal error, which is a bug.
 - **Untested**: the probe's request failed for another reason.
 
-| Status | Methods |
-| --- | --- |
-| Partial | 11 |
-| Supported | 16 |
-| Unsupported | 20 |
+| Resource | Supported | Partial | Unsupported |
+| --- | --- | --- | --- |
+| [datasets](#datasets) | 3 | 3 | 1 |
+| [jobs](#jobs) | 5 | 2 | 0 |
+| [models](#models) | 0 | 0 | 4 |
+| [projects](#projects) | 1 | 0 | 1 |
+| [routines](#routines) | 3 | 2 | 3 |
+| [rowAccessPolicies](#rowaccesspolicies) | 0 | 0 | 8 |
+| [tabledata](#tabledata) | 1 | 1 | 0 |
+| [tables](#tables) | 3 | 3 | 3 |
 
 ## datasets
 

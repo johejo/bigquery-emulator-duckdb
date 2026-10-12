@@ -283,12 +283,13 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 		results[j.method] = append(results[j.method], probes[i])
 	}
 
-	totals := map[string]int{}
+	var tallies []tally
 	var failed []string
 	var body bytes.Buffer
 	for _, resource := range resources {
 		fmt.Fprintf(&body, "## %s\n\n| Method | HTTP request | Status | Notes |\n"+
 			"| --- | --- | --- | --- |\n", resource.name)
+		t := tally{resource.name, map[string]int{}}
 		for _, m := range resource.methods {
 			generated := len(m.requests) == 0
 			counts := map[outcome]int{}
@@ -307,7 +308,7 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 				}
 			}
 			st := status(counts)
-			totals[st]++
+			t.counts[st]++
 			var note []string
 			if m.note != "" {
 				note = append(note, m.note)
@@ -324,6 +325,7 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 			fmt.Fprintf(&body, "| [`%s`](%s/%s/%s) | `%s %s` | %s | %s |\n", name, apiDocs,
 				resource.name, page, m.httpMethod, m.flatPath, st, escape(strings.Join(note, " ")))
 		}
+		tallies = append(tallies, t)
 		body.WriteString("\n")
 	}
 	// Every request in the methods file is written by hand, so one that fails for a reason other
@@ -332,7 +334,7 @@ func probeAPI(w io.Writer, binary, discoveryPath, path string) error {
 		return fmt.Errorf("requests failed:\n%s", strings.Join(failed, "\n"))
 	}
 	fmt.Fprint(w, apiPreamble)
-	writeTotals(w, "Methods", totals)
+	writeSummary(w, "Resource", tallies)
 	fmt.Fprint(w, "\n", strings.TrimSuffix(body.String(), "\n"))
 	return nil
 }

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 )
@@ -97,12 +98,50 @@ func status(counts map[outcome]int) string {
 	return "Partial"
 }
 
-// writeTotals prints how many rows have each status, in the order of the status names.
-func writeTotals(w io.Writer, heading string, totals map[string]int) {
-	fmt.Fprintf(w, "| Status | %s |\n| --- | --- |\n", heading)
-	for _, name := range sortedNames(totals) {
-		fmt.Fprintf(w, "| %s | %d |\n", name, totals[name])
+// statuses lists the statuses in the order summaries show them.
+var statuses = []string{"Supported", "Partial", "Unsupported", "Broken", "Untested"}
+
+// tally counts the rows of a section by status.
+type tally struct {
+	title  string
+	counts map[string]int
+}
+
+// writeSummary prints a table of how many rows of each section have each status. Each section has
+// a row of its own, so changes to different sections do not conflict.
+func writeSummary(w io.Writer, heading string, tallies []tally) {
+	var columns []string
+	for _, st := range statuses {
+		for _, t := range tallies {
+			if t.counts[st] > 0 {
+				columns = append(columns, st)
+				break
+			}
+		}
 	}
+	fmt.Fprintf(w, "| %s | %s |\n|%s\n", heading, strings.Join(columns, " | "),
+		strings.Repeat(" --- |", len(columns)+1))
+	for _, t := range tallies {
+		fmt.Fprintf(w, "| [%s](#%s) |", t.title, anchor(t.title))
+		for _, st := range columns {
+			fmt.Fprintf(w, " %d |", t.counts[st])
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+// anchor is the fragment GitHub links a Markdown heading with.
+func anchor(heading string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(heading) {
+		switch {
+		case r == ' ':
+			b.WriteRune('-')
+		case r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // sortedNames returns the keys of entries in order.
