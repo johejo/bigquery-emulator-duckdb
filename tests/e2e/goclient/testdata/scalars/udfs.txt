@@ -148,3 +148,15 @@ SELECT result
 CREATE TEMP FUNCTION f(x FLOAT64) AS (x);
 SELECT COUNT(DISTINCT f(RAND())) FROM UNNEST(GENERATE_ARRAY(1, 100))
 => "100"
+
+## Scope
+# Temporary functions have query scope, and declarations and calls are case-insensitive.
+# https://cloud.google.com/bigquery/docs/user-defined-functions
+
+CREATE TEMP FUNCTION Foo(x INT64) AS (x);
+SELECT FOO(1)
+=> "1"
+
+CREATE TEMP FUNCTION foo(x INT64) AS (x);
+SELECT FOO(1)
+=> "1"
