@@ -102,9 +102,9 @@ Query values may have anonymous or duplicate STRUCT field names, but at least on
 table columns require distinct nonempty names. Casts between STRUCT types match fields by position,
 and JSON functions preserve the original field names, including in nested arrays and structs.
 Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
-NULL semantics. `IS DISTINCT FROM` and equality of ARRAYs of STRUCTs with anonymous or duplicate
-fields are unsupported, as are casts of these values to JSON and correlated aggregate subqueries
-returning them; use JSON functions for JSON conversion.
+NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts
+of these values to JSON and correlated aggregate subqueries returning them; use JSON functions for
+JSON conversion. As in BigQuery, ARRAYs, and STRUCTs that contain them, cannot be compared.
 
 ### INTERVAL values
 

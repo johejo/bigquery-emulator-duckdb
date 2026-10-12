@@ -1,0 +1,16 @@
+# BigQuery does not compare ARRAYs for equality, whatever their elements, even inside STRUCTs.
+
+SELECT [1, NULL] = [1, NULL]
+=> error contains: Equality is not defined for arguments of type ARRAY<INT64>
+
+SELECT [1, NULL] != [1, NULL]
+=> error contains: Inequality is not defined for arguments of type ARRAY<INT64>
+
+SELECT CAST(NULL AS ARRAY<INT64>) = [1]
+=> error contains: Equality is not defined for arguments of type ARRAY<INT64>
+
+SELECT [STRUCT(x, CAST(NULL AS INT64))] = [STRUCT(1, CAST(NULL AS INT64))] FROM UNNEST([1]) AS x
+=> error contains: Equality is not defined for arguments of type ARRAY<STRUCT<x INT64, INT64>>
+
+SELECT [x] = [x] FROM UNNEST([CAST('NaN' AS FLOAT64)]) AS x
+=> error contains: Equality is not defined for arguments of type ARRAY<DOUBLE>
