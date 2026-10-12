@@ -2240,12 +2240,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "PIVOT does not count NULL pivot values as BigQuery does, and rejects HAVING in its aggregates"
-  label: "pivot_test:pivot_countfns"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "RANGE window frames over NUMERIC overflow near the type's limits"
   label: "analytic_numeric_range_window_frames_test:numeric_range_window_asc_with_special_values_1"
