@@ -605,6 +605,16 @@ TEST_F(TranslatorTest, RunsAggregatesAndDistinct) {
             (V{"NULL", "false", "true"}));
 }
 
+TEST_F(TranslatorTest, TopSumBindsVolatileWeightsOnce) {
+  for (const std::string& suffix : {std::string(), std::string(" OVER ()")}) {
+    const auto sql = Translate("SELECT APPROX_TOP_SUM(a, RAND(), 1)" + suffix + " FROM t");
+    ASSERT_TRUE(sql.has_value());
+    const auto random = sql->find("random()");
+    ASSERT_NE(random, std::string::npos);
+    EXPECT_EQ(sql->find("random()", random + 1), std::string::npos);
+  }
+}
+
 TEST_F(TranslatorTest, RunsAggregateLimitAndHavingModifiers) {
   using V = std::vector<std::string>;
   EXPECT_EQ(Column(Execute("SELECT MOD(a, 2) AS k, ANY_VALUE(b HAVING MIN a), COUNT(*) FROM t "

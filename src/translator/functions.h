@@ -166,6 +166,9 @@ struct AggregateRule {
   // FILTER and OVER clauses of the call; null keeps it as it is.
   std::string (*finish)(const std::string& sql, const std::vector<std::string>& arguments,
                         const std::string& tail) = nullptr;
+  // A finish containing a subquery needs its aggregate result in a preceding SELECT.
+  // DuckDB cannot bind constant aggregates or correlated windows inside that subquery.
+  bool finish_after_scan = false;
 };
 
 // A function in the registry.

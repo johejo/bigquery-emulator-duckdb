@@ -36,9 +36,9 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 
 | Status | Functions |
 | --- | --- |
-| Partial | 18 |
+| Partial | 19 |
 | Supported | 254 |
-| Unsupported | 121 |
+| Unsupported | 120 |
 | Untested | 13 |
 
 | Function | Category | Status | Implementation | Notes |
@@ -55,7 +55,7 @@ It is empty for syntax such as `CASE` and for functions the analyzer rewrites in
 | [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
 | [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | approximate_aggregate_functions | Supported | DuckDB aggregate |  |
-| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Unsupported |  | aggregate or analytic function APPROX_TOP_SUM |
+| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | approximate_aggregate_functions | Partial | DuckDB aggregate | aggregate or analytic function APPROX_TOP_SUM with INTERVAL; aggregate or analytic function APPROX_TOP_SUM with RANGE |
 | [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | array_functions | Supported |  |  |
 | [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | aggregate_functions | Supported | DuckDB aggregate |  |
 | [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | array_functions | Supported | DuckDB SQL, in code | returns NULL when any array is NULL |

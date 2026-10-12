@@ -1,0 +1,165 @@
+# APPROX_TOP_SUM
+# Expected values follow the approximate aggregate documentation examples and the
+# definition of nonnegative per-value sums, NULL handling, and weight result types.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, weight, 2)) FROM UNNEST([STRUCT("apple" AS x, 3 AS weight), ("pear", 2), ("apple", 0), ("banana", 5), ("pear", 4)])
+=> "[{\"value\":\"pear\",\"sum\":6},{\"value\":\"banana\",\"sum\":5}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, weight, 2)) FROM UNNEST([STRUCT("apple" AS x, CAST(NULL AS INT64) AS weight), ("pear", 0), ("pear", NULL)])
+=> "[{\"value\":\"pear\",\"sum\":0},{\"value\":\"apple\",\"sum\":null}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, weight, 2)) FROM UNNEST([STRUCT("apple" AS x, 0 AS weight), (NULL, 2)])
+=> "[{\"value\":null,\"sum\":2},{\"value\":\"apple\",\"sum\":0}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, weight, 2)) FROM UNNEST([STRUCT("apple" AS x, 0 AS weight), (NULL, NULL)])
+=> "[{\"value\":\"apple\",\"sum\":0},{\"value\":null,\"sum\":null}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, 1, 2)) FROM UNNEST(ARRAY<INT64>[]) x
+=> "null"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, x, 2)) FROM UNNEST([CAST(NULL AS INT64), NULL]) x
+=> "[{\"value\":null,\"sum\":null}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, 1, 10)) FROM UNNEST(['a', 'a']) x
+=> "[{\"value\":\"a\",\"sum\":2}]"
+
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum AS STRING) FROM UNNEST([STRUCT("a" AS x, 2 AS w), ("a", 2)])
+=> "4"
+
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum AS STRING) FROM UNNEST([STRUCT("a" AS x, NUMERIC '2.11' AS w), ("a", NUMERIC '2.11')])
+=> "4.22"
+
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum AS STRING) FROM UNNEST([STRUCT("a" AS x, BIGNUMERIC '2.11' AS w), ("a", BIGNUMERIC '2.11')])
+=> "4.22"
+
+SELECT APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum FROM UNNEST([STRUCT("a" AS x, 2.5 AS w), ("a", 2.5)])
+=> "5.0"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value = b'\x00\xff' FROM UNNEST([b'\x00\xff', b'\x00\xff', b'a']) x
+=> "true"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value = DATE '2024-01-01' FROM UNNEST([DATE '2024-01-01', DATE '2024-01-01', DATE '2024-01-02']) x
+=> "true"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value = NUMERIC '1.23' FROM UNNEST([NUMERIC '1.23', NUMERIC '1.23', NUMERIC '2.34']) x
+=> "true"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value = BIGNUMERIC '1e-38' FROM UNNEST([BIGNUMERIC '1e-38', BIGNUMERIC '1e-38', BIGNUMERIC '2e-38']) x
+=> "true"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].sum FROM UNNEST([0.0, -0.0, 1.0]) x
+=> "2"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].sum FROM UNNEST([CAST('nan' AS FLOAT64), CAST('nan' AS FLOAT64), 1.0]) x
+=> "2"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value) FROM UNNEST([STRUCT(1 AS a, "x" AS b), (1, "x"), (2, "y")]) x
+=> "{\"a\":1,\"b\":\"x\"}"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value) FROM UNNEST([STRUCT([1, NULL] AS x), STRUCT([1, NULL] AS x), STRUCT([2] AS x)])
+=> "[1,null]"
+
+SELECT APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum FROM UNNEST([STRUCT(1 AS g, "a" AS x, 2 AS w), (1, "a", 3), (2, "b", 7)]) GROUP BY g HAVING g = 1
+=> "5"
+
+SELECT APPROX_TOP_SUM(x, w, 1) OVER (PARTITION BY g)[OFFSET(0)].sum FROM UNNEST([STRUCT(1 AS g, "a" AS x, 2 AS w), (1, "a", 3), (2, "b", 7)]) WHERE g = 1 LIMIT 1
+=> "5"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM(x, 1, 1) OVER (ORDER BY x ROWS BETWEEN 1 FOLLOWING AND 1 FOLLOWING)) FROM UNNEST([1]) x
+=> "null"
+
+SELECT APPROX_TOP_SUM(x, w, 1 HAVING MAX h)[OFFSET(0)].sum FROM UNNEST([STRUCT("a" AS x, 100 AS w, 0 AS h), ("b", 2, 1), ("b", 3, 1)])
+=> "5"
+
+SELECT IS_INF(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum) FROM UNNEST([STRUCT('a' AS x, CAST('inf' AS FLOAT64) AS w), ('a', 1.0)])
+=> "true"
+
+SELECT APPROX_TOP_SUM(x, -1, 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, -0.1, 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, NUMERIC '-0.1', 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, BIGNUMERIC '-1e-38', 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, CAST('nan' AS FLOAT64), 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, CAST('-inf' AS FLOAT64), 1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT('a' AS x, 100 AS w), ('b', -1)])
+=> error:
+
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT('a' AS x, 9223372036854775807 AS w), ('a', 1)])
+=> error:
+
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT('a' AS x, NUMERIC '99999999999999999999999999999.999999999' AS w), ('a', NUMERIC '1e-9')])
+=> error:
+
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT('a' AS x, BIGNUMERIC '5e38' AS w), ('a', BIGNUMERIC '5e38')])
+=> error:
+
+SELECT APPROX_TOP_SUM(x, 1, 0) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, 1, -1) FROM UNNEST([1]) x
+=> error:
+
+SELECT APPROX_TOP_SUM(x, 1, CAST(NULL AS INT64)) FROM UNNEST([1]) x
+=> error:
+
+# Multiple window finishes share a scan with ordinary analytic functions.
+SELECT a[OFFSET(0)].sum + b[OFFSET(0)].sum + n FROM
+  (SELECT APPROX_TOP_SUM(x, w, 1) OVER (PARTITION BY g) AS a,
+    APPROX_TOP_SUM(x, w, 1) OVER () AS b, COUNT(*) OVER (PARTITION BY g) AS n
+    FROM UNNEST([STRUCT(1 AS g, "a" AS x, 2 AS w), (1, "a", 3), (2, "b", 7)]))
+  WHERE n = 2 LIMIT 1
+=> "14"
+
+SELECT s[OFFSET(0)].sum FROM
+  (SELECT APPROX_TOP_SUM(x, w, 1) OVER (ORDER BY i ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS s, i
+    FROM UNNEST([STRUCT("a" AS x, 2 AS w), ("a", 3), ("b", 7)]) WITH OFFSET i)
+  WHERE i = 1
+=> "5"
+
+# The BIGNUMERIC representation must retain the smallest unit in both keys and weights.
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum AS STRING)
+  FROM UNNEST([STRUCT(BIGNUMERIC '1e-38' AS x, BIGNUMERIC '1e-38' AS w),
+    (BIGNUMERIC '1e-38', BIGNUMERIC '2e-38')])
+=> "0.00000000000000000000000000000000000003"
+
+SELECT APPROX_TOP_SUM(x, 1, 1)[OFFSET(0)].value = TIMESTAMP '2024-01-01 00:00:00+00'
+  FROM UNNEST([TIMESTAMP '2024-01-01 00:00:00+00', TIMESTAMP '2024-01-01 09:00:00+09',
+    TIMESTAMP '2024-01-02 00:00:00+00']) x
+=> "true"
+
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum AS STRING)
+  FROM UNNEST([STRUCT("a" AS x, NUMERIC '1e-9' AS w), ("a", NUMERIC '2e-9')])
+=> "0.000000003"
+
+SELECT APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].sum
+  FROM UNNEST([STRUCT("a" AS x, 9223372036854775806 AS w), ("a", 1)])
+=> "9223372036854775807"
+
+SELECT top[OFFSET(0)].sum FROM
+  (SELECT g, APPROX_TOP_SUM(x, w, 1) AS top
+    FROM UNNEST([STRUCT(1 AS g, "a" AS x, 2 AS w), (1, "a", 3), (2, "b", 7)])
+    GROUP BY GROUPING SETS ((g), ()))
+  WHERE g IS NULL
+=> "7"
+
+# Constant inputs still aggregate the outer query's rows, including an empty input.
+SELECT TO_JSON_STRING(APPROX_TOP_SUM('a', 2, 2)) FROM UNNEST([1, 2]) x
+=> "[{\"value\":\"a\",\"sum\":4}]"
+
+SELECT TO_JSON_STRING(APPROX_TOP_SUM('a', 2, 2)) FROM UNNEST([1, 2]) x WHERE FALSE
+=> "null"
+
+SELECT APPROX_TOP_SUM('a', 2, 1)[OFFSET(0)].sum + COUNT(*) FROM UNNEST([1, 2]) x
+=> "6"

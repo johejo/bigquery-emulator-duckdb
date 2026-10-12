@@ -28,6 +28,18 @@ and REST table creation, lookup, listing and deletion. Query views with SQL; `ta
 cannot read them. Temporary, recursive and value-table views, and views that read temporary
 tables, are unsupported.
 
+## Approximate aggregates
+
+`APPROX_TOP_SUM` computes exact per-value sums and returns the highest sums, retaining NULL
+values and groups whose weights are all NULL. It supports INT64, NUMERIC, BIGNUMERIC and FLOAT64
+weights. The implementation collects the input rows before grouping them, so its memory use
+grows with the input size rather than only with the requested number of results. Equal sums
+have no guaranteed order.
+
+INTERVAL and RANGE keys, requested counts above 100000, and overflowing sums of finite FLOAT64
+weights are unsupported. BigQuery answers for the latter two boundaries are pending under
+`tests/e2e/goclient/testdata/unverified/approx_top_sum.txt`.
+
 ## User-defined functions
 
 ### SQL UDFs

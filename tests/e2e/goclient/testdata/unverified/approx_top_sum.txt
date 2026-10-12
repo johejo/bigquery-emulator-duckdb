@@ -1,0 +1,8 @@
+# Overflow of finite FLOAT64 weights and the runtime count upper bound need
+# BigQuery answers; GoogleSQL is only a lead for these boundaries.
+
+SELECT APPROX_TOP_SUM(x, w, 1) FROM UNNEST([STRUCT("a" AS x, 1e308 AS w), ("a", 1e308)])
+?>
+
+SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 100001)) FROM UNNEST([1]) x
+?>
