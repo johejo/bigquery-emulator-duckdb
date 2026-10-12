@@ -87,23 +87,26 @@ run *args:
 
 check: lint test e2e docs-check
 
-# Generates docs/sql.md and docs/api.md: tools/restprobe probes emulators started from the binary.
+# Generates docs/sql.md, docs/api.md and docs/functions.md: tools/restprobe probes emulators started
+# from the binary, running the calls //:function_probe builds for functions.
 _restprobe := "go run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
+_function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt"
 _storage_probe := "go run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 
 # Regenerates the compatibility tables for functions, SQL, REST and Storage RPCs.
 docs:
-    bazelisk build //:functions_md //:bigquery-emulator-duckdb
-    install -m 644 bazel-bin/functions.md docs/functions.md
+    bazelisk build //:function_probe //:bigquery-emulator-duckdb
+    {{ _function_probe }} > docs/functions.md.tmp && mv docs/functions.md.tmp docs/functions.md
     {{ _sql_probe }} > docs/sql.md.tmp && mv docs/sql.md.tmp docs/sql.md
     {{ _api_probe }} > docs/api.md.tmp && mv docs/api.md.tmp docs/api.md
     {{ _storage_probe }} > docs/storage.md.tmp && mv docs/storage.md.tmp docs/storage.md
 
-# Fails when SQL, REST or Storage docs are stale; `just test` checks docs/functions.md.
+# Fails when function, SQL, REST or Storage docs are stale.
 docs-check:
-    bazelisk build //:bigquery-emulator-duckdb
+    bazelisk build //:function_probe //:bigquery-emulator-duckdb
+    {{ _function_probe }} | diff -u docs/functions.md - || { echo "docs/functions.md is stale; run just docs" >&2; exit 1; }
     {{ _sql_probe }} | diff -u docs/sql.md - || { echo "docs/sql.md is stale; run just docs" >&2; exit 1; }
     {{ _api_probe }} | diff -u docs/api.md - || { echo "docs/api.md is stale; run just docs" >&2; exit 1; }
     {{ _storage_probe }} | diff -u docs/storage.md - || { echo "docs/storage.md is stale; run just docs" >&2; exit 1; }

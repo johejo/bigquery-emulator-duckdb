@@ -1,4 +1,3 @@
-load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
@@ -665,56 +664,23 @@ cc_binary(
     ],
 )
 
-# The pieces of //:function_probe that print docs/functions.md.
-cc_library(
-    name = "probe",
-    srcs = ["tools/probe.cc"],
-    hdrs = ["tools/probe.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = ["@googlesql//googlesql/public/types"],
-    deps = [
-        ":analyzer",
-        ":bignumeric",
-        ":catalog",
-        ":emulator",
-        "@googlesql//googlesql/public:type",
-    ],
-)
-
+# Prints the calls that `restprobe functions` runs to write docs/functions.md. It links the
+# analyzer's catalog and the function registry but not the emulator, so most changes to the
+# emulator do not rebuild it.
 cc_binary(
     name = "function_probe",
     srcs = ["tools/function_probe.cc"],
     copts = ["-std=c++20"],
     deps = [
         ":catalog",
-        ":emulator",
         ":field_schema",
-        ":probe",
-        ":translator",
         "//src/translator:functions",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public/types",
+        "@nlohmann_json//:json",
     ],
-)
-
-genrule(
-    name = "functions_md",
-    srcs = [
-        "tools/bigquery_functions.txt",
-        "tools/function_probe_hints.txt",
-    ],
-    outs = ["functions.md"],
-    cmd = "$(execpath :function_probe) $(execpath tools/bigquery_functions.txt) $(execpath tools/function_probe_hints.txt) > $@",
-    tools = [":function_probe"],
-)
-
-diff_test(
-    name = "functions_md_test",
-    failure_message = "docs/functions.md is stale; run `just docs` to regenerate it.",
-    file1 = ":functions_md",
-    file2 = "docs/functions.md",
 )
 
 cc_test(

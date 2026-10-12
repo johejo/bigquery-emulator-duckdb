@@ -112,8 +112,10 @@ expected result from one layer to another.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
   `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by
   hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
-  from GoogleSQL's signatures: write a hint only for a form it cannot build, and extend it rather
-  than writing hints for a whole class of forms.
+  from GoogleSQL's signatures and the samples in `tools/function_probe_hints.txt`, and
+  `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
+  class of forms with an `elements` or `argument` hint that matches their signatures, and extend
+  the probe only for what hints cannot express.
 - **GoogleSQL's compliance tests** (`just compliance`) check query results broadly against
   GoogleSQL's reference implementation, which is not BigQuery. CI fails on both an unlisted
   failure and a listed failure that passes; `just compliance-summary` names both. Remove fixed
@@ -144,7 +146,7 @@ Keep setup and deliberate compatibility exceptions in [README.md](README.md). Pu
 query and API behavior in [docs/compatibility.md](docs/compatibility.md), Storage client usage
 and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
 [docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
-the REST and SQL preambles under `tools/restprobe/` are their handwritten inputs.
+the REST, SQL and function preambles under `tools/restprobe/` are their handwritten inputs.
 
 ## Before committing
 

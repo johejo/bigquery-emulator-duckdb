@@ -1,9 +1,13 @@
 // Command restprobe probes the emulator through its REST API and prints the Markdown reports
-// docs/sql.md and docs/api.md. Each probe starts a fresh emulator from the binary that -emulator
-// names, so that probes neither see nor disturb each other's data, and probes run in parallel.
+// docs/sql.md, docs/api.md and docs/functions.md. Each SQL and API probe starts a fresh emulator
+// from the binary that -emulator names, so that probes neither see nor disturb each other's data;
+// function calls need no data and share a few emulators. Probes run in parallel.
 //
 //	restprobe -emulator BINARY sql FEATURES_FILE
 //	restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE
+//	restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE
+//
+// FUNCTION_PROBE is //:function_probe, which builds the calls.
 package main
 
 import (
@@ -111,11 +115,11 @@ func sortedNames[V any](entries map[string]V) []string {
 	return names
 }
 
-func startEmulator(binary string) (*emulatorprocess.Process, error) {
+func startEmulator(binary string, args ...string) (*emulatorprocess.Process, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--port", "0",
-		"--project", `{"projectId":"test"}`)
+	return emulatorprocess.Start(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--port", "0",
+		"--project", `{"projectId":"test"}`}, args...)...)
 }
 
 // parallel calls run(i) for each i below n, as many at a time as there are CPUs, and returns the
@@ -144,6 +148,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: restprobe -emulator BINARY sql FEATURES_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE")
+		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE")
 	}
 	flag.Parse()
 	args := flag.Args()
@@ -153,6 +158,8 @@ func main() {
 		err = probeSQL(os.Stdout, *binary, args[1])
 	case *binary != "" && len(args) == 3 && args[0] == "api":
 		err = probeAPI(os.Stdout, *binary, args[1], args[2])
+	case *binary != "" && len(args) == 4 && args[0] == "functions":
+		err = probeFunctions(os.Stdout, *binary, args[1], args[2:])
 	default:
 		flag.Usage()
 		os.Exit(2)
