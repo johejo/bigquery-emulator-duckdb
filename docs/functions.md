@@ -540,9 +540,9 @@ rewrites into others.
 | [`BYTE_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#byte_length) | Supported | DuckDB SQL |  |
 | [`CHARACTER_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#character_length) | Supported | DuckDB function |  |
 | [`CHAR_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#char_length) | Supported | DuckDB function |  |
-| [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | Supported | DuckDB SQL |  |
-| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | Supported | DuckDB SQL |  |
-| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | Supported | DuckDB SQL |  |
+| [`CHR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr) | Supported | GoogleSQL function |  |
+| [`CODE_POINTS_TO_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_bytes) | Supported | GoogleSQL function |  |
+| [`CODE_POINTS_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#code_points_to_string) | Supported | GoogleSQL function |  |
 | [`COLLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#collate) | Unsupported |  |  |
 | [`CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#concat) | Supported | DuckDB SQL, in code |  |
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
@@ -583,11 +583,11 @@ rewrites into others.
 | [`SUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substring) | Supported | GoogleSQL function |  |
 | [`TO_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base32) | Supported | GoogleSQL function |  |
 | [`TO_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_base64) | Supported | DuckDB SQL |  |
-| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | Supported | DuckDB SQL |  |
+| [`TO_CODE_POINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_code_points) | Supported | GoogleSQL function |  |
 | [`TO_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#to_hex) | Supported | DuckDB SQL |  |
 | [`TRANSLATE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#translate) | Supported | GoogleSQL function |  |
 | [`TRIM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#trim) | Supported | GoogleSQL function |  |
-| [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | Supported | DuckDB SQL |  |
+| [`UNICODE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#unicode) | Supported | GoogleSQL function |  |
 | [`UPPER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#upper) | Supported | GoogleSQL function |  |
 
 ## Text analysis functions

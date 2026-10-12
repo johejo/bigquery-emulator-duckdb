@@ -72,13 +72,17 @@ TEST(FunctionsTest, MatchesRoundingModes) {
 
 TEST(FunctionsTest, BindsArgumentsUsedTwice) {
   // Columns and literals are repeated as they are.
-  EXPECT_EQ(TranslateFunction("CHR", {Sql("q.a")}),
-            "CASE WHEN q.a = 0 THEN '' ELSE chr(CAST(q.a AS INTEGER)) END");
-  EXPECT_EQ(TranslateFunction("CHR", {Sql("65")}),
-            "CASE WHEN 65 = 0 THEN '' ELSE chr(CAST(65 AS INTEGER)) END");
-  EXPECT_EQ(TranslateFunction("CHR", {Sql("CAST(-65 AS BIGINT)")}),
-            "CASE WHEN CAST(-65 AS BIGINT) = 0 THEN '' ELSE chr(CAST(CAST(-65 AS BIGINT) AS "
-            "INTEGER)) END");
+  EXPECT_EQ(TranslateFunction("CODE_POINTS_TO_STRING", {Sql("q.a")}),
+            "CASE WHEN list_count(q.a) <> len(q.a) THEN NULL ELSE bq_code_points_to_string(q.a) "
+            "END");
+  EXPECT_EQ(TranslateFunction("$BITWISE_LEFT_SHIFT", {Sql("q.a", googlesql::TYPE_INT64), Sql("3")}),
+            "CASE WHEN 3 < 0 THEN error('Bit shift by a negative value') WHEN 3 >= 64 THEN 0 ELSE "
+            "CAST(CAST(q.a AS BIT) << CAST(3 AS INTEGER) AS BIGINT) END");
+  EXPECT_EQ(TranslateFunction("$BITWISE_LEFT_SHIFT",
+                              {Sql("q.a", googlesql::TYPE_INT64), Sql("CAST(-1 AS BIGINT)")}),
+            "CASE WHEN CAST(-1 AS BIGINT) < 0 THEN error('Bit shift by a negative value') WHEN "
+            "CAST(-1 AS BIGINT) >= 64 THEN 0 ELSE CAST(CAST(q.a AS BIT) << CAST(CAST(-1 AS "
+            "BIGINT) AS INTEGER) AS BIGINT) END");
   // Anything else is evaluated once, while trivial arguments stay as they are.
   EXPECT_EQ(TranslateFunction("$BITWISE_LEFT_SHIFT",
                               {Sql("q.a", googlesql::TYPE_INT64), Sql("(q.n + 1)")}),
@@ -119,8 +123,8 @@ TEST(FunctionsTest, RenamesAndPassesThrough) {
 TEST(FunctionsTest, RegistersEachFunctionWithItsImplementation) {
   EXPECT_EQ(FindFunction("COALESCE")->implementation, Implementation::kSame);
   EXPECT_EQ(FindFunction("RAND")->implementation, Implementation::kRenamed);
-  EXPECT_EQ(FindFunction("CHR")->implementation, Implementation::kRules);
-  EXPECT_EQ(FindFunction("SHA512")->implementation, Implementation::kBackend);
+  EXPECT_EQ(FindFunction("$BITWISE_LEFT_SHIFT")->implementation, Implementation::kRules);
+  EXPECT_EQ(FindFunction("CHR")->implementation, Implementation::kBackend);
   EXPECT_EQ(FindFunction("CONCAT")->implementation, Implementation::kHandler);
   EXPECT_EQ(FindFunction("SAFE_ADD")->implementation, Implementation::kSafe);
   EXPECT_EQ(FindFunction("SUM")->implementation, Implementation::kAggregate);

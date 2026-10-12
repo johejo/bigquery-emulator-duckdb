@@ -106,6 +106,16 @@ std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
   });
 }
 
+// CODE_POINTS_TO_STRING and CODE_POINTS_TO_BYTES, which are NULL when an element is NULL.
+std::vector<Rule> CodePointsTo(const std::string& function) {
+  return {
+      {
+          .arity = 1,
+          .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE " + function + "($1) END",
+      },
+  };
+}
+
 // TRIM, LTRIM and RTRIM. Without the characters to trim, they trim Unicode whitespace, where
 // DuckDB's trim() only trims spaces.
 std::vector<Rule> Trim(const std::string& function) {
@@ -214,6 +224,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"REPLACE", Strings("bq_replace", 3)},
       {"TRANSLATE", Strings("bq_translate", 3)},
       {"ASCII", Strings("bq_ascii", 1)},
+      {"UNICODE", Same("bq_unicode", 1, {Is(1, {TYPE_STRING})})},
+      {"CHR", {{.arity = 1, .spelling = "bq_chr($1)"}}},
+      {"TO_CODE_POINTS", Strings("bq_to_code_points", 1)},
+      {"CODE_POINTS_TO_STRING", CodePointsTo("bq_code_points_to_string")},
+      {"CODE_POINTS_TO_BYTES", CodePointsTo("bq_code_points_to_bytes")},
       {"LEFT", Strings("bq_left", 2)},
       {"RIGHT", Strings("bq_right", 2)},
       {"LPAD", Pad("bq_lpad")},

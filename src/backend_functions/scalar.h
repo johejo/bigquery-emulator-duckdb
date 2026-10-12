@@ -70,6 +70,15 @@ class Arguments {
     return strings;
   }
 
+  // A list of BIGINT without NULL elements.
+  [[nodiscard]] std::vector<int64_t> Ints(idx_t column) const {
+    duckdb_vector vector = duckdb_data_chunk_get_vector(input_, column);
+    const auto entry = VectorElement<duckdb_list_entry>(vector, row_);
+    const auto* values =
+        static_cast<int64_t*>(duckdb_vector_get_data(duckdb_list_vector_get_child(vector)));
+    return {values + entry.offset, values + entry.offset + entry.length};
+  }
+
   [[nodiscard]] bool Bool(idx_t column) const {
     return static_cast<bool*>(
         duckdb_vector_get_data(duckdb_data_chunk_get_vector(input_, column)))[row_];
