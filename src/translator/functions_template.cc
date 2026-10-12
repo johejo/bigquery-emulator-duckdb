@@ -562,14 +562,30 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           "$SUBTRACT",
           {BigNumericOperator("bq_bignumeric_subtract", 2), {.arity = 2, .spelling = "($1 - $2)"}},
       },
+      // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20
+      // integer digits, and divides them as DOUBLE values; GoogleSQL computes the NUMERIC result,
+      // rounded half away from zero.
       {
           "$MULTIPLY",
-          {BigNumericOperator("bq_bignumeric_multiply", 2), {.arity = 2, .spelling = "($1 * $2)"}},
+          {
+              BigNumericOperator("bq_bignumeric_multiply", 2),
+              {
+                  .arity = 2,
+                  .spelling = "bq_multiply_numeric($1, $2)",
+                  .conditions = {Is(1, {TYPE_NUMERIC})},
+              },
+              {.arity = 2, .spelling = "($1 * $2)"},
+          },
       },
       {
           "$DIVIDE",
           {
               BigNumericOperator("bq_bignumeric_divide", 2),
+              {
+                  .arity = 2,
+                  .spelling = "bq_divide_numeric($1, $2)",
+                  .conditions = {Is(1, {TYPE_NUMERIC})},
+              },
               {
                   .arity = 2,
                   .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
@@ -644,6 +660,11 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           "SAFE_DIVIDE",
           {
               BigNumericOperator("bq_bignumeric_safe_divide", 2),
+              {
+                  .arity = 2,
+                  .spelling = "bq_safe_divide_numeric($1, $2)",
+                  .conditions = {Is(1, {TYPE_NUMERIC})},
+              },
               {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
           },
       },

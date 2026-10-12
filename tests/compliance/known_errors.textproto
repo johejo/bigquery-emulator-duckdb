@@ -2009,18 +2009,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Dividing INT64 by NUMERIC loses precision through FLOAT64"
-  label: "code:CoercedDivide_INT64_9223372036854775807_NUMERIC_0.000000001"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Dividing a large NUMERIC loses precision"
-  label: "groupby_queries_test:groupby_single_computed_column_numeric"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "DuckDB cannot flatten a FULL JOIN of arrays in a correlated subquery"
   label: "array_joins_test:array_full_join_in_correlated_subquery_with_offset"
@@ -2378,18 +2366,6 @@ known_errors {
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1e29"
   label: "code:SafeCastTo_STRING_BYTES_<@x00@n>"
   label: "code:SafeCastTo_STRING_BYTES_<@xd7>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE_DIVIDE on NUMERIC loses precision through FLOAT64 and fails where BigQuery returns NULL"
-  label: "code:SAFE_DIVIDE_NUMERIC_99999999999999999999999999999.999999999_NUMERIC_0.001"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SAFE_DIVIDE on NUMERIC loses precision through FLOAT64 and fails where BigQuery returns NULL"
-  label: "code:SAFE_DIVIDE_INT64_9223372036854775807_NUMERIC_0.000000001"
 }
 
 known_errors {
