@@ -1,0 +1,37 @@
+# Statement forms and modifiers the emulator does not implement are named in the error.
+
+SELECT STRUCT()
+=> error contains: The emulator does not support type STRUCT<>
+
+SELECT SAFE.RAND()
+=> error contains: The emulator does not support SAFE.RAND
+
+SELECT x FROM UNNEST([1]) AS x WHERE x IN (SELECT SAFE.RAND())
+=> error contains: The emulator does not support SAFE.RAND
+
+WITH RECURSIVE c AS (SELECT 1 AS n UNION ALL SELECT n + 1 FROM c WHERE n < 3) WITH DEPTH SELECT n FROM c
+=> error contains: The emulator does not support WITH RECURSIVE depth modifier
+
+CREATE TEMP TABLE t (a INT64); INSERT OR IGNORE INTO t (a) VALUES (1)
+=> error contains: The emulator does not support INSERT with
+
+CREATE TEMP TABLE t (a INT64); INSERT INTO t (a) VALUES (1) ASSERT_ROWS_MODIFIED 1
+=> error contains: The emulator does not support INSERT with
+
+CREATE TEMP TABLE t (a INT64); INSERT INTO t (a) VALUES (1) THEN RETURN a
+=> error contains: The emulator does not support INSERT with
+
+CREATE TEMP TABLE t (a INT64); UPDATE t SET a = 1 WHERE TRUE ASSERT_ROWS_MODIFIED 1
+=> error contains: The emulator does not support UPDATE with
+
+CREATE TEMP TABLE t (a INT64); CREATE TEMP VIEW v AS SELECT a FROM t
+=> error contains: The emulator does not support temporary, recursive or value-table views
+
+CREATE TEMP TABLE g (x INT64, y INT64 AS (x + 1)); SELECT 1
+=> error contains: The emulator does not support generated columns
+
+CREATE TEMP TABLE c (x INT64 NOT NULL) AS SELECT 1 AS x; SELECT 1
+=> error contains: The emulator does not support NOT NULL in CREATE TABLE AS SELECT
+
+CREATE OR REPLACE SCHEMA errors_statements
+=> error contains: The emulator does not support CREATE OR REPLACE SCHEMA

@@ -50,99 +50,12 @@ SELECT COUNT(*) AS c, SUM(id) AS s FROM t;`)
 	}
 }
 
-// EXECUTE IMMEDIATE follows
-// https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate,
-// whose examples set y to 5 and fill Books with four rows, the earliest from 1599.
-func TestExecuteImmediateRunsTheDocumentedExamples(t *testing.T) {
+// EXECUTE IMMEDIATE sees no query parameters of the request, as
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
+// describes; testdata/scalars/scripts.txt covers the rest of its rules.
+func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
-	job, _, err := runScript(t, client, "", `
-DECLARE y INT64;
-DECLARE z INT64;
-DECLARE book_name STRING DEFAULT 'Ulysses';
-DECLARE book_year INT64 DEFAULT 1922;
-DECLARE first_date INT64;
-EXECUTE IMMEDIATE "SELECT ? * (? + 2)" INTO y USING 1, 3;
-EXECUTE IMMEDIATE "SELECT @a * (@b + 2)" INTO z USING 1 as a, 3 as b;
-EXECUTE IMMEDIATE
-  "CREATE TEMP TABLE Books (title STRING, publish_date INT64)";
-EXECUTE IMMEDIATE
-  "INSERT INTO Books (title, publish_date) VALUES('Hamlet', 1599)";
-EXECUTE IMMEDIATE
-  "INSERT INTO Books (title, publish_date) VALUES(?, ?)"
-  USING book_name, book_year;
-EXECUTE IMMEDIATE
-  "INSERT INTO Books (title, publish_date) VALUES(@name, @year)"
-  USING 1815 as year, "Emma" as name;
-EXECUTE IMMEDIATE
-  CONCAT(
-    "INSERT INTO Books (title, publish_date)", "VALUES('Middlemarch', 1871)"
-  );
-EXECUTE IMMEDIATE "SELECT MIN(publish_date) FROM Books LIMIT 1" INTO first_date;
-SELECT title, publish_date, y, z, first_date FROM Books ORDER BY publish_date;`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, err := job.Read(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	type book struct {
-		Title       string
-		PublishDate int64 `bigquery:"publish_date"`
-		Y, Z        int64
-		FirstDate   int64 `bigquery:"first_date"`
-	}
-	want := []book{
-		{"Hamlet", 1599, 5, 5, 1599},
-		{"Emma", 1815, 5, 5, 1599},
-		{"Middlemarch", 1871, 5, 5, 1599},
-		{"Ulysses", 1922, 5, 5, 1599},
-	}
-	for _, w := range want {
-		var got book
-		if err := rows.Next(&got); err != nil {
-			t.Fatal(err)
-		}
-		if got != w {
-			t.Errorf("got %+v, want %+v", got, w)
-		}
-	}
-	if err := rows.Next(&book{}); err != iterator.Done {
-		t.Errorf("got another row or an error: %v", err)
-	}
-}
-
-// The behavior the same documentation describes: the statement's result is the result of the
-// whole statement, INTO sets every variable to NULL for no rows and fails for more than one, a
-// variable may be both in INTO and in USING, and the statement sees no other variables or query
-// parameters, nor control statements or another EXECUTE IMMEDIATE.
-func TestExecuteImmediateFollowsTheDocumentedRules(t *testing.T) {
-	ctx := context.Background()
-	client := newClient(t)
-	for _, c := range []struct {
-		sql  string
-		want bigquery.Value
-	}{
-		{`EXECUTE IMMEDIATE "SELECT @a * (@b + 2)" USING 1 as a, 3 as b`, int64(5)},
-		{`DECLARE x INT64 DEFAULT 1; EXECUTE IMMEDIATE "SELECT 2 FROM UNNEST([])" INTO x; SELECT x`, nil},
-		{`DECLARE y INT64 DEFAULT 1; EXECUTE IMMEDIATE "SELECT ? + 1" INTO y USING y; SELECT y`, int64(2)},
-	} {
-		job, _, err := runScript(t, client, "", c.sql)
-		if err != nil {
-			t.Errorf("%s: %v", c.sql, err)
-			continue
-		}
-		rows, err := job.Read(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var row []bigquery.Value
-		if err := rows.Next(&row); err != nil || len(row) != 1 || row[0] != c.want {
-			t.Errorf("%s: got %v and %v, want %v", c.sql, row, err, c.want)
-		}
-	}
-
 	query := client.Query(`SELECT @p; EXECUTE IMMEDIATE "SELECT @p"`)
 	query.Parameters = []bigquery.QueryParameter{{Name: "p", Value: int64(1)}}
 	job, err := query.Run(ctx)
@@ -260,24 +173,6 @@ SELECT a FROM t;`)
 	}
 	if len(names) != 1 || names[0] != "t" {
 		t.Errorf("got tables %v, want only t", names)
-	}
-}
-
-// Temporary functions have query scope, and declarations and calls are case-insensitive.
-// https://cloud.google.com/bigquery/docs/user-defined-functions
-func TestTemporaryFunctionsHaveQueryScope(t *testing.T) {
-	client := newClient(t)
-	for _, name := range []string{"Foo", "foo"} {
-		if _, _, err := runScript(t, client, "", "CREATE TEMP FUNCTION "+name+"(x INT64) AS (x); SELECT FOO(1)"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, _, err := runScript(t, client, "", "SELECT foo(1)"); err == nil {
-		t.Error("a temporary function outlived its query")
-	}
-	_, _, err := runScript(t, client, "", "CREATE TEMP FUNCTION f() AS (1); CREATE TEMP FUNCTION F() AS (2); SELECT f()")
-	if err == nil {
-		t.Error("duplicate function declarations succeeded")
 	}
 }
 

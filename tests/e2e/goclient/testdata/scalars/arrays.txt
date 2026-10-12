@@ -96,3 +96,9 @@ SELECT RPAD('a', 3, 'xy')
 
 SELECT LPAD('abc', 2)
 => "ab"
+
+SELECT 1 << -1
+=> error:
+
+SELECT ARRAY_FIRST(CAST([] AS ARRAY<INT64>))
+=> error:

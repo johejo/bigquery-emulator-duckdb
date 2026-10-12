@@ -70,3 +70,10 @@ CREATE TEMP FUNCTION f(x FLOAT64) AS (1 / x); SELECT f(0)
 
 CREATE TEMP FUNCTION f(x FLOAT64) AS (x); SELECT f(1 / 0)
 => error:
+
+# A temporary function does not outlive its query, and names differing only in case are the same.
+SELECT foo(1)
+=> error:
+
+CREATE TEMP FUNCTION f() AS (1); CREATE TEMP FUNCTION F() AS (2); SELECT f()
+=> error:

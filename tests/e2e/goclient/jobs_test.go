@@ -146,6 +146,59 @@ func TestQueryToADestinationTable(t *testing.T) {
 	}
 }
 
+// A destination table takes the result's names and types, and a query can read the table it
+// replaces. CREATE_NEVER fails for a table that does not exist, and a result with column names that
+// differ only in case, or a DDL statement, cannot be written to a table.
+func TestQueryDestinationTableEdges(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_destination_edges")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	p := creationPaths{t: t, client: client, dataset: dataset}
+
+	never := client.Query("SELECT 1 AS a")
+	never.Dst = dataset.Table("dest")
+	never.CreateDisposition = bigquery.CreateNever
+	err := p.wait(never.Run(ctx))
+	if err == nil || !strings.Contains(err.Error(), "Not found: Table") {
+		t.Errorf("CREATE_NEVER for a missing table: got %v, want Not found", err)
+	}
+
+	if err := p.query("SELECT 1 AS a, SUM(x) FROM UNNEST([2]) AS x", "dest", bigquery.WriteEmpty); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := dataset.Table("dest").Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := bigquery.Schema{
+		{Name: "a", Type: bigquery.IntegerFieldType}, {Name: "f0_", Type: bigquery.IntegerFieldType},
+	}
+	if !reflect.DeepEqual(metadata.Schema, want) {
+		t.Errorf("created schema = %v, want %v", metadata.Schema, want)
+	}
+	if err := p.query("SELECT a * 10 AS a, f0_ FROM go_destination_edges.dest", "dest", bigquery.WriteTruncate); err != nil {
+		t.Fatal(err)
+	}
+	rows := [][]bigquery.Value{{int64(10), int64(2)}}
+	if got := p.read("SELECT * FROM dest"); !reflect.DeepEqual(got, rows) {
+		t.Errorf("rows after replacing the table with its own rows = %v, want %v", got, rows)
+	}
+
+	for _, sql := range []string{"SELECT 1 AS a, 2 AS A", "CREATE TABLE other (a INT64)"} {
+		if err := p.query(sql, "dest", bigquery.WriteTruncate); err == nil {
+			t.Errorf("%s: written to a destination table", sql)
+		}
+	}
+	if got := p.read("SELECT * FROM dest"); !reflect.DeepEqual(got, rows) {
+		t.Errorf("rows after failed writes = %v, want %v", got, rows)
+	}
+}
+
 func TestJobLifecycle(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)

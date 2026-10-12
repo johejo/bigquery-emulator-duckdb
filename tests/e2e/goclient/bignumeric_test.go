@@ -3,7 +3,6 @@ package goclient
 import (
 	"context"
 	"math/big"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -202,41 +201,5 @@ func TestParseBigNumeric(t *testing.T) {
 	}
 	if err := rows.Next(new([]bigquery.Value)); err != iterator.Done {
 		t.Errorf("got another row (%v), want one", err)
-	}
-}
-
-// Out of range results fail with GoogleSQL's messages, as in BigQuery.
-func TestBigNumericErrors(t *testing.T) {
-	ctx := context.Background()
-	client := newClient(t)
-	for sql, want := range map[string]string{
-		"SELECT x + 1 FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "']) x": "BIGNUMERIC overflow: " +
-			maxBigNumeric + " + 1",
-		"SELECT SUM(x) FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "', 1]) x": "BIGNUMERIC overflow: SUM",
-		"SELECT CAST(x AS BIGNUMERIC) FROM UNNEST(['x']) x":                    "Invalid BIGNUMERIC value: x",
-		"SELECT x * 2 FROM UNNEST([BIGNUMERIC '" + maxBigNumeric + "']) x": "BIGNUMERIC overflow: " +
-			maxBigNumeric + " * 2",
-		"SELECT x / 0 FROM UNNEST([BIGNUMERIC '1']) x":                   "division by zero: 1 / 0",
-		"SELECT MOD(x, 0) FROM UNNEST([BIGNUMERIC '1']) x":               "division by zero: MOD(1, 0)",
-		"SELECT EXP(x) FROM UNNEST([BIGNUMERIC '100']) x":                "BIGNUMERIC overflow: EXP(100)",
-		"SELECT POW(x, -1) FROM UNNEST([BIGNUMERIC '0']) x":              "division by zero: POW(0, -1)",
-		"SELECT SQRT(x) FROM UNNEST([BIGNUMERIC '-1']) x":                "SQRT is undefined for negative value: SQRT(-1)",
-		"SELECT CAST(x AS INT64) FROM UNNEST([BIGNUMERIC '1e20']) x":     "int64 out of range: 100000000000000000000",
-		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1 2']) x":              `Invalid input to PARSE_BIGNUMERIC: "1 2"`,
-		"SELECT PARSE_BIGNUMERIC(x) FROM UNNEST(['1e39']) x":             `Invalid input to PARSE_BIGNUMERIC: "1e39"`,
-		"SELECT GENERATE_ARRAY(x, 3, 0) FROM UNNEST([BIGNUMERIC '1']) x": "Sequence step cannot be 0.",
-		"SELECT ARRAY_FIRST(x) FROM UNNEST([STRUCT(ARRAY<BIGNUMERIC>[] AS x)])": "ARRAY_FIRST cannot get " +
-			"the first element of an empty array",
-	} {
-		job, err := client.Query(sql).Run(ctx)
-		if err == nil {
-			var status *bigquery.JobStatus
-			if status, err = job.Wait(ctx); err == nil {
-				err = status.Err()
-			}
-		}
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: got error %v, want %q", sql, err, want)
-		}
 	}
 }

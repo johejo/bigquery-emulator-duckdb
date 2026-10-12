@@ -2,11 +2,13 @@ package goclient
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/iterator"
 )
 
 func TestQueryWithNamedParameters(t *testing.T) {
@@ -111,5 +113,113 @@ func TestQueryRuntimeError(t *testing.T) {
 	}
 	if _, err := job.Read(ctx); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Errorf("Job.Read: got error %v, want boom", err)
+	}
+}
+
+// Result columns take the names and types GoogleSQL resolves, rather than DuckDB's: a column
+// without a name is f0_, f1_ and so on, and a value table of structs comes back as their fields.
+// A dry run reports the same schema.
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#implicit_aliases
+func TestResultSchema(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	describe := func(schema bigquery.Schema) string {
+		fields := make([]string, len(schema))
+		for i, field := range schema {
+			fields[i] = field.Name + " " + string(field.Type)
+		}
+		return strings.Join(fields, ", ")
+	}
+	for _, c := range []struct {
+		sql        string
+		parameters []bigquery.QueryParameter
+		schema     string
+		rows       [][]bigquery.Value
+	}{
+		// DuckDB sums integers into a HUGEINT, which alone would be reported as BIGNUMERIC.
+		{
+			sql:    `SELECT SUM(x) AS s, ANY_VALUE('a'), 2.5, NULL, b'\x00\xff' FROM UNNEST([1, 2]) AS x`,
+			schema: "s INTEGER, f0_ STRING, f1_ FLOAT, f2_ INTEGER, f3_ BYTES",
+			rows:   [][]bigquery.Value{{int64(3), "a", 2.5, nil, []byte{0, 0xff}}},
+		},
+		{
+			sql:    "SELECT AS STRUCT 1 AS a, 'x' AS b",
+			schema: "a INTEGER, b STRING",
+			rows:   [][]bigquery.Value{{int64(1), "x"}},
+		},
+		{
+			sql: "SELECT BYTE_LENGTH(@s), BYTE_LENGTH(@b) AS bytes, SAFE_CAST(@s AS INT64)",
+			parameters: []bigquery.QueryParameter{
+				{Name: "s", Value: "あ"}, {Name: "b", Value: []byte{0, 0xff}},
+			},
+			schema: "f0_ INTEGER, bytes INTEGER, f1_ INTEGER",
+			rows:   [][]bigquery.Value{{int64(3), int64(2), nil}},
+		},
+		{
+			sql:        "SELECT @n * 2 AS x",
+			parameters: []bigquery.QueryParameter{{Name: "n", Value: int64(2)}},
+			schema:     "x INTEGER",
+			rows:       [][]bigquery.Value{{int64(4)}},
+		},
+		{
+			sql: "SELECT x + @min AS y FROM UNNEST([3, 1, 2]) AS x WHERE x > @min " +
+				"ORDER BY x DESC LIMIT @n OFFSET @skip",
+			parameters: []bigquery.QueryParameter{
+				{Name: "min", Value: int64(1)}, {Name: "n", Value: int64(1)}, {Name: "skip", Value: int64(1)},
+			},
+			schema: "y INTEGER",
+			rows:   [][]bigquery.Value{{int64(3)}},
+		},
+	} {
+		query := client.Query(c.sql)
+		query.Parameters = c.parameters
+		it, err := query.Read(ctx)
+		if err != nil {
+			t.Errorf("%s: %v", c.sql, err)
+			continue
+		}
+		var rows [][]bigquery.Value
+		for {
+			var row []bigquery.Value
+			err := it.Next(&row)
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				t.Fatalf("%s: %v", c.sql, err)
+			}
+			rows = append(rows, row)
+		}
+		if got := describe(it.Schema); got != c.schema {
+			t.Errorf("%s: got schema %s, want %s", c.sql, got, c.schema)
+		}
+		if !reflect.DeepEqual(rows, c.rows) {
+			t.Errorf("%s: got rows %v, want %v", c.sql, rows, c.rows)
+		}
+
+		query.DryRun = true
+		job, err := query.Run(ctx)
+		if err != nil {
+			t.Errorf("%s: dry run: %v", c.sql, err)
+			continue
+		}
+		statistics := job.LastStatus().Statistics.Details.(*bigquery.QueryStatistics)
+		if got := describe(statistics.Schema); got != c.schema {
+			t.Errorf("%s: got dry-run schema %s, want %s", c.sql, got, c.schema)
+		}
+	}
+}
+
+// A parameter keeps the type it is declared with: BigQuery does not coerce a STRING to a number,
+// and a cast of one that is not a number fails.
+func TestQueryParameterTypes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	for sql, value := range map[string]string{"SELECT @s * 2": "2", "SELECT CAST(@s AS INT64)": "あ"} {
+		query := client.Query(sql)
+		query.Parameters = []bigquery.QueryParameter{{Name: "s", Value: value}}
+		if _, err := query.Read(ctx); err == nil {
+			t.Errorf("%s: succeeded with @s = %q", sql, value)
+		}
 	}
 }
