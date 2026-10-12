@@ -1801,16 +1801,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "COUNTIF over no rows, or over only NULL, returns NULL instead of 0"
-  label: "groupby_queries_2_test:countif_empty_input"
-  label: "groupby_queries_2_test:groupby_countif_by_bool_val"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "COUNTIF(DISTINCT) over no rows returns NULL instead of 0, and MIN and MAX of arrays do not order NULL and NaN elements as BigQuery does"
-  label: "aggregation_distinct_queries_test:aggregation_distinct_countif_3"
-  label: "aggregation_distinct_queries_test:aggregation_distinct_countif_4"
+  reason: "MIN and MAX of arrays do not order NULL and NaN elements as BigQuery does"
   label: "aggregation_distinct_queries_test:aggregation_distinct_min_max_array_null_nan"
 }
 

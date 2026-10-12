@@ -144,7 +144,9 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                   },
               },
           },
-          {"COUNTIF", {{.function = "count_if"}}},
+          // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
+          // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
+          {"COUNTIF", {{.function = "count", .arguments = {"CASE WHEN $1 THEN TRUE END"}}}},
           {"LOGICAL_AND", {{.function = "bool_and"}}},
           {"LOGICAL_OR", {{.function = "bool_or"}}},
           {"BIT_AND", {{.function = "bit_and"}}},
