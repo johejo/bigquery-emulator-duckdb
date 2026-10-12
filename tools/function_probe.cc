@@ -320,7 +320,7 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
           argument.type() != nullptr ? Sample(argument.type(), hints) : Find(hints.samples, type);
     }
     if (!sample) {
-      return {.untested = "no sample for " + argument.DebugString()};
+      return {.sql = "", .untested = "no sample for " + argument.DebugString()};
     }
     element_used = element_used || kind == googlesql::ARG_KIND_EXPR_ANY_1;
     // Optional INT64/date-part pairs spell one INTERVAL expression, such as
@@ -343,6 +343,7 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
                  ? "SELECT " + call + " OVER (ORDER BY x) FROM UNNEST([1, 2]) AS x"
              : function.IsAggregate() ? "SELECT " + call + " FROM UNNEST([1, 2]) AS x"
                                       : "SELECT " + call,
+      .untested = "",
   };
 }
 
