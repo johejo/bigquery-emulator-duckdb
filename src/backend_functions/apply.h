@@ -13,6 +13,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "duckdb.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/scalar.h"
@@ -70,6 +71,14 @@ struct Codec<std::string_view> {
     return arguments.String(column);
   }
   static std::string Write(std::string_view value) { return std::string(value); }
+};
+
+// An ARRAY<INT64> argument views the list read for the row, which has no NULL elements.
+template <>
+struct Codec<absl::Span<const int64_t>> {
+  static absl::StatusOr<std::vector<int64_t>> Read(const Arguments& arguments, idx_t column) {
+    return arguments.Ints(column);
+  }
 };
 
 // A NUMERIC as a DECIMAL(38, 9), whose units are its packed integer.

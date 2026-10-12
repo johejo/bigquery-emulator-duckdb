@@ -169,33 +169,6 @@ std::vector<Rule> Civil(const std::string& target) {
   };
 }
 
-// CODE_POINTS_TO_STRING and CODE_POINTS_TO_BYTES, by the type `result` they return. They are NULL
-// when an element is NULL and raise an error for the first element out of range.
-std::vector<Rule> CodePointsTo(googlesql::TypeKind result) {
-  const bool bytes = result == TYPE_BYTES;
-  const std::string first =
-      std::string("list_filter($1, _p -> ") +
-      (bytes ? "_p < 0 OR _p > 255" : "_p < 0 OR _p > 1114111 OR _p BETWEEN 55296 AND 57343") +
-      ")[1]";
-  const std::string spelling =
-      bytes ? "unhex(array_to_string(list_transform($1, _p -> lpad(hex(_p), 2, '0')), ''))"
-            : "array_to_string(list_transform($1, _p -> chr(CAST(_p AS INTEGER))), '')";
-  return {
-      {
-          .arity = 1,
-          .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL WHEN " + first +
-                      " IS NOT NULL THEN !1 ELSE " + spelling + " END",
-          .conditions = {},
-          .defaults = {},
-          .errors =
-              {
-                  std::string(bytes ? "'Invalid ASCII value '" : "'Invalid codepoint '") + " || " +
-                      first,
-              },
-      },
-  };
-}
-
 // RANGE_BUCKET counts boundaries <= the point, including duplicates. GoogleSQL implements it
 // only in the reference evaluator; DuckDB comparisons suffice for these scalar types once NULL,
 // NaN and descending boundaries have been rejected. Templates bind both arguments once.
@@ -919,42 +892,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               {.arity = 1, .spelling = "octet_length($1)", .conditions = {Is(1, {TYPE_BYTES})}},
           },
       },
-      {
-          "UNICODE",
-          {
-              {
-                  .arity = 1,
-                  .spelling = "CASE WHEN $1 = '' THEN 0 ELSE unicode($1) END",
-                  .conditions = {Is(1, {TYPE_STRING})},
-              },
-          },
-      },
-      {
-          "CHR",
-          {{.arity = 1, .spelling = "CASE WHEN $1 = 0 THEN '' ELSE chr(CAST($1 AS INTEGER)) END"}},
-      },
-      // '.' would skip line breaks without the s flag.
-      {
-          "TO_CODE_POINTS",
-          {
-              {
-                  .arity = 1,
-                  .spelling =
-                      "list_transform(regexp_extract_all($1, '(?s).'), _c -> CAST(unicode(_c) AS "
-                      "BIGINT))",
-                  .conditions = {Is(1, {TYPE_STRING})},
-              },
-              {
-                  .arity = 1,
-                  .spelling =
-                      "list_transform(regexp_extract_all(hex($1), '..'), _b -> CAST('0x' || _b AS "
-                      "BIGINT))",
-                  .conditions = {Is(1, {TYPE_BYTES})},
-              },
-          },
-      },
-      {"CODE_POINTS_TO_STRING", CodePointsTo(TYPE_STRING)},
-      {"CODE_POINTS_TO_BYTES", CodePointsTo(TYPE_BYTES)},
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
       {"MD5", {{.arity = 1, .spelling = "unhex(md5($1))"}}},
       {"SHA1", {{.arity = 1, .spelling = "unhex(sha1($1))"}}},

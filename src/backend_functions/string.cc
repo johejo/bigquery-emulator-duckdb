@@ -107,6 +107,15 @@ absl::StatusOr<int64_t> EditDistance(std::string_view first, std::string_view se
   return kFunction(first, second, max_distance);
 }
 
+// CHR, which BigQuery makes an empty string for 0 where GoogleSQL makes NUL.
+bool Chr(int64_t codepoint, std::string* out, absl::Status* error) {
+  if (codepoint == 0) {
+    out->clear();
+    return true;
+  }
+  return googlesql::functions::CodePointToString(codepoint, out, error);
+}
+
 // Sets each row to what `compute` returns for the row's arguments and its regular expression,
 // the second argument, which GoogleSQL compiles as UTF-8 for STRING or as bytes for BYTES.
 template <bool kBytes, typename Compute>
@@ -277,6 +286,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
                kBigint,
                Apply<fn::StrPosOccurrenceBytes>,
            },
+           {"bq_unicode", {kVarchar}, kBigint, Apply<fn::FirstCharToCodePoint>},
+           {"bq_chr", {kBigint}, kVarchar, Apply<Chr>},
            {"bq_left", {kVarchar, kBigint}, kVarchar, Apply<fn::LeftUtf8>},
            {"bq_left_bytes", {kBlob, kBigint}, kBlob, Apply<fn::LeftBytes>},
            {"bq_right", {kVarchar, kBigint}, kVarchar, Apply<fn::RightUtf8>},
@@ -320,6 +331,20 @@ void RegisterStringFunctions(duckdb_connection connection) {
         connection, "bq_split_bytes", {kBlob, kBlob}, list.get(),
         Apply<static_cast<bool (*)(absl::string_view, absl::string_view, std::vector<std::string>*,
                                    absl::Status*)>(fn::SplitBytes)>);
+  }
+  {
+    LogicalType const bigint(duckdb_create_logical_type(kBigint));
+    LogicalType const list(duckdb_create_list_type(bigint.get()));
+    Register(connection, "bq_to_code_points", {kVarchar}, list.get(),
+             Apply<fn::StringToCodePoints>);
+    Register(connection, "bq_to_code_points_bytes", {kBlob}, list.get(),
+             Apply<fn::BytesToCodePoints>);
+    LogicalType const varchar(duckdb_create_logical_type(kVarchar));
+    LogicalType const blob(duckdb_create_logical_type(kBlob));
+    Register(connection, "bq_code_points_to_string", {list.get()}, varchar.get(),
+             Apply<fn::CodePointsToString>);
+    Register(connection, "bq_code_points_to_bytes", {list.get()}, blob.get(),
+             Apply<fn::CodePointsToBytes>);
   }
   Register(connection, "bq_farm_fingerprint", {kBlob}, kBigint, Apply<fn::FarmFingerprint>);
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);

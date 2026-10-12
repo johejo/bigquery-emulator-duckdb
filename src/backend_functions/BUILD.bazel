@@ -219,6 +219,7 @@ cc_library(
         "//third_party/duckdb",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/public:numeric_value",
     ],
 )
