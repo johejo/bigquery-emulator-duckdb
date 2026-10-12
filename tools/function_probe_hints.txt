@@ -1,12 +1,90 @@
-# Hints for //:function_probe.
+# Hints for //:function_probe, which reads them when it runs, so changing them needs no rebuild.
 #
-#   query NAME SQL   probes SQL instead of the calls generated from the function's signatures;
-#                    repeat it to cover each signature BigQuery documents
-#   note NAME TEXT   shows TEXT in the Notes column, for behavior a probe cannot observe;
-#                    at most one per function
+#   query NAME SQL                     probes SQL instead of the calls generated from the
+#                                      function's signatures; repeat it to cover each signature
+#                                      BigQuery documents
+#   note NAME TEXT                     shows TEXT in the Notes column, for behavior a probe cannot
+#                                      observe; at most one per function
+#   sample TYPE | LITERAL              calls an argument of TYPE with LITERAL; an ARRAY or STRUCT
+#                                      without a sample of its own is built from its elements' or
+#                                      fields' samples
+#   optional TYPE | LITERAL            the same, for an optional argument in the longest form
+#   longest PATTERN                    also probes the longest form of the signatures PATTERN
+#                                      matches, with every positional optional argument
+#   values SET | LITERAL | LITERAL...  names a set of values for `elements`
+#   elements PATTERN | SET             calls the signatures PATTERN matches once for each value in
+#                                      SET, as <T1>, an array of <T1>, a RANGE from it, and ANY TYPE
+#   argument PATTERN | TYPE | LITERAL  calls an argument of TYPE with LITERAL in the signatures
+#                                      PATTERN matches, where a type does not describe valid values
 #
-# NAME must be in tools/bigquery_functions.txt. Run
+# NAME must be in tools/bigquery_functions.txt. TYPE and PATTERN refer to signatures as
+# `--signatures` prints them, such as `RANGE_BUCKET(<T1>, <array<T1>>) -> INT64`, which shows each
+# signature with its call:
 # `bazel run //:function_probe -- --signatures $PWD/tools/bigquery_functions.txt $PWD/tools/function_probe_hints.txt`
+# TYPE is an argument's type without its cardinality and name, and PATTERN is an ECMAScript
+# regular expression that has to match some signature. Where several `elements` or `argument`
+# hints match, the last one applies.
+
+# The samples of types and templated kinds. <T1> and <T2> differ.
+sample INT64 | 2
+sample DOUBLE | 1.5
+sample NUMERIC | NUMERIC '1.5'
+sample BIGNUMERIC | BIGNUMERIC '1.5'
+sample BOOL | TRUE
+sample STRING | 'abc'
+sample BYTES | b'abc'
+sample DATE | DATE '2024-01-15'
+sample DATETIME | DATETIME '2024-01-15 10:20:30'
+sample TIME | TIME '10:20:30'
+sample TIMESTAMP | TIMESTAMP '2024-01-15 10:20:30+00'
+sample INTERVAL | INTERVAL 1 DAY
+sample JSON | JSON '{"a": [1, 2]}'
+sample GEOGRAPHY | ST_GEOGPOINT(1, 2)
+sample RANGE<DATE> | RANGE<DATE> '[2024-01-01, 2024-02-01)'
+sample RANGE<DATETIME> | RANGE<DATETIME> '[2024-01-01 00:00:00, 2024-02-01 00:00:00)'
+sample RANGE<TIMESTAMP> | RANGE<TIMESTAMP> '[2024-01-01 00:00:00, 2024-02-01 00:00:00)'
+# Date parts are the only enum arguments BigQuery spells as keywords; it spells rounding modes as
+# strings.
+sample ENUM<googlesql.functions.DateTimestampPart> | DAY
+sample ENUM<ROUNDING_MODE> | 'ROUND_HALF_EVEN'
+sample <T1> | 2
+sample ANY TYPE | 2
+sample <T2> | 'abc'
+sample ANY STRING | 'abc'
+sample <array<T1>> | [1, 2]
+sample <array<T2>> | ['a', 'b']
+sample <struct> | STRUCT(1 AS a)
+sample <range<T>> | RANGE<DATE> '[2024-01-01, 2024-02-01)'
+
+# Date-part signatures can also take an optional period or time zone. Probe the longest form so
+# rejecting those arguments makes support Partial. An optional INT64 and date part spell one
+# INTERVAL expression, such as GENERATE_DATE_ARRAY's step.
+longest ENUM<googlesql\.functions\.DateTimestampPart>
+optional ENUM<googlesql.functions.DateTimestampPart> | MONTH
+optional STRING | 'UTC'
+
+# These functions take independently typed values, including containers. Probe their argument
+# types rather than declaring the arbitrary signature supported from INT64 alone, with valid paths
+# or a format specifier.
+values any | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | INTERVAL 1 SECOND | JSON '[1]' | [1, NULL] | STRUCT(BIGNUMERIC '2' AS b) | STRUCT() | RANGE<DATE> '[2024-01-01, 2024-02-01)'
+elements ^(FORMAT|JSON_ARRAY_APPEND|JSON_ARRAY_INSERT)\( | any
+argument ^FORMAT\( | STRING | '%t'
+argument ^JSON_ARRAY_APPEND\( | STRING | '$'
+argument ^JSON_ARRAY_INSERT\( | STRING | '$[0]'
+
+# TOP_SUM preserves arbitrary grouping keys, independently of its weight overload. Include the
+# grouping types the translator rejects, so the report remains Partial.
+values grouping | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | INTERVAL 1 SECOND | [1, NULL] | STRUCT(BIGNUMERIC '2' AS b) | RANGE<DATE> '[2024-01-01, 2024-02-01)'
+elements ^APPROX_TOP_SUM\( | grouping
+
+# Probe a point and same-typed boundaries across orderable scalar types, rather than declaring the
+# generic signature supported from INT64 alone.
+values orderable | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | INTERVAL 1 DAY | RANGE<DATE> '[2024-01-01, 2024-02-01)'
+elements \(<T1>, <array<T1>>\) | orderable
+
+# Probe each element type a RANGE can have.
+values range | DATE '2024-01-15' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00'
+elements <range<T>> | range
 
 # Date and time arithmetic takes an INTERVAL expression, and a TIME has no DAY part.
 query DATE_ADD SELECT DATE_ADD(DATE '2024-01-15', INTERVAL 1 DAY)

@@ -72,21 +72,26 @@ func probeQuery(binary string, setup []string, sql string) (probe, error) {
 	if err != nil || !failed {
 		return probe{runs, ""}, err
 	}
+	return classify(sql, message), nil
+}
+
+// classify names the outcome of sql from the error message jobs.query reported for it.
+func classify(sql, message string) probe {
 	message = firstLine(message)
 	if feature, ok := strings.CutPrefix(message, unsupportedPrefix); ok {
-		return probe{unsupported, feature}, nil
+		return probe{unsupported, feature}
 	}
 	if prefix := analyzerError.FindString(message); prefix != "" {
 		// A feature whose language option the emulator leaves off, such as COLLATE, is one it does
 		// not support rather than a query the probe got wrong.
 		if feature, _, ok := strings.Cut(message[len(prefix):], " is not supported"); ok {
-			return probe{unsupported, feature}, nil
+			return probe{unsupported, feature}
 		}
-		return probe{untested, "`" + sql + "`: " + message}, nil
+		return probe{untested, "`" + sql + "`: " + message}
 	}
 	// DuckDB's hint to add casts is noise in a report.
 	message, _, _ = strings.Cut(message, ". You might need")
-	return probe{broken, "`" + sql + "`: " + message}, nil
+	return probe{broken, "`" + sql + "`: " + message}
 }
 
 func probeSQL(w io.Writer, binary, path string) error {
