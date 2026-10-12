@@ -181,6 +181,11 @@ LoadRequest ParseLoadJob(const std::string& project_id, const json& body) {
       ParseTableReference(load["destinationTable"], "destination table");
   ParseDispositions(load, request.load);
   RejectDestinationLayout(load);
+  // A new table's description, friendly name and labels, which must match an existing table's.
+  if (load.contains("destinationTableProperties") &&
+      !load["destinationTableProperties"].is_null()) {
+    throw ApiError::Invalid("The emulator does not support destinationTableProperties");
+  }
   request.load.configuration = load;
   return request;
 }
@@ -217,6 +222,9 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
     }
   }
   ParseDispositions(copy, request.copy);
+  if (copy.contains("destinationExpirationTime") && !copy["destinationExpirationTime"].is_null()) {
+    throw ApiError::Invalid("The emulator does not support destinationExpirationTime");
+  }
   request.copy.configuration = copy;
   return request;
 }

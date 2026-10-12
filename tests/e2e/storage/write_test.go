@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -524,27 +525,184 @@ func TestManagedWriter(t *testing.T) {
 	wantVisible(t, rest, "storage_managed_writer", 0, 1, 2)
 }
 
-func TestDroppedTableInvalidatesOldStream(t *testing.T) {
-	rest, _, write := clients(t)
-	path := table(t, rest, "storage_write_recreate", "id INT64, name STRING")
-	state := writeStream(t, write, path, storagepb.WriteStream_COMMITTED)
-	query(t, rest, "CREATE OR REPLACE TABLE storage_write_recreate.rows (id INT64, name STRING)")
-	_, err := write.GetWriteStream(t.Context(), &storagepb.GetWriteStreamRequest{Name: state.Name})
-	if status.Code(err) != codes.NotFound {
-		t.Fatal(err)
+// A write stream belongs to the table it was created for: once the table is dropped and another
+// takes its name, by any path, the stream is gone and the default stream writes to the new table.
+// Changing the table's rows or metadata, or failing to replace it, keeps the stream.
+func TestStreamsFollowTableIdentity(t *testing.T) {
+	wait := func(t *testing.T, job *bigquery.Job, err error) error {
+		t.Helper()
+		if err != nil {
+			return err
+		}
+		state, err := job.Wait(t.Context())
+		if err != nil {
+			return err
+		}
+		return state.Err()
 	}
-	stream, err := write.AppendRows(t.Context())
-	if err != nil {
-		t.Fatal(err)
+	run := func(t *testing.T, rest *bigquery.Client, sql string) error {
+		t.Helper()
+		job, err := rest.Query(sql).Run(t.Context())
+		return wait(t, job, err)
 	}
-	response := send(t, stream, appendRequest(state.Name, true, nil, row(1, "old")))
-	if response.GetError().GetCode() != int32(codes.NotFound) {
-		t.Fatal(response)
+	queryTo := func(t *testing.T, rest *bigquery.Client, table *bigquery.Table, sql string,
+		disposition bigquery.TableWriteDisposition) error {
+		t.Helper()
+		query := rest.Query(sql)
+		query.Dst = table
+		query.WriteDisposition = disposition
+		job, err := query.Run(t.Context())
+		return wait(t, job, err)
 	}
-	response = send(t, stream, appendRequest(path+"/streams/_default", true, nil, row(2, "new")))
-	if response.GetError() != nil {
-		t.Fatal(response)
+	loadTo := func(t *testing.T, table *bigquery.Table, rows string, schema bigquery.Schema,
+		disposition bigquery.TableWriteDisposition) error {
+		t.Helper()
+		source := bigquery.NewReaderSource(strings.NewReader(rows))
+		source.SourceFormat = bigquery.JSON
+		source.Schema = schema
+		loader := table.LoaderFrom(source)
+		loader.WriteDisposition = disposition
+		job, err := loader.Run(t.Context())
+		return wait(t, job, err)
 	}
-	closeAppend(t, stream)
-	wantVisible(t, rest, "storage_write_recreate", 2)
+	schema := bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType}, {Name: "name", Type: bigquery.StringFieldType}}
+	for _, c := range []struct {
+		name string
+		// change runs after the stream wrote row 1, and returns the rows the table holds then.
+		change    func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64
+		recreated bool
+	}{
+		{"create_or_replace", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			query(t, rest, "CREATE OR REPLACE TABLE "+table.DatasetID+".rows (id INT64, name STRING)")
+			return nil
+		}, true},
+		{"drop_and_create", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			query(t, rest, "DROP TABLE "+table.DatasetID+".rows")
+			query(t, rest, "CREATE TABLE "+table.DatasetID+".rows (id INT64, name STRING)")
+			return nil
+		}, true},
+		{"tables_delete_and_insert", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := table.Delete(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := table.Create(t.Context(), &bigquery.TableMetadata{Schema: schema}); err != nil {
+				t.Fatal(err)
+			}
+			return nil
+		}, true},
+		{"query_job", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := table.Delete(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := queryTo(t, rest, table, "SELECT 0 AS id, 'query' AS name", bigquery.WriteEmpty); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{0}
+		}, true},
+		{"load_job", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := table.Delete(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := loadTo(t, table, `{"id": 0, "name": "load"}`, schema, bigquery.WriteEmpty); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{0}
+		}, true},
+		{"copy_job", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			source := rest.Dataset(table.DatasetID).Table("source")
+			if err := table.Delete(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			query(t, rest, "CREATE TABLE "+table.DatasetID+".source AS SELECT 0 AS id, 'copy' AS name")
+			job, err := table.CopierFrom(source).Run(t.Context())
+			if err := wait(t, job, err); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{0}
+		}, true},
+		{"tables_patch", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if _, err := table.Update(t.Context(), bigquery.TableMetadataToUpdate{Description: "patched"}, ""); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{1}
+		}, false},
+		{"truncate_table", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			query(t, rest, "TRUNCATE TABLE "+table.DatasetID+".rows")
+			return nil
+		}, false},
+		{"query_append", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := queryTo(t, rest, table, "SELECT 0 AS id, 'query' AS name", bigquery.WriteAppend); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{0, 1}
+		}, false},
+		{"query_truncate_data", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := queryTo(t, rest, table, "SELECT 0 AS id, 'query' AS name", bigquery.WriteTruncateData); err != nil {
+				t.Fatal(err)
+			}
+			return []int64{0}
+		}, false},
+		{"failed_create_or_replace", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := run(t, rest, "CREATE OR REPLACE TABLE "+table.DatasetID+".rows AS SELECT ERROR('boom') AS id, '' AS name"); err == nil {
+				t.Fatal("replacement succeeded")
+			}
+			return []int64{1}
+		}, false},
+		{"failed_query_truncate", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			if err := queryTo(t, rest, table, "SELECT ERROR('boom') AS id, '' AS name", bigquery.WriteTruncate); err == nil {
+				t.Fatal("replacement succeeded")
+			}
+			return []int64{1}
+		}, false},
+		{"failed_load_truncate", func(t *testing.T, rest *bigquery.Client, table *bigquery.Table) []int64 {
+			required := bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType, Required: true}, schema[1]}
+			if err := loadTo(t, table, `{"id": null}`, required, bigquery.WriteTruncate); err == nil {
+				t.Fatal("replacement succeeded")
+			}
+			return []int64{1}
+		}, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			rest, _, write := clients(t)
+			dataset := "storage_identity_" + c.name
+			path := table(t, rest, dataset, "id INT64, name STRING")
+			state := writeStream(t, write, path, storagepb.WriteStream_COMMITTED)
+			stream, err := write.AppendRows(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response := send(t, stream, appendRequest(state.Name, true, nil, row(1, "before"))); response.GetError() != nil {
+				t.Fatal(response)
+			}
+			closeAppend(t, stream)
+			rows := c.change(t, rest, rest.Dataset(dataset).Table("rows"))
+
+			_, err = write.GetWriteStream(t.Context(), &storagepb.GetWriteStreamRequest{Name: state.Name})
+			stream, err2 := write.AppendRows(t.Context())
+			if err2 != nil {
+				t.Fatal(err2)
+			}
+			response := send(t, stream, appendRequest(state.Name, true, nil, row(2, "old stream")))
+			if c.recreated {
+				if status.Code(err) != codes.NotFound || response.GetError().GetCode() != int32(codes.NotFound) {
+					t.Fatalf("old stream on a recreated table: get = %v, append = %v", err, response)
+				}
+			} else {
+				if err != nil || response.GetError() != nil {
+					t.Fatalf("old stream on the same table: get = %v, append = %v", err, response)
+				}
+				rows = append(rows, 2)
+			}
+			closeAppend(t, stream)
+			stream, err = write.AppendRows(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response := send(t, stream, appendRequest(path+"/streams/_default", true, nil, row(3, "default"))); response.GetError() != nil {
+				t.Fatal(response)
+			}
+			closeAppend(t, stream)
+			wantVisible(t, rest, dataset, append(rows, 3)...)
+		})
+	}
 }

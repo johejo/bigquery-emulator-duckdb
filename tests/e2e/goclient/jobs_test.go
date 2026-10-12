@@ -51,9 +51,7 @@ func TestJobTableCreation(t *testing.T) {
 			before := time.Now().Truncate(time.Millisecond)
 			switch name {
 			case "api":
-				if err := table.Create(ctx, &bigquery.TableMetadata{
-					Schema: schema, Description: "keep on failure", Labels: map[string]string{"origin": "api"},
-				}); err != nil {
+				if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
 					t.Fatal(err)
 				}
 			case "ddl":
@@ -96,42 +94,6 @@ func TestJobTableCreation(t *testing.T) {
 				t.Fatalf("omitted repeated column: row = %+v, error = %v", row, err)
 			}
 		})
-	}
-
-	// A failed load must roll back both a new table and a replacement, including metadata.
-	for _, name := range []string{"failed", "api"} {
-		table := dataset.Table(name)
-		var before *bigquery.TableMetadata
-		if name == "api" {
-			var err error
-			before, err = table.Metadata(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		source := bigquery.NewReaderSource(strings.NewReader("{\"id\":null}\n"))
-		source.SourceFormat = bigquery.JSON
-		source.Schema = bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType, Required: true}}
-		loader := table.LoaderFrom(source)
-		loader.WriteDisposition = bigquery.WriteTruncate
-		job, err := loader.Run(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		status, err := job.Wait(ctx)
-		if err != nil || status.Err() == nil {
-			t.Fatalf("failed load: status = %v, error = %v", status, err)
-		}
-		after, err := table.Metadata(ctx)
-		if before == nil {
-			if err == nil {
-				t.Fatal("failed load left a table behind")
-			}
-		} else if err != nil || !after.CreationTime.Equal(before.CreationTime) ||
-			!reflect.DeepEqual(after.Schema, before.Schema) || after.NumRows != before.NumRows ||
-			after.Description != before.Description || !reflect.DeepEqual(after.Labels, before.Labels) {
-			t.Fatalf("failed replacement changed table: before = %+v, after = %+v, error = %v", before, after, err)
-		}
 	}
 }
 

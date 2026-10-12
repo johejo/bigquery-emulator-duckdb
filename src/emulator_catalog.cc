@@ -518,8 +518,10 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
   for (const FieldSchema& field : schema) {
     columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
   }
-  const DdlWrite write =
+  DdlWrite write =
       CreateTableWrite(TableDefinition{.table = table, .schema = schema, .metadata = metadata});
+  std::ranges::move(ColumnDefaultStatements(table, schema),
+                    std::back_inserter(write.metadata_statements));
   try {
     backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + columns + ")",
                         write.metadata_statements, write.skip_query);
