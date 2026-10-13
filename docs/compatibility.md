@@ -46,9 +46,14 @@ NULL for options other than the location.
 
 Tables keep a description, friendly name, labels and expiration, and columns a description, which
 DDL `OPTIONS` and the `tables` methods set; other options are unsupported. Expiration comes from
-REST `expirationTime`, DDL `expiration_timestamp` (TIMESTAMP literals or NULL), or the
-`destinationExpirationTime` of a copy job that creates its destination; a copy job with one to an
-existing table is rejected. Expired tables and views are deleted lazily when the catalog is read,
+REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
+that creates its destination; a copy job with one to an existing table is rejected.
+
+A DDL option's value is a literal or a constant expression of query parameters and the supported
+scalar functions, which the backend evaluates when the statement runs; the functions BigQuery
+excludes, such as `REPEAT` and `RAND`, fail, and other expressions, such as a parenthesized script
+variable, are unsupported. As in BigQuery, a STRING literal converts to the TIMESTAMP of
+`expiration_timestamp`, and a bare identifier that names a script variable is an error. Expired tables and views are deleted lazily when the catalog is read,
 including before query analysis, and are treated as missing.
 
 ### Partitioning and clustering

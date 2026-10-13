@@ -67,8 +67,8 @@ bool ApplyAnnotations(const googlesql::Type* type,
     field.mode = FieldMode::kRequired;
   }
   for (const auto& option : annotations.option_list()) {
-    const googlesql::Value* value = OptionLiteral(*option);
-    if (ToLowerAscii(option->name()) != "description" || value == nullptr ||
+    const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
+    if (ToLowerAscii(option->name()) != "description" || !value.has_value() ||
         !StringOption(*value, field.description)) {
       Unsupported(scope, "column option " + option->name());
       return false;
@@ -145,8 +145,8 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
 // unsupported, and so are += and -=.
 bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsAction& action) {
   for (const auto& option : options) {
-    const googlesql::Value* value = OptionLiteral(*option);
-    if (ToLowerAscii(option->name()) != "description" || value == nullptr ||
+    const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
+    if (ToLowerAscii(option->name()) != "description" || !value.has_value() ||
         !StringOption(*value, action.description.emplace())) {
       Unsupported(scope, "column option " + option->name());
       return false;

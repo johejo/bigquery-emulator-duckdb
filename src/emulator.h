@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+#include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -266,6 +267,9 @@ class Emulator {
                                                    const std::vector<FieldSchema>& schema);
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
                       bool null_arrays = false);
+  // The one value of `type` that `result`, a query run with null_arrays set, returns, such as the
+  // value of a DDL option. Throws ApiError::InvalidQuery for a value the emulator cannot decode.
+  static googlesql::Value ResultValue(const QueryResult& result, const googlesql::Type* type);
   // Runs `translation` as a query job without a destination table does, recording the metadata
   // of a DDL statement, and returns its result with the schema the translation gives it.
   QueryResult RunStatement(const TranslatedStatement& translation,

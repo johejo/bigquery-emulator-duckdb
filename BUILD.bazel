@@ -600,6 +600,7 @@ cc_library(
         ":references",
         ":routine",
         ":table_metadata",
+        "@googlesql//googlesql/public:value",
         "@nlohmann_json//:json",
     ],
 )

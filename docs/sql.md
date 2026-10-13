@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 28 | 5 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 12 | 9 | 7 |
+| [DDL](#ddl) | 13 | 8 | 7 |
 | [Multi-statement queries](#multi-statement-queries) | 8 | 4 | 1 |
 | [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
@@ -88,7 +88,7 @@ rejected.
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported |  |
-| Table and column options | Partial | See [Options and expiration](compatibility.md#options-and-expiration). Unsupported: CREATE TABLE option expiration_timestamp; column option rounding_mode. |
+| Table and column options | Partial | See [Options and expiration](compatibility.md#options-and-expiration). Unsupported: column option rounding_mode. |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option require_partition_filter. |
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
@@ -99,11 +99,11 @@ rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported |  |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE option expiration_timestamp; column option rounding_mode. |
+| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL; column option rounding_mode. |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: CREATE SCHEMA option location. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |
-| `CREATE VIEW` | Partial | See [Views](compatibility.md#views). Unsupported: CREATE VIEW option expiration_timestamp. |
+| `CREATE VIEW` | Supported | See [Views](compatibility.md#views). |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported |  |
 | `CREATE FUNCTION` | Partial | See [User-defined functions](compatibility.md#user-defined-functions). Unsupported: JavaScript UDF arguments of type DATE; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; persistent non-SQL UDFs; views that call SQL UDFs; volatile SQL UDF arguments with subquery bodies. |
