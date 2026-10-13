@@ -180,6 +180,7 @@ cc_library(
         ":duckdb_sql",
         ":field_schema",
         ":parquet_metadata",
+        ":schema_sql",
         ":type_mapping",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:numeric_value",

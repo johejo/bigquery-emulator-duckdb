@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -27,6 +28,19 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
 // field of a RECORD is an error unless `ignore_unknown_values` is set.
 std::string InsertValue(const nlohmann::json& value, const FieldSchema& field,
                         bool ignore_unknown_values);
+
+// The DuckDB value `sql` of the REPEATED `field` with each element replaced by
+// `element(name, element_field, depth + 1)`, where `name` is the lambda's parameter, _e and
+// `depth`, and `element_field` is `field` as NULLABLE.
+std::string MapElements(
+    const std::string& sql, const FieldSchema& field, int depth,
+    const std::function<std::string(const std::string&, const FieldSchema&, int)>& element);
+
+// The DuckDB value `sql` of the RECORD `field` with each field `child` replaced by
+// `value(child_sql, child)`. A NULL record stays NULL.
+std::string MapFields(
+    const std::string& sql, const FieldSchema& field,
+    const std::function<std::string(const std::string&, const FieldSchema&)>& value);
 
 // Checks that BigQuery lets the schema `current` of `table` become `updated` through tables.patch
 // or tables.update, and returns the ALTER TABLE statements that make the change. Existing fields
