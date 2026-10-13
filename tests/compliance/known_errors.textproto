@@ -987,15 +987,8 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "ARRAY_TO_STRING ignores a NULL delimiter or NULL text instead of returning NULL, and fails on BYTES"
-  label: "code:array_to_string_ARRAY<BYTES>_<b@@a@@, b@@b@@>_BYTES_NULL"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ARRAY_TO_STRING ignores a NULL delimiter or NULL text instead of returning NULL, and fails on BYTES"
-  label: "code:array_to_string_ARRAY<BYTES>_<b@@a@@, b@@b@@>_BYTES_<,>_BYTES_NULL"
+  reason: "ARRAY_TO_STRING ignores a NULL delimiter or NULL text for STRING instead of returning NULL"
   label: "code:array_to_string_ARRAY<STRING>_<@@a@@, @@b@@>_STRING_<,>_STRING_NULL"
   label: "code:array_to_string_ARRAY<STRING>_<@@a@@, @@b@@>_STRING_NULL"
 }
