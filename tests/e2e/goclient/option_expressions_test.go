@@ -91,6 +91,11 @@ func TestOptionExpressions(t *testing.T) {
 		t.Errorf("string_literal: expiration = %v, want %v", got, want)
 	}
 
+	// An expression that fails, such as a TIMESTAMP_ADD past the type's range, fails the statement.
+	if err := run("CREATE TABLE overflow (id INT64) OPTIONS (expiration_timestamp = TIMESTAMP_ADD(TIMESTAMP '9999-12-31 00:00:00 UTC', INTERVAL 2 DAY))"); err == nil || strings.Contains(err.Error(), "does not support") {
+		t.Errorf("overflow: error = %v, want the expression's error", err)
+	}
+
 	for _, test := range []struct {
 		sql  string
 		want string

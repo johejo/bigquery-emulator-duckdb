@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -300,11 +301,48 @@ std::string RoundHalfEven() {
          " THEN " + away + " WHEN " + toward + " % (2 * (" + away + " - " + toward +
          ")) = 0 THEN " + toward + " ELSE " + away + " END";
 }
+
+// The values of a type the date arithmetic functions return, as DuckDB literals, and how a
+// result outside them fails.
+struct ResultRange {
+  std::string_view min;
+  std::string_view max;
+  std::string_view error;
+};
+
+constexpr ResultRange kDateRange = {
+    .min = "DATE '0001-01-01'",
+    .max = "DATE '9999-12-31'",
+    .error = "'Date arithmetic produces an out-of-range date'",
+};
+constexpr ResultRange kDatetimeRange = {
+    .min = "TIMESTAMP '0001-01-01 00:00:00'",
+    .max = "TIMESTAMP '9999-12-31 23:59:59.999999'",
+    .error = "'Datetime arithmetic produces an out-of-range datetime'",
+};
+constexpr ResultRange kTimestampRange = {
+    .min = "TIMESTAMPTZ '0001-01-01 00:00:00+00'",
+    .max = "TIMESTAMPTZ '9999-12-31 23:59:59.999999+00'",
+    .error = "'Timestamp arithmetic produces an out-of-range timestamp'",
+};
+
 // INTERVAL n PART resolves to two arguments, the count and the date part. The three argument
 // form of the date arithmetic functions is the two argument `spelling` of an INTERVAL value with
-// $2 multiplied out to that part.
-std::vector<Rule> WithInterval(const std::string& spelling) {
-  std::vector<Rule> rules = {{.arity = 2, .spelling = spelling}};
+// $2 multiplied out to that part. A result outside `range`, which DuckDB's wider types can hold,
+// fails as in BigQuery.
+std::vector<Rule> WithInterval(const std::string& spelling,
+                               const std::optional<ResultRange>& range = std::nullopt) {
+  const auto rule = [&range](Arity arity, const std::string& result,
+                             std::vector<Condition> conditions) {
+    Rule rule{.arity = arity, .spelling = result, .conditions = std::move(conditions)};
+    if (range.has_value()) {
+      rule.spelling = "CASE WHEN " + result + " NOT BETWEEN " + std::string(range->min) + " AND " +
+                      std::string(range->max) + " THEN !1 ELSE " + result + " END";
+      rule.errors = {std::string(range->error)};
+    }
+    return rule;
+  };
+  std::vector<Rule> rules = {rule(2, spelling, {})};
   for (const std::string_view part : {
            "year",
            "quarter",
@@ -326,7 +364,7 @@ std::vector<Rule> WithInterval(const std::string& spelling) {
         expanded += spelling.at(i);
       }
     }
-    rules.push_back({.arity = 3, .spelling = expanded, .conditions = {Part(3, {part})}});
+    rules.push_back(rule(3, expanded, {Part(3, {part})}));
   }
   return rules;
 }
@@ -777,12 +815,13 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
-      {"DATE_ADD", WithInterval("CAST($1 + $2 AS DATE)")},
-      {"DATE_SUB", WithInterval("CAST($1 - $2 AS DATE)")},
-      {"DATETIME_ADD", WithInterval("($1 + $2)")},
-      {"DATETIME_SUB", WithInterval("($1 - $2)")},
-      {"TIMESTAMP_ADD", WithInterval("($1 + $2)")},
-      {"TIMESTAMP_SUB", WithInterval("($1 - $2)")},
+      {"DATE_ADD", WithInterval("CAST($1 + $2 AS DATE)", kDateRange)},
+      {"DATE_SUB", WithInterval("CAST($1 - $2 AS DATE)", kDateRange)},
+      {"DATETIME_ADD", WithInterval("($1 + $2)", kDatetimeRange)},
+      {"DATETIME_SUB", WithInterval("($1 - $2)", kDatetimeRange)},
+      {"TIMESTAMP_ADD", WithInterval("($1 + $2)", kTimestampRange)},
+      {"TIMESTAMP_SUB", WithInterval("($1 - $2)", kTimestampRange)},
+      // TIME wraps around midnight.
       {"TIME_ADD", WithInterval("($1 + $2)")},
       {"TIME_SUB", WithInterval("($1 - $2)")},
       {"$EXTRACT", Extract()},
