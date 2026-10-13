@@ -57,7 +57,7 @@ rewrites into others.
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
 | [ObjectRef functions](#objectref-functions) | 0 | 0 | 4 | 0 |
-| [Range functions](#range-functions) | 6 | 0 | 2 | 0 |
+| [Range functions](#range-functions) | 7 | 0 | 1 | 0 |
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
@@ -496,7 +496,7 @@ rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | Unsupported |  |  |
+| [`GENERATE_RANGE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#generate_range_array) | Supported | GoogleSQL function |  |
 | [`RANGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range) | Supported | DuckDB SQL |  |
 | [`RANGE_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_contains) | Supported | DuckDB SQL |  |
 | [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | Supported | DuckDB SQL |  |

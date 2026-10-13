@@ -13,9 +13,6 @@ SELECT CAST(r AS JSON) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
 SELECT FORMAT('%t', RANGE<DATE> '[2020-01-01, 2020-02-01)')
 => error contains: The emulator does not support function FORMAT with RANGE
 
-SELECT GENERATE_RANGE_ARRAY(RANGE<DATE> '[2020-01-01, 2020-02-01)', INTERVAL 1 DAY)
-=> error contains: The emulator does not support function GENERATE_RANGE_ARRAY
-
 SELECT SAFE_CAST(CONCAT('[2020-01-01, ', '2020-01-02)') AS RANGE<DATE>)
 => error contains: The emulator does not support CAST from STRING to RANGE<DATE>
 

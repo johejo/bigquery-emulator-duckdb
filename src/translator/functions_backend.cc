@@ -6,13 +6,35 @@
 #include <unordered_map>
 #include <vector>
 
+#include "src/duckdb_sql.h"
 #include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
 using enum googlesql::TypeKind;
+
+// GoogleSQL splits the RANGE into the bounds of its subranges, each subrange's end the next one's
+// start, which become the RANGEs, and fails on an UNBOUNDED end and on steps BigQuery rejects. The
+// last, partial subrange is kept by default.
+std::vector<Rule> GenerateRangeArray() {
+  const auto bound = [](std::string_view name) {
+    return "struct_extract($1, " + QuoteLiteral(name) + ")";
+  };
+  return {
+      {
+          .arity = {2, 3},
+          .spelling = "list_transform([bq_generate_range_array(" + bound(kRangeStart) + ", " +
+                      bound(kRangeEnd) + ", $2, $3)], _b -> list_transform(range(1, len(_b)), " +
+                      "_i -> struct_pack(" + QuoteIdentifier(kRangeStart) + " := _b[_i], " +
+                      QuoteIdentifier(kRangeEnd) + " := _b[_i + 1])))[1]",
+          .conditions = {},
+          .defaults = {"true"},
+      },
+  };
+}
 
 // SUBSTR and SUBSTRING. BigQuery starts at the first character for a position of 0 or one
 // before the start, where DuckDB takes as many characters fewer. BYTES go to GoogleSQL, without
@@ -313,6 +335,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               {.arity = 4, .spelling = "bq_generate_date_array($1, $2, $3, #4)"},
           },
       },
+      {"GENERATE_RANGE_ARRAY", GenerateRangeArray()},
       // The mode is passed by its name.
       // Formatting and parsing dates and times. DuckDB's strftime() and strptime() differ in
       // the format elements, in how leniently they parse and in their errors. FORMAT_DATE,
