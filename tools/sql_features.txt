@@ -76,7 +76,7 @@ query `* EXCEPT`, `* REPLACE` | SELECT * REPLACE (id + 1 AS id) FROM u
 query `.*` of a struct | SELECT s.* FROM t
 query STRUCT constructors and casts | SELECT STRUCT(1, 'x'), STRUCT(1 AS a, 'x' AS a)
 query STRUCT constructors and casts | SELECT CAST(STRUCT(1 AS x, 'y' AS y) AS STRUCT<INT64, STRING>)
-query STRUCT constructors and casts | SELECT STRUCT()
+query STRUCT constructors and casts | SELECT TO_JSON_STRING(STRUCT())
 query STRUCT constructors and casts | SELECT STRUCT(NULL) = STRUCT(1)
 query STRUCT constructors and casts | SELECT CAST(STRUCT(1, 2) AS JSON)
 note STRUCT constructors and casts | See [STRUCT values](compatibility.md#struct-values).
@@ -261,7 +261,7 @@ query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (1, 'x'
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT id, name FROM t ORDER BY id LIMIT 1); SELECT a, b
 query `DECLARE`, `SET` | DECLARE a INT64; DECLARE b STRING; SET (a, b) = (SELECT AS STRUCT 1, 'x'); SELECT a, b
 query `DECLARE`, `SET` | DECLARE s STRUCT<INT64, STRING> DEFAULT (1, 'x'); SET s = (2, 'y'); SELECT s
-query `DECLARE`, `SET` | DECLARE s STRUCT<> DEFAULT STRUCT(); SELECT s
+query `DECLARE`, `SET` | DECLARE s STRUCT<> DEFAULT STRUCT(); SELECT TO_JSON_STRING(s)
 query `DECLARE`, `SET` | DECLARE s STRING(3) DEFAULT 'a'; SELECT s
 query `BEGIN ... END` | BEGIN DECLARE x INT64 DEFAULT 1; SELECT x; END
 query `BEGIN ... EXCEPTION ... END` | BEGIN SELECT 1 / 0; EXCEPTION WHEN ERROR THEN SELECT @@error.message, @@error.statement_text; END

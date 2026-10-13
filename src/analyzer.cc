@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -44,10 +46,6 @@ AnalyzerResult::AnalyzerResult(AnalyzerResult&&) noexcept = default;
 AnalyzerResult& AnalyzerResult::operator=(AnalyzerResult&&) noexcept = default;
 AnalyzerResult::~AnalyzerResult() = default;
 
-std::string ValueTableFieldName(const std::string& name, int index) {
-  return name.empty() ? "_field_" + std::to_string(index + 1) : name;
-}
-
 const googlesql::ResolvedStatement& AnalyzerResult::statement() const {
   return *analyzer_output_->resolved_statement();
 }
@@ -60,33 +58,58 @@ std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
   return ResultSchema(statement());
 }
 
+namespace {
+
+// The name BigQuery reports for field `index` (0-based) of a STRUCT in a result schema.
+std::string StructFieldName(const std::string& name, int index) {
+  return name.empty() ? "_field_" + std::to_string(index + 1) : name;
+}
+
+// Whether `query` returns a value table of structs, whose fields BigQuery returns as columns.
+bool ReturnsStructFields(const googlesql::ResolvedQueryStmt& query) {
+  return query.is_value_table() && query.output_column_list_size() == 1 &&
+         query.output_column_list(0)->column().type()->IsStruct();
+}
+
+// The columns of the rows `query` returns, named the way BigQuery reports them. The fields of a
+// value table of structs may have empty names, which BigQuery rejects; a field whose name repeats
+// an earlier one's, ignoring case, is named by its position.
+std::vector<std::pair<std::string, const googlesql::Type*>> ResultColumns(
+    const googlesql::ResolvedQueryStmt& query) {
+  std::vector<std::pair<std::string, const googlesql::Type*>> columns;
+  if (ReturnsStructFields(query)) {
+    const auto& fields = query.output_column_list(0)->column().type()->AsStruct()->fields();
+    std::set<std::string> names;
+    for (size_t i = 0; i < fields.size(); ++i) {
+      const std::string& name = fields.at(i).name;
+      columns.emplace_back(name.empty() || names.insert(ToUpperAscii(name)).second
+                               ? name
+                               : "_field_" + std::to_string(i + 1),
+                           fields.at(i).type);
+    }
+    return columns;
+  }
+  int anonymous_columns = 0;
+  for (const auto& output_column : query.output_column_list()) {
+    std::string name = output_column->name();
+    if (googlesql::IsInternalAlias(name)) {
+      name = "f" + std::to_string(anonymous_columns++) + "_";
+    }
+    columns.emplace_back(std::move(name), output_column->column().type());
+  }
+  return columns;
+}
+
+}  // namespace
+
 std::optional<std::vector<FieldSchema>> ResultSchema(
     const googlesql::ResolvedStatement& statement) {
   if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
     return std::nullopt;
   }
-  const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
   std::vector<FieldSchema> schema;
-  if (query->is_value_table() && query->output_column_list_size() == 1 &&
-      query->output_column_list(0)->column().type()->IsStruct()) {
-    const auto& fields = query->output_column_list(0)->column().type()->AsStruct()->fields();
-    for (size_t i = 0; i < fields.size(); ++i) {
-      absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(
-          ValueTableFieldName(fields.at(i).name, static_cast<int>(i)), fields.at(i).type);
-      if (!field.ok()) {
-        return std::nullopt;
-      }
-      schema.push_back(*std::move(field));
-    }
-    return schema;
-  }
-  int anonymous_columns = 0;
-  for (const auto& output_column : query->output_column_list()) {
-    std::string name = output_column->name();
-    if (googlesql::IsInternalAlias(name)) {
-      name = "f" + std::to_string(anonymous_columns++) + "_";
-    }
-    absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(name, output_column->column().type());
+  for (const auto& [name, type] : ResultColumns(*statement.GetAs<googlesql::ResolvedQueryStmt>())) {
+    absl::StatusOr<FieldSchema> field = BigQueryFieldSchema(name, type);
     if (!field.ok()) {
       return std::nullopt;
     }
@@ -241,6 +264,62 @@ absl::Status CheckDistinctArrays(const googlesql::ResolvedNode& node) {
   return absl::OkStatus();
 }
 
+// BigQuery rejects a STRUCT<> in a query's result, at any depth, naming the field by its path.
+absl::Status CheckEmptyStructs(const std::string& path, const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return CheckEmptyStructs(path, type->AsArray()->element_type());
+  }
+  if (!type->IsStruct()) {
+    return absl::OkStatus();
+  }
+  const auto& fields = type->AsStruct()->fields();
+  if (fields.empty()) {
+    return absl::InvalidArgumentError("Unsupported empty struct type for field '" + path + "'");
+  }
+  for (size_t i = 0; i < fields.size(); ++i) {
+    GOOGLESQL_RETURN_IF_ERROR(CheckEmptyStructs(
+        path + "." + StructFieldName(fields.at(i).name, static_cast<int>(i)), fields.at(i).type));
+  }
+  return absl::OkStatus();
+}
+
+// BigQuery rejects a query whose result has a column without a name, as a value table of structs
+// with an anonymous field has, or a STRUCT<>.
+absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement) {
+  if (!statement.Is<googlesql::ResolvedQueryStmt>()) {
+    return absl::OkStatus();
+  }
+  const auto& query = *statement.GetAs<googlesql::ResolvedQueryStmt>();
+  const auto columns = ResultColumns(query);
+  // BigQuery does not document the names of a field repeated more than twice, or of one whose
+  // positional name another field already has.
+  if (ReturnsStructFields(query)) {
+    std::map<std::string, int> fields;
+    std::set<std::string> names;
+    for (size_t i = 0; i < columns.size(); ++i) {
+      const std::string& field =
+          query.output_column_list(0)->column().type()->AsStruct()->field(static_cast<int>(i)).name;
+      if ((!field.empty() && ++fields[ToUpperAscii(field)] > 2) ||
+          (!columns.at(i).first.empty() &&
+           !names.insert(ToUpperAscii(columns.at(i).first)).second)) {
+        return absl::UnimplementedError(
+            "The emulator does not support these duplicate field names in a value table result: " +
+            field);
+      }
+    }
+  }
+  for (const auto& [name, type] : columns) {
+    if (name.empty()) {
+      return absl::InvalidArgumentError(
+          "Invalid field name \"\". Fields must contain the allowed characters, and be at most 300 "
+          "characters long. For allowed characters, please refer to "
+          "https://cloud.google.com/bigquery/docs/schemas#column_names");
+    }
+    GOOGLESQL_RETURN_IF_ERROR(CheckEmptyStructs(name, type));
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
@@ -295,6 +374,10 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
       !distinct.ok()) {
     throw std::runtime_error(std::string(distinct.message()));
   }
+  if (const absl::Status columns = CheckResultColumns(*analyzer_output->resolved_statement());
+      !columns.ok()) {
+    throw std::runtime_error(std::string(columns.message()));
+  }
   return AnalyzerResult(std::move(analyzer_output));
 }
 
@@ -329,6 +412,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
   GOOGLESQL_RETURN_IF_ERROR(CheckIntervalCasts(segment.GetSegmentText(), false));
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
   GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArrays(*analyzer_output->resolved_statement()));
+  GOOGLESQL_RETURN_IF_ERROR(CheckResultColumns(*analyzer_output->resolved_statement()));
   return AnalyzerResult(std::move(analyzer_output));
 }
 

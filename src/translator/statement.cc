@@ -1,6 +1,5 @@
 #include "src/translator/statement.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -14,7 +13,6 @@
 #include "src/translator/ddl.h"
 #include "src/translator/dml.h"
 #include "src/translator/scan.h"
-#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
@@ -77,11 +75,6 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (!relation) {
     return std::nullopt;
   }
-  if (std::ranges::any_of(query->output_column_list(), [](const auto& output) {
-        return HasEmptyStruct(output->column().type());
-      })) {
-    return Unsupported(scope, "result type STRUCT<>");
-  }
   std::vector<std::string> projections;
   // A value table of structs is returned as the structs' fields, like BigQuery does.
   if (query->is_value_table() && query->output_column_list_size() == 1 &&
@@ -93,9 +86,8 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
       return Unsupported(scope, "SELECT AS STRUCT without fields");
     }
     for (size_t i = 0; i < fields.size(); ++i) {
-      projections.push_back(
-          "struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ") AS " +
-          QuoteIdentifier(ValueTableFieldName(fields.at(i).name, static_cast<int>(i))));
+      projections.push_back("struct_extract_at(" + column->second + ", " + std::to_string(i + 1) +
+                            ") AS " + QuoteIdentifier(fields.at(i).name));
     }
     return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
   }

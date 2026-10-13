@@ -22,7 +22,7 @@ rejected.
 | [Queries](#queries) | 28 | 5 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 13 | 8 | 7 |
-| [Multi-statement queries](#multi-statement-queries) | 8 | 4 | 1 |
+| [Multi-statement queries](#multi-statement-queries) | 9 | 3 | 1 |
 | [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
 ## Queries
@@ -55,7 +55,7 @@ rejected.
 | `SELECT AS STRUCT`, `SELECT AS VALUE` | Supported |  |
 | `* EXCEPT`, `* REPLACE` | Supported |  |
 | `.*` of a struct | Supported |  |
-| STRUCT constructors and casts | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: CAST to JSON with anonymous or duplicate STRUCT fields; result type STRUCT<>. |
+| STRUCT constructors and casts | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: CAST to JSON with anonymous or duplicate STRUCT fields. |
 | Struct field and array element access | Supported |  |
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |
@@ -116,7 +116,7 @@ rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Statement lists | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
-| `DECLARE`, `SET` | Partial | Unsupported: result type STRUCT<>. |
+| `DECLARE`, `SET` | Supported |  |
 | `BEGIN ... END` | Supported |  |
 | `BEGIN ... EXCEPTION ... END` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `IF` | Supported |  |

@@ -121,6 +121,13 @@ known_errors {
 }
 
 known_errors {
+  mode: ALLOW_ERROR
+  reason: "BigQuery rejects query results with a STRUCT<> or an anonymous value table field, which GoogleSQL returns"
+  label: "struct_queries_test:struct_with_zero_field"
+  label: "union_distinct_queries_test:union_distinct_datatype_struct"
+}
+
+known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Floating-point arithmetic returns an infinity where BigQuery fails with an overflow, or returns NULL under SAFE"
   label: "aggregation_distinct_queries_test:aggregation_distinct_sum_9"

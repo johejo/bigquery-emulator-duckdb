@@ -164,10 +164,33 @@ func TestResultSchema(t *testing.T) {
 			schema: "a INTEGER, a_1 INTEGER",
 			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
 		},
+		// Names that differ only in case are duplicates too, as a dry run on BigQuery reports.
+		{
+			sql:    "SELECT 1 AS a, 2 AS A",
+			schema: "a INTEGER, A_1 INTEGER",
+			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
+		},
 		{
 			sql:    "SELECT AS STRUCT 1 AS a, 'x' AS b",
 			schema: "a INTEGER, b STRING",
 			rows:   [][]bigquery.Value{{int64(1), "x"}},
+		},
+		// BigQuery names a repeated field of a value table by its position, ignoring case, as a dry
+		// run on BigQuery reports.
+		{
+			sql:    "SELECT AS STRUCT 1 AS a, 2 AS a",
+			schema: "a INTEGER, _field_2 INTEGER",
+			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
+		},
+		{
+			sql:    "SELECT AS VALUE STRUCT(1 AS a, 2 AS a)",
+			schema: "a INTEGER, _field_2 INTEGER",
+			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
+		},
+		{
+			sql:    "SELECT AS STRUCT 1 AS a, 2 AS A",
+			schema: "a INTEGER, _field_2 INTEGER",
+			rows:   [][]bigquery.Value{{int64(1), int64(2)}},
 		},
 		{
 			sql: "SELECT BYTE_LENGTH(@s), BYTE_LENGTH(@b) AS bytes, SAFE_CAST(@s AS INT64)",

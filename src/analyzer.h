@@ -37,10 +37,6 @@ struct AnalyzerSettings {
   const googlesql::ScriptExecutor* script = nullptr;
 };
 
-// The result column for field `index` (0-based) of a query returning a value table of structs,
-// whose fields BigQuery returns as columns; anonymous fields are named `_field_<index + 1>`.
-std::string ValueTableFieldName(const std::string& name, int index);
-
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so
 // the statement stays valid for as long as the result does. Types in the AST come from the
 // TypeFactory passed to AnalyzeGoogleSql and are valid only as long as that factory is.
