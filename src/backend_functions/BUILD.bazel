@@ -105,6 +105,8 @@ cc_library(
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
+        "@googlesql//googlesql/public/functions:datetime_cc_proto",
+        "@googlesql//googlesql/public/functions:generate_array",
         "@googlesql//googlesql/public/functions:parse_date_time",
         "@googlesql//googlesql/public/functions:string_format",
     ],

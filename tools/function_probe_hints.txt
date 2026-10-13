@@ -215,6 +215,5 @@ query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 
 
 # Limits the probe's calls do not show.
 note CONTAINS_SUBSTR Takes STRING only.
-note GENERATE_DATE_ARRAY Takes only a DAY or WEEK step.
 note FORMAT JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported.
 note SESSION_USER Requires --session-user; returns the configured identity for every client.

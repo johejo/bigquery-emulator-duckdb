@@ -20,6 +20,8 @@
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
+#include "googlesql/public/functions/datetime.pb.h"
+#include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/parse_date_time.h"
 #include "googlesql/public/functions/string_format.h"
 #include "googlesql/public/numeric_value.h"
@@ -170,6 +172,24 @@ absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_v
     return absl::InvalidArgumentError("Unsupported date part");
   }
   return fn::TimestampTrunc(micros, time_zone, value, out);
+}
+
+// GENERATE_DATE_ARRAY(start, end, INTERVAL step part), with BigQuery's documented
+// 1,048,576-element limit. Like BigQuery, each step adds to the previous element, so an element
+// clamped to the end of a shorter month moves the rest to that day.
+absl::Status GenerateDateArray(int32_t start, int32_t end, int64_t step, std::string_view part,
+                               std::vector<int32_t>* out) {
+  constexpr int kMaxGeneratedArraySize = 1048576;
+  fn::DateTimestampPart unit = fn::DAY;
+  if (!fn::DateTimestampPart_Parse(absl::AsciiStrToUpper(part), &unit)) {
+    return absl::InvalidArgumentError("Unsupported date part");
+  }
+  std::vector<int64_t> dates;
+  GOOGLESQL_RETURN_IF_ERROR((fn::GenerateArrayHelper<fn::ArrayGenTrait<int64_t, fn::DateIncrement>,
+                                                     kMaxGeneratedArraySize>(
+      start, end, {.unit = unit, .value = step}, &dates)));
+  out->assign(dates.begin(), dates.end());
+  return absl::OkStatus();
 }
 
 // CAST(datetime AS STRING), whose fractional seconds have three or six digits, where DuckDB
@@ -464,6 +484,10 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
            Apply<StringToTimestampIn>);
   Register(connection, "bq_timestamp_trunc", {kTimestamp, kVarchar, kVarchar}, kTimestamp,
            Apply<TimestampTrunc>);
+  LogicalType const date(duckdb_create_logical_type(kDate));
+  LogicalType const dates(duckdb_create_list_type(date.get()));
+  Register(connection, "bq_generate_date_array", {kDate, kDate, kBigint, kVarchar}, dates.get(),
+           Apply<GenerateDateArray>);
   Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, Apply<DatetimeToString>);
   Register(connection, "bq_time_string", {kTime}, kVarchar, Apply<TimeToString>);
   Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar,

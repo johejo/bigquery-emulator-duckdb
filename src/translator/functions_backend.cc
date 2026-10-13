@@ -304,6 +304,15 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               },
           },
       },
+      // GoogleSQL stops before an element that would overflow, and rejects a zero step and
+      // arrays beyond BigQuery's limit.
+      {
+          "GENERATE_DATE_ARRAY",
+          {
+              {.arity = 2, .spelling = "bq_generate_date_array($1, $2, 1, 'day')"},
+              {.arity = 4, .spelling = "bq_generate_date_array($1, $2, $3, #4)"},
+          },
+      },
       // The mode is passed by its name.
       // Formatting and parsing dates and times. DuckDB's strftime() and strptime() differ in
       // the format elements, in how leniently they parse and in their errors. FORMAT_DATE,
