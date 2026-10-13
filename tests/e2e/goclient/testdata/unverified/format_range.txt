@@ -1,9 +1,0 @@
-# FORMAT with RANGE values whose bounds have years below 1000. BigQuery's answers to
-# scalars/range.txt settle bounds in 2020; whether %t and %T pad a year below 1000 to four digits
-# in a RANGE is not settled.
-
-SELECT FORMAT('%t|%T', RANGE<DATE> '[0099-01-01, UNBOUNDED)', RANGE<DATE> '[0099-01-01, UNBOUNDED)')
-?>
-
-SELECT FORMAT('%t|%T', RANGE<TIMESTAMP> '[0099-01-01 00:00:00+00, UNBOUNDED)', RANGE<TIMESTAMP> '[0099-01-01 00:00:00+00, UNBOUNDED)')
-?>
