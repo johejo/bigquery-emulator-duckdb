@@ -171,6 +171,7 @@ cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@boringssl//:crypto",
         "@googlesql//googlesql/base:status",
+        "@nlohmann_json//:json",
         "@protobuf//third_party/utf8_range:utf8_validity",
     ],
     linkstatic = True,

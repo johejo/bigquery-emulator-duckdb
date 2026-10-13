@@ -1,6 +1,7 @@
 #include "src/analyzer.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -251,10 +252,14 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);
   if (!status.ok()) {
-    // This array-cast error has been checked against BigQuery, including its location format:
-    // the first line of the caret message, with " [at 1:29]" written as " at [1:29]".
-    if (const std::string_view message = status.message();
-        message.starts_with("Casting between arrays with incompatible element types")) {
+    // These errors have been checked against BigQuery, including their location format: the
+    // first line of the caret message, with " [at 1:29]" written as " at [1:29]".
+    static constexpr std::array<std::string_view, 2> kChecked = {
+        "Casting between arrays with incompatible element types",
+        "First argument (key type) in function KEYS.NEW_KEYSET",
+    };
+    if (const std::string_view message = status.message(); std::ranges::any_of(
+            kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); })) {
       const std::string_view line = message.substr(0, message.find('\n'));
       if (const size_t at = line.rfind(" [at ");
           at != std::string_view::npos && line.ends_with(']')) {
