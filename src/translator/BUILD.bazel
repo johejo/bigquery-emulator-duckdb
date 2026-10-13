@@ -134,15 +134,19 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":context",
+        ":query",
         "//:duckdb_sql",
         "//:translated_statement",
         "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
     ],
     linkstatic = True,
-    deps = ["//:table_metadata"],
+    deps = [
+        "//:table_metadata",
+        "@googlesql//googlesql/public:value",
+    ],
 )
 
 cc_library(

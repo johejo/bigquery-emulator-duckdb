@@ -627,15 +627,19 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return QueryResult{};
     }
     std::string unsupported;
-    const std::optional<TranslatedStatement> translation =
-        TranslateStatement(analyzed.statement(), parameters,
-                           DefaultDataset{
-                               .project = settings.default_project,
-                               .dataset = settings.default_dataset,
-                               .temporary = catalog.temporary.get(),
-                               .has_session_user = emulator_.has_session_user_,
-                           },
-                           &unsupported, &executor.GetKnownSystemVariables());
+    const std::optional<TranslatedStatement> translation = TranslateStatement(
+        analyzed.statement(), parameters,
+        DefaultDataset{
+            .project = settings.default_project,
+            .dataset = settings.default_dataset,
+            .temporary = catalog.temporary.get(),
+            .has_session_user = emulator_.has_session_user_,
+            .evaluate =
+                [this](const std::string& sql, const googlesql::Type* type) {
+                  return Emulator::ResultValue(backend_->Execute(sql, setup_, true), type);
+                },
+        },
+        &unsupported, &executor.GetKnownSystemVariables());
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }

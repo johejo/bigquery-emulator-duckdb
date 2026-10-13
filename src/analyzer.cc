@@ -25,6 +25,7 @@
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/templated_sql_function.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
@@ -167,6 +168,12 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
     }
     return absl::OkStatus();
   });
+  // BigQuery coerces an option's value to the option's type as GoogleSQL does, so that a STRING
+  // literal of a timestamp sets expiration_timestamp and other STRING values are rejected, and,
+  // since the option has a type, rejects a bare identifier that names a script variable.
+  googlesql::AllowedHintsAndOptions allowed = options.allowed_hints_and_options();
+  allowed.AddOption("expiration_timestamp", googlesql::types::TimestampType());
+  options.set_allowed_hints_and_options(allowed);
   // BigQuery interprets civil times without an explicit zone as UTC.
   options.set_default_time_zone(absl::UTCTimeZone());
   options.set_error_message_mode(mode);

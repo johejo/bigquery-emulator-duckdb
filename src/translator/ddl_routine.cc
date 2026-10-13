@@ -110,9 +110,9 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
   };
   // A function's only option is its description, which BigQuery keeps as metadata.
   for (const auto& option : create.option_list()) {
-    const googlesql::Value* value = OptionLiteral(*option);
+    const std::optional<googlesql::Value> value = OptionValue(*option, "function", scope);
     std::string description;
-    if (value == nullptr || ToLowerAscii(option->name()) != "description" ||
+    if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
         !StringOption(*value, description)) {
       return Unsupported(scope, "CREATE FUNCTION option " + option->name());
     }

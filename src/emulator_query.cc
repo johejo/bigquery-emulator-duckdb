@@ -22,6 +22,7 @@
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/catalog.h"
+#include "src/cell_value.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
@@ -160,6 +161,15 @@ QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::str
   }
 }
 
+googlesql::Value Emulator::ResultValue(const QueryResult& result, const googlesql::Type* type) {
+  absl::StatusOr<googlesql::Value> value = CellValue(type, result.rows.at(0).at("f").at(0).at("v"));
+  if (!value.ok()) {
+    throw ApiError::InvalidQuery("The emulator does not support option values of type " +
+                                 type->DebugString());
+  }
+  return *std::move(value);
+}
+
 QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
   try {
     return backend_.Prepare(sql, setup);
@@ -237,6 +247,10 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                              .dataset = settings.default_dataset,
                              .temporary = nullptr,
                              .has_session_user = has_session_user_,
+                             .evaluate =
+                                 [this](const std::string& sql, const googlesql::Type* type) {
+                                   return ResultValue(Execute(sql, {}, true), type);
+                                 },
                          },
                          &unsupported);
   if (!translated.has_value()) {

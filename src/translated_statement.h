@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -22,7 +23,7 @@ struct TemporaryTables;
 
 // The project and dataset that unqualified table and dataset names in DDL belong to, and the
 // temporary tables of a multi-statement query that take precedence over them, matching the
-// defaults the catalog resolves queries with, plus the execution identity availability.
+// defaults the catalog resolves queries with, plus what the execution backend provides.
 // `dataset` may be empty.
 struct DefaultDataset {
   std::string project;
@@ -30,6 +31,10 @@ struct DefaultDataset {
   const TemporaryTables* temporary = nullptr;
   // Whether SESSION_USER is available from the execution backend.
   bool has_session_user = false;
+  // Runs a DuckDB query that returns one value of `type`, the value of a DDL option that is not
+  // a literal. Without it, such options are unsupported.
+  std::function<googlesql::Value(const std::string& query, const googlesql::Type* type)> evaluate =
+      {};
 };
 
 // The view a CREATE VIEW defines, which the emulator records next to the DuckDB view: DuckDB

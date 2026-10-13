@@ -6,11 +6,11 @@
 #include <string_view>
 #include <vector>
 
+#include "googlesql/public/value.h"
 #include "src/table_metadata.h"
 
 namespace googlesql {
 class ResolvedOption;
-class Value;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
@@ -22,7 +22,8 @@ struct Scope;
 
 using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
 
-const googlesql::Value* OptionLiteral(const googlesql::ResolvedOption& option);
+std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
+                                            std::string_view object, const Scope& scope);
 bool StringOption(const googlesql::Value& value, std::string& into);
 std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
                                              const Scope& scope, TableMetadata metadata = {});

@@ -1,9 +1,12 @@
 #include "src/translator/ddl_options.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -15,6 +18,7 @@
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
+#include "src/translator/expression.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
@@ -79,16 +83,94 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
   return true;
 }
 
+// The scalar functions that BigQuery's DDL reference excludes from option values.
+constexpr std::array<std::string_view, 11> kExcludedOptionFunctions = {
+    "ARRAY_TO_STRING",
+    "REPLACE",
+    "REGEXP_REPLACE",
+    "RAND",
+    "FORMAT",
+    "LPAD",
+    "RPAD",
+    "REPEAT",
+    "SESSION_USER",
+    "GENERATE_ARRAY",
+    "GENERATE_DATE_ARRAY",
+};
+
+// Whether `expression`, the value of `option` of `object` such as a table, is what BigQuery's DDL
+// reference allows as an option value: "a constant expression containing only literals, query
+// parameters, and scalar functions", other than the functions it excludes, which fail. Anything
+// else, such as a script variable in parentheses, is unsupported.
+bool ConstantOptionValue(const googlesql::ResolvedExpr& expression, std::string_view option,
+                         std::string_view object, const Scope& scope) {
+  const auto constant = [&](const googlesql::ResolvedExpr& element) {
+    return ConstantOptionValue(element, option, object, scope);
+  };
+  const auto all = [&](const auto& expressions) {
+    return std::ranges::all_of(expressions,
+                               [&](const auto& element) { return constant(*element); });
+  };
+  if (expression.Is<googlesql::ResolvedLiteral>() ||
+      expression.Is<googlesql::ResolvedParameter>()) {
+    return true;
+  }
+  if (expression.Is<googlesql::ResolvedFunctionCall>()) {
+    const auto* call = expression.GetAs<googlesql::ResolvedFunctionCall>();
+    const std::string name = ToUpperAscii(call->function()->Name());
+    if (std::ranges::find(kExcludedOptionFunctions, name) != kExcludedOptionFunctions.end()) {
+      throw std::invalid_argument("Found unsupported function call '" + name +
+                                  "'; failed to evaluate '" + std::string(option) + "' in " +
+                                  std::string(object) + " OPTIONS");
+    }
+    if (!call->function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
+      Unsupported(scope, "function " + name + " in option values");
+      return false;
+    }
+    return all(call->argument_list());
+  }
+  if (expression.Is<googlesql::ResolvedCast>()) {
+    const auto* cast = expression.GetAs<googlesql::ResolvedCast>();
+    return constant(*cast->expr()) && (cast->format() == nullptr || constant(*cast->format())) &&
+           (cast->time_zone() == nullptr || constant(*cast->time_zone()));
+  }
+  if (expression.Is<googlesql::ResolvedMakeStruct>()) {
+    const auto* make = expression.GetAs<googlesql::ResolvedMakeStruct>();
+    return all(make->field_list());
+  }
+  Unsupported(scope, "option values other than literals, query parameters and scalar functions");
+  return false;
+}
+
+// The object whose options `statement`, such as CREATE TABLE, sets, as BigQuery's errors name it.
+std::string OptionObject(std::string_view statement) {
+  return ToLowerAscii(statement.substr(statement.find(' ') + 1));
+}
+
 }  // namespace
 
-// The literal an option of a CREATE statement assigns, or nullptr for any other value.
-const googlesql::Value* OptionLiteral(const googlesql::ResolvedOption& option) {
+// The value an option of `object`, such as a table, assigns: a literal, or a constant expression,
+// which the backend evaluates as a query would. nullopt for += and -=, and for a value the
+// emulator does not support, which `scope` may then name.
+std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
+                                            std::string_view object, const Scope& scope) {
   if (!option.qualifier().empty() ||
-      option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN ||
-      !option.value()->Is<googlesql::ResolvedLiteral>()) {
-    return nullptr;
+      option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN) {
+    return std::nullopt;
   }
-  return &option.value()->GetAs<googlesql::ResolvedLiteral>()->value();
+  const googlesql::ResolvedExpr& expression = *option.value();
+  if (expression.Is<googlesql::ResolvedLiteral>()) {
+    return expression.GetAs<googlesql::ResolvedLiteral>()->value();
+  }
+  const auto& evaluate = scope.context.defaults.evaluate;
+  if (!evaluate || !ConstantOptionValue(expression, option.name(), object, scope)) {
+    return std::nullopt;
+  }
+  const std::optional<std::string> sql = Expression(expression, scope, {});
+  if (!sql.has_value()) {
+    return std::nullopt;
+  }
+  return evaluate("SELECT " + *sql, expression.type());
 }
 
 // A STRING option into `into`; NULL leaves it unset.
@@ -109,9 +191,10 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
                                              const Scope& scope, TableMetadata metadata) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
-    const googlesql::Value* value = OptionLiteral(*option);
+    const std::optional<googlesql::Value> value =
+        OptionValue(*option, OptionObject(statement), scope);
     const bool applied =
-        value != nullptr &&
+        value.has_value() &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
@@ -130,10 +213,10 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
   DatasetMetadata metadata;
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
-    const googlesql::Value* value = OptionLiteral(*option);
+    const std::optional<googlesql::Value> value = OptionValue(*option, "schema", scope);
     std::string location;
     const bool applied =
-        value != nullptr &&
+        value.has_value() &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
@@ -155,9 +238,10 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
                 OptionUpdates& updates) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
-    const googlesql::Value* value = OptionLiteral(*option);
+    const std::optional<googlesql::Value> value =
+        OptionValue(*option, OptionObject(statement), scope);
     const bool applied =
-        value != nullptr &&
+        value.has_value() &&
         ((name == "description" && StringOption(*value, updates.description.emplace())) ||
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
          (name == "labels" && LabelsOption(*value, updates.labels.emplace())) ||
