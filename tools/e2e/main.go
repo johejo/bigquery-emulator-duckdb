@@ -1,5 +1,6 @@
 // Command e2e runs runn scenarios against the built emulator and fake GCS,
-// then restarts the emulator on the same data directory to test persistence.
+// then restarts the emulator on the same data directory to test persistence,
+// editing the stopped emulator's database with the DuckDB CLI in between.
 // Run it through just e2e so that the binary is built first.
 package main
 
@@ -185,6 +186,12 @@ func run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	if err := p.Stop(); err != nil {
+		return err
+	}
+	if err := os.Setenv("E2E_DATA_DIR", dataDir); err != nil {
+		return err
+	}
+	if err := runn(ctx, "tests/e2e/restart/stopped.yml"); err != nil {
 		return err
 	}
 	p, err = startEmulator(ctx, binary, dataDir, nil, "principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice")
