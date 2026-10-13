@@ -79,6 +79,10 @@ backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
   or path. The handler builds the call and leaves the semantics to the backend chosen above; do
   not reimplement them in generated SQL, such as by walking BYTES as hex digits.
 
+The registry reads the resolved AST only through `src/translator/resolved_access.h`; add a
+function there, such as one that reads a literal, rather than a dependency on the AST to
+`//src/translator:functions`.
+
 Aggregate and window functions map to DuckDB ones through `AggregateRule`. A function its fields
 cannot express stays unsupported unless it is common enough to justify a custom aggregate.
 

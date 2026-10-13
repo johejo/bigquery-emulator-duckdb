@@ -22,35 +22,11 @@
 #include "src/translator/function.h"
 #include "src/translator/functions.h"
 #include "src/translator/handlers.h"
+#include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
-
-// The name of a rounding mode, such as ROUND_HALF_EVEN, which is also an enum literal after
-// analysis.
-std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr) {
-  if (!expr.Is<googlesql::ResolvedLiteral>()) {
-    return std::nullopt;
-  }
-  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
-  if (value.is_null() || !value.type()->Equals(googlesql::types::RoundingModeEnumType())) {
-    return std::nullopt;
-  }
-  return value.EnumDisplayName();
-}
-
-// The name of a NORMALIZE mode, such as NFKC.
-std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr) {
-  if (!expr.Is<googlesql::ResolvedLiteral>()) {
-    return std::nullopt;
-  }
-  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
-  if (value.is_null() || !value.type()->Equals(googlesql::types::NormalizeModeEnumType())) {
-    return std::nullopt;
-  }
-  return value.EnumDisplayName();
-}
 
 // The DuckDB spelling of a scalar call over already translated arguments.
 std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,

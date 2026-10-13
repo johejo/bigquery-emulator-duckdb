@@ -1,3 +1,5 @@
+#include "src/translator/resolved_access.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -12,18 +14,29 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
-#include "src/translator/functions.h"
-#include "src/translator/handlers.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
-const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {
-  return *resolved.argument_list(static_cast<int>(i));
+const googlesql::ResolvedExpr& ArgumentOf(const googlesql::ResolvedFunctionCall& call, size_t i) {
+  return *call.argument_list(static_cast<int>(i));
 }
 
-const googlesql::Type* ScalarCall::ArgumentType(size_t i) const { return Argument(i).type(); }
+const googlesql::Type* TypeOf(const googlesql::ResolvedExpr& expr) { return expr.type(); }
 
-const googlesql::Type* ScalarCall::ResultType() const { return resolved.type(); }
+const googlesql::Type* ResultTypeOf(const googlesql::ResolvedFunctionCall& call) {
+  return call.type();
+}
+
+std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->IsString()) {
+    return std::nullopt;
+  }
+  return value.string_value();
+}
 
 std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
   if (!expr.Is<googlesql::ResolvedLiteral>()) {
@@ -41,6 +54,28 @@ std::optional<std::string> DatePart(const googlesql::ResolvedExpr& expr) {
       "week_tuesday", "week_wednesday", "week_thursday", "week_friday", "week_saturday",
   };
   return supported.contains(part) ? std::optional<std::string>(part) : std::nullopt;
+}
+
+std::optional<std::string> RoundingMode(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->Equals(googlesql::types::RoundingModeEnumType())) {
+    return std::nullopt;
+  }
+  return value.EnumDisplayName();
+}
+
+std::optional<std::string> NormalizeMode(const googlesql::ResolvedExpr& expr) {
+  if (!expr.Is<googlesql::ResolvedLiteral>()) {
+    return std::nullopt;
+  }
+  const auto& value = expr.GetAs<googlesql::ResolvedLiteral>()->value();
+  if (value.is_null() || !value.type()->Equals(googlesql::types::NormalizeModeEnumType())) {
+    return std::nullopt;
+  }
+  return value.EnumDisplayName();
 }
 
 std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
