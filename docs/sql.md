@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 13 | 8 | 7 |
+| [DDL](#ddl) | 14 | 8 | 7 |
 | [Multi-statement queries](#multi-statement-queries) | 9 | 3 | 1 |
 | [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
@@ -88,7 +88,8 @@ rejected.
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported |  |
-| Table and column options | Partial | See [Options and expiration](compatibility.md#options-and-expiration). Unsupported: column option rounding_mode. |
+| Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
+| Column rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields; writing a STRUCT or ARRAY with parameterized ROUND_HALF_EVEN values. |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option require_partition_filter. |
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
@@ -99,7 +100,7 @@ rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported |  |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL; column option rounding_mode. |
+| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL. |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: CREATE SCHEMA option location. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |

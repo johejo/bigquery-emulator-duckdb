@@ -20,6 +20,7 @@ using nlohmann::json;
 
 std::vector<std::string> ColumnCommentStatements(const TableReference& table,
                                                  const std::vector<FieldSchema>& schema) {
+  CheckRoundingModes(schema);
   std::vector<std::string> statements;
   statements.reserve(schema.size());
   std::ranges::transform(schema, std::back_inserter(statements), [&](const FieldSchema& field) {

@@ -50,7 +50,7 @@ Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 constexpr const char* kEmptyArray = "[]";
 
-// An unset description or default, which the table resource omits, is NULL.
+// An unset description, default or rounding mode, which the table resource omits, is NULL.
 Cell OptionalString(const std::string& value) { return value.empty() ? kNull : String(value); }
 
 const std::vector<ViewColumn>& SchemataColumns() {
@@ -250,7 +250,7 @@ absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& t
       String(*type),
       OptionalString(field.description),
       kNull,
-      kNull,
+      OptionalString(field.rounding_mode),
       kEmptyArray,
   });
   for (const FieldSchema& child : field.fields) {
@@ -357,7 +357,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
             kNull,
             kNull,
             OptionalString(field.default_value_expression),
-            kNull,
+            OptionalString(field.rounding_mode),
             kEmptyArray,
             String("NO"),
             kNull,

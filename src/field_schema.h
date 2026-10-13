@@ -55,6 +55,8 @@ struct FieldSchema {
   std::optional<int64_t> precision = {};   // NUMERIC and BIGNUMERIC.
   std::optional<int64_t> scale = {};       // NUMERIC and BIGNUMERIC.
   std::string default_value_expression = {};
+  // roundingMode: ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN, empty when unset.
+  std::string rounding_mode = {};
   std::vector<std::string> policy_tags = {};  // policyTags.names.
 
   [[nodiscard]] nlohmann::json ToJson() const;
@@ -65,6 +67,24 @@ inline FieldSchema AsNullable(FieldSchema field) {
   field.mode = FieldMode::kNullable;
   return field;
 }
+
+// The rounding modes a NUMERIC or BIGNUMERIC field takes.
+inline constexpr std::string_view kRoundHalfAwayFromZero = "ROUND_HALF_AWAY_FROM_ZERO";
+inline constexpr std::string_view kRoundHalfEven = "ROUND_HALF_EVEN";
+
+// Whether a field of `schema`, at any depth, rounds halfway values to even. DuckDB's casts round
+// them away from zero, so only DML and CREATE TABLE AS SELECT, which round typed values before
+// the cast, write such fields; loaded values can need rounding even without a precision.
+bool HasRoundHalfEven(const std::vector<FieldSchema>& schema);
+
+// Whether values written to `field`, or to a field of it, are rounded to even to a scale, which
+// DuckDB's casts to a parameterized NUMERIC or BIGNUMERIC round away from zero instead.
+bool RoundsToEven(const FieldSchema& field);
+
+// Throws ApiError::Unsupported for a rounding mode the emulator cannot keep: one on a field that
+// is not NUMERIC or BIGNUMERIC, or ROUND_HALF_EVEN on a parameterized field of a column with a
+// default, whose value DuckDB would round away from zero.
+void CheckRoundingModes(const std::vector<FieldSchema>& schema);
 
 // Parses a TableFieldSchema object. Throws ApiError::Invalid for a field BigQuery would reject.
 FieldSchema FieldSchemaFromJson(const nlohmann::json& value);

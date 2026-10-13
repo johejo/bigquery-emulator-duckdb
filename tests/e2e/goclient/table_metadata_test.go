@@ -87,18 +87,9 @@ func TestTableMetadata(t *testing.T) {
 	}
 	check("ddl", metadata{})
 
-	for sql, want := range map[string]string{
-		"CREATE TABLE rounded (n NUMERIC OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))": "column option rounding_mode",
-		"CREATE TABLE labeled (id INT64) OPTIONS (labels = [('Env', 'prod')])":         "must start with a lowercase letter",
-	} {
-		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
-		}
-	}
-	rounded := bigquery.Schema{{Name: "n", Type: bigquery.NumericFieldType, RoundingMode: bigquery.RoundHalfEven}}
-	if err := dataset.Table("rounded").Create(ctx, &bigquery.TableMetadata{Schema: rounded}); err == nil ||
-		!strings.Contains(err.Error(), "field roundingMode") {
-		t.Errorf("roundingMode: error = %v", err)
+	sql := "CREATE TABLE labeled (id INT64) OPTIONS (labels = [('Env', 'prod')])"
+	if err := run(sql); err == nil || !strings.Contains(err.Error(), "must start with a lowercase letter") {
+		t.Errorf("%s: error = %v", sql, err)
 	}
 }
 

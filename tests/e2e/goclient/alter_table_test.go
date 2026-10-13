@@ -289,7 +289,7 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 	check(want)
 
 	for sql, want := range map[string]string{
-		"ALTER TABLE t ALTER COLUMN id SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')":                                         "column option rounding_mode",
+		"ALTER TABLE t ALTER COLUMN id SET OPTIONS (expiration_timestamp = NULL)":                                               "column option expiration_timestamp",
 		"ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), DROP COLUMN id":                                       "different kinds of actions",
 		"ALTER TABLE t ALTER COLUMN name SET OPTIONS (description = 'x'), ALTER COLUMN missing SET OPTIONS (description = 'x')": "missing",
 		"ALTER TABLE missing ALTER COLUMN id SET OPTIONS (description = 'x')":                                                   "missing",

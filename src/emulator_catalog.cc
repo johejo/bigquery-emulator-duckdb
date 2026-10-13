@@ -808,6 +808,10 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
     throw ApiError::Invalid("Cannot insert into a view: " + TableName(table));
   }
   const std::vector<FieldSchema>& schema = info.schema;
+  // Rows are written with DuckDB's casts, which round halfway values away from zero.
+  if (HasRoundHalfEven(schema)) {
+    throw ApiError::Unsupported("tabledata.insertAll into ROUND_HALF_EVEN columns");
+  }
   std::vector<InsertError> errors;
   std::vector<std::string> statements;
   std::vector<size_t> indexes;

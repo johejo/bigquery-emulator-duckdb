@@ -167,6 +167,9 @@ json FieldSchema::ToJson() const {
   if (!default_value_expression.empty()) {
     field["defaultValueExpression"] = default_value_expression;
   }
+  if (!rounding_mode.empty()) {
+    field["roundingMode"] = rounding_mode;
+  }
   if (!policy_tags.empty()) {
     field["policyTags"] = {{"names", policy_tags}};
   }
@@ -222,11 +225,11 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   field.precision = Int64Member(value, "precision");
   field.scale = Int64Member(value, "scale");
   field.default_value_expression = StringMember(value, "defaultValueExpression");
-  // A rounding mode changes how values written to the field are rounded, which the emulator
-  // does not emulate.
-  if (const std::string mode = StringMember(value, "roundingMode");
-      !mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
-    throw ApiError::Unsupported("field roundingMode");
+  if (std::string mode = StringMember(value, "roundingMode");
+      mode == kRoundHalfAwayFromZero || mode == kRoundHalfEven) {
+    field.rounding_mode = std::move(mode);
+  } else if (!mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
+    throw ApiError::Invalid("Invalid rounding mode for field " + field.name + ": " + mode);
   }
   if (const auto tags = value.find("policyTags"); tags != value.end() && tags->is_object()) {
     for (const json& name : tags->value("names", json::array())) {
@@ -237,6 +240,32 @@ FieldSchema FieldSchemaFromJson(const json& value) {
     }
   }
   return field;
+}
+
+bool HasRoundHalfEven(const std::vector<FieldSchema>& schema) {
+  return std::ranges::any_of(schema, [](const FieldSchema& field) {
+    return field.rounding_mode == kRoundHalfEven || HasRoundHalfEven(field.fields);
+  });
+}
+
+bool RoundsToEven(const FieldSchema& field) {
+  return (field.rounding_mode == kRoundHalfEven && field.precision.has_value()) ||
+         std::ranges::any_of(field.fields, RoundsToEven);
+}
+
+void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
+  for (const FieldSchema& field : schema) {
+    if (!field.rounding_mode.empty() && field.type != FieldType::kNumeric &&
+        field.type != FieldType::kBigNumeric) {
+      throw ApiError::Unsupported("rounding modes on " + std::string(FieldTypeName(field.type)) +
+                                  " fields");
+    }
+    // DuckDB writes a default with its own cast.
+    if (!field.default_value_expression.empty() && RoundsToEven(field)) {
+      throw ApiError::Unsupported("defaults on parameterized ROUND_HALF_EVEN fields");
+    }
+    CheckRoundingModes(field.fields);
+  }
 }
 
 json SchemaToJson(const std::vector<FieldSchema>& schema) {

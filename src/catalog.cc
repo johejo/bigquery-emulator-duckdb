@@ -314,7 +314,7 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
   if (!schema.has_value()) {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(normalized, "."));
   }
-  auto simple_table = std::make_unique<BigQueryTable>(source_, normalized);
+  auto simple_table = std::make_unique<BigQueryTable>(source_, normalized, *schema);
   if (absl::Status status = simple_table->set_full_name(absl::StrJoin(normalized, "."));
       !status.ok()) {
     return status;

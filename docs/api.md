@@ -50,7 +50,7 @@ emulator rejected.
 | [`jobs.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/delete) | `DELETE projects/{projectsId}/jobs/{jobsId}/delete` | Supported |  |
 | [`jobs.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/get) | `GET projects/{projectsId}/jobs/{jobsId}` | Supported |  |
 | [`jobs.getQueryResults`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/getQueryResults) | `GET projects/{projectsId}/queries/{queriesId}` | Supported | Ignores `timeoutMs`, `location` and `formatOptions.timestampOutputFormat`. |
-| [`jobs.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; clustering for a destination table; copy operationType CLONE; extracting models; multiple destination URIs. |
+| [`jobs.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; appending rows of another schema to ROUND_HALF_EVEN columns; clustering for a destination table; copy operationType CLONE; extracting models; load jobs into ROUND_HALF_EVEN columns; multiple destination URIs. |
 | [`jobs.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/list) | `GET projects/{projectsId}/jobs` | Supported | Ignores `allUsers`. See [Jobs](compatibility.md#jobs). |
 | [`jobs.query`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query) | `POST projects/{projectsId}/queries` | Partial | Ignores `timeoutMs`, `location`, `labels` and `useQueryCache`. Unsupported: legacy SQL. |
 
@@ -100,7 +100,7 @@ emulator rejected.
 
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
-| [`tabledata.insertAll`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/insertAll` | Partial | Ignores `insertId`, so retried rows are not deduplicated. Unsupported: templateSuffix. |
+| [`tabledata.insertAll`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/insertAll` | Partial | Ignores `insertId`, so retried rows are not deduplicated. Unsupported: tabledata.insertAll into ROUND_HALF_EVEN columns; templateSuffix. |
 | [`tabledata.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}/data` | Supported | Supports `selectedFields` row projection, including nested fields. Ignores `formatOptions.timestampOutputFormat`. |
 
 ## tables
@@ -110,7 +110,7 @@ emulator rejected.
 | [`tables.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported |  |
 | [`tables.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/get) | `GET projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Supported | Supports `selectedFields`, including nested fields, and `view`. Storage statistics include the row count; `numBytes` is always 0. |
 | [`tables.getIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/getIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:getIamPolicy` | Unsupported |  |
-| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | See [Tables](compatibility.md#tables). Unsupported: field roundingMode; ingestion-time partitioning; table defaultRoundingMode. |
+| [`tables.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/insert) | `POST projects/{projectsId}/datasets/{datasetsId}/tables` | Partial | See [Tables](compatibility.md#tables). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields; ingestion-time partitioning; table defaultRoundingMode. |
 | [`tables.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list) | `GET projects/{projectsId}/datasets/{datasetsId}/tables` | Supported |  |
 | [`tables.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}` | Partial | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes). Unsupported: partition expiration; table defaultRoundingMode. |
 | [`tables.setIamPolicy`](https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/setIamPolicy) | `POST projects/{projectsId}/datasets/{datasetsId}/tables/{tablesId}:setIamPolicy` | Unsupported |  |

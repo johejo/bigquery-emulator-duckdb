@@ -44,8 +44,9 @@ NULL for options other than the location.
 
 ### Options and expiration
 
-Tables keep a description, friendly name, labels and expiration, and columns a description, which
-DDL `OPTIONS` and the `tables` methods set; other options are unsupported. Expiration comes from
+Tables keep a description, friendly name, labels and expiration, and columns a description and a
+[rounding mode](#rounding-modes), which DDL `OPTIONS` and the `tables` methods set; other options,
+such as a table's default rounding mode, are unsupported. Expiration comes from
 REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
 that creates its destination; a copy job with one to an existing table is rejected.
 
@@ -60,6 +61,19 @@ including before query analysis, and are treated as missing.
 
 Tables keep partitioning on a column or an integer range, and clustering. Ingestion-time
 partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) is unsupported, and partitions do not expire.
+
+### Rounding modes
+
+NUMERIC and BIGNUMERIC columns and STRUCT fields keep the rounding mode that DDL `rounding_mode` or
+a schema's `roundingMode` sets, which `tables.get` and the `rounding_mode` of
+`INFORMATION_SCHEMA.COLUMNS` and `COLUMN_FIELD_PATHS` return; `ROUNDING_MODE_UNSPECIFIED` leaves it
+unset. A rounding mode on another type is unsupported.
+
+DML and `CREATE TABLE AS SELECT` round the values they write to a parameterized column's scale with
+its rounding mode, `ROUND_HALF_AWAY_FROM_ZERO` when unset. Other writes round halfway values away
+from zero, so they reject `ROUND_HALF_EVEN` columns: loads, `tabledata.insertAll`, the Storage
+Write API, and query or copy jobs that append to a table of another schema. So do DML writes of a
+STRUCT or ARRAY with parameterized `ROUND_HALF_EVEN` values, and defaults on such columns.
 
 ### Column defaults
 
@@ -76,7 +90,7 @@ write to a table with defaults.
 `ALTER TABLE` supports `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS` and `ALTER COLUMN`
 with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`, with `IF EXISTS` and `IF NOT EXISTS`. One
 statement may list several `ADD COLUMN`, `DROP COLUMN` or `ALTER COLUMN SET OPTIONS` actions. `ALTER
-COLUMN SET OPTIONS` sets the column's description only. `ADD COLUMN` with a default or with
+COLUMN SET OPTIONS` sets the column's description and rounding mode only. `ADD COLUMN` with a default or with
 top-level `NOT NULL`, and other actions, are unsupported.
 
 `SET DEFAULT` and `DROP DEFAULT` change the default for future writes and the column's

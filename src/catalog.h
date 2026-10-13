@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <optional>
@@ -97,9 +98,12 @@ class SqlTable : public googlesql::SimpleTable {
 // see, while CREATE TABLE LIKE, COPY and CLONE copy the schema and metadata tables.get reports.
 class BigQueryTable : public googlesql::SimpleTable {
  public:
-  // `source` must outlive the table.
-  BigQueryTable(TableSource& source, std::vector<std::string> path)
-      : googlesql::SimpleTable(path.back()), source_(source), path_(std::move(path)) {}
+  // `source` must outlive the table, whose columns are those of `schema`, in order.
+  BigQueryTable(TableSource& source, std::vector<std::string> path, std::vector<FieldSchema> schema)
+      : googlesql::SimpleTable(path.back()),
+        source_(source),
+        path_(std::move(path)),
+        schema_(std::move(schema)) {}
 
   [[nodiscard]] std::optional<TableDescription> Describe() const {
     return source_.DescribeTable(path_.at(0), path_.at(1), path_.at(2));
@@ -107,10 +111,15 @@ class BigQueryTable : public googlesql::SimpleTable {
   [[nodiscard]] TableReference reference() const {
     return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
   }
+  // The field of column `index`, such as for its rounding mode.
+  [[nodiscard]] const FieldSchema& field(int index) const {
+    return schema_.at(static_cast<size_t>(index));
+  }
 
  private:
   TableSource& source_;
   std::vector<std::string> path_;
+  std::vector<FieldSchema> schema_;
 };
 
 // Splits a table path into its dot-separated parts. An element with dots in it, which is how
