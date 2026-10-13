@@ -11,15 +11,22 @@
 #include <vector>
 
 #include "googlesql/public/type.h"
-#include "googlesql/public/value.h"
-#include "googlesql/resolved_ast/resolved_ast.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
+#include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {
+  return ArgumentOf(resolved, i);
+}
+
+const googlesql::Type* ScalarCall::ArgumentType(size_t i) const { return TypeOf(Argument(i)); }
+
+const googlesql::Type* ScalarCall::ResultType() const { return ResultTypeOf(resolved); }
 
 namespace {
 
@@ -421,11 +428,7 @@ std::optional<std::string> Extremum(const ScalarCall& call) {
 // KEYS.ADD_KEY_FROM_RAW_BYTES with the key type 'AES_GCM'. 'AES_CBC_PKCS' keys decrypt a
 // ciphertext format that no independent source settles, so they stay unsupported.
 std::optional<std::string> AddKeyFromRawBytes(const ScalarCall& call) {
-  if (call.arguments.size() != 3 || !call.Argument(1).Is<googlesql::ResolvedLiteral>()) {
-    return std::nullopt;
-  }
-  const auto& key_type = call.Argument(1).GetAs<googlesql::ResolvedLiteral>()->value();
-  if (key_type.is_null() || !key_type.type()->IsString() || key_type.string_value() != "AES_GCM") {
+  if (call.arguments.size() != 3 || StringLiteral(call.Argument(1)) != "AES_GCM") {
     return std::nullopt;
   }
   return "bq_keys_add_aes_gcm_key(" + call.arguments.at(0).sql + ", " + call.arguments.at(2).sql +
