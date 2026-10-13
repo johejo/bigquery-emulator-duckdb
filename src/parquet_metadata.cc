@@ -257,7 +257,7 @@ std::pair<std::string, uint64_t> ReadFooter(const std::string& path) {
   input.seekg(static_cast<std::streamoff>(size - tail.size()));
   input.read(tail.data(), static_cast<std::streamsize>(tail.size()));
   if (tail.ends_with(kEncryptedMagic)) {
-    throw ApiError::Invalid("The emulator does not support Parquet files with an encrypted footer");
+    throw ApiError::Unsupported("Parquet files with an encrypted footer");
   }
   if (!tail.ends_with(kMagic)) {
     Invalid("no Parquet magic number");

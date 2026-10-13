@@ -379,7 +379,7 @@ class RestServer::Impl {
     Route("bigquery.routines.update", {},
           Json([this](const httplib::Request& request, httplib::Response&) {
             if (request.has_header("If-Match")) {
-              throw ApiError::Invalid("The emulator does not support conditional routine updates");
+              throw ApiError::Unsupported("conditional routine updates");
             }
             const RoutineReference reference = RoutineFromPath(request);
             Routine routine = ParseRoutine(

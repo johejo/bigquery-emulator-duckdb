@@ -32,10 +32,6 @@ constexpr size_t kMaxClusteringFields = 4;
 constexpr int64_t kMaxRangePartitions = 10000;
 constexpr int64_t kMinDefaultTableExpirationMs = 3600000;
 
-ApiError Unsupported(std::string_view what) {
-  return ApiError::Invalid(std::format("The emulator does not support {}", what));
-}
-
 // A string member, or "" when `value` is null.
 std::string StringValue(const json& value, const char* key) {
   if (value.is_null()) {
@@ -122,13 +118,13 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
     throw ApiError::Invalid("Invalid time partitioning type: " + partitioning.type);
   }
   if (partitioning.field.empty()) {
-    throw Unsupported("ingestion-time partitioning");
+    throw ApiError::Unsupported("ingestion-time partitioning");
   }
   if (!value.value("expirationMs", json()).is_null()) {
-    throw Unsupported("partition expiration");
+    throw ApiError::Unsupported("partition expiration");
   }
   if (value.value("requirePartitionFilter", false)) {
-    throw Unsupported("requirePartitionFilter");
+    throw ApiError::Unsupported("requirePartitionFilter");
   }
   return partitioning;
 }
@@ -173,7 +169,7 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
     throw ApiError::Invalid("A table cannot have both time and range partitioning");
   }
   if (Member(table, "requirePartitionFilter") == true) {
-    throw Unsupported("requirePartitionFilter");
+    throw ApiError::Unsupported("requirePartitionFilter");
   }
 }
 
@@ -225,10 +221,10 @@ void CheckDatasetFields(const json& dataset) {
       continue;
     }
     if (key != "location") {
-      throw Unsupported("dataset field " + key);
+      throw ApiError::Unsupported("dataset field " + key);
     }
     if (ToUpperAscii(StringValue(value, "location")) != "US") {
-      throw Unsupported("dataset location " + value.get<std::string>());
+      throw ApiError::Unsupported("dataset location " + value.get<std::string>());
     }
   }
 }

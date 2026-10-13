@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace bigquery_emulator_duckdb {
 std::string ToUpperAscii(std::string_view text) {
@@ -88,6 +89,17 @@ std::string ToHex(std::string_view value) {
     const auto byte = static_cast<unsigned char>(c);
     result += kDigits.at(byte >> 4U);
     result += kDigits.at(byte & 0x0FU);
+  }
+  return result;
+}
+
+std::string Join(const std::vector<std::string>& parts, std::string_view separator) {
+  std::string result;
+  for (const auto& part : parts) {
+    if (!result.empty()) {
+      result += separator;
+    }
+    result += part;
   }
   return result;
 }

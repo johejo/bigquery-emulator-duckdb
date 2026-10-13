@@ -141,9 +141,8 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
     FieldSchema& duplicate = schema.at(indexes.at(1));
     if (indexes.size() > 2 || duplicate.name != schema.at(indexes.at(0)).name ||
         columns.contains(name + "_1")) {
-      throw ApiError::InvalidQuery(
-          "The emulator does not support these duplicate column names in a query result: " +
-          duplicate.name);
+      throw ApiError::UnsupportedQuery("these duplicate column names in a query result: " +
+                                       duplicate.name);
     }
     duplicate.name += "_1";
   }
@@ -164,8 +163,7 @@ QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::str
 googlesql::Value Emulator::ResultValue(const QueryResult& result, const googlesql::Type* type) {
   absl::StatusOr<googlesql::Value> value = CellValue(type, result.rows.at(0).at("f").at(0).at("v"));
   if (!value.ok()) {
-    throw ApiError::InvalidQuery("The emulator does not support option values of type " +
-                                 type->DebugString());
+    throw ApiError::UnsupportedQuery("option values of type " + type->DebugString());
   }
   return *std::move(value);
 }
@@ -254,7 +252,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                          },
                          &unsupported);
   if (!translated.has_value()) {
-    throw ApiError::InvalidQuery("The emulator does not support " + unsupported);
+    throw ApiError::UnsupportedQuery(unsupported);
   }
   CheckRoutine(*translated, catalog);
   return *std::move(translated);
@@ -293,8 +291,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
                             },
                             &unsupported, nullptr);
     if (!query.has_value()) {
-      throw ApiError::Invalid("The emulator does not support " + unsupported +
-                              " in the default value of field " + field.name);
+      throw ApiError::Unsupported(unsupported + " in the default value of field " + field.name);
     }
     // TranslateExpression returns the expression as a query, "SELECT <expression>".
     statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",

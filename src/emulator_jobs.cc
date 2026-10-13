@@ -291,7 +291,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     const std::string format = config.value("destinationFormat", "CSV");
     const std::string compression = config.value("compression", "NONE");
     if (format == "AVRO") {
-      throw ApiError::Invalid("The emulator does not support Avro extracts");
+      throw ApiError::Unsupported("Avro extracts");
     }
     if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
       throw ApiError::Invalid("Unsupported destination format: " + format);
@@ -302,7 +302,7 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       throw ApiError::Invalid("Unsupported compression " + compression + " for " + format);
     }
     if (extract.destination_uris.size() != 1) {
-      throw ApiError::Invalid("The emulator does not support multiple destination URIs");
+      throw ApiError::Unsupported("multiple destination URIs");
     }
     std::string uri = extract.destination_uris.front();
     TemporaryFiles uploads;
@@ -360,18 +360,18 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                                        const std::vector<std::string>& setup, bool count_only,
                                        const TableMetadata& metadata) {
   std::set<std::string> names;
-  std::string duplicates;
+  std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
     std::string name = field.name;
     std::ranges::transform(name, name.begin(), [](unsigned char c) { return std::tolower(c); });
     if (!names.insert(name).second) {
-      duplicates += (duplicates.empty() ? "" : ", ") + field.name;
+      duplicates.push_back(field.name);
     }
   }
   if (!duplicates.empty()) {
     throw ApiError::InvalidQuery(
         "Duplicate column names in the result are not supported. Found duplicate(s): " +
-        duplicates);
+        Join(duplicates, ", "));
   }
 
   if (destination.project_id.empty()) {
@@ -399,24 +399,22 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
   if (existing.has_value() && !metadata.empty()) {
-    throw ApiError::Invalid(
-        "The emulator does not support setting the expiration of an existing destination table " +
-        TableName(destination));
+    throw ApiError::Unsupported("setting the expiration of an existing destination table " +
+                                TableName(destination));
   }
 
   // The result is materialized first, which runs the query once even when it reads the
   // destination itself. DuckDB lets a transaction write to a single database, so the temporary
   // table is filled before the transaction that writes the destination begins.
   const std::string result_table = "temp.main._bigquery_emulator_query_result";
-  std::string aliases;
-  for (const FieldSchema& field : schema) {
-    aliases += (aliases.empty() ? "" : ", ") + QuoteIdentifier(field.name);
-  }
+  std::vector<std::string> aliases;
+  std::ranges::transform(schema, std::back_inserter(aliases),
+                         [&](const FieldSchema& field) { return QuoteIdentifier(field.name); });
   const std::string target = QualifiedName(destination);
   std::vector<std::string> statements = {
       std::format("CREATE TEMP TABLE _bigquery_emulator_query_result AS"
                   " SELECT * FROM ({}) AS _bigquery_emulator_query_result({})",
-                  sql, aliases),
+                  sql, Join(aliases, ", ")),
       "BEGIN TRANSACTION",
   };
   if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {

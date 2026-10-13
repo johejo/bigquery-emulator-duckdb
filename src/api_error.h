@@ -6,6 +6,9 @@
 
 namespace bigquery_emulator_duckdb {
 
+// How every message about a form the emulator rejects as unsupported starts.
+inline constexpr std::string_view kUnsupported = "The emulator does not support ";
+
 // An error reported to clients in BigQuery's error response format.
 class ApiError : public std::runtime_error {
  public:
@@ -16,6 +19,13 @@ class ApiError : public std::runtime_error {
   static ApiError NotFound(const std::string& message) { return {404, "notFound", message}; }
   static ApiError Duplicate(const std::string& message) { return {409, "duplicate", message}; }
   static ApiError Internal(const std::string& message) { return {500, "internalError", message}; }
+  // An invalid or invalidQuery error saying the emulator does not support `what`.
+  static ApiError Unsupported(std::string_view what) {
+    return Invalid(std::string(kUnsupported).append(what));
+  }
+  static ApiError UnsupportedQuery(std::string_view what) {
+    return InvalidQuery(std::string(kUnsupported).append(what));
+  }
 
   // This error with `message` in place of its own.
   [[nodiscard]] ApiError WithMessage(const std::string& message) const {

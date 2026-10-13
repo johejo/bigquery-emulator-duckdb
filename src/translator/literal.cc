@@ -12,7 +12,6 @@
 #include "src/bignumeric.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
-#include "src/translator/context.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {

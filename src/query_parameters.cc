@@ -1,6 +1,8 @@
 #include "src/query_parameters.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -102,15 +104,13 @@ std::string ValueText(const json& value) {
 std::string ToDuckDbLiteral(const TypedValue& parameter);
 
 std::string ArrayLiteral(const TypedValue& parameter) {
-  std::string elements;
-  for (const json& element : parameter.value["arrayValues"]) {
-    if (!elements.empty()) {
-      elements += ", ";
-    }
-    elements += ToDuckDbLiteral({.type = parameter.type["arrayType"], .value = element});
-  }
+  std::vector<std::string> elements;
+  std::ranges::transform(
+      parameter.value["arrayValues"], std::back_inserter(elements), [&](const json& element) {
+        return ToDuckDbLiteral({.type = parameter.type["arrayType"], .value = element});
+      });
   // The cast pins down the element type, which an empty list literal does not carry.
-  return "CAST([" + elements + "] AS " + ToDuckDbType(parameter.type) + ")";
+  return "CAST([" + Join(elements, ", ") + "] AS " + ToDuckDbType(parameter.type) + ")";
 }
 
 std::string StructLiteral(const TypedValue& parameter) {
@@ -118,18 +118,17 @@ std::string StructLiteral(const TypedValue& parameter) {
   // distinct field values. Validate their stored schema before spelling the value.
   (void)ToDuckDbType(parameter.type);
   const json& values = parameter.value["structValues"];
-  std::string fields;
+  std::vector<std::string> fields;
   for (const json& field : parameter.type.value("structTypes", json::array())) {
-    if (!fields.empty()) {
-      fields += ", ";
-    }
     const std::string name = field.value("name", "");
     const auto value = values.find(name);
-    fields += QuoteIdentifier(name) + " := " +
-              ToDuckDbLiteral(
-                  {.type = field.at("type"), .value = value == values.end() ? NoValue() : *value});
+    fields.push_back(QuoteIdentifier(name) + " := " +
+                     ToDuckDbLiteral({
+                         .type = field.at("type"),
+                         .value = value == values.end() ? NoValue() : *value,
+                     }));
   }
-  return "struct_pack(" + fields + ")";
+  return "struct_pack(" + Join(fields, ", ") + ")";
 }
 
 // A RANGE's bounds are values of its element type; a missing one is unbounded.

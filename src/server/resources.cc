@@ -430,7 +430,7 @@ json JobList(const std::vector<std::shared_ptr<const Job>>& jobs, const JobListR
         return job->job_id == *request.parent_job_id && job->query() != nullptr &&
                job->query()->statement_type == kScriptStatementType;
       })) {
-    throw ApiError::Invalid("The emulator does not support child jobs of multi-statement queries");
+    throw ApiError::Unsupported("child jobs of multi-statement queries");
   }
   const bool none =
       request.parent_job_id.has_value() ||

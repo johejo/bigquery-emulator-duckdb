@@ -6,6 +6,7 @@
 
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "src/duckdb_sql.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -18,7 +19,7 @@ class JavaScriptFunction : public googlesql::Function {
                      const std::vector<std::string>& argument_names, const std::string& body)
       : googlesql::Function(std::move(name_path), "JavaScript", googlesql::Function::SCALAR,
                             {signature}, VolatileOptions()),
-        source_("(function(" + Join(argument_names) + ") {\n" + body + "\n})") {}
+        source_("(function(" + Join(argument_names, ", ") + ") {\n" + body + "\n})") {}
 
   [[nodiscard]] const std::string& source() const { return source_; }
 
@@ -28,14 +29,6 @@ class JavaScriptFunction : public googlesql::Function {
     googlesql::FunctionOptions options;
     options.set_volatility(googlesql::FunctionEnums::VOLATILE);
     return options;
-  }
-
-  static std::string Join(const std::vector<std::string>& names) {
-    std::string joined;
-    for (const auto& name : names) {
-      joined += (joined.empty() ? "" : ", ") + name;
-    }
-    return joined;
   }
 
   std::string source_;

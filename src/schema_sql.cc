@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <format>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -35,16 +36,14 @@ std::string InsertRecord(const json& value, const FieldSchema& field, bool ignor
       throw ApiError::Invalid("Unknown field: " + it.key());
     }
   }
-  std::string fields;
+  std::vector<std::string> fields;
   for (const FieldSchema& child : field.fields) {
-    if (!fields.empty()) {
-      fields += ", ";
-    }
     const auto it = value.find(child.name);
-    fields += QuoteIdentifier(child.name) + " := " +
-              InsertValue(it == value.end() ? json(nullptr) : *it, child, ignore_unknown_values);
+    fields.push_back(
+        QuoteIdentifier(child.name) + " := " +
+        InsertValue(it == value.end() ? json(nullptr) : *it, child, ignore_unknown_values));
   }
-  return "struct_pack(" + fields + ")";
+  return "struct_pack(" + Join(fields, ", ") + ")";
 }
 
 // Appends to `statements` the statements of SchemaUpdateStatements for the fields `current` of
@@ -91,8 +90,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
                                           FieldModeName(after.mode)));
     }
     if (after.default_value_expression != before.default_value_expression) {
-      throw ApiError::Invalid("The emulator does not support changing the default value of field " +
-                              name);
+      throw ApiError::Unsupported("changing the default value of field " + name);
     }
     // DuckDB enforces REQUIRED only on columns; a field of a record keeps it in its metadata.
     if (after.mode != before.mode && path.empty()) {
@@ -114,8 +112,7 @@ void AppendSchemaUpdateStatements(const TableReference& table, const std::string
                       mismatch, prefix, added.name));
     }
     if (!added.default_value_expression.empty()) {
-      throw ApiError::Invalid("The emulator does not support adding field " + prefix + added.name +
-                              " with a default value");
+      throw ApiError::Unsupported("adding field " + prefix + added.name + " with a default value");
     }
     // Existing rows read an added REPEATED column as empty, as rows that leave it out later do;
     // see RepeatedColumnDefaultStatements. DuckDB takes no default for a field of a record.
@@ -145,16 +142,12 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     if (!value.is_array()) {
       throw ApiError::Invalid("Expected an array for field " + field.name);
     }
-    FieldSchema element = field;
-    element.mode = FieldMode::kNullable;
-    std::string values;
-    for (const json& item : value) {
-      if (!values.empty()) {
-        values += ", ";
-      }
-      values += InsertValue(item, element, ignore_unknown_values);
-    }
-    return "CAST([" + values + "] AS " + type + ")";
+    const FieldSchema element = AsNullable(field);
+    std::vector<std::string> values;
+    std::ranges::transform(value, std::back_inserter(values), [&](const json& item) {
+      return InsertValue(item, element, ignore_unknown_values);
+    });
+    return "CAST([" + Join(values, ", ") + "] AS " + type + ")";
   }
   if (field.type == FieldType::kRecord) {
     return InsertRecord(value, field, ignore_unknown_values);
@@ -198,40 +191,36 @@ std::string ColumnDefinition(const FieldSchema& field) {
 }
 
 std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& schema) {
-  std::string columns;
+  std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
-    if (!columns.empty()) {
-      columns += ", ";
-    }
     try {
-      columns += ColumnDefinition(field);
+      columns.push_back(ColumnDefinition(field));
     } catch (const ApiError&) {
       return std::nullopt;
     }
   }
-  return columns;
+  return Join(columns, ", ");
 }
 
 std::string MapElements(
     const std::string& sql, const FieldSchema& field, int depth,
     const std::function<std::string(const std::string&, const FieldSchema&, int)>& element) {
-  FieldSchema element_field = field;
-  element_field.mode = FieldMode::kNullable;
   const std::string name = "_e" + std::to_string(depth);
   return std::format("list_transform({}, {} -> {})", sql, name,
-                     element(name, element_field, depth + 1));
+                     element(name, AsNullable(field), depth + 1));
 }
 
 std::string MapFields(
     const std::string& sql, const FieldSchema& field,
     const std::function<std::string(const std::string&, const FieldSchema&)>& value) {
-  std::string fields;
-  for (const FieldSchema& child : field.fields) {
-    fields += std::format(
-        "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
+  std::vector<std::string> fields;
+  std::ranges::transform(field.fields, std::back_inserter(fields), [&](const FieldSchema& child) {
+    return std::format(
+        "{} := {}", QuoteIdentifier(child.name),
         value(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child));
-  }
-  return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
+  });
+  return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql,
+                     Join(fields, ", "));
 }
 
 std::vector<std::string> SchemaUpdateStatements(const TableReference& table,

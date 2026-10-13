@@ -21,17 +21,6 @@ using Columns = std::map<int, std::string>;
 
 inline std::string ColumnName(int id) { return QuoteIdentifier("_c" + std::to_string(id)); }
 
-inline std::string Join(const std::vector<std::string>& parts, std::string_view separator) {
-  std::string result;
-  for (const auto& part : parts) {
-    if (!result.empty()) {
-      result += separator;
-    }
-    result += part;
-  }
-  return result;
-}
-
 struct WithQuery {
   std::string name;
   size_t width;

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -54,7 +55,7 @@ std::string SqlTypeName(const json& type) {
         !structure["fields"].is_array()) {
       throw ApiError::Invalid("Invalid routine struct type");
     }
-    std::string fields;
+    std::vector<std::string> fields;
     for (const json& field : structure["fields"]) {
       if (!field.is_object() || !field.contains("type") ||
           (field.contains("name") && !field["name"].is_string())) {
@@ -65,15 +66,13 @@ std::string SqlTypeName(const json& type) {
           throw ApiError::Invalid("Invalid routine struct field: " + name);
         }
       }
-      if (!fields.empty()) {
-        fields += ", ";
-      }
+      std::string spelling;
       if (const std::string name = field.value("name", ""); !name.empty()) {
-        fields += googlesql::ToIdentifierLiteral(name) + " ";
+        spelling = googlesql::ToIdentifierLiteral(name) + " ";
       }
-      fields += SqlTypeName(field.value("type", json::object()));
+      fields.push_back(spelling + SqlTypeName(field.value("type", json::object())));
     }
-    return "STRUCT<" + fields + ">";
+    return "STRUCT<" + Join(fields, ", ") + ">";
   }
   return kind;
 }
@@ -116,20 +115,18 @@ std::string RoutineQuery(const RoutineReference& routine) {
 std::string RoutineStatement(const Routine& routine) {
   const json& resource = routine.resource;
   const RoutineReference& reference = routine.reference;
-  std::string arguments;
-  for (const json& argument : resource.value("arguments", json::array())) {
-    if (!arguments.empty()) {
-      arguments += ", ";
-    }
-    arguments += googlesql::ToIdentifierLiteral(argument.value("name", "")) + " ";
-    arguments += argument.value("argumentKind", "") == "ANY_TYPE"
-                     ? "ANY TYPE"
-                     : SqlTypeName(argument.value("dataType", json::object()));
-  }
+  std::vector<std::string> arguments;
+  std::ranges::transform(resource.value("arguments", json::array()), std::back_inserter(arguments),
+                         [&](const json& argument) {
+                           return googlesql::ToIdentifierLiteral(argument.value("name", "")) + " " +
+                                  (argument.value("argumentKind", "") == "ANY_TYPE"
+                                       ? "ANY TYPE"
+                                       : SqlTypeName(argument.value("dataType", json::object())));
+                         });
   std::string statement = std::format(
       "CREATE FUNCTION {}.{}.{}({})", googlesql::ToIdentifierLiteral(reference.project_id),
       googlesql::ToIdentifierLiteral(reference.dataset_id),
-      googlesql::ToIdentifierLiteral(reference.routine_id), arguments);
+      googlesql::ToIdentifierLiteral(reference.routine_id), Join(arguments, ", "));
   if (resource.contains("returnType")) {
     statement += " RETURNS " + SqlTypeName(resource["returnType"]);
   }

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace bigquery_emulator_duckdb {
 
@@ -19,5 +20,8 @@ std::string QuoteIdentifier(std::string_view name);
 std::string QuoteIdentifierPath(std::string_view path);
 
 std::string ToHex(std::string_view value);
+
+// `parts` with `separator` between each two.
+std::string Join(const std::vector<std::string>& parts, std::string_view separator);
 
 }  // namespace bigquery_emulator_duckdb

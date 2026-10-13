@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "src/duckdb_sql.h"
 #include "src/translator/functions.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -47,13 +48,12 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
 // implements, which takes and returns the units of a BIGNUM as text. `bignumerics` arguments are
 // BIGNUMERIC, and the `others` after them, such as ROUND's digits, go as they are.
 std::string BigNumericCall(std::string_view function, std::size_t bignumerics, std::size_t others) {
-  std::string arguments;
+  std::vector<std::string> arguments;
   for (std::size_t i = 1; i <= bignumerics + others; ++i) {
     const std::string argument = "$" + std::to_string(i);
-    arguments +=
-        (i == 1 ? "" : ", ") + (i <= bignumerics ? "CAST(" + argument + " AS VARCHAR)" : argument);
+    arguments.push_back(i <= bignumerics ? "CAST(" + argument + " AS VARCHAR)" : argument);
   }
-  return "CAST(" + std::string(function) + "(" + arguments + ") AS BIGNUM)";
+  return "CAST(" + std::string(function) + "(" + Join(arguments, ", ") + ") AS BIGNUM)";
 }
 
 // An operator on BIGNUMERIC, all of whose `arity` arguments are BIGNUMERIC.
