@@ -27,6 +27,8 @@
 #include "googlesql/public/functions/string_format.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
+#include "googlesql/public/type.h"
+#include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "src/backend_functions/apply.h"
 #include "src/backend_functions/register.h"
@@ -243,6 +245,42 @@ absl::Status TimestampToString(int64_t micros, std::string_view time_zone, std::
                                       out);
 }
 
+// A RANGE argument to FORMAT, the only STRUCT the handler passes, whose unbounded ends are
+// infinite in DuckDB and NULL in GoogleSQL.
+absl::StatusOr<googlesql::Value> FormatRange(duckdb_vector vector, idx_t row, bool null) {
+  LogicalType const type(duckdb_vector_get_column_type(vector));
+  LogicalType const element(duckdb_struct_type_child_type(type.get(), 0));
+  const duckdb_type element_type = duckdb_get_type_id(element.get());
+  const googlesql::Type* range = element_type == kDate ? googlesql::types::DateRangeType()
+                                 : element_type == kDatetime
+                                     ? googlesql::types::DatetimeRangeType()
+                                     : googlesql::types::TimestampRangeType();
+  if (null) {
+    return googlesql::Value::Null(range);
+  }
+  std::vector<googlesql::Value> bounds;
+  for (idx_t i = 0; i < 2; ++i) {
+    duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
+    if (element_type == kDate) {
+      const auto days = VectorElement<int32_t>(child, row);
+      bounds.push_back(duckdb_is_finite_date({days})
+                           ? googlesql::Value::Date(days)
+                           : googlesql::Value::Null(range->AsRange()->element_type()));
+      continue;
+    }
+    const auto micros = VectorElement<int64_t>(child, row);
+    if (!duckdb_is_finite_timestamp({micros})) {
+      bounds.push_back(googlesql::Value::Null(range->AsRange()->element_type()));
+    } else if (element_type == kDatetime) {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+      bounds.push_back(googlesql::Value::Datetime(datetime));
+    } else {
+      bounds.push_back(googlesql::Value::Timestamp(absl::FromUnixMicros(micros)));
+    }
+  }
+  return googlesql::Value::MakeRange(bounds.at(0), bounds.at(1));
+}
+
 // A FORMAT argument as the GoogleSQL value of the type its DuckDB type stands for.
 absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_t column,
                                                 duckdb_type type) {
@@ -306,6 +344,8 @@ absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_
       }
       return googlesql::Value::Numeric(*numeric);
     }
+    case DUCKDB_TYPE_STRUCT:
+      return FormatRange(arguments.Vector(column), arguments.Row(), null);
     default:
       return absl::UnimplementedError("Unsupported argument type for FORMAT");
   }
