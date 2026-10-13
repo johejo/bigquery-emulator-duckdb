@@ -1,0 +1,52 @@
+## FORMAT with JSON values
+# Expected values: BigQuery's FORMAT documentation, which shows %p, %P, %t and %T of JSON, and
+# GoogleSQL compliance functions_testlib_format_json.cc for NULL and escaped strings.
+# UNNEST prevents constant folding by the analyzer.
+
+SELECT FORMAT('%p', j) FROM UNNEST([JSON '{"month": 10, "year": 2019}']) AS j
+=> "{\"month\":10,\"year\":2019}"
+
+SELECT FORMAT('%P', j) FROM UNNEST([JSON '{"month": 10, "year": 2019}']) AS j
+=> "{\n  \"month\": 10,\n  \"year\": 2019\n}"
+
+SELECT FORMAT('%t', j) FROM UNNEST([JSON '{"name": "apple", "stock": 3}']) AS j
+=> "{\"name\":\"apple\",\"stock\":3}"
+
+SELECT FORMAT('%T', j) FROM UNNEST([JSON '{"name": "apple", "stock": 3}']) AS j
+=> "JSON '{\"name\":\"apple\",\"stock\":3}'"
+
+SELECT FORMAT('%T', JSON '{"name": "apple", "stock": 3}')
+=> "JSON '{\"name\":\"apple\",\"stock\":3}'"
+
+SELECT FORMAT('%t|%T', j, j) FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> "NULL|NULL"
+
+SELECT FORMAT('%p', j) FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> null
+
+SELECT FORMAT('%P', j) FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> null
+
+SELECT FORMAT('%t', j) FROM UNNEST([JSON r"""{"a": "foo\"bar", "b": "foo\\bar", "c": "foo'bar"}"""]) AS j
+=> "{\"a\":\"foo\\\"bar\",\"b\":\"foo\\\\bar\",\"c\":\"foo'bar\"}"
+
+SELECT FORMAT('%P', j) FROM UNNEST([JSON '{"a": [null, 3, "world"], "b": {"c": false}}']) AS j
+=> "{\n  \"a\": [\n    null,\n    3,\n    \"world\"\n  ],\n  \"b\": {\n    \"c\": false\n  }\n}"
+
+SELECT FORMAT('%d', j) FROM UNNEST([JSON '1']) AS j
+=> error:
+
+SELECT FORMAT('%s', j) FROM UNNEST([JSON '"a"']) AS j
+=> error:
+
+# The literal of %T is quoted as a STRING literal, in double quotes unless the text holds one;
+# width and precision act on the text as for %s; and a number that a FLOAT64 cannot hold exactly
+# is rounded. Confirmed against BigQuery.
+SELECT FORMAT('%T', JSON '{"a": "foo\'bar"}')
+=> "JSON \"{\\\"a\\\":\\\"foo'bar\\\"}\""
+
+SELECT FORMAT('|%20t|%-12p|%.4P|', JSON '{"a": 1}', JSON '{"a": 1}', JSON '{"a": 1}')
+=> "|             {\"a\":1}|{\"a\":1}     |{\n  |"
+
+SELECT FORMAT('%t|%T', JSON '123456789012345678901', JSON '123456789012345678901')
+=> "1.2345678901234568e+20|JSON \"1.2345678901234568e+20\""

@@ -247,7 +247,7 @@ query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 
 
 # Limits the probe's calls do not show.
 note CONTAINS_SUBSTR Takes STRING only.
-note FORMAT JSON, ARRAY, STRUCT and INTERVAL values are unsupported.
+note FORMAT ARRAY, STRUCT and INTERVAL values are unsupported.
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
 
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.
