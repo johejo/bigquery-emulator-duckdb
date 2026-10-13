@@ -70,6 +70,43 @@ steps:
       current.res.status == 200 &&
       current.res.body.id == "rest-resources:ds.t" &&
       current.res.body.schema.fields[1].mode == "REPEATED"
+  # Default rounding modes change how written values are rounded, which the emulator does not
+  # emulate.
+  table_with_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: rounded}
+              schema:
+                fields:
+                  - {name: n, type: NUMERIC}
+              defaultRoundingMode: ROUND_HALF_EVEN
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "The emulator does not support table defaultRoundingMode"
+  patch_table_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/ds/tables/t:
+        patch:
+          body:
+            application/json:
+              defaultRoundingMode: ROUND_HALF_EVEN
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "The emulator does not support table defaultRoundingMode"
+  dataset_with_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rounded}
+              defaultRoundingMode: ROUND_HALF_EVEN
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "The emulator does not support dataset field defaultRoundingMode"
   list_tables:
     req:
       /bigquery/v2/projects/rest-resources/datasets/ds/tables:

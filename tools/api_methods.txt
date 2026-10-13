@@ -29,6 +29,7 @@ request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"da
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "access": [{"role": "READER", "specialGroup": "projectReaders"}]}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
 note bigquery.datasets.insert | See [Datasets](compatibility.md#datasets).
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:test
@@ -101,11 +102,14 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "x"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "expirationTime": "1893456000000"}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "10", "scale": "2"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "BIGNUMERIC", "precision": "40", "scale": "2"}]}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC"}]}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
 note bigquery.tables.insert | See [Tables](compatibility.md#tables).
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
 note bigquery.tables.patch | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes).
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}

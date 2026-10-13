@@ -222,6 +222,12 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   field.precision = Int64Member(value, "precision");
   field.scale = Int64Member(value, "scale");
   field.default_value_expression = StringMember(value, "defaultValueExpression");
+  // A rounding mode changes how values written to the field are rounded, which the emulator
+  // does not emulate.
+  if (const std::string mode = StringMember(value, "roundingMode");
+      !mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
+    throw ApiError::Unsupported("field roundingMode");
+  }
   if (const auto tags = value.find("policyTags"); tags != value.end() && tags->is_object()) {
     for (const json& name : tags->value("names", json::array())) {
       if (!name.is_string()) {

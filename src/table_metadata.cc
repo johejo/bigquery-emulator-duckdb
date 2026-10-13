@@ -173,6 +173,16 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
   }
 }
 
+// Throws for a default rounding mode, which sets how values written to the table's new NUMERIC
+// and BIGNUMERIC columns are rounded and which the emulator does not emulate.
+void CheckDefaultRoundingMode(const json& table) {
+  if (const std::string mode =
+          StringValue(Member(table, "defaultRoundingMode"), "defaultRoundingMode");
+      !mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
+    throw ApiError::Unsupported("table defaultRoundingMode");
+  }
+}
+
 // Applies the description, friendly name and labels of a Table or Dataset resource `body` to
 // `metadata`, as UpdateTableMetadata documents.
 template <typename Metadata>
@@ -392,6 +402,7 @@ TableMetadata TableMetadataFromJson(const json& table) {
 }
 
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
+  CheckDefaultRoundingMode(body);
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&

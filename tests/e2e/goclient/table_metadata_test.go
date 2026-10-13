@@ -95,6 +95,11 @@ func TestTableMetadata(t *testing.T) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
 		}
 	}
+	rounded := bigquery.Schema{{Name: "n", Type: bigquery.NumericFieldType, RoundingMode: bigquery.RoundHalfEven}}
+	if err := dataset.Table("rounded").Create(ctx, &bigquery.TableMetadata{Schema: rounded}); err == nil ||
+		!strings.Contains(err.Error(), "field roundingMode") {
+		t.Errorf("roundingMode: error = %v", err)
+	}
 }
 
 // Tables keep the partitioning and clustering that tables.insert and DDL give them. Partitioning
