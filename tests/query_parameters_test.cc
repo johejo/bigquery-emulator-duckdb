@@ -83,6 +83,18 @@ TEST(QueryParametersTest, ConvertsStructs) {
             R"(struct_pack("x" := CAST('1' AS BIGINT), "y" := CAST('a' AS VARCHAR)))");
 }
 
+TEST(QueryParametersTest, KeepsTheIntervalParts) {
+  const QueryParameters parameters = Parse(R"([
+      {"name": "i", "parameterType": {"type": "INTERVAL"},
+       "parameterValue": {"value": "1-2 -3 4:5:6.789"}},
+      {"name": "a", "parameterType": {"type": "ARRAY", "arrayType": {"type": "INTERVAL"}},
+       "parameterValue": {"arrayValues": [{"value": "0-0 1 0:0:0"}]}},
+      {"name": "n", "parameterType": {"type": "INTERVAL"}, "parameterValue": {}}])");
+  EXPECT_EQ(parameters.ByName("i"), "bq_interval_parts(14, -3, 14706789000)");
+  EXPECT_EQ(parameters.ByName("a"), "CAST([bq_interval_parts(0, 1, 0)] AS INTERVAL[])");
+  EXPECT_EQ(parameters.ByName("n"), "CAST(NULL AS INTERVAL)");
+}
+
 TEST(QueryParametersTest, NumbersParametersWithoutANameByPosition) {
   const QueryParameters parameters = Parse(R"([
       {"parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}},
@@ -129,6 +141,9 @@ TEST(QueryParametersTest, RejectsMalformedParameters) {
   EXPECT_THROW(Parse(R"({})"), ApiError);
   EXPECT_THROW(Parse(R"([{"name": "a"}])"), ApiError);
   EXPECT_THROW(Parse(R"([{"name": "a", "parameterType": {}}])"), ApiError);
+  EXPECT_THROW(Parse(R"([{"name": "a", "parameterType": {"type": "INTERVAL"},
+                 "parameterValue": {"value": "1 DAY"}}])"),
+               ApiError);
   EXPECT_THROW(Parse(R"([{"name": "a", "parameterType": {"type": "ARRAY", "arrayType":
                  {"type": "ARRAY", "arrayType": {"type": "INT64"}}}}])"),
                ApiError);

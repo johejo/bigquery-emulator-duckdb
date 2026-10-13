@@ -114,9 +114,9 @@ cannot be compared, ordered or passed to aggregate functions with DISTINCT.
 
 ### INTERVAL values
 
-INTERVAL values keep separate month, day and microsecond components. Literals, constructors,
-`JUSTIFY` functions, `EXTRACT` and casts to STRING are supported. Stored columns, query parameters,
-casts from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are
+INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
+parameters, `JUSTIFY` functions, `EXTRACT` and casts to STRING are supported. Stored columns, casts
+from STRING, arithmetic, comparisons, ordering, grouping, aggregates and JSON conversion are
 unsupported.
 
 ### RANGE values

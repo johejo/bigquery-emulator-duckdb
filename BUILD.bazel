@@ -75,6 +75,7 @@ cc_library(
         ":duckdb_sql",
         ":type_mapping",
         "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:interval_value",
         "@googlesql//googlesql/public:numeric_value",
     ],
     deps = [

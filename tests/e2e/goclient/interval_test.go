@@ -48,3 +48,29 @@ func TestIntervalResults(t *testing.T) {
 		t.Fatalf("next = %v, want iterator.Done", err)
 	}
 }
+
+// INTERVAL query parameters, which the client sends in the canonical format. EXTRACT's results
+// follow BigQuery's interval_functions#extract example for the same value.
+func TestIntervalParameters(t *testing.T) {
+	query := newClient(t).Query(`SELECT @i AS i, EXTRACT(MONTH FROM @i) AS m,
+		EXTRACT(MICROSECOND FROM @i) AS us, @a AS a`)
+	value := &bigquery.IntervalValue{Years: 1, Months: 2, Days: 3, Hours: 4, Minutes: 5, Seconds: 6,
+		SubSecondNanos: 789999000}
+	query.Parameters = []bigquery.QueryParameter{
+		{Name: "i", Value: value},
+		{Name: "a", Value: []*bigquery.IntervalValue{{Days: -1}}},
+	}
+	rows, err := query.Read(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []bigquery.Value
+	if err := rows.Next(&got); err != nil {
+		t.Fatal(err)
+	}
+	want := []bigquery.Value{value, int64(2), int64(789999),
+		[]bigquery.Value{&bigquery.IntervalValue{Days: -1}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("values = %#v, want %#v", got, want)
+	}
+}

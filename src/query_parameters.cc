@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -84,7 +85,7 @@ FieldSchema ToFieldSchema(const std::string& name, const json& type) {
 }
 
 std::string ToDuckDbType(const json& type) {
-  absl::StatusOr<std::string> duckdb_type = DuckDbColumnType(ToFieldSchema("", type));
+  absl::StatusOr<std::string> duckdb_type = DuckDbParameterType(ToFieldSchema("", type));
   if (!duckdb_type.ok()) {
     throw ApiError::Invalid("Unsupported query parameter type: " +
                             std::string(duckdb_type.status().message()));
@@ -171,6 +172,17 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
       throw ApiError::Invalid("Invalid BIGNUMERIC query parameter value: " + text);
     }
     return BigNumericSql(*number);
+  }
+  if (ParseFieldType(name) == FieldType::kInterval) {
+    // GoogleSQL parses the text as a cast from STRING would; the literal keeps the month, day
+    // and microsecond parts apart.
+    const auto interval = googlesql::IntervalValue::ParseFromString(text, /*allow_nanos=*/false);
+    if (!interval.ok()) {
+      throw ApiError::Invalid("Invalid INTERVAL query parameter value: " + text);
+    }
+    return "bq_interval_parts(" + std::to_string(interval->get_months()) + ", " +
+           std::to_string(interval->get_days()) + ", " + std::to_string(interval->get_micros()) +
+           ")";
   }
   if (name == "BYTES") {
     // BYTES parameters are base64 encoded, which DuckDB decodes back into a BLOB.
