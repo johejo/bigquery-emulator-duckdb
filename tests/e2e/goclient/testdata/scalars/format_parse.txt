@@ -173,6 +173,22 @@ SELECT ARRAY_TO_STRING(CAST(ARRAY_AGG(x ORDER BY x) AS ARRAY<STRING>), ',')
 FROM UNNEST([NUMERIC '1.50', NUMERIC '20']) x
 => error:
 
+# The year elements print years below 1000 without leading zeros.
+SELECT FORMAT_TIMESTAMP('%Y-%m-%d', TIMESTAMP '0001-01-01 00:00:00+00', 'UTC')
+=> "1-01-01"
+
+SELECT FORMAT_DATETIME('%Y-%m-%d', DATETIME '0001-01-01 00:00:00')
+=> "1-01-01"
+
+SELECT FORMAT_DATE('%Y-%m-%d', DATE '0001-01-01')
+=> "1-01-01"
+
+SELECT FORMAT_DATE('%F', DATE '0999-12-31')
+=> "999-12-31"
+
+SELECT FORMAT_DATE('%G', DATE '0001-01-01')
+=> "1"
+
 ## Casts from STRING accept only BigQuery's canonical formats
 
 SELECT SAFE_CAST(x AS DATE) FROM UNNEST(['2009-02-13 ']) AS x
