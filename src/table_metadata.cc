@@ -30,6 +30,7 @@ constexpr size_t kMaxLabels = 64;
 constexpr size_t kMaxLabelLength = 63;
 constexpr size_t kMaxClusteringFields = 4;
 constexpr int64_t kMaxRangePartitions = 10000;
+constexpr int64_t kMinDefaultTableExpirationMs = 3600000;
 
 ApiError Unsupported(std::string_view what) {
   return ApiError::Invalid(std::format("The emulator does not support {}", what));
@@ -216,6 +217,7 @@ void CheckDatasetFields(const json& dataset) {
       "description",
       "friendlyName",
       "labels",
+      "defaultTableExpirationMs",
   };
   for (const auto& [key, value] : dataset.items()) {
     if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
@@ -380,6 +382,9 @@ json DatasetMetadata::ToJson() const {
   if (!labels.empty()) {
     fields["labels"] = labels;
   }
+  if (default_table_expiration_ms.has_value()) {
+    fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
+  }
   return fields;
 }
 
@@ -422,6 +427,34 @@ DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
   CheckDatasetFields(body);
   UpdateDescriptiveFields(metadata, body, patch);
+  if (body.contains("defaultTableExpirationMs") || !patch) {
+    const bool unset = Member(body, "defaultTableExpirationMs").is_null() ||
+                       Int64Member(body, "defaultTableExpirationMs") == 0;
+    metadata.default_table_expiration_ms =
+        unset ? std::nullopt : std::optional(Int64Member(body, "defaultTableExpirationMs"));
+  }
+  ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
+}
+
+void ValidateDefaultTableExpiration(const std::optional<int64_t>& milliseconds) {
+  if (milliseconds.has_value() && *milliseconds < kMinDefaultTableExpirationMs) {
+    throw ApiError::Invalid(
+        std::format("The default table expiration must be at least 3600000 milliseconds (one "
+                    "hour), but was {}",
+                    *milliseconds));
+  }
+}
+
+std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expiration_time,
+                                             int64_t creation_time,
+                                             const DatasetMetadata& dataset) {
+  if (expiration_time.has_value() || !dataset.default_table_expiration_ms.has_value()) {
+    return expiration_time;
+  }
+  if (*dataset.default_table_expiration_ms > std::numeric_limits<int64_t>::max() - creation_time) {
+    throw ApiError::Invalid("The default table expiration of the dataset is out of range");
+  }
+  return creation_time + *dataset.default_table_expiration_ms;
 }
 
 void ValidateLabels(const std::map<std::string, std::string>& labels) {

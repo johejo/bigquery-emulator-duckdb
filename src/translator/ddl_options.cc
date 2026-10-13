@@ -1,5 +1,6 @@
 #include "src/translator/ddl_options.h"
 
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -28,6 +29,28 @@ bool ExpirationOption(const googlesql::Value& value, std::optional<int64_t>& int
     return false;
   }
   into = absl::ToUnixMillis(value.ToUnixPicos().ToAbslTime());
+  return true;
+}
+
+// The default_table_expiration_days option, a FLOAT64 number of days, in the milliseconds of
+// Dataset.defaultTableExpirationMs; 0, as there, and NULL clear it.
+bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
+  if (value.is_null()) {
+    into.reset();
+    return true;
+  }
+  if (!value.type()->IsDouble() && !value.type()->IsInt64()) {
+    return false;
+  }
+  constexpr double kMillisecondsPerDay = 86400000;
+  const double milliseconds = std::round(
+      (value.type()->IsDouble() ? value.double_value() : static_cast<double>(value.int64_value())) *
+      kMillisecondsPerDay);
+  // Days whose milliseconds do not fit in an INT64 are rejected.
+  if (!std::isfinite(milliseconds) || std::abs(milliseconds) >= 0x1p63) {
+    return false;
+  }
+  into = milliseconds == 0 ? std::nullopt : std::optional(static_cast<int64_t>(milliseconds));
   return true;
 }
 
@@ -100,9 +123,9 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
   return metadata;
 }
 
-// The description, friendly name and labels the OPTIONS of a CREATE SCHEMA set. Every dataset is
-// in the US, so a location elsewhere is unsupported, and so are the other options, which change
-// how BigQuery treats the dataset's tables.
+// The description, friendly name, labels and default table expiration the OPTIONS of a CREATE
+// SCHEMA set. Every dataset is in the US, so a location elsewhere is unsupported, and so are the
+// other options, which change how BigQuery treats the dataset's tables.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
   DatasetMetadata metadata;
   for (const auto& option : options) {
@@ -114,6 +137,8 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
+         (name == "default_table_expiration_days" &&
+          DaysOption(*value, metadata.default_table_expiration_ms)) ||
          (name == "location" && StringOption(*value, location) &&
           (value->is_null() || ToUpperAscii(location) == "US")));
     if (!applied) {
@@ -137,7 +162,9 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
          (name == "labels" && LabelsOption(*value, updates.labels.emplace())) ||
          (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
-          ExpirationOption(*value, updates.expiration_time.emplace())));
+          ExpirationOption(*value, updates.expiration_time.emplace())) ||
+         (statement == "ALTER SCHEMA" && name == "default_table_expiration_days" &&
+          DaysOption(*value, updates.default_table_expiration_ms.emplace())));
     if (!applied) {
       Unsupported(scope, std::string(statement) + " option " + option->name());
       return false;

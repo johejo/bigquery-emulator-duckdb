@@ -37,10 +37,13 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset);
 // What table creation runs besides CREATE TABLE: column metadata and defaults, table metadata
 // with a fresh creation time, and any rows to copy. DDL, REST and destination jobs execute these
 // statements in the same transaction as creation; their callers decide what to inherit or replace.
-DdlWrite CreateTableWrite(const TableDefinition& definition);
+// A table that sets no expiration takes the default of `dataset`, the dataset it is created in,
+// unless it is temporary.
+DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset);
 
-// What CREATE VIEW of `view` runs besides itself.
-DdlWrite CreateViewWrite(const ViewDefinition& view);
+// What CREATE VIEW of `view` runs besides itself. A view that sets no expiration takes the
+// default of `dataset`, as a table does.
+DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset);
 
 // The statements that apply `alteration` to its table, whose BigQuery schema and metadata are
 // `schema` and `metadata` when it runs, or none when its actions all have nothing to do. Throws
@@ -54,7 +57,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
 std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alteration,
                                                 DatasetMetadata metadata);
 
-// What a translated statement runs besides itself, if it records metadata.
-std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement);
+// What a translated statement runs besides itself, if it records metadata. `dataset` is the
+// metadata of the dataset a table or view it creates belongs to.
+std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement,
+                                      const DatasetMetadata& dataset);
 
 }  // namespace bigquery_emulator_duckdb

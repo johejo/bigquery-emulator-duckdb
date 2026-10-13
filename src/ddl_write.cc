@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <format>
 #include <iterator>
 #include <optional>
@@ -64,6 +65,12 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
   }
 }
 
+int64_t NowMillis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
+
 // The column of `schema` named `name`; BigQuery's column names ignore case, as DuckDB's do.
 std::vector<FieldSchema>::iterator FindColumn(std::vector<FieldSchema>& schema,
                                               const std::string& name) {
@@ -86,6 +93,7 @@ std::string DatasetMetadataTable(const std::string& project) {
 std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,
                                                    const DatasetMetadata& metadata) {
   ValidateLabels(metadata.labels);
+  ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
   const std::string table = DatasetMetadataTable(dataset.project_id);
   std::vector<std::string> statements = {
       std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id)),
@@ -103,15 +111,17 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
   return {.metadata_statements = {DatasetMetadataStatements(dataset, {}).front()}};
 }
 
-DdlWrite CreateViewWrite(const ViewDefinition& view) {
+DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset) {
   const TableReference& table = view.table;
+  TableMetadata metadata = view.metadata;
+  metadata.expiration_time = ExpirationWithDefault(metadata.expiration_time, NowMillis(), dataset);
   DdlWrite write;
   // DuckDB can create a circular view and only reject it when queried. Bind the new definition
   // before committing so a failed replacement keeps the old view.
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
       ViewCommentStatement(table,
-                           {.query = view.query, .schema = view.schema, .metadata = view.metadata}),
+                           {.query = view.query, .schema = view.schema, .metadata = metadata}),
   };
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);
@@ -119,11 +129,13 @@ DdlWrite CreateViewWrite(const ViewDefinition& view) {
   return write;
 }
 
-DdlWrite CreateTableWrite(const TableDefinition& definition) {
+DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset) {
   TableMetadata metadata = definition.metadata;
-  metadata.creation_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                               std::chrono::system_clock::now().time_since_epoch())
-                               .count();
+  metadata.creation_time = NowMillis();
+  if (!definition.temporary) {
+    metadata.expiration_time =
+        ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
+  }
   DdlWrite write{
       .metadata_statements = ColumnCommentStatements(definition.table, definition.schema),
   };
@@ -277,15 +289,19 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
 std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alteration,
                                                 DatasetMetadata metadata) {
   ApplyOptionUpdates(alteration.options, metadata);
+  if (alteration.options.default_table_expiration_ms.has_value()) {
+    metadata.default_table_expiration_ms = *alteration.options.default_table_expiration_ms;
+  }
   return DatasetMetadataStatements(alteration.dataset, metadata);
 }
 
-std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement) {
+std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement,
+                                      const DatasetMetadata& dataset) {
   if (statement.table.has_value()) {
-    return CreateTableWrite(*statement.table);
+    return CreateTableWrite(*statement.table, dataset);
   }
   if (statement.view.has_value()) {
-    return CreateViewWrite(*statement.view);
+    return CreateViewWrite(*statement.view, dataset);
   }
   if (statement.dataset.has_value()) {
     return CreateDatasetWrite(*statement.dataset);

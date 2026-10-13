@@ -485,6 +485,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
       .metadata = std::move(description->metadata),
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
+      .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
   };
   return *head + " (" + *columns + ")";
 }
@@ -683,6 +684,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
       .metadata = *std::move(metadata),
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
+      .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
   };
   std::vector<std::string> columns;
   for (const auto& column : create.column_definition_list()) {
@@ -754,6 +756,7 @@ std::optional<std::string> CreateTableAsSelect(
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .as_select = true,
+      .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
   };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {

@@ -353,6 +353,23 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
   return std::nullopt;
 }
 
+DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
+                                           const TranslatedStatement& translation) {
+  std::optional<TableReference> table;
+  if (translation.table.has_value() && !translation.table->temporary) {
+    table = translation.table->table;
+  } else if (translation.view.has_value()) {
+    table = translation.view->table;
+  }
+  if (!table.has_value()) {
+    return {};
+  }
+  const QueryResult result =
+      backend.Execute(DatasetEntriesQuery(table->project_id, table->dataset_id));
+  return result.rows.empty() ? DatasetMetadata{}
+                             : ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+}
+
 std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
@@ -511,15 +528,16 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
                                 const TableMetadata& metadata) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
-  GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+  const DatasetMetadata dataset =
+      GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   std::string columns;
   for (const FieldSchema& field : schema) {
     columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
   }
-  DdlWrite write =
-      CreateTableWrite(TableDefinition{.table = table, .schema = schema, .metadata = metadata});
+  DdlWrite write = CreateTableWrite(
+      TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
   std::ranges::move(ColumnDefaultStatements(table, schema),
                     std::back_inserter(write.metadata_statements));
   try {
@@ -593,7 +611,8 @@ TableInfo Emulator::UpdateTable(TableReference table,
 void Emulator::WriteView(TableReference table, const json& definition,
                          const TableMetadata& metadata, bool replace) {
   table.project_id = ResolveProject(table.project_id);
-  GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
+  const DatasetMetadata dataset =
+      GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   if (definition.value("useLegacySql", true)) {
     throw ApiError::Invalid("The emulator does not support legacy SQL views");
   }
@@ -616,7 +635,10 @@ void Emulator::WriteView(TableReference table, const json& definition,
     }
     ViewDefinition view = *translation.view;
     view.metadata = metadata;
-    backend_.ExecuteDdl(translation.sql, CreateViewWrite(view).metadata_statements, "");
+    // A replaced view keeps the expiration `metadata` gives it.
+    backend_.ExecuteDdl(
+        translation.sql,
+        CreateViewWrite(view, replace ? DatasetMetadata{} : dataset).metadata_statements, "");
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {
       throw ApiError::Duplicate("Already Exists: Table " + TableName(table));

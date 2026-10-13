@@ -66,15 +66,18 @@ struct TableMetadata {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
-// What a dataset carries besides its reference: Dataset.description, friendlyName and labels. The
-// emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
+// What a dataset carries besides its reference: Dataset.description, friendlyName and labels, and
+// defaultTableExpirationMs, which sets the expiration of tables and views created in it later.
+// The emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
 struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
+  std::optional<int64_t> default_table_expiration_ms;
 
   [[nodiscard]] bool empty() const {
-    return description.empty() && friendly_name.empty() && labels.empty();
+    return description.empty() && friendly_name.empty() && labels.empty() &&
+           !default_table_expiration_ms.has_value();
   }
 
   // The fields of a Dataset resource that it sets.
@@ -102,8 +105,18 @@ void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bo
 DatasetMetadata DatasetMetadataFromJson(const nlohmann::json& dataset);
 
 // datasets.patch (`patch`) or datasets.update applied to `metadata`, as UpdateTableMetadata does
-// for tables. Throws as DatasetMetadataFromJson does.
+// for tables; a defaultTableExpirationMs of 0 clears it, as BigQuery documents for datasets.patch.
+// Throws as DatasetMetadataFromJson does.
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const nlohmann::json& body, bool patch);
+
+// Throws ApiError::Invalid for a default table expiration BigQuery rejects: one shorter than an
+// hour.
+void ValidateDefaultTableExpiration(const std::optional<int64_t>& milliseconds);
+
+// The expiration a table or view created at `creation_time` in a dataset with `dataset`'s default
+// takes when its own `expiration_time` is unset; times are milliseconds since the Unix epoch.
+std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expiration_time,
+                                             int64_t creation_time, const DatasetMetadata& dataset);
 
 // Throws ApiError::Invalid for labels BigQuery rejects: more than 64, a key that is empty or
 // does not start with a lowercase letter, or a key or value longer than 63 characters or with

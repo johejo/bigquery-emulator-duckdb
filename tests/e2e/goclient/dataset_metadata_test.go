@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -100,14 +99,9 @@ func TestDatasetMetadata(t *testing.T) {
 
 	for name, err := range map[string]error{
 		"dataset location EU": client.Dataset("go_dataset_metadata_eu").Create(ctx, &bigquery.DatasetMetadata{Location: "EU"}),
-		"dataset field defaultTableExpirationMs": client.Dataset("go_dataset_metadata_expiring").Create(ctx, &bigquery.DatasetMetadata{
-			DefaultTableExpiration: time.Hour,
-		}),
 		"must start with a lowercase letter": client.Dataset("go_dataset_metadata_labeled").Create(ctx, &bigquery.DatasetMetadata{
 			Labels: map[string]string{"Env": "prod"},
 		}),
-		"CREATE SCHEMA option default_table_expiration_days":  run("CREATE SCHEMA go_dataset_metadata_expiring OPTIONS (default_table_expiration_days = 1)"),
-		"ALTER SCHEMA option default_table_expiration_days":   run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (default_table_expiration_days = 1)"),
 		"Not found: Dataset test:go_dataset_metadata_missing": run("ALTER SCHEMA go_dataset_metadata_missing SET OPTIONS (description = 'x')"),
 		// DuckDB's own schemas, where the emulator keeps dataset metadata, are not datasets.
 		"Table not found: main.emulator_datasets": run("SELECT * FROM main.emulator_datasets"),
