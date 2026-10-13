@@ -43,6 +43,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_handle.h"
 #include "src/interval.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
@@ -129,6 +130,19 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       return *array;
     }
     case DUCKDB_TYPE_STRUCT: {
+      // A RANGE is a STRUCT whose field names no STRUCT can have, and contributes no names.
+      if (IsRange(type)) {
+        LogicalType const child(duckdb_struct_type_child_type(type, 0));
+        const auto element = GoogleSqlTypeOf(child.get(), factory, names, next_name);
+        if (!element.ok()) {
+          return element.status();
+        }
+        const googlesql::Type* range = nullptr;
+        if (absl::Status status = factory.MakeRangeType(*element, &range); !status.ok()) {
+          return status;
+        }
+        return range;
+      }
       std::vector<googlesql::StructField> fields;
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
         LogicalType const child(duckdb_struct_type_child_type(type, i));
@@ -231,6 +245,25 @@ absl::StatusOr<googlesql::Value> ValueOf(duckdb_vector vector, duckdb_logical_ty
         elements.push_back(*std::move(element));
       }
       return googlesql::Value::MakeArray(type->AsArray(), std::move(elements));
+    }
+    case googlesql::TYPE_RANGE: {
+      // Unbounded ends are infinite in DuckDB and NULL in GoogleSQL.
+      const googlesql::Type* element_type = type->AsRange()->element_type();
+      LogicalType const child_type(duckdb_struct_type_child_type(duck_type, 0));
+      std::vector<googlesql::Value> bounds;
+      for (idx_t i = 0; i < 2; ++i) {
+        duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
+        const bool finite = element_type->IsDate()
+                                ? duckdb_is_finite_date({VectorElement<int32_t>(child, row)})
+                                : duckdb_is_finite_timestamp({VectorElement<int64_t>(child, row)});
+        auto bound = finite ? ValueOf(child, child_type.get(), element_type, row)
+                            : googlesql::Value::Null(element_type);
+        if (!bound.ok()) {
+          return bound.status();
+        }
+        bounds.push_back(*std::move(bound));
+      }
+      return googlesql::Value::MakeRange(bounds.at(0), bounds.at(1));
     }
     case googlesql::TYPE_STRUCT: {
       std::vector<googlesql::Value> fields;

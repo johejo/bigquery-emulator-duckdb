@@ -44,16 +44,6 @@ LogicalType ElementType(duckdb_logical_type type) {
 
 FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type);
 
-// Whether `type` is the STRUCT that keeps a RANGE; see kRangeStart.
-bool IsRange(duckdb_logical_type type) {
-  if (duckdb_get_type_id(type) != DUCKDB_TYPE_STRUCT || duckdb_struct_type_child_count(type) != 2) {
-    return false;
-  }
-  DuckString const start(duckdb_struct_type_child_name(type, 0));
-  DuckString const end(duckdb_struct_type_child_name(type, 1));
-  return start.get() == kRangeStart && end.get() == kRangeEnd;
-}
-
 // Maps a DuckDB type to the BigQuery type of a TableFieldSchema.
 FieldType ToBigQueryType(duckdb_logical_type type) {
   if (IsRange(type)) {

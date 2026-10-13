@@ -14,10 +14,12 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "duckdb.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/type_parameters.pb.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 
@@ -394,6 +396,15 @@ bool HasInterval(const googlesql::Type* type) {
                                [](const auto& field) { return HasInterval(field.type); });
   }
   return false;
+}
+
+bool IsRange(duckdb_logical_type type) {
+  if (duckdb_get_type_id(type) != DUCKDB_TYPE_STRUCT || duckdb_struct_type_child_count(type) != 2) {
+    return false;
+  }
+  DuckString const start(duckdb_struct_type_child_name(type, 0));
+  DuckString const end(duckdb_struct_type_child_name(type, 1));
+  return start.get() == kRangeStart && end.get() == kRangeEnd;
 }
 
 bool HasRange(const googlesql::Type* type) {
