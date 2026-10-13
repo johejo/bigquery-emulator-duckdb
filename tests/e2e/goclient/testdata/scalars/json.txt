@@ -114,6 +114,28 @@ SELECT JSON_VALUE_ARRAY('{"a": {"b": [1, null, {"c": "x"}, "s"]}}', '$.a.b') IS 
 SELECT TO_JSON_STRING(TO_JSON(STRUCT(1 AS a, [2, 3] AS b)))
 => "{\"a\":1,\"b\":[2,3]}"
 
+# STRUCT<> values encode as GoogleSQL compliance data in functions_testlib_tojson.cc does.
+SELECT TO_JSON_STRING(STRUCT())
+=> "{}"
+
+SELECT TO_JSON_STRING(STRUCT(), true)
+=> "{}"
+
+SELECT TO_JSON_STRING(CAST(NULL AS STRUCT<>))
+=> "null"
+
+SELECT TO_JSON_STRING(TO_JSON(STRUCT([10, 11] AS a, CAST(NULL AS STRUCT<>) AS c, STRUCT() AS x)))
+=> "{\"a\":[10,11],\"c\":null,\"x\":{}}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY(STRUCT(), [STRUCT()]))
+=> "[{},[{}]]"
+
+SELECT TO_JSON_STRING(JSON_OBJECT('a', STRUCT()))
+=> "{\"a\":{}}"
+
+SELECT TO_JSON_STRING(JSON_SET(JSON '{}', '$.a', STRUCT()))
+=> "{\"a\":{}}"
+
 SELECT TO_JSON_STRING(TO_JSON(CAST(NULL AS INT64)))
 => "null"
 

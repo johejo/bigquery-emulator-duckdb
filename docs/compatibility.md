@@ -108,8 +108,10 @@ views that read temporary tables, are unsupported.
 
 ### STRUCT values
 
-Query values may have anonymous or duplicate STRUCT field names, but at least one field; stored
-table columns require distinct nonempty names. Casts between STRUCT types match fields by position,
+Query values may have anonymous or duplicate STRUCT field names; stored table columns require
+distinct nonempty names. A STRUCT without fields, `STRUCT<>`, can only be passed to JSON functions,
+such as `TO_JSON` and `JSON_ARRAY_APPEND`, and to ARRAY constructors; results, aggregates and other
+functions reject it. Casts between STRUCT types match fields by position,
 and JSON functions preserve the original field names, including in nested arrays and structs.
 Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
 NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts

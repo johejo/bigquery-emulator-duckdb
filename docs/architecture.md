@@ -49,7 +49,8 @@ The sources in [src/translator/](../src/translator/) share a statement-wide `Con
 STRUCT names to positional internal names. Construction, casts and field access use that mapping;
 JSON functions receive the original names separately so they preserve JSON keys. Comparisons of
 STRUCTs access fields by position instead, since DuckDB's composite equality takes NULL fields as
-equal. User-visible
+equal. DuckDB has no STRUCT without fields, so a `STRUCT<>` is a STRUCT whose one field,
+`$empty`, is TRUE; translation lets only JSON functions and ARRAY constructors see it. User-visible
 limits are documented in [compatibility.md](compatibility.md#struct-values).
 
 [functions.cc](../src/translator/functions.cc) assembles DuckDB names, SQL templates, GoogleSQL

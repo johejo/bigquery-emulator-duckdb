@@ -50,7 +50,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 0 | 0 | 4 | 0 |
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
-| [JSON functions](#json-functions) | 26 | 2 | 0 | 0 |
+| [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
 | [KLL functions](#kll-functions) | 0 | 0 | 11 | 0 |
 | [Mathematical functions](#mathematical-functions) | 49 | 1 | 0 | 0 |
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
@@ -349,8 +349,8 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | Supported | GoogleSQL function |  |
 | [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | Supported | GoogleSQL function |  |
 | [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Partial | DuckDB SQL, in code | Unsupported: type STRUCT<>. |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Partial | DuckDB SQL, in code | Unsupported: type STRUCT<>. |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Supported | DuckDB SQL, in code |  |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Supported | DuckDB SQL, in code |  |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | Supported | GoogleSQL function |  |
@@ -548,7 +548,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | Supported | GoogleSQL function |  |
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | Supported | GoogleSQL function |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported. Unsupported: function FORMAT; function FORMAT with INTERVAL; function FORMAT with RANGE; type STRUCT<>. |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | JSON, ARRAY, STRUCT, INTERVAL and RANGE values are unsupported. Unsupported: function FORMAT; function FORMAT with INTERVAL; function FORMAT with RANGE; function FORMAT with STRUCT<>. |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | Supported | DuckDB SQL |  |

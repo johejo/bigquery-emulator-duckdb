@@ -130,6 +130,10 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlTypeOf(duckdb_logical_type type,
       return *array;
     }
     case DUCKDB_TYPE_STRUCT: {
+      // A STRUCT<> keeps a placeholder field, which contributes no names.
+      if (IsEmptyStruct(type)) {
+        return googlesql::types::EmptyStructType();
+      }
       // A RANGE is a STRUCT whose field names no STRUCT can have, and contributes no names.
       if (IsRange(type)) {
         LogicalType const child(duckdb_struct_type_child_type(type, 0));

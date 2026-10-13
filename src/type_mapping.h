@@ -27,6 +27,11 @@ namespace bigquery_emulator_duckdb {
 inline constexpr std::string_view kRangeStart = "$start";
 inline constexpr std::string_view kRangeEnd = "$end";
 
+// The DuckDB STRUCT field name of a STRUCT<>, which DuckDB cannot hold without a field. The field
+// is TRUE in every non-NULL value, so DuckDB compares and groups them as BigQuery does. No struct
+// field of a BigQuery column can have this name.
+inline constexpr std::string_view kEmptyStruct = "$empty";
+
 // GoogleSQL's error for a RANGE whose start does not precede its end.
 inline constexpr std::string_view kRangeOrderError =
     "Range start element must be smaller than range end element";
@@ -38,6 +43,12 @@ std::string DuckDbRange(std::string_view start, std::string_view end, std::strin
 
 // Whether the DuckDB `type` is the STRUCT that keeps a RANGE.
 bool IsRange(duckdb_logical_type type);
+
+// Whether the DuckDB `type` is the STRUCT that keeps a STRUCT<>.
+bool IsEmptyStruct(duckdb_logical_type type);
+
+// Whether a type contains STRUCT<>, including array elements and struct fields.
+bool HasEmptyStruct(const googlesql::Type* type);
 
 // Whether a type contains RANGE, including array elements and struct fields.
 bool HasRange(const googlesql::Type* type);
@@ -51,7 +62,7 @@ absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
 
 // The inverse of GoogleSqlType: describes a column of GoogleSQL type `type` the way BigQuery
 // reports it in a TableSchema. Struct fields without a name get BigQuery's `_field_n`. Fails
-// for a type BigQuery has no TableFieldSchema for, such as an array of arrays.
+// for a type BigQuery has no TableFieldSchema for, such as an array of arrays or STRUCT<>.
 absl::StatusOr<FieldSchema> BigQueryFieldSchema(const std::string& name,
                                                 const googlesql::Type* type);
 
@@ -62,9 +73,9 @@ std::vector<std::string> DuckDbStructFieldNames(const googlesql::StructType* typ
 // The DuckDB type of `type`, narrowed by `parameters` when a column definition gives some, or
 // nullopt for a type the translator does not support. DuckDB ignores lengths, so STRING(L) and
 // BYTES(L) lose them; NUMERIC(P, S) keeps its rounding as DECIMAL(P, S), and BIGNUMERIC(P, S) as
-// the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; empty structs are
-// unsupported. INTERVAL is available only for query values. A RANGE is a STRUCT with the fields
-// kRangeStart and kRangeEnd.
+// the type BigNumericTypeName names. Structs use DuckDbStructFieldNames; STRUCT<> is a STRUCT
+// with the field kEmptyStruct, available only for query values, as is INTERVAL. A RANGE is a STRUCT
+// with the fields kRangeStart and kRangeEnd.
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters = nullptr);
 

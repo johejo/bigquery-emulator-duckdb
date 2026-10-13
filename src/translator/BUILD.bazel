@@ -219,6 +219,7 @@ cc_library(
         ":query",
         "//:analyzer",
         "//:duckdb_sql",
+        "//:type_mapping",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
     ],

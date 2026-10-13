@@ -72,6 +72,9 @@ std::optional<std::string> Literal(const googlesql::Value& value) {
       }
       fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *sql);
     }
+    if (fields.empty()) {
+      fields.push_back(QuoteIdentifier(kEmptyStruct) + " := TRUE");
+    }
     literal = "struct_pack(" + Join(fields, ", ") + ")";
   } else if (value.type()->IsDouble() && value.double_value() == 0 &&
              std::signbit(value.double_value())) {
