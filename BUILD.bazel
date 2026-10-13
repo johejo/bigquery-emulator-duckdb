@@ -320,7 +320,10 @@ cc_library(
     name = "javascript_function",
     hdrs = ["src/javascript_function.h"],
     copts = ["-std=c++20"],
-    deps = ["@googlesql//googlesql/public:function"],
+    deps = [
+        ":duckdb_sql",
+        "@googlesql//googlesql/public:function",
+    ],
 )
 
 cc_library(

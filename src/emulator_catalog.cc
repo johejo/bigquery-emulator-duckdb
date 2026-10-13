@@ -63,8 +63,8 @@ void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
       }
       const googlesql::Function* function = nullptr;
       if (path.size() == 2 && !builtins.FindFunction(path, &function).ok()) {
-        throw ApiError::Invalid(
-            "The emulator does not support API routine bodies with function references without a "
+        throw ApiError::Unsupported(
+            "API routine bodies with function references without a "
             "project ID");
       }
     }
@@ -532,16 +532,14 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
-  std::string columns;
-  for (const FieldSchema& field : schema) {
-    columns += (columns.empty() ? "" : ", ") + ColumnDefinition(field);
-  }
+  std::vector<std::string> columns;
+  std::ranges::transform(schema, std::back_inserter(columns), ColumnDefinition);
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
   std::ranges::move(ColumnDefaultStatements(table, schema),
                     std::back_inserter(write.metadata_statements));
   try {
-    backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + columns + ")",
+    backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + Join(columns, ", ") + ")",
                         write.metadata_statements, write.skip_query);
   } catch (const BackendError& error) {
     if (std::string(error.what()).find("already exists") != std::string::npos) {
@@ -570,8 +568,7 @@ TableInfo Emulator::UpdateTable(TableReference table,
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
   if (info.view_query.has_value()) {
     if (schema.has_value()) {
-      throw ApiError::Invalid(
-          "The emulator does not support changing the schema of a view; change its query instead");
+      throw ApiError::Unsupported("changing the schema of a view; change its query instead");
     }
     if (view.has_value()) {
       // Every view the emulator keeps is GoogleSQL.
@@ -614,10 +611,10 @@ void Emulator::WriteView(TableReference table, const json& definition,
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
   if (definition.value("useLegacySql", true)) {
-    throw ApiError::Invalid("The emulator does not support legacy SQL views");
+    throw ApiError::Unsupported("legacy SQL views");
   }
   if (definition.contains("userDefinedFunctionResources")) {
-    throw ApiError::Invalid("The emulator does not support view userDefinedFunctionResources");
+    throw ApiError::Unsupported("view userDefinedFunctionResources");
   }
   const std::string query = definition.value("query", "");
   if (query.empty()) {
@@ -771,23 +768,19 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
     std::vector<std::string> statements;
     for (size_t index = 0; index < rows.size(); ++index) {
       const auto& row = rows.at(index);
-      std::string columns;
-      std::string values;
+      std::vector<std::string> columns;
+      std::vector<std::string> values;
       for (const auto& field : schema) {
-        if (!columns.empty()) {
-          columns += ", ";
-          values += ", ";
-        }
-        columns += QuoteIdentifier(field.name);
+        columns.push_back(QuoteIdentifier(field.name));
         const auto value = row.find(field.name);
         try {
-          values += InsertValue(value == row.end() ? json(nullptr) : *value, field, false);
+          values.push_back(InsertValue(value == row.end() ? json(nullptr) : *value, field, false));
         } catch (const ApiError& error) {
           return {{.index = index, .message = error.what()}};
         }
       }
-      statements.push_back(
-          std::format("INSERT INTO {} ({}) VALUES ({})", QualifiedName(table), columns, values));
+      statements.push_back(std::format("INSERT INTO {} ({}) VALUES ({})", QualifiedName(table),
+                                       Join(columns, ", "), Join(values, ", ")));
     }
     for (size_t index = 0; index < statements.size(); ++index) {
       try {
@@ -831,23 +824,20 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
           throw ApiError::Invalid("Unknown field: " + it.key());
         }
       }
-      std::string columns;
-      std::string literals;
+      std::vector<std::string> columns;
+      std::vector<std::string> literals;
       for (const FieldSchema& field : schema) {
-        if (!columns.empty()) {
-          columns += ", ";
-          literals += ", ";
-        }
-        columns += QuoteIdentifier(field.name);
+        columns.push_back(QuoteIdentifier(field.name));
         const auto it = values.find(field.name);
-        literals += it == values.end() ? "DEFAULT" : InsertValue(*it, field, ignore_unknown_values);
+        literals.push_back(it == values.end() ? "DEFAULT"
+                                              : InsertValue(*it, field, ignore_unknown_values));
       }
       std::string statement = "INSERT INTO ";
       statement += QualifiedName(table);
       statement += " (";
-      statement += columns;
+      statement += Join(columns, ", ");
       statement += ") VALUES (";
-      statement += literals;
+      statement += Join(literals, ", ");
       statement += ')';
       statements.push_back(std::move(statement));
       indexes.push_back(i);

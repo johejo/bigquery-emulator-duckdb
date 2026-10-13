@@ -93,7 +93,7 @@ QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& 
   // Only GoogleSQL is emulated. An omitted useLegacySql runs as GoogleSQL, although BigQuery
   // defaults it to true.
   if (config.contains("useLegacySql") && config["useLegacySql"] == true) {
-    throw ApiError::Invalid("The emulator does not support legacy SQL; set useLegacySql to false");
+    throw ApiError::Unsupported("legacy SQL; set useLegacySql to false");
   }
   QueryRequest request;
   request.project_id = project_id;
@@ -138,8 +138,7 @@ std::string JobId(const json& body) {
 void RejectDestinationLayout(const json& config) {
   for (const char* key : {"timePartitioning", "rangePartitioning", "clustering"}) {
     if (config.contains(key) && !config[key].is_null()) {
-      throw ApiError::Invalid(std::string("The emulator does not support ") + key +
-                              " for a destination table");
+      throw ApiError::Unsupported(std::string(key) + " for a destination table");
     }
   }
 }
@@ -185,7 +184,7 @@ LoadRequest ParseLoadJob(const std::string& project_id, const json& body) {
   // A new table's description, friendly name and labels, which must match an existing table's.
   if (load.contains("destinationTableProperties") &&
       !load["destinationTableProperties"].is_null()) {
-    throw ApiError::Invalid("The emulator does not support destinationTableProperties");
+    throw ApiError::Unsupported("destinationTableProperties");
   }
   request.load.configuration = load;
   return request;
@@ -200,9 +199,9 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
   // A snapshot, a restore and a clone record where they came from, which a copy does not.
   if (const json operation = copy.value("operationType", json());
       !operation.is_null() && operation != "COPY" && operation != "OPERATION_TYPE_UNSPECIFIED") {
-    throw ApiError::Invalid(
-        "The emulator does not support copy operationType " +
-        (operation.is_string() ? operation.get<std::string>() : operation.dump()));
+    throw ApiError::Unsupported("copy operationType " + (operation.is_string()
+                                                             ? operation.get<std::string>()
+                                                             : operation.dump()));
   }
   CopyRequest request;
   request.project_id = project_id;
@@ -245,7 +244,7 @@ ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) 
     throw ApiError::Invalid("Invalid extract configuration");
   }
   if (extract.contains("sourceModel")) {
-    throw ApiError::Invalid("The emulator does not support extracting models");
+    throw ApiError::Unsupported("extracting models");
   }
   if (!extract.contains("sourceTable")) {
     throw ApiError::Invalid("Source table is required");
@@ -609,17 +608,16 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
     }
     if (name != "routineType" && name != "language" && name != "arguments" &&
         name != "returnType" && name != "definitionBody" && name != "description") {
-      throw ApiError::Invalid("The emulator does not support routine field " + name);
+      throw ApiError::Unsupported("routine field " + name);
     }
     resource[name] = value;
   }
   if (StringField(resource, "routineType", "routine type") != "SCALAR_FUNCTION") {
-    throw ApiError::Invalid(
-        "The emulator does not support routines other than SQL scalar functions");
+    throw ApiError::Unsupported("routines other than SQL scalar functions");
   }
   if (resource.contains("language") &&
       StringField(resource, "language", "routine language") != "SQL") {
-    throw ApiError::Invalid("The emulator does not support non-SQL routines");
+    throw ApiError::Unsupported("non-SQL routines");
   }
   resource["language"] = "SQL";
   if (StringField(resource, "definitionBody", "routine body").empty()) {
@@ -640,12 +638,12 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
     }
     for (const auto& [name, value] : argument.items()) {
       if (name != "name" && name != "argumentKind" && name != "dataType") {
-        throw ApiError::Invalid("The emulator does not support routine argument field " + name);
+        throw ApiError::Unsupported("routine argument field " + name);
       }
     }
     const std::string kind = StringField(argument, "argumentKind", "argument kind");
     if (!kind.empty() && kind != "FIXED_TYPE" && kind != "ANY_TYPE") {
-      throw ApiError::Invalid("The emulator does not support routine argument kind " + kind);
+      throw ApiError::Unsupported("routine argument kind " + kind);
     }
     if (kind == "ANY_TYPE" && argument.contains("dataType")) {
       throw ApiError::Invalid("ANY_TYPE arguments cannot have dataType");
@@ -686,7 +684,7 @@ InsertAllRequest ParseInsertAll(const json& body) {
   if (body.contains("templateSuffix") && !body["templateSuffix"].is_null() &&
       (!body["templateSuffix"].is_string() ||
        !body["templateSuffix"].get_ref<const std::string&>().empty())) {
-    throw ApiError::Invalid("The emulator does not support templateSuffix");
+    throw ApiError::Unsupported("templateSuffix");
   }
   return InsertAllRequest{
       .rows = body["rows"],

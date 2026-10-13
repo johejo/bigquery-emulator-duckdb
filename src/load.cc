@@ -9,6 +9,7 @@
 #include <format>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -260,8 +261,6 @@ std::string ReadMaybeGzip(const std::string& path) {
   return contents;
 }
 
-constexpr std::string_view kUnsupported = "The emulator does not support ";
-
 // The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
 // most columns itself, but StageParquetDecimals makes it read a wide DECIMAL as its bytes, and
 // it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A
@@ -295,9 +294,9 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
   }
   if (column->IsWideDecimal() &&
       (field.type != FieldType::kBigNumeric || column->scale > kBigNumericScale)) {
-    throw ApiError::Invalid(
-        std::format("{}loading a Parquet DECIMAL({}, {}) column into {} field {}", kUnsupported,
-                    column->precision, column->scale, FieldTypeName(field.type), field.name));
+    throw ApiError::Unsupported(
+        std::format("loading a Parquet DECIMAL({}, {}) column into {} field {}", column->precision,
+                    column->scale, FieldTypeName(field.type), field.name));
   }
   if (field.type != FieldType::kBigNumeric) {
     return cast;
@@ -310,9 +309,9 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
     return std::format("CAST(bq_bignumeric_from_string(CAST({} AS VARCHAR), false) AS BIGNUM)",
                        sql);
   }
-  throw ApiError::Invalid(std::format(
-      "{}loading BIGNUMERIC field {} from a Parquet column that is not a DECIMAL or an integer",
-      kUnsupported, field.name));
+  throw ApiError::Unsupported(std::format(
+      "loading BIGNUMERIC field {} from a Parquet column that is not a DECIMAL or an integer",
+      field.name));
 }
 
 // The schema elements of the wide DECIMAL leaves of `column`.
@@ -353,10 +352,10 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json&
   };
   const bool fits = column->precision <= 76 && column->scale <= kBigNumericScale;
   if (!listed("BIGNUMERIC") || (!fits && listed("STRING"))) {
-    throw ApiError::Invalid(std::format(
-        "{}detecting the type of a Parquet DECIMAL({}, {}) column unless decimalTargetTypes picks "
+    throw ApiError::Unsupported(std::format(
+        "detecting the type of a Parquet DECIMAL({}, {}) column unless decimalTargetTypes picks "
         "BIGNUMERIC",
-        kUnsupported, column->precision, column->scale));
+        column->precision, column->scale));
   }
   field.type = FieldType::kBigNumeric;
 }
@@ -373,9 +372,9 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
       sources.columns = columns;
     } else if (columns != sources.columns &&
                (columns.HasWideDecimal() || sources.columns.HasWideDecimal())) {
-      throw ApiError::Invalid(std::string(kUnsupported) +
-                              "loading Parquet files whose schemas differ when one has a DECIMAL "
-                              "wider than 38 digits");
+      throw ApiError::Unsupported(
+          "loading Parquet files whose schemas differ when one has a DECIMAL "
+          "wider than 38 digits");
     }
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
@@ -451,13 +450,11 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
                       const json& config, const std::vector<FieldSchema>& schema,
                       const ParquetColumn& parquet) {
   if (HasType(schema, FieldType::kRange)) {
-    throw ApiError::Invalid(std::string(kUnsupported) + "loading RANGE columns");
+    throw ApiError::Unsupported("loading RANGE columns");
   }
-  std::string files;
-  for (const std::string& path : paths) {
-    files += (files.empty() ? "" : ", ") + QuoteLiteral(path);
-  }
-  files = "[" + files + "]";
+  std::vector<std::string> quoted;
+  std::ranges::transform(paths, std::back_inserter(quoted), QuoteLiteral);
+  const std::string files = "[" + Join(quoted, ", ") + "]";
   std::string sql;
   if (format == "CSV") {
     sql = "SELECT * FROM read_csv(" + files +
@@ -465,21 +462,20 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
           ", delim=" + QuoteLiteral(config.value("fieldDelimiter", ","));
     if (!schema.empty()) {
       sql += ", auto_detect=false";
-      std::string columns;
+      std::vector<std::string> columns;
       // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted.
-      std::string conversions;
+      std::vector<std::string> conversions;
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
-        columns += (columns.empty() ? "" : ", ") + QuoteLiteral(field.name) + ": " +
-                   QuoteLiteral(big ? "VARCHAR" : ToDuckDbType(field));
-        conversions +=
-            (conversions.empty() ? "" : ", ") +
-            (big ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}",
-                               QuoteIdentifier(field.name), ToDuckDbType(field))
-                 : QuoteIdentifier(field.name));
+        columns.push_back(QuoteLiteral(field.name) + ": " +
+                          QuoteLiteral(big ? "VARCHAR" : ToDuckDbType(field)));
+        conversions.push_back(
+            big ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}",
+                              QuoteIdentifier(field.name), ToDuckDbType(field))
+                : QuoteIdentifier(field.name));
       }
-      sql += ", columns={" + columns + "})";
-      return std::format("SELECT {} FROM ({}) AS source", conversions, sql);
+      sql += ", columns={" + Join(columns, ", ") + "})";
+      return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);
     }
     sql += ')';
   } else if (format == "NEWLINE_DELIMITED_JSON") {
@@ -488,19 +484,16 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     sql = std::format("SELECT * FROM read_parquet({})", files);
   }
   if (!schema.empty() && format != "CSV") {
-    std::string columns;
+    std::vector<std::string> columns;
     for (const FieldSchema& field : schema) {
-      if (!columns.empty()) {
-        columns += ", ";
-      }
       const std::string name = QuoteIdentifier(field.name);
-      columns += std::format("{} AS {}",
-                             format == "PARQUET"
-                                 ? ParquetValue(name, field, parquet.Child(field.name), 0)
-                                 : std::format("CAST({} AS {})", name, ToDuckDbType(field)),
-                             name);
+      columns.push_back(std::format("{} AS {}",
+                                    format == "PARQUET"
+                                        ? ParquetValue(name, field, parquet.Child(field.name), 0)
+                                        : std::format("CAST({} AS {})", name, ToDuckDbType(field)),
+                                    name));
     }
-    sql = std::format("SELECT {} FROM ({}) AS source", columns, sql);
+    sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);
   }
   return sql;
 }

@@ -180,10 +180,10 @@ void CheckQueryParameters(const ApiMethod& method, const std::vector<std::string
     }
     if (std::ranges::find(accepted, name) == accepted.end() &&
         std::ranges::find(kAcceptedApiParameters, name) == kAcceptedApiParameters.end()) {
-      throw ApiError::Invalid("The emulator does not support " + name);
+      throw ApiError::Unsupported(name);
     }
     if (name == "alt" && value != "json") {
-      throw ApiError::Invalid("The emulator does not support alt=" + value);
+      throw ApiError::Unsupported("alt=" + value);
     }
   }
 }

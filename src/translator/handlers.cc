@@ -15,7 +15,6 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
-#include "src/translator/context.h"
 #include "src/translator/function_rule_builders.h"
 #include "src/translator/functions.h"
 #include "src/type_mapping.h"

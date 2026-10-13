@@ -65,8 +65,6 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-constexpr std::string_view kUnsupported = "The emulator does not support ";
-
 // The rows of a query that a FOR...IN loop iterates over.
 class RowIterator : public googlesql::EvaluatorTableIterator {
  public:
@@ -748,17 +746,16 @@ QueryResult Emulator::RunScript(const QueryRequest& request, const googlesql::Pa
                                 const std::string& default_dataset,
                                 const std::vector<std::string>& setup) {
   if (request.dry_run) {
-    throw ApiError::InvalidQuery(std::string(kUnsupported) + "dry runs of multi-statement queries");
+    throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
   }
   if (request.destination_table.has_value()) {
     throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
   }
   if (!request.parameters.positional_types().empty()) {
-    throw ApiError::InvalidQuery(std::string(kUnsupported) +
-                                 "positional parameters in multi-statement queries");
+    throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
   }
   if (const auto unsupported = UnsupportedStatement(*script.script())) {
-    throw ApiError::InvalidQuery(std::string(kUnsupported) + *unsupported);
+    throw ApiError::UnsupportedQuery(*unsupported);
   }
 
   googlesql::TypeFactory type_factory;

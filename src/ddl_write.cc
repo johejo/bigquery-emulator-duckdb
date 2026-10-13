@@ -238,8 +238,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
           throw ApiError::Invalid(std::string(parameters.status().message()));
         }
         if (HasDefaultTypeConstraints(*column) && !value->literal.has_value()) {
-          throw ApiError::Invalid(
-              "The emulator does not support non-literal defaults on parameterized columns");
+          throw ApiError::Unsupported("non-literal defaults on parameterized columns");
         }
         if (value->literal.has_value()) {
           auto literal = *value->literal;

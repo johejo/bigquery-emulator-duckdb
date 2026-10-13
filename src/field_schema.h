@@ -60,6 +60,12 @@ struct FieldSchema {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
+// `field` as NULLABLE, such as the element of a REPEATED field.
+inline FieldSchema AsNullable(FieldSchema field) {
+  field.mode = FieldMode::kNullable;
+  return field;
+}
+
 // Parses a TableFieldSchema object. Throws ApiError::Invalid for a field BigQuery would reject.
 FieldSchema FieldSchemaFromJson(const nlohmann::json& value);
 

@@ -8,6 +8,7 @@
 #include <format>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,8 +34,6 @@ namespace bigquery_emulator_duckdb {
 using nlohmann::json;
 
 namespace {
-
-constexpr std::string_view kUnsupported = "The emulator does not support ";
 
 template <typename T>
 T Checked(absl::StatusOr<T> value) {
@@ -83,8 +82,8 @@ void CheckTextFields(const std::vector<FieldSchema>& fields) {
   for (const FieldSchema& field : fields) {
     if (field.type == FieldType::kInterval || field.type == FieldType::kRange ||
         field.type == FieldType::kGeography) {
-      throw ApiError::Invalid(std::string(kUnsupported) + "extracting " +
-                              std::string(FieldTypeName(field.type)) + " columns");
+      throw ApiError::Unsupported("extracting " + std::string(FieldTypeName(field.type)) +
+                                  " columns");
     }
     CheckTextFields(field.fields);
   }
@@ -201,8 +200,8 @@ FieldSchema ParquetField(FieldSchema field) {
     case FieldType::kInterval:
     case FieldType::kRange:
     case FieldType::kGeography:
-      throw ApiError::Invalid(std::string(kUnsupported) + "extracting " +
-                              std::string(FieldTypeName(field.type)) + " columns to Parquet");
+      throw ApiError::Unsupported("extracting " + std::string(FieldTypeName(field.type)) +
+                                  " columns to Parquet");
     // TIMESTAMP is written without isAdjustedToUTC, which is DuckDB's TIMESTAMP, and JSON as a
     // string.
     case FieldType::kTimestamp:
@@ -228,14 +227,13 @@ std::string ParquetType(const FieldSchema& field) {
   if (field.type == FieldType::kTime) {
     type = "TIMETZ";
   } else if (field.type == FieldType::kRecord) {
-    for (const FieldSchema& child : field.fields) {
-      type += (type.empty() ? "" : ", ") + QuoteIdentifier(child.name) + " " + ParquetType(child);
-    }
-    type = "STRUCT(" + type + ")";
+    std::vector<std::string> fields;
+    std::ranges::transform(field.fields, std::back_inserter(fields), [&](const FieldSchema& child) {
+      return QuoteIdentifier(child.name) + " " + ParquetType(child);
+    });
+    type = "STRUCT(" + Join(fields, ", ") + ")";
   } else {
-    FieldSchema scalar = field;
-    scalar.mode = FieldMode::kNullable;
-    type = Checked(DuckDbColumnType(scalar));
+    type = Checked(DuckDbColumnType(AsNullable(field)));
   }
   return field.mode == FieldMode::kRepeated ? type + "[]" : type;
 }
@@ -271,9 +269,7 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field, int d
 void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
                          std::vector<ThriftValue>& schema, std::vector<size_t>& leaves) {
   if (field.mode == FieldMode::kRepeated) {
-    FieldSchema element = field;
-    element.mode = FieldMode::kNullable;
-    AnnotateBigNumerics(element, column.children.at(0), schema, leaves);
+    AnnotateBigNumerics(AsNullable(field), column.children.at(0), schema, leaves);
   } else if (field.type == FieldType::kRecord) {
     for (size_t i = 0; i < field.fields.size(); ++i) {
       AnnotateBigNumerics(field.fields.at(i), column.children.at(i), schema, leaves);
@@ -346,15 +342,12 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
 }
 
 std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema) {
-  std::string columns;
+  std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     const std::string name = QuoteIdentifier(field.name);
-    if (!columns.empty()) {
-      columns += ", ";
-    }
-    columns += std::format("{} AS {}", ParquetValue(name, ParquetField(field), 0), name);
+    columns.push_back(std::format("{} AS {}", ParquetValue(name, ParquetField(field), 0), name));
   }
-  return columns;
+  return Join(columns, ", ");
 }
 
 void AnnotateParquetBigNumerics(const std::string& path, const std::vector<FieldSchema>& schema) {

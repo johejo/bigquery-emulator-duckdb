@@ -9,6 +9,7 @@
 #include <string_view>
 #include <vector>
 
+#include "src/duckdb_sql.h"
 #include "src/translator/functions.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -114,7 +115,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
     bind = bind || (uses.at(i) > 1 && !Trivial(sql.at(i)));
   }
   std::vector<std::string> references = sql;
-  std::string fields;
+  std::vector<std::string> fields;
   if (bind) {
     // Trivial arguments stay as they are, so a literal that DuckDB needs as a constant, such as a
     // rounding precision, remains one.
@@ -123,7 +124,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
         continue;
       }
       const std::string field = "a" + std::to_string(i + 1);
-      fields += (fields.empty() ? "" : ", ") + field + " := " + sql.at(i);
+      fields.push_back(field + " := " + sql.at(i));
       references.at(i) = "_fn." + field;
     }
   }
@@ -139,15 +140,13 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   if (!bind) {
     return body;
   }
-  return "list_transform([struct_pack(" + fields + ")], _fn -> " + body + ")[1]";
+  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _fn -> " + body + ")[1]";
 }
 
 std::string Invoke(std::string_view function, const std::vector<FunctionArgument>& arguments) {
-  std::string sql = std::string(function) + "(";
-  for (std::size_t i = 0; i < arguments.size(); ++i) {
-    sql += (i == 0 ? "" : ", ") + arguments.at(i).sql;
-  }
-  return sql + ")";
+  std::vector<std::string> sql;
+  std::ranges::transform(arguments, std::back_inserter(sql), &FunctionArgument::sql);
+  return std::string(function) + "(" + Join(sql, ", ") + ")";
 }
 
 // Substitutes the translated arguments for each $n in `spelling`.
