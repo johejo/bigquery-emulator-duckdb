@@ -187,6 +187,12 @@ void EachRow(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector o
   }
 }
 
+// A row computation as a DuckDB scalar callback, for registration without a wrapper.
+template <auto kCompute, bool kNulls = true>
+void EachRow(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, kCompute, kNulls);
+}
+
 // Turns a GoogleSQL function's out parameter and error into a StatusOr.
 template <typename T>
 absl::StatusOr<T> ToStatusOr(bool ok, T value, const absl::Status& error) {

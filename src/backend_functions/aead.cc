@@ -857,96 +857,49 @@ absl::StatusOr<std::string> KeysetFromJson(const Arguments& arguments) {
   return Serialize(keyset);
 }
 
-void AeadEncrypt(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, Encrypt);
+absl::StatusOr<std::string> AeadDecryptBytes(const Arguments& arguments) {
+  return Decrypt("AEAD.DECRYPT_BYTES", kAead, arguments);
 }
 
-void AeadDecryptBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    return Decrypt("AEAD.DECRYPT_BYTES", kAead, arguments);
-  });
+absl::StatusOr<std::string> AeadDecryptString(const Arguments& arguments) {
+  return DecryptString("AEAD.DECRYPT_STRING", "AEAD.DECRYPT_BYTES", kAead, arguments);
 }
 
-void AeadDecryptString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    return DecryptString("AEAD.DECRYPT_STRING", "AEAD.DECRYPT_BYTES", kAead, arguments);
-  });
+absl::StatusOr<std::string> DeterministicDecryptBytes(const Arguments& arguments) {
+  return Decrypt("DETERMINISTIC_DECRYPT_BYTES", kDeterministicAead, arguments);
 }
 
-void DeterministicEncryptFunction(duckdb_function_info info, duckdb_data_chunk input,
-                                  duckdb_vector output) {
-  EachRow(info, input, output, DeterministicEncrypt);
-}
-
-void DeterministicDecryptBytes(duckdb_function_info info, duckdb_data_chunk input,
-                               duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    return Decrypt("DETERMINISTIC_DECRYPT_BYTES", kDeterministicAead, arguments);
-  });
-}
-
-void DeterministicDecryptString(duckdb_function_info info, duckdb_data_chunk input,
-                                duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& arguments) {
-    return DecryptString("DETERMINISTIC_DECRYPT_STRING", "DETERMINISTIC_DECRYPT_BYTES",
-                         kDeterministicAead, arguments);
-  });
-}
-
-void NewKeysetFunction(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, NewKeyset, false);
-}
-
-void RotateKeysetFunction(duckdb_function_info info, duckdb_data_chunk input,
-                          duckdb_vector output) {
-  EachRow(info, input, output, RotateKeyset, false);
-}
-
-void AddAesGcmKeyFunction(duckdb_function_info info, duckdb_data_chunk input,
-                          duckdb_vector output) {
-  EachRow(info, input, output, AddAesGcmKey);
-}
-
-void KeysetLengthFunction(duckdb_function_info info, duckdb_data_chunk input,
-                          duckdb_vector output) {
-  EachRow(info, input, output, KeysetLength);
-}
-
-void KeysetToJsonFunction(duckdb_function_info info, duckdb_data_chunk input,
-                          duckdb_vector output) {
-  EachRow(info, input, output, KeysetToJson);
-}
-
-void KeysetFromJsonFunction(duckdb_function_info info, duckdb_data_chunk input,
-                            duckdb_vector output) {
-  EachRow(info, input, output, KeysetFromJson);
+absl::StatusOr<std::string> DeterministicDecryptString(const Arguments& arguments) {
+  return DecryptString("DETERMINISTIC_DECRYPT_STRING", "DETERMINISTIC_DECRYPT_BYTES",
+                       kDeterministicAead, arguments);
 }
 
 }  // namespace
 
 void RegisterAeadFunctions(duckdb_connection connection) {
   // A new random IV makes each call's ciphertext differ.
-  Register(connection, "bq_aead_encrypt", {kBlob, kBlob, kBlob}, kBlob, AeadEncrypt, true,
+  Register(connection, "bq_aead_encrypt", {kBlob, kBlob, kBlob}, kBlob, EachRow<Encrypt>, true,
            std::nullopt, true);
-  Register(connection, "bq_aead_decrypt_bytes", {kBlob, kBlob, kBlob}, kBlob, AeadDecryptBytes);
+  Register(connection, "bq_aead_decrypt_bytes", {kBlob, kBlob, kBlob}, kBlob,
+           EachRow<AeadDecryptBytes>);
   Register(connection, "bq_aead_decrypt_string", {kBlob, kBlob, kBlob}, kVarchar,
-           AeadDecryptString);
+           EachRow<AeadDecryptString>);
   Register(connection, "bq_deterministic_encrypt", {kBlob, kBlob, kBlob}, kBlob,
-           DeterministicEncryptFunction);
+           EachRow<DeterministicEncrypt>);
   Register(connection, "bq_deterministic_decrypt_bytes", {kBlob, kBlob, kBlob}, kBlob,
-           DeterministicDecryptBytes);
+           EachRow<DeterministicDecryptBytes>);
   Register(connection, "bq_deterministic_decrypt_string", {kBlob, kBlob, kBlob}, kVarchar,
-           DeterministicDecryptString);
+           EachRow<DeterministicDecryptString>);
   // New random keys make each call's keyset differ. A NULL key type is an error.
-  Register(connection, "bq_keys_new_keyset", {kVarchar}, kBlob, NewKeysetFunction, false,
+  Register(connection, "bq_keys_new_keyset", {kVarchar}, kBlob, EachRow<NewKeyset, false>, false,
            std::nullopt, true);
-  Register(connection, "bq_keys_rotate_keyset", {kBlob, kVarchar}, kBlob, RotateKeysetFunction,
-           false, std::nullopt, true);
+  Register(connection, "bq_keys_rotate_keyset", {kBlob, kVarchar}, kBlob,
+           EachRow<RotateKeyset, false>, false, std::nullopt, true);
   // GoogleSQL takes this as immutable, which lets SAFE. take it, although the key ID is random.
-  Register(connection, "bq_keys_add_aes_gcm_key", {kBlob, kBlob}, kBlob, AddAesGcmKeyFunction);
-  Register(connection, "bq_keys_keyset_length", {kBlob}, kBigint, KeysetLengthFunction);
-  Register(connection, "bq_keys_keyset_to_json", {kBlob}, kVarchar, KeysetToJsonFunction);
-  Register(connection, "bq_keys_keyset_from_json", {kVarchar}, kBlob, KeysetFromJsonFunction);
+  Register(connection, "bq_keys_add_aes_gcm_key", {kBlob, kBlob}, kBlob, EachRow<AddAesGcmKey>);
+  Register(connection, "bq_keys_keyset_length", {kBlob}, kBigint, EachRow<KeysetLength>);
+  Register(connection, "bq_keys_keyset_to_json", {kBlob}, kVarchar, EachRow<KeysetToJson>);
+  Register(connection, "bq_keys_keyset_from_json", {kVarchar}, kBlob, EachRow<KeysetFromJson>);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions
