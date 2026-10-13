@@ -602,21 +602,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
           "JSON_FLATTEN",
           {{.arity = 1, .spelling = "CAST(bq_json_flatten(CAST($1 AS VARCHAR)) AS JSON[])"}},
       },
-      {
-          "$SUBSCRIPT",
-          {
-              {
-                  .arity = 2,
-                  .spelling = "json(bq_json_field(CAST($1 AS VARCHAR), $2))",
-                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_STRING})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "json(bq_json_element(CAST($1 AS VARCHAR), $2))",
-                  .conditions = {Is(1, {TYPE_JSON}), Is(2, {TYPE_INT64})},
-              },
-          },
-      },
       {"JSON_QUERY", JsonExtract("bq_json_query", true, true)},
       {"JSON_EXTRACT", JsonExtract("bq_json_query", false, true)},
       {"JSON_VALUE", JsonExtract("bq_json_value", true, false)},
