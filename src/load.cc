@@ -279,24 +279,19 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
     if (column->kind != ParquetColumn::Kind::kList) {
       return cast;
     }
-    FieldSchema element = field;
-    element.mode = FieldMode::kNullable;
-    const std::string name = "_e" + std::to_string(depth);
-    return std::format("list_transform({}, {} -> {})", sql, name,
-                       ParquetValue(name, element, &column->children.front(), depth + 1));
+    return MapElements(sql, field, depth,
+                       [&](const std::string& name, const FieldSchema& element, int element_depth) {
+                         return ParquetValue(name, element, &column->children.front(),
+                                             element_depth);
+                       });
   }
   if (field.type == FieldType::kRecord) {
     if (column->kind != ParquetColumn::Kind::kStruct) {
       return cast;
     }
-    std::string fields;
-    for (const FieldSchema& child : field.fields) {
-      fields += std::format(
-          "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
-          ParquetValue(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child,
-                       column->Child(child.name), depth));
-    }
-    return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
+    return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
+      return ParquetValue(value, child, column->Child(child.name), depth);
+    });
   }
   if (column->IsWideDecimal() &&
       (field.type != FieldType::kBigNumeric || column->scale > kBigNumericScale)) {

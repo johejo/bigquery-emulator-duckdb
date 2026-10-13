@@ -25,6 +25,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/parquet_metadata.h"
+#include "src/schema_sql.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -252,23 +253,17 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field, int d
     return std::format("CAST({} AS {})", sql, ParquetType(field));
   }
   if (field.mode == FieldMode::kRepeated) {
-    FieldSchema element = field;
-    element.mode = FieldMode::kNullable;
-    const std::string name = "_e" + std::to_string(depth);
-    return std::format("list_transform({}, {} -> {})", sql, name,
-                       ParquetValue(name, element, depth + 1));
+    return MapElements(sql, field, depth,
+                       [](const std::string& name, const FieldSchema& element, int element_depth) {
+                         return ParquetValue(name, element, element_depth);
+                       });
   }
   if (field.type == FieldType::kBigNumeric) {
     return std::format("bq_bignumeric_to_decimal_bytes(CAST({} AS VARCHAR))", sql);
   }
-  std::string fields;
-  for (const FieldSchema& child : field.fields) {
-    fields += std::format(
-        "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
-        ParquetValue(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child,
-                     depth));
-  }
-  return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
+  return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
+    return ParquetValue(value, child, depth);
+  });
 }
 
 // Declares the leaves of `column` that hold the BIGNUMERICs of `field` as DECIMAL(76, 38) in

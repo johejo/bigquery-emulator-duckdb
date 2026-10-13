@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -209,6 +210,28 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
     }
   }
   return columns;
+}
+
+std::string MapElements(
+    const std::string& sql, const FieldSchema& field, int depth,
+    const std::function<std::string(const std::string&, const FieldSchema&, int)>& element) {
+  FieldSchema element_field = field;
+  element_field.mode = FieldMode::kNullable;
+  const std::string name = "_e" + std::to_string(depth);
+  return std::format("list_transform({}, {} -> {})", sql, name,
+                     element(name, element_field, depth + 1));
+}
+
+std::string MapFields(
+    const std::string& sql, const FieldSchema& field,
+    const std::function<std::string(const std::string&, const FieldSchema&)>& value) {
+  std::string fields;
+  for (const FieldSchema& child : field.fields) {
+    fields += std::format(
+        "{}{} := {}", fields.empty() ? "" : ", ", QuoteIdentifier(child.name),
+        value(std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name)), child));
+  }
+  return std::format("CASE WHEN {0} IS NULL THEN NULL ELSE struct_pack({1}) END", sql, fields);
 }
 
 std::vector<std::string> SchemaUpdateStatements(const TableReference& table,
