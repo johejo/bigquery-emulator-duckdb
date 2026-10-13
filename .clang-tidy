@@ -28,7 +28,7 @@ Checks:
   - -clang-diagnostic-deprecated-declarations
 
   # Not followed yet. Enabling one means fixing what it finds first, along with its aliases, such
-  # as hicpp-avoid-c-arrays for modernize-avoid-c-arrays.
+  # as cppcoreguidelines-avoid-c-arrays for modernize-avoid-c-arrays.
   - -cppcoreguidelines-avoid-c-arrays
   - -cppcoreguidelines-avoid-const-or-ref-data-members
   - -cppcoreguidelines-avoid-magic-numbers
