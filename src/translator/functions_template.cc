@@ -1,6 +1,7 @@
 #include "src/translator/functions_template.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -517,6 +518,29 @@ std::vector<Rule> Compare(std::string_view op) {
   };
 }
 
+// TIMESTAMP_SECONDS and its siblings, whose argument counts units of scale microseconds. DuckDB
+// takes instants past BigQuery's range, and fails on some only after the query returns them.
+std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
+  constexpr std::int64_t kMin = -62135596800000000;
+  constexpr std::int64_t kMax = 253402300799999999;
+  return {
+      {
+          .arity = 1,
+          .spelling = "CASE WHEN $1 NOT BETWEEN " + std::to_string(kMin / scale) + " AND " +
+                      std::to_string(kMax / scale) + " THEN !1 ELSE " + std::string(timestamp) +
+                      " END",
+          .conditions = {},
+          .defaults = {},
+          .errors =
+              {
+                  "'Input value ' || $1 || ' cannot be converted into a TIMESTAMP, because it "
+                  "would be out of the allowed range between " +
+                      std::to_string(kMin) + " to " + std::to_string(kMax) + " (microseconds)'",
+              },
+      },
+  };
+}
+
 }  // namespace
 
 // Functions implemented by DuckDB SQL templates.
@@ -866,14 +890,19 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       },
       {"UNIX_MILLIS", {{.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"}}},
       {"UNIX_DATE", {{.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"}}},
-      {"TIMESTAMP_MILLIS", {{.arity = 1, .spelling = "(epoch_ms($1) AT TIME ZONE 'UTC')"}}},
-      {"TIMESTAMP_MICROS", {{.arity = 1, .spelling = "(make_timestamp($1) AT TIME ZONE 'UTC')"}}},
+      {"TIMESTAMP_SECONDS", FromUnixTime("to_timestamp($1)", 1000000)},
+      {"TIMESTAMP_MILLIS", FromUnixTime("(epoch_ms($1) AT TIME ZONE 'UTC')", 1000)},
+      {"TIMESTAMP_MICROS", FromUnixTime("(make_timestamp($1) AT TIME ZONE 'UTC')", 1)},
       {
           "DATE_FROM_UNIX_DATE",
           {
               {
                   .arity = 1,
-                  .spelling = "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE)",
+                  .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
+                              "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
+                  .conditions = {},
+                  .defaults = {},
+                  .errors = {"'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1"},
               },
           },
       },

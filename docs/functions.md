@@ -635,7 +635,7 @@ rewrites into others.
 | [`TIMESTAMP_DIFF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_diff) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_micros) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_MILLIS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_millis) | Supported | DuckDB SQL |  |
-| [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | Supported | DuckDB function, renamed |  |
+| [`TIMESTAMP_SECONDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_seconds) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_SUB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_sub) | Supported | DuckDB SQL |  |
 | [`TIMESTAMP_TRUNC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#timestamp_trunc) | Supported | DuckDB SQL |  |
 | [`UNIX_MICROS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#unix_micros) | Supported | DuckDB function, renamed |  |
