@@ -63,6 +63,7 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"CONCAT", ConcatStrings},
       {"GREATEST", Extremum},
       {"LEAST", Extremum},
+      {"ADD_KEY_FROM_RAW_BYTES", AddKeyFromRawBytes},
   };
   return *kHandlers;
 }

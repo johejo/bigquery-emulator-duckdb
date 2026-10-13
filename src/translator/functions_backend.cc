@@ -427,8 +427,9 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       {"HOST", {{.arity = 1, .spelling = "bq_net_host($1)"}}},
       {"REG_DOMAIN", {{.arity = 1, .spelling = "bq_net_reg_domain($1)"}}},
       {"PUBLIC_SUFFIX", {{.arity = 1, .spelling = "bq_net_public_suffix($1)"}}},
-      // AEAD with Tink keysets of AES-GCM keys, where a STRING is its UTF-8 bytes. The keyset
-      // chain of KEYS.KEYSET_CHAIN needs Cloud KMS.
+      // AEAD with Tink keysets of AES-GCM keys, and deterministic AEAD with AES-SIV keys, where a
+      // STRING is its UTF-8 bytes. The keyset chain of KEYS.KEYSET_CHAIN needs Cloud KMS, as do
+      // the KEYS functions of wrapped keysets.
       {
           "ENCRYPT",
           {
@@ -464,6 +465,46 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               },
           },
       },
+      {
+          "DETERMINISTIC_ENCRYPT",
+          {
+              {
+                  .arity = 3,
+                  .spelling = "bq_deterministic_encrypt($1, encode($2), encode($3))",
+                  .conditions = {Is(1, {TYPE_BYTES}), Is(2, {TYPE_STRING})},
+              },
+              {
+                  .arity = 3,
+                  .spelling = "bq_deterministic_encrypt($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_BYTES}), Is(2, {TYPE_BYTES})},
+              },
+          },
+      },
+      {
+          "DETERMINISTIC_DECRYPT_BYTES",
+          {
+              {
+                  .arity = 3,
+                  .spelling = "bq_deterministic_decrypt_bytes($1, $2, $3)",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
+          },
+      },
+      {
+          "DETERMINISTIC_DECRYPT_STRING",
+          {
+              {
+                  .arity = 3,
+                  .spelling = "bq_deterministic_decrypt_string($1, $2, encode($3))",
+                  .conditions = {Is(1, {TYPE_BYTES})},
+              },
+          },
+      },
+      {"NEW_KEYSET", {{.arity = 1, .spelling = "bq_keys_new_keyset($1)"}}},
+      {"ROTATE_KEYSET", {{.arity = 2, .spelling = "bq_keys_rotate_keyset($1, $2)"}}},
+      {"KEYSET_LENGTH", {{.arity = 1, .spelling = "bq_keys_keyset_length($1)"}}},
+      {"KEYSET_TO_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_to_json($1)"}}},
+      {"KEYSET_FROM_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_from_json($1)"}}},
       // Without max_distance, the distance is not capped.
       {
           "EDIT_DISTANCE",

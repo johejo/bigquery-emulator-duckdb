@@ -32,7 +32,7 @@ rewrites into others.
 
 | Category | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [AEAD encryption functions](#aead-encryption-functions) | 0 | 3 | 13 | 0 |
+| [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
 | [Aggregate functions](#aggregate-functions) | 13 | 5 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 3 | 1 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
@@ -76,18 +76,18 @@ rewrites into others.
 | [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
 | [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
 | [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | Unsupported |  |  |
-| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | Unsupported |  |  |
-| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | Unsupported |  |  |
-| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Unsupported |  |  |
+| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
+| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
+| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
+| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Partial | DuckDB SQL, in code | Unsupported: function ADD_KEY_FROM_RAW_BYTES. |
 | [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | Unsupported |  |  |
-| [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | Unsupported |  |  |
-| [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | Unsupported |  |  |
-| [`KEYS.KEYSET_TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_to_json) | Unsupported |  |  |
-| [`KEYS.NEW_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_keyset) | Unsupported |  |  |
+| [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | Supported | GoogleSQL function |  |
+| [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | Supported | GoogleSQL function |  |
+| [`KEYS.KEYSET_TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_to_json) | Supported | GoogleSQL function |  |
+| [`KEYS.NEW_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_keyset) | Supported | GoogleSQL function |  |
 | [`KEYS.NEW_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysnew_wrapped_keyset) | Unsupported |  |  |
 | [`KEYS.REWRAP_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrewrap_keyset) | Unsupported |  |  |
-| [`KEYS.ROTATE_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_keyset) | Unsupported |  |  |
+| [`KEYS.ROTATE_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_keyset) | Supported | GoogleSQL function |  |
 | [`KEYS.ROTATE_WRAPPED_KEYSET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysrotate_wrapped_keyset) | Unsupported |  |  |
 
 ## Aggregate functions
