@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/range.h"
 #include "googlesql/public/interval_value.h"
+#include "src/backend_functions/apply.h"
 #include "src/backend_functions/datetime.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
@@ -28,16 +30,14 @@ namespace {
 
 namespace fn = googlesql::functions;
 
-// Bound 0 or 1 of the text of a RANGE, which CAST to RANGE then casts to the element type, or NULL
-// where it is unbounded.
-void RangeBound(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output,
-          [](const Arguments& args) -> absl::StatusOr<std::optional<std::string>> {
-            const std::string text = args.String(0);
-            GOOGLESQL_ASSIGN_OR_RETURN(const auto bounds, googlesql::ParseRangeBoundaries(text));
-            const auto bound = args.Int(1) == 0 ? bounds.start : bounds.end;
-            return bound ? std::optional<std::string>(*bound) : std::nullopt;
-          });
+// The bounds of the text of a RANGE, which CAST to RANGE then casts to the element type, each
+// NULL where it is unbounded.
+absl::StatusOr<std::vector<std::optional<std::string>>> RangeBounds(std::string_view text) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto bounds, googlesql::ParseRangeBoundaries(text));
+  return std::vector<std::optional<std::string>>{
+      bounds.start ? std::optional<std::string>(*bounds.start) : std::nullopt,
+      bounds.end ? std::optional<std::string>(*bounds.end) : std::nullopt,
+  };
 }
 
 // An emitter that collects the bounds of the subranges a generator emits, in order: the first
@@ -139,7 +139,10 @@ void GenerateTimestampRanges(duckdb_function_info info, duckdb_data_chunk input,
 }  // namespace
 
 void RegisterRangeFunctions(duckdb_connection connection) {
-  Register(connection, "bq_range_bound", {kVarchar, kBigint}, kVarchar, RangeBound);
+  LogicalType const text(duckdb_create_logical_type(kVarchar));
+  LogicalType const texts(duckdb_create_list_type(text.get()));
+  Register(connection, "bq_range_bounds", {kVarchar, kBoolean}, texts.get(),
+           Apply<RangeBounds, Errors::kNullUnderSafeCast>);
   // One name for each element type, so that DuckDB picks the overload.
   constexpr duckdb_type kInterval = DUCKDB_TYPE_INTERVAL;
   for (const auto& [element, function] : {

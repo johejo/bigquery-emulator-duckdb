@@ -151,27 +151,33 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
            " || ')' END)[1]";
   }
   if (from->IsString() && to->IsRange()) {
-    // GoogleSQL parses the bounds, then casts each to the element type. SAFE_CAST would have to
-    // tell a bound that fails from an unbounded one.
-    if (safe) {
-      return std::nullopt;
-    }
+    // GoogleSQL parses the bounds, then casts each to the element type. Under SAFE_CAST, a bound
+    // that fails to cast is NULL where its text is not, and bounds out of order are NULL.
     const std::string text = context.FreshName("_t");
-    const std::string parts = context.FreshName("_b");
+    const std::string texts = context.FreshName("_b");
+    const std::string pair = context.FreshName("_p");
     std::vector<std::string> bounds;
-    for (const int index : {0, 1}) {
-      const auto bound =
-          CastValue(from, to->AsRange()->element_type(),
-                    "bq_range_bound(" + text + ", " + std::to_string(index) + ")", false, context);
+    std::vector<std::string> failures;
+    for (const int index : {1, 2}) {
+      const std::string bound_text = texts + "[" + std::to_string(index) + "]";
+      const auto bound = CastValue(from, to->AsRange()->element_type(), bound_text, safe, context);
       if (!bound) {
         return std::nullopt;
       }
       bounds.push_back(*bound);
+      std::string failure = "(" + pair + (index == 1 ? ".s" : ".e");
+      failure += " IS NULL AND " + bound_text + " IS NOT NULL)";
+      failures.push_back(std::move(failure));
+    }
+    std::string range = DuckDbRange(pair + ".s", pair + ".e", safe ? "NULL" : "");
+    if (safe) {
+      range = "CASE WHEN " + Join(failures, " OR ") + " THEN NULL ELSE " + range + " END";
     }
     return "list_transform([" + sql + "], " + text + " -> CASE WHEN " + text +
+           " IS NULL THEN NULL ELSE list_transform([bq_range_bounds(" + text + ", " +
+           (safe ? "true" : "false") + ")], " + texts + " -> CASE WHEN " + texts +
            " IS NULL THEN NULL ELSE list_transform([struct_pack(s := " + bounds.at(0) +
-           ", e := " + bounds.at(1) + ")], " + parts + " -> " +
-           DuckDbRange(parts + ".s", parts + ".e") + ")[1] END)[1]";
+           ", e := " + bounds.at(1) + ")], " + pair + " -> " + range + ")[1] END)[1] END)[1]";
   }
   if (HasRange(from) || HasRange(to)) {
     return std::nullopt;
