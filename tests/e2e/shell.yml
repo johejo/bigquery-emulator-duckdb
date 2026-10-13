@@ -1,0 +1,8 @@
+desc: the shell subcommand runs queries from standard input and -e without listening
+steps:
+  shell:
+    exec:
+      command: go test -count=1 ./tests/e2e/shell
+    dump:
+      expr: current.stdout + current.stderr
+    test: current.exit_code == 0

@@ -64,6 +64,33 @@ err = client.EnableStorageReadClient(ctx,
 
 See the [Storage API guide](docs/storage-api.md) for writing rows, limits and stream lifetime.
 
+### Run queries without a server
+
+`shell` runs queries in the process instead of listening. It accepts `--project`, `--data-dir`
+and `--session-user` as the server does, and uses the only registered project unless
+`--project-id` names one. `--dataset-id` sets the default dataset.
+
+```bash
+bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' < script.sql
+bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' -e 'SELECT 1 AS x'
+# {"x":"1"}
+```
+
+Standard input that is not a terminal, or the `-e` argument, runs as one query job, so a
+multi-statement input is a script whose result is its last statement's. The shell exits with 1
+when the job fails.
+
+On a terminal, each entry runs as its own job once it ends with `;` after a complete script, so
+an entry can hold a `BEGIN ... END` block. As in BigQuery without sessions, jobs share no
+variables or temporary tables. Ctrl+C discards the entry being typed and Ctrl+D exits. Lines
+starting with `.` or `\` outside an entry are commands: `.help`, `.quit`,
+`.use PROJECT[.DATASET]` and `.format FORMAT`.
+
+Rows are written to standard output, keeping the values the REST API returns, such as INT64 as a
+string. `--format` chooses `pretty`, `json`, `jsonl` or `csv`, and defaults to `pretty` on a
+terminal and `jsonl` otherwise. Errors and DML row counts go to standard error. A project file
+can be open in only one process, so the shell and a server cannot share a `--data-dir`.
+
 ## Projects
 
 Register projects before using them. `--project` is repeatable and accepts either a JSON object
