@@ -1,10 +1,10 @@
 #include "src/gcs.h"
 
-// include-cleaner requires stdlib.h for the POSIX mkdtemp/setenv/unsetenv APIs; the
-// deprecated-header checks suggest cstdlib instead, so suppress them on this include.
+// include-cleaner requires stdlib.h for the POSIX mkdtemp/setenv/unsetenv APIs;
+// modernize-deprecated-headers suggests cstdlib instead, so suppress it on this include.
 // On macOS, include-cleaner still misses these declarations through libc++'s stdlib.h wrapper;
 // suppress those false positives at the calls.
-#include <stdlib.h>  // NOLINT(hicpp-deprecated-headers,modernize-deprecated-headers)
+#include <stdlib.h>  // NOLINT(modernize-deprecated-headers)
 
 #include <atomic>
 #include <cstdlib>

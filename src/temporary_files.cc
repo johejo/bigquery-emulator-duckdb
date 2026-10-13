@@ -1,8 +1,8 @@
 #include "src/temporary_files.h"
 
-// include-cleaner requires stdlib.h for the POSIX mkstemps API; the deprecated-header checks
-// suggest cstdlib instead, so suppress them on this include.
-#include <stdlib.h>  // NOLINT(hicpp-deprecated-headers,modernize-deprecated-headers)
+// include-cleaner requires stdlib.h for the POSIX mkstemps API; modernize-deprecated-headers
+// suggests cstdlib instead, so suppress it on this include.
+#include <stdlib.h>  // NOLINT(modernize-deprecated-headers)
 #include <unistd.h>
 
 #include <filesystem>
