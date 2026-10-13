@@ -136,7 +136,7 @@ rewrites into others.
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | Supported |  |  |
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | Supported | DuckDB SQL |  |
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | Supported | DuckDB SQL |  |
-| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Supported | GoogleSQL function | The emulator does not support a MONTH, QUARTER or YEAR step past an element clamped to the end of a month, until BigQuery's answer is verified. |
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Supported | GoogleSQL function |  |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | Supported | DuckDB SQL |  |
 
 ## Bit functions

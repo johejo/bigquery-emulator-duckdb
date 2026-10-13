@@ -175,10 +175,8 @@ absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_v
 }
 
 // GENERATE_DATE_ARRAY(start, end, INTERVAL step part), with BigQuery's documented
-// 1,048,576-element limit. GoogleSQL adds each step to the previous element, so an element
-// clamped to the end of a shorter month moves the rest to that day. No source settles whether
-// BigQuery steps the same way or from the start, so a clamped element followed by another is
-// unsupported; up to it, both ways agree.
+// 1,048,576-element limit. Like BigQuery, each step adds to the previous element, so an element
+// clamped to the end of a shorter month moves the rest to that day.
 absl::Status GenerateDateArray(int32_t start, int32_t end, int64_t step, std::string_view part,
                                std::vector<int32_t>* out) {
   constexpr int kMaxGeneratedArraySize = 1048576;
@@ -190,23 +188,7 @@ absl::Status GenerateDateArray(int32_t start, int32_t end, int64_t step, std::st
   GOOGLESQL_RETURN_IF_ERROR((fn::GenerateArrayHelper<fn::ArrayGenTrait<int64_t, fn::DateIncrement>,
                                                      kMaxGeneratedArraySize>(
       start, end, {.unit = unit, .value = step}, &dates)));
-  int32_t first_day = 0;
-  if (!dates.empty()) {
-    GOOGLESQL_RETURN_IF_ERROR(fn::ExtractFromDate(fn::DAY, start, &first_day));
-  }
-  out->reserve(dates.size());
-  for (const int64_t date : dates) {
-    if (!out->empty() && unit != fn::DAY && unit != fn::WEEK) {
-      int32_t day = 0;
-      GOOGLESQL_RETURN_IF_ERROR(fn::ExtractFromDate(fn::DAY, out->back(), &day));
-      if (day != first_day) {
-        return absl::UnimplementedError(
-            "The emulator does not support GENERATE_DATE_ARRAY stepping on from a date clamped "
-            "to the end of a month");
-      }
-    }
-    out->push_back(static_cast<int32_t>(date));
-  }
+  out->assign(dates.begin(), dates.end());
   return absl::OkStatus();
 }
 
