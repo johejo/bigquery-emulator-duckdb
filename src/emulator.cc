@@ -64,7 +64,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
         throw std::invalid_argument("Project registry must be an array");
       }
       for (const auto& value : saved) {
-        Project project = ParseProject(value);
+        const Project project = ParseProject(value);
         if (!registered.emplace(project.project_id, project).second) {
           throw std::invalid_argument("Duplicate saved projectId: " + project.project_id);
         }
