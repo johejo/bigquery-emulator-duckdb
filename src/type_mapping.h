@@ -74,4 +74,8 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 // its text. Stored structs still require distinct nonempty field names.
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
+// The DuckDB type of a query parameter described by a BigQuery TableFieldSchema: as
+// DuckDbColumnType, except that INTERVAL, a query value, is supported.
+absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field);
+
 }  // namespace bigquery_emulator_duckdb

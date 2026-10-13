@@ -102,9 +102,12 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
   }
 }
 
+// What a DuckDB type is for: a query value, a stored column, or a query parameter, which is a
+// query value whose type a TableFieldSchema describes.
+enum class TypeUse : std::uint8_t { kQuery, kColumn, kParameter };
+
 std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
-                                       const googlesql::TypeParameters* parameters,
-                                       bool column_type) {
+                                       const googlesql::TypeParameters* parameters, TypeUse use) {
   if (parameters != nullptr && (parameters->IsEmpty() || parameters->IsStringTypeParameters())) {
     parameters = nullptr;
   }
@@ -158,9 +161,9 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_INTERVAL:
-      return column_type ? std::nullopt : std::optional<std::string>("INTERVAL");
+      return use == TypeUse::kColumn ? std::nullopt : std::optional<std::string>("INTERVAL");
     case googlesql::TYPE_RANGE: {
-      const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, column_type);
+      const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, use);
       return element ? std::optional<std::string>(
                            std::format("STRUCT({} {}, {} {})", QuoteIdentifier(kRangeStart),
                                        *element, QuoteIdentifier(kRangeEnd), *element))
@@ -168,9 +171,9 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     }
     case googlesql::TYPE_GEOGRAPHY:
       // Stored as text; queries over it are not translated.
-      return column_type ? std::optional<std::string>("VARCHAR") : std::nullopt;
+      return use == TypeUse::kQuery ? std::nullopt : std::optional<std::string>("VARCHAR");
     case googlesql::TYPE_ARRAY: {
-      const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), column_type);
+      const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
     }
     case googlesql::TYPE_STRUCT: {
@@ -178,9 +181,10 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       std::vector<std::string> fields;
       for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
         const auto& field = type->AsStruct()->field(i);
-        const auto field_type = MapToDuckDb(field.type, child(i), column_type);
-        // Stored columns keep their declared names; only query values use internal names.
-        if (!field_type || (column_type && names.at(i) != field.name)) {
+        const auto field_type = MapToDuckDb(field.type, child(i), use);
+        // Stored columns and parameters keep their declared names; only query values use
+        // internal names.
+        if (!field_type || (use != TypeUse::kQuery && names.at(i) != field.name)) {
           return std::nullopt;
         }
         fields.push_back(QuoteIdentifier(names.at(i)) + " " + *field_type);
@@ -192,6 +196,24 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     default:
       return std::nullopt;
   }
+}
+
+absl::StatusOr<std::string> DuckDbFieldType(const FieldSchema& field, TypeUse use) {
+  googlesql::TypeFactory type_factory;
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
+  if (!type.ok()) {
+    return type.status();
+  }
+  absl::StatusOr<googlesql::TypeParameters> parameters = FieldTypeParameters(field);
+  if (!parameters.ok()) {
+    return parameters.status();
+  }
+  std::optional<std::string> duckdb_type = MapToDuckDb(*type, &*parameters, use);
+  if (duckdb_type.has_value()) {
+    return *std::move(duckdb_type);
+  }
+  return absl::InvalidArgumentError("Unsupported field type: " +
+                                    (*type)->TypeName(googlesql::PRODUCT_EXTERNAL));
 }
 
 }  // namespace
@@ -399,25 +421,15 @@ std::string DuckDbRange(std::string_view start, std::string_view end, std::strin
 
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters) {
-  return MapToDuckDb(type, parameters, /*column_type=*/false);
+  return MapToDuckDb(type, parameters, TypeUse::kQuery);
 }
 
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field) {
-  googlesql::TypeFactory type_factory;
-  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
-  if (!type.ok()) {
-    return type.status();
-  }
-  absl::StatusOr<googlesql::TypeParameters> parameters = FieldTypeParameters(field);
-  if (!parameters.ok()) {
-    return parameters.status();
-  }
-  std::optional<std::string> duckdb_type = MapToDuckDb(*type, &*parameters, /*column_type=*/true);
-  if (duckdb_type.has_value()) {
-    return *std::move(duckdb_type);
-  }
-  return absl::InvalidArgumentError("Unsupported field type: " +
-                                    (*type)->TypeName(googlesql::PRODUCT_EXTERNAL));
+  return DuckDbFieldType(field, TypeUse::kColumn);
+}
+
+absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field) {
+  return DuckDbFieldType(field, TypeUse::kParameter);
 }
 
 }  // namespace bigquery_emulator_duckdb
