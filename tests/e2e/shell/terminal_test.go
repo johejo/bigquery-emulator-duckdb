@@ -16,6 +16,17 @@ import (
 	"github.com/creack/pty"
 )
 
+const project = `--project={"projectId":"test"}`
+
+func golden(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 // terminal is a shell whose standard input is a terminal; its standard output and error are not.
 type terminal struct {
 	t      *testing.T
@@ -32,7 +43,7 @@ func (b *terminal) Write(p []byte) (int, error) {
 	return b.stderr.Write(p)
 }
 
-func startTerminal(t *testing.T, args ...string) *terminal {
+func startTerminal(t *testing.T) *terminal {
 	t.Helper()
 	binary := os.Getenv("BQ_EMULATOR_BINARY")
 	if binary == "" {
@@ -45,7 +56,7 @@ func startTerminal(t *testing.T, args ...string) *terminal {
 		t.Fatal(err)
 	}
 	term := &terminal{t: t, input: input}
-	term.cmd = exec.CommandContext(ctx, binary, append([]string{"shell", project}, args...)...)
+	term.cmd = exec.CommandContext(ctx, binary, "shell", project)
 	term.cmd.Stdin, term.cmd.Stdout, term.cmd.Stderr = tty, &term.stdout, term
 	// The terminal is the shell's controlling terminal, so that ^C sends it SIGINT.
 	term.cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
@@ -157,9 +168,9 @@ func TestTerminalInterruptDiscardsEntry(t *testing.T) {
 }
 
 func TestTerminalCommands(t *testing.T) {
-	dir := t.TempDir()
-	expect(t, run(t, "CREATE SCHEMA ds;\nCREATE TABLE ds.t AS SELECT 1 AS x;\n", project, "--data-dir", dir), result{})
-	term := startTerminal(t, "--data-dir", dir)
+	term := startTerminal(t)
+	term.send("CREATE SCHEMA ds;\n")
+	term.send("CREATE TABLE ds.t AS SELECT 1 AS x;\n")
 	term.send(".format csv\n")
 	term.send("SELECT 1 AS a;\n")
 	term.send("\\format jsonl\n")
