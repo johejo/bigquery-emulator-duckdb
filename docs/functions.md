@@ -33,7 +33,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | Category | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
 | [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
-| [Aggregate functions](#aggregate-functions) | 13 | 5 | 0 | 1 |
+| [Aggregate functions](#aggregate-functions) | 16 | 2 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 3 | 1 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
@@ -99,9 +99,9 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | Supported | DuckDB aggregate |  |
 | [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | Supported | DuckDB aggregate |  |
 | [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function AVG with INTERVAL. |
-| [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | Partial | DuckDB aggregate | Unsupported: type ENUM<BITWISE_AGG_MODE>. |
-| [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | Partial | DuckDB aggregate | Unsupported: type ENUM<BITWISE_AGG_MODE>. |
-| [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | Partial | DuckDB aggregate | Unsupported: type ENUM<BITWISE_AGG_MODE>. |
+| [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | Supported | DuckDB aggregate |  |
+| [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | Supported | DuckDB aggregate |  |
+| [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | Supported | DuckDB aggregate |  |
 | [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | Supported | DuckDB aggregate |  |
 | [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | Supported | DuckDB aggregate |  |
 | [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | Supported |  |  |
