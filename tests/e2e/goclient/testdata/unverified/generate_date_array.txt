@@ -1,0 +1,10 @@
+# Whether a MONTH, QUARTER or YEAR step adds to the previous element, carrying a date clamped to the
+# end of a shorter month, or to the start date. The emulator rejects these until this is settled.
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(d AS STRING) FROM UNNEST(GENERATE_DATE_ARRAY(DATE
+  '2024-01-31', DATE '2024-05-01', INTERVAL 1 MONTH)) AS d), ',')
+?>
+
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(d AS STRING) FROM UNNEST(GENERATE_DATE_ARRAY(DATE
+  '2024-02-29', DATE '2028-03-01', INTERVAL 1 YEAR)) AS d), ',')
+?>

@@ -35,7 +35,7 @@ rewrites into others.
 | [AEAD encryption functions](#aead-encryption-functions) | 0 | 3 | 13 | 0 |
 | [Aggregate functions](#aggregate-functions) | 13 | 5 | 0 | 1 |
 | [Approximate aggregate functions](#approximate-aggregate-functions) | 3 | 1 | 0 | 0 |
-| [Array functions](#array-functions) | 10 | 1 | 0 | 0 |
+| [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
 | [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
@@ -136,7 +136,7 @@ rewrites into others.
 | [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | Supported |  |  |
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | Supported | DuckDB SQL |  |
 | [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | Supported | DuckDB SQL |  |
-| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Partial | DuckDB SQL | Takes only a DAY or WEEK step. Unsupported: function GENERATE_DATE_ARRAY. |
+| [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Supported | GoogleSQL function | The emulator does not support a MONTH, QUARTER or YEAR step past an element clamped to the end of a month, until BigQuery's answer is verified. |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | Supported | DuckDB SQL |  |
 
 ## Bit functions

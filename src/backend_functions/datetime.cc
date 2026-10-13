@@ -20,6 +20,8 @@
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
+#include "googlesql/public/functions/datetime.pb.h"
+#include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/parse_date_time.h"
 #include "googlesql/public/functions/string_format.h"
 #include "googlesql/public/numeric_value.h"
@@ -170,6 +172,42 @@ absl::Status TimestampTrunc(int64_t micros, std::string_view part, std::string_v
     return absl::InvalidArgumentError("Unsupported date part");
   }
   return fn::TimestampTrunc(micros, time_zone, value, out);
+}
+
+// GENERATE_DATE_ARRAY(start, end, INTERVAL step part), with BigQuery's documented
+// 1,048,576-element limit. GoogleSQL adds each step to the previous element, so an element
+// clamped to the end of a shorter month moves the rest to that day. No source settles whether
+// BigQuery steps the same way or from the start, so a clamped element followed by another is
+// unsupported; up to it, both ways agree.
+absl::Status GenerateDateArray(int32_t start, int32_t end, int64_t step, std::string_view part,
+                               std::vector<int32_t>* out) {
+  constexpr int kMaxGeneratedArraySize = 1048576;
+  fn::DateTimestampPart unit = fn::DAY;
+  if (!fn::DateTimestampPart_Parse(absl::AsciiStrToUpper(part), &unit)) {
+    return absl::InvalidArgumentError("Unsupported date part");
+  }
+  std::vector<int64_t> dates;
+  GOOGLESQL_RETURN_IF_ERROR((fn::GenerateArrayHelper<fn::ArrayGenTrait<int64_t, fn::DateIncrement>,
+                                                     kMaxGeneratedArraySize>(
+      start, end, {.unit = unit, .value = step}, &dates)));
+  int32_t first_day = 0;
+  if (!dates.empty()) {
+    GOOGLESQL_RETURN_IF_ERROR(fn::ExtractFromDate(fn::DAY, start, &first_day));
+  }
+  out->reserve(dates.size());
+  for (const int64_t date : dates) {
+    if (!out->empty() && unit != fn::DAY && unit != fn::WEEK) {
+      int32_t day = 0;
+      GOOGLESQL_RETURN_IF_ERROR(fn::ExtractFromDate(fn::DAY, out->back(), &day));
+      if (day != first_day) {
+        return absl::UnimplementedError(
+            "The emulator does not support GENERATE_DATE_ARRAY stepping on from a date clamped "
+            "to the end of a month");
+      }
+    }
+    out->push_back(static_cast<int32_t>(date));
+  }
+  return absl::OkStatus();
 }
 
 // CAST(datetime AS STRING), whose fractional seconds have three or six digits, where DuckDB
@@ -464,6 +502,10 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
            Apply<StringToTimestampIn>);
   Register(connection, "bq_timestamp_trunc", {kTimestamp, kVarchar, kVarchar}, kTimestamp,
            Apply<TimestampTrunc>);
+  LogicalType const date(duckdb_create_logical_type(kDate));
+  LogicalType const dates(duckdb_create_list_type(date.get()));
+  Register(connection, "bq_generate_date_array", {kDate, kDate, kBigint, kVarchar}, dates.get(),
+           Apply<GenerateDateArray>);
   Register(connection, "bq_datetime_string", {kDatetime}, kVarchar, Apply<DatetimeToString>);
   Register(connection, "bq_time_string", {kTime}, kVarchar, Apply<TimeToString>);
   Register(connection, "bq_timestamp_string", {kTimestamp, kVarchar}, kVarchar,

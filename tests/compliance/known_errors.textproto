@@ -1329,20 +1329,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "GENERATE_DATE_ARRAY fails on a step beyond INT32 instead of stopping at the end date"
-  label: "code:generate_date_array_DATE_<0001-01-01>_DATE_<9999-12-31>_INT64_9223372036854775807_STRING_<DAY>"
-  label: "code:generate_date_array_DATE_<9999-12-31>_DATE_<0001-01-01>_INT64_-9223372036854775808_STRING_<DAY>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "GENERATE_DATE_ARRAY with a step of 0 returns an empty array instead of failing"
-  label: "array_functions_test:generate_date_array_literal_zero_step"
-  label: "array_functions_test:generate_date_array_parameterized_zero_step"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "HAVING MIN and HAVING MAX do not order NaN as BigQuery does"
   label: "aggregation_having_modifier_queries_test:aggregate_count_distinct_id_having_double_ignore_nan"

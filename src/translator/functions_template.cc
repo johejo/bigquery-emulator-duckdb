@@ -425,24 +425,6 @@ std::vector<Rule> Extract() {
   return rules;
 }
 
-// DuckDB's generate_series steps from the previous element, which only agrees with BigQuery
-// stepping from the start for parts of a fixed length.
-std::vector<Rule> GenerateDateArray() {
-  const auto series = [](const std::string& step) {
-    return "list_transform(generate_series(CAST($1 AS TIMESTAMP), CAST($2 AS TIMESTAMP), " + step +
-           "), _d -> CAST(_d AS DATE))";
-  };
-  return {
-      {.arity = 2, .spelling = series("INTERVAL 1 DAY")},
-      {.arity = 4, .spelling = series("($3 * INTERVAL '1 day')"), .conditions = {Part(4, {"day"})}},
-      {
-          .arity = 4,
-          .spelling = series("($3 * INTERVAL '1 week')"),
-          .conditions = {Part(4, {"week"})},
-      },
-  };
-}
-
 // Steps of fixed microseconds, so the session time zone plays no part. DuckDB would return an
 // empty array for a zero step.
 std::vector<Rule> GenerateTimestampArray() {
@@ -780,7 +762,6 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"TIME_ADD", WithInterval("($1 + $2)")},
       {"TIME_SUB", WithInterval("($1 - $2)")},
       {"$EXTRACT", Extract()},
-      {"GENERATE_DATE_ARRAY", GenerateDateArray()},
       {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
       // Below a day, BigQuery counts whole units rather than the boundaries crossed, which is
       // DuckDB's date_sub rather than date_diff.
