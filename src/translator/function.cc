@@ -215,6 +215,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "ARRAY_CONCAT",
       "JSON_ARRAY_APPEND",
       "JSON_ARRAY_INSERT",
+      "GENERATE_RANGE_ARRAY",
   };
   if (interval && entry->handler != Bucket &&
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
@@ -229,6 +230,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "RANGE_CONTAINS",
       "RANGE_OVERLAPS",
       "RANGE_INTERSECT",
+      "GENERATE_RANGE_ARRAY",
       "$EQUAL",
       "$NOT_EQUAL",
       "$LESS",
