@@ -43,3 +43,6 @@ WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT sessi
 
 WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
 => "1"
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT (SELECT AS STRUCT * FROM RANGE_SESSIONIZE(TABLE ranges, 'r', []))
+=> {"f":[{"v":"[2024-01-01, 2024-02-01)"},{"v":"[2024-01-01, 2024-02-01)"}]}

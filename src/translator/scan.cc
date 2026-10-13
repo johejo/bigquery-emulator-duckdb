@@ -92,7 +92,7 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   for (int i = 0; i < tvf.column_list_size(); ++i) {
     const int index = tvf.column_index_list(i);
     const int id = tvf.column_list(i).column_id();
-    const std::string value = index == schema.num_columns()
+    const std::string value = absl::EqualsIgnoreCase(tvf.column_list(i).name(), "session_range")
                                   ? session
                                   : ColumnName(argument.argument_column_list(index).column_id());
     projections.push_back(value + " AS " + ColumnName(id));

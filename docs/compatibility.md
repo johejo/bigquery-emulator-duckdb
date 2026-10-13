@@ -136,9 +136,8 @@ sessionizes the whole input. Unbounded ends are supported. A NULL range retains 
 and receives a NULL `session_range`. Mode names are case sensitive.
 
 The range column, partitioning columns and sessionize option must be non-NULL literals.
-Value tables and INTERVAL or annotated partitioning columns are unsupported. Inputs already
-containing `session_range` are accepted; the output of `SELECT *` for these inputs is awaiting
-BigQuery answers in the [unverified case](../tests/e2e/goclient/testdata/unverified/range_sessionize.txt).
+Value tables and INTERVAL or annotated partitioning columns are unsupported. An existing
+`session_range` column is replaced with the computed session range.
 
 ## User-defined functions
 

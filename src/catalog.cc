@@ -88,7 +88,16 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SessionizeSchema(
     return absl::InvalidArgumentError("RANGE_SESSIONIZE option must be MEETS or OVERLAPS");
   }
   auto columns = input.columns();
-  columns.emplace_back("session_range", range->type);
+  bool replaced = false;
+  for (auto& column : columns) {
+    if (absl::EqualsIgnoreCase(column.name, "session_range")) {
+      column = googlesql::TVFRelation::Column("session_range", range->type);
+      replaced = true;
+    }
+  }
+  if (!replaced) {
+    columns.emplace_back("session_range", range->type);
+  }
   return googlesql::TVFSignature::Create(arguments, googlesql::TVFRelation(std::move(columns)));
 }
 

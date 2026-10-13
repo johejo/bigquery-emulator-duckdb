@@ -1,4 +1,0 @@
-## RANGE_SESSIONIZE collision output, beyond the confirmed COUNT(*) case
-
-WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT (SELECT AS STRUCT * FROM RANGE_SESSIONIZE(TABLE ranges, 'r', []))
-?>
