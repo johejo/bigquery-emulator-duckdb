@@ -102,6 +102,7 @@ query RANGE values | CREATE TABLE range_storage (r RANGE<DATE>) CLUSTER BY r
 query RANGE values | SELECT CAST(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS STRING), CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
 query RANGE values | SELECT SAFE_CAST(CONCAT('[2020-01-01, ', 'UNBOUNDED)') AS RANGE<DATE>)
 query RANGE values | SELECT TO_JSON(r) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
+query RANGE values | SELECT FORMAT('%t', RANGE<DATE> '[2020-01-01, UNBOUNDED)')
 note RANGE values | See [RANGE values](compatibility.md#range-values).
 
 section DML

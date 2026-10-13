@@ -284,6 +284,7 @@ cc_library(
     hdrs = ["range.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":apply",
         ":datetime",
         ":register",
         ":scalar",
