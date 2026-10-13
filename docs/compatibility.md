@@ -110,8 +110,9 @@ views that read temporary tables, are unsupported.
 
 Query values may have anonymous or duplicate STRUCT field names; stored table columns require
 distinct nonempty names. A STRUCT without fields, `STRUCT<>`, can only be passed to JSON functions,
-such as `TO_JSON` and `JSON_ARRAY_APPEND`, and to ARRAY constructors; results, aggregates and other
-functions reject it. Casts between STRUCT types match fields by position,
+such as `TO_JSON` and `JSON_ARRAY_APPEND`, and to ARRAY constructors; aggregates and other functions
+reject it. As in BigQuery, a query result cannot contain one at any depth, and `SELECT AS STRUCT`
+and `SELECT AS VALUE` results cannot have anonymous fields. Casts between STRUCT types match fields by position,
 and JSON functions preserve the original field names, including in nested arrays and structs.
 Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
 NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts
@@ -201,9 +202,13 @@ Query result schemas come from the GoogleSQL analyzer, so anonymous columns are 
 except the structs that keep `RANGE` values → `RANGE`.
 
 Without a destination table, a second column with the same name as another is renamed with `_1`,
-as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`. BigQuery does not document how it renames a name
-repeated more than twice, names that differ only in case, or a column that would collide with a
-renamed one, so the emulator rejects those results.
+as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`; names that differ only in case are duplicates, as
+`SELECT 1 AS a, 2 AS A` returns `a` and `A_1`. BigQuery does not document how it renames a name
+repeated more than twice or a column that would collide with a renamed one, so the emulator rejects
+those results. In a `SELECT AS STRUCT` or `SELECT AS VALUE`
+result, a field whose name repeats an earlier one's, ignoring case, is named by its position, such
+as `_field_2`; a name repeated more than twice, or a positional name another field already has, is
+rejected.
 
 Timestamps are encoded as epoch seconds, or epoch microseconds with
 `formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`.

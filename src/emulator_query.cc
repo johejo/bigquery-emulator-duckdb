@@ -122,8 +122,9 @@ std::vector<FieldSchema> ReconcileSchema(std::vector<FieldSchema> duckdb_schema,
 // A query without a destination table returns each duplicate column after the first renamed:
 // SELECT 1 AS a, 2 AS a returns a and a_1.
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
-// The names BigQuery takes for a name repeated more than twice, names that differ only in case
-// or a renamed column that would collide with another are not documented, so those are
+// BigQuery renames the second of two columns whose names differ at most in case, keeping its
+// spelling, as `A_1` for `SELECT 1 AS a, 2 AS A`. The names it takes for a name repeated more than
+// twice or a renamed column that would collide with another are not documented, so those are
 // unsupported.
 std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
   const auto folded = [](std::string name) {
@@ -139,8 +140,7 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
       continue;
     }
     FieldSchema& duplicate = schema.at(indexes.at(1));
-    if (indexes.size() > 2 || duplicate.name != schema.at(indexes.at(0)).name ||
-        columns.contains(name + "_1")) {
+    if (indexes.size() > 2 || columns.contains(name + "_1")) {
       throw ApiError::UnsupportedQuery("these duplicate column names in a query result: " +
                                        duplicate.name);
     }

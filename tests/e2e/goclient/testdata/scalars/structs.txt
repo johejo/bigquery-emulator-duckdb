@@ -205,3 +205,57 @@ SELECT NULLIF(STRUCT(a AS x, 2 AS y), (1, 2)) FROM t WHERE a = 1
 # CASE evaluates only the result it returns.
 SELECT CASE (a, 2) WHEN (1, 2) THEN 'match' ELSE ERROR('unreachable') END FROM t WHERE a = 1
 => "match"
+
+# BigQuery returns no STRUCT<> in query results, at any depth; these answers are BigQuery's.
+SELECT STRUCT()
+=> error: Unsupported empty struct type for field 'f0_'
+
+SELECT CAST(NULL AS STRUCT<>)
+=> error: Unsupported empty struct type for field 'f0_'
+
+SELECT [STRUCT()]
+=> error: Unsupported empty struct type for field 'f0_'
+
+SELECT ARRAY<STRUCT<>>[]
+=> error: Unsupported empty struct type for field 'f0_'
+
+SELECT STRUCT(STRUCT() AS e)
+=> error: Unsupported empty struct type for field 'f0_.e'
+
+SELECT STRUCT(1 AS a, STRUCT() AS e)
+=> error: Unsupported empty struct type for field 'f0_.e'
+
+SELECT STRUCT(1 AS a, [STRUCT()] AS e)
+=> error: Unsupported empty struct type for field 'f0_.e'
+
+SELECT STRUCT(1, STRUCT())
+=> error: Unsupported empty struct type for field 'f0_._field_2'
+
+SELECT STRUCT(1, [STRUCT()])
+=> error: Unsupported empty struct type for field 'f0_._field_2'
+
+SELECT STRUCT(STRUCT(1, STRUCT()) AS s)
+=> error: Unsupported empty struct type for field 'f0_.s._field_2'
+
+SELECT 1, STRUCT()
+=> error: Unsupported empty struct type for field 'f1_'
+
+SELECT STRUCT() AS s
+=> error: Unsupported empty struct type for field 's'
+
+SELECT AS STRUCT 1 AS a, STRUCT() AS e
+=> error: Unsupported empty struct type for field 'e'
+
+# BigQuery rejects a value table of STRUCTs with an anonymous field, before a STRUCT<> in a later
+# field; these answers are BigQuery's.
+SELECT AS STRUCT 1
+=> error: Invalid field name "". Fields must contain the allowed characters, and be at most 300 characters long. For allowed characters, please refer to https://cloud.google.com/bigquery/docs/schemas#column_names
+
+SELECT AS VALUE STRUCT(1)
+=> error: Invalid field name "". Fields must contain the allowed characters, and be at most 300 characters long. For allowed characters, please refer to https://cloud.google.com/bigquery/docs/schemas#column_names
+
+SELECT AS STRUCT 1 FROM UNNEST([1])
+=> error: Invalid field name "". Fields must contain the allowed characters, and be at most 300 characters long. For allowed characters, please refer to https://cloud.google.com/bigquery/docs/schemas#column_names
+
+SELECT AS STRUCT 1, STRUCT()
+=> error: Invalid field name "". Fields must contain the allowed characters, and be at most 300 characters long. For allowed characters, please refer to https://cloud.google.com/bigquery/docs/schemas#column_names

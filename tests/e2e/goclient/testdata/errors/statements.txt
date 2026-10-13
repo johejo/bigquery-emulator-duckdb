@@ -1,8 +1,5 @@
 # Statement forms and modifiers the emulator does not implement are named in the error.
 
-SELECT STRUCT()
-=> error contains: The emulator does not support result type STRUCT<>
-
 SELECT SAFE.RAND()
 => error contains: The emulator does not support SAFE.RAND
 
@@ -37,11 +34,16 @@ CREATE OR REPLACE SCHEMA errors_statements
 => error contains: The emulator does not support CREATE OR REPLACE SCHEMA
 
 # BigQuery renames a duplicate column of a query result, but not documented how for these names.
-SELECT 1 AS a, 2 AS A
-=> error contains: The emulator does not support these duplicate column names in a query result: A
-
 SELECT 1 AS a, 2 AS a, 3 AS a
 => error contains: The emulator does not support these duplicate column names in a query result: a
 
 SELECT 1 AS a, 2 AS a, 3 AS a_1
 => error contains: The emulator does not support these duplicate column names in a query result: a
+
+# Nor how it names a value table's field repeated more than twice, or one whose positional name
+# another field has.
+SELECT AS STRUCT 1 AS a, 2 AS a, 3 AS a
+=> error contains: The emulator does not support these duplicate field names in a value table result: a
+
+SELECT AS STRUCT 1 AS a, 2 AS a, 3 AS _field_2
+=> error contains: The emulator does not support these duplicate field names in a value table result: _field_2
