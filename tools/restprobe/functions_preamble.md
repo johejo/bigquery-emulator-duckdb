@@ -18,14 +18,14 @@ function list the forms the emulator rejected.
 - **Broken**: a call translates but fails on DuckDB, which is a bug.
 - **Untested**: the probe could not build a valid call.
 
-The Implementation column says how the function registry, in `src/translator/functions.cc`,
-implements the function; it is empty for syntax such as `CASE` and for functions the analyzer
-rewrites into others.
+The Implementation column says how the translator implements the function; it is empty for
+syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 - **DuckDB function**: the DuckDB function of the same name.
 - **DuckDB function, renamed**: a DuckDB function of another name.
 - **DuckDB SQL**: DuckDB SQL templates, chosen by the arguments.
 - **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
+- **Table function**: DuckDB SQL for a table-valued call.
 - **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
 - **SAFE. operator**: an operator with the `SAFE.` prefix.
 - **DuckDB aggregate** and **DuckDB window function**: a DuckDB aggregate or window function.

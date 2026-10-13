@@ -8,8 +8,11 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/match.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
@@ -21,6 +24,80 @@
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
+
+std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, const Scope& scope) {
+  if (tvf.tvf()->Name() != "range_sessionize") {
+    return Unsupported(scope, "table function " + tvf.tvf()->Name());
+  }
+  const auto& argument = *tvf.argument_list(0);
+  const auto input = Scan(*argument.scan(), scope);
+  if (!input) {
+    return std::nullopt;
+  }
+  const auto& schema = tvf.signature()->input_arguments().at(0).relation();
+  const auto range_name = tvf.signature()->input_arguments().at(1).GetScalarArgType();
+  const auto partitions = tvf.signature()->input_arguments().at(2).GetScalarArgType();
+  const auto partition_names = partitions->literal_value()->elements_view();
+  std::vector<std::string> keys;
+  std::string range;
+  for (int i = 0; i < schema.num_columns(); ++i) {
+    const auto& column = argument.argument_column_list(i);
+    if (!DuckDbType(column.type()) || column.type_annotation_map() != nullptr) {
+      return Unsupported(scope, "RANGE_SESSIONIZE column type");
+    }
+    const std::string name = ColumnName(column.column_id());
+    // Names were validated by the catalog, including ambiguous input names.
+    if (absl::EqualsIgnoreCase(schema.column(i).name,
+                               range_name->literal_value()->string_value())) {
+      range = "q." + name;
+    }
+    for (const auto& key : *partition_names) {
+      if (absl::EqualsIgnoreCase(schema.column(i).name, key.string_value())) {
+        keys.push_back(name);
+      }
+    }
+  }
+  const auto& arguments = tvf.signature()->input_arguments();
+  const bool overlaps =
+      arguments.size() == 4 &&
+      arguments.at(3).GetScalarArgType()->literal_value()->string_value() == "OVERLAPS";
+  const std::string partition = keys.empty() ? "" : "PARTITION BY " + Join(keys, ", ") + " ";
+  const std::string order =
+      "ORDER BY _rs_start, _rs_end, _rs_id ROWS BETWEEN UNBOUNDED PRECEDING AND ";
+  // RANGE's unbounded ends are stored as infinities. A running maximum (rather
+  // than LAG) keeps nested ranges and chains in the same connected component.
+  const std::string bounds = std::format(
+      "SELECT q.*, row_number() OVER () AS _rs_id, {0}.{1} AS _rs_start, "
+      "{0}.{2} AS _rs_end{3} WHERE CASE WHEN {0} IS NULL THEN "
+      "error('The emulator does not support RANGE_SESSIONIZE NULL range') ELSE TRUE END",
+      range, QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd), input->From());
+  const std::string previous =
+      std::format("SELECT *, max(_rs_end) OVER ({}{}1 PRECEDING) AS _rs_previous FROM ({})",
+                  partition, order, bounds);
+  const std::string groups = std::format(
+      "SELECT *, sum(CASE WHEN _rs_previous IS NULL OR _rs_start {} _rs_previous "
+      "THEN 1 ELSE 0 END) OVER ({}{}CURRENT ROW) AS _rs_group FROM ({})",
+      overlaps ? ">=" : ">", partition, order, previous);
+  keys.emplace_back("_rs_group");
+  const std::string window = " OVER (PARTITION BY " + Join(keys, ", ") + ")";
+  const std::string session =
+      std::format("struct_pack({} := min(_rs_start){}, {} := max(_rs_end){})",
+                  QuoteIdentifier(kRangeStart), window, QuoteIdentifier(kRangeEnd), window);
+  Relation result;
+  std::vector<std::string> projections;
+  for (int i = 0; i < tvf.column_list_size(); ++i) {
+    const int index = tvf.column_index_list(i);
+    const int id = tvf.column_list(i).column_id();
+    const std::string value = index == schema.num_columns()
+                                  ? session
+                                  : ColumnName(argument.argument_column_list(index).column_id());
+    projections.push_back(value + " AS " + ColumnName(id));
+    result.columns.emplace(id, "q." + ColumnName(id));
+  }
+  result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
+               " FROM (" + groups + ")";
+  return result;
+}
 
 // Projects `columns` of a relation, positionally renamed to `names`.
 std::optional<std::vector<std::string>> Renamed(
@@ -371,6 +448,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
                  (sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
                                        : QuoteIdentifierPath(table->table()->FullName()));
     return result;
+  }
+  if (scan.Is<googlesql::ResolvedTVFScan>()) {
+    return SessionizeScan(*scan.GetAs<googlesql::ResolvedTVFScan>(), scope);
   }
   if (scan.Is<googlesql::ResolvedJoinScan>()) {
     return JoinScan(*scan.GetAs<googlesql::ResolvedJoinScan>(), scope);

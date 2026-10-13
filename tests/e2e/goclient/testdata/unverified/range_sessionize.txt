@@ -1,0 +1,10 @@
+## RANGE_SESSIONIZE behavior not specified by BigQuery's documentation
+
+WITH ranges AS (SELECT 1 AS id, CAST(NULL AS RANGE<DATE>) AS r UNION ALL SELECT 2, RANGE<DATE> '[2024-01-01, 2024-02-01)') SELECT ARRAY_AGG(STRUCT(id, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+?>
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT session_range FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'meets')
+?>
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+?>
