@@ -1,0 +1,3 @@
+IF TRUE THEN
+  SELECT 1 AS a;
+END IF;

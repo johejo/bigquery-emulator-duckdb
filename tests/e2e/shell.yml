@@ -1,0 +1,162 @@
+desc: the shell subcommand runs queries from standard input or -e without listening
+steps:
+  # Input that is not a terminal runs as one script, whose result is its last statement's.
+  stdin_runs_one_script:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+      stdin: |
+        CREATE SCHEMA ds;
+        CREATE TABLE ds.t (x INT64, s STRING);
+        INSERT ds.t VALUES (2, NULL), (1, 'a');
+        SELECT x, s FROM ds.t ORDER BY x;
+    test: |
+      current.exit_code == 0 && current.stderr == "" &&
+      current.stdout == '{"x":"1","s":"a"}' + "\n" + '{"x":"2","s":null}' + "\n"
+  stdin_keeps_script_variables:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+      stdin: |
+        DECLARE x INT64 DEFAULT 1;
+        SELECT x + 1 AS y;
+    test: current.exit_code == 0 && current.stdout == '{"y":"2"}' + "\n"
+  execute:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' -e 'SELECT 1 AS x'
+    test: current.exit_code == 0 && current.stderr == "" && current.stdout == '{"x":"1"}' + "\n"
+  # Values keep the REST API's encoding, such as INT64 as a string, in every format; columns keep
+  # the schema's order.
+  format_jsonl:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format jsonl
+      stdin: &rows |
+        SELECT x, s, a, r FROM UNNEST([
+          STRUCT(1 AS x, 'a,"b"' AS s, [2, 3] AS a, STRUCT('é' AS f) AS r),
+          (NULL, '', [], NULL)]) WITH OFFSET ORDER BY offset
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '{"x":"1","s":"a,\\"b\\"","a":["2","3"],"r":{"f":"é"}}' + "\n" +
+        '{"x":null,"s":"","a":[],"r":null}' + "\n"
+  format_json:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format json
+      stdin: *rows
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == '[{"x":"1","s":"a,\\"b\\"","a":["2","3"],"r":{"f":"é"}},' +
+        '{"x":null,"s":"","a":[],"r":null}]' + "\n"
+  # RFC 4180 quoting with CRLF line ends; NULL is an empty field.
+  format_csv:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format csv
+      stdin: *rows
+    test: |
+      current.exit_code == 0 &&
+      current.stdout == "x,s,a,r\r\n" +
+        '1,"a,""b""","[""2"",""3""]","{""f"":""é""}"' + "\r\n" +
+        ",,[],\r\n"
+  # Columns align by code point, and NULL differs from an empty string.
+  format_pretty:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format pretty
+      stdin: *rows
+    test: |
+      current.exit_code == 0 &&
+      current.stdout ==
+        "+------+-------+-----------+-----------+\n" +
+        "| x    | s     | a         | r         |\n" +
+        "+------+-------+-----------+-----------+\n" +
+        '| 1    | a,"b" | ["2","3"] | {"f":"é"} |' + "\n" +
+        "| NULL |       | []        | NULL      |\n" +
+        "+------+-------+-----------+-----------+\n"
+  empty_result:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' -e 'SELECT 1 AS n LIMIT 0'
+    test: current.exit_code == 0 && current.stdout == ""
+  empty_result_keeps_csv_header:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format csv
+        -e 'SELECT 1 AS n LIMIT 0'
+    test: current.exit_code == 0 && current.stdout == "n\r\n"
+  blank_input:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+      stdin: " \n"
+    test: current.exit_code == 0 && current.stdout == "" && current.stderr == ""
+  error_exits_with_failure:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+      stdin: |
+        SELECT * FROM missing.t;
+    test: |
+      current.exit_code == 1 && current.stdout == "" && current.stderr startsWith "Error: "
+  invalid_format:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --format yaml -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  project_id_is_required_with_several_projects:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+        --project='{"projectId":"other"}' -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  project_id_sets_the_default_project:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+        --project='{"projectId":"other"}' --project-id other
+      stdin: &other_table |
+        CREATE SCHEMA other.ds;
+        CREATE TABLE other.ds.t AS SELECT 'other' AS p;
+        SELECT p FROM ds.t;
+    test: current.exit_code == 0 && current.stdout == '{"p":"other"}' + "\n"
+  project_id_of_another_project:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+        --project='{"projectId":"other"}' --project-id test
+      stdin: *other_table
+    test: current.exit_code == 1 && current.stdout == ""
+  unregistered_project_id:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --project-id missing
+        -e 'SELECT 1'
+    test: current.exit_code == 2 && current.stdout == ""
+  # A DML statement's affected rows go to standard error, leaving standard output to results.
+  dml_reports_affected_rows:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e 'CREATE SCHEMA ds; CREATE TABLE ds.t (x INT64)'
+        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" -e 'INSERT ds.t VALUES (1), (2)'
+    test: current.exit_code == 0 && current.stdout == "" && current.stderr == "2 rows affected\n"
+  data_dir_persists:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e 'CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT 1 AS x'
+        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --dataset-id ds -e 'SELECT x FROM t'
+    test: current.exit_code == 0 && current.stdout == '{"x":"1"}' + "\n"
+  # runn cannot give the shell a terminal, so a Go test drives it through a pty.
+  terminal:
+    exec:
+      command: go test -count=1 ./tests/e2e/shell
+    dump:
+      expr: current.stdout + current.stderr
+    test: current.exit_code == 0
