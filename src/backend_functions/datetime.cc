@@ -15,6 +15,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
+#include "absl/time/civil_time.h"
 #include "absl/time/time.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
@@ -83,14 +84,40 @@ constexpr fn::FormatDateTimestampOptions kFormatOptions = {
     .expand_J = true,
 };
 
+// Expands %G, the ISO 8601 year, in format for day. GoogleSQL leaves it to the C library's
+// strftime(), and macOS pads years below 1000 with zeros where BigQuery, like glibc, does not.
+std::string ExpandIsoYear(std::string_view format, absl::CivilDay day) {
+  // The ISO year is the year of the week's Thursday; absl::Weekday counts from Monday.
+  const absl::CivilDay thursday = day + (3 - static_cast<int>(absl::GetWeekday(day)));
+  std::string expanded;
+  for (size_t pct = format.find('%'); pct != std::string_view::npos && pct + 1 < format.size();
+       pct = format.find('%')) {
+    expanded.append(format.substr(0, pct));
+    const std::string_view element = format.substr(pct, 2);
+    expanded += element == "%G" ? std::to_string(thursday.year()) : std::string(element);
+    format.remove_prefix(pct + 2);
+  }
+  expanded.append(format);
+  return expanded;
+}
+
 // FORMAT_DATE(format, date).
 absl::Status FormatDate(std::string_view format, int32_t date, std::string* out) {
+  if (format.find("%G") != std::string_view::npos) {
+    return fn::FormatDateToString(ExpandIsoYear(format, absl::CivilDay(1970, 1, 1) + date), date,
+                                  kFormatOptions, out);
+  }
   return fn::FormatDateToString(format, date, kFormatOptions, out);
 }
 
 // FORMAT_DATETIME(format, datetime).
 absl::Status FormatDatetime(std::string_view format, int64_t micros, std::string* out) {
   GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+  if (format.find("%G") != std::string_view::npos) {
+    return fn::FormatDatetimeToStringWithOptions(
+        ExpandIsoYear(format, absl::ToCivilDay(absl::FromUnixMicros(micros), absl::UTCTimeZone())),
+        datetime, kFormatOptions, out);
+  }
   return fn::FormatDatetimeToStringWithOptions(format, datetime, kFormatOptions, out);
 }
 
@@ -102,6 +129,12 @@ absl::Status FormatTime(std::string_view format, int64_t micros, std::string* ou
 // FORMAT_TIMESTAMP(format, timestamp, time_zone).
 absl::Status FormatTimestamp(std::string_view format, int64_t micros, std::string_view time_zone,
                              std::string* out) {
+  absl::TimeZone zone;
+  if (format.find("%G") != std::string_view::npos && fn::MakeTimeZone(time_zone, &zone).ok()) {
+    return fn::FormatTimestampToString(
+        ExpandIsoYear(format, absl::ToCivilDay(absl::FromUnixMicros(micros), zone)), micros,
+        time_zone, kFormatOptions, out);
+  }
   return fn::FormatTimestampToString(format, micros, time_zone, kFormatOptions, out);
 }
 

@@ -23,7 +23,6 @@ const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
       {"IS_NAN", "isnan"},
       {"RAND", "random"},
       {"SESSION_USER", "bq_session_user"},
-      {"TIMESTAMP_SECONDS", "to_timestamp"},
       {"UNIX_MICROS", "epoch_us"},
   };
   return *kNames;

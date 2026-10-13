@@ -673,12 +673,6 @@ known_errors {
   label: "code:date_sub_TIMESTAMP_253402300799998999_INT64_-2_STRING_<MILLISECOND>"
   label: "code:date_sub_TIMESTAMP_253402300799999999_INT64_-1_STRING_<MICROSECOND>"
   label: "code:safe_error_mode__safe_timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<America/_gHqr2K5IEYY__Angeles>"
-  label: "code:safe_error_mode__safe_timestamp_micros_INT64_-62135596800000001"
-  label: "code:safe_error_mode__safe_timestamp_micros_INT64_253402300800000000"
-  label: "code:safe_error_mode__safe_timestamp_millis_INT64_-62135596800001"
-  label: "code:safe_error_mode__safe_timestamp_millis_INT64_253402300800000"
-  label: "code:safe_error_mode__safe_timestamp_seconds_INT64_-62135596801"
-  label: "code:safe_error_mode__safe_timestamp_seconds_INT64_253402300800"
   label: "code:timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<America/_gHqr2K5IEYY__Angeles>"
   label: "code:timestamp_add_TIMESTAMP_-62135564400000000_INT64_-10_STRING_<HOUR>"
   label: "code:timestamp_add_TIMESTAMP_-62135596260000000_INT64_-10_STRING_<MINUTE>"
@@ -698,12 +692,6 @@ known_errors {
   label: "code:timestamp_add_TIMESTAMP_253402300795000000_INT64_6_STRING_<SECOND>"
   label: "code:timestamp_add_TIMESTAMP_253402300799998999_INT64_2_STRING_<MILLISECOND>"
   label: "code:timestamp_add_TIMESTAMP_253402300799999999_INT64_1_STRING_<MICROSECOND>"
-  label: "code:timestamp_micros_INT64_-62135596800000001"
-  label: "code:timestamp_micros_INT64_253402300800000000"
-  label: "code:timestamp_millis_INT64_-62135596800001"
-  label: "code:timestamp_millis_INT64_253402300800000"
-  label: "code:timestamp_seconds_INT64_-62135596801"
-  label: "code:timestamp_seconds_INT64_253402300800"
   label: "code:timestamp_sub_TIMESTAMP_-62135564400000000_INT64_10_STRING_<HOUR>"
   label: "code:timestamp_sub_TIMESTAMP_-62135596260000000_INT64_10_STRING_<MINUTE>"
   label: "code:timestamp_sub_TIMESTAMP_-62135596791000000_INT64_10_STRING_<SECOND>"
@@ -1607,13 +1595,6 @@ known_errors {
   mode: ALLOW_ERROR
   reason: "SAFE.DATETIME fails on a result outside BigQuery's range instead of returning NULL"
   label: "code:safe_error_mode__safe_datetime_TIMESTAMP_-62135596800000000_STRING_<America/_gHqr2K5IEYY__Angeles>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE.DATE_FROM_UNIX_DATE fails on a date outside BigQuery's range instead of returning NULL"
-  label: "code:safe_error_mode__safe_date_from_unix_date_INT64_-719163"
-  label: "code:safe_error_mode__safe_date_from_unix_date_INT64_2932897"
 }
 
 known_errors {
