@@ -154,6 +154,38 @@ TEST_F(TranslatorTest, TopSumBindsVolatileWeightsOnce) {
   }
 }
 
+// Invalid TVF arguments must fail before translation rather than producing a
+// schema that loses an input column or cannot identify the session's range.
+TEST_F(TranslatorTest, ValidatesSessionizeArguments) {
+  const std::string input =
+      "WITH input AS (SELECT 1 AS k, RANGE(DATE '2000-01-01', DATE '2000-01-02') AS r) ";
+  for (const char* arguments : {
+           "'missing', []",
+           "'k', []",
+           "'r', ['missing']",
+           "'r', [NULL]",
+           "NULL, []",
+           "'r', CAST(NULL AS ARRAY<STRING>)",
+           "'r', [], 'invalid'",
+           "'r', [], NULL",
+       }) {
+    SCOPED_TRACE(arguments);
+    EXPECT_THROW(
+        Translate(input + "SELECT * FROM RANGE_SESSIONIZE(TABLE input, " + arguments + ")"),
+        std::exception);
+  }
+}
+
+TEST_F(TranslatorTest, SessionizeBindsItsInputOnce) {
+  const auto sql = Translate(
+      "WITH input AS (SELECT RAND() AS marker, RANGE(DATE '2000-01-01', DATE '2000-01-02') AS r) "
+      "SELECT * FROM RANGE_SESSIONIZE(TABLE input, 'r', [])");
+  ASSERT_TRUE(sql.has_value());
+  const auto random = sql->find("random()");
+  ASSERT_NE(random, std::string::npos);
+  EXPECT_EQ(sql->find("random()", random + 1), std::string::npos);
+}
+
 TEST_F(TranslatorTest, DoesNotReportParameterErrorsAsUnsupported) {
   AnalyzerSettings settings;
   settings.named_parameters.emplace_back("s", googlesql::types::StringType());

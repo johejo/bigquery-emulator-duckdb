@@ -40,6 +40,7 @@ cc_library(
         "//:javascript_function",
         "//:type_mapping",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer",
         "@googlesql//googlesql/public:catalog",

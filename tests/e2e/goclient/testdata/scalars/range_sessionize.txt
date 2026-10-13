@@ -1,0 +1,48 @@
+## RANGE_SESSIONIZE
+# Source: BigQuery range-functions#range_sessionize specifies connected sessions,
+# retaining input rows, with MEETS including touching bounds and OVERLAPS excluding them.
+# RANGE's unbounded ends follow data-types#range_type. These cases apply those rules.
+
+# A contained range must not hide an earlier, longer range from the running end.
+WITH ranges AS (SELECT 1 AS id, RANGE<DATE> '[2024-01-01, 2024-01-10)' AS r UNION ALL SELECT 2, RANGE<DATE> '[2024-01-02, 2024-01-03)' UNION ALL SELECT 3, RANGE<DATE> '[2024-01-09, 2024-01-12)') SELECT STRING_AGG(CAST(session_range AS STRING), ';' ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'OVERLAPS')
+=> "[2024-01-01, 2024-01-12);[2024-01-01, 2024-01-12);[2024-01-01, 2024-01-12)"
+
+# Transitive overlap; duplicate rows are retained, even when only the added column is read.
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r UNION ALL SELECT RANGE<DATE> '[2024-01-02, 2024-01-04)' UNION ALL SELECT RANGE<DATE> '[2024-01-03, 2024-01-05)' UNION ALL SELECT RANGE<DATE> '[2024-01-03, 2024-01-05)') SELECT STRING_AGG(CAST(session_range AS STRING), ';') FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'OVERLAPS')
+=> "[2024-01-01, 2024-01-05);[2024-01-01, 2024-01-05);[2024-01-01, 2024-01-05);[2024-01-01, 2024-01-05)"
+
+# Unbounded ranges meet at their finite boundary in MEETS.
+WITH ranges AS (SELECT RANGE<DATE> '[UNBOUNDED, 2024-01-03)' AS r UNION ALL SELECT RANGE<DATE> '[2024-01-03, UNBOUNDED)') SELECT STRING_AGG(CAST(session_range AS STRING), ';') FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> "[UNBOUNDED, UNBOUNDED);[UNBOUNDED, UNBOUNDED)"
+
+WITH ranges AS (SELECT 1 AS id, RANGE<DATE> '[UNBOUNDED, 2024-01-03)' AS r UNION ALL SELECT 2, RANGE<DATE> '[2024-01-03, UNBOUNDED)') SELECT STRING_AGG(CAST(session_range AS STRING), ';' ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'OVERLAPS')
+=> "[UNBOUNDED, 2024-01-03);[2024-01-03, UNBOUNDED)"
+
+# Separate partitions do not merge touching ranges.
+WITH ranges AS (SELECT 1 AS id, 'a' AS p, 1 AS k, RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r UNION ALL SELECT 2, 'a', 2, RANGE<DATE> '[2024-01-03, 2024-01-05)' UNION ALL SELECT 3, 'b', 1, RANGE<DATE> '[2024-01-03, 2024-01-05)') SELECT STRING_AGG(CAST(session_range AS STRING), ';' ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', ['p', 'k'])
+=> "[2024-01-01, 2024-01-03);[2024-01-03, 2024-01-05);[2024-01-03, 2024-01-05)"
+
+# DATETIME bounds retain microseconds, and a disjoint range starts another session.
+WITH ranges AS (SELECT 1 AS id, RANGE<DATETIME> '[2024-01-01 00:00:00.000001, 2024-01-01 00:00:00.000002)' AS r UNION ALL SELECT 2, RANGE<DATETIME> '[2024-01-01 00:00:00.000002, 2024-01-01 00:00:00.000003)' UNION ALL SELECT 3, RANGE<DATETIME> '[2024-01-01 00:00:00.000004, UNBOUNDED)') SELECT STRING_AGG(CAST(session_range AS STRING), ';' ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'MEETS')
+=> "[2024-01-01 00:00:00.000001, 2024-01-01 00:00:00.000003);[2024-01-01 00:00:00.000001, 2024-01-01 00:00:00.000003);[2024-01-01 00:00:00.000004, UNBOUNDED)"
+
+# TIMESTAMP sessionization uses instants, including pre-epoch fractional bounds.
+WITH ranges AS (SELECT RANGE<TIMESTAMP> '[1969-12-31 23:59:59.999999+00, 1970-01-01 00:00:00+00)' AS r UNION ALL SELECT RANGE<TIMESTAMP> '[1970-01-01 00:00:00+00, 1970-01-01 00:00:00.000001+00)') SELECT STRING_AGG(CAST(session_range AS STRING), ';') FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> "[1969-12-31 23:59:59.999999+00, 1970-01-01 00:00:00.000001+00);[1969-12-31 23:59:59.999999+00, 1970-01-01 00:00:00.000001+00)"
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r LIMIT 0) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> "0"
+
+# Confirmed against BigQuery by the maintainer.
+
+WITH ranges AS (SELECT 1 AS id, CAST(NULL AS RANGE<DATE>) AS r UNION ALL SELECT 2, RANGE<DATE> '[2024-01-01, 2024-02-01)') SELECT ARRAY_AGG(STRUCT(id, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> [{"v":{"f":[{"v":"1"},{"v":null}]}},{"v":{"f":[{"v":"2"},{"v":"[2024-01-01, 2024-02-01)"}]}}]
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT session_range FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'meets')
+=> error contains: Could not cast literal "meets" to type RANGE_SESSIONIZE_MODE; Did you mean 'MEETS'? (Note: ENUM values are case sensitive)
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> "1"
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT (SELECT AS STRUCT * FROM RANGE_SESSIONIZE(TABLE ranges, 'r', []))
+=> {"f":[{"v":"[2024-01-01, 2024-02-01)"},{"v":"[2024-01-01, 2024-02-01)"}]}

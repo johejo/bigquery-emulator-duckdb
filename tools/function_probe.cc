@@ -400,8 +400,14 @@ int Main(int argc, char** argv) {
     // Functions spelled as syntax, such as EXTRACT, are operators such as $EXTRACT.
     const translator::FunctionEntry* entry =
         translator::FindFunction(known ? absl::AsciiStrToUpper(function->Name()) : "$" + name);
+    const googlesql::TableValuedFunction* table_function = nullptr;
+    // RANGE_SESSIONIZE has a scan translator rather than a scalar registry entry.
+    const bool known_table_function =
+        name == "RANGE_SESSIONIZE" && catalog.FindTableValuedFunction(path, &table_function).ok();
     const std::string implementation =
-        entry == nullptr ? "" : std::string(translator::Describe(entry->implementation));
+        known_table_function ? "Table function"
+        : entry == nullptr   ? ""
+                             : std::string(translator::Describe(entry->implementation));
     nlohmann::json line = {
         {"name", name},
         {"docs", docs},

@@ -132,6 +132,18 @@ columns, query parameters and `tabledata.insertAll` rows, with comparisons, orde
 `SAFE_CAST` from STRING, JSON conversion, `FORMAT`, other functions over RANGE values, and loads and
 extracts of RANGE columns are unsupported.
 
+### RANGE_SESSIONIZE
+
+`RANGE_SESSIONIZE` retains every input row and appends `session_range` for DATE, DATETIME and
+TIMESTAMP ranges. The default `MEETS` mode merges touching or overlapping ranges; `OVERLAPS`
+merges only overlapping ranges. Partitioning columns separate sessions, and an empty list
+sessionizes the whole input. Unbounded ends are supported. A NULL range retains its input row
+and receives a NULL `session_range`. Mode names are case sensitive.
+
+The range column, partitioning columns and sessionize option must be non-NULL literals.
+Value tables and INTERVAL or annotated partitioning columns are unsupported. An existing
+`session_range` column is replaced with the computed session range.
+
 ## User-defined functions
 
 ### SQL UDFs

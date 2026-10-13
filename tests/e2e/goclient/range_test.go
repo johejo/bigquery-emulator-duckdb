@@ -2,6 +2,7 @@ package goclient
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -157,5 +158,128 @@ func TestRangeColumns(t *testing.T) {
 	want := []*row{inserted[1], inserted[0]}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("rows = %v, want %v", got, want)
+	}
+}
+
+// The rows and both session sets are from BigQuery's RANGE_SESSIONIZE examples:
+// https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize
+func TestRangeSessionize(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_range_sessionize")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	for _, sql := range []string{
+		"CREATE TABLE " + dataset.DatasetID + ".ranges (emp_id INT64, dept_id INT64, duration RANGE<DATE>)",
+		"INSERT " + dataset.DatasetID + `.ranges VALUES
+    (10, 1000, RANGE<DATE> '[2010-01-10, 2010-03-10)'),
+    (10, 2000, RANGE<DATE> '[2010-03-10, 2010-07-15)'),
+    (10, 2000, RANGE<DATE> '[2010-06-15, 2010-08-18)'),
+    (20, 2000, RANGE<DATE> '[2010-03-10, 2010-07-20)'),
+    (20, 1000, RANGE<DATE> '[2020-05-10, 2020-09-20)')`,
+	} {
+		if _, err := client.Query(sql).Read(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dateRange := func(start, end string) *bigquery.RangeValue {
+		s, err := civil.ParseDate(start)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e, err := civil.ParseDate(end)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &bigquery.RangeValue{Start: s, End: e}
+	}
+	durations := []*bigquery.RangeValue{
+		dateRange("2010-01-10", "2010-03-10"), dateRange("2010-03-10", "2010-07-15"),
+		dateRange("2010-06-15", "2010-08-18"), dateRange("2010-03-10", "2010-07-20"),
+		dateRange("2020-05-10", "2020-09-20"),
+	}
+	for _, option := range []string{"", ", 'MEETS'", ", 'OVERLAPS'"} {
+		t.Run(option, func(t *testing.T) {
+			query := client.Query(fmt.Sprintf(`SELECT * FROM RANGE_SESSIONIZE(TABLE %s.ranges,
+     'duration', ['emp_id']%s) ORDER BY emp_id, duration`, dataset.DatasetID, option))
+			rows, err := query.Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantSchema := bigquery.Schema{
+				{Name: "emp_id", Type: bigquery.IntegerFieldType}, {Name: "dept_id", Type: bigquery.IntegerFieldType},
+				{Name: "duration", Type: bigquery.RangeFieldType, RangeElementType: &bigquery.RangeElementType{Type: bigquery.DateFieldType}},
+				{Name: "session_range", Type: bigquery.RangeFieldType, RangeElementType: &bigquery.RangeElementType{Type: bigquery.DateFieldType}},
+			}
+			sessions := []*bigquery.RangeValue{
+				dateRange("2010-01-10", "2010-08-18"), dateRange("2010-01-10", "2010-08-18"),
+				dateRange("2010-01-10", "2010-08-18"), durations[3], durations[4],
+			}
+			if option == ", 'OVERLAPS'" {
+				sessions[0] = durations[0]
+				sessions[1] = dateRange("2010-03-10", "2010-08-18")
+				sessions[2] = sessions[1]
+			}
+			for i := range durations {
+				var got []bigquery.Value
+				if err := rows.Next(&got); err != nil {
+					t.Fatal(err)
+				}
+				emp := []int64{10, 10, 10, 20, 20}[i]
+				dept := []int64{1000, 2000, 2000, 2000, 1000}[i]
+				want := []bigquery.Value{emp, dept, durations[i], sessions[i]}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("row %d = %v, want %v", i, got, want)
+				}
+			}
+			if !reflect.DeepEqual(rows.Schema, wantSchema) {
+				t.Fatalf("schema = %v, want %v", fields(rows.Schema), fields(wantSchema))
+			}
+			var extra []bigquery.Value
+			if err := rows.Next(&extra); err != iterator.Done {
+				t.Fatalf("next = %v, want iterator.Done", err)
+			}
+		})
+	}
+}
+
+// Session ranges preserve the element type that the input RANGE resolves to.
+func TestRangeSessionizeElementTypes(t *testing.T) {
+	for _, c := range []struct {
+		element bigquery.FieldType
+		sql     string
+		want    *bigquery.RangeValue
+	}{
+		{bigquery.DateTimeFieldType,
+			"RANGE(DATETIME '2022-10-01 14:53:27', DATETIME '2022-10-01 16:00:00')",
+			&bigquery.RangeValue{
+				Start: civil.DateTime{Date: civil.Date{Year: 2022, Month: 10, Day: 1}, Time: civil.Time{Hour: 14, Minute: 53, Second: 27}},
+				End:   civil.DateTime{Date: civil.Date{Year: 2022, Month: 10, Day: 1}, Time: civil.Time{Hour: 16}},
+			}},
+		{bigquery.TimestampFieldType,
+			"RANGE(TIMESTAMP '2022-10-01 14:53:27 America/Los_Angeles', TIMESTAMP '2022-10-01 16:00:00 America/Los_Angeles')",
+			&bigquery.RangeValue{Start: time.Date(2022, 10, 1, 21, 53, 27, 0, time.UTC), End: time.Date(2022, 10, 1, 23, 0, 0, 0, time.UTC)}},
+	} {
+		t.Run(string(c.element), func(t *testing.T) {
+			query := newClient(t).Query("WITH input AS (SELECT " + c.sql + " AS r) SELECT session_range FROM RANGE_SESSIONIZE(TABLE input, 'r', [])")
+			rows, err := query.Read(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantSchema := bigquery.Schema{{Name: "session_range", Type: bigquery.RangeFieldType, RangeElementType: &bigquery.RangeElementType{Type: c.element}}}
+			var got []bigquery.Value
+			if err := rows.Next(&got); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(rows.Schema, wantSchema) {
+				t.Fatalf("schema = %v, want %v", fields(rows.Schema), fields(wantSchema))
+			}
+			if want := []bigquery.Value{c.want}; !reflect.DeepEqual(got, want) {
+				t.Fatalf("values = %v, want %v", got, want)
+			}
+		})
 	}
 }
