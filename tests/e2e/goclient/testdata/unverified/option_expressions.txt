@@ -1,0 +1,117 @@
+# Options set by constant expressions. BigQuery's DDL reference says an option's VALUE "is a
+# constant expression containing only literals, query parameters, and scalar functions", and
+# lists the scalar functions it cannot contain. It does not say whether script variables count,
+# whether a STRING converts to the TIMESTAMP of expiration_timestamp, which instant
+# CURRENT_TIMESTAMP() is relative to the table's creation time, whether an expiration in the past
+# is accepted, or the message for a function it excludes. Each script reports "ok", a value or the
+# error, and drops the dataset it creates.
+
+# A script variable as the value.
+DECLARE result STRING;
+DECLARE expiration TIMESTAMP DEFAULT TIMESTAMP '2030-01-01 00:00:00 UTC';
+CREATE SCHEMA bqanswers_option_variable;
+BEGIN
+  CREATE TABLE bqanswers_option_variable.t (a INT64) OPTIONS (expiration_timestamp = expiration);
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_variable CASCADE;
+SELECT result
+?>
+
+# A STRING literal for expiration_timestamp, reported as the option value BigQuery stores.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_string;
+BEGIN
+  CREATE TABLE bqanswers_option_string.t (a INT64)
+    OPTIONS (expiration_timestamp = '2030-01-01 00:00:00 UTC');
+  SET result = (
+    SELECT option_value FROM bqanswers_option_string.INFORMATION_SCHEMA.TABLE_OPTIONS
+    WHERE table_name = 't' AND option_name = 'expiration_timestamp');
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_string CASCADE;
+SELECT result
+?>
+
+# A STRING expression for expiration_timestamp.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_string_expression;
+BEGIN
+  CREATE TABLE bqanswers_option_string_expression.t (a INT64)
+    OPTIONS (expiration_timestamp = CONCAT('2030-01-01', ' 00:00:00 UTC'));
+  SET result = (
+    SELECT option_value FROM bqanswers_option_string_expression.INFORMATION_SCHEMA.TABLE_OPTIONS
+    WHERE table_name = 't' AND option_name = 'expiration_timestamp');
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_string_expression CASCADE;
+SELECT result
+?>
+
+# How many milliseconds the expiration of TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY) is
+# from a day after the table's creation time; 0 when CURRENT_TIMESTAMP() is the creation time.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_current_timestamp;
+BEGIN
+  CREATE TABLE bqanswers_option_current_timestamp.t (a INT64)
+    OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY));
+  SET result = (
+    SELECT CAST(TIMESTAMP_DIFF(
+        TIMESTAMP(REGEXP_EXTRACT(o.option_value, r'"(.*)"')), t.creation_time, MILLISECOND)
+        - 86400000 AS STRING)
+    FROM bqanswers_option_current_timestamp.INFORMATION_SCHEMA.TABLE_OPTIONS AS o
+    JOIN bqanswers_option_current_timestamp.INFORMATION_SCHEMA.TABLES AS t USING (table_name)
+    WHERE table_name = 't' AND o.option_name = 'expiration_timestamp');
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_current_timestamp CASCADE;
+SELECT result
+?>
+
+# CREATE TABLE with an expiration in the past.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_past_create;
+BEGIN
+  CREATE TABLE bqanswers_option_past_create.t (a INT64)
+    OPTIONS (expiration_timestamp = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY));
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_past_create CASCADE;
+SELECT result
+?>
+
+# ALTER TABLE SET OPTIONS with an expiration in the past.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_past_alter;
+CREATE TABLE bqanswers_option_past_alter.t (a INT64);
+BEGIN
+  ALTER TABLE bqanswers_option_past_alter.t
+    SET OPTIONS (expiration_timestamp = TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY));
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_past_alter CASCADE;
+SELECT result
+?>
+
+# A scalar function the DDL reference excludes from option values.
+DECLARE result STRING;
+CREATE SCHEMA bqanswers_option_excluded_function;
+BEGIN
+  CREATE TABLE bqanswers_option_excluded_function.t (a INT64)
+    OPTIONS (description = REPEAT('x', 2));
+  SET result = 'ok';
+EXCEPTION WHEN ERROR THEN
+  SET result = 'error: ' || @@error.message;
+END;
+DROP SCHEMA bqanswers_option_excluded_function CASCADE;
+SELECT result
+?>
