@@ -725,6 +725,11 @@ class WriteService final : public pb::BigQueryWrite::Service {
     if (info.view_query) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "Cannot write to a logical view");
     }
+    // Rows are written with DuckDB's casts, which round halfway values away from zero.
+    if (HasRoundHalfEven(info.schema)) {
+      Fail(grpc::StatusCode::UNIMPLEMENTED,
+           "Storage Write does not support ROUND_HALF_EVEN columns");
+    }
     return info;
   }
 

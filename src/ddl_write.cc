@@ -223,6 +223,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
       if (options->description.has_value()) {
         column->description = *options->description;
       }
+      if (options->rounding_mode.has_value()) {
+        column->rounding_mode = *options->rounding_mode;
+      }
       commented.push_back(column->name);
     } else if (const auto* value = std::get_if<ColumnDefaultAction>(&action)) {
       const auto column = FindColumn(schema, value->name);

@@ -105,11 +105,12 @@ struct RenameTableAction {
   std::string table_id;
 };
 
-// ALTER TABLE ALTER COLUMN [IF EXISTS] SET OPTIONS, which sets the column's description; NULL
-// clears it.
+// ALTER TABLE ALTER COLUMN [IF EXISTS] SET OPTIONS, which sets the column's description and
+// rounding mode; NULL clears them.
 struct ColumnOptionsAction {
   std::string name;
   std::optional<std::string> description = {};
+  std::optional<std::string> rounding_mode = {};
   bool if_exists = false;
 };
 

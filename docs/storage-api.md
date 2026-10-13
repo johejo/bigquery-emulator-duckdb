@@ -22,7 +22,8 @@ unsupported. The [support table](storage.md) lists the request options the emula
 ## Write limitations
 
 Protobuf scalar fields, STRUCTs and repeated fields are supported. Column defaults, parameterized
-columns, custom protobuf annotations, JSON/GEOGRAPHY input and schema evolution are unsupported.
+columns, `ROUND_HALF_EVEN` columns, custom protobuf annotations, JSON/GEOGRAPHY input and schema
+evolution are unsupported.
 
 Create a new stream after changing a table schema. Default streams established before a schema
 change require restarting the process. Tables persisted without creation metadata cannot return

@@ -19,6 +19,7 @@ setup POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId"
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}]}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "w"}, "view": {"query": "SELECT 1 AS id", "useLegacySql": false}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "r"}, "schema": {"fields": [{"name": "record", "type": "RECORD", "mode": "REPEATED", "fields": [{"name": "id", "type": "INTEGER"}]}]}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "h"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x INT64) AS (x + 1)", "useLegacySql": false}
 
@@ -52,7 +53,10 @@ request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configurat
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}, "clustering": {"fields": ["x"]}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "t"}, "writeDisposition": "WRITE_APPEND"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "h"}, "writeDisposition": "WRITE_APPEND"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT NUMERIC '1' AS a", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "h"}, "writeDisposition": "WRITE_APPEND"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "h"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}, "operationType": "CLONE"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.avro"], "destinationFormat": "AVRO"}}}
@@ -83,6 +87,7 @@ note bigquery.routines.get | Describes the persistent SQL UDFs that `CREATE FUNC
 
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}
+request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/h/insertAll {"rows": [{"json": {"a": "2.5"}}]}
 note bigquery.tabledata.insertAll | Ignores `insertId`, so retried rows are not deduplicated.
 request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?maxResults=1&startIndex=0
 request bigquery.tabledata.list | GET /bigquery/v2/projects/test/datasets/d/tables/t/data?selectedFields=id
@@ -103,6 +108,7 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "10", "scale": "2"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "BIGNUMERIC", "precision": "40", "scale": "2"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "10", "scale": "1", "roundingMode": "ROUND_HALF_EVEN", "defaultValueExpression": "1"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC"}]}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
 note bigquery.tables.insert | See [Tables](compatibility.md#tables).
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}

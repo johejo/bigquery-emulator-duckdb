@@ -8,12 +8,14 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -99,6 +101,24 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
   return HasBigNumeric(call.type()) ||
          std::ranges::any_of(call.argument_list(),
                              [](const auto& argument) { return HasBigNumeric(argument->type()); });
+}
+
+std::optional<std::string> WrittenValue(std::string value, const googlesql::Type* type,
+                                        const FieldSchema& field, const Scope& scope) {
+  if (!RoundsToEven(field)) {
+    return value;
+  }
+  if (field.type == FieldType::kRecord || field.mode == FieldMode::kRepeated) {
+    return Unsupported(scope,
+                       "writing a STRUCT or ARRAY with parameterized ROUND_HALF_EVEN values");
+  }
+  return TranslateFunction(
+      "ROUND",
+      {
+          {.sql = std::move(value), .type = type->kind()},
+          {.sql = std::to_string(field.scale.value_or(0)), .type = googlesql::TYPE_INT64},
+          {.sql = "NULL", .type = googlesql::TYPE_ENUM, .rounding_mode = "ROUND_HALF_EVEN"},
+      });
 }
 
 namespace {

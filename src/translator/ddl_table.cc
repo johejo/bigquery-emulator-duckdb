@@ -26,6 +26,7 @@
 #include "src/translator/ddl_names.h"
 #include "src/translator/ddl_options.h"
 #include "src/translator/expression.h"
+#include "src/translator/function.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
@@ -58,8 +59,20 @@ std::optional<googlesql::TypeParameters> ColumnTypeParameters(
   return *std::move(parameters);
 }
 
-// Records NOT NULL as REQUIRED and the description in OPTIONS on `field`, and the same for the
-// fields of a struct. Other column options are unsupported.
+// Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
+// value.
+bool RoundingModeOption(const googlesql::Value& value, std::string& into) {
+  std::string mode;
+  if (!StringOption(value, mode) ||
+      (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven)) {
+    return false;
+  }
+  into = std::move(mode);
+  return true;
+}
+
+// Records NOT NULL as REQUIRED and the description and rounding mode in OPTIONS on `field`, and
+// the same for the fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
                       const googlesql::ResolvedColumnAnnotations& annotations, FieldSchema& field,
                       const Scope& scope) {
@@ -67,9 +80,11 @@ bool ApplyAnnotations(const googlesql::Type* type,
     field.mode = FieldMode::kRequired;
   }
   for (const auto& option : annotations.option_list()) {
+    const std::string name = ToLowerAscii(option->name());
     const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
-    if (ToLowerAscii(option->name()) != "description" || !value.has_value() ||
-        !StringOption(*value, field.description)) {
+    if (!value.has_value() ||
+        !((name == "description" && StringOption(*value, field.description)) ||
+          (name == "rounding_mode" && RoundingModeOption(*value, field.rounding_mode)))) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -140,14 +155,17 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   return type;
 }
 
-// The description ALTER COLUMN SET OPTIONS sets on `action`. The other column options change how
-// BigQuery stores or reads the column, which the emulator does not emulate, so they are
-// unsupported, and so are += and -=.
+// The description and rounding mode ALTER COLUMN SET OPTIONS sets on `action`. The other column
+// options change how BigQuery stores or reads the column, which the emulator does not emulate, so
+// they are unsupported, and so are += and -=.
 bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsAction& action) {
   for (const auto& option : options) {
+    const std::string name = ToLowerAscii(option->name());
     const std::optional<googlesql::Value> value = OptionValue(*option, "column", scope);
-    if (ToLowerAscii(option->name()) != "description" || !value.has_value() ||
-        !StringOption(*value, action.description.emplace())) {
+    if (!value.has_value() ||
+        !((name == "description" && StringOption(*value, action.description.emplace())) ||
+          (name == "rounding_mode" &&
+           RoundingModeOption(*value, action.rounding_mode.emplace())))) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -785,7 +803,12 @@ std::optional<std::string> CreateTableAsSelect(
       table.schema.push_back(*std::move(field));
     }
     const FieldSchema& field = table.schema.at(i);
-    projections.push_back("CAST(" + column->second + " AS " + *type + ") AS " +
+    const auto value =
+        WrittenValue(column->second, create.output_column_list(i)->column().type(), field, scope);
+    if (!value) {
+      return std::nullopt;
+    }
+    projections.push_back("CAST(" + *value + " AS " + *type + ") AS " +
                           QuoteIdentifier(field.name));
   }
   scope.context.table = std::move(table);

@@ -185,6 +185,10 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         DetectParquetDecimals(requested_schema, parquet, config);
       }
     }
+    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
+    if (HasRoundHalfEven(requested_schema)) {
+      throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
+    }
     const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
     const QueryResult prepared = Prepare(sql);
     const QueryResult result = WriteDestination(
@@ -396,6 +400,13 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
   if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
     throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
+  }
+  // Appended rows are written with DuckDB's casts, which round halfway values away from zero; only
+  // a copy from a table of the same schema has nothing to round.
+  if (existing.has_value() && write != WriteDisposition::kWriteTruncate &&
+      HasRoundHalfEven(existing->schema) &&
+      SchemaToJson(existing->schema) != SchemaToJson(schema)) {
+    throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
   }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
   if (existing.has_value() && !metadata.empty()) {

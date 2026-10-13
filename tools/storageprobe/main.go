@@ -336,6 +336,8 @@ var sections = []section{
 				MaxLength: 10}}, "probe")},
 			{"JSON columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.JSONFieldType}}, `{"a": 1}`)},
 			{"GEOGRAPHY columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.GeographyFieldType}}, "POINT(1 2)")},
+			{"ROUND_HALF_EVEN columns", appendTo(bigquery.Schema{{Name: "value", Type: bigquery.NumericFieldType,
+				RoundingMode: bigquery.RoundHalfEven}}, "1.5")},
 		}},
 		{"GetWriteStream", "See [Write limitations](storage-api.md#write-limitations).", []form{
 			{"BASIC", getStream(storagepb.WriteStreamView_BASIC)},

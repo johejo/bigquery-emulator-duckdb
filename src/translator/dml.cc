@@ -1,9 +1,11 @@
 #include "src/translator/dml.h"
 
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/catalog.h"
@@ -11,8 +13,10 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
+#include "src/translator/function.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
@@ -28,7 +32,16 @@ struct Target {
   // The same columns qualified by the alias, for expressions.
   Columns columns;
   std::map<int, const googlesql::Type*> column_types;
+  // The schema fields of the same columns, which say how values written to them are rounded.
+  std::map<int, const FieldSchema*> fields;
 };
+
+// The schema field of the column `index` of `table`, or null for a table the emulator does not
+// keep a schema for.
+const FieldSchema* ColumnField(const googlesql::Table* table, int index) {
+  const auto* kept = dynamic_cast<const BigQueryTable*>(table);
+  return kept == nullptr ? nullptr : &kept->field(index);
+}
 
 std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope) {
   if (!table.hint_list().empty() || table.for_system_time_expr() != nullptr ||
@@ -44,6 +57,7 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
       .names = {},
       .columns = {},
       .column_types = {},
+      .fields = {},
   };
   for (int i = 0; i < table.column_list_size(); ++i) {
     const auto& column = table.column_list(i);
@@ -55,6 +69,8 @@ std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const
     target.names.emplace(column.column_id(), name);
     target.columns.emplace(column.column_id(), StoredColumn("_t." + name, column.type()));
     target.column_types.emplace(column.column_id(), column.type());
+    target.fields.emplace(column.column_id(),
+                          ColumnField(table.table(), table.column_index_list(i)));
   }
   return target;
 }
@@ -66,12 +82,18 @@ Scope DmlScope(const Scope& scope, const Target& target) {
   return dml;
 }
 
-std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value, const Scope& scope,
+// The value `value` writes to the column `field`, or to a field of it; see WrittenValue.
+std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value,
+                                    const FieldSchema* field, const Scope& scope,
                                     const Columns& columns) {
   if (value.value()->Is<googlesql::ResolvedDMLDefault>()) {
     return "DEFAULT";
   }
-  return Expression(*value.value(), scope, columns);
+  std::optional<std::string> sql = Expression(*value.value(), scope, columns);
+  if (!sql || field == nullptr) {
+    return sql;
+  }
+  return WrittenValue(*std::move(sql), value.value()->type(), *field, scope);
 }
 
 // The assignments below one column or struct field: either its new value, or the fields of it
@@ -144,7 +166,8 @@ std::optional<std::string> UpdateItems(
     if (!target.names.contains(id) || !target.columns.contains(id)) {
       return Unsupported(scope, "UPDATE target");
     }
-    const auto value = DmlValue(*item->set_value(), scope, columns);
+    // A field of a STRUCT column is written as part of the column.
+    const auto value = DmlValue(*item->set_value(), target.fields.at(id), scope, columns);
     if (!value) {
       return std::nullopt;
     }
@@ -209,12 +232,17 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   }
   // The inserted columns are the table scan's columns; name them by the table's own columns.
   std::map<int, std::string> table_columns;
+  std::map<int, const FieldSchema*> table_fields;
   for (int i = 0; i < table->column_list_size(); ++i) {
     table_columns.emplace(
         table->column_list(i).column_id(),
         QuoteIdentifier(table->table()->GetColumn(table->column_index_list(i))->Name()));
+    table_fields.emplace(table->column_list(i).column_id(),
+                         ColumnField(table->table(), table->column_index_list(i)));
   }
   std::vector<std::string> names;
+  // The field of each inserted column, in order.
+  std::vector<const FieldSchema*> fields;
   for (const auto& column : insert.insert_column_list()) {
     const auto name = table_columns.find(column.column_id());
     if (name == table_columns.end() || !DuckDbType(column.type()) ||
@@ -222,6 +250,7 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
       return std::nullopt;
     }
     names.push_back(name->second);
+    fields.push_back(table_fields.at(column.column_id()));
   }
   std::string const sql = "INSERT INTO " + QuoteIdentifierPath(table->table()->FullName()) + " (" +
                           Join(names, ", ") + ") ";
@@ -231,12 +260,19 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
       return std::nullopt;
     }
     std::vector<std::string> projections;
-    for (const auto& output : insert.query_output_column_list()) {
+    for (std::size_t i = 0; i < insert.query_output_column_list().size(); ++i) {
+      const auto& output = insert.query_output_column_list().at(i);
       const auto column = relation->columns.find(output.column_id());
-      if (column == relation->columns.end()) {
+      if (column == relation->columns.end() || i >= fields.size()) {
         return std::nullopt;
       }
-      projections.push_back(column->second);
+      const auto value = fields.at(i) == nullptr
+                             ? column->second
+                             : WrittenValue(column->second, output.type(), *fields.at(i), scope);
+      if (!value) {
+        return std::nullopt;
+      }
+      projections.push_back(*value);
     }
     return sql + "SELECT " + Join(projections, ", ") + relation->From();
   }
@@ -246,17 +282,15 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
   std::vector<std::string> rows;
   for (const auto& row : insert.row_list()) {
     std::vector<std::string> values;
-    for (const auto& dml_value : row->value_list()) {
-      const auto* value = dml_value->value();
-      if (value->Is<googlesql::ResolvedDMLDefault>()) {
-        values.emplace_back("DEFAULT");
-        continue;
-      }
-      const auto sql_value = Expression(*value, scope, {});
-      if (!sql_value) {
+    for (int i = 0; i < row->value_list_size(); ++i) {
+      if (std::cmp_greater_equal(i, fields.size())) {
         return std::nullopt;
       }
-      values.push_back(*sql_value);
+      const auto value = DmlValue(*row->value_list(i), fields.at(i), scope, {});
+      if (!value) {
+        return std::nullopt;
+      }
+      values.push_back(*value);
     }
     rows.push_back("(" + Join(values, ", ") + ")");
   }
@@ -388,7 +422,9 @@ std::optional<std::string> MergeClause(const googlesql::ResolvedMergeWhen& when,
         if (name == target.names.end()) {
           return Unsupported(scope, "MERGE INSERT column");
         }
-        const auto value = DmlValue(*when.insert_row()->value_list(i), scope, columns);
+        const auto value =
+            DmlValue(*when.insert_row()->value_list(i),
+                     target.fields.at(when.insert_column_list(i).column_id()), scope, columns);
         if (!value) {
           return std::nullopt;
         }

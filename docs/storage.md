@@ -32,7 +32,7 @@ RPC list the forms the emulator rejected.
 | RPC | Status | Notes |
 | --- | --- | --- |
 | `CreateWriteStream` | Supported | See [Lifetime and persistence](storage-api.md#lifetime-and-persistence). |
-| `AppendRows` | Partial | See [Write limitations](storage-api.md#write-limitations). Unsupported: Arrow rows; GEOGRAPHY columns; JSON columns; column defaults; parameterized columns; writer schema changes on a connection. |
+| `AppendRows` | Partial | See [Write limitations](storage-api.md#write-limitations). Unsupported: Arrow rows; GEOGRAPHY columns; JSON columns; ROUND_HALF_EVEN columns; column defaults; parameterized columns; writer schema changes on a connection. |
 | `GetWriteStream` | Supported | See [Write limitations](storage-api.md#write-limitations). |
 | `FinalizeWriteStream` | Supported |  |
 | `FlushRows` | Supported |  |
