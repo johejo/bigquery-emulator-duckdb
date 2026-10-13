@@ -502,7 +502,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`RANGE_END`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_end) | Supported | DuckDB SQL |  |
 | [`RANGE_INTERSECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_intersect) | Supported | DuckDB SQL |  |
 | [`RANGE_OVERLAPS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_overlaps) | Supported | DuckDB SQL |  |
-| [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | Partial | Table function | See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits. Unsupported: RANGE_SESSIONIZE NULL range. |
+| [`RANGE_SESSIONIZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize) | Partial | Table function | See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits. Unsupported: RANGE_SESSIONIZE partitioning column type. |
 | [`RANGE_START`](https://cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_start) | Supported | DuckDB SQL |  |
 
 ## Search functions

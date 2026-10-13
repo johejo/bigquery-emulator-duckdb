@@ -32,3 +32,14 @@ WITH ranges AS (SELECT RANGE<TIMESTAMP> '[1969-12-31 23:59:59.999999+00, 1970-01
 
 WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-01-03)' AS r LIMIT 0) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
 => "0"
+
+# Confirmed against BigQuery by the maintainer.
+
+WITH ranges AS (SELECT 1 AS id, CAST(NULL AS RANGE<DATE>) AS r UNION ALL SELECT 2, RANGE<DATE> '[2024-01-01, 2024-02-01)') SELECT ARRAY_AGG(STRUCT(id, CAST(session_range AS STRING) AS session_range) ORDER BY id) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> [{"v":{"f":[{"v":"1"},{"v":null}]}},{"v":{"f":[{"v":"2"},{"v":"[2024-01-01, 2024-02-01)"}]}}]
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT session_range FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [], 'meets')
+=> error contains: Could not cast literal "meets" to type RANGE_SESSIONIZE_MODE; Did you mean 'MEETS'? (Note: ENUM values are case sensitive)
+
+WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r, 1 AS session_range) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, 'r', [])
+=> "1"

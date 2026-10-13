@@ -53,6 +53,9 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
     }
     for (const auto& key : *partition_names) {
       if (absl::EqualsIgnoreCase(schema.column(i).name, key.string_value())) {
+        if (HasInterval(column.type())) {
+          return Unsupported(scope, "RANGE_SESSIONIZE partitioning column type");
+        }
         keys.push_back(name);
       }
     }
@@ -60,16 +63,16 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
   const auto& arguments = tvf.signature()->input_arguments();
   const bool overlaps =
       arguments.size() == 4 &&
-      arguments.at(3).GetScalarArgType()->literal_value()->string_value() == "OVERLAPS";
+      arguments.at(3).GetScalarArgType()->literal_value()->EnumDisplayName() == "OVERLAPS";
   const std::string partition = keys.empty() ? "" : "PARTITION BY " + Join(keys, ", ") + " ";
   const std::string order =
-      "ORDER BY _rs_start, _rs_end, _rs_id ROWS BETWEEN UNBOUNDED PRECEDING AND ";
+      "ORDER BY _rs_start NULLS LAST, _rs_end NULLS LAST, _rs_id "
+      "ROWS BETWEEN UNBOUNDED PRECEDING AND ";
   // RANGE's unbounded ends are stored as infinities. A running maximum (rather
   // than LAG) keeps nested ranges and chains in the same connected component.
   const std::string bounds = std::format(
       "SELECT q.*, row_number() OVER () AS _rs_id, {0}.{1} AS _rs_start, "
-      "{0}.{2} AS _rs_end{3} WHERE CASE WHEN {0} IS NULL THEN "
-      "error('The emulator does not support RANGE_SESSIONIZE NULL range') ELSE TRUE END",
+      "{0}.{2} AS _rs_end{3}",
       range, QuoteIdentifier(kRangeStart), QuoteIdentifier(kRangeEnd), input->From());
   const std::string previous =
       std::format("SELECT *, max(_rs_end) OVER ({}{}1 PRECEDING) AS _rs_previous FROM ({})",
@@ -80,9 +83,10 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
       overlaps ? ">=" : ">", partition, order, previous);
   keys.emplace_back("_rs_group");
   const std::string window = " OVER (PARTITION BY " + Join(keys, ", ") + ")";
-  const std::string session =
-      std::format("struct_pack({} := min(_rs_start){}, {} := max(_rs_end){})",
-                  QuoteIdentifier(kRangeStart), window, QuoteIdentifier(kRangeEnd), window);
+  const std::string session = std::format(
+      "CASE WHEN {} IS NULL THEN NULL ELSE "
+      "struct_pack({} := min(_rs_start){}, {} := max(_rs_end){}) END",
+      range, QuoteIdentifier(kRangeStart), window, QuoteIdentifier(kRangeEnd), window);
   Relation result;
   std::vector<std::string> projections;
   for (int i = 0; i < tvf.column_list_size(); ++i) {
@@ -95,7 +99,7 @@ std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, co
     result.columns.emplace(id, "q." + ColumnName(id));
   }
   result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-               " FROM (" + groups + ")";
+               " FROM (" + groups + ") AS q";
   return result;
 }
 

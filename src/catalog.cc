@@ -78,23 +78,16 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> SessionizeSchema(
       return absl::InvalidArgumentError(
           "RANGE_SESSIONIZE requires unambiguous partitioning columns");
     }
-    if (!column->type->SupportsGrouping(GoogleSqlLanguageOptions()) || HasInterval(column->type) ||
-        column->annotation_map != nullptr) {
+    if (!column->type->SupportsGrouping(GoogleSqlLanguageOptions())) {
       return absl::InvalidArgumentError(
           "The emulator does not support RANGE_SESSIONIZE partitioning column type");
     }
   }
-  if (literals.size() == 3 && literals.at(2).string_value() != "MEETS" &&
-      literals.at(2).string_value() != "OVERLAPS") {
+  if (literals.size() == 3 && literals.at(2).EnumDisplayName() != "MEETS" &&
+      literals.at(2).EnumDisplayName() != "OVERLAPS") {
     return absl::InvalidArgumentError("RANGE_SESSIONIZE option must be MEETS or OVERLAPS");
   }
   auto columns = input.columns();
-  if (std::ranges::any_of(columns, [](const auto& column) {
-        return absl::EqualsIgnoreCase(column.name, "session_range");
-      })) {
-    return absl::InvalidArgumentError(
-        "The emulator does not support RANGE_SESSIONIZE input with session_range column");
-  }
   columns.emplace_back("session_range", range->type);
   return googlesql::TVFSignature::Create(arguments, googlesql::TVFRelation(std::move(columns)));
 }
@@ -118,7 +111,7 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
                     googlesql::FunctionArgumentType::AnyRelation(),
                     googlesql::FunctionArgumentType(googlesql::types::StringType()),
                     googlesql::FunctionArgumentType(googlesql::types::StringArrayType()),
-                    googlesql::FunctionArgumentType(googlesql::types::StringType(),
+                    googlesql::FunctionArgumentType(googlesql::types::RangeSessionizeModeEnumType(),
                                                     googlesql::FunctionArgumentType::OPTIONAL),
                 },
                 /*context_id=*/int64_t{0}),
