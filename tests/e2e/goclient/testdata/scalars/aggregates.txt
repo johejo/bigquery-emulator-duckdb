@@ -39,6 +39,32 @@ FROM UNNEST([TRUE]) AS x WITH OFFSET AS i
 SELECT COUNTIF(x) OVER () FROM UNNEST([TRUE, FALSE, NULL, TRUE]) AS x LIMIT 1
 => "2"
 
+# Bitwise aggregates over INT64. Expected values are the examples in BigQuery's documentation.
+SELECT BIT_AND(x) FROM UNNEST([0xF001, 0x00A1]) AS x
+=> "1"
+
+SELECT BIT_OR(x) FROM UNNEST([0xF001, 0x00A1]) AS x
+=> "61601"
+
+SELECT BIT_XOR(x) FROM UNNEST([5678, 1234]) AS x
+=> "4860"
+
+SELECT BIT_XOR(x) FROM UNNEST([1234, 5678, 1234]) AS x
+=> "5678"
+
+SELECT BIT_XOR(DISTINCT x) FROM UNNEST([1234, 5678, 1234]) AS x
+=> "4860"
+
+# They ignore NULL and return NULL when no value remains. Expected values come from BigQuery.
+SELECT BIT_AND(x) FROM UNNEST([12, NULL, 10]) AS x
+=> "8"
+
+SELECT BIT_OR(x) FROM UNNEST(ARRAY<INT64>[]) AS x
+=> null
+
+SELECT BIT_XOR(x) FROM UNNEST([CAST(NULL AS INT64), NULL]) AS x
+=> null
+
 ## Aggregate limit and having modifiers
 
 SELECT ARRAY_TO_STRING(ARRAY_AGG(b ORDER BY a LIMIT 2), ',') FROM t WHERE a IS NOT NULL

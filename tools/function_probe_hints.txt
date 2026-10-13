@@ -130,6 +130,12 @@ query MAX_BY SELECT MAX_BY(x, x) FROM UNNEST([BIGNUMERIC '1.5']) AS x
 query MIN_BY SELECT MIN_BY(x, 'abc') FROM UNNEST([1, 2]) AS x
 query MIN_BY SELECT MIN_BY(x, x) FROM UNNEST([BIGNUMERIC '1.5']) AS x
 
+# BigQuery documents the bitwise aggregates over INT64 only, without GoogleSQL's BYTES overload
+# and its mode.
+query BIT_AND SELECT BIT_AND(x) FROM UNNEST([1, 2]) AS x
+query BIT_OR SELECT BIT_OR(x) FROM UNNEST([1, 2]) AS x
+query BIT_XOR SELECT BIT_XOR(x) FROM UNNEST([1, 2]) AS x
+
 # Arguments whose valid values a type alone does not describe.
 query ACOS SELECT ACOS(0.5)
 query ASIN SELECT ASIN(0.5)
