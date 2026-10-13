@@ -15,13 +15,20 @@ concurrency:
 
 jobs:
   clang-tidy:
-    name: Clang-tidy
-    runs-on: ubuntu-26.04-arm
+    name: Clang-tidy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     permissions:
       contents: read
       # Main runs delete the caches they replace.
       actions: write
+    # The system headers differ, so include-cleaner reports different findings on each platform.
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-26.04-arm
+          - macos-26
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

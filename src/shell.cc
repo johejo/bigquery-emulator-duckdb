@@ -3,7 +3,6 @@
 // include-cleaner requires signal.h for sigaction; modernize-deprecated-headers suggests csignal
 // instead, so suppress it on this include.
 #include <signal.h>  // NOLINT(modernize-deprecated-headers)
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -66,7 +65,7 @@ LineStatus ReadLine(std::string& line) {
   line.clear();
   char byte = 0;
   while (true) {
-    const ssize_t count = read(STDIN_FILENO, &byte, 1);
+    const auto count = read(STDIN_FILENO, &byte, 1);
     if (count < 0 && errno == EINTR) {
       return LineStatus::kInterrupted;
     }
