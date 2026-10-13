@@ -55,7 +55,7 @@ rejected.
 | `SELECT AS STRUCT`, `SELECT AS VALUE` | Supported |  |
 | `* EXCEPT`, `* REPLACE` | Supported |  |
 | `.*` of a struct | Supported |  |
-| STRUCT constructors and casts | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: CAST to JSON with anonymous or duplicate STRUCT fields; type STRUCT<>. |
+| STRUCT constructors and casts | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: CAST to JSON with anonymous or duplicate STRUCT fields; result type STRUCT<>. |
 | Struct field and array element access | Supported |  |
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |
@@ -116,7 +116,7 @@ rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Statement lists | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
-| `DECLARE`, `SET` | Partial | Unsupported: type STRUCT<>. |
+| `DECLARE`, `SET` | Partial | Unsupported: result type STRUCT<>. |
 | `BEGIN ... END` | Supported |  |
 | `BEGIN ... EXCEPTION ... END` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `IF` | Supported |  |

@@ -1,7 +1,7 @@
 # Statement forms and modifiers the emulator does not implement are named in the error.
 
 SELECT STRUCT()
-=> error contains: The emulator does not support type STRUCT<>
+=> error contains: The emulator does not support result type STRUCT<>
 
 SELECT SAFE.RAND()
 => error contains: The emulator does not support SAFE.RAND

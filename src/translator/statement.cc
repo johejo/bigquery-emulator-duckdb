@@ -1,5 +1,6 @@
 #include "src/translator/statement.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -13,6 +14,7 @@
 #include "src/translator/ddl.h"
 #include "src/translator/dml.h"
 #include "src/translator/scan.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
@@ -74,6 +76,11 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   const auto relation = Scan(*query->query(), scope);
   if (!relation) {
     return std::nullopt;
+  }
+  if (std::ranges::any_of(query->output_column_list(), [](const auto& output) {
+        return HasEmptyStruct(output->column().type());
+      })) {
+    return Unsupported(scope, "result type STRUCT<>");
   }
   std::vector<std::string> projections;
   // A value table of structs is returned as the structs' fields, like BigQuery does.

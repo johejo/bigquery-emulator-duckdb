@@ -470,6 +470,9 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       }
       fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *field);
     }
+    if (fields.empty()) {
+      fields.push_back(QuoteIdentifier(kEmptyStruct) + " := TRUE");
+    }
     return "CAST(struct_pack(" + Join(fields, ", ") + ") AS " + *type + ")";
   }
   if (expr.Is<googlesql::ResolvedGetStructField>()) {

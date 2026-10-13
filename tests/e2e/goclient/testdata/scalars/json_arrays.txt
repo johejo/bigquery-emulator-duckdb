@@ -2,7 +2,8 @@
 # https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/json_functions
 # Empty arrays and typed NULL arrays also follow GoogleSQL compliance data in
 # functions_testlib_json.cc, GetFunctionTestsJsonFlatten and
-# GetFunctionTestsJsonArrayAppend / GetFunctionTestsJsonArrayInsert.
+# GetFunctionTestsJsonArrayAppend / GetFunctionTestsJsonArrayInsert. STRUCT<> values follow the
+# TO_JSON encoding in functions_testlib_tojson.cc.
 
 SELECT TO_JSON_STRING(JSON_FLATTEN(JSON '1'))
 => "[1]"
@@ -127,6 +128,18 @@ SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', JSON '[1,2]'))
 SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT(1 AS a, b'abc' AS b)))
 => "[{\"a\":1,\"b\":\"YWJj\"}]"
 
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT()))
+=> "[{}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', CAST(NULL AS STRUCT<>)))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', [STRUCT(), STRUCT()]))
+=> "[{},{}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT(CAST(NULL AS STRUCT<>) AS c, STRUCT() AS x)))
+=> "[{\"c\":null,\"x\":{}}]"
+
 SELECT TO_JSON_STRING(JSON_ARRAY_APPEND(JSON '[]', '$', NUMERIC '1.5', '$', BIGNUMERIC '2.5'))
 => "[1.5,2.5]"
 
@@ -182,6 +195,15 @@ SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', JSON '[1,2]'))
 
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', STRUCT(1 AS a, b'abc' AS b)))
 => "[{\"a\":1,\"b\":\"YWJj\"}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', STRUCT()))
+=> "[{}]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', CAST(NULL AS STRUCT<>)))
+=> "[null]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', [STRUCT(), STRUCT()], insert_each_element => FALSE))
+=> "[[{},{}]]"
 
 SELECT TO_JSON_STRING(JSON_ARRAY_INSERT(JSON '[]', '$[0]', NUMERIC '1.5', '$[0]', BIGNUMERIC '2.5'))
 => "[2.5,1.5]"

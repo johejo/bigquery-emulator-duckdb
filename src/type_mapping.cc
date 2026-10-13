@@ -97,6 +97,10 @@ absl::StatusOr<FieldType> BigQueryFieldType(const googlesql::Type* type) {
     case googlesql::TYPE_GEOGRAPHY:
       return FieldType::kGeography;
     case googlesql::TYPE_STRUCT:
+      // A RECORD has at least one field.
+      if (type->AsStruct()->num_fields() == 0) {
+        return absl::InvalidArgumentError("Unsupported result type: STRUCT<>");
+      }
       return FieldType::kRecord;
     default:
       return absl::InvalidArgumentError("Unsupported result type: " +
@@ -191,9 +195,13 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
         }
         fields.push_back(QuoteIdentifier(names.at(i)) + " " + *field_type);
       }
-      return fields.empty()
-                 ? std::nullopt
-                 : std::optional<std::string>("STRUCT(" + absl::StrJoin(fields, ", ") + ")");
+      // DuckDB has no empty STRUCT, and BigQuery stores none.
+      if (fields.empty()) {
+        return use == TypeUse::kQuery ? std::optional<std::string>(std::format(
+                                            "STRUCT({} BOOLEAN)", QuoteIdentifier(kEmptyStruct)))
+                                      : std::nullopt;
+      }
+      return "STRUCT(" + absl::StrJoin(fields, ", ") + ")";
     }
     default:
       return std::nullopt;
@@ -405,6 +413,26 @@ bool IsRange(duckdb_logical_type type) {
   DuckString const start(duckdb_struct_type_child_name(type, 0));
   DuckString const end(duckdb_struct_type_child_name(type, 1));
   return start.get() == kRangeStart && end.get() == kRangeEnd;
+}
+
+bool IsEmptyStruct(duckdb_logical_type type) {
+  if (duckdb_get_type_id(type) != DUCKDB_TYPE_STRUCT || duckdb_struct_type_child_count(type) != 1) {
+    return false;
+  }
+  DuckString const name(duckdb_struct_type_child_name(type, 0));
+  return name.get() == kEmptyStruct;
+}
+
+bool HasEmptyStruct(const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return HasEmptyStruct(type->AsArray()->element_type());
+  }
+  if (type->IsStruct()) {
+    return type->AsStruct()->num_fields() == 0 ||
+           std::ranges::any_of(type->AsStruct()->fields(),
+                               [](const auto& field) { return HasEmptyStruct(field.type); });
+  }
+  return false;
 }
 
 bool HasRange(const googlesql::Type* type) {

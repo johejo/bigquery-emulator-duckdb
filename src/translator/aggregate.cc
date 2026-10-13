@@ -57,6 +57,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                           [](const auto& argument) { return HasInterval(argument->type()); })) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with INTERVAL");
   }
+  if (HasEmptyStruct(call.type()) ||
+      std::ranges::any_of(call.argument_list(),
+                          [](const auto& argument) { return HasEmptyStruct(argument->type()); })) {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with STRUCT<>");
+  }
   // These order, compare or carry a RANGE's STRUCT as BigQuery does its RANGE.
   static constexpr std::string_view range_functions[] = {
       "COUNT",      "MIN",       "MAX", "ANY_VALUE", "ARRAY_AGG", "FIRST_VALUE",
