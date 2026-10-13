@@ -381,7 +381,8 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
       backend.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
                          setup);
     }
-  } else if (const std::optional<DdlWrite> write = MetadataWrite(translation)) {
+  } else if (const std::optional<DdlWrite> write =
+                 MetadataWrite(translation, CreatedInDataset(backend, translation))) {
     try {
       backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
     } catch (const BackendError& error) {

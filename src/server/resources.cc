@@ -528,9 +528,10 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
         },
         {"location", kLocation},
     };
-    // A list entry carries the metadata but the description.
+    // A list entry carries the friendly name and labels of the metadata.
     item.update(entry.metadata.ToJson());
     item.erase("description");
+    item.erase("defaultTableExpirationMs");
     datasets.push_back(std::move(item));
   }
   // BigQuery omits the datasets of a project that has none.

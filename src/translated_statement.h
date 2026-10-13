@@ -54,6 +54,9 @@ struct TableDefinition {
   std::optional<TableReference> rows_from = {};
   // DuckDB's CREATE TABLE AS SELECT cannot declare NOT NULL; apply it after creating the table.
   bool as_select = false;
+  // A temporary table belongs to its script rather than to a dataset, whose default expiration
+  // it does not take.
+  bool temporary = false;
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS
@@ -71,6 +74,7 @@ struct OptionUpdates {
   std::optional<std::string> friendly_name = {};
   std::optional<std::map<std::string, std::string>> labels = {};
   std::optional<std::optional<int64_t>> expiration_time = {};
+  std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
 };
 
 // The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.

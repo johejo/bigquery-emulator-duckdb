@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 28 | 5 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 11 | 10 | 7 |
+| [DDL](#ddl) | 12 | 9 | 7 |
 | [Multi-statement queries](#multi-statement-queries) | 8 | 4 | 1 |
 | [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
@@ -100,9 +100,9 @@ rejected.
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
 | `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL; ALTER TABLE option expiration_timestamp; column option rounding_mode. |
-| `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: CREATE SCHEMA option default_table_expiration_days; CREATE SCHEMA option location. |
+| `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: CREATE SCHEMA option location. |
 | `DROP SCHEMA` | Supported |  |
-| `ALTER SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: ALTER SCHEMA option default_table_expiration_days. |
+| `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |
 | `CREATE VIEW` | Partial | See [Views](compatibility.md#views). Unsupported: CREATE VIEW option expiration_timestamp. |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported |  |

@@ -30,9 +30,14 @@ BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_
 Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier `` `region-us`
 `` covers every dataset of the project, and any other region none.
 
-Datasets keep a description, friendly name and labels, which `CREATE SCHEMA`, `ALTER SCHEMA SET
-OPTIONS` and the `datasets` methods set. Other options and fields, such as default table expiration
-and access controls, are unsupported. `INFORMATION_SCHEMA.SCHEMATA` returns NULL creation times and
+Datasets keep a description, friendly name, labels and default table expiration, which `CREATE
+SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such
+as default partition expiration and access controls, are unsupported. A table or view created in a
+dataset with a default table expiration, by DDL, `tables.insert` or a job that creates its
+destination, expires that long after its creation time unless it sets an expiration of its own.
+Changing the default leaves existing tables as they are, and a job that replaces an existing table
+with `WRITE_TRUNCATE` does not apply it. Temporary tables of scripts do not take it either.
+`default_table_expiration_days` is rounded to milliseconds. `INFORMATION_SCHEMA.SCHEMATA` returns NULL creation times and
 NULL for options other than the location.
 
 ## Tables

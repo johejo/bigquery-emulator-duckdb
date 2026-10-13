@@ -21,7 +21,7 @@ emulator rejected.
 
 | Resource | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [datasets](#datasets) | 3 | 3 | 1 |
+| [datasets](#datasets) | 5 | 1 | 1 |
 | [jobs](#jobs) | 5 | 2 | 0 |
 | [models](#models) | 0 | 0 | 4 |
 | [projects](#projects) | 1 | 0 | 1 |
@@ -35,12 +35,12 @@ emulator rejected.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`datasets.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}` | Supported |  |
-| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name and labels, and location `US`. |
-| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: dataset field access; dataset field defaultTableExpirationMs; dataset location EU. |
+| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name, labels and default table expiration, and location `US`. |
+| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: dataset field access; dataset location EU. |
 | [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Supported | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination. |
-| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Partial | Changes `description`, `friendlyName` and `labels`. Ignores the etag. Unsupported: dataset field defaultTableExpirationMs. |
+| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Supported | Changes `description`, `friendlyName`, `labels` and `defaultTableExpirationMs`, which `0` clears. Ignores the etag. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
-| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Partial | Behaves like `datasets.patch`, except that it replaces the description, friendly name and labels. Unsupported: dataset field defaultTableExpirationMs. |
+| [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Supported | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels and default table expiration. |
 
 ## jobs
 

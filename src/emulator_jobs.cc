@@ -378,7 +378,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     destination.project_id = project_id;
   }
   destination.project_id = ResolveProject(destination.project_id);
-  GetDataset(
+  const DatasetMetadata dataset = GetDataset(
       DatasetReference{.project_id = destination.project_id, .dataset_id = destination.dataset_id});
   std::optional<TableInfo> existing;
   try {
@@ -433,9 +433,12 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     }
     // Creation and its schema, defaults and table metadata commit together, as for DDL and REST.
     // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
+    // Only a table the job creates takes the dataset's default expiration, which BigQuery
+    // documents for new tables.
     std::ranges::move(
         CreateTableWrite(
-            TableDefinition{.table = destination, .schema = schema, .metadata = metadata})
+            TableDefinition{.table = destination, .schema = schema, .metadata = metadata},
+            existing.has_value() ? DatasetMetadata{} : dataset)
             .metadata_statements,
         std::back_inserter(statements));
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));

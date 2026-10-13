@@ -1,0 +1,55 @@
+desc: Dataset.defaultTableExpirationMs on the wire, and clearing it with 0 or by datasets.update
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_dataset_expiration}
+              defaultTableExpirationMs: '7200000'
+    test: current.res.status == 200 && current.res.body.defaultTableExpirationMs == '7200000'
+  too_short:
+    req:
+      /projects/test/datasets/rest_dataset_expiration:
+        patch:
+          body:
+            application/json: {defaultTableExpirationMs: '3599999'}
+    test: current.res.status == 400
+  kept:
+    req:
+      /projects/test/datasets/rest_dataset_expiration:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.defaultTableExpirationMs == '7200000'
+  # "To clear an existing default expiration with a PATCH request, set to 0."
+  zero:
+    req:
+      /projects/test/datasets/rest_dataset_expiration:
+        patch:
+          body:
+            application/json: {defaultTableExpirationMs: '0'}
+    test: current.res.status == 200 && !("defaultTableExpirationMs" in current.res.body)
+  integer:
+    req:
+      /projects/test/datasets/rest_dataset_expiration:
+        patch:
+          body:
+            application/json: {defaultTableExpirationMs: 3600000}
+    test: current.res.status == 200 && current.res.body.defaultTableExpirationMs == '3600000'
+  replace:
+    req:
+      /projects/test/datasets/rest_dataset_expiration:
+        put:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_dataset_expiration}
+    test: current.res.status == 200 && !("defaultTableExpirationMs" in current.res.body)
+  cleanup:
+    req:
+      /projects/test/datasets/rest_dataset_expiration?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

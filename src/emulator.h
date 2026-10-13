@@ -278,6 +278,9 @@ class Emulator {
   // for any other statement.
   std::optional<std::vector<std::string>> AlterationStatements(
       const TranslatedStatement& translation);
+  // The metadata of the dataset the table or view that `translation` creates belongs to, as
+  // `backend` sees it, or none for any other statement, a temporary table or a missing dataset.
+  static DatasetMetadata CreatedInDataset(Backend& backend, const TranslatedStatement& translation);
   // A catalog source for the tables, views and datasets the emulator holds.
   std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true);
   // The script that `query` is, or null when it is a single statement or does not parse, which
@@ -294,7 +297,7 @@ class Emulator {
                         const std::vector<std::string>& setup);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
-  // one there when `replace` is set.
+  // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,
                  const TableMetadata& metadata, bool replace);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
