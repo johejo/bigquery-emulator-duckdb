@@ -1,0 +1,17 @@
+desc: edits the stopped emulator's database as another DuckDB client or an earlier emulator would
+steps:
+  edit:
+    exec:
+      command: duckdb "$E2E_DATA_DIR/test.duckdb"
+      stdin: |
+        -- Comments the emulator did not write, or that describe another column.
+        COMMENT ON COLUMN persist.column_comments.b IS 'written by someone else';
+        COMMENT ON COLUMN persist.column_comments.c IS '{"name": "other", "type": "STRING"}';
+        COMMENT ON COLUMN persist.column_comments.d IS '{"name": "d", "type": "NOPE"}';
+        COMMENT ON COLUMN persist.column_comments.e IS NULL;
+        ALTER TABLE persist.column_comments ADD COLUMN f DOUBLE;
+        -- An earlier emulator stored BIGNUMERIC as DECIMAL(38, 19), which reads back as NUMERIC and
+        -- cannot hold every BIGNUMERIC.
+        ALTER TABLE persist.decimal_bignumeric ALTER n TYPE DECIMAL(38, 19);
+        ALTER TABLE persist.nested_decimal_bignumeric ALTER s TYPE STRUCT(n DECIMAL(38, 19));
+    test: current.exit_code == 0 && current.stderr == ""

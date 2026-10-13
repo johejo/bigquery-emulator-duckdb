@@ -30,3 +30,26 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"b":"2"}]'
+  # A column keeps the field derived from its DuckDB type unless its comment is a field the
+  # emulator wrote for it.
+  column_comments:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json persist.column_comments
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"description":"a","mode":"REQUIRED","name":"a","type":"JSON"},' +
+        '{"mode":"NULLABLE","name":"b","type":"STRING"},{"mode":"NULLABLE","name":"c","type":"INTEGER"},' +
+        '{"mode":"NULLABLE","name":"d","type":"STRING"},{"mode":"NULLABLE","name":"e","type":"STRING"},' +
+        '{"mode":"NULLABLE","name":"f","type":"FLOAT"}]'
+  decimal_bignumeric:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json persist.decimal_bignumeric
+    test: |
+      current.exit_code != 0 && current.stdout contains 'Column n was created by an earlier' &&
+      current.stdout contains 'recreate the table'
+  nested_decimal_bignumeric:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json persist.nested_decimal_bignumeric
+    test: |
+      current.exit_code != 0 && current.stdout contains 'Column s was created by an earlier' &&
+      current.stdout contains 'recreate the table'
