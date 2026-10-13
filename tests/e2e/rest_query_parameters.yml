@@ -1,0 +1,99 @@
+desc: Query parameter wire types and invalid requests
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  # The bq reference uses Count:INTEGER:42 as a parameter example.
+  # https://cloud.google.com/bigquery/docs/reference/bq-cli-reference#bq_query
+  legacy_integer_type:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @i AS i
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: i
+                  parameterType: {type: INTEGER}
+                  parameterValue: {value: '1'}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields[0].type == 'INTEGER' &&
+      current.res.body.rows[0].f[0].v == '1'
+  # The discovery document requires queryParameters to be an array, each
+  # parameterType, and its type name. Check the wire forms the Go client cannot emit.
+  parameters_not_array:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @a
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters: {}
+    test: current.res.status == 400
+  missing_parameter_type:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @a
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: a
+                  parameterValue: {value: '1'}
+    test: current.res.status == 400
+  missing_type_name:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @a
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: a
+                  parameterType: {}
+                  parameterValue: {value: '1'}
+    test: current.res.status == 400
+  # INTERVAL strings use the canonical year-month day hour:minute:second format.
+  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#interval_type
+  invalid_interval_value:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @a
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: a
+                  parameterType: {type: INTERVAL}
+                  parameterValue: {value: '1 DAY'}
+    test: current.res.status == 400
+  # Arrays cannot directly contain arrays.
+  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#array_type
+  nested_arrays:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT @a
+              useLegacySql: false
+              parameterMode: NAMED
+              queryParameters:
+                - name: a
+                  parameterType:
+                    type: ARRAY
+                    arrayType:
+                      type: ARRAY
+                      arrayType: {type: INT64}
+                  parameterValue: {arrayValues: []}
+    test: current.res.status == 400

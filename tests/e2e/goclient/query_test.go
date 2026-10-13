@@ -46,6 +46,15 @@ func TestQueryWithNamedParameters(t *testing.T) {
 	if len(row.Tags) != 2 || row.Tags[0] != "a" || row.Tags[1] != "b" {
 		t.Errorf("got tags %q, want [a b]", row.Tags)
 	}
+	wantSchema := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		{Name: "name", Type: bigquery.StringFieldType},
+		{Name: "created", Type: bigquery.TimestampFieldType},
+		{Name: "tags", Type: bigquery.StringFieldType, Repeated: true},
+	}
+	if !reflect.DeepEqual(rows.Schema, wantSchema) {
+		t.Errorf("schema = %#v, want %#v", rows.Schema, wantSchema)
+	}
 }
 
 func TestQueryWithPositionalParameters(t *testing.T) {
@@ -62,6 +71,13 @@ func TestQueryWithPositionalParameters(t *testing.T) {
 	}
 	if len(row) != 2 || row[0] != int64(1) || row[1] != "b" {
 		t.Errorf("got row %v, want [1 b]", row)
+	}
+	wantSchema := bigquery.Schema{
+		{Name: "a", Type: bigquery.IntegerFieldType},
+		{Name: "b", Type: bigquery.StringFieldType},
+	}
+	if !reflect.DeepEqual(rows.Schema, wantSchema) {
+		t.Errorf("schema = %#v, want %#v", rows.Schema, wantSchema)
 	}
 }
 
