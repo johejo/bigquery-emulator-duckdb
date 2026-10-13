@@ -951,16 +951,21 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)",
                   .conditions = {Is(2, {TYPE_STRING})},
               },
+              // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with ||,
+              // starting from NULL when the delimiter or NULL text is NULL.
               {
                   .arity = 2,
-                  .spelling = "unhex(array_to_string(list_transform($1, _e -> hex(_e)), hex($2)))",
+                  .spelling = "list_reduce(list_filter($1, _e -> _e IS NOT NULL), (_a, _e, _i) -> "
+                              "_a || if(_i = 1, _e, $2 || _e), if($2 IS NULL, NULL, CAST('' AS "
+                              "BLOB)))",
                   .conditions = {Is(2, {TYPE_BYTES})},
               },
               {
                   .arity = 3,
                   .spelling =
-                      "unhex(array_to_string(list_transform($1, _e -> hex(coalesce(_e, $3))), "
-                      "hex($2)))",
+                      "list_reduce(list_transform($1, _e -> coalesce(_e, $3)), (_a, _e, _i) "
+                      "-> _a || if(_i = 1, _e, $2 || _e), if($2 IS NULL OR $3 IS NULL, "
+                      "NULL, CAST('' AS BLOB)))",
                   .conditions = {Is(2, {TYPE_BYTES})},
               },
           },
