@@ -189,6 +189,16 @@ SELECT FORMAT_DATE('%F', DATE '0999-12-31')
 SELECT FORMAT_DATE('%G', DATE '0001-01-01')
 => "1"
 
+# %G is the year of the ISO week's Thursday, in the given time zone.
+SELECT FORMAT_DATE('%G|%%G', DATE '2021-01-01')
+=> "2020|%G"
+
+SELECT FORMAT_DATETIME('%G', DATETIME '2024-12-30 00:00:00')
+=> "2025"
+
+SELECT FORMAT_TIMESTAMP('%G', TIMESTAMP '2021-01-04 03:00:00+00', 'America/Los_Angeles')
+=> "2020"
+
 ## Casts from STRING accept only BigQuery's canonical formats
 
 SELECT SAFE_CAST(x AS DATE) FROM UNNEST(['2009-02-13 ']) AS x
