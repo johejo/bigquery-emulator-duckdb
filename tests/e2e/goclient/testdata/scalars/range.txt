@@ -241,3 +241,41 @@ SELECT GENERATE_RANGE_ARRAY(RANGE<DATETIME> '[2020-01-01 00:00:00, 2020-01-03 00
 # ends on the start's day again.
 SELECT GENERATE_RANGE_ARRAY(RANGE<DATE> '[2020-01-31, 2020-05-24)', INTERVAL 1 MONTH)
 => [{"v": "[2020-01-31, 2020-02-29)"}, {"v": "[2020-02-29, 2020-03-31)"}, {"v": "[2020-03-31, 2020-04-30)"}, {"v": "[2020-04-30, 2020-05-24)"}]
+
+# JSON encodes a RANGE as an object of its start and end, with null for an unbounded end; the
+# documented SQL-to-JSON encoding table, with each bound encoded as a value of its element type.
+SELECT TO_JSON_STRING(RANGE<DATE> '[2024-07-24, 2024-07-25)')
+=> "{\"start\":\"2024-07-24\",\"end\":\"2024-07-25\"}"
+
+SELECT TO_JSON_STRING(RANGE<DATETIME> '[2024-07-24 10:00:00, UNBOUNDED)')
+=> "{\"start\":\"2024-07-24T10:00:00\",\"end\":null}"
+
+SELECT TO_JSON_STRING(RANGE<TIMESTAMP> '[UNBOUNDED, 2017-03-06 12:34:56.789012+00)')
+=> "{\"start\":null,\"end\":\"2017-03-06T12:34:56.789012Z\"}"
+
+SELECT TO_JSON_STRING(CAST(NULL AS RANGE<DATE>))
+=> "null"
+
+SELECT TO_JSON_STRING(STRUCT([RANGE<DATE> '[2024-07-24, UNBOUNDED)'] AS r))
+=> "{\"r\":[{\"start\":\"2024-07-24\",\"end\":null}]}"
+
+SELECT STRING(TO_JSON(RANGE<DATE> '[2024-07-24, 2024-07-25)').start)
+=> "2024-07-24"
+
+SELECT JSON_TYPE(TO_JSON(RANGE<DATETIME> '[2024-07-24 10:00:00, UNBOUNDED)').`end`)
+=> "null"
+
+SELECT STRING(JSON_ARRAY(RANGE<DATE> '[2024-07-24, 2024-07-25)')[0].`end`)
+=> "2024-07-25"
+
+SELECT STRING(JSON_OBJECT('r', RANGE<DATE> '[2024-07-24, 2024-07-25)').r.start)
+=> "2024-07-24"
+
+SELECT STRING(JSON_SET(JSON '{}', '$.r', RANGE<DATE> '[2024-07-24, 2024-07-25)').r.start)
+=> "2024-07-24"
+
+SELECT STRING(JSON_ARRAY_APPEND(JSON '[]', '$', RANGE<DATE> '[2024-07-24, 2024-07-25)')[0].start)
+=> "2024-07-24"
+
+SELECT JSON_TYPE(JSON_ARRAY_INSERT(JSON '[]', '$[0]', RANGE<DATE> '[UNBOUNDED, 2024-07-25)')[0].start)
+=> "null"

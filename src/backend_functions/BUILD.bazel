@@ -133,6 +133,7 @@ cc_library(
         "//:catalog",
         "//:duckdb_handle",
         "//:interval",
+        "//:type_mapping",
         "@abseil-cpp//absl/numeric:int128",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",

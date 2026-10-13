@@ -221,9 +221,16 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
-  // A RANGE is a STRUCT in DuckDB, which these compare and carry as BigQuery does a RANGE; others,
-  // such as JSON conversion and FORMAT, would see the STRUCT.
+  // A RANGE is a STRUCT in DuckDB, which these compare and carry as BigQuery does a RANGE, and the
+  // JSON backend reads as a RANGE; others, such as FORMAT, would see the STRUCT.
   static constexpr std::string_view range_functions[] = {
+      "TO_JSON",
+      "TO_JSON_STRING",
+      "JSON_ARRAY",
+      "JSON_OBJECT",
+      "JSON_SET",
+      "JSON_ARRAY_APPEND",
+      "JSON_ARRAY_INSERT",
       "RANGE",
       "RANGE_START",
       "RANGE_END",

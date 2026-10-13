@@ -349,8 +349,8 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | Supported | GoogleSQL function |  |
 | [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | Supported | GoogleSQL function |  |
 | [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Partial | DuckDB SQL, in code | Unsupported: function JSON_ARRAY_APPEND with RANGE; type STRUCT<>. |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Partial | DuckDB SQL, in code | Unsupported: function JSON_ARRAY_INSERT with RANGE; type STRUCT<>. |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Partial | DuckDB SQL, in code | Unsupported: type STRUCT<>. |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Partial | DuckDB SQL, in code | Unsupported: type STRUCT<>. |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | Supported | GoogleSQL function |  |

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "duckdb.h"
 #include "src/field_schema.h"
 
 namespace googlesql {
@@ -34,6 +35,9 @@ inline constexpr std::string_view kRangeOrderError =
 // for an unbounded end. Where `start` does not precede `end` it is `raise`, by default the SQL
 // that raises kRangeOrderError. Each bound is evaluated more than once.
 std::string DuckDbRange(std::string_view start, std::string_view end, std::string_view raise = "");
+
+// Whether the DuckDB `type` is the STRUCT that keeps a RANGE.
+bool IsRange(duckdb_logical_type type);
 
 // Whether a type contains RANGE, including array elements and struct fields.
 bool HasRange(const googlesql::Type* type);

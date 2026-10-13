@@ -62,7 +62,7 @@ rejected.
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
 | INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: CAST to INTERVAL other than typed NULL or INTERVAL literals; function $ADD with INTERVAL; function TO_JSON with INTERVAL; stored INTERVAL columns. |
-| RANGE values | Partial | See [RANGE values](compatibility.md#range-values). Unsupported: CAST from STRING to RANGE<DATE>; function TO_JSON with RANGE. |
+| RANGE values | Partial | See [RANGE values](compatibility.md#range-values). Unsupported: CAST from STRING to RANGE<DATE>. |
 
 ## DML
 

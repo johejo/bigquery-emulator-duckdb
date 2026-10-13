@@ -1,12 +1,6 @@
 # A RANGE is a STRUCT in DuckDB, which functions that serialize or inspect values would see, so
 # those functions are unsupported for RANGE until they are implemented.
 
-SELECT TO_JSON_STRING(RANGE<DATE> '[2020-01-01, 2020-02-01)')
-=> error contains: The emulator does not support function TO_JSON_STRING with RANGE
-
-SELECT TO_JSON([RANGE<DATE> '[2020-01-01, 2020-02-01)'])
-=> error contains: The emulator does not support function TO_JSON with RANGE
-
 SELECT CAST(r AS JSON) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
 => error contains: The emulator does not support CAST from RANGE<DATE> to JSON
 
