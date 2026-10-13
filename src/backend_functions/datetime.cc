@@ -25,6 +25,7 @@
 #include "googlesql/public/functions/generate_array.h"
 #include "googlesql/public/functions/parse_date_time.h"
 #include "googlesql/public/functions/string_format.h"
+#include "googlesql/public/json_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/type.h"
@@ -67,13 +68,22 @@ absl::StatusOr<int64_t> MicrosFromDatetime(const googlesql::DatetimeValue& datet
 
 namespace {
 
-// The DuckDB type of each argument column.
-std::vector<duckdb_type> ColumnTypes(duckdb_data_chunk input) {
-  std::vector<duckdb_type> types;
+// The DuckDB type of each argument column, and whether it is JSON, a VARCHAR by its alias.
+struct ColumnType {
+  duckdb_type id;
+  bool json;
+};
+
+std::vector<ColumnType> ColumnTypes(duckdb_data_chunk input) {
+  std::vector<ColumnType> types;
   for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(input); ++column) {
     LogicalType const type(
         duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
-    types.push_back(duckdb_get_type_id(type.get()));
+    const DuckString alias(duckdb_logical_type_get_alias(type.get()));
+    types.push_back({
+        .id = duckdb_get_type_id(type.get()),
+        .json = alias != nullptr && std::string_view(alias.get()) == "JSON",
+    });
   }
   return types;
 }
@@ -283,9 +293,18 @@ absl::StatusOr<googlesql::Value> FormatRange(duckdb_vector vector, idx_t row, bo
 
 // A FORMAT argument as the GoogleSQL value of the type its DuckDB type stands for.
 absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_t column,
-                                                duckdb_type type) {
+                                                ColumnType type) {
   const bool null = arguments.IsNull(column);
-  switch (type) {
+  if (type.json) {
+    // Parsed as the JSON functions parse it.
+    if (null) {
+      return googlesql::Value::Null(googlesql::types::JsonType());
+    }
+    GOOGLESQL_ASSIGN_OR_RETURN(auto json,
+                               googlesql::JSONValue::ParseJSONString(arguments.String(column)));
+    return googlesql::Value::Json(std::move(json));
+  }
+  switch (type.id) {
     case DUCKDB_TYPE_VARCHAR:
       return null ? googlesql::Value::NullString()
                   : googlesql::Value::String(arguments.String(column));
@@ -488,7 +507,7 @@ std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
 // FORMAT(format, values...), which is NULL for a NULL format and where GoogleSQL says so for
 // a NULL value.
 void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const std::vector<duckdb_type> types = ColumnTypes(input);
+  const std::vector<ColumnType> types = ColumnTypes(input);
   EachRow(
       info, input, output,
       [&types](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {

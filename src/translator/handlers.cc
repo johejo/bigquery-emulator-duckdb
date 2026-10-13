@@ -372,8 +372,8 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call) {
 
 // FORMAT goes to GoogleSQL's implementation, which src/backend_functions.cc registers to tell
 // the type of each value by its DuckDB type. The values are cast to the DuckDB type that stands
-// for their type, and a RANGE passes as the STRUCT that holds it; values of other types are
-// unsupported.
+// for their type, a RANGE passes as the STRUCT that holds it and JSON as DuckDB's JSON; values of
+// other types are unsupported.
 std::optional<std::string> Format(const ScalarCall& call) {
   static const std::map<googlesql::TypeKind, std::string_view> types = {
       {googlesql::TYPE_STRING, "VARCHAR"},
@@ -390,7 +390,7 @@ std::optional<std::string> Format(const ScalarCall& call) {
   };
   std::vector<std::string> arguments;
   for (const FunctionArgument& argument : call.arguments) {
-    if (argument.type == googlesql::TYPE_RANGE) {
+    if (argument.type == googlesql::TYPE_RANGE || argument.type == googlesql::TYPE_JSON) {
       arguments.push_back(argument.sql);
       continue;
     }
