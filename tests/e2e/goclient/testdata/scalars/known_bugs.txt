@@ -10,3 +10,14 @@
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
 !> error: Error: boom at f() line 1, column 1
+
+# BigQuery names the element type of a RANGE where GoogleSQL's analyzer names the RANGE.
+SELECT FORMAT('%s', RANGE<DATE> '[2020-01-01, 2020-02-01)')
+!> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got DATE at [1:8]
+
+# FORMAT does not take ARRAY or STRUCT values yet, including those holding a RANGE.
+SELECT FORMAT('%t', [RANGE<DATE> '[2020-01-01, 2020-02-01)'])
+!> "[[2020-01-01, 2020-02-01)]"
+
+SELECT FORMAT('%T', STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 1 AS n))
+!> "(RANGE<DATE> \"[2020-01-01, UNBOUNDED)\", 1)"

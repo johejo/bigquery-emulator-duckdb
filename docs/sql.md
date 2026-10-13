@@ -19,7 +19,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 28 | 5 | 1 |
+| [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 13 | 8 | 7 |
 | [Multi-statement queries](#multi-statement-queries) | 9 | 3 | 1 |
@@ -62,7 +62,7 @@ rejected.
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
 | INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: CAST to INTERVAL other than typed NULL or INTERVAL literals; function $ADD with INTERVAL; function TO_JSON with INTERVAL; stored INTERVAL columns. |
-| RANGE values | Partial | See [RANGE values](compatibility.md#range-values). Unsupported: function FORMAT with RANGE. |
+| RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML
 

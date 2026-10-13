@@ -134,8 +134,8 @@ columns, query parameters and `tabledata.insertAll` rows, with comparisons, orde
 `COUNT`, `MIN`, `MAX`, `ANY_VALUE`, `ARRAY_AGG`, navigation functions and casts to and from STRING,
 including `SAFE_CAST`. `TO_JSON`, `TO_JSON_STRING` and the JSON functions that take values of any
 type encode a RANGE as an object of its `start` and `end`, with `null` for an unbounded end.
-`FORMAT`, other functions over RANGE values, and loads and extracts of RANGE columns are
-unsupported.
+`FORMAT` writes a RANGE argument with `%t` and `%T`, but not one inside an ARRAY or STRUCT. Other
+functions over RANGE values, and loads and extracts of RANGE columns are unsupported.
 
 ### RANGE_SESSIONIZE
 
