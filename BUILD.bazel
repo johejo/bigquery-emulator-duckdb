@@ -19,7 +19,6 @@ refresh_compile_commands(
         ":backend_test": "",
         ":catalog_test": "",
         ":emulator_test": "",
-        ":functions_test": "",
         ":translator_test": "",
         ":bigquery-emulator-duckdb": "",
         ":server_test": "",
@@ -756,18 +755,6 @@ cc_test(
 )
 
 cc_test(
-    name = "functions_test",
-    srcs = ["tests/functions_test.cc"],
-    copts = ["-std=c++20"],
-    deps = [
-        ":translator",
-        "//src/translator:functions",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
     name = "parquet_metadata_test",
     srcs = ["tests/parquet_metadata_test.cc"],
     copts = ["-std=c++20"],
@@ -863,7 +850,6 @@ cc_test(
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@googlesql//googlesql/public:type",
-        "@nlohmann_json//:json",
     ],
 )
 

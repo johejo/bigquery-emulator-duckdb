@@ -96,6 +96,20 @@ func TestDatasetMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(ddl, metadata{})
+	// DROP SCHEMA refuses a dataset that holds tables unless it says CASCADE.
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#drop_schema_statement
+	if err := run("CREATE TABLE go_dataset_metadata_ddl.t (x INT64)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := run("DROP SCHEMA go_dataset_metadata_ddl"); err == nil {
+		t.Fatal("DROP SCHEMA dropped a dataset that holds a table")
+	}
+	if err := run("DROP SCHEMA go_dataset_metadata_ddl CASCADE"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ddl.Metadata(ctx); err == nil {
+		t.Fatal("DROP SCHEMA CASCADE left the dataset")
+	}
 
 	for name, err := range map[string]error{
 		"dataset location EU": client.Dataset("go_dataset_metadata_eu").Create(ctx, &bigquery.DatasetMetadata{Location: "EU"}),

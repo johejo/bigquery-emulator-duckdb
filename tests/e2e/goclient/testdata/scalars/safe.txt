@@ -33,3 +33,7 @@ SELECT SAFE.DIV(1, 0)
 # Only the function's own errors become NULL, not those of its arguments.
 SELECT SAFE.ABS(1 / 0)
 => error:
+
+# BigQuery rejects SAFE.ERROR although GoogleSQL accepts it.
+SELECT SAFE.ERROR('boom')
+=> error: SAFE with function error is not supported.

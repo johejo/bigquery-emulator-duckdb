@@ -1023,9 +1023,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casts between TIMESTAMP and TIME fail in DuckDB, and DATE_ADD and DATE_DIFF on DATETIME differ"
+  reason: "Casts between TIMESTAMP and TIME fail in DuckDB, and DATE_ADD on DATETIME differs"
   label: "civil_time_test:datetime_in_date_add_sub"
-  label: "civil_time_test:datetime_in_date_diff"
   label: "civil_time_test:datetime_in_date_trunc"
 }
 
@@ -1052,33 +1051,6 @@ known_errors {
   reason: "Casting FLOAT64 negative zero to STRING gives '-0', as BigQuery does, where the reference implementation gives '0'"
   label: "code:CastTo_STRING_FLOAT64_-0"
   label: "code:SafeCastTo_STRING_FLOAT64_-0"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "DATETIME_DIFF counts the unit boundaries crossed rather than the whole units elapsed"
-  label: "code:datetime_diff_DATETIME_1969-07-21 02:56:13.456789_DATETIME_2016-04-08 14:49:32.123456_STRING_<HOUR>"
-  label: "code:datetime_diff_DATETIME_1969-07-21 02:56:13.456789_DATETIME_2016-04-08 14:49:32.123456_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_1969-07-21 02:56:13.456789_DATETIME_2016-04-08 14:49:32.123456_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 00:59:59.123456_DATETIME_2016-04-08 23:00:00_STRING_<HOUR>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:00:59.123456_DATETIME_2016-04-08 14:59:00_STRING_<MINUTE>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:49:32.123456_DATETIME_1969-07-21 02:56:13.456789_STRING_<HOUR>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:49:32.123456_DATETIME_1969-07-21 02:56:13.456789_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:49:32.123456_DATETIME_1969-07-21 02:56:13.456789_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:00.123456_DATETIME_2016-04-08 14:59:59_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:00_DATETIME_2016-04-08 14:00:59.123456_STRING_<MINUTE>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.123456_DATETIME_2016-04-08 15:00:00_STRING_<HOUR>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.123456_DATETIME_2016-04-08 15:00:00_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.123456_DATETIME_2016-04-08 15:00:00_STRING_<MINUTE>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.123456_DATETIME_2016-04-08 15:00:00_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.567987_DATETIME_2016-04-08 14:59:59.654321_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59.654321_DATETIME_2016-04-08 14:59:59.567987_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 14:59:59_DATETIME_2016-04-08 14:59:00.123456_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 15:00:00_DATETIME_2016-04-08 14:59:59.123456_STRING_<HOUR>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 15:00:00_DATETIME_2016-04-08 14:59:59.123456_STRING_<MILLISECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 15:00:00_DATETIME_2016-04-08 14:59:59.123456_STRING_<MINUTE>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 15:00:00_DATETIME_2016-04-08 14:59:59.123456_STRING_<SECOND>"
-  label: "code:datetime_diff_DATETIME_2016-04-08 23:00:00_DATETIME_2016-04-08 00:59:59.123456_STRING_<HOUR>"
 }
 
 known_errors {
@@ -1133,6 +1105,15 @@ known_errors {
   label: "code:date_add_TIMESTAMP_946703482345678_INT64_49_STRING_<HOUR>"
   label: "code:date_add_TIMESTAMP_946707082345678_INT64_-11_STRING_<HOUR>"
   label: "code:date_add_TIMESTAMP_947052682345678_INT64_-11_STRING_<DAY>"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "SAFE.ERROR fails, as BigQuery does, where the reference implementation returns NULL"
+  label: "code:safe_error_mode__safe_error_STRING_<message>"
+  label: "code:safe_error_mode__safe_error_STRING_NULL"
+  label: "misc_test:cast_safe_error_as_string"
+  label: "misc_test:default_safe_error_int64"
 }
 
 known_errors {
