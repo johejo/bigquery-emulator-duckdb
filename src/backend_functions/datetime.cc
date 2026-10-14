@@ -37,6 +37,7 @@
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/interval.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
@@ -270,6 +271,8 @@ absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
       return types::BigNumericType();
     case DUCKDB_TYPE_DECIMAL:
       return types::NumericType();
+    case DUCKDB_TYPE_INTERVAL:
+      return types::IntervalType();
     case DUCKDB_TYPE_STRUCT: {
       if (IsRange(type)) {
         LogicalType const element(duckdb_struct_type_child_type(type, 0));
@@ -353,6 +356,11 @@ absl::StatusOr<googlesql::Value> FormatValue(duckdb_vector vector, idx_t row,
           googlesql::NumericValue::FromPackedInt(std::bit_cast<__int128>(
               (static_cast<unsigned __int128>(value.upper) << 64U) | value.lower)));
       return googlesql::Value::Numeric(numeric);
+    }
+    case googlesql::TYPE_INTERVAL: {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto interval,
+                                 IntervalFromDuckDb(VectorElement<duckdb_interval>(vector, row)));
+      return googlesql::Value::Interval(interval);
     }
     case googlesql::TYPE_RANGE: {
       // The unbounded ends are infinite in DuckDB and NULL in GoogleSQL.

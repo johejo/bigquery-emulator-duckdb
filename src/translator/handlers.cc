@@ -377,13 +377,11 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call) {
 
 // FORMAT goes to GoogleSQL's implementation, which src/backend_functions.cc registers to tell
 // the type of each value by its DuckDB type. The values are cast to the DuckDB type that stands
-// for their type; values that are or hold INTERVAL, and of types DuckDbType does not map, are
-// unsupported.
+// for their type; values of types DuckDbType does not map are unsupported.
 std::optional<std::string> Format(const ScalarCall& call) {
   std::vector<std::string> arguments;
   for (std::size_t i = 0; i < call.arguments.size(); ++i) {
-    const googlesql::Type* type = call.ArgumentType(i);
-    const auto duckdb_type = HasInterval(type) ? std::nullopt : DuckDbType(type);
+    const auto duckdb_type = DuckDbType(call.ArgumentType(i));
     if (!duckdb_type) {
       return std::nullopt;
     }
