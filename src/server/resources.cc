@@ -598,7 +598,10 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
     item.erase("cloneDefinition");
     entries.push_back(std::move(item));
   }
-  response["tables"] = std::move(entries);
+  // BigQuery omits the tables of a dataset that has none.
+  if (!entries.empty()) {
+    response["tables"] = std::move(entries);
+  }
   return response;
 }
 

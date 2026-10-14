@@ -1,143 +1,212 @@
 desc: data written with --data-dir survives a restart
+runners:
+  req: ${BQ_EMULATOR_API}
 steps:
   rows:
-    exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT a, b FROM persist.v'
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT a, b FROM persist.v', useLegacySql: false}
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"a":"1","b":["x","y"]}]'
+      current.res.status == 200 &&
+      current.res.body.rows == [{"f": [{"v": "1"}, {"v": [{"v": "x"}, {"v": "y"}]}]}]
   view:
-    exec:
-      command: tests/e2e/bq.sh show --format=json persist.v
+    req:
+      /projects/test/datasets/persist/tables/v:
+        get:
+          body: null
     test: |
-      current.exit_code == 0 &&
-      current.stdout contains '"query":"SELECT a, b FROM persist.t"'
+      current.res.status == 200 &&
+      current.res.body.view.query == 'SELECT a, b FROM persist.t'
   scoped_dataset:
-    exec:
-      command: BQ_EMULATOR_PROJECT=example.com:proj tests/e2e/bq.sh ls --format=json
+    req:
+      /projects/example.com:proj/datasets:
+        get:
+          body: null
     test: |
-      current.exit_code == 0 &&
-      current.stdout contains '"datasetId":"scoped"'
+      current.res.status == 200 &&
+      current.res.body.datasets[0].datasetReference.datasetId == 'scoped'
   session_user_view:
-    exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT v.identity FROM persist.identity AS v'
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT v.identity FROM persist.identity AS v', useLegacySql: false}
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"identity":"principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice"}]'
+      current.res.status == 200 &&
+      current.res.body.rows == [{"f": [{"v": "principal://iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/subject/alice"}]}]
   function:
-    exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT persist.add_one(a) AS b FROM persist.t'
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT persist.add_one(a) AS b FROM persist.t', useLegacySql: false}
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"b":"2"}]'
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "2"}]}]
   # A column keeps the field derived from its DuckDB type unless its comment is a field the
   # emulator wrote for it.
   column_comments:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json persist.column_comments
+    req:
+      /projects/test/datasets/persist/tables/column_comments:
+        get:
+          body: null
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"description":"a","mode":"REQUIRED","name":"a","type":"JSON"},' +
-        '{"mode":"NULLABLE","name":"b","type":"STRING"},{"mode":"NULLABLE","name":"c","type":"INTEGER"},' +
-        '{"mode":"NULLABLE","name":"d","type":"STRING"},{"mode":"NULLABLE","name":"e","type":"STRING"},' +
-        '{"mode":"NULLABLE","name":"f","type":"FLOAT"}]'
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        {"name": "a", "type": "JSON", "mode": "REQUIRED", "description": "a"},
+        {"name": "b", "type": "STRING", "mode": "NULLABLE"},
+        {"name": "c", "type": "INTEGER", "mode": "NULLABLE"},
+        {"name": "d", "type": "STRING", "mode": "NULLABLE"},
+        {"name": "e", "type": "STRING", "mode": "NULLABLE"},
+        {"name": "f", "type": "FLOAT", "mode": "NULLABLE"}]
   decimal_bignumeric:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json persist.decimal_bignumeric
+    req:
+      /projects/test/datasets/persist/tables/decimal_bignumeric:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 && current.stdout contains 'Column n was created by an earlier' &&
-      current.stdout contains 'recreate the table'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column n was created by an earlier' &&
+      current.res.body.error.message contains 'recreate the table'
   nested_decimal_bignumeric:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json persist.nested_decimal_bignumeric
+    req:
+      /projects/test/datasets/persist/tables/nested_decimal_bignumeric:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 && current.stdout contains 'Column s was created by an earlier' &&
-      current.stdout contains 'recreate the table'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column s was created by an earlier' &&
+      current.res.body.error.message contains 'recreate the table'
   # restart/stopped.yml writes duckdb_types.t with types BigQuery does not have; queries and
   # tabledata.list read them alike, as docs/compatibility.md describes.
   duckdb_types_query:
-    exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT * FROM duckdb_types.t'
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT * FROM duckdb_types.t', useLegacySql: false}
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"b":"101","d16":"-1.23","d32":"-12345.67","d64":"-1234567890.123456",' +
-        '"e":"happy","fixed":[{"x":"1"},{"x":null}],"inf":"infinity","m":"{x=[1, NULL]}","n":[],' +
-        '"ns":"2020-01-02T03:04:05.123456","s":null,"u":"hello","uuid":"00112233-4455-6677-8899-aabbccddeeff"}]'
-  duckdb_types_head:
-    exec:
-      command: tests/e2e/bq.sh head --format=json duckdb_types.t
+      current.res.status == 200 &&
+      current.res.body.rows == [{"f": [
+        {"v": "happy"}, {"v": "101"}, {"v": "{x=[1, NULL]}"}, {"v": "hello"},
+        {"v": "00112233-4455-6677-8899-aabbccddeeff"}, {"v": "2020-01-02T03:04:05.123456"},
+        {"v": "infinity"}, {"v": "-1.23"}, {"v": "-12345.67"}, {"v": "-1234567890.123456"},
+        {"v": [{"v": {"f": [{"v": "1"}]}}, {"v": {"f": [{"v": null}]}}]}, {"v": null}, {"v": []}]}]
+  duckdb_types_rows:
+    req:
+      /projects/test/datasets/duckdb_types/tables/t/data:
+        get:
+          body: null
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"b":"101","d16":"-1.23","d32":"-12345.67","d64":"-1234567890.123456",' +
-        '"e":"happy","fixed":[{"x":"1"},{"x":null}],"inf":"infinity","m":"{x=[1, NULL]}","n":[],' +
-        '"ns":"2020-01-02T03:04:05.123456","s":null,"u":"hello","uuid":"00112233-4455-6677-8899-aabbccddeeff"}]'
+      current.res.status == 200 &&
+      current.res.body.rows == steps.duckdb_types_query.res.body.rows
   # A table with a column of a type the emulator does not support cannot be read.
   duckdb_types_ubigint:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.ubigint
+    req:
+      /projects/test/datasets/duckdb_types/tables/ubigint:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type UBIGINT, which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type UBIGINT, which the emulator does not support'
   duckdb_types_hugeint:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.hugeint
+    req:
+      /projects/test/datasets/duckdb_types/tables/hugeint:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT, which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT, which the emulator does not support'
   duckdb_types_uhugeint:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.uhugeint
+    req:
+      /projects/test/datasets/duckdb_types/tables/uhugeint:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type UHUGEINT, which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type UHUGEINT, which the emulator does not support'
   duckdb_types_nested:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.nested
+    req:
+      /projects/test/datasets/duckdb_types/tables/nested:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column s has the DuckDB type HUGEINT, which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column s has the DuckDB type HUGEINT, which the emulator does not support'
   duckdb_types_wide_decimal:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.wide_decimal
+    req:
+      /projects/test/datasets/duckdb_types/tables/wide_decimal:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type DECIMAL(38, 0), which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type DECIMAL(38, 0), which the emulator does not support'
   duckdb_types_fine_decimal:
-    exec:
-      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.fine_decimal
+    req:
+      /projects/test/datasets/duckdb_types/tables/fine_decimal:
+        get:
+          body: null
     test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type DECIMAL(18, 12), which the emulator does not support'
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type DECIMAL(18, 12), which the emulator does not support'
   duckdb_types_hugeint_query:
-    exec:
-      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT x FROM duckdb_types.hugeint'
-    test: current.exit_code != 0 && replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT'
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT x FROM duckdb_types.hugeint', useLegacySql: false}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT'
   duckdb_types_hugeint_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json duckdb_types.hugeint
-    test: current.exit_code != 0 && replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT'
+    req:
+      /projects/test/datasets/duckdb_types/tables/hugeint/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT'
   # restart/stopped.yml creates unmanaged.v without the emulator; it is listed, queried in
   # INFORMATION_SCHEMA and deleted, but has no metadata to show.
   unmanaged_view_list:
-    exec:
-      command: tests/e2e/bq.sh ls --format=json unmanaged
+    req:
+      /projects/test/datasets/unmanaged/tables:
+        get:
+          body: null
     test: |
-      current.exit_code == 0 &&
-      current.stdout contains '"tableId":"v"' && current.stdout contains '"type":"VIEW"'
+      current.res.status == 200 &&
+      current.res.body.tables[0].tableReference.tableId == 'v' &&
+      current.res.body.tables[0].type == 'VIEW'
   unmanaged_view_show:
-    exec:
-      command: tests/e2e/bq.sh show --format=json unmanaged.v
-    test: current.exit_code != 0 && current.stdout contains 'was not created by the'
+    req:
+      /projects/test/datasets/unmanaged/tables/v:
+        get:
+          body: null
+    test: current.res.status == 400 && current.res.body.error.message contains 'was not created by the'
   unmanaged_view_information_schema:
-    exec:
-      command: >-
-        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
-        "SELECT table_type, ddl IS NULL AS no_ddl FROM unmanaged.INFORMATION_SCHEMA.TABLES
-        WHERE table_name = 'v'"
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                SELECT table_type, ddl IS NULL AS no_ddl FROM unmanaged.INFORMATION_SCHEMA.TABLES
+                WHERE table_name = 'v'
+              useLegacySql: false
     test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"no_ddl":"true","table_type":"VIEW"}]'
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "VIEW"}, {"v": "true"}]}]
   unmanaged_view_delete:
-    exec:
-      command: tests/e2e/bq.sh rm -f -t unmanaged.v && tests/e2e/bq.sh ls --format=json unmanaged
-    test: current.exit_code == 0 && trim(current.stdout) == ''
+    req:
+      /projects/test/datasets/unmanaged/tables/v:
+        delete:
+          body: null
+    test: current.res.status == 204
+  # BigQuery omits the tables of a dataset that has none.
+  unmanaged_view_deleted:
+    req:
+      /projects/test/datasets/unmanaged/tables:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.totalItems == 0 && !("tables" in current.res.body)
