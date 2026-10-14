@@ -22,6 +22,8 @@
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
+#include "src/api_error.h"
+#include "src/backend.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -158,6 +160,14 @@ absl::StatusOr<googlesql::Value> CellValue(const googlesql::Type* type, const js
     default:
       return Undecodable(type, text);
   }
+}
+
+googlesql::Value ResultValue(const QueryResult& result, const googlesql::Type* type) {
+  absl::StatusOr<googlesql::Value> value = CellValue(type, result.rows.at(0).at("f").at(0).at("v"));
+  if (!value.ok()) {
+    throw ApiError::UnsupportedQuery("option values of type " + type->DebugString());
+  }
+  return *std::move(value);
 }
 
 }  // namespace bigquery_emulator_duckdb

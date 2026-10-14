@@ -34,9 +34,10 @@ with names bound and expressions typed. The frontend is independent of DuckDB ex
   as `invalidQuery`, and supplies query result schemas from resolved output columns.
 
 For multi-statement queries, GoogleSQL's `ScriptExecutor` manages control flow and variables.
-[emulator_script.cc](../src/emulator_script.cc) analyzes and translates each statement or
-expression it reaches, exposing script variables as catalog constants and decoding expression
-results from DuckDB rows.
+[script.cc](../src/script.cc) analyzes and translates each statement or expression it reaches,
+exposing script variables as catalog constants and decoding expression results from DuckDB rows.
+It reaches the emulator only through `ScriptHost`, so it does not depend on the emulator's
+internals.
 
 ## Translator
 
