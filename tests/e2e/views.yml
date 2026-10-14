@@ -19,6 +19,16 @@ steps:
       current.exit_code == 0 && current.stdout contains '"type":"VIEW"' &&
       current.stdout contains '"query":"SELECT SUM(id) FROM views.source"' &&
       current.stdout contains '"name":"total"' && current.stdout contains '"type":"INTEGER"'
+  repeated_column:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE VIEW views.arrays AS SELECT id, [id] AS ids FROM views.source'
+    test: current.exit_code == 0
+  repeated_column_metadata:
+    exec:
+      command: tests/e2e/bq.sh show --format=json views.arrays
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"name":"ids"' && current.stdout contains '"mode":"REPEATED"'
   if_not_exists_keeps_definition:
     exec:
       command: tests/e2e/bq.sh query --nouse_legacy_sql 'CREATE VIEW IF NOT EXISTS views.v AS SELECT 999 AS ignored'

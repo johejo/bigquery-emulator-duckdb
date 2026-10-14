@@ -129,8 +129,10 @@ expected result from one layer to another.
   function support. Use the platform-specific file only for failures confined to that platform.
   The bugs these tests found are `!>` cases of `scalars/known_bugs.txt`; fix each and turn it
   into a `=>` case.
-- **C++ tests** (`just test`) check what clients cannot observe, such as translation edge cases,
-  or runn cannot drive, such as many concurrent connections.
+- **C++ tests** (`just test`) check what matters to clients but end-to-end tests cannot check
+  reliably, such as many concurrent connections, injected failures, or a volatile argument
+  evaluated once. Do not assert internal state, such as generated SQL or which rule matched,
+  whose outcome end-to-end tests already check.
 
 ### Expected values
 

@@ -40,6 +40,11 @@ SELECT SAFE_DIVIDE(3, 2)
 SELECT DIV(7, 2)
 => "3"
 
+# DIV fails on a zero divisor, as division does.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#div
+SELECT DIV(x + 1, 0) FROM UNNEST([1]) x
+=> error contains: division by zero
+
 SELECT ARRAY_LENGTH(GENERATE_ARRAY(1, 5, 2))
 => "3"
 
