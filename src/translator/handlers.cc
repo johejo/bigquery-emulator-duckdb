@@ -3,11 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.h"
@@ -379,38 +377,17 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call) {
 
 // FORMAT goes to GoogleSQL's implementation, which src/backend_functions.cc registers to tell
 // the type of each value by its DuckDB type. The values are cast to the DuckDB type that stands
-// for their type, a RANGE passes as the STRUCT that holds it and JSON as DuckDB's JSON, and an
-// ARRAY as a LIST of its elements so passed; values of other types are unsupported.
+// for their type; values that are or hold INTERVAL, and of types DuckDbType does not map, are
+// unsupported.
 std::optional<std::string> Format(const ScalarCall& call) {
-  static const std::map<googlesql::TypeKind, std::string_view> types = {
-      {googlesql::TYPE_STRING, "VARCHAR"},
-      {googlesql::TYPE_BYTES, "BLOB"},
-      {googlesql::TYPE_INT64, "BIGINT"},
-      {googlesql::TYPE_DOUBLE, "DOUBLE"},
-      {googlesql::TYPE_NUMERIC, "DECIMAL(38, 9)"},
-      {googlesql::TYPE_BOOL, "BOOLEAN"},
-      {googlesql::TYPE_DATE, "DATE"},
-      {googlesql::TYPE_TIME, "TIME"},
-      {googlesql::TYPE_DATETIME, "TIMESTAMP"},
-      {googlesql::TYPE_TIMESTAMP, "TIMESTAMPTZ"},
-      {googlesql::TYPE_BIGNUMERIC, "BIGNUM"},
-  };
   std::vector<std::string> arguments;
   for (std::size_t i = 0; i < call.arguments.size(); ++i) {
-    const FunctionArgument& argument = call.arguments.at(i);
-    const bool array = argument.type == googlesql::TYPE_ARRAY;
-    const googlesql::TypeKind kind =
-        array ? call.ArgumentType(i)->AsArray()->element_type()->kind() : argument.type;
-    if (kind == googlesql::TYPE_RANGE || kind == googlesql::TYPE_JSON) {
-      arguments.push_back(argument.sql);
-      continue;
-    }
-    const auto type = types.find(kind);
-    if (type == types.end()) {
+    const googlesql::Type* type = call.ArgumentType(i);
+    const auto duckdb_type = HasInterval(type) ? std::nullopt : DuckDbType(type);
+    if (!duckdb_type) {
       return std::nullopt;
     }
-    arguments.push_back("CAST(" + argument.sql + " AS " + std::string(type->second) +
-                        (array ? "[]" : "") + ")");
+    arguments.push_back("CAST(" + call.arguments.at(i).sql + " AS " + *duckdb_type + ")");
   }
   return "bq_format(" + Join(arguments, ", ") + ")";
 }

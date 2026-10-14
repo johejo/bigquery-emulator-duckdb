@@ -37,6 +37,7 @@
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 
@@ -237,8 +238,8 @@ absl::Status TimestampToString(int64_t micros, std::string_view time_zone, std::
 }
 
 // The GoogleSQL type of a FORMAT value, which the handler passes as the DuckDB type that stands
-// for it: JSON as a VARCHAR by its alias, a RANGE as the only STRUCT, and an ARRAY as a LIST.
-// Arrays are made in `factory`; other types are unsupported.
+// for it: JSON as a VARCHAR by its alias, a RANGE as the STRUCT IsRange tells from others, and an
+// ARRAY as a LIST. Arrays and structs are made in `factory`; other types are unsupported.
 absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
                                                   googlesql::TypeFactory& factory) {
   namespace types = googlesql::types;
@@ -270,11 +271,24 @@ absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
     case DUCKDB_TYPE_DECIMAL:
       return types::NumericType();
     case DUCKDB_TYPE_STRUCT: {
-      LogicalType const element(duckdb_struct_type_child_type(type, 0));
-      const duckdb_type element_type = duckdb_get_type_id(element.get());
-      return element_type == kDate       ? types::DateRangeType()
-             : element_type == kDatetime ? types::DatetimeRangeType()
-                                         : types::TimestampRangeType();
+      if (IsRange(type)) {
+        LogicalType const element(duckdb_struct_type_child_type(type, 0));
+        const duckdb_type element_type = duckdb_get_type_id(element.get());
+        return element_type == kDate       ? types::DateRangeType()
+               : element_type == kDatetime ? types::DatetimeRangeType()
+                                           : types::TimestampRangeType();
+      }
+      // FORMAT writes no field names.
+      std::vector<googlesql::StructField> fields;
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType const field(duckdb_struct_type_child_type(type, i));
+        GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::Type* field_type,
+                                   FormatType(field.get(), factory));
+        fields.emplace_back("", field_type);
+      }
+      const googlesql::StructType* struct_type = nullptr;
+      GOOGLESQL_RETURN_IF_ERROR(factory.MakeStructType(fields, &struct_type));
+      return struct_type;
     }
     case DUCKDB_TYPE_LIST: {
       LogicalType const element(duckdb_list_type_child_type(type));
@@ -369,6 +383,16 @@ absl::StatusOr<googlesql::Value> FormatValue(duckdb_vector vector, idx_t row,
         elements.push_back(std::move(element));
       }
       return googlesql::Value::MakeArray(type->AsArray(), std::move(elements));
+    }
+    case googlesql::TYPE_STRUCT: {
+      std::vector<googlesql::Value> fields;
+      for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+        GOOGLESQL_ASSIGN_OR_RETURN(auto field,
+                                   FormatValue(duckdb_struct_vector_get_child(vector, i), row,
+                                               type->AsStruct()->field(i).type));
+        fields.push_back(std::move(field));
+      }
+      return googlesql::Value::MakeStruct(type->AsStruct(), std::move(fields));
     }
     default:
       return absl::UnimplementedError("Unsupported argument type for FORMAT");

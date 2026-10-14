@@ -548,7 +548,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | Supported | GoogleSQL function |  |
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | Supported | GoogleSQL function |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | STRUCT and INTERVAL values, and arrays of them, are unsupported. Unsupported: function FORMAT; function FORMAT with INTERVAL; function FORMAT with STRUCT<>. |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | INTERVAL values, and arrays and structs that hold them, are unsupported. Unsupported: function FORMAT with INTERVAL; function FORMAT with STRUCT<>. |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | Supported | DuckDB SQL |  |

@@ -19,7 +19,3 @@ SELECT FORMAT('%s', RANGE<DATE> '[2020-01-01, 2020-02-01)')
 # keeps the NUL.
 SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([CONCAT('a', CODE_POINTS_TO_STRING([0]), 'b')] AS a)]) AS s
 !> "[a"
-
-# FORMAT does not take STRUCT values yet, including those holding a RANGE.
-SELECT FORMAT('%T', STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 1 AS n))
-!> "(RANGE<DATE> \"[2020-01-01, UNBOUNDED)\", 1)"
