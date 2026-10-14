@@ -69,6 +69,9 @@ enum class Implementation : std::uint8_t {
   // Templates calling GoogleSQL's own implementation, which src/backend_functions.cc registers
   // with DuckDB as a bq_* function.
   kBackend,
+  // Templates calling the emulator's GEOGRAPHY functions over the S2 Geometry library, which
+  // src/backend_functions/geography.cc registers with DuckDB as bq_* functions.
+  kS2,
   // Code in src/translator/handlers.cc.
   kHandler,
   // Another function with the SAFE. prefix, as SAFE_ADD is SAFE.$ADD.
@@ -174,7 +177,7 @@ struct AggregateRule {
 // A function in the registry.
 struct FunctionEntry {
   Implementation implementation;
-  // kRules and kBackend: the rules, the first that matches a call translating it.
+  // kRules, kBackend and kS2: the rules, the first that matches a call translating it.
   std::vector<Rule> rules = {};
   // kRenamed: the DuckDB function. kSafe: the function it is with SAFE.
   std::string_view target = {};
@@ -194,7 +197,7 @@ const FunctionEntry* FindFunction(std::string_view upper_name);
 bool SupportsBigNumeric(std::string_view upper_name);
 
 // The DuckDB spelling of a call to `upper_name`, a function implemented by kSame, kRenamed,
-// kRules or kBackend, or nullopt when no rule matches.
+// kRules, kBackend or kS2, or nullopt when no rule matches.
 std::optional<std::string> TranslateFunction(std::string_view upper_name,
                                              const std::vector<FunctionArgument>& arguments,
                                              bool safe = false);

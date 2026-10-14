@@ -152,6 +152,15 @@ type encode a RANGE as an object of its `start` and `end`, with `null` for an un
 `FORMAT` writes a RANGE argument with `%t` and `%T`, but not one inside an ARRAY or STRUCT. Other
 functions over RANGE values, and loads and extracts of RANGE columns are unsupported.
 
+### GEOGRAPHY values
+
+Queries hold a GEOGRAPHY as WKT with every digit of its coordinates, and return or store it as
+the WKT BigQuery does, in 15 significant digits. Only points are supported: from `ST_GEOGPOINT`,
+`ST_GEOGPOINTFROMGEOHASH` and `ST_GEOGFROMTEXT` of a nonempty `POINT`. Functions over them use the [S2 Geometry](https://s2geometry.io/)
+library; distances use S2's Earth radius of 6,371,010 meters, which BigQuery's distances match.
+`use_spheroid` `TRUE` is unsupported. Stored GEOGRAPHY columns read as the STRING they hold, and
+GEOGRAPHY query parameters are unsupported.
+
 ### RANGE_SESSIONIZE
 
 `RANGE_SESSIONIZE` retains every input row and appends `session_range` for DATE, DATETIME and

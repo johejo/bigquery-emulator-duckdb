@@ -179,6 +179,7 @@ std::optional<std::string> TranslateFunction(std::string_view upper_name,
       return Invoke(entry->target, arguments);
     case Implementation::kRules:
     case Implementation::kBackend:
+    case Implementation::kS2:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
       if (const auto rule = std::ranges::find_if(

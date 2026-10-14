@@ -12,6 +12,7 @@
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"
 #include "src/translator/dml.h"
+#include "src/translator/function.h"
 #include "src/translator/scan.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -86,8 +87,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
       return Unsupported(scope, "SELECT AS STRUCT without fields");
     }
     for (size_t i = 0; i < fields.size(); ++i) {
-      projections.push_back("struct_extract_at(" + column->second + ", " + std::to_string(i + 1) +
-                            ") AS " + QuoteIdentifier(fields.at(i).name));
+      projections.push_back(
+          GeographyWkt("struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ")",
+                       fields.at(i).type) +
+          " AS " + QuoteIdentifier(fields.at(i).name));
     }
     return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
   }
@@ -96,7 +99,8 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     if (column == relation->columns.end()) {
       return std::nullopt;
     }
-    projections.push_back(column->second + " AS " + QuoteIdentifier(output->name()));
+    projections.push_back(GeographyWkt(column->second, output->column().type()) + " AS " +
+                          QuoteIdentifier(output->name()));
   }
   if (projections.empty()) {
     return std::nullopt;

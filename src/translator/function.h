@@ -25,6 +25,11 @@ bool HasBigNumeric(const googlesql::Type* type);
 // Whether the result or an argument of `call` has a BIGNUMERIC, at any depth.
 bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call);
 
+// `value`, the SQL of a value of `type`, with each GEOGRAPHY in it, at any depth, turned into the
+// WKT BigQuery returns for it, as a query returns or a table stores it. A GEOGRAPHY keeps more
+// digits until then; see src/backend_functions/geography.cc.
+std::string GeographyWkt(const std::string& value, const googlesql::Type* type, int depth = 0);
+
 // `value`, the SQL of a value of `type` that a statement writes to the column `field`. DuckDB's
 // cast to a parameterized NUMERIC or BIGNUMERIC rounds halfway values away from zero, so the value
 // of a ROUND_HALF_EVEN column is rounded to even first, as ROUND does. Writing a STRUCT or ARRAY

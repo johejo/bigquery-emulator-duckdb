@@ -56,6 +56,9 @@ bool HasRange(const googlesql::Type* type);
 // Whether a type contains INTERVAL, including array elements and struct fields.
 bool HasInterval(const googlesql::Type* type);
 
+// Whether a type contains GEOGRAPHY, including array elements and struct fields.
+bool HasGeography(const googlesql::Type* type);
+
 // Maps a BigQuery TableFieldSchema to the GoogleSQL type of the column.
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory);
@@ -90,7 +93,7 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
 // The DuckDB type of a query parameter described by a BigQuery TableFieldSchema: as
-// DuckDbColumnType, except that INTERVAL, a query value, is supported.
+// DuckDbColumnType, except that INTERVAL, a query value, is supported and GEOGRAPHY is not.
 absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field);
 
 }  // namespace bigquery_emulator_duckdb

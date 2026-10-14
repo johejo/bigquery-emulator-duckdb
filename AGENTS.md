@@ -74,6 +74,8 @@ backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
   difference such as argument order, a default or a date part.
 - **A backend rule** (`BackendRules`, registered in `src/backend_functions/`): a call to
   GoogleSQL's implementation.
+- **An S2 rule** (`S2Rules`, registered in `src/backend_functions/geography.cc`): a GEOGRAPHY
+  function, which GoogleSQL does not implement, over the S2 Geometry library.
 - **A handler** (`Handlers`, `src/translator/handlers.cc`): when the spelling depends on more of
   the resolved AST than a rule sees, such as a variable number of arguments or a literal pattern
   or path. The handler builds the call and leaves the semantics to the backend chosen above; do

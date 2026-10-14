@@ -28,9 +28,11 @@ build --host_per_file_copt=external/.*@-w
 build --copt=--system-header-prefix=absl/
 build --copt=--system-header-prefix=google/
 build --copt=--system-header-prefix=googlesql/
+build --copt=--system-header-prefix=s2/
 build --host_copt=--system-header-prefix=absl/
 build --host_copt=--system-header-prefix=google/
 build --host_copt=--system-header-prefix=googlesql/
+build --host_copt=--system-header-prefix=s2/
 
 # GoogleSQL's py_binary relies on implicit __init__.py creation, which rules_python deprecates. No
 # Python target in the build needs it.

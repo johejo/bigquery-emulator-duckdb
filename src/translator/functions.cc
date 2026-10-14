@@ -203,6 +203,9 @@ const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
     for (const auto& [name, rules] : BackendRules()) {
       add(name, {.implementation = Implementation::kBackend, .rules = rules});
     }
+    for (const auto& [name, rules] : S2Rules()) {
+      add(name, {.implementation = Implementation::kS2, .rules = rules});
+    }
     for (const auto& [name, target] : FunctionNames()) {
       add(name, {.implementation = Implementation::kRenamed, .target = target});
     }
@@ -238,6 +241,8 @@ std::string_view Describe(Implementation implementation) {
       return "DuckDB SQL";
     case Implementation::kBackend:
       return "GoogleSQL function";
+    case Implementation::kS2:
+      return "S2 function";
     case Implementation::kHandler:
       return "DuckDB SQL, in code";
     case Implementation::kSafe:

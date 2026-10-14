@@ -215,8 +215,9 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& tab
   return schema;
 }
 
-// Queries see a GEOGRAPHY column as the STRING it is stored as, since the emulator does not
-// translate GEOGRAPHY in SQL; tables.get still reports the column as GEOGRAPHY.
+// Queries see a GEOGRAPHY column as the STRING it is stored as, since the stored text is what the
+// client wrote rather than the WKT that GEOGRAPHY values in queries hold; tables.get still
+// reports the column as GEOGRAPHY.
 void GeographyAsString(std::vector<FieldSchema>& schema) {
   for (FieldSchema& field : schema) {
     if (field.type == FieldType::kGeography) {
