@@ -1,5 +1,6 @@
 #include "src/backend_functions/datetime.h"
 
+#include <bit>
 #include <charconv>
 #include <cmath>
 #include <cstddef>
@@ -67,26 +68,6 @@ absl::StatusOr<int64_t> MicrosFromDatetime(const googlesql::DatetimeValue& datet
 }
 
 namespace {
-
-// The DuckDB type of each argument column, and whether it is JSON, a VARCHAR by its alias.
-struct ColumnType {
-  duckdb_type id;
-  bool json;
-};
-
-std::vector<ColumnType> ColumnTypes(duckdb_data_chunk input) {
-  std::vector<ColumnType> types;
-  for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(input); ++column) {
-    LogicalType const type(
-        duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
-    const DuckString alias(duckdb_logical_type_get_alias(type.get()));
-    types.push_back({
-        .id = duckdb_get_type_id(type.get()),
-        .json = alias != nullptr && std::string_view(alias.get()) == "JSON",
-    });
-  }
-  return types;
-}
 
 namespace fn = googlesql::functions;
 
@@ -255,116 +236,140 @@ absl::Status TimestampToString(int64_t micros, std::string_view time_zone, std::
                                       out);
 }
 
-// A RANGE argument to FORMAT, the only STRUCT the handler passes, whose unbounded ends are
-// infinite in DuckDB and NULL in GoogleSQL.
-absl::StatusOr<googlesql::Value> FormatRange(duckdb_vector vector, idx_t row, bool null) {
-  LogicalType const type(duckdb_vector_get_column_type(vector));
-  LogicalType const element(duckdb_struct_type_child_type(type.get(), 0));
-  const duckdb_type element_type = duckdb_get_type_id(element.get());
-  const googlesql::Type* range = element_type == kDate ? googlesql::types::DateRangeType()
-                                 : element_type == kDatetime
-                                     ? googlesql::types::DatetimeRangeType()
-                                     : googlesql::types::TimestampRangeType();
-  if (null) {
-    return googlesql::Value::Null(range);
+// The GoogleSQL type of a FORMAT value, which the handler passes as the DuckDB type that stands
+// for it: JSON as a VARCHAR by its alias, a RANGE as the only STRUCT, and an ARRAY as a LIST.
+// Arrays are made in `factory`; other types are unsupported.
+absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
+                                                  googlesql::TypeFactory& factory) {
+  namespace types = googlesql::types;
+  const DuckString alias(duckdb_logical_type_get_alias(type));
+  if (alias != nullptr && std::string_view(alias.get()) == "JSON") {
+    return types::JsonType();
   }
-  std::vector<googlesql::Value> bounds;
-  for (idx_t i = 0; i < 2; ++i) {
-    duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
-    if (element_type == kDate) {
-      const auto days = VectorElement<int32_t>(child, row);
-      bounds.push_back(duckdb_is_finite_date({days})
-                           ? googlesql::Value::Date(days)
-                           : googlesql::Value::Null(range->AsRange()->element_type()));
-      continue;
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_VARCHAR:
+      return types::StringType();
+    case DUCKDB_TYPE_BLOB:
+      return types::BytesType();
+    case DUCKDB_TYPE_BIGINT:
+      return types::Int64Type();
+    case DUCKDB_TYPE_DOUBLE:
+      return types::DoubleType();
+    case DUCKDB_TYPE_BOOLEAN:
+      return types::BoolType();
+    case DUCKDB_TYPE_DATE:
+      return types::DateType();
+    case DUCKDB_TYPE_TIME:
+      return types::TimeType();
+    case DUCKDB_TYPE_TIMESTAMP:
+      return types::DatetimeType();
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+      return types::TimestampType();
+    case DUCKDB_TYPE_BIGNUM:
+      return types::BigNumericType();
+    case DUCKDB_TYPE_DECIMAL:
+      return types::NumericType();
+    case DUCKDB_TYPE_STRUCT: {
+      LogicalType const element(duckdb_struct_type_child_type(type, 0));
+      const duckdb_type element_type = duckdb_get_type_id(element.get());
+      return element_type == kDate       ? types::DateRangeType()
+             : element_type == kDatetime ? types::DatetimeRangeType()
+                                         : types::TimestampRangeType();
     }
-    const auto micros = VectorElement<int64_t>(child, row);
-    if (!duckdb_is_finite_timestamp({micros})) {
-      bounds.push_back(googlesql::Value::Null(range->AsRange()->element_type()));
-    } else if (element_type == kDatetime) {
-      GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
-      bounds.push_back(googlesql::Value::Datetime(datetime));
-    } else {
-      bounds.push_back(googlesql::Value::Timestamp(absl::FromUnixMicros(micros)));
+    case DUCKDB_TYPE_LIST: {
+      LogicalType const element(duckdb_list_type_child_type(type));
+      GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::Type* element_type,
+                                 FormatType(element.get(), factory));
+      return factory.MakeArrayType(element_type);
     }
+    default:
+      return absl::UnimplementedError("Unsupported argument type for FORMAT");
   }
-  return googlesql::Value::MakeRange(bounds.at(0), bounds.at(1));
 }
 
-// A FORMAT argument as the GoogleSQL value of the type its DuckDB type stands for.
-absl::StatusOr<googlesql::Value> FormatArgument(const Arguments& arguments, idx_t column,
-                                                ColumnType type) {
-  const bool null = arguments.IsNull(column);
-  if (type.json) {
-    // Parsed as the JSON functions parse it.
-    if (null) {
-      return googlesql::Value::Null(googlesql::types::JsonType());
-    }
-    GOOGLESQL_ASSIGN_OR_RETURN(auto json,
-                               googlesql::JSONValue::ParseJSONString(arguments.String(column)));
-    return googlesql::Value::Json(std::move(json));
+// The FORMAT value of `type` in row `row` of `vector`, whose DuckDB type FormatType maps to it.
+absl::StatusOr<googlesql::Value> FormatValue(duckdb_vector vector, idx_t row,
+                                             const googlesql::Type* type) {
+  uint64_t* validity = duckdb_vector_get_validity(vector);
+  if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
+    return googlesql::Value::Null(type);
   }
-  switch (type.id) {
-    case DUCKDB_TYPE_VARCHAR:
-      return null ? googlesql::Value::NullString()
-                  : googlesql::Value::String(arguments.String(column));
-    case DUCKDB_TYPE_BLOB:
-      return null ? googlesql::Value::NullBytes()
-                  : googlesql::Value::Bytes(arguments.String(column));
-    case DUCKDB_TYPE_BIGINT:
-      return null ? googlesql::Value::NullInt64() : googlesql::Value::Int64(arguments.Int(column));
-    case DUCKDB_TYPE_DOUBLE: {
-      if (null) {
-        return googlesql::Value::NullDouble();
-      }
+  switch (type->kind()) {
+    case googlesql::TYPE_JSON: {
+      // Parsed as the JSON functions parse it.
+      GOOGLESQL_ASSIGN_OR_RETURN(auto json,
+                                 googlesql::JSONValue::ParseJSONString(VectorString(vector, row)));
+      return googlesql::Value::Json(std::move(json));
+    }
+    case googlesql::TYPE_STRING:
+      return googlesql::Value::String(VectorString(vector, row));
+    case googlesql::TYPE_BYTES:
+      return googlesql::Value::Bytes(VectorString(vector, row));
+    case googlesql::TYPE_INT64:
+      return googlesql::Value::Int64(VectorElement<int64_t>(vector, row));
+    case googlesql::TYPE_DOUBLE: {
       // GoogleSQL prints the sign of a negative NaN when it preserves the sign of zero; BigQuery
       // does not.
-      const double value = arguments.Double(column);
+      const auto value = VectorElement<double>(vector, row);
       return googlesql::Value::Double(std::isnan(value) ? std::numeric_limits<double>::quiet_NaN()
                                                         : value);
     }
-    case DUCKDB_TYPE_BOOLEAN:
-      return null ? googlesql::Value::NullBool() : googlesql::Value::Bool(arguments.Bool(column));
-    case DUCKDB_TYPE_DATE:
-      return null ? googlesql::Value::NullDate() : googlesql::Value::Date(arguments.Date(column));
-    case DUCKDB_TYPE_TIME:
-      return null ? googlesql::Value::NullTime()
-                  : googlesql::Value::Time(TimeFromMicros(arguments.Int(column)));
-    case DUCKDB_TYPE_TIMESTAMP: {
-      if (null) {
-        return googlesql::Value::NullDatetime();
-      }
-      const auto datetime = DatetimeFromMicros(arguments.Int(column));
-      if (!datetime.ok()) {
-        return datetime.status();
-      }
-      return googlesql::Value::Datetime(*datetime);
+    case googlesql::TYPE_BOOL:
+      return googlesql::Value::Bool(VectorElement<bool>(vector, row));
+    case googlesql::TYPE_DATE:
+      return googlesql::Value::Date(VectorElement<int32_t>(vector, row));
+    case googlesql::TYPE_TIME:
+      return googlesql::Value::Time(TimeFromMicros(VectorElement<int64_t>(vector, row)));
+    case googlesql::TYPE_DATETIME: {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime,
+                                 DatetimeFromMicros(VectorElement<int64_t>(vector, row)));
+      return googlesql::Value::Datetime(datetime);
     }
-    case DUCKDB_TYPE_TIMESTAMP_TZ:
-      return null ? googlesql::Value::NullTimestamp()
-                  : googlesql::Value::Timestamp(absl::FromUnixMicros(arguments.Int(column)));
-    case DUCKDB_TYPE_BIGNUM: {
-      if (null) {
-        return googlesql::Value::NullBigNumeric();
-      }
-      const auto bignumeric = BigNumericFromBignum(arguments.String(column));
-      if (!bignumeric.ok()) {
-        return bignumeric.status();
-      }
-      return googlesql::Value::BigNumeric(*bignumeric);
+    case googlesql::TYPE_TIMESTAMP:
+      return googlesql::Value::Timestamp(absl::FromUnixMicros(VectorElement<int64_t>(vector, row)));
+    case googlesql::TYPE_BIGNUMERIC: {
+      GOOGLESQL_ASSIGN_OR_RETURN(const auto bignumeric,
+                                 BigNumericFromBignum(VectorString(vector, row)));
+      return googlesql::Value::BigNumeric(bignumeric);
     }
-    case DUCKDB_TYPE_DECIMAL: {
-      if (null) {
-        return googlesql::Value::NullNumeric();
-      }
-      const auto numeric = googlesql::NumericValue::FromPackedInt(arguments.Decimal(column));
-      if (!numeric.ok()) {
-        return numeric.status();
-      }
-      return googlesql::Value::Numeric(*numeric);
+    case googlesql::TYPE_NUMERIC: {
+      const auto value = VectorElement<duckdb_hugeint>(vector, row);
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          const auto numeric,
+          googlesql::NumericValue::FromPackedInt(std::bit_cast<__int128>(
+              (static_cast<unsigned __int128>(value.upper) << 64U) | value.lower)));
+      return googlesql::Value::Numeric(numeric);
     }
-    case DUCKDB_TYPE_STRUCT:
-      return FormatRange(arguments.Vector(column), arguments.Row(), null);
+    case googlesql::TYPE_RANGE: {
+      // The unbounded ends are infinite in DuckDB and NULL in GoogleSQL.
+      const googlesql::Type* element = type->AsRange()->element_type();
+      std::vector<googlesql::Value> bounds;
+      for (idx_t i = 0; i < 2; ++i) {
+        duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
+        const bool finite = element->IsDate()
+                                ? duckdb_is_finite_date({VectorElement<int32_t>(child, row)})
+                                : duckdb_is_finite_timestamp({VectorElement<int64_t>(child, row)});
+        if (finite) {
+          GOOGLESQL_ASSIGN_OR_RETURN(auto bound, FormatValue(child, row, element));
+          bounds.push_back(std::move(bound));
+        } else {
+          bounds.push_back(googlesql::Value::Null(element));
+        }
+      }
+      return googlesql::Value::MakeRange(bounds.at(0), bounds.at(1));
+    }
+    case googlesql::TYPE_ARRAY: {
+      const auto entry = VectorElement<duckdb_list_entry>(vector, row);
+      duckdb_vector child = duckdb_list_vector_get_child(vector);
+      std::vector<googlesql::Value> elements;
+      elements.reserve(entry.length);
+      for (idx_t i = 0; i < entry.length; ++i) {
+        GOOGLESQL_ASSIGN_OR_RETURN(
+            auto element, FormatValue(child, entry.offset + i, type->AsArray()->element_type()));
+        elements.push_back(std::move(element));
+      }
+      return googlesql::Value::MakeArray(type->AsArray(), std::move(elements));
+    }
     default:
       return absl::UnimplementedError("Unsupported argument type for FORMAT");
   }
@@ -507,7 +512,18 @@ std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
 // FORMAT(format, values...), which is NULL for a NULL format and where GoogleSQL says so for
 // a NULL value.
 void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const std::vector<ColumnType> types = ColumnTypes(input);
+  googlesql::TypeFactory factory;
+  std::vector<const googlesql::Type*> types;
+  for (idx_t column = 1; column < duckdb_data_chunk_get_column_count(input); ++column) {
+    LogicalType const type(
+        duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
+    const auto format_type = FormatType(type.get(), factory);
+    if (!format_type.ok()) {
+      duckdb_scalar_function_set_error(info, std::string(format_type.status().message()).c_str());
+      return;
+    }
+    types.push_back(*format_type);
+  }
   EachRow(
       info, input, output,
       [&types](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
@@ -515,8 +531,8 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
           return std::nullopt;
         }
         std::vector<googlesql::Value> values;
-        for (idx_t column = 1; column < types.size(); ++column) {
-          auto value = FormatArgument(arguments, column, types.at(column));
+        for (idx_t column = 1; column <= types.size(); ++column) {
+          auto value = FormatValue(arguments.Vector(column), arguments.Row(), types.at(column - 1));
           if (!value.ok()) {
             return value.status();
           }

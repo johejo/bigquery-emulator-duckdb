@@ -1,0 +1,64 @@
+## FORMAT with ARRAY values
+# Expected values: BigQuery's FORMAT documentation, which formats an ARRAY for %t and %T as
+# [value, value, ...] with each value formatted by the same specifier, and GoogleSQL compliance
+# functions_testlib_format.cc, functions_testlib_format_nulls.cc and
+# functions_testlib_format_floating_point.cc, which agree with it.
+# UNNEST prevents constant folding by the analyzer.
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([0, 1] AS a)]) AS s
+=> "[0, 1]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([0, 1] AS a)]) AS s
+=> "[0, 1]"
+
+SELECT FORMAT('%t', [0, 1])
+=> "[0, 1]"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(CAST(NULL AS ARRAY<INT64>) AS a)]) AS s
+=> "NULL|NULL"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([5, NULL, -6] AS a)]) AS s
+=> "[5, NULL, -6]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([5, NULL, -6] AS a)]) AS s
+=> "[5, NULL, -6]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([5.0, NULL, -6.0] AS a)]) AS s
+=> "[5.0, NULL, -6.0]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([-4, CAST('inf' AS FLOAT64)] AS a)]) AS s
+=> "[-4.0, inf]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([-4, CAST('-inf' AS FLOAT64)] AS a)]) AS s
+=> "[-4.0, CAST(\"-inf\" AS FLOAT64)]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([DATETIME '1970-01-01 00:00:00', DATETIME '2016-04-26 15:23:27.123456'] AS a)]) AS s
+=> "[1970-01-01 00:00:00, 2016-04-26 15:23:27.123456]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([DATETIME '1970-01-01 00:00:00', DATETIME '2016-04-26 15:23:27.123456'] AS a)]) AS s
+=> "[DATETIME \"1970-01-01 00:00:00\", DATETIME \"2016-04-26 15:23:27.123456\"]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([TIME '00:00:00', TIME '15:23:27.123456'] AS a)]) AS s
+=> "[00:00:00, 15:23:27.123456]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([TIME '00:00:00', TIME '15:23:27.123456'] AS a)]) AS s
+=> "[TIME \"00:00:00\", TIME \"15:23:27.123456\"]"
+
+SELECT FORMAT('%s', s.a) FROM UNNEST([STRUCT([0, 1] AS a)]) AS s
+=> error:
+
+SELECT FORMAT('%d', s.a) FROM UNNEST([STRUCT([0, 1] AS a)]) AS s
+=> error:
+
+# Confirmed against BigQuery.
+SELECT FORMAT('%t', [RANGE<DATE> '[2020-01-01, 2020-02-01)'])
+=> "[[2020-01-01, 2020-02-01)]"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(ARRAY<INT64>[] AS a)]) AS s
+=> "[]|[]"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([JSON '{"a": 1}', NULL] AS a)]) AS s
+=> "[{\"a\":1}, NULL]|[JSON '{\"a\":1}', NULL]"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([RANGE(DATE '2024-01-01', NULL)] AS a)]) AS s
+=> "[[2024-01-01, NULL)]|[RANGE<DATE> \"[2024-01-01, UNBOUNDED)\"]"
