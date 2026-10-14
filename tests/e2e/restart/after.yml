@@ -53,3 +53,28 @@ steps:
     test: |
       current.exit_code != 0 && current.stdout contains 'Column s was created by an earlier' &&
       current.stdout contains 'recreate the table'
+  # restart/stopped.yml creates unmanaged.v without the emulator; it is listed, queried in
+  # INFORMATION_SCHEMA and deleted, but has no metadata to show.
+  unmanaged_view_list:
+    exec:
+      command: tests/e2e/bq.sh ls --format=json unmanaged
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '"tableId":"v"' && current.stdout contains '"type":"VIEW"'
+  unmanaged_view_show:
+    exec:
+      command: tests/e2e/bq.sh show --format=json unmanaged.v
+    test: current.exit_code != 0 && current.stdout contains 'was not created by the'
+  unmanaged_view_information_schema:
+    exec:
+      command: >-
+        tests/e2e/bq.sh query --nouse_legacy_sql --format=json
+        "SELECT table_type, ddl IS NULL AS no_ddl FROM unmanaged.INFORMATION_SCHEMA.TABLES
+        WHERE table_name = 'v'"
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"no_ddl":"true","table_type":"VIEW"}]'
+  unmanaged_view_delete:
+    exec:
+      command: tests/e2e/bq.sh rm -f -t unmanaged.v && tests/e2e/bq.sh ls --format=json unmanaged
+    test: current.exit_code == 0 && trim(current.stdout) == ''
