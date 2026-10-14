@@ -399,6 +399,41 @@ absl::StatusOr<googlesql::Value> FormatValue(duckdb_vector vector, idx_t row,
   }
 }
 
+// Whether `value` is or holds a STRING with a NUL.
+bool HasNul(const googlesql::Value& value) {
+  if (value.is_null()) {
+    return false;
+  }
+  switch (value.type_kind()) {
+    case googlesql::TYPE_STRING:
+      return value.string_value().find('\0') != std::string::npos;
+    case googlesql::TYPE_ARRAY:
+      for (int i = 0; i < value.num_elements(); ++i) {
+        if (HasNul(value.element(i))) {
+          return true;
+        }
+      }
+      return false;
+    case googlesql::TYPE_STRUCT:
+      for (int i = 0; i < value.num_fields(); ++i) {
+        if (HasNul(value.field(i))) {
+          return true;
+        }
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
+// GoogleSQL's FORMAT, preserving the sign of floating-point zero as BigQuery does.
+absl::Status StringFormat(std::string_view pattern, const std::vector<googlesql::Value>& values,
+                          std::string* out, bool* is_null) {
+  return googlesql::functions::StringFormatUtf8(pattern, values, googlesql::PRODUCT_EXTERNAL, out,
+                                                is_null, /*canonicalize_zero=*/false,
+                                                /*use_external_float32=*/true);
+}
+
 // A FORMAT pattern and its values, rewritten by AdaptFormat.
 struct AdaptedFormat {
   std::string pattern;
@@ -465,10 +500,11 @@ std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
       continue;
     }
     const googlesql::Value& value = values.at(value_arg);
-    if (conversion == 't' && value.type_kind() == googlesql::TYPE_STRING &&
-        value.string_value().find('\0') != std::string::npos) {
-      // BigQuery truncates a STRING at NUL for %t, as GoogleSQL does for %s.
-      const std::string& text = value.string_value();
+    std::string text;
+    bool is_null = false;
+    if (conversion == 't' && HasNul(value) && StringFormat("%t", {value}, &text, &is_null).ok()) {
+      // BigQuery ends the text of %t at the first NUL of a STRING, also of one in an ARRAY or a
+      // STRUCT, as GoogleSQL does for %s. A value that fails here fails below as well.
       adapted.values.at(value_arg) = googlesql::Value::String(text.substr(0, text.find('\0')));
       changed = true;
     } else if (std::string_view("dioxX").find(conversion) != std::string_view::npos &&
@@ -568,10 +604,7 @@ void Format(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
         bool is_null = false;
         const auto format = [&](const std::string& format_pattern,
                                 const std::vector<googlesql::Value>& format_values) {
-          // BigQuery preserves the sign of floating-point zero in FORMAT.
-          return googlesql::functions::StringFormatUtf8(
-              format_pattern, format_values, googlesql::PRODUCT_EXTERNAL, &out, &is_null,
-              /*canonicalize_zero=*/false, /*use_external_float32=*/true);
+          return StringFormat(format_pattern, format_values, &out, &is_null);
         };
         absl::Status status = adapted.has_value() ? format(adapted->pattern, adapted->values)
                                                   : format(pattern, values);
