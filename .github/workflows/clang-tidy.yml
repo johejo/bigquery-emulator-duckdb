@@ -54,6 +54,13 @@ jobs:
         run: |
           echo 'common --config=ci' > .bazelrc.local
           mkdir -p "$RUNNER_TEMP/bazel-reports"
+      # Bazel's own Xcode repository runs xcodebuild for every Xcode on the runner, which takes
+      # most of a minute before anything builds.
+      - name: Configure Xcode for Bazel
+        if: runner.os == 'macOS'
+        run: |
+          .github/scripts/xcode-config.sh "$RUNNER_TEMP/xcode"
+          echo "common --override_repository=bazel_tools+xcode_configure_extension+local_config_xcode=$RUNNER_TEMP/xcode" >> .bazelrc.local
       - name: Clang-tidy
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.bep.json --profile=$RUNNER_TEMP/bazel-reports/clang-tidy.profile.json.gz" >> .bazelrc.local

@@ -54,6 +54,9 @@ build:clang-tidy --keep_going
 # .github/workflows/test.yml.
 build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
+# Build gazelle's tools and fetch go_repository modules with the Go caches that CI restores, rather
+# than with caches of their own that each run starts empty.
+build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
 # Allow room for the roughly 6G macOS cache used by a full CI run. Bazel
 # collects the disk cache once idle during the end-to-end tests, dropping
 # entries no run has used for 3 days so that each cache fits the repository's

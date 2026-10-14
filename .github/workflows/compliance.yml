@@ -43,7 +43,7 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}
+          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum', 'MODULE.bazel.lock') }}
           restore-keys: go-v1-${{ runner.os }}-${{ runner.arch }}-
       # Repository downloads are shared with the Test workflow, which saves this cache.
       - name: Restore Bazel repository cache
