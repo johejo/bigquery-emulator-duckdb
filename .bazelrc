@@ -58,7 +58,7 @@ build:ci --repository_cache=~/.cache/bazel-repo
 # collects the disk cache once idle during the end-to-end tests, dropping
 # entries no run has used for 3 days so that each cache fits the repository's
 # quota once compressed.
-build:ci --experimental_disk_cache_gc_max_size=8G
+build:ci --experimental_disk_cache_gc_max_size=7G
 build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 test:ci --test_output=errors
