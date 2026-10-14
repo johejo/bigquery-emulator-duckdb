@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cstddef>
 #include <format>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -392,8 +393,13 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
       backend.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
                          setup);
     }
-  } else if (const std::optional<DdlWrite> write =
+  } else if (std::optional<DdlWrite> write =
                  MetadataWrite(translation, CreatedInDataset(backend, translation))) {
+    if (translation.table.has_value() && translation.table->schema_defaults) {
+      std::ranges::move(
+          ColumnDefaultStatements(translation.table->table, translation.table->schema),
+          std::back_inserter(write->metadata_statements));
+    }
     try {
       backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);
     } catch (const BackendError& error) {

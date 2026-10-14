@@ -102,8 +102,9 @@ for a required column is rejected. `DROP DEFAULT` fails if the column has no def
 `CREATE TABLE LIKE` copies a table's schema, partitioning, clustering, description, friendly name
 and labels; with `AS SELECT`, it fills the new table with the query's rows. `CREATE TABLE COPY` also
 copies the rows, and `CREATE TABLE CLONE` also records the table it was cloned from and when, which
-`tables.get` and `INFORMATION_SCHEMA.TABLES` return. None of them copies a view or a table with
-column defaults.
+`tables.get` and `INFORMATION_SCHEMA.TABLES` return. All three keep the source's column defaults,
+and reject a view as BigQuery does. A temporary table can be made only from a temporary table, as
+BigQuery requires.
 
 ### Schema changes
 

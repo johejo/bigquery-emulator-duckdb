@@ -1,0 +1,26 @@
+# A temporary LIKE, COPY or CLONE of a temporary table, as BigQuery answers.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like
+
+CREATE TEMP TABLE s (id INT64);
+INSERT s (id) VALUES (1);
+CREATE TEMP TABLE n LIKE s;
+INSERT n (id) VALUES (2);
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM n))
+=> "[2]"
+
+CREATE TEMP TABLE s (id INT64);
+CREATE TEMP TABLE n LIKE s AS SELECT 2 AS id;
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM n))
+=> "[2]"
+
+CREATE TEMP TABLE s (id INT64);
+INSERT s (id) VALUES (1);
+CREATE TEMP TABLE n COPY s;
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM n))
+=> "[1]"
+
+CREATE TEMP TABLE s (id INT64);
+INSERT s (id) VALUES (1);
+CREATE TEMP TABLE n CLONE s;
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM n))
+=> "[1]"

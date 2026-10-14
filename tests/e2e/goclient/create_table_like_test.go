@@ -2,6 +2,7 @@ package goclient
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
@@ -66,7 +67,7 @@ func TestCreateTableLike(t *testing.T) {
 		// The new table has no relationship to the source table after creation.
 		`ALTER TABLE source ADD COLUMN later STRING`,
 		`CREATE VIEW v AS SELECT id FROM source`,
-		`CREATE TABLE defaulted (a INT64 DEFAULT 1)`,
+		`CREATE TABLE defaulted (id INT64, a INT64 DEFAULT 1)`,
 	} {
 		if err := run(sql); err != nil {
 			t.Fatalf("%s: %v", sql, err)
@@ -192,13 +193,45 @@ func TestCreateTableLike(t *testing.T) {
 	for sql, want := range map[string]string{
 		"CREATE TABLE n LIKE nested_required AS SELECT STRUCT(1 AS x) AS s": "CREATE TABLE LIKE AS SELECT with nested NOT NULL",
 		"CREATE TABLE n LIKE text_source AS SELECT 'abc' AS s":              "CREATE TABLE LIKE AS SELECT with length parameters",
-		"CREATE TABLE n LIKE v":                          "CREATE TABLE LIKE a view",
-		"CREATE TABLE n LIKE v AS SELECT id FROM v":      "CREATE TABLE LIKE a view",
-		"CREATE TABLE n LIKE defaulted":                  "CREATE TABLE LIKE a table with column defaults",
-		"CREATE TABLE n LIKE defaulted AS SELECT 1 AS a": "CREATE TABLE LIKE a table with column defaults",
+		"CREATE TABLE n LIKE go_create_table_like.v":                        "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
+		"CREATE TABLE n LIKE go_create_table_like.v AS SELECT id FROM v":    "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
+		// BigQuery's message for a temporary table like a table that is not temporary.
+		"CREATE TEMP TABLE n LIKE source; SELECT 1":                         "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table.",
+		"CREATE TEMP TABLE n LIKE text_source AS SELECT 'a' AS s; SELECT 1": "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table.",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
+		}
+	}
+
+	// The new table keeps the defaults of the source, with AS SELECT too, as BigQuery answers.
+	for _, sql := range []string{
+		"CREATE TABLE defaulted_like LIKE defaulted",
+		"INSERT defaulted_like (id) VALUES (1)",
+		"CREATE TABLE defaulted_like_select LIKE defaulted AS SELECT 1 AS id, 2 AS a",
+		"INSERT defaulted_like_select (id) VALUES (3)",
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	for name, id := range map[string]int64{"defaulted_like": 1, "defaulted_like_select": 3} {
+		query := client.Query(fmt.Sprintf("SELECT a FROM %s WHERE id = %d", name, id))
+		query.DefaultDatasetID = dataset.DatasetID
+		rows, err := query.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var row struct{ A int64 }
+		if err := rows.Next(&row); err != nil || row.A != 1 {
+			t.Errorf("%s: a = %d, err %v, want the default 1", name, row.A, err)
+		}
+		metadata, err := dataset.Table(name).Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := metadata.Schema[1].DefaultValueExpression; got != "1" {
+			t.Errorf("%s: defaultValueExpression = %q, want \"1\"", name, got)
 		}
 	}
 }

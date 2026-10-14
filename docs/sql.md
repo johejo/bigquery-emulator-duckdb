@@ -94,9 +94,9 @@ rejected.
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
-| `CREATE TABLE LIKE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE LIKE AS SELECT with length parameters; CREATE TABLE LIKE AS SELECT with nested NOT NULL; CREATE TABLE LIKE a table with column defaults; CREATE TABLE LIKE a view. |
-| `CREATE TABLE COPY` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE COPY with FOR SYSTEM_TIME AS OF; CREATE TEMP TABLE COPY. |
-| `CREATE TABLE CLONE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE OR REPLACE TABLE CLONE; CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF. |
+| `CREATE TABLE LIKE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE LIKE AS SELECT with length parameters; CREATE TABLE LIKE AS SELECT with nested NOT NULL. |
+| `CREATE TABLE COPY` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE COPY with FOR SYSTEM_TIME AS OF. |
+| `CREATE TABLE CLONE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF. |
 | `CREATE SNAPSHOT TABLE` | Unsupported |  |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
