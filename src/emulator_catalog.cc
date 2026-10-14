@@ -192,7 +192,8 @@ std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
 
 // The BigQuery schema of `table`: the recorded schema for a view, or its columns as DuckDB types
 // describe them, each replaced by the field its comment records. Throws BackendError when the
-// table does not exist.
+// table does not exist, and ApiError when a column's DuckDB type is one the emulator does not
+// support.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
   // Reading a view's schema must not require its execution identity to be configured.
   if (const std::optional<json> comment = ViewComment(backend, table); comment.has_value()) {
@@ -206,7 +207,12 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& tab
   std::ranges::transform(backend.Execute(ColumnCommentsQuery(table)).rows,
                          std::back_inserter(comments),
                          [](const json& row) { return row["f"][0]["v"]; });
-  return ApplyColumnComments(std::move(schema), comments);
+  schema = ApplyColumnComments(std::move(schema), comments);
+  if (const std::optional<std::string> error = backend.UnreadableColumnError(QualifiedName(table));
+      error.has_value()) {
+    throw ApiError::Invalid(*error + "; change the column's type to read the table");
+  }
+  return schema;
 }
 
 // Queries see a GEOGRAPHY column as the STRING it is stored as, since the emulator does not

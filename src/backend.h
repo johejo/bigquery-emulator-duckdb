@@ -72,6 +72,10 @@ class Backend {
   // has rows; `has_rows` says whether the statement produces a result set at all.
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
 
+  // Why the columns of `relation`, a table or view, cannot be read, naming the first column of a
+  // DuckDB type the emulator does not support, or nullopt.
+  std::optional<std::string> UnreadableColumnError(const std::string& relation);
+
   // Inserts each row on one connection. Unless skip_invalid_rows is set, a failed row rolls
   // back the entire request. Returns the failed row indexes and their DuckDB errors.
   std::vector<std::pair<size_t, std::string>> InsertRows(const std::vector<std::string>& statements,
