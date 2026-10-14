@@ -46,3 +46,6 @@ SELECT FORMAT('%d', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, 0 AS b) AS a)]) 
 # Confirmed against BigQuery.
 SELECT FORMAT('%T', STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 1 AS n))
 => "(RANGE<DATE> \"[2020-01-01, UNBOUNDED)\", 1)"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a) AS a)]) AS s
+=> "STRUCT(\"foo\")"
