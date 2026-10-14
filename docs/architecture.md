@@ -11,11 +11,6 @@ and Storage RPCs share the same emulator.
 threads. Destruction also stops and joins them. Instances are single-use, and the CLI announces
 endpoints only after startup succeeds.
 
-The server calls the emulator through [emulator.h](../src/emulator.h), which declares only its
-public API and the job and table types. The emulator's state and helpers live in `Emulator::Impl`,
-declared in [emulator_impl.h](../src/emulator_impl.h), which only the emulator's sources include,
-so changes to them and the GoogleSQL headers they need do not rebuild the server.
-
 REST uses [cpp-httplib](https://github.com/yhirose/cpp-httplib) and
 [nlohmann/json](https://github.com/nlohmann/json).
 [src/server/routes.cc](../src/server/routes.cc) builds routes from the bundled

@@ -1,12 +1,10 @@
 #include "src/emulator.h"
 
 #include <cctype>
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <ios>
 #include <map>
-#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -16,16 +14,10 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
-#include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator_impl.h"
-#include "src/field_schema.h"
 #include "src/project.h"
-#include "src/references.h"
-#include "src/routine.h"
-#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -53,8 +45,8 @@ std::string ProjectFileName(const std::string& project_id) {
 
 }  // namespace
 
-Emulator::Impl::Impl(std::string data_dir, const std::vector<Project>& projects,
-                     const std::optional<std::string>& session_user)
+Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
+                   const std::optional<std::string>& session_user)
     : backend_(session_user),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
@@ -128,9 +120,9 @@ Emulator::Impl::Impl(std::string data_dir, const std::vector<Project>& projects,
   }
 }
 
-const std::vector<Project>& Emulator::Impl::ListProjects() const { return projects_; }
+const std::vector<Project>& Emulator::ListProjects() const { return projects_; }
 
-std::string Emulator::Impl::ResolveProject(const std::string& project_id) const {
+std::string Emulator::ResolveProject(const std::string& project_id) const {
   const auto found = project_ids_.find(project_id);
   if (found == project_ids_.end()) {
     throw ApiError::NotFound("Not found: Project " + project_id);
@@ -138,144 +130,11 @@ std::string Emulator::Impl::ResolveProject(const std::string& project_id) const 
   return found->second;
 }
 
-std::string Emulator::Impl::ProjectDatabase(const std::string& project_id) const {
+std::string Emulator::ProjectDatabase(const std::string& project_id) const {
   if (data_dir_.empty()) {
     return ":memory:";
   }
   return (std::filesystem::path(data_dir_) / ProjectFileName(project_id)).string();
-}
-
-Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
-                   const std::optional<std::string>& session_user)
-    : impl_(std::make_unique<Impl>(std::move(data_dir), projects, session_user)) {}
-
-Emulator::~Emulator() = default;
-
-const std::vector<Project>& Emulator::ListProjects() const { return impl_->ListProjects(); }
-
-std::string Emulator::ResolveProject(const std::string& project_id) const {
-  return impl_->ResolveProject(project_id);
-}
-
-const std::string& Emulator::storage_endpoint() const { return impl_->storage_endpoint(); }
-
-std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
-  return impl_->RunQuery(std::move(request));
-}
-
-std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
-  return impl_->RunLoad(std::move(request));
-}
-
-std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
-  return impl_->RunCopy(std::move(request));
-}
-
-std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
-  return impl_->RunExtract(std::move(request));
-}
-
-std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id) {
-  return impl_->GetJob(std::move(project_id), job_id);
-}
-
-std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_id) {
-  return impl_->ListJobs(std::move(project_id));
-}
-
-void Emulator::DeleteJob(std::string project_id, const std::string& job_id) {
-  impl_->DeleteJob(std::move(project_id), job_id);
-}
-
-std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
-  return impl_->ListDatasets(std::move(project_id));
-}
-
-std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_id) {
-  return impl_->ListDatasetEntries(std::move(project_id));
-}
-
-DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
-  return impl_->GetDataset(std::move(dataset));
-}
-
-void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
-  impl_->CreateDataset(std::move(dataset), metadata);
-}
-
-void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
-  impl_->UpdateDataset(std::move(dataset), metadata);
-}
-
-void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
-  impl_->DeleteDataset(std::move(dataset), delete_contents);
-}
-
-std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
-  return impl_->ListTables(std::move(dataset));
-}
-
-std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
-  return impl_->ListTableEntries(std::move(dataset));
-}
-
-TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool expire) {
-  return impl_->GetTable(std::move(table), include_row_count, expire);
-}
-
-TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
-                                const TableMetadata& metadata) {
-  return impl_->CreateTable(std::move(table), schema, metadata);
-}
-
-TableInfo Emulator::CreateView(TableReference table, const nlohmann::json& definition,
-                               const TableMetadata& metadata) {
-  return impl_->CreateView(std::move(table), definition, metadata);
-}
-
-TableInfo Emulator::UpdateTable(TableReference table,
-                                const std::optional<std::vector<FieldSchema>>& schema,
-                                const std::optional<nlohmann::json>& view,
-                                const std::optional<TableMetadata>& metadata) {
-  return impl_->UpdateTable(std::move(table), schema, view, metadata);
-}
-
-void Emulator::DeleteTable(TableReference table) { impl_->DeleteTable(std::move(table)); }
-
-std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
-  return impl_->ListRoutines(std::move(dataset));
-}
-
-Routine Emulator::GetRoutine(RoutineReference routine) {
-  return impl_->GetRoutine(std::move(routine));
-}
-
-Routine Emulator::WriteRoutine(Routine routine, bool update) {
-  return impl_->WriteRoutine(std::move(routine), update);
-}
-
-void Emulator::DeleteRoutine(RoutineReference routine) { impl_->DeleteRoutine(std::move(routine)); }
-
-QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
-                                    int64_t max_results) {
-  return impl_->ListTableData(std::move(table), start_index, max_results);
-}
-
-QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& restriction) {
-  return impl_->ReadStorageTable(std::move(table), restriction);
-}
-
-std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
-                                                    const std::vector<FieldSchema>& schema,
-                                                    const nlohmann::json& rows, int64_t storage_id,
-                                                    bool validate_only) {
-  return impl_->WriteStorageRows(std::move(table), schema, rows, storage_id, validate_only);
-}
-
-std::vector<InsertError> Emulator::InsertTableData(TableReference table, const nlohmann::json& rows,
-                                                   bool skip_invalid_rows,
-                                                   bool ignore_unknown_values) {
-  return impl_->InsertTableData(std::move(table), rows, skip_invalid_rows, ignore_unknown_values);
 }
 
 }  // namespace bigquery_emulator_duckdb

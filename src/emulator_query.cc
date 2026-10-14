@@ -27,7 +27,6 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
-#include "src/emulator_impl.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
@@ -195,27 +194,27 @@ std::string ScriptStatementType(const googlesql::ParserOutput& script) {
 
 }  // namespace
 
-class Emulator::Impl::ScriptHostImpl : public ScriptHost {
+class Emulator::ScriptHostImpl : public ScriptHost {
  public:
-  explicit ScriptHostImpl(Impl& impl) : impl_(impl) {}
+  explicit ScriptHostImpl(Emulator& emulator) : emulator_(emulator) {}
 
-  Backend& backend() override { return impl_.backend_; }
-  [[nodiscard]] bool has_session_user() const override { return impl_.has_session_user_; }
+  Backend& backend() override { return emulator_.backend_; }
+  [[nodiscard]] bool has_session_user() const override { return emulator_.has_session_user_; }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
-    return impl_.NewTableSource(session, expire);
+    return emulator_.NewTableSource(session, expire);
   }
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays,
                            Backend* session) override {
-    return impl_.RunStatement(translation, setup, null_arrays, session);
+    return emulator_.RunStatement(translation, setup, null_arrays, session);
   }
 
  private:
-  Impl& impl_;
+  Emulator& emulator_;
 };
 
-QueryResult Emulator::Impl::Execute(const std::string& sql, const std::vector<std::string>& setup,
-                                    bool null_arrays) {
+QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
+                              bool null_arrays) {
   try {
     return backend_.Execute(sql, setup, null_arrays);
   } catch (const BackendError& error) {
@@ -223,7 +222,7 @@ QueryResult Emulator::Impl::Execute(const std::string& sql, const std::vector<st
   }
 }
 
-QueryResult Emulator::Impl::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
+QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
   try {
     return backend_.Prepare(sql, setup);
   } catch (const BackendError& error) {
@@ -231,7 +230,7 @@ QueryResult Emulator::Impl::Prepare(const std::string& sql, const std::vector<st
   }
 }
 
-QueryResult Emulator::Impl::ReadStorageTable(TableReference table, const std::string& restriction) {
+QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   if (info.view_query) {
@@ -277,10 +276,9 @@ QueryResult Emulator::Impl::ReadStorageTable(TableReference table, const std::st
   return result;
 }
 
-TranslatedStatement Emulator::Impl::Translate(const std::string& query,
-                                              const QueryParameters& parameters,
-                                              const std::string& default_project,
-                                              const std::string& default_dataset) {
+TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
+                                        const std::string& default_project,
+                                        const std::string& default_dataset) {
   AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
@@ -314,8 +312,8 @@ TranslatedStatement Emulator::Impl::Translate(const std::string& query,
   return *std::move(translated);
 }
 
-std::vector<std::string> Emulator::Impl::ColumnDefaultStatements(
-    const TableReference& table, const std::vector<FieldSchema>& schema) {
+std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference& table,
+                                                           const std::vector<FieldSchema>& schema) {
   std::vector<std::string> statements;
   for (const FieldSchema& field : schema) {
     if (field.default_value_expression.empty()) {
@@ -357,7 +355,7 @@ std::vector<std::string> Emulator::Impl::ColumnDefaultStatements(
   return statements;
 }
 
-std::shared_ptr<const Job> Emulator::Impl::RunQuery(QueryRequest request) {
+std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
   request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -440,9 +438,9 @@ std::shared_ptr<const Job> Emulator::Impl::RunQuery(QueryRequest request) {
   });
 }
 
-QueryResult Emulator::Impl::RunStatement(const TranslatedStatement& translation,
-                                         const std::vector<std::string>& setup, bool null_arrays,
-                                         Backend* session) {
+QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
+                                   const std::vector<std::string>& setup, bool null_arrays,
+                                   Backend* session) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
   std::optional<std::vector<FieldSchema>> schema;

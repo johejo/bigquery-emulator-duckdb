@@ -541,7 +541,6 @@ cc_library(
     srcs = [
         "src/emulator.cc",
         "src/emulator_catalog.cc",
-        "src/emulator_impl.h",
         "src/emulator_jobs.cc",
         "src/emulator_query.cc",
     ],
@@ -556,7 +555,6 @@ cc_library(
         ":ddl_write",
         ":duckdb_sql",
         ":extract",
-        ":gcs",
         ":load",
         ":parquet_metadata",
         ":routine_catalog",
@@ -577,6 +575,7 @@ cc_library(
         ":api_error",
         ":backend",
         ":field_schema",
+        ":gcs",
         ":project",
         ":query_parameters",
         ":references",
