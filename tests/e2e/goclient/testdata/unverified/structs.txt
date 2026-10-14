@@ -1,3 +1,0 @@
-# A STRUCT whose field names are those the emulator gives a RANGE's bounds stays a STRUCT.
-SELECT TO_JSON_STRING(STRUCT(DATE '2020-01-01' AS `$start`, DATE '2020-01-02' AS `$end`))
-?>

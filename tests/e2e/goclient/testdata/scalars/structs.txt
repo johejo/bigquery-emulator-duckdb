@@ -259,3 +259,7 @@ SELECT AS STRUCT 1 FROM UNNEST([1])
 
 SELECT AS STRUCT 1, STRUCT()
 => error: Invalid field name "". Fields must contain the allowed characters, and be at most 300 characters long. For allowed characters, please refer to https://cloud.google.com/bigquery/docs/schemas#column_names
+
+# A STRUCT whose field names are those the emulator gives a RANGE's bounds stays a STRUCT.
+SELECT TO_JSON_STRING(STRUCT(DATE '2020-01-01' AS `$start`, DATE '2020-01-02' AS `$end`))
+=> "{\"$start\":\"2020-01-01\",\"$end\":\"2020-01-02\"}"

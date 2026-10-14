@@ -24,6 +24,10 @@ Condition Mode(std::size_t argument, std::string_view rounding_mode) {
   return {.argument = argument, .rounding_mode = rounding_mode};
 }
 
+Condition SubDay(std::size_t argument) {
+  return Part(argument, {"hour", "minute", "second", "millisecond", "microsecond"});
+}
+
 // DuckDB rounds DECIMAL to scale zero; converting that result back to NUMERIC
 // can overflow. Check the input first so SAFE. also handles that error.
 std::vector<Rule> IntegralRound(std::string_view function) {
@@ -822,8 +826,22 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"TIME_SUB", WithInterval("($1 - $2)")},
       {"$EXTRACT", Extract()},
       {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
-      // DATE and DATETIME differences count the boundaries crossed, which is DuckDB's date_diff.
-      {"DATE_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
+      // DATE and DATETIME differences count the boundaries crossed, which is DuckDB's date_diff,
+      // while TIMESTAMP differences below a day count whole units, which is its date_sub.
+      {
+          "DATE_DIFF",
+          Concat({
+              WeekDiff(),
+              {
+                  {
+                      .arity = 3,
+                      .spelling = "date_sub(#3, $2, $1)",
+                      .conditions = {Is(1, {TYPE_TIMESTAMP}), SubDay(3)},
+                  },
+              },
+              {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}},
+          }),
+      },
       {"DATETIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
       // Every TIMESTAMP and TIME difference counts whole units.
       {"TIMESTAMP_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_sub(#3, $2, $1)"}}})},

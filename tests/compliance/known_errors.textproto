@@ -1110,6 +1110,15 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "SAFE.ERROR fails, as BigQuery does, where the reference implementation returns NULL"
+  label: "code:safe_error_mode__safe_error_STRING_<message>"
+  label: "code:safe_error_mode__safe_error_STRING_NULL"
+  label: "misc_test:cast_safe_error_as_string"
+  label: "misc_test:default_safe_error_int64"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "DATE_DIFF on TIMESTAMPs counts the unit boundaries crossed rather than the whole units elapsed"
   label: "code:date_diff_TIMESTAMP_1_TIMESTAMP_3600000000_STRING_<HOUR>"
 }
