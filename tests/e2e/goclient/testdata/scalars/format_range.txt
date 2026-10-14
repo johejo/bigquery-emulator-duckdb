@@ -1,0 +1,12 @@
+## FORMAT with RANGE values
+# Confirmed against BigQuery, which names the element type of a RANGE that a specifier rejects,
+# also of one in an ARRAY, and says INT64 where GoogleSQL says integer.
+
+SELECT FORMAT('%s', RANGE<DATE> '[2020-01-01, 2020-02-01)')
+=> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got DATE at [1:8]
+
+SELECT FORMAT('%d', r) FROM UNNEST([RANGE<TIMESTAMP> '[2020-01-01, 2020-02-01)']) AS r
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got TIMESTAMP at [1:8]
+
+SELECT FORMAT('%d', [RANGE<DATE> '[2020-01-01, 2020-02-01)'])
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got DATE at [1:8]

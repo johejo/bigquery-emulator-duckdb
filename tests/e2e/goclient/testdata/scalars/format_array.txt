@@ -62,3 +62,11 @@ SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([JSON '{"a": 1}', NULL] AS 
 
 SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([RANGE(DATE '2024-01-01', NULL)] AS a)]) AS s
 => "[[2024-01-01, NULL)]|[RANGE<DATE> \"[2024-01-01, UNBOUNDED)\"]"
+
+# Confirmed against BigQuery: %t ends at the NUL of a STRING element.
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([CONCAT('a', CODE_POINTS_TO_STRING([0]), 'b')] AS a)]) AS s
+=> "[a"
+
+# Confirmed against BigQuery: the width pads the text that ends at the NUL.
+SELECT FORMAT('[%5t]', s.a) FROM UNNEST([STRUCT([STRUCT(CONCAT('a', CODE_POINTS_TO_STRING([0]), 'b') AS x)] AS a)]) AS s
+=> "[  [(a]"

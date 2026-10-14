@@ -49,3 +49,7 @@ SELECT FORMAT('%T', STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 1 AS n))
 
 SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a) AS a)]) AS s
 => "STRUCT(\"foo\")"
+
+# Confirmed against BigQuery: %t ends at the NUL of a STRING field.
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT(CONCAT('a', CODE_POINTS_TO_STRING([0]), 'b') AS x, 1 AS y) AS a)]) AS s
+=> "(a"

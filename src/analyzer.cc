@@ -344,13 +344,32 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
         "Casting between arrays with incompatible element types",
         "First argument (key type) in function KEYS.NEW_KEYSET",
     };
-    if (const std::string_view message = status.message(); std::ranges::any_of(
-            kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); })) {
-      const std::string_view line = message.substr(0, message.find('\n'));
-      if (const size_t at = line.rfind(" [at ");
-          at != std::string_view::npos && line.ends_with(']')) {
-        throw std::runtime_error(std::string(line.substr(0, at)) + " at [" +
-                                 std::string(line.substr(at + 5)));
+    const std::string_view message = status.message();
+    std::string line(message.substr(0, message.find('\n')));
+    bool checked = std::ranges::any_of(
+        kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); });
+    // BigQuery names the element type of a RANGE that FORMAT rejects, also of one in an ARRAY,
+    // and says INT64 where GoogleSQL says integer; these errors have been checked as well.
+    static constexpr std::string_view kGot = "; Got ";
+    if (const size_t got = line.find(kGot); line.starts_with("Invalid type for argument ") &&
+                                            got != std::string::npos &&
+                                            line.find(" to FORMAT; ") < got) {
+      const size_t range = line.find("RANGE<", got);
+      const size_t end = range == std::string::npos ? range : line.find('>', range);
+      const size_t at = line.rfind(" [at ");
+      if (end != std::string::npos && at != std::string::npos && end < at) {
+        const size_t type = got + kGot.size();
+        line.replace(type, at - type, line.substr(range + 6, end - range - 6));
+        static constexpr std::string_view kInteger = "; Expected integer;";
+        if (const size_t integer = line.find(kInteger); integer != std::string::npos) {
+          line.replace(integer, kInteger.size(), "; Expected INT64;");
+        }
+        checked = true;
+      }
+    }
+    if (checked) {
+      if (const size_t at = line.rfind(" [at "); at != std::string::npos && line.ends_with(']')) {
+        throw std::runtime_error(line.substr(0, at) + " at [" + line.substr(at + 5));
       }
     }
     // In the caret mode the analyzer has already folded the location into the message; this
