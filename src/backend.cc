@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -108,6 +109,39 @@ FieldType ToBigQueryType(duckdb_logical_type type) {
 bool IsListLike(duckdb_logical_type type) {
   return duckdb_get_type_id(type) == DUCKDB_TYPE_LIST ||
          duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
+}
+
+// The DuckDB type, at any depth, that the emulator does not read, or empty. A table another DuckDB
+// client wrote can have these: a UBIGINT can exceed INT64 and a DECIMAL can exceed NUMERIC, and
+// BIGNUMERIC, which holds both, is stored as units of 10^-38, which a HUGEINT, a UHUGEINT or such a
+// value would have to be converted to. MAP and UNION values are read as text, whatever they hold.
+std::string UnsupportedType(duckdb_logical_type type) {
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_UBIGINT:
+      return "UBIGINT";
+    case DUCKDB_TYPE_HUGEINT:
+      return "HUGEINT";
+    case DUCKDB_TYPE_UHUGEINT:
+      return "UHUGEINT";
+    case DUCKDB_TYPE_DECIMAL: {
+      const int width = duckdb_decimal_width(type);
+      const int scale = duckdb_decimal_scale(type);
+      return width - scale > 29 || scale > 9 ? std::format("DECIMAL({}, {})", width, scale) : "";
+    }
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY:
+      return UnsupportedType(ElementType(type).get());
+    case DUCKDB_TYPE_STRUCT:
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
+        if (std::string child_type = UnsupportedType(child.get()); !child_type.empty()) {
+          return child_type;
+        }
+      }
+      return "";
+    default:
+      return "";
+  }
 }
 
 FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
@@ -784,6 +818,26 @@ QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::stri
     query_result.schema.push_back(ToFieldSchema(name.get(), type.get()));
   }
   return query_result;
+}
+
+std::optional<std::string> Backend::UnreadableColumnError(const std::string& relation) {
+  Connection const owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  Prepared prepared;
+  const std::string sql = "SELECT * FROM " + relation;
+  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
+    throw BackendError(
+        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
+  }
+  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
+    LogicalType const type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
+    if (const std::string name = UnsupportedType(type.get()); !name.empty()) {
+      DuckString const column(duckdb_prepared_statement_column_name(prepared.get(), i));
+      return "Column " + std::string(column.get()) + " has the DuckDB type " + name +
+             ", which the emulator does not support";
+    }
+  }
+  return std::nullopt;
 }
 
 std::vector<std::pair<size_t, std::string>> Backend::InsertRows(

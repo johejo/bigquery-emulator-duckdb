@@ -71,6 +71,51 @@ steps:
       trim(current.stdout) == '[{"b":"101","d16":"-1.23","d32":"-12345.67","d64":"-1234567890.123456",' +
         '"e":"happy","fixed":[{"x":"1"},{"x":null}],"inf":"infinity","m":"{x=[1, NULL]}","n":[],' +
         '"ns":"2020-01-02T03:04:05.123456","s":null,"u":"hello","uuid":"00112233-4455-6677-8899-aabbccddeeff"}]'
+  # A table with a column of a type the emulator does not support cannot be read.
+  duckdb_types_ubigint:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.ubigint
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type UBIGINT, which the emulator does not support'
+  duckdb_types_hugeint:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.hugeint
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT, which the emulator does not support'
+  duckdb_types_uhugeint:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.uhugeint
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type UHUGEINT, which the emulator does not support'
+  duckdb_types_nested:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.nested
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column s has the DuckDB type HUGEINT, which the emulator does not support'
+  duckdb_types_wide_decimal:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.wide_decimal
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type DECIMAL(38, 0), which the emulator does not support'
+  duckdb_types_fine_decimal:
+    exec:
+      command: tests/e2e/bq.sh show --schema --format=json duckdb_types.fine_decimal
+    test: |
+      current.exit_code != 0 &&
+      replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type DECIMAL(18, 12), which the emulator does not support'
+  duckdb_types_hugeint_query:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT x FROM duckdb_types.hugeint'
+    test: current.exit_code != 0 && replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT'
+  duckdb_types_hugeint_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json duckdb_types.hugeint
+    test: current.exit_code != 0 && replace(current.stdout, "\n", " ") contains 'Column x has the DuckDB type HUGEINT'
   # restart/stopped.yml creates unmanaged.v without the emulator; it is listed, queried in
   # INFORMATION_SCHEMA and deleted, but has no metadata to show.
   unmanaged_view_list:

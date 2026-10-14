@@ -215,9 +215,12 @@ Query result schemas come from the GoogleSQL analyzer, so anonymous columns are 
 … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from DuckDB types:
 `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`,
 except the structs that keep `RANGE` values → `RANGE`. A table another DuckDB client wrote may hold
-types BigQuery does not have: `DECIMAL` of any width reads as `NUMERIC`, `TIMESTAMP_NS` as a
-`DATETIME` truncated to microseconds, fixed-size arrays as `REPEATED`, and types such as `ENUM`,
-`UUID`, `BIT`, `MAP` and `UNION` as a `STRING` in DuckDB's text form.
+types BigQuery does not have: a `DECIMAL` that fits `NUMERIC` reads as `NUMERIC`, `TIMESTAMP_NS` as
+a `DATETIME` truncated to microseconds, fixed-size arrays as `REPEATED`, and types such as `ENUM`,
+`UUID`, `BIT`, `MAP` and `UNION` as a `STRING` in DuckDB's text form. A table with a column, or a
+field at any depth, of `UBIGINT`, `HUGEINT`, `UHUGEINT` or a wider `DECIMAL` cannot be read or
+queried: `BIGNUMERIC` would hold their values, but the emulator does not convert them to how it
+stores one.
 
 Without a destination table, a second column with the same name as another is renamed with `_1`,
 as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`; names that differ only in case are duplicates, as

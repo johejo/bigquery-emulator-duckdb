@@ -37,6 +37,13 @@ steps:
           -1234567890.123456::DECIMAL(18, 6) AS d64,
           [{'x': 1}, {'x': NULL}]::STRUCT(x INTEGER)[2] AS fixed, NULL::STRUCT(x INTEGER) AS s,
           NULL::INTEGER[2] AS n;
+        -- Types the emulator does not support.
+        CREATE TABLE duckdb_types.ubigint AS SELECT '18446744073709551615'::UBIGINT AS x;
+        CREATE TABLE duckdb_types.hugeint AS SELECT 1::HUGEINT AS x;
+        CREATE TABLE duckdb_types.uhugeint AS SELECT 1::UHUGEINT AS x;
+        CREATE TABLE duckdb_types.nested AS SELECT 1 AS id, [{'x': 1::HUGEINT}] AS s;
+        CREATE TABLE duckdb_types.wide_decimal AS SELECT 1::DECIMAL(38, 0) AS x;
+        CREATE TABLE duckdb_types.fine_decimal AS SELECT 1::DECIMAL(18, 12) AS x;
     test: current.exit_code == 0 && current.stderr == ""
   # Each project is stored in a file of its own, its id encoded into a single file name.
   project_files:
