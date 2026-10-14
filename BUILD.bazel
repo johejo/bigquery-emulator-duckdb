@@ -406,6 +406,7 @@ cc_library(
         "//src/backend_functions:aead",
         "//src/backend_functions:bignumeric",
         "//src/backend_functions:datetime",
+        "//src/backend_functions:geography",
         "//src/backend_functions:interval",
         "//src/backend_functions:javascript",
         "//src/backend_functions:json",

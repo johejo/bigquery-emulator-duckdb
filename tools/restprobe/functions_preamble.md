@@ -27,6 +27,9 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 - **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
 - **Table function**: DuckDB SQL for a table-valued call.
 - **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
+- **S2 function**: the emulator's GEOGRAPHY implementation over the
+  [S2 Geometry](https://s2geometry.io/) library, which GoogleSQL does not implement, registered
+  with DuckDB.
 - **SAFE. operator**: an operator with the `SAFE.` prefix.
 - **DuckDB aggregate** and **DuckDB window function**: a DuckDB aggregate or window function.
 

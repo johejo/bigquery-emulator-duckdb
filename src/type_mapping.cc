@@ -176,8 +176,9 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                      : std::nullopt;
     }
     case googlesql::TYPE_GEOGRAPHY:
-      // Stored as text; queries over it are not translated.
-      return use == TypeUse::kQuery ? std::nullopt : std::optional<std::string>("VARCHAR");
+      // The WKT BigQuery returns for it; see src/backend_functions/geography.cc. A parameter's
+      // text would need parsing into that form.
+      return use == TypeUse::kParameter ? std::nullopt : std::optional<std::string>("VARCHAR");
     case googlesql::TYPE_ARRAY: {
       const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;
@@ -402,6 +403,20 @@ bool HasInterval(const googlesql::Type* type) {
   if (type->IsStruct()) {
     return std::ranges::any_of(type->AsStruct()->fields(),
                                [](const auto& field) { return HasInterval(field.type); });
+  }
+  return false;
+}
+
+bool HasGeography(const googlesql::Type* type) {
+  if (type->IsGeography()) {
+    return true;
+  }
+  if (type->IsArray()) {
+    return HasGeography(type->AsArray()->element_type());
+  }
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(),
+                               [](const auto& field) { return HasGeography(field.type); });
   }
   return false;
 }

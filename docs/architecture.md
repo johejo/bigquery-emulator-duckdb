@@ -67,7 +67,8 @@ catalog and each dataset a schema. Results are encoded in BigQuery's `{"f": [{"v
 [src/backend_functions/](../src/backend_functions/) registers functions using GoogleSQL's
 implementations. Most register a GoogleSQL function, or a small adapter of one, through `Apply` in
 [apply.h](../src/backend_functions/apply.h), which reads its arguments and writes its result by
-their C++ types. GCS load jobs download objects with
+their C++ types. GEOGRAPHY functions, which GoogleSQL does not implement, use the
+[S2 Geometry](https://s2geometry.io/) library over the WKT that holds a GEOGRAPHY in queries. GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files for DuckDB.
 
 Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.

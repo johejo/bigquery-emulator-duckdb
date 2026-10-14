@@ -215,6 +215,34 @@ std::string ValueString(duckdb_value value) {
   return text.get();
 }
 
+// BigQuery writes a FLOAT64 outside [1e-3, 1e7) with an exponent, as 2.001511821194711E7, in the
+// shortest digits that round-trip, infinities as Infinity and -Infinity, NaN as NaN, and others as
+// DuckDB does, such as 20.0 and -0.0.
+std::string DoubleText(double number, duckdb_value value) {
+  if (std::isnan(number)) {
+    return "NaN";
+  }
+  if (std::isinf(number)) {
+    return number < 0 ? "-Infinity" : "Infinity";
+  }
+  const double magnitude = std::abs(number);
+  if (number == 0 || (magnitude >= 1e-3 && magnitude < 1e7)) {
+    return ValueString(value);
+  }
+  std::string text(32, '\0');
+  const auto result =
+      std::to_chars(text.data(), text.data() + text.size(), number, std::chars_format::scientific);
+  text.resize(result.ptr - text.data());
+  // to_chars writes 2.001511821194711e+07 and 1e+20.
+  const size_t e = text.find('e');
+  std::string mantissa = text.substr(0, e);
+  if (mantissa.find('.') == std::string::npos) {
+    mantissa += ".0";
+  }
+  const int exponent = std::stoi(text.substr(e + 1));
+  return mantissa + "E" + std::to_string(exponent);
+}
+
 std::string Base64(const std::string& bytes) {
   static constexpr char alphabet[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -493,6 +521,9 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
       break;
     case DUCKDB_TYPE_BLOB:
       value = Base64(VectorString(vector, row));
+      break;
+    case DUCKDB_TYPE_DOUBLE:
+      value = DoubleText(VectorElement<double>(vector, row), VectorValue(vector, type, row).get());
       break;
     case DUCKDB_TYPE_TIMESTAMP_TZ:
       // Keep epoch microseconds internally for formatOptions.useInt64Timestamp.

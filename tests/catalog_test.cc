@@ -205,11 +205,10 @@ TEST(DuckDbColumnTypeTest, StoresRangeAsStruct) {
             R"(STRUCT("$start" TIMESTAMP, "$end" TIMESTAMP)[])");
 }
 
-// Tables keep GEOGRAPHY as text, though queries over it are not translated.
+// Tables keep GEOGRAPHY as text.
 TEST(DuckDbColumnTypeTest, StoresGeographyAsText) {
   EXPECT_EQ(ColumnType({.name = "c", .type = FieldType::kGeography, .mode = FieldMode::kRepeated}),
             "VARCHAR[]");
-  EXPECT_EQ(DuckDbType(googlesql::types::GeographyType()), std::nullopt);
 }
 
 TEST(DuckDbColumnTypeTest, RejectsTypesDuckDbCannotStore) {

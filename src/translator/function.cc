@@ -79,8 +79,35 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
                              [](const auto& argument) { return HasBigNumeric(argument->type()); });
 }
 
+std::string GeographyWkt(const std::string& value, const googlesql::Type* type, int depth) {
+  if (!HasGeography(type)) {
+    return value;
+  }
+  if (type->IsGeography()) {
+    return "bq_st_astext(" + value + ")";
+  }
+  // Each level binds its value once, under a name of its own.
+  const std::string name = "_geo" + std::to_string(depth);
+  if (type->IsArray()) {
+    return "list_transform(" + value + ", " + name + " -> " +
+           GeographyWkt(name, type->AsArray()->element_type(), depth + 1) + ")";
+  }
+  const auto* structure = type->AsStruct();
+  const std::vector<std::string> names = DuckDbStructFieldNames(structure);
+  std::vector<std::string> fields;
+  fields.reserve(names.size());
+  for (int i = 0; i < structure->num_fields(); ++i) {
+    fields.push_back(QuoteIdentifier(names.at(i)) + " := " +
+                     GeographyWkt("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
+                                  structure->field(i).type, depth + 1));
+  }
+  return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
+         " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+}
+
 std::optional<std::string> WrittenValue(std::string value, const googlesql::Type* type,
                                         const FieldSchema& field, const Scope& scope) {
+  value = GeographyWkt(value, type);
   if (!RoundsToEven(field)) {
     return value;
   }
@@ -219,6 +246,30 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (interval && entry->handler != Bucket &&
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
+  }
+  // A GEOGRAPHY is its WKT in DuckDB, which the S2 functions and these build, read or carry;
+  // others, such as TO_JSON, would see a STRING.
+  static constexpr std::string_view geography_functions[] = {
+      "$IS_NULL",
+      "$CASE_NO_VALUE",
+      "IF",
+      "IFNULL",
+      "COALESCE",
+      "$MAKE_ARRAY",
+      "$ARRAY_AT_OFFSET",
+      "$ARRAY_AT_ORDINAL",
+      "$SAFE_ARRAY_AT_OFFSET",
+      "$SAFE_ARRAY_AT_ORDINAL",
+      "ARRAY_LENGTH",
+      "ARRAY_REVERSE",
+      "ARRAY_CONCAT",
+  };
+  if ((HasGeography(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasGeography(argument->type()); })) &&
+      entry->implementation != Implementation::kS2 &&
+      std::ranges::find(geography_functions, function) == std::end(geography_functions)) {
+    return Unsupported(scope, "function " + name + " with GEOGRAPHY");
   }
   // A RANGE is a STRUCT in DuckDB, which these compare and carry as BigQuery does a RANGE, and the
   // JSON and FORMAT backends read as a RANGE; others would see the STRUCT.

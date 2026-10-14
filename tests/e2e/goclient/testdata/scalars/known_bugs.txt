@@ -10,3 +10,7 @@
 CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');";
 SELECT f()
 !> error: Error: boom at f() line 1, column 1
+
+# An empty GEOGRAPHY is unsupported.
+SELECT ST_GEOGFROMTEXT('POINT EMPTY')
+!> "GEOMETRYCOLLECTION EMPTY"

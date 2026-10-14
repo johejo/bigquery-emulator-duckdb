@@ -8,6 +8,7 @@
 #include "src/backend_functions/aead.h"
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/datetime.h"
+#include "src/backend_functions/geography.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
 #include "src/backend_functions/json.h"
@@ -78,6 +79,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());
   backend_functions::RegisterRangeFunctions(connection.get());
+  backend_functions::RegisterGeographyFunctions(connection.get());
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get());

@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "src/duckdb_sql.h"
@@ -753,6 +754,69 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               },
           },
       },
+  };
+  return *kRules;
+}
+
+const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
+  // A call of `function` with the arguments of the rule, the optional ones defaulting to
+  // `defaults`.
+  const auto call = [](std::string_view function, Arity arity,
+                       std::vector<std::string_view> defaults = {}) {
+    std::string arguments;
+    for (size_t i = 1; i <= arity.max; ++i) {
+      arguments += (i == 1 ? "$" : ", $") + std::to_string(i);
+    }
+    return std::vector<Rule>{
+        {
+            .arity = arity,
+            .spelling = std::string(function) + "(" + arguments + ")",
+            .conditions = {},
+            .defaults = std::move(defaults),
+        },
+    };
+  };
+  // A function whose last argument, use_spheroid, defaults to FALSE; the backend function takes
+  // the name of `function` for its error on TRUE.
+  const auto spheroid = [](std::string_view backend, Arity arity, std::string_view function) {
+    std::vector<Rule> rules;
+    std::string arguments;
+    for (size_t i = 1; i <= arity.max; ++i) {
+      arguments += "$" + std::to_string(i) + ", ";
+    }
+    rules.push_back({
+        .arity = arity,
+        .spelling = std::string(backend) + "(" + arguments + QuoteLiteral(function) + ")",
+        .conditions = {},
+        .defaults = {"false"},
+    });
+    return rules;
+  };
+  static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      {"ST_GEOGPOINT", call("bq_st_geogpoint", 2)},
+      {"ST_GEOGFROMTEXT", call("bq_st_geogfromtext", 1)},
+      {"ST_GEOGPOINTFROMGEOHASH", call("bq_st_geogpointfromgeohash", 1)},
+      {"ST_ASTEXT", call("bq_st_astext", 1)},
+      {"ST_ASGEOJSON", call("bq_st_asgeojson", 1)},
+      {"ST_AZIMUTH", call("bq_st_azimuth", 2)},
+      {"ST_DISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_DISTANCE")},
+      {"ST_MAXDISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_MAXDISTANCE")},
+      {"ST_DWITHIN", spheroid("bq_st_dwithin", {3, 4}, "ST_DWITHIN")},
+      {"ST_EQUALS", call("bq_st_equals", 2)},
+      {"ST_X", call("bq_st_x", 1)},
+      {"ST_Y", call("bq_st_y", 1)},
+      {"ST_GEOMETRYTYPE", call("bq_st_geometrytype", 1)},
+      {"ST_DIMENSION", call("bq_st_dimension", 1)},
+      {"ST_NUMPOINTS", call("bq_st_numpoints", 1)},
+      {"ST_NPOINTS", call("bq_st_numpoints", 1)},
+      {"ST_ISEMPTY", call("bq_st_isempty", 1)},
+      {"ST_ISCOLLECTION", call("bq_st_iscollection", 1)},
+      {"ST_ISCLOSED", call("bq_st_isclosed", 1)},
+      {"ST_LENGTH", spheroid("bq_st_zero_measure", {1, 2}, "ST_LENGTH")},
+      {"ST_AREA", spheroid("bq_st_zero_measure", {1, 2}, "ST_AREA")},
+      {"ST_PERIMETER", spheroid("bq_st_zero_measure", {1, 2}, "ST_PERIMETER")},
+      {"ST_GEOHASH", call("bq_st_geohash", {1, 2}, {"20"})},
+      {"S2_CELLIDFROMPOINT", call("bq_s2_cellidfrompoint", {1, 2}, {"30"})},
   };
   return *kRules;
 }
