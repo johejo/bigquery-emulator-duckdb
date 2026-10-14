@@ -98,6 +98,7 @@ cc_library(
         ":scalar",
         "//:bignumeric",
         "//:duckdb_handle",
+        "//:type_mapping",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",

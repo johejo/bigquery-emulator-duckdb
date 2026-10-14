@@ -1,0 +1,51 @@
+## FORMAT with STRUCT values
+# Expected values: BigQuery's FORMAT documentation, which formats a STRUCT for %t and %T as
+# (value, value, ...) with each field formatted by the same specifier, and GoogleSQL compliance
+# functions_testlib_format.cc, which agrees with it.
+# UNNEST prevents constant folding by the analyzer.
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, 0 AS b) AS a)]) AS s
+=> "(foo, 0)"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, 0 AS b) AS a)]) AS s
+=> "(\"foo\", 0)"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('foo', 0) AS a)]) AS s
+=> "(\"foo\", 0)"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a) AS a)]) AS s
+=> "(foo)"
+
+SELECT FORMAT('%t', STRUCT('foo' AS a, 0 AS b))
+=> "(foo, 0)"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(CAST(NULL AS STRUCT<a STRING, b INT64>) AS a)]) AS s
+=> "NULL|NULL"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(STRUCT(CAST(NULL AS STRING) AS a, 0 AS b) AS a)]) AS s
+=> "(NULL, 0)|(NULL, 0)"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT('bar' AS a, DATETIME '2016-04-26 15:23:27.123456' AS b, TIME '15:23:27.123456' AS c) AS a)]) AS s
+=> "(bar, 2016-04-26 15:23:27.123456, 15:23:27.123456)"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('bar' AS a, DATETIME '2016-04-26 15:23:27.123456' AS b, TIME '15:23:27.123456' AS c) AS a)]) AS s
+=> "(\"bar\", DATETIME \"2016-04-26 15:23:27.123456\", TIME \"15:23:27.123456\")"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(STRUCT([1, 2] AS x, STRUCT('y' AS y, 1.5 AS z) AS w) AS a)]) AS s
+=> "([1, 2], (y, 1.5))|([1, 2], (\"y\", 1.5))"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([STRUCT('foo' AS a, 0 AS b), STRUCT('bar', 1)] AS a)]) AS s
+=> "[(foo, 0), (bar, 1)]|[(\"foo\", 0), (\"bar\", 1)]"
+
+SELECT FORMAT('%s', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, 0 AS b) AS a)]) AS s
+=> error:
+
+SELECT FORMAT('%d', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, 0 AS b) AS a)]) AS s
+=> error:
+
+# Confirmed against BigQuery.
+SELECT FORMAT('%T', STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 1 AS n))
+=> "(RANGE<DATE> \"[2020-01-01, UNBOUNDED)\", 1)"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a) AS a)]) AS s
+=> "STRUCT(\"foo\")"
