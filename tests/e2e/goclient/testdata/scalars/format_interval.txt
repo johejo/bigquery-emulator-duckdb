@@ -46,3 +46,18 @@ SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([INTERVAL 1 DAY] AS a)]) AS s
 
 SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, INTERVAL 1 DAY AS b) AS a)]) AS s
 => "(foo, 0-0 1 0:0:0)"
+
+# Confirmed against BigQuery, which names INTERVAL for a value a specifier rejects, also for one in
+# an ARRAY or a STRUCT.
+
+SELECT FORMAT('%s', INTERVAL 1 DAY)
+=> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%d', i) FROM UNNEST([INTERVAL 1 DAY]) AS i
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%d', [INTERVAL 1 DAY])
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%s', STRUCT(INTERVAL 1 DAY AS i))
+=> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got INTERVAL at [1:8]

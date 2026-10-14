@@ -348,18 +348,30 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
         kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); });
-    // BigQuery names the element type of a RANGE that FORMAT rejects, also of one in an ARRAY,
-    // and says INT64 where GoogleSQL says integer; these errors have been checked as well.
+    // BigQuery names the element type of a RANGE that FORMAT rejects, and INTERVAL for an INTERVAL,
+    // also for one in an ARRAY or, for INTERVAL, in a STRUCT of one field, and says INT64 where
+    // GoogleSQL says integer; these errors have been checked as well.
     static constexpr std::string_view kGot = "; Got ";
-    if (const size_t got = line.find(kGot); line.starts_with("Invalid type for argument ") &&
-                                            got != std::string::npos &&
-                                            line.find(" to FORMAT; ") < got) {
-      const size_t range = line.find("RANGE<", got);
-      const size_t end = range == std::string::npos ? range : line.find('>', range);
-      const size_t at = line.rfind(" [at ");
-      if (end != std::string::npos && at != std::string::npos && end < at) {
-        const size_t type = got + kGot.size();
-        line.replace(type, at - type, line.substr(range + 6, end - range - 6));
+    if (const size_t got = line.find(kGot), at = line.rfind(" [at ");
+        line.starts_with("Invalid type for argument ") && got != std::string::npos &&
+        at != std::string::npos && got < at && line.find(" to FORMAT; ") < got) {
+      const size_t type = got + kGot.size();
+      std::string_view got_type = std::string_view(line).substr(type, at - type);
+      std::string reported;
+      if (const size_t range = got_type.find("RANGE<"); range != std::string_view::npos) {
+        if (const size_t end = got_type.find('>', range); end != std::string_view::npos) {
+          reported = got_type.substr(range + 6, end - range - 6);
+        }
+      } else if (got_type.find(',') == std::string_view::npos) {
+        while (got_type.ends_with('>')) {
+          got_type.remove_suffix(1);
+        }
+        if (got_type.substr(got_type.find_last_of("< ") + 1) == "INTERVAL") {
+          reported = "INTERVAL";
+        }
+      }
+      if (!reported.empty()) {
+        line.replace(type, at - type, reported);
         static constexpr std::string_view kInteger = "; Expected integer;";
         if (const size_t integer = line.find(kInteger); integer != std::string::npos) {
           line.replace(integer, kInteger.size(), "; Expected INT64;");
