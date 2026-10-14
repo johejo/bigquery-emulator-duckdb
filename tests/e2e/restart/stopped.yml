@@ -15,3 +15,18 @@ steps:
         ALTER TABLE persist.decimal_bignumeric ALTER n TYPE DECIMAL(38, 19);
         ALTER TABLE persist.nested_decimal_bignumeric ALTER s TYPE STRUCT(n DECIMAL(38, 19));
     test: current.exit_code == 0 && current.stderr == ""
+  # A view written by another DuckDB client has no GoogleSQL definition or schema.
+  unmanaged_view:
+    exec:
+      command: duckdb "$E2E_DATA_DIR/test.duckdb"
+      stdin: |
+        CREATE SCHEMA unmanaged;
+        CREATE VIEW unmanaged.v AS SELECT 1 AS x;
+    test: current.exit_code == 0 && current.stderr == ""
+  # Each project is stored in a file of its own, its id encoded into a single file name.
+  project_files:
+    exec:
+      command: ls "$E2E_DATA_DIR"
+    test: |
+      current.exit_code == 0 && current.stdout contains 'test.duckdb' &&
+      current.stdout contains 'example%2Ecom%3Aproj.duckdb'

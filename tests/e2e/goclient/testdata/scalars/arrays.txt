@@ -37,6 +37,10 @@ SELECT NULL IN UNNEST([1])
 SELECT 1 IN UNNEST(CAST([] AS ARRAY<INT64>))
 => "false"
 
+# BigQuery returns a NULL array in a query result as an empty one.
+SELECT CAST(NULL AS ARRAY<INT64>)
+=> []
+
 SELECT 1 IN UNNEST(CAST(NULL AS ARRAY<INT64>))
 => "false"
 
