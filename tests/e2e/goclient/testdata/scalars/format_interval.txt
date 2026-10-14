@@ -1,0 +1,63 @@
+## FORMAT with INTERVAL values
+# Expected values: BigQuery's FORMAT documentation, which formats an INTERVAL for %t as
+# 1-2 3 4:5:6.789 and for %T as INTERVAL "1-2 3 4:5:6.789" YEAR TO SECOND, and an ARRAY or a
+# STRUCT with each value formatted by the same specifier; GoogleSQL compliance
+# functions_testlib_interval.cc (GetFunctionTestsFormatInterval), which agrees with it.
+# UNNEST prevents constant folding by the analyzer.
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND AS a)]) AS s
+=> "1-2 3 4:5:6.789"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND AS a)]) AS s
+=> "INTERVAL \"1-2 3 4:5:6.789\" YEAR TO SECOND"
+
+SELECT FORMAT('%t', INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND)
+=> "1-2 3 4:5:6.789"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(MAKE_INTERVAL(-1, -2, -3, -4, -5, -6) AS a)]) AS s
+=> "-1-2 -3 -4:5:6"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(INTERVAL -20 MONTH AS a)]) AS s
+=> "-1-8 0 0:0:0"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(INTERVAL -59 SECOND AS a)]) AS s
+=> "0-0 0 -0:0:59"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(INTERVAL -123400 MICROSECOND AS a)]) AS s
+=> "0-0 0 -0:0:0.123400"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(INTERVAL 123 MICROSECOND AS a)]) AS s
+=> "0-0 0 0:0:0.000123"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(INTERVAL 10 YEAR AS a)]) AS s
+=> "INTERVAL \"10-0 0 0:0:0\" YEAR TO SECOND"
+
+SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(CAST(NULL AS INTERVAL) AS a)]) AS s
+=> "NULL|NULL"
+
+SELECT FORMAT(s.f, s.a) FROM UNNEST([STRUCT(CAST(NULL AS STRING) AS f, INTERVAL 5 SECOND AS a)]) AS s
+=> null
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([INTERVAL 1 DAY, NULL, INTERVAL 2 HOUR] AS a)]) AS s
+=> "[0-0 1 0:0:0, NULL, 0-0 0 2:0:0]"
+
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([INTERVAL 1 DAY] AS a)]) AS s
+=> "[INTERVAL \"0-0 1 0:0:0\" YEAR TO SECOND]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT('foo' AS a, INTERVAL 1 DAY AS b) AS a)]) AS s
+=> "(foo, 0-0 1 0:0:0)"
+
+# Confirmed against BigQuery, which names INTERVAL for a value a specifier rejects, also for one in
+# an ARRAY or a STRUCT.
+
+SELECT FORMAT('%s', INTERVAL 1 DAY)
+=> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%d', i) FROM UNNEST([INTERVAL 1 DAY]) AS i
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%d', [INTERVAL 1 DAY])
+=> error: Invalid type for argument 2 to FORMAT; Expected INT64; Got INTERVAL at [1:8]
+
+SELECT FORMAT('%s', STRUCT(INTERVAL 1 DAY AS i))
+=> error: Invalid type for argument 2 to FORMAT; Expected STRING; Got INTERVAL at [1:8]

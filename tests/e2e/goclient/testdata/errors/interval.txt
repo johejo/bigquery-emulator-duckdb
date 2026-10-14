@@ -25,9 +25,6 @@ SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
 SELECT TO_JSON_STRING([MAKE_INTERVAL(day => 7)])
 => error contains: The emulator does not support function TO_JSON_STRING with INTERVAL
 
-SELECT FORMAT('%t', MAKE_INTERVAL(day => 7))
-=> error contains: The emulator does not support function FORMAT with INTERVAL
-
 SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function $EXTRACT
 
