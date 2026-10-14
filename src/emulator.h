@@ -1,39 +1,25 @@
 #pragma once
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <variant>
 #include <vector>
 
-#include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/field_schema.h"
-#include "src/gcs.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/table_metadata.h"
 
-namespace googlesql {
-class ParserOutput;
-}
-
 namespace bigquery_emulator_duckdb {
-
-class TableSource;
-struct TranslatedStatement;
 
 // JobStatistics2.statementType of a multi-statement query.
 inline constexpr char kScriptStatementType[] = "SCRIPT";
@@ -189,11 +175,14 @@ class Emulator {
   // session_user enables SESSION_USER for every client; it is not persisted.
   explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {},
                     const std::optional<std::string>& session_user = std::nullopt);
-  const std::vector<Project>& ListProjects() const;
-  std::string ResolveProject(const std::string& project_id) const;
+  Emulator(const Emulator&) = delete;
+  Emulator& operator=(const Emulator&) = delete;
+  ~Emulator();
+  [[nodiscard]] const std::vector<Project>& ListProjects() const;
+  [[nodiscard]] std::string ResolveProject(const std::string& project_id) const;
 
   // The Storage API endpoint that load jobs read gs:// objects from and extract jobs write to.
-  const std::string& storage_endpoint() const { return gcs_client_.endpoint(); }
+  [[nodiscard]] const std::string& storage_endpoint() const;
 
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
@@ -250,88 +239,10 @@ class Emulator {
                                            bool skip_invalid_rows, bool ignore_unknown_values);
 
  private:
-  // Evaluates the statements and expressions of a multi-statement query; in emulator_script.cc.
-  friend class ScriptEvaluator;
-
-  // The registered project's DuckDB file path, or ":memory:".
-  std::string ProjectDatabase(const std::string& project_id) const;
-  // Keeps the catalog, types and resolved AST alive until translation finishes.
-  TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
-                                const std::string& default_project,
-                                const std::string& default_dataset);
-  // What gives the columns of `table`, created with `schema` rather than by CREATE TABLE, the
-  // defaults of their defaultValueExpression, translated as CREATE TABLE ... DEFAULT translates
-  // them. Throws ApiError::Invalid for an expression BigQuery would reject or the emulator cannot
-  // translate.
-  std::vector<std::string> ColumnDefaultStatements(const TableReference& table,
-                                                   const std::vector<FieldSchema>& schema);
-  QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
-                      bool null_arrays = false);
-  // The one value of `type` that `result`, a query run with null_arrays set, returns, such as the
-  // value of a DDL option. Throws ApiError::InvalidQuery for a value the emulator cannot decode.
-  static googlesql::Value ResultValue(const QueryResult& result, const googlesql::Type* type);
-  // Runs `translation` as a query job without a destination table does, recording the metadata
-  // of a DDL statement, and returns its result with the schema the translation gives it.
-  QueryResult RunStatement(const TranslatedStatement& translation,
-                           const std::vector<std::string>& setup, bool null_arrays = false,
-                           Backend* session = nullptr);
-  // Rejects DDL targets in DuckDB's internal schemas.
-  static void CheckDdlTarget(const TranslatedStatement& translation);
-  // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
-  // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
-  // for any other statement.
-  std::optional<std::vector<std::string>> AlterationStatements(
-      const TranslatedStatement& translation);
-  // The metadata of the dataset the table or view that `translation` creates belongs to, as
-  // `backend` sees it, or none for any other statement, a temporary table or a missing dataset.
-  static DatasetMetadata CreatedInDataset(Backend& backend, const TranslatedStatement& translation);
-  // A catalog source for the tables, views and datasets the emulator holds.
-  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true);
-  // The script that `query` is, or null when it is a single statement or does not parse, which
-  // RunQuery then reports as it does for a single statement.
-  static std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query);
-
-  // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
-  static std::string ScriptStatementType(const googlesql::ParserOutput& script);
-  // Runs the multi-statement query `script`, the text of `request.query`, with `setup` selecting
-  // the default dataset `default_project`.`default_dataset`, and returns the result of the last
-  // statement it ran. Rejects a request a multi-statement query cannot be.
-  QueryResult RunScript(const QueryRequest& request, const googlesql::ParserOutput& script,
-                        const std::string& default_project, const std::string& default_dataset,
-                        const std::vector<std::string>& setup);
-  QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
-  // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
-  // one there when `replace` is set; a view created anew takes its dataset's default expiration.
-  void WriteView(TableReference table, const nlohmann::json& definition,
-                 const TableMetadata& metadata, bool replace);
-  // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
-  // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
-  std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,
-                                    const std::function<void(Job&)>& body);
-  // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`
-  // with the given dispositions. A table the write creates takes `metadata`; a write to an
-  // existing table rejects metadata. Returns the query's result.
-  QueryResult WriteDestination(const std::string& project_id, TableReference destination,
-                               CreateDisposition create, WriteDisposition write,
-                               const std::string& sql, const std::vector<FieldSchema>& schema,
-                               const std::vector<std::string>& setup, bool count_only = false,
-                               const TableMetadata& metadata = {});
-
-  // Mutations also hold this while reading their response. Recursive because their catalog
-  // lookups may expire other relations on the same thread.
-  std::recursive_mutex expiration_mutex_;
-  Backend backend_;
-  bool has_session_user_;
-  GcsClient gcs_client_;
-  std::string data_dir_;
-  std::mutex mutex_;
-  std::vector<Project> projects_;
-  std::unordered_map<std::string, std::string> project_ids_;
-  std::unordered_map<std::string, std::shared_ptr<const Job>> jobs_;
-  std::unordered_set<std::string> running_jobs_;
-  int64_t next_job_number_ = 1;
-  // Names the database of each multi-statement query's temporary tables.
-  std::atomic<int64_t> next_script_number_ = 1;
+  // The state and the helpers of the emulator, in emulator_impl.h, so that the headers they need
+  // and their frequent changes stay out of the files that only call the emulator.
+  class Impl;
+  std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace bigquery_emulator_duckdb

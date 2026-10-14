@@ -27,10 +27,12 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/emulator_impl.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/routine_catalog.h"
+#include "src/script.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
@@ -150,10 +152,70 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
   return schema;
 }
 
+// The script that `query` is, or null when it is a single statement or does not parse, which
+// RunQuery then reports as it does for a single statement.
+std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
+  std::unique_ptr<googlesql::ParserOutput> output;
+  if (!googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
+                              {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &output)
+           .ok()) {
+    return nullptr;
+  }
+  // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
+  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
+  const auto& statements = output->script()->statement_list();
+  if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
+      statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT) {
+    const auto* create = statements.at(0)->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
+    if (create == nullptr || !create->is_temp()) {
+      return nullptr;
+    }
+  }
+  return statements.empty() ? nullptr : std::move(output);
+}
+
+// TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
+std::string ScriptStatementType(const googlesql::ParserOutput& script) {
+  const auto& statements = script.script()->statement_list();
+  if (statements.size() == 1 &&
+      statements.at(0)->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+    return "CREATE_FUNCTION";
+  }
+  if (statements.empty() || statements.back()->node_kind() != googlesql::AST_QUERY_STATEMENT) {
+    return kScriptStatementType;
+  }
+  const bool query =
+      std::all_of(statements.begin(), statements.end() - 1, [](const auto* statement) {
+        const auto* create =
+            statement->template GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
+        return create != nullptr && create->is_temp();
+      });
+  return query ? "SELECT" : kScriptStatementType;
+}
+
 }  // namespace
 
-QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
-                              bool null_arrays) {
+class Emulator::Impl::ScriptHostImpl : public ScriptHost {
+ public:
+  explicit ScriptHostImpl(Impl& impl) : impl_(impl) {}
+
+  Backend& backend() override { return impl_.backend_; }
+  [[nodiscard]] bool has_session_user() const override { return impl_.has_session_user_; }
+  std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
+    return impl_.NewTableSource(session, expire);
+  }
+  QueryResult RunStatement(const TranslatedStatement& translation,
+                           const std::vector<std::string>& setup, bool null_arrays,
+                           Backend* session) override {
+    return impl_.RunStatement(translation, setup, null_arrays, session);
+  }
+
+ private:
+  Impl& impl_;
+};
+
+QueryResult Emulator::Impl::Execute(const std::string& sql, const std::vector<std::string>& setup,
+                                    bool null_arrays) {
   try {
     return backend_.Execute(sql, setup, null_arrays);
   } catch (const BackendError& error) {
@@ -161,15 +223,7 @@ QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::str
   }
 }
 
-googlesql::Value Emulator::ResultValue(const QueryResult& result, const googlesql::Type* type) {
-  absl::StatusOr<googlesql::Value> value = CellValue(type, result.rows.at(0).at("f").at(0).at("v"));
-  if (!value.ok()) {
-    throw ApiError::UnsupportedQuery("option values of type " + type->DebugString());
-  }
-  return *std::move(value);
-}
-
-QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
+QueryResult Emulator::Impl::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
   try {
     return backend_.Prepare(sql, setup);
   } catch (const BackendError& error) {
@@ -177,7 +231,7 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& restriction) {
+QueryResult Emulator::Impl::ReadStorageTable(TableReference table, const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   if (info.view_query) {
@@ -223,9 +277,10 @@ QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& 
   return result;
 }
 
-TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
-                                        const std::string& default_project,
-                                        const std::string& default_dataset) {
+TranslatedStatement Emulator::Impl::Translate(const std::string& query,
+                                              const QueryParameters& parameters,
+                                              const std::string& default_project,
+                                              const std::string& default_dataset) {
   AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
@@ -259,8 +314,8 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   return *std::move(translated);
 }
 
-std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference& table,
-                                                           const std::vector<FieldSchema>& schema) {
+std::vector<std::string> Emulator::Impl::ColumnDefaultStatements(
+    const TableReference& table, const std::vector<FieldSchema>& schema) {
   std::vector<std::string> statements;
   for (const FieldSchema& field : schema) {
     if (field.default_value_expression.empty()) {
@@ -302,7 +357,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
   return statements;
 }
 
-std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
+std::shared_ptr<const Job> Emulator::Impl::RunQuery(QueryRequest request) {
   request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -339,8 +394,16 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
 
     if (const auto script = ParseScript(request.query)) {
       std::get<QueryJob>(job.configuration).statement_type = ScriptStatementType(*script);
+      if (request.dry_run) {
+        throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
+      }
+      if (request.destination_table.has_value()) {
+        throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
+      }
+      ScriptHostImpl host(*this);
       job.result =
-          RunScript(request, *script, settings.default_project, settings.default_dataset, setup);
+          RunScript(host, request.query, *script, request.parameters, settings.default_project,
+                    settings.default_dataset, setup, next_script_number_++);
       return;
     }
     const TranslatedStatement translation = Translate(
@@ -377,9 +440,9 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
   });
 }
 
-QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
-                                   const std::vector<std::string>& setup, bool null_arrays,
-                                   Backend* session) {
+QueryResult Emulator::Impl::RunStatement(const TranslatedStatement& translation,
+                                         const std::vector<std::string>& setup, bool null_arrays,
+                                         Backend* session) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
   std::optional<std::vector<FieldSchema>> schema;

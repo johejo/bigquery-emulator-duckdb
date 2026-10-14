@@ -27,6 +27,7 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/emulator_impl.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
@@ -302,7 +303,7 @@ class DuckDbTableSource : public TableSource {
 
 }  // namespace
 
-void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
+void Emulator::Impl::CheckDdlTarget(const TranslatedStatement& translation) {
   if (const auto& target = translation.ddl_target_table;
       target.has_value() && IsDuckDbSchema(target->dataset_id)) {
     throw ApiError::NotFound("Not found: Dataset " + target->project_id + ":" + target->dataset_id);
@@ -319,7 +320,7 @@ void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
 
 // Throws DuckDB's `error` about the macro that records the routine a CREATE or DROP FUNCTION
 // names in BigQuery's words, if it says that the routine exists or that it does not.
-std::optional<std::vector<std::string>> Emulator::AlterationStatements(
+std::optional<std::vector<std::string>> Emulator::Impl::AlterationStatements(
     const TranslatedStatement& translation) {
   if (const auto& alteration = translation.altered_table) {
     const TableReference& table = alteration->table;
@@ -353,8 +354,8 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
   return std::nullopt;
 }
 
-DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
-                                           const TranslatedStatement& translation) {
+DatasetMetadata Emulator::Impl::CreatedInDataset(Backend& backend,
+                                                 const TranslatedStatement& translation) {
   std::optional<TableReference> table;
   if (translation.table.has_value() && !translation.table->temporary) {
     table = translation.table->table;
@@ -370,7 +371,7 @@ DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
                              : ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
 }
 
-std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire) {
+std::unique_ptr<TableSource> Emulator::Impl::NewTableSource(Backend* session, bool expire) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
@@ -378,12 +379,12 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   return std::make_unique<DuckDbTableSource>(backend);
 }
 
-std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
+std::vector<std::string> Emulator::Impl::ListDatasets(std::string project_id) {
   project_id = ResolveProject(project_id);
   return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
 }
 
-std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_id) {
+std::vector<DatasetListEntry> Emulator::Impl::ListDatasetEntries(std::string project_id) {
   project_id = ResolveProject(project_id);
   std::vector<DatasetListEntry> entries;
   for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
@@ -397,7 +398,7 @@ std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_i
   return entries;
 }
 
-DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
+DatasetMetadata Emulator::Impl::GetDataset(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   const QueryResult result = Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
   if (result.rows.empty()) {
@@ -406,7 +407,7 @@ DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
   return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
 }
 
-void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+void Emulator::Impl::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
   dataset.project_id = ResolveProject(dataset.project_id);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
   try {
@@ -420,7 +421,7 @@ void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& me
   }
 }
 
-void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
+void Emulator::Impl::UpdateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
@@ -431,7 +432,7 @@ void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& me
   }
 }
 
-void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
+void Emulator::Impl::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   if (!delete_contents &&
@@ -448,14 +449,14 @@ void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
   }
 }
 
-std::vector<std::string> Emulator::ListTables(DatasetReference dataset) {
+std::vector<std::string> Emulator::Impl::ListTables(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
   return FirstColumnStrings(Execute(TablesQuery(dataset)));
 }
 
-std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset) {
+std::vector<TableListEntry> Emulator::Impl::ListTableEntries(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   ExpireTables(backend_, expiration_mutex_, dataset);
@@ -480,7 +481,7 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
   return entries;
 }
 
-TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool expire) {
+TableInfo Emulator::Impl::GetTable(TableReference table, bool include_row_count, bool expire) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
   GetDataset(dataset);
@@ -524,8 +525,8 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   return info;
 }
 
-TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
-                                const TableMetadata& metadata) {
+TableInfo Emulator::Impl::CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
+                                      const TableMetadata& metadata) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const DatasetMetadata dataset =
@@ -551,18 +552,18 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-TableInfo Emulator::CreateView(TableReference table, const json& definition,
-                               const TableMetadata& metadata) {
+TableInfo Emulator::Impl::CreateView(TableReference table, const json& definition,
+                                     const TableMetadata& metadata) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   WriteView(table, definition, metadata, /*replace=*/false);
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-TableInfo Emulator::UpdateTable(TableReference table,
-                                const std::optional<std::vector<FieldSchema>>& schema,
-                                const std::optional<json>& view,
-                                const std::optional<TableMetadata>& metadata) {
+TableInfo Emulator::Impl::UpdateTable(TableReference table,
+                                      const std::optional<std::vector<FieldSchema>>& schema,
+                                      const std::optional<json>& view,
+                                      const std::optional<TableMetadata>& metadata) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
@@ -605,8 +606,8 @@ TableInfo Emulator::UpdateTable(TableReference table,
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
-void Emulator::WriteView(TableReference table, const json& definition,
-                         const TableMetadata& metadata, bool replace) {
+void Emulator::Impl::WriteView(TableReference table, const json& definition,
+                               const TableMetadata& metadata, bool replace) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
@@ -646,7 +647,7 @@ void Emulator::WriteView(TableReference table, const json& definition,
   }
 }
 
-void Emulator::DeleteTable(TableReference table) {
+void Emulator::Impl::DeleteTable(TableReference table) {
   table.project_id = ResolveProject(table.project_id);
   ExpireTables(backend_, expiration_mutex_,
                DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
@@ -659,7 +660,7 @@ void Emulator::DeleteTable(TableReference table) {
   Execute("DROP TABLE " + QualifiedName(table));
 }
 
-std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
+std::vector<Routine> Emulator::Impl::ListRoutines(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   std::vector<Routine> routines;
@@ -676,7 +677,7 @@ std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
   return routines;
 }
 
-Routine Emulator::GetRoutine(RoutineReference routine) {
+Routine Emulator::Impl::GetRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
   GetDataset(DatasetReference{.project_id = routine.project_id, .dataset_id = routine.dataset_id});
   const QueryResult result = Execute(RoutineQuery(routine));
@@ -690,7 +691,7 @@ Routine Emulator::GetRoutine(RoutineReference routine) {
   return *std::move(found);
 }
 
-Routine Emulator::WriteRoutine(Routine routine, bool update) {
+Routine Emulator::Impl::WriteRoutine(Routine routine, bool update) {
   routine.reference.project_id = ResolveProject(routine.reference.project_id);
   const RoutineReference& reference = routine.reference;
   GetDataset({.project_id = reference.project_id, .dataset_id = reference.dataset_id});
@@ -727,14 +728,14 @@ Routine Emulator::WriteRoutine(Routine routine, bool update) {
   return routine;
 }
 
-void Emulator::DeleteRoutine(RoutineReference routine) {
+void Emulator::Impl::DeleteRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
   GetRoutine(routine);
   Execute("DROP MACRO " + QualifiedName(routine));
 }
 
-QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
-                                    int64_t max_results) {
+QueryResult Emulator::Impl::ListTableData(TableReference table, int64_t start_index,
+                                          int64_t max_results) {
   table.project_id = ResolveProject(table.project_id);
   if (GetTable(table).view_query) {
     throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
@@ -743,10 +744,10 @@ QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
                  " OFFSET " + std::to_string(start_index));
 }
 
-std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
-                                                    const std::vector<FieldSchema>& schema,
-                                                    const json& rows, int64_t storage_id,
-                                                    bool validate_only) {
+std::vector<InsertError> Emulator::Impl::WriteStorageRows(TableReference table,
+                                                          const std::vector<FieldSchema>& schema,
+                                                          const json& rows, int64_t storage_id,
+                                                          bool validate_only) {
   table.project_id = ResolveProject(table.project_id);
   if (GetTable(table, false).view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
@@ -796,9 +797,9 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
   }
 }
 
-std::vector<InsertError> Emulator::InsertTableData(TableReference table, const json& rows,
-                                                   bool skip_invalid_rows,
-                                                   bool ignore_unknown_values) {
+std::vector<InsertError> Emulator::Impl::InsertTableData(TableReference table, const json& rows,
+                                                         bool skip_invalid_rows,
+                                                         bool ignore_unknown_values) {
   table.project_id = ResolveProject(table.project_id);
   if (!rows.is_array()) {
     throw ApiError::Invalid("rows must be an array");

@@ -23,6 +23,7 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/emulator_impl.h"
 #include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
@@ -99,8 +100,8 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
   return std::nullopt;
 }
 
-std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
-                                            const std::function<void(Job&)>& body) {
+std::shared_ptr<const Job> Emulator::Impl::RunJob(std::shared_ptr<Job> job,
+                                                  const std::function<void(Job&)>& body) {
   job->creation_time_ms = NowMillis();
   {
     std::scoped_lock const lock(mutex_);
@@ -139,7 +140,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
   return job;
 }
 
-std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
+std::shared_ptr<const Job> Emulator::Impl::RunLoad(LoadRequest request) {
   request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -199,7 +200,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
   });
 }
 
-std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
+std::shared_ptr<const Job> Emulator::Impl::RunCopy(CopyRequest request) {
   request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -278,7 +279,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
   });
 }
 
-std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
+std::shared_ptr<const Job> Emulator::Impl::RunExtract(ExtractRequest request) {
   request.project_id = ResolveProject(request.project_id);
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -357,12 +358,12 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
   });
 }
 
-QueryResult Emulator::WriteDestination(const std::string& project_id, TableReference destination,
-                                       CreateDisposition create, WriteDisposition write,
-                                       const std::string& sql,
-                                       const std::vector<FieldSchema>& schema,
-                                       const std::vector<std::string>& setup, bool count_only,
-                                       const TableMetadata& metadata) {
+QueryResult Emulator::Impl::WriteDestination(const std::string& project_id,
+                                             TableReference destination, CreateDisposition create,
+                                             WriteDisposition write, const std::string& sql,
+                                             const std::vector<FieldSchema>& schema,
+                                             const std::vector<std::string>& setup, bool count_only,
+                                             const TableMetadata& metadata) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -468,7 +469,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
 }
 
-std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id) {
+std::shared_ptr<const Job> Emulator::Impl::GetJob(std::string project_id,
+                                                  const std::string& job_id) {
   project_id = ResolveProject(project_id);
   std::scoped_lock const lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
@@ -478,7 +480,7 @@ std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::s
   return it->second;
 }
 
-std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_id) {
+std::vector<std::shared_ptr<const Job>> Emulator::Impl::ListJobs(std::string project_id) {
   project_id = ResolveProject(project_id);
   std::scoped_lock const lock(mutex_);
   std::vector<std::shared_ptr<const Job>> result;
@@ -497,7 +499,7 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_i
   return result;
 }
 
-void Emulator::DeleteJob(std::string project_id, const std::string& job_id) {
+void Emulator::Impl::DeleteJob(std::string project_id, const std::string& job_id) {
   project_id = ResolveProject(project_id);
   std::scoped_lock const lock(mutex_);
   if (jobs_.erase(JobKey(project_id, job_id)) == 0) {

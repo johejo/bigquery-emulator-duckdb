@@ -2,6 +2,8 @@
 // variables; the emulator evaluates each statement and expression the script reaches, translated
 // to DuckDB like the statement of a single-statement query.
 
+#include "src/script.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -53,7 +55,6 @@
 #include "src/catalog.h"
 #include "src/cell_value.h"
 #include "src/duckdb_sql.h"
-#include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/query_parameters.h"
@@ -169,25 +170,23 @@ class TemporaryDatabase {
   std::string name_;
 };
 
-}  // namespace
-
 // Evaluates what the ScriptExecutor asks for: each statement, as a query job would run it, and
 // each expression, as a query of one row and column whose value it then holds as a GoogleSQL
 // value. A failure the script may handle in an EXCEPTION clause carries a ScriptException; a
 // construct the emulator does not support fails the script whatever the script handles.
 class ScriptEvaluator : public googlesql::StatementEvaluator {
  public:
-  ScriptEvaluator(Emulator& emulator, const QueryRequest& request, const AnalyzerSettings& settings,
-                  const std::vector<std::string>& setup, const TemporaryTables& temporary,
-                  googlesql::TypeFactory& type_factory)
-      : emulator_(emulator),
-        request_(request),
+  ScriptEvaluator(ScriptHost& host, const QueryParameters& parameters,
+                  const AnalyzerSettings& settings, const std::vector<std::string>& setup,
+                  const TemporaryTables& temporary, googlesql::TypeFactory& type_factory)
+      : host_(host),
+        parameters_(parameters),
         settings_(settings),
         setup_(setup),
         temporary_(temporary),
         type_factory_(type_factory),
         functions_("temporary functions", &type_factory),
-        backend_(emulator.backend_.NewSession()) {}
+        backend_(host.backend().NewSession()) {}
 
   // The result of the last statement that ran, which is the script's result.
   const std::optional<QueryResult>& last_result() const { return last_result_; }
@@ -276,8 +275,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
     AnalyzerSettings settings = settings_;
     settings.script = &executor;
-    std::unique_ptr<TableSource> source =
-        emulator_.NewTableSource(backend_.get(), /*expire=*/false);
+    std::unique_ptr<TableSource> source = host_.NewTableSource(backend_.get(), /*expire=*/false);
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset);
     return AnalyzeScriptType(segment, catalog, type_factory_, settings);
@@ -404,7 +402,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   absl::StatusOr<ScriptCatalog> Catalog(const googlesql::ScriptExecutor& executor,
                                         bool list_temporary = true) {
     ScriptCatalog catalog;
-    catalog.source = emulator_.NewTableSource(backend_.get(), /*expire=*/list_temporary);
+    catalog.source = host_.NewTableSource(backend_.get(), /*expire=*/list_temporary);
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
     if (list_temporary) {
       for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {
@@ -521,7 +519,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     settings.script = &executor;
     const googlesql::StackFrame* frame = executor.GetCurrentStackFrame();
     if (frame == nullptr || !frame->is_dynamic_sql()) {
-      return request_.parameters;
+      return parameters_;
     }
     settings.named_parameters.clear();
     const auto& values = executor.GetCurrentParameterValues();
@@ -625,26 +623,26 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return QueryResult{};
     }
     std::string unsupported;
-    const std::optional<TranslatedStatement> translation = TranslateStatement(
-        analyzed.statement(), parameters,
-        DefaultDataset{
-            .project = settings.default_project,
-            .dataset = settings.default_dataset,
-            .temporary = catalog.temporary.get(),
-            .has_session_user = emulator_.has_session_user_,
-            .evaluate =
-                [this](const std::string& sql, const googlesql::Type* type) {
-                  return Emulator::ResultValue(backend_->Execute(sql, setup_, true), type);
-                },
-        },
-        &unsupported, &executor.GetKnownSystemVariables());
+    const std::optional<TranslatedStatement> translation =
+        TranslateStatement(analyzed.statement(), parameters,
+                           DefaultDataset{
+                               .project = settings.default_project,
+                               .dataset = settings.default_dataset,
+                               .temporary = catalog.temporary.get(),
+                               .has_session_user = host_.has_session_user(),
+                               .evaluate =
+                                   [this](const std::string& sql, const googlesql::Type* type) {
+                                     return ResultValue(backend_->Execute(sql, setup_, true), type);
+                                   },
+                           },
+                           &unsupported, &executor.GetKnownSystemVariables());
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
     if (translation->routine.has_value()) {
       GOOGLESQL_RETURN_IF_ERROR(catalog.tables->CheckRoutine(translation->routine->routine));
     }
-    return emulator_.RunStatement(*translation, setup_, null_arrays, backend_.get());
+    return host_.RunStatement(*translation, setup_, null_arrays, backend_.get());
   }
 
   // Evaluates the expression `sql`, the text of `segment` when it is given, coerced to
@@ -666,7 +664,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                 .project = settings.default_project,
                                 .dataset = settings.default_dataset,
                                 .temporary = catalog.temporary.get(),
-                                .has_session_user = emulator_.has_session_user_,
+                                .has_session_user = host_.has_session_user(),
                             },
                             &unsupported, &executor.GetKnownSystemVariables());
     if (!query.has_value()) {
@@ -686,8 +684,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return value;
   }
 
-  Emulator& emulator_;
-  const QueryRequest& request_;
+  ScriptHost& host_;
+  const QueryParameters& parameters_;
   const AnalyzerSettings& settings_;
   const std::vector<std::string>& setup_;
   const TemporaryTables& temporary_;
@@ -703,55 +701,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   std::optional<std::string> unsupported_dynamic_sql_;
 };
 
-std::unique_ptr<googlesql::ParserOutput> Emulator::ParseScript(const std::string& query) {
-  std::unique_ptr<googlesql::ParserOutput> output;
-  if (!googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
-                              {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &output)
-           .ok()) {
-    return nullptr;
-  }
-  // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
-  // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
-  const auto& statements = output->script()->statement_list();
-  if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
-      statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT) {
-    const auto* create = statements.at(0)->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
-    if (create == nullptr || !create->is_temp()) {
-      return nullptr;
-    }
-  }
-  return statements.empty() ? nullptr : std::move(output);
-}
+}  // namespace
 
-std::string Emulator::ScriptStatementType(const googlesql::ParserOutput& script) {
-  const auto& statements = script.script()->statement_list();
-  if (statements.size() == 1 &&
-      statements.at(0)->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
-    return "CREATE_FUNCTION";
-  }
-  if (statements.empty() || statements.back()->node_kind() != googlesql::AST_QUERY_STATEMENT) {
-    return kScriptStatementType;
-  }
-  const bool query =
-      std::all_of(statements.begin(), statements.end() - 1, [](const auto* statement) {
-        const auto* create =
-            statement->template GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
-        return create != nullptr && create->is_temp();
-      });
-  return query ? "SELECT" : kScriptStatementType;
-}
-
-QueryResult Emulator::RunScript(const QueryRequest& request, const googlesql::ParserOutput& script,
-                                const std::string& default_project,
-                                const std::string& default_dataset,
-                                const std::vector<std::string>& setup) {
-  if (request.dry_run) {
-    throw ApiError::UnsupportedQuery("dry runs of multi-statement queries");
-  }
-  if (request.destination_table.has_value()) {
-    throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
-  }
-  if (!request.parameters.positional_types().empty()) {
+QueryResult RunScript(ScriptHost& host, const std::string& query,
+                      const googlesql::ParserOutput& script, const QueryParameters& parameters,
+                      const std::string& default_project, const std::string& default_dataset,
+                      const std::vector<std::string>& setup, int64_t number) {
+  if (!parameters.positional_types().empty()) {
     throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
   }
   if (const auto unsupported = UnsupportedStatement(*script.script())) {
@@ -760,7 +716,7 @@ QueryResult Emulator::RunScript(const QueryRequest& request, const googlesql::Pa
 
   googlesql::TypeFactory type_factory;
   AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
-  for (const FieldSchema& field : request.parameters.named_types()) {
+  for (const FieldSchema& field : parameters.named_types()) {
     absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
     if (!type.ok()) {
       throw ApiError::InvalidQuery(std::string(type.status().message()));
@@ -776,13 +732,13 @@ QueryResult Emulator::RunScript(const QueryRequest& request, const googlesql::Pa
   options.set_type_factory(&type_factory);
 
   const TemporaryTables temporary{
-      .project = "_script_" + std::to_string(next_script_number_++),
+      .project = "_script_" + std::to_string(number),
       .dataset = kSessionDataset,
   };
-  const TemporaryDatabase database(backend_, temporary);
-  ScriptEvaluator evaluator(*this, request, settings, setup, temporary, type_factory);
+  const TemporaryDatabase database(host.backend(), temporary);
+  ScriptEvaluator evaluator(host, parameters, settings, setup, temporary, type_factory);
   absl::StatusOr<std::unique_ptr<googlesql::ScriptExecutor>> executor =
-      googlesql::ScriptExecutor::CreateFromAST(request.query, script.script(), options, &evaluator);
+      googlesql::ScriptExecutor::CreateFromAST(query, script.script(), options, &evaluator);
   if (!executor.ok()) {
     throw ApiError::InvalidQuery(std::string(executor.status().message()));
   }
