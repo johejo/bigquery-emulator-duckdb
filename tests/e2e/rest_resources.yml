@@ -188,7 +188,7 @@ steps:
       current.res.status == 200 &&
       current.res.body.rows[0].f[1].v == [{"v": "a"}, {"v": "b"}] &&
       current.res.body.rows[0].f[2].v.f[0].v == "alice" &&
-      current.res.body.rows[0].f[3].v == "1704164645" &&
+      current.res.body.rows[0].f[3].v == "1.704164645E9" &&
       current.res.body.rows[0].f[4].v == "AP8="
 
   delete_dataset_with_tables:

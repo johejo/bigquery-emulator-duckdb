@@ -658,7 +658,7 @@ steps:
         post:
           body:
             application/json: {query: "SELECT TIMESTAMP '2020-01-02 03:04:05+00' AS ts"}
-    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1577934245"
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1.577934245E9"
   timestamp_microseconds:
     req:
       /bigquery/v2/projects/rest-timestamps/queries:
