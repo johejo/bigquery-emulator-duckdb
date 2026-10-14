@@ -75,7 +75,7 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 		// The new tables have no relationship to the source table after creation.
 		`INSERT source (id) VALUES (3)`,
 		`CREATE VIEW v AS SELECT id FROM source`,
-		`CREATE TABLE defaulted (a INT64 DEFAULT 1)`,
+		`CREATE TABLE defaulted (id INT64, a INT64 DEFAULT 1)`,
 	} {
 		if err := run(sql); err != nil {
 			t.Fatalf("%s: %v", sql, err)
@@ -202,14 +202,49 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 		t.Errorf("INFORMATION_SCHEMA.TABLES = %v, want %v", got, want)
 	}
 
+	// A copy and a clone keep the defaults of the source, as BigQuery answers.
+	for _, sql := range []string{
+		"CREATE TABLE defaulted_copy COPY defaulted",
+		"CREATE TABLE defaulted_clone CLONE defaulted",
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	for _, name := range []string{"defaulted_copy", "defaulted_clone"} {
+		if err := run("INSERT " + name + " (id) VALUES (1)"); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		query := client.Query("SELECT a FROM " + name)
+		query.DefaultDatasetID = dataset.DatasetID
+		rows, err := query.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var row struct{ A int64 }
+		if err := rows.Next(&row); err != nil || row.A != 1 {
+			t.Errorf("%s: a = %d, err %v, want the default 1", name, row.A, err)
+		}
+		metadata, err := dataset.Table(name).Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := metadata.Schema[1].DefaultValueExpression; got != "1" {
+			t.Errorf("%s: defaultValueExpression = %q, want \"1\"", name, got)
+		}
+	}
+
+	// BigQuery's messages for a view.
+	view := dataset.ProjectID + ":" + dataset.DatasetID + ".v"
 	for sql, want := range map[string]string{
-		"CREATE TABLE n COPY v":          "CREATE TABLE COPY a view",
-		"CREATE TABLE n CLONE defaulted": "CREATE TABLE CLONE a table with column defaults",
+		"CREATE TABLE n COPY v":  "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE]",
+		"CREATE TABLE n CLONE v": "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE, SNAPSHOT]",
 		"CREATE TABLE n COPY source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()":  "CREATE TABLE COPY with FOR SYSTEM_TIME AS OF",
 		"CREATE TABLE n CLONE source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()": "CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF",
-		"CREATE OR REPLACE TABLE copied CLONE source":                           "CREATE OR REPLACE TABLE CLONE",
 		"CREATE OR REPLACE TABLE copied COPY copied":                            "CREATE OR REPLACE TABLE COPY of itself",
-		"CREATE TEMP TABLE n COPY source; SELECT 1":                             "CREATE TEMP TABLE COPY",
+		// BigQuery's messages for a temporary copy or clone of a table that is not temporary.
+		"CREATE TEMP TABLE n COPY source; SELECT 1":  "CREATE TEMPORARY TABLE ... COPY is only allowed if the source table is a temporary table.",
+		"CREATE TEMP TABLE n CLONE source; SELECT 1": "CREATE TEMPORARY TABLE ... CLONE is only allowed if the source table is a temporary table.",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
@@ -217,6 +252,20 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 	}
 	if got := ids("copied"); !reflect.DeepEqual(got, []int64{1, 2}) {
 		t.Errorf("copied after a rejected replacement: ids = %v", got)
+	}
+
+	// CREATE OR REPLACE replaces a clone with the source's current rows, as BigQuery answers.
+	for _, sql := range []string{
+		`CREATE TABLE replaced_clone CLONE copied`,
+		`INSERT copied (id) VALUES (5)`,
+		`CREATE OR REPLACE TABLE replaced_clone CLONE copied`,
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	if got := ids("replaced_clone"); !reflect.DeepEqual(got, []int64{1, 2, 5}) {
+		t.Errorf("replaced_clone: ids = %v, want [1 2 5]", got)
 	}
 
 	// A copy job records no clone, so it cannot make one.

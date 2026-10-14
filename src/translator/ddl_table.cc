@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cstdint>
+#include <format>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -413,22 +415,37 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
 }
 
 // The schema and metadata of `table`, the source of `statement`, which is a CREATE TABLE LIKE,
-// COPY or CLONE. A clone's cloneDefinition is its own, which no copy inherits.
+// COPY or CLONE, of a temporary table when `temporary`. A clone's cloneDefinition is its own,
+// which no copy inherits. BigQuery rejects a view, and a temporary table of a table that is not
+// temporary, with these messages.
 std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
-                                                  std::string_view statement, const Scope& scope) {
+                                                  std::string_view statement, bool temporary,
+                                                  const Scope& scope) {
   const auto* source = dynamic_cast<const BigQueryTable*>(table);
-  std::optional<TableDescription> description =
-      source == nullptr ? std::nullopt : source->Describe();
-  if (!description) {
-    Unsupported(scope, std::string(statement) + " a view");
-    return std::nullopt;
+  if (source == nullptr) {
+    return Unsupported(scope, std::string(statement) + " of this table");
   }
-  // A default is stored as GoogleSQL, which would have to be translated again.
-  if (std::ranges::any_of(description->schema, [](const FieldSchema& field) {
-        return !field.default_value_expression.empty();
-      })) {
-    Unsupported(scope, std::string(statement) + " a table with column defaults");
-    return std::nullopt;
+  const TemporaryTables* temporaries = scope.context.defaults.temporary;
+  if (temporary &&
+      (temporaries == nullptr || source->reference().project_id != temporaries->project ||
+       source->reference().dataset_id != temporaries->dataset)) {
+    throw std::invalid_argument(std::format(
+        "CREATE TEMPORARY TABLE ... {} is only allowed if the source table is a temporary table.",
+        statement.substr(std::string_view("CREATE TABLE ").size())));
+  }
+  std::optional<TableDescription> description = source->Describe();
+  if (!description) {
+    const TableReference view = source->reference();
+    if (statement == "CREATE TABLE LIKE") {
+      throw std::invalid_argument(
+          std::format("Invalid value: Cannot CREATE TABLE LIKE `{}.{}`, "
+                      "which is VIEW.",
+                      view.dataset_id, view.table_id));
+    }
+    throw std::invalid_argument(
+        std::format("Invalid value: Cannot clone {}:{}.{} which has type VIEW. Allowed types: [{}]",
+                    view.project_id, view.dataset_id, view.table_id,
+                    statement == "CREATE TABLE CLONE" ? "TABLE, SNAPSHOT" : "TABLE"));
   }
   description->metadata.clone.reset();
   return description;
@@ -463,8 +480,9 @@ bool HasNestedNotNull(const FieldSchema& field) {
 // SET OPTIONS does.
 template <typename CreateTable>
 std::optional<TableDescription> LikeDescription(const CreateTable& create, const Scope& scope) {
-  std::optional<TableDescription> description =
-      SourceDescription(create.like_table(), "CREATE TABLE LIKE", scope);
+  std::optional<TableDescription> description = SourceDescription(
+      create.like_table(), "CREATE TABLE LIKE",
+      create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP, scope);
   if (!description) {
     return std::nullopt;
   }
@@ -504,6 +522,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
+      .schema_defaults = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -517,8 +536,7 @@ std::string Rfc3339Now() {
 // copies, which OPTIONS replace; the analyzer rejects PARTITION BY and CLUSTER BY with them. A
 // clone also records the table it was cloned from and when, which tables.get reports as its
 // cloneDefinition. The emulator keeps no table's history, so FOR SYSTEM_TIME AS OF is
-// unsupported, and so are a temporary copy or clone and CREATE OR REPLACE of a clone, which
-// BigQuery does not document.
+// unsupported.
 std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableStmt& create,
                                            const Scope& scope) {
   const bool clone = create.clone_from() != nullptr;
@@ -532,18 +550,14 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   if (scan.for_system_time_expr() != nullptr) {
     return Unsupported(scope, statement + " with FOR SYSTEM_TIME AS OF");
   }
-  if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
-    return Unsupported(scope, "CREATE TEMP TABLE " + kind);
-  }
-  const bool replace =
-      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
-  if (clone && replace) {
-    return Unsupported(scope, "CREATE OR REPLACE TABLE CLONE");
-  }
-  std::optional<TableDescription> description = SourceDescription(scan.table(), statement, scope);
+  const bool temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP;
+  std::optional<TableDescription> description =
+      SourceDescription(scan.table(), statement, temporary, scope);
   if (!description) {
     return std::nullopt;
   }
+  const bool replace =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
   const TableReference source = dynamic_cast<const BigQueryTable*>(scan.table())->reference();
   const auto head = CreateTableHead(create, scope);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
@@ -558,7 +572,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   }
   // The new table would replace the source before its rows are copied.
   if (replace && ToLowerAscii(QualifiedName(*target)) == ToLowerAscii(QualifiedName(source))) {
-    return Unsupported(scope, "CREATE OR REPLACE TABLE COPY of itself");
+    return Unsupported(scope, "CREATE OR REPLACE TABLE " + kind + " of itself");
   }
   scope.context.table = TableDefinition{
       .table = *target,
@@ -567,6 +581,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .rows_from = source,
+      .temporary = temporary,
+      .schema_defaults = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -775,6 +791,7 @@ std::optional<std::string> CreateTableAsSelect(
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .as_select = true,
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
+      .schema_defaults = like,
   };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {

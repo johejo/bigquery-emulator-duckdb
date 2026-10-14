@@ -8,7 +8,8 @@
 #                         docs/compatibility.md, which holds the details.
 #
 # Every query must be valid GoogleSQL against the fixture; the probe fails on one that is not.
-# List only forms BigQuery documents, not GoogleSQL syntax that BigQuery rejects.
+# List only forms BigQuery accepts: those it documents, and undocumented ones that BigQuery's
+# answers to unverified cases show it runs. Leave out GoogleSQL syntax that BigQuery rejects.
 
 setup CREATE SCHEMA d
 setup CREATE TABLE d.t (id INT64, name STRING, tags ARRAY<STRING>, s STRUCT<a INT64, b STRING>)
@@ -164,23 +165,26 @@ query `CREATE TEMP TABLE` | CREATE TEMP TABLE t AS SELECT 1 AS id; DROP TABLE t;
 note `CREATE TEMP TABLE` | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 10, 1)) CLUSTER BY name OPTIONS (description = 'x')
-query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t; INSERT n (id) VALUES (1); SELECT id FROM n
 query `CREATE TABLE LIKE` | CREATE TABLE n LIKE t AS SELECT id, name, tags, s FROM t
-query `CREATE TABLE LIKE` | CREATE TEMP TABLE n LIKE t AS SELECT * FROM t; SELECT id FROM n
+query `CREATE TABLE LIKE` | CREATE TEMP TABLE s (id INT64); CREATE TEMP TABLE n LIKE s; INSERT n (id) VALUES (1); SELECT id FROM n
+query `CREATE TABLE LIKE` | CREATE TEMP TABLE s (id INT64); CREATE TEMP TABLE n LIKE s AS SELECT 1 AS id; SELECT id FROM n
 query `CREATE TABLE LIKE` | CREATE TABLE lengths (s STRING(3)); CREATE TABLE n LIKE lengths AS SELECT 'abc' AS s
 query `CREATE TABLE LIKE` | CREATE TABLE required (s STRUCT<x INT64 NOT NULL>); CREATE TABLE n LIKE required AS SELECT STRUCT(1 AS x) AS s
 query `CREATE TABLE LIKE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n LIKE defaulted
-query `CREATE TABLE LIKE` | CREATE VIEW v AS SELECT id FROM t; CREATE TABLE n LIKE v
+query `CREATE TABLE LIKE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n LIKE defaulted AS SELECT 2 AS id
 note `CREATE TABLE LIKE` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t
 query `CREATE TABLE COPY` | CREATE OR REPLACE TABLE n COPY t OPTIONS (description = 'x')
+query `CREATE TABLE COPY` | CREATE TEMP TABLE s (id INT64); CREATE TEMP TABLE n COPY s; SELECT id FROM n
 query `CREATE TABLE COPY` | CREATE TABLE n COPY t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
-query `CREATE TABLE COPY` | CREATE TEMP TABLE n COPY t; SELECT id FROM n
+query `CREATE TABLE COPY` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n COPY defaulted
 note `CREATE TABLE COPY` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t
 query `CREATE TABLE CLONE` | CREATE TABLE IF NOT EXISTS n CLONE t OPTIONS (labels = [('env', 'dev')])
-query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
 query `CREATE TABLE CLONE` | CREATE OR REPLACE TABLE n CLONE t
+query `CREATE TABLE CLONE` | CREATE TEMP TABLE s (id INT64); CREATE TEMP TABLE n CLONE s; SELECT id FROM n
+query `CREATE TABLE CLONE` | CREATE TABLE n CLONE t FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()
+query `CREATE TABLE CLONE` | CREATE TABLE defaulted (id INT64 DEFAULT 1); CREATE TABLE n CLONE defaulted
 note `CREATE TABLE CLONE` | See [Copies and clones](compatibility.md#copies-and-clones).
 query `CREATE SNAPSHOT TABLE` | CREATE SNAPSHOT TABLE n CLONE t
 query `CREATE EXTERNAL TABLE` | CREATE EXTERNAL TABLE n (a INT64) OPTIONS (format = 'CSV', uris = ['gs://b/f.csv'])

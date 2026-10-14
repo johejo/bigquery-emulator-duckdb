@@ -62,6 +62,9 @@ struct TableDefinition {
   // A temporary table belongs to its script rather than to a dataset, whose default expiration
   // it does not take.
   bool temporary = false;
+  // CREATE TABLE LIKE, COPY and CLONE declare no defaults but keep those of `schema`, which are
+  // GoogleSQL and set once the table exists.
+  bool schema_defaults = false;
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS
