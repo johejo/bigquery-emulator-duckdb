@@ -53,6 +53,7 @@ jobs:
       - name: Configure Bazel for CI
         run: |
           echo 'common --config=ci' > .bazelrc.local
+          echo "common --repo_env=TMP=$RUNNER_TEMP --repo_env=TEMP=$RUNNER_TEMP" >> .bazelrc.local
           mkdir -p "$RUNNER_TEMP/bazel-reports"
       - name: Clang-tidy
         run: |
