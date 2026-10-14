@@ -119,8 +119,10 @@ expected result from one layer to another.
   from GoogleSQL's signatures and the samples in `tools/function_probe_hints.txt`, and
   `tools/restprobe` runs them. Write a `query` hint only for a form it cannot build; cover a whole
   class of forms with an `elements` or `argument` hint that matches their signatures, and extend
-  the probe only for what hints cannot express. Probe only what BigQuery documents; GoogleSQL
-  syntax that BigQuery rejects belongs in neither the probes nor the docs.
+  the probe only for what hints cannot express. Probe the forms BigQuery runs, whether it
+  documents them or answers an unverified case; a form it rejects, such as GoogleSQL syntax it
+  does not take, belongs in an end-to-end test that the emulator rejects it as BigQuery does, not
+  in the probes or the docs.
 - **GoogleSQL's compliance tests** (`just compliance`) check query results broadly against
   GoogleSQL's reference implementation, which is not BigQuery. CI fails on both an unlisted
   failure and a listed failure that passes; `just compliance-summary` names both. Remove fixed

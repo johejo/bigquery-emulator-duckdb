@@ -8,7 +8,8 @@
 #                         docs/compatibility.md, which holds the details.
 #
 # Every query must be valid GoogleSQL against the fixture; the probe fails on one that is not.
-# List only forms BigQuery documents, not GoogleSQL syntax that BigQuery rejects.
+# List only forms BigQuery accepts: those it documents, and undocumented ones that BigQuery's
+# answers to unverified cases show it runs. Leave out GoogleSQL syntax that BigQuery rejects.
 
 setup CREATE SCHEMA d
 setup CREATE TABLE d.t (id INT64, name STRING, tags ARRAY<STRING>, s STRUCT<a INT64, b STRING>)
