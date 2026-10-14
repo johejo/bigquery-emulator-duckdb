@@ -1,0 +1,79 @@
+## Result cells
+# jobs.query returns BYTES in base64, as the REST API encodes bytes, and NUMERIC as its decimal
+# string.
+
+SELECT b''
+=> ""
+
+SELECT b'a'
+=> "YQ=="
+
+SELECT b'ab'
+=> "YWI="
+
+SELECT FROM_HEX('00ff10')
+=> "AP8Q"
+
+SELECT raw FROM t WHERE a = 3
+=> "AP8="
+
+# A STRING keeps an embedded NUL.
+SELECT '\x00abc'
+=> "\u0000abc"
+
+SELECT NUMERIC '-1.23'
+=> "-1.23"
+
+SELECT NUMERIC '-12345678901234567890.12345678'
+=> "-12345678901234567890.12345678"
+
+# Answers collected from BigQuery with bqanswers.
+# Without formatOptions.useInt64Timestamp, a TIMESTAMP is seconds since the epoch, written as a
+# FLOAT64 in Java's notation, in an array or a struct too.
+SELECT TIMESTAMP '2020-01-02 03:04:05.25+00'
+=> "1.57793424525E9"
+
+SELECT TIMESTAMP '1969-12-31 23:59:59+00'
+=> "-1.0"
+
+SELECT [TIMESTAMP '1970-01-01 00:00:01+00']
+=> [{"v": "1.0"}]
+
+SELECT STRUCT(TIMESTAMP '1969-12-31 23:59:59.5+00' AS t)
+=> {"f": [{"v": "-0.5"}]}
+
+# The values rest_jobs.yml and rest_resources.yml expect.
+SELECT TIMESTAMP '2020-01-02 03:04:05+00'
+=> "1.577934245E9"
+
+SELECT TIMESTAMP '2024-01-02 03:04:05+00'
+=> "1.704164645E9"
+
+# Where Java switches between decimal and scientific notation: below 1e-3 and from 1e7.
+SELECT TIMESTAMP '1970-01-01 00:00:00+00'
+=> "0.0"
+
+SELECT TIMESTAMP '1970-01-01 00:00:00.000001+00'
+=> "1.0E-6"
+
+SELECT TIMESTAMP '1970-01-01 00:00:00.001+00'
+=> "0.001"
+
+SELECT TIMESTAMP '1969-12-31 23:59:59.999+00'
+=> "-0.001"
+
+SELECT TIMESTAMP '1970-04-26 17:46:39.999999+00'
+=> "9999999.999999"
+
+SELECT TIMESTAMP '1970-04-26 17:46:40+00'
+=> "1.0E7"
+
+# Microseconds, and the ends of the range, where a FLOAT64 no longer holds every microsecond.
+SELECT TIMESTAMP '2020-01-02 03:04:05.123456+00'
+=> "1.577934245123456E9"
+
+SELECT TIMESTAMP '9999-12-31 23:59:59.999999+00'
+=> "2.534023008E11"
+
+SELECT TIMESTAMP '0001-01-01 00:00:00+00'
+=> "-6.21355968E10"

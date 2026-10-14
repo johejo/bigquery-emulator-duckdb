@@ -53,6 +53,24 @@ steps:
     test: |
       current.exit_code != 0 && current.stdout contains 'Column s was created by an earlier' &&
       current.stdout contains 'recreate the table'
+  # restart/stopped.yml writes duckdb_types.t with types BigQuery does not have; queries and
+  # tabledata.list read them alike, as docs/compatibility.md describes.
+  duckdb_types_query:
+    exec:
+      command: tests/e2e/bq.sh query --nouse_legacy_sql --format=json 'SELECT * FROM duckdb_types.t'
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"b":"101","d16":"-1.23","d32":"-12345.67","d64":"-1234567890.123456",' +
+        '"e":"happy","fixed":[{"x":"1"},{"x":null}],"inf":"infinity","m":"{x=[1, NULL]}","n":[],' +
+        '"ns":"2020-01-02T03:04:05.123456","s":null,"u":"hello","uuid":"00112233-4455-6677-8899-aabbccddeeff"}]'
+  duckdb_types_head:
+    exec:
+      command: tests/e2e/bq.sh head --format=json duckdb_types.t
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"b":"101","d16":"-1.23","d32":"-12345.67","d64":"-1234567890.123456",' +
+        '"e":"happy","fixed":[{"x":"1"},{"x":null}],"inf":"infinity","m":"{x=[1, NULL]}","n":[],' +
+        '"ns":"2020-01-02T03:04:05.123456","s":null,"u":"hello","uuid":"00112233-4455-6677-8899-aabbccddeeff"}]'
   # restart/stopped.yml creates unmanaged.v without the emulator; it is listed, queried in
   # INFORMATION_SCHEMA and deleted, but has no metadata to show.
   unmanaged_view_list:

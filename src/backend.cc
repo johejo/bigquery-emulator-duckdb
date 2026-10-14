@@ -1,8 +1,12 @@
 #include "src/backend.h"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -126,26 +130,47 @@ FieldSchema ToFieldSchema(const std::string& name, duckdb_logical_type type) {
   return field;
 }
 
-// BigQuery's default TIMESTAMP encoding: a decimal string of seconds since the Unix epoch. A
-// RANGE<TIMESTAMP> writes its bounds with all six digits of the fraction, even for a whole
-// second, as `all_digits` does.
-std::string EpochSecondsString(int64_t micros, bool all_digits = false) {
+// The bounds of a RANGE<TIMESTAMP> in BigQuery's default encoding: a decimal string of seconds
+// since the Unix epoch with all six digits of the fraction, even for a whole second.
+std::string EpochSecondsString(int64_t micros) {
   const bool negative = micros < 0;
   const uint64_t magnitude =
       negative ? static_cast<uint64_t>(-(micros + 1)) + 1 : static_cast<uint64_t>(micros);
-  const uint64_t seconds = magnitude / 1000000;
-  const uint64_t fraction = magnitude % 1000000;
-  std::string result = negative ? "-" : "";
-  result += std::to_string(seconds);
-  if (fraction != 0 || all_digits) {
-    std::string digits = std::to_string(fraction);
-    digits.insert(0, 6 - digits.size(), '0');
-    while (!all_digits && digits.back() == '0') {
-      digits.pop_back();
-    }
-    result += "." + digits;
+  std::string digits = std::to_string(magnitude % 1000000);
+  digits.insert(0, 6 - digits.size(), '0');
+  return (negative ? "-" : "") + std::to_string(magnitude / 1000000) + "." + digits;
+}
+
+// BigQuery's default TIMESTAMP encoding: seconds since the Unix epoch as a FLOAT64, written as
+// Java's Double.toString writes it, such as 1.0, -0.5 or 1.57793424525E9.
+std::string EpochSecondsDouble(int64_t micros) {
+  const double seconds = static_cast<double>(micros) / 1e6;
+  if (seconds == 0) {
+    return "0.0";
   }
-  return result;
+  // The shortest digits that read back as `seconds`, as d.ddde[+-]x.
+  std::array<char, 32> buffer{};
+  const auto converted = std::to_chars(buffer.data(), buffer.data() + buffer.size(), seconds,
+                                       std::chars_format::scientific);
+  const std::string_view text(buffer.data(), converted.ptr);
+  const size_t e = text.find('e');
+  const int exponent = std::stoi(std::string(text.substr(e + 1)));
+  std::string digits;
+  std::ranges::copy_if(text.substr(0, e), std::back_inserter(digits),
+                       [](char c) { return c >= '0' && c <= '9'; });
+  const std::string result = seconds < 0 ? "-" : "";
+  if (std::abs(seconds) < 1e-3 || std::abs(seconds) >= 1e7) {
+    return result + digits.front() + "." + (digits.size() > 1 ? digits.substr(1) : "0") + "E" +
+           std::to_string(exponent);
+  }
+  if (exponent < 0) {
+    return result + "0." + std::string(-exponent - 1, '0') + digits;
+  }
+  const auto integer_digits = static_cast<size_t>(exponent) + 1;
+  if (digits.size() <= integer_digits) {
+    return result + digits + std::string(integer_digits - digits.size(), '0') + ".0";
+  }
+  return result + digits.substr(0, integer_digits) + "." + digits.substr(integer_digits);
 }
 
 std::string ValueString(duckdb_value value) {
@@ -517,14 +542,13 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
     return value;
   }
   if (field.type == FieldType::kTimestamp) {
-    return EpochSecondsString(std::stoll(value.get<std::string>()));
+    return EpochSecondsDouble(std::stoll(value.get<std::string>()));
   }
   if (field.type == FieldType::kRange && field.range_element_type == FieldType::kTimestamp) {
     const std::string text = value.get<std::string>();
     const size_t separator = text.find(", ");
     const auto bound = [](const std::string& micros) {
-      return micros == "UNBOUNDED" ? micros
-                                   : EpochSecondsString(std::stoll(micros), /*all_digits=*/true);
+      return micros == "UNBOUNDED" ? micros : EpochSecondsString(std::stoll(micros));
     };
     return "[" + bound(text.substr(1, separator - 1)) + ", " +
            bound(text.substr(separator + 2, text.size() - separator - 3)) + ")";
@@ -786,35 +810,6 @@ std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     Query(connection, "COMMIT");
   }
   return errors;
-}
-
-std::string ExecuteScalarString(const std::string& sql) {
-  Handle<duckdb_database, duckdb_close> database;
-  if (duckdb_open(nullptr, database.out()) == DuckDBError) {
-    throw BackendError("DuckDB failed to open database");
-  }
-  RegisterBackendFunctions(database.get(), std::nullopt);
-  Connection connection;
-  if (duckdb_connect(database.get(), connection.out()) == DuckDBError) {
-    throw BackendError("DuckDB failed to connect");
-  }
-  Result result;
-  Query(connection.get(), sql, result);
-  Chunk const chunk(duckdb_fetch_chunk(result.result));
-  if (chunk.get() == nullptr || duckdb_data_chunk_get_size(chunk.get()) == 0 ||
-      duckdb_data_chunk_get_column_count(chunk.get()) == 0) {
-    throw BackendError("DuckDB query returned no scalar value");
-  }
-  duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), 0);
-  uint64_t* validity = duckdb_vector_get_validity(vector);
-  if (validity != nullptr && !duckdb_validity_row_is_valid(validity, 0)) {
-    return "NULL";
-  }
-  LogicalType const type(duckdb_vector_get_column_type(vector));
-  if (duckdb_get_type_id(type.get()) == DUCKDB_TYPE_VARCHAR) {
-    return VectorString(vector, 0);
-  }
-  return ValueString(VectorValue(vector, type.get(), 0).get());
 }
 
 }  // namespace bigquery_emulator_duckdb

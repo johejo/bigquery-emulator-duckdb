@@ -268,3 +268,67 @@ func TestQueryParameterTypes(t *testing.T) {
 		}
 	}
 }
+
+// A result larger than DuckDB reads at once comes back whole and in order, arrays included.
+func TestLargeResult(t *testing.T) {
+	ctx := context.Background()
+	it, err := newClient(t).Query("SELECT x, [x, -x] AS a FROM UNNEST(GENERATE_ARRAY(0, 4999)) AS x ORDER BY x").Read(ctx)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	want := int64(0)
+	for {
+		var row struct {
+			X int64
+			A []int64
+		}
+		err := it.Next(&row)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+		if row.X != want || !reflect.DeepEqual(row.A, []int64{want, -want}) {
+			t.Fatalf("row %d = %+v", want, row)
+		}
+		want++
+	}
+	if want != 5000 {
+		t.Errorf("got %d rows, want 5000", want)
+	}
+}
+
+// A DML statement reports the rows it changed, none where it matches none.
+// https://cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2
+func TestDMLAffectedRows(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_dml_affected_rows")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE t (id INT64)"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		sql  string
+		want int64
+	}{
+		{"INSERT INTO t VALUES (1), (2)", 2},
+		{"UPDATE t SET id = id + 10 WHERE TRUE", 2},
+		{"DELETE FROM t WHERE id = 999", 0},
+		{"DELETE FROM t WHERE TRUE", 2},
+	} {
+		_, status, err := runScript(t, client, dataset.DatasetID, c.sql)
+		if err != nil {
+			t.Fatalf("%s: %v", c.sql, err)
+		}
+		statistics, ok := status.Statistics.Details.(*bigquery.QueryStatistics)
+		if !ok || statistics.NumDMLAffectedRows != c.want {
+			t.Errorf("%s: statistics = %+v, want %d affected rows", c.sql, status.Statistics.Details, c.want)
+		}
+	}
+}

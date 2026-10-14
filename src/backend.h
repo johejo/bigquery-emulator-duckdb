@@ -85,7 +85,4 @@ class Backend {
   std::unique_ptr<Session> session_;
 };
 
-// Executes `sql` against a throwaway in-memory database and returns the first cell as text.
-std::string ExecuteScalarString(const std::string& sql);
-
 }  // namespace bigquery_emulator_duckdb

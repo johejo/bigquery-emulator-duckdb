@@ -372,6 +372,18 @@ SET x = NULL;
 SELECT x IS NULL
 => "true"
 
+# Inside a query, "NULL and empty ARRAYs are two distinct values", in a struct too.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#array_type
+DECLARE x STRUCT<y ARRAY<STRING>> DEFAULT STRUCT(['a']);
+SET x = STRUCT(CAST(NULL AS ARRAY<STRING>));
+SELECT x.y IS NULL
+=> "true"
+
+DECLARE x ARRAY<INT64> DEFAULT [1];
+SET x = [];
+SELECT x IS NULL
+=> "false"
+
 ## EXECUTE IMMEDIATE
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate,
 # whose examples set y to 5 and fill Books with four rows, the earliest from 1599.

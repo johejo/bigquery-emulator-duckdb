@@ -214,7 +214,10 @@ use grows with the input size rather than with the requested number of results.
 Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`,
 … and `SUM` over integers reports `INTEGER`. Other statements derive the schema from DuckDB types:
 `TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`,
-except the structs that keep `RANGE` values → `RANGE`.
+except the structs that keep `RANGE` values → `RANGE`. A table another DuckDB client wrote may hold
+types BigQuery does not have: `DECIMAL` of any width reads as `NUMERIC`, `TIMESTAMP_NS` as a
+`DATETIME` truncated to microseconds, fixed-size arrays as `REPEATED`, and types such as `ENUM`,
+`UUID`, `BIT`, `MAP` and `UNION` as a `STRING` in DuckDB's text form.
 
 Without a destination table, a second column with the same name as another is renamed with `_1`,
 as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`; names that differ only in case are duplicates, as
@@ -226,6 +229,8 @@ as `_field_2`; a name repeated more than twice, or a positional name another fie
 rejected.
 
 Timestamps are encoded as epoch seconds, or epoch microseconds with
-`formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`.
+`formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`. As in BigQuery,
+seconds are a `FLOAT64` in Java's notation, such as `1.57793424525E9`, while the bounds of a range
+have six fractional digits.
 
 The `SAFE.` prefix is unsupported on volatile functions.
