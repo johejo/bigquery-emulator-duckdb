@@ -1,5 +1,6 @@
 #include "src/shell.h"
 
+#include <pthread.h>
 // include-cleaner requires signal.h for sigaction; modernize-deprecated-headers suggests csignal
 // instead, so suppress it on this include.
 #include <signal.h>  // NOLINT(modernize-deprecated-headers)
@@ -47,10 +48,22 @@ using nlohmann::ordered_json;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 volatile sig_atomic_t interrupted = 0;
 
-void Interrupt(int /*signal*/) { interrupted = 1; }
+// The thread that reads input. SIGINT is directed at the process, so the kernel may deliver it to
+// any thread, such as one of DuckDB's, whose read() it would not interrupt.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+pthread_t reader;
+
+void Interrupt(int signal) {
+  if (pthread_equal(pthread_self(), reader) == 0) {
+    pthread_kill(reader, signal);
+    return;
+  }
+  interrupted = 1;
+}
 
 // Without SA_RESTART, so that SIGINT also interrupts a pending read().
 void InstallInterruptHandler() {
+  reader = pthread_self();
   struct sigaction action{};
   action.sa_handler = Interrupt;
   sigemptyset(&action.sa_mask);
