@@ -26,15 +26,17 @@ SELECT 1/0;
 DECLARE x STRING(3) DEFAULT 'abcd'; SELECT x
 => error:
 
-# System variable references in definitions remain unsupported.
-SET @@dataset_id = 'd'; CREATE VIEW d.v AS SELECT @@dataset_id AS dataset_id
-=> error contains: The emulator does not support system variables in function or view definitions
+# Answers collected from BigQuery with bqanswers: definitions cannot refer to system variables.
+# BigQuery appends the location of the defining statement, which the emulator does not report.
+SET @@dataset_id = 'before';
+CREATE TEMP FUNCTION current_dataset() AS (@@dataset_id);
+SET @@dataset_id = 'after';
+SELECT current_dataset()
+=> error contains: Invalid reference to system variable @@dataset_id; in function current_dataset
 
-SET @@dataset_id = 'd'; CREATE FUNCTION d.f(x ANY TYPE) AS (@@dataset_id)
-=> error contains: The emulator does not support system variables in function or view definitions
-
-SET @@dataset_id = 'd'; CREATE TEMP FUNCTION f() AS (@@dataset_id); SELECT f()
-=> error contains: The emulator does not support system variables in function or view definitions
-
-SET @@dataset_id = 'd'; BEGIN EXECUTE IMMEDIATE 'CREATE VIEW d.v AS SELECT @@dataset_id AS dataset_id'; EXCEPTION WHEN ERROR THEN SELECT 1; END
-=> error contains: The emulator does not support system variables in function or view definitions
+CREATE SCHEMA IF NOT EXISTS errors_dataset_system_variables;
+SET @@dataset_id = 'errors_dataset_system_variables';
+CREATE OR REPLACE VIEW errors_dataset_system_variables.v AS SELECT @@dataset_id AS dataset_id;
+SET @@dataset_id = 'after';
+SELECT dataset_id FROM errors_dataset_system_variables.v
+=> error contains: Invalid reference to system variable @@dataset_id
