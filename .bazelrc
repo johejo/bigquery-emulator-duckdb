@@ -56,8 +56,10 @@ build:clang-tidy --keep_going
 # .github/workflows/test.yml.
 build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
-# Reuse extracted repositories across runs instead of fetching them again.
+# Reuse extracted repositories across runs instead of fetching them again. The cache outlives
+# dependency changes, so let Bazel remove unused entries while its server waits between steps.
 build:ci --repo_contents_cache=~/.cache/bazel-repo/contents
+build:ci --repo_contents_cache_gc_idle_delay=5s
 # Let Gazelle reuse the Go caches that CI saves between runs.
 build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
 # Keep the disk cache within the repository's cache quota; a full macOS run uses about 6G.
