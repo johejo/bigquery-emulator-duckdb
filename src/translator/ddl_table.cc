@@ -472,15 +472,27 @@ bool HasNestedNotNull(const FieldSchema& field) {
   });
 }
 
-// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
-// labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
-// SET OPTIONS does.
+// Whether the OPTIONS of a CREATE TABLE LIKE, COPY or CLONE set a default rounding mode, which the
+// copied columns may or may not take; BigQuery's answer is not known.
+bool SetsDefaultRoundingMode(const Options& options, const Scope& scope) {
+  if (std::ranges::any_of(options, [](const auto& option) {
+        return ToLowerAscii(option->name()) == "default_rounding_mode";
+      })) {
+    Unsupported(scope, "CREATE TABLE LIKE, COPY and CLONE with OPTIONS (default_rounding_mode)");
+    return true;
+  }
+  return false;
+}
+
+// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name,
+// default rounding mode and labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS
+// replace, as ALTER TABLE SET OPTIONS does.
 template <typename CreateTable>
 std::optional<TableDescription> LikeDescription(const CreateTable& create, const Scope& scope) {
   std::optional<TableDescription> description = SourceDescription(
       create.like_table(), "CREATE TABLE LIKE",
       create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP, scope);
-  if (!description) {
+  if (!description || SetsDefaultRoundingMode(create.option_list(), scope)) {
     return std::nullopt;
   }
   TableMetadata& inherited = description->metadata;
@@ -550,7 +562,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   const bool temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP;
   std::optional<TableDescription> description =
       SourceDescription(scan.table(), statement, temporary, scope);
-  if (!description) {
+  if (!description || SetsDefaultRoundingMode(create.option_list(), scope)) {
     return std::nullopt;
   }
   const bool replace =

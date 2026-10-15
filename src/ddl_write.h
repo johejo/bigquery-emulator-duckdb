@@ -39,9 +39,10 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset);
 // statements in the same transaction as creation; their callers decide what to inherit or replace.
 // A table that sets no expiration or default rounding mode takes the defaults of `dataset`, the
 // dataset it is created in, unless it is temporary, and its NUMERIC and BIGNUMERIC fields without
-// a rounding mode take the table's default. Throws ApiError::Unsupported for a copy of a table
-// with any default rounding mode, and for CREATE TABLE AS SELECT into a column the dataset's
-// default makes round to even, since its values are rounded as translated.
+// a rounding mode take the table's default. A copy of another table keeps the modes of its
+// columns, and a COPY or CLONE the source's default rounding mode even when it is unset. Throws
+// ApiError::Unsupported for CREATE TABLE AS SELECT into a column the dataset's default makes round
+// to even, since its values are rounded as translated.
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset);
 
 // What CREATE VIEW of `view` runs besides itself. A view that sets no expiration takes the

@@ -157,6 +157,7 @@ query Default rounding modes | CREATE SCHEMA e OPTIONS (default_rounding_mode = 
 query Default rounding modes | CREATE SCHEMA e OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); CREATE TABLE e.n (a NUMERIC(10, 1)) AS SELECT NUMERIC '2.25' AS a
 query Default rounding modes | ALTER SCHEMA d SET OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')
 query Default rounding modes | CREATE TABLE n OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS a; CREATE TABLE m LIKE n
+query Default rounding modes | CREATE SCHEMA e OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); CREATE TABLE e.m LIKE t
 note Default rounding modes | See [Rounding modes](compatibility.md#rounding-modes).
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)

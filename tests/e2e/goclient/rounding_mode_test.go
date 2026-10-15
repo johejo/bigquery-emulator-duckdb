@@ -271,9 +271,7 @@ func TestDefaultRoundingModes(t *testing.T) {
 	// Forms whose outcome BigQuery does not document, and writes the emulator does not round to
 	// even, are rejected.
 	for sql, want := range map[string]string{
-		"CREATE TABLE p (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n": "CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset",
-		"CREATE TABLE l LIKE t":    "CREATE TABLE LIKE, COPY and CLONE with default rounding modes",
-		"CREATE TABLE c CLONE own": "CREATE TABLE LIKE, COPY and CLONE with default rounding modes",
+		"CREATE TABLE p (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n":                     "CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset",
 		"CREATE VIEW v OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS x": "CREATE VIEW option default_rounding_mode",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
@@ -339,5 +337,74 @@ func TestDefaultRoundingModes(t *testing.T) {
 	want := [][]bigquery.Value{{int64(1), "2.2", "2.3", "2.2"}, {int64(2), "2.3", "2.2", nil}, {int64(3), "2.2", nil, nil}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("rounded rows = %v, want %v", got, want)
+	}
+}
+
+// CREATE TABLE LIKE, COPY and CLONE keep the source's default rounding mode, which a column added
+// to the copy later takes, and the rounding modes of the source's columns. In a dataset with a
+// default, LIKE takes it when the source has none, and COPY and CLONE do not; BigQuery's answers
+// to cases that were unverified.
+func TestCopiedDefaultRoundingModes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	plain := client.Dataset("go_default_rounding_plain")
+	even := client.Dataset("go_default_rounding_even")
+	for _, dataset := range []*bigquery.Dataset{plain, even} {
+		_ = dataset.DeleteWithContents(ctx)
+		t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	}
+	run := func(sql string) error {
+		_, _, err := runScript(t, client, "", sql)
+		return err
+	}
+	read := func(sql string) []bigquery.Value {
+		t.Helper()
+		rows, err := client.Query(sql).Read(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+		var row []bigquery.Value
+		if err := rows.Next(&row); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+		return row
+	}
+	for _, sql := range []string{
+		"CREATE SCHEMA go_default_rounding_plain",
+		"CREATE SCHEMA go_default_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
+		"CREATE TABLE go_default_rounding_plain.src (n NUMERIC(5, 1))",
+		"CREATE TABLE go_default_rounding_plain.default_src (i INT64) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
+	} {
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	for kind, added := range map[string]string{"LIKE": "2.2", "COPY": "2.3", "CLONE": "2.3"} {
+		copied := "go_default_rounding_even." + strings.ToLower(kind) + "_dst"
+		if err := run("CREATE TABLE " + copied + " " + kind + " go_default_rounding_plain.src; " +
+			"ALTER TABLE " + copied + " ADD COLUMN m NUMERIC(5, 1); " +
+			"INSERT " + copied + " (n, m) VALUES (2.25, 2.25)"); err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		got := read("SELECT CAST(n AS STRING), CAST(m AS STRING) FROM " + copied)
+		if want := []bigquery.Value{"2.3", added}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s in a dataset with a default: %v, want %v", kind, got, want)
+		}
+
+		copied = "go_default_rounding_plain." + strings.ToLower(kind) + "_default"
+		if err := run("CREATE TABLE " + copied + " " + kind + " go_default_rounding_plain.default_src; " +
+			"ALTER TABLE " + copied + " ADD COLUMN n NUMERIC(5, 1); " +
+			"INSERT " + copied + " (n) VALUES (2.25)"); err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		if got := read("SELECT CAST(n AS STRING) FROM " + copied); !reflect.DeepEqual(got, []bigquery.Value{"2.2"}) {
+			t.Errorf("%s of a table with a default: %v, want [2.2]", kind, got)
+		}
+	}
+	// Whether the copied columns take a default that OPTIONS set is not known.
+	err := run("CREATE TABLE go_default_rounding_plain.o LIKE go_default_rounding_plain.src OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO')")
+	if want := "CREATE TABLE LIKE, COPY and CLONE with OPTIONS (default_rounding_mode)"; err == nil ||
+		!strings.Contains(err.Error(), want) {
+		t.Errorf("LIKE with OPTIONS: error = %v, want one containing %q", err, want)
 	}
 }

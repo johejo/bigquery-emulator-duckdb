@@ -90,7 +90,7 @@ rejected.
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported |  |
 | Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
 | Column rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields; writing a STRUCT or ARRAY with parameterized ROUND_HALF_EVEN values. |
-| Default rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset; CREATE TABLE LIKE, COPY and CLONE with default rounding modes. |
+| Default rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset. |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option require_partition_filter. |
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |

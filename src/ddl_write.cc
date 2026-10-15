@@ -136,22 +136,20 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset) {
   TableMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
-  // Whether a copy keeps the source's default rounding mode, or its columns take the default of
-  // the table or dataset, is not known.
-  if (definition.copies_table &&
-      (!metadata.default_rounding_mode.empty() ||
-       (!definition.temporary && !dataset.default_rounding_mode.empty()))) {
-    throw ApiError::Unsupported("CREATE TABLE LIKE, COPY and CLONE with default rounding modes");
-  }
   std::vector<FieldSchema> schema = definition.schema;
   if (!definition.temporary) {
     metadata.expiration_time =
         ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
-    if (metadata.default_rounding_mode.empty()) {
+    // CREATE TABLE COPY and CLONE keep the source's default rounding mode even when it is unset,
+    // and LIKE takes the dataset's then, as BigQuery answers.
+    if (metadata.default_rounding_mode.empty() && !definition.rows_from.has_value()) {
       metadata.default_rounding_mode = dataset.default_rounding_mode;
     }
   }
-  ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
+  // The columns of a copy keep their rounding modes.
+  if (!definition.copies_table) {
+    ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
+  }
   // CREATE TABLE AS SELECT rounds the values it writes with the modes its columns have when it is
   // translated, which the dataset's default does not give them.
   for (size_t i = 0; definition.as_select && i < schema.size(); ++i) {
