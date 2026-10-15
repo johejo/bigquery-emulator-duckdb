@@ -56,10 +56,9 @@ build:clang-tidy --keep_going
 # .github/workflows/test.yml.
 build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
-# Allow room for the roughly 6G macOS cache used by a full CI run. Bazel
-# collects the disk cache once idle during the end-to-end tests, dropping
-# entries no run has used for 3 days so that each cache fits the repository's
-# quota once compressed.
+# Reuse extracted repositories across runs instead of fetching them again.
+build:ci --repo_contents_cache=~/.cache/bazel-repo/contents
+# Keep the disk cache within the repository's cache quota; a full macOS run uses about 6G.
 build:ci --experimental_disk_cache_gc_max_size=7G
 build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s

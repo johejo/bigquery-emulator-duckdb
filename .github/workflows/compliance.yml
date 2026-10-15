@@ -37,14 +37,17 @@ jobs:
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod" >> "$GITHUB_ENV"
 
       # Go caches are shared with the Test workflow, which saves them.
-      - name: Restore Go cache
+      - name: Restore Go module cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: go-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', 'go.mod', 'go.sum') }}
-          restore-keys: go-v1-${{ runner.os }}-${{ runner.arch }}-
+          path: ${{ env.GOMODCACHE }}
+          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
+      - name: Restore Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.GOCACHE }}
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: go-build-v1-${{ runner.os }}-${{ runner.arch }}-
       # Repository downloads are shared with the Test workflow, which saves this cache.
       - name: Restore Bazel repository cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -52,7 +55,7 @@ jobs:
           path: |
             ~/.cache/bazel-repo
             ~/.cache/bazelisk
-          key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
+          key: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
       - name: Restore Bazel disk cache
         id: disk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

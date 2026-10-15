@@ -40,7 +40,7 @@ jobs:
           path: |
             ~/.cache/bazel-repo
             ~/.cache/bazelisk
-          key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
+          key: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
       - name: Restore Bazel disk cache
         id: disk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
