@@ -1,4 +1,4 @@
-desc: server startup rejects invalid listeners and shutdown succeeds immediately after readiness
+desc: server startup rejects invalid listeners, accepts bursts of connections and IPv6 hosts, and shuts down promptly
 steps:
   server:
     exec:

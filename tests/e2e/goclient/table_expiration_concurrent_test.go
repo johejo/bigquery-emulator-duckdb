@@ -3,11 +3,15 @@ package goclient
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"testing"
+	"time"
 
+	"cloud.google.com/go/bigquery"
 	bqapi "google.golang.org/api/bigquery/v2"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -112,5 +116,44 @@ func TestTableExpirationConcurrentMutations(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Readers arriving together at an expired table must all see absence, rather than one of them
+// failing while another deletes it.
+func TestTableExpirationConcurrentReads(t *testing.T) {
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_expiration_reads")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	table := dataset.Table("t")
+	if err := table.Create(ctx, &bigquery.TableMetadata{
+		Schema:         bigquery.Schema{{Name: "id", Type: bigquery.IntegerFieldType}},
+		ExpirationTime: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const readers = 32
+	start := make(chan struct{})
+	errors := make(chan error, readers)
+	var workers sync.WaitGroup
+	for range readers {
+		workers.Go(func() {
+			<-start
+			_, err := table.Metadata(ctx)
+			if apiError, ok := err.(*googleapi.Error); !ok || apiError.Code != http.StatusNotFound {
+				errors <- fmt.Errorf("metadata of an expired table: %v", err)
+			}
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(errors)
+	for err := range errors {
+		t.Error(err)
 	}
 }
