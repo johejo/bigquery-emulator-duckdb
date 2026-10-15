@@ -9,12 +9,14 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/field_schema.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
@@ -186,7 +188,18 @@ bool StringOption(const googlesql::Value& value, std::string& into) {
   return true;
 }
 
-// The metadata the OPTIONS of a CREATE TABLE or CREATE VIEW set.
+bool RoundingModeOption(const googlesql::Value& value, std::string& into) {
+  std::string mode;
+  if (!StringOption(value, mode) ||
+      (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven)) {
+    return false;
+  }
+  into = std::move(mode);
+  return true;
+}
+
+// The metadata the OPTIONS of a CREATE TABLE or CREATE VIEW set; only a table has a default
+// rounding mode.
 std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
                                              const Scope& scope, TableMetadata metadata) {
   for (const auto& option : options) {
@@ -198,7 +211,9 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
-         (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)));
+         (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)) ||
+         (statement == "CREATE TABLE" && name == "default_rounding_mode" &&
+          RoundingModeOption(*value, metadata.default_rounding_mode)));
     if (!applied) {
       return Unsupported(scope, std::string(statement) + " option " + option->name());
     }
@@ -206,9 +221,9 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
   return metadata;
 }
 
-// The description, friendly name, labels and default table expiration the OPTIONS of a CREATE
-// SCHEMA set. Every dataset is in the US, so a location elsewhere is unsupported, and so are the
-// other options, which change how BigQuery treats the dataset's tables.
+// The description, friendly name, labels, default table expiration and default rounding mode the
+// OPTIONS of a CREATE SCHEMA set. Every dataset is in the US, so a location elsewhere is
+// unsupported, and so are the other options, which change how BigQuery treats the dataset's tables.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
   DatasetMetadata metadata;
   for (const auto& option : options) {
@@ -222,6 +237,8 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
          (name == "default_table_expiration_days" &&
           DaysOption(*value, metadata.default_table_expiration_ms)) ||
+         (name == "default_rounding_mode" &&
+          RoundingModeOption(*value, metadata.default_rounding_mode)) ||
          (name == "location" && StringOption(*value, location) &&
           (value->is_null() || ToUpperAscii(location) == "US")));
     if (!applied) {
@@ -248,7 +265,10 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
          (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
           ExpirationOption(*value, updates.expiration_time.emplace())) ||
          (statement == "ALTER SCHEMA" && name == "default_table_expiration_days" &&
-          DaysOption(*value, updates.default_table_expiration_ms.emplace())));
+          DaysOption(*value, updates.default_table_expiration_ms.emplace())) ||
+         ((statement == "ALTER TABLE" || statement == "ALTER SCHEMA") &&
+          name == "default_rounding_mode" &&
+          RoundingModeOption(*value, updates.default_rounding_mode.emplace())));
     if (!applied) {
       Unsupported(scope, std::string(statement) + " option " + option->name());
       return false;

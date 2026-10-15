@@ -77,6 +77,11 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
   if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
     throw ApiError::Invalid("A view cannot be partitioned or clustered");
   }
+  // A view has no columns of its own to give a default rounding mode, and what BigQuery does with
+  // one is not known.
+  if (!view.metadata.default_rounding_mode.empty()) {
+    throw ApiError::Unsupported("defaultRoundingMode on views");
+  }
   json comment = view.metadata.ToJson();
   comment["query"] = view.query;
   comment["fields"] = SchemaToJson(view.schema).at("fields");

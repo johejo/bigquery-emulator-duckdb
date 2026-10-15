@@ -1,0 +1,65 @@
+# Default rounding modes of copied tables
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/tables (Table.defaultRoundingMode)
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets (Dataset.defaultRoundingMode)
+#
+# Each script creates the datasets unverified_rounding_plain, which has no default rounding mode,
+# and unverified_rounding_even, whose default is ROUND_HALF_EVEN, and tables of its own. The
+# datasets stay in the project after the scripts run.
+#
+# BigQuery documents that a table created in a dataset takes its default rounding mode and that
+# fields added to a table take the table's, but not what CREATE TABLE LIKE, COPY and CLONE do with
+# either, which the emulator rejects until these are answered.
+
+# Whether a copy's columns, which the source created without a rounding mode, take the default of
+# the dataset the copy is created in: 2.25 rounds to 2.2 if they do, and to 2.3 if they do not.
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.src (n NUMERIC(5, 1));
+CREATE OR REPLACE TABLE unverified_rounding_even.like_dst LIKE unverified_rounding_plain.src;
+INSERT unverified_rounding_even.like_dst (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.like_dst
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.src (n NUMERIC(5, 1));
+CREATE OR REPLACE TABLE unverified_rounding_even.copy_dst COPY unverified_rounding_plain.src;
+INSERT unverified_rounding_even.copy_dst (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.copy_dst
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.src (n NUMERIC(5, 1));
+CREATE OR REPLACE TABLE unverified_rounding_even.clone_dst CLONE unverified_rounding_plain.src;
+INSERT unverified_rounding_even.clone_dst (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.clone_dst
+?>
+
+# Whether a copy keeps the source's default rounding mode, which a column added to the copy later
+# takes: 2.25 rounds to 2.2 if it does, and to 2.3 if it does not.
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_src (i INT64) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_like LIKE unverified_rounding_plain.default_src;
+ALTER TABLE unverified_rounding_plain.default_like ADD COLUMN n NUMERIC(5, 1);
+INSERT unverified_rounding_plain.default_like (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_plain.default_like
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_src (i INT64) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_copy COPY unverified_rounding_plain.default_src;
+ALTER TABLE unverified_rounding_plain.default_copy ADD COLUMN n NUMERIC(5, 1);
+INSERT unverified_rounding_plain.default_copy (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_plain.default_copy
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_plain;
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_src (i INT64) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_plain.default_clone CLONE unverified_rounding_plain.default_src;
+ALTER TABLE unverified_rounding_plain.default_clone ADD COLUMN n NUMERIC(5, 1);
+INSERT unverified_rounding_plain.default_clone (n) VALUES (2.25);
+SELECT CAST(n AS STRING) FROM unverified_rounding_plain.default_clone
+?>

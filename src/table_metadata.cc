@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -173,18 +174,8 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
   }
 }
 
-// Throws for a default rounding mode, which sets how values written to the table's new NUMERIC
-// and BIGNUMERIC columns are rounded and which the emulator does not emulate.
-void CheckDefaultRoundingMode(const json& table) {
-  if (const std::string mode =
-          StringValue(Member(table, "defaultRoundingMode"), "defaultRoundingMode");
-      !mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
-    throw ApiError::Unsupported("table defaultRoundingMode");
-  }
-}
-
-// Applies the description, friendly name and labels of a Table or Dataset resource `body` to
-// `metadata`, as UpdateTableMetadata documents.
+// Applies the description, friendly name, labels and default rounding mode of a Table or Dataset
+// resource `body` to `metadata`, as UpdateTableMetadata documents.
 template <typename Metadata>
 void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
   if (!patch) {
@@ -202,6 +193,14 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
   set("friendlyName",
       [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
   set("labels", [&](const json& value) { MergeLabels(value, metadata.labels); });
+  set("defaultRoundingMode", [&](const json& value) {
+    const std::string mode = StringValue(value, "defaultRoundingMode");
+    std::optional<std::string> parsed = ParseRoundingMode(mode);
+    if (!parsed.has_value()) {
+      throw ApiError::Invalid("Invalid default rounding mode: " + mode);
+    }
+    metadata.default_rounding_mode = *std::move(parsed);
+  });
   ValidateLabels(metadata.labels);
 }
 
@@ -224,6 +223,7 @@ void CheckDatasetFields(const json& dataset) {
       "friendlyName",
       "labels",
       "defaultTableExpirationMs",
+      "defaultRoundingMode",
   };
   for (const auto& [key, value] : dataset.items()) {
     if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
@@ -358,6 +358,9 @@ json TableMetadata::ToJson() const {
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
+  if (!default_rounding_mode.empty()) {
+    fields["defaultRoundingMode"] = default_rounding_mode;
+  }
   if (expiration_time.has_value()) {
     fields["expirationTime"] = std::to_string(*expiration_time);
   }
@@ -391,6 +394,9 @@ json DatasetMetadata::ToJson() const {
   if (default_table_expiration_ms.has_value()) {
     fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
   }
+  if (!default_rounding_mode.empty()) {
+    fields["defaultRoundingMode"] = default_rounding_mode;
+  }
   return fields;
 }
 
@@ -402,7 +408,6 @@ TableMetadata TableMetadataFromJson(const json& table) {
 }
 
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
-  CheckDefaultRoundingMode(body);
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&

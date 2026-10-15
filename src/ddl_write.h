@@ -37,8 +37,11 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset);
 // What table creation runs besides CREATE TABLE: column metadata and defaults, table metadata
 // with a fresh creation time, and any rows to copy. DDL, REST and destination jobs execute these
 // statements in the same transaction as creation; their callers decide what to inherit or replace.
-// A table that sets no expiration takes the default of `dataset`, the dataset it is created in,
-// unless it is temporary.
+// A table that sets no expiration or default rounding mode takes the defaults of `dataset`, the
+// dataset it is created in, unless it is temporary, and its NUMERIC and BIGNUMERIC fields without
+// a rounding mode take the table's default. Throws ApiError::Unsupported for a copy of a table
+// with any default rounding mode, and for CREATE TABLE AS SELECT into a column the dataset's
+// default makes round to even, since its values are rounded as translated.
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset);
 
 // What CREATE VIEW of `view` runs besides itself. A view that sets no expiration takes the
@@ -46,8 +49,9 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset);
 
 // The statements that apply `alteration` to its table, whose BigQuery schema and metadata are
-// `schema` and `metadata` when it runs, or none when its actions all have nothing to do. Throws
-// ApiError::Invalid for an action BigQuery rejects.
+// `schema` and `metadata` when it runs, or none when its actions all have nothing to do. An added
+// column takes the table's default rounding mode. Throws ApiError::Invalid for an action BigQuery
+// rejects.
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                               std::vector<FieldSchema> schema,
                                               TableMetadata metadata);

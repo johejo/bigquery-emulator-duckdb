@@ -62,9 +62,9 @@ struct TableDefinition {
   // A temporary table belongs to its script rather than to a dataset, whose default expiration
   // it does not take.
   bool temporary = false;
-  // CREATE TABLE LIKE, COPY and CLONE declare no defaults but keep those of `schema`, which are
-  // GoogleSQL and set once the table exists.
-  bool schema_defaults = false;
+  // CREATE TABLE LIKE, COPY and CLONE copy the schema of another table. They declare no defaults
+  // but keep those of `schema`, which are GoogleSQL and set once the table exists.
+  bool copies_table = false;
 };
 
 // The dataset a CREATE SCHEMA defines, with the description, friendly name and labels its OPTIONS
@@ -83,6 +83,7 @@ struct OptionUpdates {
   std::optional<std::map<std::string, std::string>> labels = {};
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
+  std::optional<std::string> default_rounding_mode = {};
 };
 
 // The routine a CREATE FUNCTION defines, which the emulator records next to its DuckDB macro.

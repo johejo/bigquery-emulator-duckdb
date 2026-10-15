@@ -30,8 +30,8 @@ BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_
 Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier `` `region-us`
 `` covers every dataset of the project, and any other region none.
 
-Datasets keep a description, friendly name, labels and default table expiration, which `CREATE
-SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such
+Datasets keep a description, friendly name, labels, default table expiration and [default rounding
+mode](#rounding-modes), which `CREATE SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such
 as default partition expiration and access controls, are unsupported. A table or view created in a
 dataset with a default table expiration, by DDL, `tables.insert` or a job that creates its
 destination, expires that long after its creation time unless it sets an expiration of its own.
@@ -44,9 +44,9 @@ NULL for options other than the location.
 
 ### Options and expiration
 
-Tables keep a description, friendly name, labels and expiration, and columns a description and a
-[rounding mode](#rounding-modes), which DDL `OPTIONS` and the `tables` methods set; other options,
-such as a table's default rounding mode, are unsupported. Expiration comes from
+Tables keep a description, friendly name, labels, expiration and [default rounding
+mode](#rounding-modes), and columns a description and a rounding mode, which DDL `OPTIONS` and the
+`tables` methods set; other options, such as partition expiration, are unsupported. Expiration comes from
 REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
 that creates its destination; a copy job with one to an existing table is rejected.
 
@@ -68,6 +68,22 @@ NUMERIC and BIGNUMERIC columns and STRUCT fields keep the rounding mode that DDL
 a schema's `roundingMode` sets, which `tables.get` and the `rounding_mode` of
 `INFORMATION_SCHEMA.COLUMNS` and `COLUMN_FIELD_PATHS` return; `ROUNDING_MODE_UNSPECIFIED` leaves it
 unset. A rounding mode on another type is unsupported.
+
+Tables and datasets keep a default rounding mode, from DDL `default_rounding_mode` or a resource's
+`defaultRoundingMode`. A table created in a dataset, by DDL, `tables.insert` or a job that creates
+its destination, takes the dataset's default unless it sets its own; temporary tables do not. The
+NUMERIC and BIGNUMERIC fields that creation, `ALTER TABLE ADD COLUMN` or a schema update adds
+without a rounding mode take the table's default, which `tables.get` and `INFORMATION_SCHEMA` then
+report as theirs; changing a default later keeps the modes of existing fields and tables. Views
+cannot have a default.
+
+What BigQuery does with default rounding modes is not documented for some forms, which the emulator
+rejects: `CREATE TABLE LIKE`, `COPY` and `CLONE` and copy jobs, when the source, their `OPTIONS` or
+the destination's dataset has a default; a `tables.patch` or `tables.update` that changes the
+default and adds NUMERIC or BIGNUMERIC fields; and a job that replaces a table with a default by
+`WRITE_TRUNCATE`. `CREATE TABLE AS SELECT` into a parameterized column that takes `ROUND_HALF_EVEN`
+from the dataset, rather than from the table's `OPTIONS`, and loads into a table they create in such
+a dataset are unsupported too.
 
 DML and `CREATE TABLE AS SELECT` round the values they write to a parameterized column's scale with
 its rounding mode, `ROUND_HALF_AWAY_FROM_ZERO` when unset. Other writes round halfway values away

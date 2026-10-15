@@ -159,19 +159,33 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     }
     TemporaryFiles downloads;
     std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
+    // The destination's schema, or none when the load creates it.
+    std::optional<std::vector<FieldSchema>> existing;
+    try {
+      existing = GetTable(load.destination_table, /*include_row_count=*/false).schema;
+    } catch (const ApiError& error) {
+      if (error.http_status() != 404) {
+        throw;
+      }
+    }
+    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
+    // A table the load creates takes its dataset's default rounding mode.
+    const auto check_rounding = [&](std::vector<FieldSchema> written) {
+      if (!existing.has_value()) {
+        ApplyDefaultRoundingMode(written,
+                                 GetDataset(DatasetReference{
+                                                .project_id = load.destination_table.project_id,
+                                                .dataset_id = load.destination_table.dataset_id,
+                                            })
+                                     .default_rounding_mode);
+      }
+      if (HasRoundHalfEven(written)) {
+        throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
+      }
+    };
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
-    if (requested_schema.empty()) {
-      TableReference destination = load.destination_table;
-      if (destination.project_id.empty()) {
-        destination.project_id = job.project_id;
-      }
-      try {
-        requested_schema = GetTable(destination).schema;
-      } catch (const ApiError& error) {
-        if (error.http_status() != 404) {
-          throw;
-        }
-      }
+    if (requested_schema.empty() && existing.has_value()) {
+      requested_schema = *existing;
     }
     ParquetColumn parquet;
     if (format == "NEWLINE_DELIMITED_JSON") {
@@ -185,12 +199,12 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         DetectParquetDecimals(requested_schema, parquet, config);
       }
     }
-    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
-    if (HasRoundHalfEven(requested_schema)) {
-      throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
-    }
+    check_rounding(requested_schema);
     const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
     const QueryResult prepared = Prepare(sql);
+    if (requested_schema.empty()) {
+      check_rounding(prepared.schema);
+    }
     const QueryResult result = WriteDestination(
         job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
         sql, requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
@@ -229,6 +243,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     }
     std::vector<FieldSchema> schema;
     std::string sql;
+    bool rounding_defaults = false;
     for (TableReference source : copy.source_tables) {
       if (source.project_id.empty()) {
         source.project_id = job.project_id;
@@ -238,6 +253,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
+      rounding_defaults = rounding_defaults || !table.metadata.default_rounding_mode.empty();
       if (sql.empty()) {
         schema = table.schema;
       } else if (SchemaToJson(table.schema) != SchemaToJson(schema)) {
@@ -267,6 +283,25 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
                                   " has a default value and is not in the source table");
         }
       }
+    }
+    // Whether a copy keeps the default rounding mode of its source, or takes the one of the
+    // dataset it creates its destination in, is not known.
+    bool creates = false;
+    try {
+      GetTable(copy.destination_table, /*include_row_count=*/false);
+    } catch (const ApiError& error) {
+      if (error.http_status() != 404) {
+        throw;
+      }
+      creates = true;
+    }
+    if (rounding_defaults ||
+        (creates && !GetDataset(DatasetReference{
+                                    .project_id = copy.destination_table.project_id,
+                                    .dataset_id = copy.destination_table.dataset_id,
+                                })
+                         .default_rounding_mode.empty())) {
+      throw ApiError::Unsupported("copy jobs with default rounding modes");
     }
     TableMetadata metadata;
     metadata.expiration_time = copy.destination_expiration_time;
@@ -407,6 +442,12 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
       HasRoundHalfEven(existing->schema) &&
       SchemaToJson(existing->schema) != SchemaToJson(schema)) {
     throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
+  }
+  // Replacing a table drops its metadata, which keeps the default rounding mode of fields added
+  // to it later.
+  if (existing.has_value() && write == WriteDisposition::kWriteTruncate &&
+      !existing->metadata.default_rounding_mode.empty()) {
+    throw ApiError::Unsupported("replacing a table that has a defaultRoundingMode");
   }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
   if (existing.has_value() && !metadata.empty()) {

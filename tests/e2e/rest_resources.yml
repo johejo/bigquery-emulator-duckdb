@@ -75,32 +75,8 @@ steps:
       current.res.status == 200 &&
       current.res.body.id == "rest-resources:ds.t" &&
       current.res.body.schema.fields[1].mode == "REPEATED"
-  # Default rounding modes change how written values are rounded, which the emulator does not
-  # emulate.
-  table_with_default_rounding_mode:
-    req:
-      /bigquery/v2/projects/rest-resources/datasets/ds/tables:
-        post:
-          body:
-            application/json:
-              tableReference: {tableId: rounded}
-              schema:
-                fields:
-                  - {name: n, type: NUMERIC}
-              defaultRoundingMode: ROUND_HALF_EVEN
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message == "The emulator does not support table defaultRoundingMode"
-  patch_table_default_rounding_mode:
-    req:
-      /bigquery/v2/projects/rest-resources/datasets/ds/tables/t:
-        patch:
-          body:
-            application/json:
-              defaultRoundingMode: ROUND_HALF_EVEN
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message == "The emulator does not support table defaultRoundingMode"
+  # A dataset keeps the defaultRoundingMode that tables created in it take, unless they set their
+  # own, and NUMERIC fields created without a rounding mode take the table's.
   dataset_with_default_rounding_mode:
     req:
       /bigquery/v2/projects/rest-resources/datasets:
@@ -110,8 +86,71 @@ steps:
               datasetReference: {datasetId: rounded}
               defaultRoundingMode: ROUND_HALF_EVEN
     test: |
-      current.res.status == 400 &&
-      current.res.body.error.message == "The emulator does not support dataset field defaultRoundingMode"
+      current.res.status == 200 &&
+      current.res.body.defaultRoundingMode == "ROUND_HALF_EVEN"
+  table_in_dataset_with_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/rounded/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: inherited}
+              schema:
+                fields:
+                  - {name: n, type: BIGNUMERIC}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.defaultRoundingMode == "ROUND_HALF_EVEN" &&
+      current.res.body.schema.fields[0].roundingMode == "ROUND_HALF_EVEN"
+  table_with_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/rounded/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: own}
+              schema:
+                fields:
+                  - {name: n, type: NUMERIC}
+                  - {name: even, type: NUMERIC, roundingMode: ROUND_HALF_EVEN}
+              defaultRoundingMode: ROUND_HALF_AWAY_FROM_ZERO
+    test: |
+      current.res.status == 200 &&
+      current.res.body.defaultRoundingMode == "ROUND_HALF_AWAY_FROM_ZERO" &&
+      current.res.body.schema.fields[0].roundingMode == "ROUND_HALF_AWAY_FROM_ZERO" &&
+      current.res.body.schema.fields[1].roundingMode == "ROUND_HALF_EVEN"
+  # Changing the default keeps the rounding modes of existing fields.
+  patch_table_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/rounded/tables/own:
+        patch:
+          body:
+            application/json:
+              defaultRoundingMode: ROUND_HALF_EVEN
+    test: |
+      current.res.status == 200 &&
+      current.res.body.defaultRoundingMode == "ROUND_HALF_EVEN" &&
+      current.res.body.schema.fields[0].roundingMode == "ROUND_HALF_AWAY_FROM_ZERO"
+  table_with_invalid_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/rounded/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: invalid}
+              defaultRoundingMode: ROUND_UP
+    test: current.res.status == 400
+  # datasets.update replaces the fields it leaves out.
+  update_dataset_clears_default_rounding_mode:
+    req:
+      /bigquery/v2/projects/rest-resources/datasets/rounded:
+        put:
+          body:
+            application/json:
+              datasetReference: {datasetId: rounded}
+    test: |
+      current.res.status == 200 &&
+      !("defaultRoundingMode" in current.res.body)
   list_tables:
     req:
       /bigquery/v2/projects/rest-resources/datasets/ds/tables:

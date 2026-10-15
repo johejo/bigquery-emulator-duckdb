@@ -38,9 +38,10 @@ struct CloneDefinition {
 };
 
 // What a table or view carries besides its schema: Table.description, friendlyName and labels,
-// and a table's partitioning and clustering, which only shape how BigQuery stores it, and the
-// cloneDefinition of a clone, and its expiration. An empty description or friendly name is unset,
-// as BigQuery reports it.
+// and a table's partitioning and clustering, which only shape how BigQuery stores it, the
+// defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
+// cloneDefinition of a clone, and its expiration. An empty description, friendly name or rounding
+// mode is unset, as BigQuery reports it.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -48,6 +49,7 @@ struct TableMetadata {
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
   std::vector<std::string> clustering;  // Clustering.fields.
+  std::string default_rounding_mode;    // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   std::optional<CloneDefinition> clone;
   std::optional<int64_t> expiration_time;  // Milliseconds since the Unix epoch.
   // Output only and persisted with the table; the Storage API's default stream uses it.
@@ -55,8 +57,8 @@ struct TableMetadata {
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           clustering.empty() && !clone.has_value() && !expiration_time.has_value() &&
-           creation_time == 0;
+           clustering.empty() && default_rounding_mode.empty() && !clone.has_value() &&
+           !expiration_time.has_value() && creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -66,18 +68,20 @@ struct TableMetadata {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
-// What a dataset carries besides its reference: Dataset.description, friendlyName and labels, and
-// defaultTableExpirationMs, which sets the expiration of tables and views created in it later.
+// What a dataset carries besides its reference: Dataset.description, friendlyName and labels,
+// defaultTableExpirationMs, which sets the expiration of tables and views created in it later, and
+// defaultRoundingMode, which tables created in it later take as their own.
 // The emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
 struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
   std::optional<int64_t> default_table_expiration_ms;
+  std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
-           !default_table_expiration_ms.has_value();
+           !default_table_expiration_ms.has_value() && default_rounding_mode.empty();
   }
 
   // The fields of a Dataset resource that it sets.
@@ -92,7 +96,8 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
 // `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
-// tables.update replaces the description, friendly name, labels, clustering and expiration.
+// tables.update replaces the description, friendly name, labels, clustering, default rounding mode
+// and expiration.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
 // cloneDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);

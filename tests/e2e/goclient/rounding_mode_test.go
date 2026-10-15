@@ -185,3 +185,159 @@ func TestColumnRoundingModes(t *testing.T) {
 		t.Errorf("copy: %v", err)
 	}
 }
+
+// A table created in a dataset "will inherit the default rounding mode of the dataset", unless it
+// sets its own, and "Existing tables in the dataset are unaffected" by a change; ALTER SCHEMA SET
+// OPTIONS "has no impact on new columns added to existing tables". A NUMERIC or BIGNUMERIC field
+// added to a table "without an explicit rounding mode specified" inherits the table's default, and
+// "Changing this field doesn't affect existing fields"
+// (https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets,
+// https://cloud.google.com/bigquery/docs/reference/rest/v2/tables,
+// https://cloud.google.com/bigquery/docs/updating-datasets). The rounded values are the examples
+// of BigQuery's DDL reference, 2.25 to 2.2 and 2.3.
+func TestDefaultRoundingModes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_default_rounding_mode")
+	_ = dataset.DeleteWithContents(ctx)
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	run := func(sql string) error {
+		_, _, err := runScript(t, client, dataset.DatasetID, sql)
+		return err
+	}
+	mustRun := func(sql string) {
+		t.Helper()
+		if err := run(sql); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	read := func(sql string) [][]bigquery.Value {
+		t.Helper()
+		query := client.Query(sql)
+		query.DefaultDatasetID = dataset.DatasetID
+		rows, err := query.Read(ctx)
+		if err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+		var result [][]bigquery.Value
+		for {
+			var row []bigquery.Value
+			if err := rows.Next(&row); err != nil {
+				break
+			}
+			result = append(result, row)
+		}
+		return result
+	}
+	// The rounding modes tables.get reports for the fields of `table`, by path.
+	modes := func(table string) map[string]bigquery.RoundingMode {
+		t.Helper()
+		metadata, err := dataset.Table(table).Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]bigquery.RoundingMode{}
+		var walk func(prefix string, schema bigquery.Schema)
+		walk = func(prefix string, schema bigquery.Schema) {
+			for _, field := range schema {
+				got[prefix+field.Name] = field.RoundingMode
+				walk(prefix+field.Name+".", field.Schema)
+			}
+		}
+		walk("", metadata.Schema)
+		return got
+	}
+	const even, away = bigquery.RoundHalfEven, bigquery.RoundHalfAwayFromZero
+
+	if _, _, err := runScript(t, client, "", "CREATE SCHEMA go_default_rounding_mode OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')"); err != nil {
+		t.Fatal(err)
+	}
+	for _, sql := range []string{
+		`CREATE TABLE t (n NUMERIC(5, 1),
+		 away NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'),
+		 s STRUCT<b BIGNUMERIC>, i INT64)`,
+		"CREATE TABLE own (n NUMERIC(5, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO')",
+		"CREATE TABLE q AS SELECT NUMERIC '2.25' AS n",
+		`CREATE TABLE ctas (n NUMERIC(5, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')
+		 AS SELECT NUMERIC '2.25' AS n`,
+	} {
+		mustRun(sql)
+	}
+	api := bigquery.Schema{{Name: "n", Type: bigquery.NumericFieldType}}
+	if err := dataset.Table("api").Create(ctx, &bigquery.TableMetadata{Schema: api}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Forms whose outcome BigQuery does not document, and writes the emulator does not round to
+	// even, are rejected.
+	for sql, want := range map[string]string{
+		"CREATE TABLE p (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n": "CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset",
+		"CREATE TABLE l LIKE t":    "CREATE TABLE LIKE, COPY and CLONE with default rounding modes",
+		"CREATE TABLE c CLONE own": "CREATE TABLE LIKE, COPY and CLONE with default rounding modes",
+		"CREATE VIEW v OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS x": "CREATE VIEW option default_rounding_mode",
+	} {
+		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
+		}
+	}
+	if err := wait(ctx, dataset.Table("copied").CopierFrom(dataset.Table("q"))); err == nil ||
+		!strings.Contains(err.Error(), "copy jobs with default rounding modes") {
+		t.Errorf("copy: error = %v", err)
+	}
+	source := bigquery.NewReaderSource(strings.NewReader("{\"n\": 2.25}\n"))
+	source.SourceFormat = bigquery.JSON
+	source.Schema = api
+	if err := wait(ctx, dataset.Table("loaded").LoaderFrom(source)); err == nil ||
+		!strings.Contains(err.Error(), "load jobs into ROUND_HALF_EVEN columns") {
+		t.Errorf("load: error = %v", err)
+	}
+	query := client.Query("SELECT NUMERIC '1' AS n")
+	query.Dst = dataset.Table("own")
+	query.WriteDisposition = bigquery.WriteTruncate
+	if err := wait(ctx, query); err == nil ||
+		!strings.Contains(err.Error(), "replacing a table that has a defaultRoundingMode") {
+		t.Errorf("query truncate: error = %v", err)
+	}
+
+	// Later defaults apply to tables and fields added afterwards only.
+	for _, sql := range []string{
+		"ALTER SCHEMA go_default_rounding_mode SET OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO')",
+		"ALTER TABLE t ADD COLUMN added NUMERIC(5, 1)",
+		"CREATE TABLE later (n NUMERIC(5, 1))",
+		"ALTER TABLE own SET OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
+		"ALTER TABLE own ADD COLUMN m NUMERIC(5, 1)",
+	} {
+		mustRun(sql)
+	}
+	metadata, err := dataset.Table("t").Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	update := bigquery.TableMetadataToUpdate{
+		Schema: append(metadata.Schema, &bigquery.FieldSchema{Name: "patched", Type: bigquery.BigNumericFieldType}),
+	}
+	if _, err := dataset.Table("t").Update(ctx, update, metadata.ETag); err != nil {
+		t.Fatal(err)
+	}
+
+	for table, want := range map[string]map[string]bigquery.RoundingMode{
+		"t":     {"n": even, "away": away, "s": "", "s.b": even, "i": "", "added": even, "patched": even},
+		"own":   {"n": away, "m": even},
+		"q":     {"n": even},
+		"ctas":  {"n": even},
+		"api":   {"n": even},
+		"later": {"n": away},
+	} {
+		if got := modes(table); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s rounding modes = %v, want %v", table, got, want)
+		}
+	}
+	mustRun("INSERT t (n, away, added) VALUES (2.25, 2.25, 2.25); INSERT own (n, m) VALUES (2.25, 2.25)")
+	got := read(`SELECT 1 AS k, CAST(n AS STRING), CAST(away AS STRING), CAST(added AS STRING) FROM t
+		UNION ALL SELECT 2, CAST(n AS STRING), CAST(m AS STRING), NULL FROM own
+		UNION ALL SELECT 3, CAST(n AS STRING), NULL, NULL FROM ctas ORDER BY k`)
+	want := [][]bigquery.Value{{int64(1), "2.2", "2.3", "2.2"}, {int64(2), "2.3", "2.2", nil}, {int64(3), "2.2", nil, nil}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rounded rows = %v, want %v", got, want)
+	}
+}
