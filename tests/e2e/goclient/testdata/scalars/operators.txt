@@ -18,6 +18,11 @@ SELECT 3 / 2
 SELECT 1 / 0
 => error:
 
+# Division uses its divisor three times, so each nesting level would triple the query unless the
+# divisor is evaluated once.
+SELECT 1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (1 / (2.0)))))))))))))))))))))))))))))) = 2
+=> "true"
+
 SELECT NOT (1 > 2 OR 2 <> 2)
 => "true"
 
