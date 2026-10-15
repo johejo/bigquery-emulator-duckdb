@@ -1,0 +1,47 @@
+# System variables in function and view definitions
+# https://cloud.google.com/bigquery/docs/reference/system-variables
+#
+# BigQuery rejects a temporary function or a view whose definition refers to @@dataset_id, as
+# errors/scripts.txt checks. These cases settle what those answers leave open. The scripts that
+# need a dataset create unverified_dataset_system_variables, which stays in the project after
+# they run.
+
+# Whether the error comes from the definition or only from a call.
+SET @@dataset_id = 'before';
+CREATE TEMP FUNCTION f() AS (@@dataset_id);
+SELECT 1
+?>
+
+# The error without an assignment to the variable earlier in the script.
+CREATE TEMP FUNCTION f() AS (@@dataset_id);
+SELECT f()
+?>
+
+# The error for a permanent function, which names it with its dataset.
+CREATE SCHEMA IF NOT EXISTS unverified_dataset_system_variables;
+SET @@dataset_id = 'unverified_dataset_system_variables';
+CREATE OR REPLACE FUNCTION unverified_dataset_system_variables.f() AS (@@dataset_id);
+SELECT unverified_dataset_system_variables.f()
+?>
+
+# Whether an EXCEPTION clause handles the error, and the message it then sees.
+BEGIN
+  CREATE TEMP FUNCTION f() AS (@@dataset_id);
+EXCEPTION WHEN ERROR THEN
+  SELECT @@error.message;
+END
+?>
+
+# The same for a view that dynamic SQL defines.
+CREATE SCHEMA IF NOT EXISTS unverified_dataset_system_variables;
+BEGIN
+  EXECUTE IMMEDIATE 'CREATE OR REPLACE VIEW unverified_dataset_system_variables.v AS SELECT @@dataset_id AS dataset_id';
+EXCEPTION WHEN ERROR THEN
+  SELECT @@error.message;
+END
+?>
+
+# Whether system variables other than the dataset ones are rejected in definitions too.
+CREATE TEMP FUNCTION f() AS (@@project_id);
+SELECT f() IS NOT NULL
+?>
