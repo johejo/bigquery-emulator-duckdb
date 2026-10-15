@@ -70,21 +70,24 @@ a schema's `roundingMode` sets, which `tables.get` and the `rounding_mode` of
 unset. A rounding mode on another type is unsupported.
 
 Tables and datasets keep a default rounding mode, from DDL `default_rounding_mode` or a resource's
-`defaultRoundingMode`. A table created in a dataset, by DDL, `tables.insert` or a job that creates
-its destination, takes the dataset's default unless it sets its own; temporary tables do not. The
-NUMERIC and BIGNUMERIC fields that creation, `ALTER TABLE ADD COLUMN` or a schema update adds
-without a rounding mode take the table's default, which `tables.get` and `INFORMATION_SCHEMA` then
-report as theirs; changing a default later keeps the modes of existing fields and tables. Views
-cannot have a default.
+`defaultRoundingMode`. A table created in a dataset, by DDL, `tables.insert` or a query or load job
+that creates its destination, takes the dataset's default unless it sets its own; temporary tables
+do not. The NUMERIC and BIGNUMERIC fields that creation, `ALTER TABLE ADD COLUMN` or a schema update
+adds without a rounding mode take the table's default, which `tables.get` and `INFORMATION_SCHEMA`
+then report as theirs; changing a default later keeps the modes of existing fields and tables.
+Views cannot have a default.
 
-`CREATE TABLE LIKE`, `COPY` and `CLONE` keep the rounding modes of the source's columns, and the
-source's default unless their `OPTIONS` set another. In a dataset with a default, `LIKE` takes it
-when the source has none, while `COPY` and `CLONE` keep the source's unset default. What BigQuery
-does with default rounding modes is not known for some forms, which the emulator rejects: copy jobs whose source or new destination's dataset has a default; a `tables.patch` or
-`tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields; and a job that
-replaces a table with a default by `WRITE_TRUNCATE`. `CREATE TABLE AS SELECT` into a parameterized column that takes `ROUND_HALF_EVEN`
-from the dataset, rather than from the table's `OPTIONS`, and loads into a table they create in such
-a dataset are unsupported too.
+Copies keep the rounding modes of the source's fields. `CREATE TABLE LIKE`, `COPY` and `CLONE` keep
+the source's default unless their `OPTIONS` set another; in a dataset with a default, `LIKE` takes
+it when the source has none, while `COPY` and `CLONE` keep the source's unset default. A table a
+copy job creates takes no default, neither the source's nor the dataset's. A job that replaces a
+table with `WRITE_TRUNCATE` keeps its default, which the new fields do not take, and appending
+keeps it too.
+
+A `tables.patch` or `tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields
+is rejected, since which default the fields take is not known. `CREATE TABLE AS SELECT` into a
+parameterized column that takes `ROUND_HALF_EVEN` from the dataset, rather than from the table's
+`OPTIONS`, and loads into a table they create in such a dataset are unsupported.
 
 DML and `CREATE TABLE AS SELECT` round the values they write to a parameterized column's scale with
 its rounding mode, `ROUND_HALF_AWAY_FROM_ZERO` when unset. Other writes round halfway values away

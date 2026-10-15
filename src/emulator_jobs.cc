@@ -243,7 +243,6 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     }
     std::vector<FieldSchema> schema;
     std::string sql;
-    bool rounding_defaults = false;
     for (TableReference source : copy.source_tables) {
       if (source.project_id.empty()) {
         source.project_id = job.project_id;
@@ -253,7 +252,6 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
-      rounding_defaults = rounding_defaults || !table.metadata.default_rounding_mode.empty();
       if (sql.empty()) {
         schema = table.schema;
       } else if (SchemaToJson(table.schema) != SchemaToJson(schema)) {
@@ -284,30 +282,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         }
       }
     }
-    // Whether a copy keeps the default rounding mode of its source, or takes the one of the
-    // dataset it creates its destination in, is not known.
-    bool creates = false;
-    try {
-      GetTable(copy.destination_table, /*include_row_count=*/false);
-    } catch (const ApiError& error) {
-      if (error.http_status() != 404) {
-        throw;
-      }
-      creates = true;
-    }
-    if (rounding_defaults ||
-        (creates && !GetDataset(DatasetReference{
-                                    .project_id = copy.destination_table.project_id,
-                                    .dataset_id = copy.destination_table.dataset_id,
-                                })
-                         .default_rounding_mode.empty())) {
-      throw ApiError::Unsupported("copy jobs with default rounding modes");
-    }
     TableMetadata metadata;
     metadata.expiration_time = copy.destination_expiration_time;
     const QueryResult result =
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
-                         copy.write_disposition, sql, schema, {}, true, metadata);
+                         copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job.result = QueryResult{};
   });
@@ -397,7 +376,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
                                        const std::vector<std::string>& setup, bool count_only,
-                                       const TableMetadata& metadata) {
+                                       const TableMetadata& metadata, bool copy) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -443,12 +422,6 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
       SchemaToJson(existing->schema) != SchemaToJson(schema)) {
     throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
   }
-  // Replacing a table drops its metadata, which keeps the default rounding mode of fields added
-  // to it later.
-  if (existing.has_value() && write == WriteDisposition::kWriteTruncate &&
-      !existing->metadata.default_rounding_mode.empty()) {
-    throw ApiError::Unsupported("replacing a table that has a defaultRoundingMode");
-  }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
   if (existing.has_value() && !metadata.empty()) {
     throw ApiError::Unsupported("setting the expiration of an existing destination table " +
@@ -484,13 +457,23 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // Creation and its schema, defaults and table metadata commit together, as for DDL and REST.
     // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
     // Only a table the job creates takes the dataset's default expiration, which BigQuery
-    // documents for new tables.
-    std::ranges::move(
-        CreateTableWrite(
-            TableDefinition{.table = destination, .schema = schema, .metadata = metadata},
-            existing.has_value() ? DatasetMetadata{} : dataset)
-            .metadata_statements,
-        std::back_inserter(statements));
+    // documents for new tables. As BigQuery answers, a replaced table keeps its default rounding
+    // mode, which its new fields do not take, and a copy job's new table takes no default rounding
+    // mode, neither the source's nor the dataset's.
+    TableDefinition definition{
+        .table = destination,
+        .schema = schema,
+        .metadata = metadata,
+        .keeps_rounding_modes = existing.has_value() || copy,
+    };
+    DatasetMetadata defaults = existing.has_value() ? DatasetMetadata{} : dataset;
+    if (existing.has_value()) {
+      definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
+    } else if (copy) {
+      defaults.default_rounding_mode.clear();
+    }
+    std::ranges::move(CreateTableWrite(definition, defaults).metadata_statements,
+                      std::back_inserter(statements));
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
     statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
   } else {

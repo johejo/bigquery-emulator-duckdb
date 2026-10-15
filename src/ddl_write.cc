@@ -146,8 +146,7 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
       metadata.default_rounding_mode = dataset.default_rounding_mode;
     }
   }
-  // The columns of a copy keep their rounding modes, whatever default its OPTIONS set.
-  if (!definition.copies_table) {
+  if (!definition.keeps_rounding_modes) {
     ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
   }
   // CREATE TABLE AS SELECT rounds the values it writes with the modes its columns have when it is

@@ -2,7 +2,11 @@ package goclient
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -278,23 +282,12 @@ func TestDefaultRoundingModes(t *testing.T) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
 		}
 	}
-	if err := wait(ctx, dataset.Table("copied").CopierFrom(dataset.Table("q"))); err == nil ||
-		!strings.Contains(err.Error(), "copy jobs with default rounding modes") {
-		t.Errorf("copy: error = %v", err)
-	}
 	source := bigquery.NewReaderSource(strings.NewReader("{\"n\": 2.25}\n"))
 	source.SourceFormat = bigquery.JSON
 	source.Schema = api
 	if err := wait(ctx, dataset.Table("loaded").LoaderFrom(source)); err == nil ||
 		!strings.Contains(err.Error(), "load jobs into ROUND_HALF_EVEN columns") {
 		t.Errorf("load: error = %v", err)
-	}
-	query := client.Query("SELECT NUMERIC '1' AS n")
-	query.Dst = dataset.Table("own")
-	query.WriteDisposition = bigquery.WriteTruncate
-	if err := wait(ctx, query); err == nil ||
-		!strings.Contains(err.Error(), "replacing a table that has a defaultRoundingMode") {
-		t.Errorf("query truncate: error = %v", err)
 	}
 
 	// Later defaults apply to tables and fields added afterwards only.
@@ -423,5 +416,114 @@ func TestCopiedDefaultRoundingModes(t *testing.T) {
 	}
 	if got := read("SELECT CAST(n AS STRING) FROM go_default_rounding_plain.like_replaced"); !reflect.DeepEqual(got, []bigquery.Value{"2.3"}) {
 		t.Errorf("LIKE replacing the source's default: %v, want [2.3]", got)
+	}
+}
+
+// tables.get as the REST API returns it, since the Go client leaves out defaultRoundingMode.
+type roundingResource struct {
+	DefaultRoundingMode string `json:"defaultRoundingMode"`
+	Schema              struct {
+		Fields []struct {
+			Name         string `json:"name"`
+			RoundingMode string `json:"roundingMode"`
+		} `json:"fields"`
+	} `json:"schema"`
+}
+
+// The default rounding mode of `table` and the rounding modes of its fields, by name.
+func tableRoundingModes(t *testing.T, client *bigquery.Client, dataset, table string) (string, map[string]string) {
+	t.Helper()
+	url := fmt.Sprintf("%s/bigquery/v2/projects/%s/datasets/%s/tables/%s",
+		os.Getenv("BQ_EMULATOR_API"), client.Project(), dataset, table)
+	response, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var resource roundingResource
+	if err := json.NewDecoder(response.Body).Decode(&resource); err != nil {
+		t.Fatal(err)
+	}
+	fields := map[string]string{}
+	for _, field := range resource.Schema.Fields {
+		fields[field.Name] = field.RoundingMode
+	}
+	return resource.DefaultRoundingMode, fields
+}
+
+// Copy jobs keep the rounding modes of the source's fields, but their new table takes no default
+// rounding mode, neither the source's nor the dataset's. Copy, query and load jobs that replace a
+// table keep its default, which the new fields do not take, and appending keeps it too. BigQuery's
+// answers, which bq show reported for the same jobs.
+func TestJobDefaultRoundingModes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	plain := client.Dataset("go_job_rounding_plain")
+	even := client.Dataset("go_job_rounding_even")
+	for _, dataset := range []*bigquery.Dataset{plain, even} {
+		_ = dataset.DeleteWithContents(ctx)
+		t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	}
+	if _, _, err := runScript(t, client, "", `
+		CREATE SCHEMA go_job_rounding_plain;
+		CREATE SCHEMA go_job_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+		CREATE TABLE go_job_rounding_plain.src (n NUMERIC(5, 1));
+		CREATE TABLE go_job_rounding_plain.default_src (n NUMERIC(5, 1))
+		  OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO');
+		CREATE TABLE go_job_rounding_plain.copy_truncated (n NUMERIC(5, 1))
+		  OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+		CREATE TABLE go_job_rounding_plain.query_truncated (n NUMERIC(5, 1))
+		  OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+		CREATE TABLE go_job_rounding_plain.load_truncated (n NUMERIC(5, 1))
+		  OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+		CREATE TABLE go_job_rounding_plain.appended (n NUMERIC(5, 1)
+		  OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'))`); err != nil {
+		t.Fatal(err)
+	}
+	copyJob := func(source, destination *bigquery.Table, write bigquery.TableWriteDisposition) {
+		t.Helper()
+		copier := destination.CopierFrom(source)
+		copier.WriteDisposition = write
+		if err := wait(ctx, copier); err != nil {
+			t.Fatalf("copy to %s: %v", destination.TableID, err)
+		}
+	}
+	copyJob(plain.Table("default_src"), plain.Table("default_copy"), bigquery.WriteEmpty)
+	copyJob(plain.Table("src"), even.Table("copy"), bigquery.WriteEmpty)
+	copyJob(plain.Table("default_src"), even.Table("default_copy"), bigquery.WriteEmpty)
+	copyJob(plain.Table("src"), plain.Table("copy_truncated"), bigquery.WriteTruncate)
+	copyJob(plain.Table("default_src"), plain.Table("appended"), bigquery.WriteAppend)
+	query := client.Query("SELECT NUMERIC '1' AS n")
+	query.Dst = plain.Table("query_truncated")
+	query.WriteDisposition = bigquery.WriteTruncate
+	if err := wait(ctx, query); err != nil {
+		t.Fatal(err)
+	}
+	source := bigquery.NewReaderSource(strings.NewReader("{\"n\": 1}\n"))
+	source.SourceFormat = bigquery.JSON
+	source.Schema = bigquery.Schema{{Name: "n", Type: bigquery.NumericFieldType}}
+	loader := plain.Table("load_truncated").LoaderFrom(source)
+	loader.WriteDisposition = bigquery.WriteTruncate
+	if err := wait(ctx, loader); err != nil {
+		t.Fatal(err)
+	}
+
+	const evenMode, away = "ROUND_HALF_EVEN", "ROUND_HALF_AWAY_FROM_ZERO"
+	for _, c := range []struct {
+		dataset, table, defaultMode, n string
+	}{
+		{"go_job_rounding_plain", "default_copy", "", away},
+		{"go_job_rounding_even", "copy", "", ""},
+		{"go_job_rounding_even", "default_copy", "", away},
+		{"go_job_rounding_plain", "copy_truncated", evenMode, ""},
+		{"go_job_rounding_plain", "query_truncated", evenMode, ""},
+		{"go_job_rounding_plain", "load_truncated", evenMode, ""},
+		{"go_job_rounding_plain", "appended", "", away},
+	} {
+		defaultMode, fields := tableRoundingModes(t, client, c.dataset, c.table)
+		if defaultMode != c.defaultMode || fields["n"] != c.n {
+			t.Errorf("%s.%s: defaultRoundingMode = %q, n = %q; want %q, %q",
+				c.dataset, c.table, defaultMode, fields["n"], c.defaultMode, c.n)
+		}
 	}
 }

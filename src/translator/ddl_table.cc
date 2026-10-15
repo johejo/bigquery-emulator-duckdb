@@ -520,6 +520,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
       .copies_table = true,
+      .keeps_rounding_modes = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -580,6 +581,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
       .rows_from = source,
       .temporary = temporary,
       .copies_table = true,
+      .keeps_rounding_modes = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -791,6 +793,7 @@ std::optional<std::string> CreateTableAsSelect(
       .as_select = true,
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
       .copies_table = like,
+      .keeps_rounding_modes = like,
   };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
