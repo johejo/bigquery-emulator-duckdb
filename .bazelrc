@@ -58,6 +58,8 @@ build:ci --disk_cache=~/.cache/bazel-disk
 build:ci --repository_cache=~/.cache/bazel-repo
 # Reuse extracted repositories across runs instead of fetching them again.
 build:ci --repo_contents_cache=~/.cache/bazel-repo/contents
+# Let Gazelle reuse the Go caches that CI saves between runs.
+build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
 # Keep the disk cache within the repository's cache quota; a full macOS run uses about 6G.
 build:ci --experimental_disk_cache_gc_max_size=7G
 build:ci --experimental_disk_cache_gc_max_age=3d
