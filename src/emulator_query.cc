@@ -402,7 +402,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
       ScriptHostImpl host(*this);
       job.result =
           RunScript(host, request.query, *script, request.parameters, settings.default_project,
-                    settings.default_dataset, setup, next_script_number_++);
+                    settings.default_dataset, setup, request.project_id, next_script_number_++);
       return;
     }
     const TranslatedStatement translation = Translate(

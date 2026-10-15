@@ -213,6 +213,11 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   if (settings.script != nullptr) {
     GOOGLESQL_RETURN_IF_ERROR(settings.script->UpdateAnalyzerOptions(options));
   }
+  if (settings.system_variables != nullptr) {
+    for (const auto& [path, value] : *settings.system_variables) {
+      GOOGLESQL_RETURN_IF_ERROR(options.AddSystemVariable(path, value.type()));
+    }
+  }
   return options;
 }
 

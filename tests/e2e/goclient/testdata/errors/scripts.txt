@@ -25,3 +25,16 @@ SELECT 1/0;
 
 DECLARE x STRING(3) DEFAULT 'abcd'; SELECT x
 => error:
+
+# System variable references in definitions remain unsupported.
+SET @@dataset_id = 'd'; CREATE VIEW d.v AS SELECT @@dataset_id AS dataset_id
+=> error contains: The emulator does not support system variables in function or view definitions
+
+SET @@dataset_id = 'd'; CREATE FUNCTION d.f(x ANY TYPE) AS (@@dataset_id)
+=> error contains: The emulator does not support system variables in function or view definitions
+
+SET @@dataset_id = 'd'; CREATE TEMP FUNCTION f() AS (@@dataset_id); SELECT f()
+=> error contains: The emulator does not support system variables in function or view definitions
+
+SET @@dataset_id = 'd'; BEGIN EXECUTE IMMEDIATE 'CREATE VIEW d.v AS SELECT @@dataset_id AS dataset_id'; EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support system variables in function or view definitions

@@ -41,11 +41,13 @@ class ScriptHost {
 
 // Runs the multi-statement query `script`, the text `query`, with `setup` selecting the default
 // dataset `default_project`.`default_dataset`, and returns the result of the last statement it
-// ran. `number` names the database of its temporary tables, so each script running at once takes
+// ran. `query_project` is the executing project, used when @@dataset_project_id is NULL.
+// `number` names the database of its temporary tables, so each script running at once takes
 // its own. Rejects parameters and statements the emulator does not run in scripts.
 QueryResult RunScript(ScriptHost& host, const std::string& query,
                       const googlesql::ParserOutput& script, const QueryParameters& parameters,
                       const std::string& default_project, const std::string& default_dataset,
-                      const std::vector<std::string>& setup, int64_t number);
+                      const std::vector<std::string>& setup, const std::string& query_project,
+                      int64_t number);
 
 }  // namespace bigquery_emulator_duckdb

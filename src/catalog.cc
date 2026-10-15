@@ -335,4 +335,19 @@ absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& pat
   return absl::OkStatus();
 }
 
+absl::Status BigQueryCatalog::FindTableWithPathPrefix(absl::Span<const std::string> path,
+                                                      const FindOptions& options,
+                                                      int* num_names_consumed,
+                                                      const googlesql::Table** table) {
+  absl::Status status =
+      googlesql::Catalog::FindTableWithPathPrefix(path, options, num_names_consumed, table);
+  // GoogleSQL also looks up prefixes of qualified names. Report a missing dataset only for
+  // an unqualified original name, after those lookups have failed.
+  if (absl::IsNotFound(status) && default_dataset_.empty() && SplitTablePath(path).size() == 1) {
+    return absl::InvalidArgumentError("Table \"" + path.front() +
+                                      "\" must be qualified with a dataset (e.g. dataset.table).");
+  }
+  return status;
+}
+
 }  // namespace bigquery_emulator_duckdb

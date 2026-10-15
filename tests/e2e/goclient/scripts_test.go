@@ -2,6 +2,7 @@ package goclient
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -296,5 +297,131 @@ func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
 	inner := fields[2].Schema
 	if len(inner) != 2 || inner[0].Name != "_field_2" || inner[1].Name != "_field_2" {
 		t.Fatalf("got nested STRUCT schema %+v", inner)
+	}
+}
+
+// Dataset system variables change the defaults for subsequent statements, including DDL,
+// DML, scalar subqueries and dynamic SQL. Explicit table paths keep their meaning.
+// https://cloud.google.com/bigquery/docs/reference/system-variables
+func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	const otherProject = "go-script-defaults-other"
+	const first = "go_script_defaults_first"
+	const second = "go_script_defaults_second"
+	for _, fixture := range []struct {
+		project string
+		dataset string
+		value   int
+	}{
+		{client.Project(), first, 1},
+		{client.Project(), second, 2},
+		{otherProject, first, 3},
+		{otherProject, second, 4},
+	} {
+		dataset := client.DatasetInProject(fixture.project, fixture.dataset)
+		_ = dataset.DeleteWithContents(ctx)
+		if err := dataset.Create(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+		sql := fmt.Sprintf("CREATE TABLE `%s.%s.t` AS SELECT %d AS x", fixture.project, fixture.dataset, fixture.value)
+		if _, _, err := runScript(t, client, "", sql); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Initial reads with a request default remain unsupported until BigQuery settles their values.
+	for _, name := range []string{"dataset_id", "dataset_project_id"} {
+		t.Run("initial "+name, func(t *testing.T) {
+			_, _, err := runScript(t, client, first, "SELECT 1; SELECT @@"+name)
+			if err == nil || !strings.Contains(err.Error(), "The emulator does not support system variable @@"+name) {
+				t.Errorf("got %v, want an unsupported initial system variable read", err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name string
+		sql  string
+		want int64
+	}{
+		{"dataset", "SET @@dataset_id = '" + second + "'; SELECT x FROM t", 2},
+		{"project", "SET @@dataset_project_id = '" + otherProject + "'; SELECT x FROM t", 3},
+		{"both", "SET @@dataset_project_id = '" + otherProject + "'; SET @@dataset_id = '" + second + "'; SELECT x FROM t", 4},
+		{"qualified dataset", "SET @@dataset_project_id = '" + otherProject + "'; SELECT x FROM " + second + ".t", 4},
+		{"explicit project", "SET @@dataset_project_id = '" + otherProject + "'; SELECT x FROM `" + client.Project() + "." + first + ".t`", 1},
+		{"scalar expression", "DECLARE n INT64; SET @@dataset_id = '" + second + "'; SET n = (SELECT x FROM t); SELECT n AS x", 2},
+		{"dynamic SQL", "SET @@dataset_project_id = '" + otherProject + "'; EXECUTE IMMEDIATE 'SELECT x FROM t'", 3},
+		{"DDL and DML", "SET @@dataset_id = '" + second + "'; CREATE TABLE n (x INT64); INSERT n SELECT x FROM t; UPDATE n SET x = x + 10 WHERE TRUE; SELECT x FROM n", 12},
+		{"project DDL and DML", "SET @@dataset_project_id = '" + otherProject + "'; CREATE TABLE n AS SELECT x FROM t; UPDATE n SET x = x + 20 WHERE TRUE; SELECT x FROM n", 23},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job, _, err := runScript(t, client, first, tc.sql)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows, err := job.Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var row []bigquery.Value
+			if err := rows.Next(&row); err != nil {
+				t.Fatal(err)
+			}
+			if len(row) != 1 || row[0] != tc.want {
+				t.Errorf("got %v, want [%d]", row, tc.want)
+			}
+		})
+	}
+
+	// NULL uses the job's project even when the request supplied another default project.
+	query := client.Query("SET @@dataset_project_id = NULL; SELECT x FROM t")
+	query.DefaultProjectID = otherProject
+	query.DefaultDatasetID = first
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(row) != 1 || row[0] != int64(1) {
+		t.Errorf("got %v, want the executing project's row [1]", row)
+	}
+
+	// A new query keeps the request's defaults, without values from earlier scripts.
+	job, _, err := runScript(t, client, first, "SELECT 1; SELECT x FROM t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err = job.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(row) != 1 || row[0] != int64(1) {
+		t.Errorf("got %v, want the request's default dataset row [1]", row)
+	}
+}
+
+// bqanswers confirmed that both variables initially return NULL without a request default.
+// This query deliberately has no DefaultDatasetID, unlike the scalar fixtures.
+func TestDatasetSystemVariablesInitiallyNull(t *testing.T) {
+	ctx := context.Background()
+	rows, err := newClient(t).Query("SELECT 1; SELECT @@dataset_project_id, @@dataset_id").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil {
+		t.Fatal(err)
+	}
+	if len(row) != 2 || row[0] != nil || row[1] != nil {
+		t.Errorf("got %v, want two NULL values", row)
+	}
+	if len(rows.Schema) != 2 || rows.Schema[0].Type != bigquery.StringFieldType || rows.Schema[1].Type != bigquery.StringFieldType {
+		t.Errorf("got schema %v, want two STRING columns", rows.Schema)
 	}
 }
