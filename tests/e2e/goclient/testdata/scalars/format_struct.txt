@@ -37,22 +37,34 @@ SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(STRUCT([1, 2] AS x, STRUCT(
 SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([STRUCT('foo' AS a, 0 AS b), STRUCT('bar', 1)] AS a)]) AS s
 => "[(foo, 0), (bar, 1)]|[(\"foo\", 0), (\"bar\", 1)]"
 
-# STRUCT<> has no fields: (), and STRUCT() for %T, as the documentation's special case for zero
-# fields shows.
-SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(STRUCT() AS a)]) AS s
-=> "()|STRUCT()"
+# STRUCT<> for %T is STRUCT(), the documentation's special case for zero fields.
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT() AS a)]) AS s
+=> "STRUCT()"
 
-SELECT FORMAT('%t|%T', STRUCT(), STRUCT())
-=> "()|STRUCT()"
+SELECT FORMAT('%T', STRUCT())
+=> "STRUCT()"
 
 SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(CAST(NULL AS STRUCT<>) AS a)]) AS s
 => "NULL|NULL"
 
-SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT([STRUCT(), STRUCT()] AS a)]) AS s
-=> "[(), ()]|[STRUCT(), STRUCT()]"
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT([STRUCT(), STRUCT()] AS a)]) AS s
+=> "[STRUCT(), STRUCT()]"
 
-SELECT FORMAT('%t|%T', s.a, s.a) FROM UNNEST([STRUCT(STRUCT(1 AS x, STRUCT() AS y) AS a)]) AS s
-=> "(1, ())|(1, STRUCT())"
+SELECT FORMAT('%T', s.a) FROM UNNEST([STRUCT(STRUCT(1 AS x, STRUCT() AS y) AS a)]) AS s
+=> "(1, STRUCT())"
+
+# Confirmed against BigQuery: STRUCT<> for %t is ().
+SELECT FORMAT('%t', STRUCT())
+=> "()"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT() AS a)]) AS s
+=> "()"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT([STRUCT(), STRUCT()] AS a)]) AS s
+=> "[(), ()]"
+
+SELECT FORMAT('%t', s.a) FROM UNNEST([STRUCT(STRUCT(1 AS x, STRUCT() AS y) AS a)]) AS s
+=> "(1, ())"
 
 SELECT FORMAT('%s', STRUCT())
 => error:
