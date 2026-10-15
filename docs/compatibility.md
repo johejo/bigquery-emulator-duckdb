@@ -77,11 +77,10 @@ without a rounding mode take the table's default, which `tables.get` and `INFORM
 report as theirs; changing a default later keeps the modes of existing fields and tables. Views
 cannot have a default.
 
-`CREATE TABLE LIKE`, `COPY` and `CLONE` keep the source's default and the rounding modes of its
-columns. In a dataset with a default, `LIKE` takes it when the source has none, while `COPY` and
-`CLONE` keep the source's unset default. What BigQuery does with default rounding modes is not known
-for some forms, which the emulator rejects: those copies with `default_rounding_mode` in their
-`OPTIONS`; copy jobs whose source or new destination's dataset has a default; a `tables.patch` or
+`CREATE TABLE LIKE`, `COPY` and `CLONE` keep the rounding modes of the source's columns, and the
+source's default unless their `OPTIONS` set another. In a dataset with a default, `LIKE` takes it
+when the source has none, while `COPY` and `CLONE` keep the source's unset default. What BigQuery
+does with default rounding modes is not known for some forms, which the emulator rejects: copy jobs whose source or new destination's dataset has a default; a `tables.patch` or
 `tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields; and a job that
 replaces a table with a default by `WRITE_TRUNCATE`. `CREATE TABLE AS SELECT` into a parameterized column that takes `ROUND_HALF_EVEN`
 from the dataset, rather than from the table's `OPTIONS`, and loads into a table they create in such

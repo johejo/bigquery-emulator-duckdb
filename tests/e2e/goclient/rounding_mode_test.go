@@ -341,9 +341,9 @@ func TestDefaultRoundingModes(t *testing.T) {
 }
 
 // CREATE TABLE LIKE, COPY and CLONE keep the source's default rounding mode, which a column added
-// to the copy later takes, and the rounding modes of the source's columns. In a dataset with a
-// default, LIKE takes it when the source has none, and COPY and CLONE do not; BigQuery's answers
-// to cases that were unverified.
+// to the copy later takes, unless their OPTIONS set another, and the rounding modes of the source's
+// columns. In a dataset with a default, LIKE takes it when the source has none, and COPY and CLONE
+// do not; BigQuery's answers to cases that were unverified.
 func TestCopiedDefaultRoundingModes(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -401,10 +401,27 @@ func TestCopiedDefaultRoundingModes(t *testing.T) {
 			t.Errorf("%s of a table with a default: %v, want [2.2]", kind, got)
 		}
 	}
-	// Whether the copied columns take a default that OPTIONS set is not known.
-	err := run("CREATE TABLE go_default_rounding_plain.o LIKE go_default_rounding_plain.src OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO')")
-	if want := "CREATE TABLE LIKE, COPY and CLONE with OPTIONS (default_rounding_mode)"; err == nil ||
-		!strings.Contains(err.Error(), want) {
-		t.Errorf("LIKE with OPTIONS: error = %v, want one containing %q", err, want)
+	// A default that OPTIONS set replaces the source's, and only columns added later take it.
+	for _, kind := range []string{"LIKE", "COPY", "CLONE"} {
+		copied := "go_default_rounding_plain." + strings.ToLower(kind) + "_options"
+		if err := run("CREATE TABLE " + copied + " " + kind + " go_default_rounding_plain.src" +
+			" OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); " +
+			"ALTER TABLE " + copied + " ADD COLUMN m NUMERIC(5, 1); " +
+			"INSERT " + copied + " (n, m) VALUES (2.25, 2.25)"); err != nil {
+			t.Fatalf("%s with OPTIONS: %v", kind, err)
+		}
+		got := read("SELECT CAST(n AS STRING), CAST(m AS STRING) FROM " + copied)
+		if want := []bigquery.Value{"2.3", "2.2"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s with OPTIONS: %v, want %v", kind, got, want)
+		}
+	}
+	if err := run("CREATE TABLE go_default_rounding_plain.like_replaced LIKE go_default_rounding_plain.default_src" +
+		" OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'); " +
+		"ALTER TABLE go_default_rounding_plain.like_replaced ADD COLUMN n NUMERIC(5, 1); " +
+		"INSERT go_default_rounding_plain.like_replaced (n) VALUES (2.25)"); err != nil {
+		t.Fatal(err)
+	}
+	if got := read("SELECT CAST(n AS STRING) FROM go_default_rounding_plain.like_replaced"); !reflect.DeepEqual(got, []bigquery.Value{"2.3"}) {
+		t.Errorf("LIKE replacing the source's default: %v, want [2.3]", got)
 	}
 }
