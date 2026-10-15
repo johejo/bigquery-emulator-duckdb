@@ -11,9 +11,11 @@ import (
 	"testing"
 )
 
-// The table that the cases in testdata/scalars/*.txt read as `t` from their default dataset.
+// The table that the cases in testdata/scalars/*.txt read as `t` from their default dataset, and
+// a dataset whose default rounding mode is ROUND_HALF_EVEN, which cases create tables in.
 var scalarFixture = []string{
 	"CREATE SCHEMA IF NOT EXISTS scalars",
+	"CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",
 	"INSERT INTO scalars.t VALUES (3, 'あ', FROM_HEX('00ff')), (1, 'x', FROM_HEX('61')), " +
 		"(2, 'yy', NULL), (NULL, NULL, NULL)",

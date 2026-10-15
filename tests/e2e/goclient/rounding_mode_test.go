@@ -275,7 +275,6 @@ func TestDefaultRoundingModes(t *testing.T) {
 	// Forms whose outcome BigQuery does not document, and writes the emulator does not round to
 	// even, are rejected.
 	for sql, want := range map[string]string{
-		"CREATE TABLE p (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n":                     "CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the dataset",
 		"CREATE VIEW v OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS x": "CREATE VIEW option default_rounding_mode",
 	} {
 		if err := run(sql); err == nil || !strings.Contains(err.Error(), want) {
