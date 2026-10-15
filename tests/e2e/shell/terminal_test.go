@@ -55,16 +55,20 @@ func startTerminal(t *testing.T) *terminal {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Wide enough that the shell's line editing writes each prompt once.
+	if err := pty.Setsize(input, &pty.Winsize{Rows: 24, Cols: 1000}); err != nil {
+		t.Fatal(err)
+	}
 	term := &terminal{t: t, input: input}
 	term.cmd = exec.CommandContext(ctx, binary, "shell", project)
 	term.cmd.Stdin, term.cmd.Stdout, term.cmd.Stderr = tty, &term.stdout, term
-	// The terminal is the shell's controlling terminal, so that ^C sends it SIGINT.
+	// The terminal is the shell's controlling terminal, so that ^C sends it SIGINT while a job runs.
 	term.cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
 	if err := term.cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	tty.Close()
-	// Discards the terminal's echo of the input.
+	// Discards anything the terminal echoes while the shell is not editing a line.
 	go func() { _, _ = io.Copy(io.Discard, input) }()
 	t.Cleanup(func() { input.Close() })
 	term.waitPrompts(1)
@@ -94,10 +98,16 @@ func (term *terminal) waitPrompts(count int) {
 func (term *terminal) send(text string) {
 	term.t.Helper()
 	before := term.prompts()
-	if _, err := term.input.WriteString(text); err != nil {
+	if _, err := term.input.WriteString(enter(text)); err != nil {
 		term.t.Fatal(err)
 	}
 	term.waitPrompts(before + strings.Count(text, "\n") + strings.Count(text, "\x03"))
+}
+
+// enter turns each newline into the carriage return a terminal sends for Enter, which the shell
+// reads as is, since it edits lines with the terminal in raw mode.
+func enter(text string) string {
+	return strings.ReplaceAll(text, "\n", "\r")
 }
 
 func (term *terminal) errors() string {
@@ -193,7 +203,7 @@ func TestTerminalCommands(t *testing.T) {
 
 func TestTerminalQuit(t *testing.T) {
 	term := startTerminal(t)
-	if _, err := term.input.WriteString(".quit\n"); err != nil {
+	if _, err := term.input.WriteString(enter(".quit\n")); err != nil {
 		t.Fatal(err)
 	}
 	if err := term.cmd.Wait(); err != nil {

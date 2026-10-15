@@ -699,6 +699,7 @@ cc_library(
         ":references",
         "//src/server:requests",
         "//src/server:resources",
+        "//src/shell:line_reader",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/parser",

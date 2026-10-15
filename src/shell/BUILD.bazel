@@ -1,0 +1,13 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+# Line editing on a terminal; knows nothing of queries, so that the editor can be replaced alone.
+cc_library(
+    name = "line_reader",
+    srcs = ["line_reader.cc"],
+    hdrs = ["line_reader.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = ["@linenoise"],
+    visibility = ["//:__pkg__"],
+)
