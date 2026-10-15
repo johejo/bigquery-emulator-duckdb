@@ -243,6 +243,48 @@ func TestStorageStateAfterRestart(t *testing.T) {
 	}
 }
 
+// An AppendRows connection a client leaves open must not keep the emulator from shutting down.
+func TestShutdownWithIdleAppendConnection(t *testing.T) {
+	binary := os.Getenv("BQ_EMULATOR_BINARY")
+	if binary == "" {
+		t.Skip("run just e2e")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	p, err := emulatorprocess.Start(ctx, binary, "", "--host", "127.0.0.1", "--port", "0", "--project", `{"projectId":"test"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Stop() })
+	rest, err := bigquery.NewClient(t.Context(), "test", option.WithEndpoint(p.URL), option.WithoutAuthentication())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = rest.Close() })
+	conn, err := grpc.NewClient(p.GRPC, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	if err := rest.Dataset("storage_shutdown").Create(t.Context(), nil); err != nil {
+		t.Fatal(err)
+	}
+	query(t, rest, "CREATE TABLE storage_shutdown.rows (id INT64, name STRING)")
+	stream, err := storagepb.NewBigQueryWriteClient(conn).AppendRows(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response := send(t, stream, appendRequest("projects/test/datasets/storage_shutdown/tables/rows/streams/_default", true, nil, row(1, "idle"))); response.GetError() != nil {
+		t.Fatal(response)
+	}
+	if err := p.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Recv(); err == nil || err == io.EOF {
+		t.Fatalf("AppendRows after shutdown: %v", err)
+	}
+}
+
 func row(id int64, name string) []byte {
 	data := protowire.AppendTag(nil, 1, protowire.VarintType)
 	data = protowire.AppendVarint(data, uint64(id))
