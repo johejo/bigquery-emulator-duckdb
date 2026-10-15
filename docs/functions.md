@@ -64,7 +64,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 | 0 |
-| [String functions](#string-functions) | 51 | 1 | 1 | 0 | 0 |
+| [String functions](#string-functions) | 52 | 0 | 1 | 0 | 0 |
 | [Text analysis functions](#text-analysis-functions) | 0 | 0 | 3 | 0 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 | 0 |
 | [Time series functions](#time-series-functions) | 3 | 0 | 3 | 0 | 0 |
@@ -551,7 +551,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | Supported | GoogleSQL function |  |
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | Supported | GoogleSQL function |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Partial | DuckDB SQL, in code | Unsupported: function FORMAT with STRUCT<>. |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Supported | DuckDB SQL, in code |  |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | Supported | DuckDB SQL |  |
