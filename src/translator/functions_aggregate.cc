@@ -129,6 +129,25 @@ constexpr char kBigNumericCorr[] = "bq_bignumeric_corr";
 constexpr char kBigNumericCovarPop[] = "bq_bignumeric_covar_pop";
 constexpr char kBigNumericCovarSamp[] = "bq_bignumeric_covar_samp";
 
+// An INTERVAL aggregate that `kFunction`, of src/backend_functions/interval.cc, computes as
+// GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would equate
+// differently spelled values, such as a month and 30 days.
+template <const char* kFunction>
+AggregateRule IntervalAggregate() {
+  return {
+      .function = "list",
+      .type = googlesql::TYPE_INTERVAL,
+      .distinct = AggregateRule::Distinct::kUnsupported,
+      .skip_nulls = true,
+      .finish =
+          [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
+             const std::string& /*tail*/) { return std::string(kFunction) + "(" + sql + ")"; },
+  };
+}
+
+constexpr char kIntervalSum[] = "bq_interval_sum";
+constexpr char kIntervalAvg[] = "bq_interval_avg";
+
 // Aggregate functions, which also take a window.
 }  // namespace
 
@@ -143,10 +162,18 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
               "SUM",
               {
                   {.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
+                  IntervalAggregate<kIntervalSum>(),
                   {.function = "sum"},
               },
           },
-          {"AVG", {BigNumericAggregate<kBigNumericAvg>(1), {.function = "avg"}}},
+          {
+              "AVG",
+              {
+                  BigNumericAggregate<kBigNumericAvg>(1),
+                  IntervalAggregate<kIntervalAvg>(),
+                  {.function = "avg"},
+              },
+          },
           {"MIN", {{.function = "min"}}},
           {"MAX", {{.function = "max"}}},
           {"ANY_VALUE", {{.function = "any_value"}}},

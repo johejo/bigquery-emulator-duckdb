@@ -52,9 +52,24 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       (entry->implementation == Implementation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
-  if (HasInterval(call.type()) ||
-      std::ranges::any_of(call.argument_list(),
-                          [](const auto& argument) { return HasInterval(argument->type()); })) {
+  const auto type_of = [&](std::size_t argument) {
+    return argument < call.argument_list().size()
+               ? call.argument_list().at(argument)->type()->kind()
+               : googlesql::TYPE_UNKNOWN;
+  };
+  const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
+    return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
+           std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
+             return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
+                    condition.types.end();
+           });
+  });
+  // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
+  // DuckDB does.
+  if ((rule == entry->aggregates.end() || rule->type != googlesql::TYPE_INTERVAL) &&
+      (HasInterval(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasInterval(argument->type()); }))) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with INTERVAL");
   }
   if (HasEmptyStruct(call.type()) ||
@@ -76,18 +91,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
-  const auto type_of = [&](std::size_t argument) {
-    return argument < call.argument_list().size()
-               ? call.argument_list().at(argument)->type()->kind()
-               : googlesql::TYPE_UNKNOWN;
-  };
-  const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
-    return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
-           std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
-             return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
-                    condition.types.end();
-           });
-  });
   if (rule == entry->aggregates.end()) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
@@ -109,7 +112,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     return rule->finish == nullptr ? sql : rule->finish(sql, arguments, tail);
   };
   if (call.distinct() && rule->distinct == AggregateRule::Distinct::kUnsupported) {
-    return Unsupported(scope, name + "(DISTINCT ...)");
+    return Unsupported(scope, name + "(DISTINCT ...)" +
+                                  (rule->type == googlesql::TYPE_INTERVAL ? " with INTERVAL" : ""));
   }
   std::string inner = Join(args, ", ");
   if (call.distinct() || rule->distinct == AggregateRule::Distinct::kAlways) {

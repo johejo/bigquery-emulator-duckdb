@@ -101,7 +101,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ANY_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#any_value) | Supported | DuckDB aggregate |  |
 | [`ARRAY_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg) | Supported | DuckDB aggregate |  |
 | [`ARRAY_CONCAT_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_concat_agg) | Supported | DuckDB aggregate |  |
-| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function AVG with INTERVAL. |
+| [`AVG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#avg) | Partial | DuckDB aggregate | Unsupported: AVG(DISTINCT ...) with INTERVAL. |
 | [`BIT_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_and) | Supported | DuckDB aggregate |  |
 | [`BIT_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_or) | Supported | DuckDB aggregate |  |
 | [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | Supported | DuckDB aggregate |  |
@@ -115,7 +115,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`MIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min) | Supported | DuckDB aggregate |  |
 | [`MIN_BY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#min_by) | Supported | DuckDB aggregate |  |
 | [`STRING_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#string_agg) | Supported | DuckDB aggregate |  |
-| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function SUM with INTERVAL. |
+| [`SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#sum) | Partial | DuckDB aggregate | Unsupported: SUM(DISTINCT ...) with INTERVAL. |
 
 ## Approximate aggregate functions
 

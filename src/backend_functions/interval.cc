@@ -1,5 +1,7 @@
 #include "src/backend_functions/interval.h"
 
+#include <cstdint>
+#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
@@ -67,6 +69,34 @@ void JustifyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_
   });
 }
 
+// SUM, or with `kAverage` AVG, of the non-NULL INTERVAL values the translator collects with list().
+// GoogleSQL sums months, days and time apart and fails only when the result is out of range.
+// BigQuery keeps microseconds, so the average truncates the nanoseconds the division leaves.
+template <bool kAverage>
+void IntervalAggregate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& args) -> absl::StatusOr<std::optional<duckdb_interval>> {
+            duckdb_vector vector = args.Vector(0);
+            const auto entry = VectorElement<duckdb_list_entry>(vector, args.Row());
+            if (entry.length == 0) {
+              return std::nullopt;
+            }
+            duckdb_vector child = duckdb_list_vector_get_child(vector);
+            googlesql::IntervalValue::SumAggregator sum;
+            for (idx_t i = 0; i < entry.length; ++i) {
+              GOOGLESQL_ASSIGN_OR_RETURN(
+                  const auto value,
+                  IntervalFromDuckDb(VectorElement<duckdb_interval>(child, entry.offset + i)));
+              sum.Add(value);
+            }
+            GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
+                                       kAverage ? sum.GetAverage(static_cast<int64_t>(entry.length),
+                                                                 /*round_to_micros=*/true)
+                                                : sum.GetSum());
+            return IntervalToDuckDb(result);
+          });
+}
+
 void IntervalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::string> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
@@ -87,6 +117,10 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            JustifyInterval<googlesql::JustifyDays>);
   Register(connection, "bq_justify_interval", {kInterval}, kInterval,
            JustifyInterval<googlesql::JustifyInterval>);
+  const LogicalType interval(duckdb_create_logical_type(kInterval));
+  const LogicalType list(duckdb_create_list_type(interval.get()));
+  Register(connection, "bq_interval_sum", {list.get()}, interval.get(), IntervalAggregate<false>);
+  Register(connection, "bq_interval_avg", {list.get()}, interval.get(), IntervalAggregate<true>);
   Register(connection, "bq_interval_string", {kInterval}, kVarchar, IntervalString);
 }
 
