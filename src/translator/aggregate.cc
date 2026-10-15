@@ -224,14 +224,14 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {
-      if (HasInterval(ref->type())) {
+      if (HasInterval(ref->type()) && !ref->type()->IsInterval()) {
         return Unsupported(scope, "PARTITION BY with INTERVAL");
       }
       const auto key = Expression(*ref, scope, columns);
       if (!key) {
         return std::nullopt;
       }
-      keys.push_back(*key);
+      keys.push_back(ref->type()->IsInterval() ? IntervalKey(*key) : *key);
     }
     window.push_back("PARTITION BY " + Join(keys, ", "));
   }
@@ -352,8 +352,13 @@ void ApplyFinishes(Relation& result, const std::map<int, std::string>& finishes)
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
-  if (std::ranges::any_of(aggregate.group_by_list(),
-                          [](const auto& key) { return HasInterval(key->column().type()); })) {
+  // INTERVAL keys group by their keys, and each group returns its first value, as BigQuery does.
+  const bool grouping_sets =
+      !aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty();
+  if (std::ranges::any_of(aggregate.group_by_list(), [&](const auto& key) {
+        const googlesql::Type* type = key->column().type();
+        return HasInterval(type) && (grouping_sets || !type->IsInterval());
+      })) {
     return Unsupported(scope, "GROUP BY with INTERVAL");
   }
   if (!aggregate.collation_list().empty()) {
@@ -371,7 +376,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   // The rows each HAVING MAX/MIN modifier keeps, keyed by the aggregate call it modifies.
   std::map<const googlesql::ResolvedAggregateFunctionCall*, std::string> havings;
   // GROUPING() without grouping sets still needs them: it is 0 over the one plain grouping.
-  if (!aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty()) {
+  if (grouping_sets) {
     // Grouping sets name their keys, so compute the keys once below the aggregation and group
     // by the column names rather than by position.
     std::vector<std::string> inner;
@@ -433,7 +438,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       if (!sql) {
         return std::nullopt;
       }
-      partition.push_back(*sql);
+      partition.push_back(key->expr()->type()->IsInterval() ? IntervalKey(*sql) : *sql);
     }
     std::vector<std::string> inner;
     Columns columns;
@@ -470,8 +475,13 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         return std::nullopt;
       }
       const int id = key->column().column_id();
-      projections.push_back(*sql + " AS " + ColumnName(id));
-      keys.push_back(std::to_string(projections.size()));
+      if (key->expr()->type()->IsInterval()) {
+        projections.push_back("first(" + *sql + ") AS " + ColumnName(id));
+        keys.push_back(IntervalKey(*sql));
+      } else {
+        projections.push_back(*sql + " AS " + ColumnName(id));
+        keys.push_back(std::to_string(projections.size()));
+      }
       result.columns.emplace(id, "q." + ColumnName(id));
     }
   }

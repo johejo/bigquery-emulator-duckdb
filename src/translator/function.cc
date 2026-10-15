@@ -243,6 +243,13 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "JSON_ARRAY_INSERT",
       "GENERATE_RANGE_ARRAY",
   };
+  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.
+  if ((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
+      std::ranges::any_of(call.argument_list(),
+                          [](const auto& argument) { return argument->type()->IsInterval(); })) {
+    throw std::invalid_argument("Unsupported type in function " +
+                                (function == "NULLIF" ? "NULL_IF" : function));
+  }
   // These only compare their INTERVAL arguments, or the elements of IN UNNEST's ARRAY, so they
   // compare the values' keys instead.
   static constexpr std::string_view interval_comparisons[] = {

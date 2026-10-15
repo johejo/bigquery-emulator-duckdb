@@ -1,5 +1,6 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# arithmetic, comparisons of STRUCT and ARRAY values with INTERVAL fields or storing them, is unsupported rather than left to DuckDB.
+# arithmetic, comparing or grouping STRUCT and ARRAY values with INTERVAL fields, or storing them,
+# is unsupported rather than left to DuckDB.
 
 SELECT CAST('P9D' AS INTERVAL)
 => error contains: The emulator does not support CAST to INTERVAL
@@ -16,12 +17,6 @@ SELECT MAKE_INTERVAL(day => 7) * 2
 SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) = STRUCT(MAKE_INTERVAL(hour => 168) AS i)
 => error contains: The emulator does not support function $EQUAL with INTERVAL
 
-SELECT GREATEST(MAKE_INTERVAL(day => 7), MAKE_INTERVAL(hour => 168))
-=> error contains: The emulator does not support function GREATEST with INTERVAL
-
-SELECT NULLIF(MAKE_INTERVAL(day => 7), MAKE_INTERVAL())
-=> error contains: The emulator does not support function NULLIF with INTERVAL
-
 SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
 => error contains: The emulator does not support CAST from STRUCT<i INTERVAL> to JSON
 
@@ -37,22 +32,22 @@ SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 SELECT SUM(DISTINCT i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support SUM(DISTINCT ...) with INTERVAL
 
-SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support aggregate or analytic function MIN with INTERVAL
+SELECT ARRAY_AGG(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
+=> error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL
 
 SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IN (SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i))
 => error contains: The emulator does not support IN subquery with INTERVAL
 
-SELECT ROW_NUMBER() OVER (PARTITION BY i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
+SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support PARTITION BY with INTERVAL
 
-SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY i
+SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY ROLLUP(i)
 => error contains: The emulator does not support GROUP BY with INTERVAL
 
 SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support GROUP BY with INTERVAL
 
-SELECT MAKE_INTERVAL(day => 7) UNION DISTINCT SELECT MAKE_INTERVAL(day => 8)
+SELECT MAKE_INTERVAL(day => 7) INTERSECT ALL SELECT MAKE_INTERVAL(day => 8)
 => error contains: The emulator does not support set operation with INTERVAL
 
 CREATE TEMP TABLE intervals (i ARRAY<STRUCT<v INTERVAL>>); SELECT 1
