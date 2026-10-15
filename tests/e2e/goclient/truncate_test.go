@@ -8,8 +8,9 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
-// TRUNCATE TABLE removes every row and keeps the schema. A dry run changes nothing and does not
-// read the data, so it validates a DML statement whose rows would make it fail.
+// TRUNCATE TABLE removes every row and keeps the schema. A dry run changes nothing, not even a
+// table it would create, and does not read the data, so it validates a DML statement whose rows
+// would make it fail.
 func TestTruncateTableAndDryRuns(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -24,6 +25,8 @@ func TestTruncateTableAndDryRuns(t *testing.T) {
 
 	for _, sql := range []string{
 		"TRUNCATE TABLE t",
+		"DELETE FROM t WHERE id = 1",
+		"CREATE TABLE dry_run (id INT64)",
 		"UPDATE t SET name = s.name FROM UNNEST([STRUCT(1 AS id, 'a' AS name), (1, 'b')]) AS s WHERE t.id = s.id",
 	} {
 		query := client.Query(sql)
@@ -40,6 +43,9 @@ func TestTruncateTableAndDryRuns(t *testing.T) {
 	want := [][]bigquery.Value{{int64(1), "1"}, {int64(2), "2"}}
 	if got := p.read("SELECT id, name FROM t ORDER BY id"); !reflect.DeepEqual(got, want) {
 		t.Errorf("rows after dry runs = %v, want %v", got, want)
+	}
+	if _, err := dataset.Table("dry_run").Metadata(ctx); err == nil {
+		t.Error("a dry run of CREATE TABLE created the table")
 	}
 
 	p.mustRun("TRUNCATE TABLE `" + client.Project() + ".go_truncate.t`")
