@@ -130,6 +130,20 @@ query MAX_BY SELECT MAX_BY(x, x) FROM UNNEST([BIGNUMERIC '1.5']) AS x
 query MIN_BY SELECT MIN_BY(x, 'abc') FROM UNNEST([1, 2]) AS x
 query MIN_BY SELECT MIN_BY(x, x) FROM UNNEST([BIGNUMERIC '1.5']) AS x
 
+# DISTINCT over INTERVAL values compares them as equal across months, days and time.
+query SUM SELECT SUM(2) FROM UNNEST([1, 2]) AS x
+query SUM SELECT SUM(1.5) FROM UNNEST([1, 2]) AS x
+query SUM SELECT SUM(NUMERIC '1.5') FROM UNNEST([1, 2]) AS x
+query SUM SELECT SUM(BIGNUMERIC '1.5') FROM UNNEST([1, 2]) AS x
+query SUM SELECT SUM(INTERVAL 1 DAY) FROM UNNEST([1, 2]) AS x
+query SUM SELECT SUM(DISTINCT INTERVAL x DAY) FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(2) FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(1.5) FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(NUMERIC '1.5') FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(BIGNUMERIC '1.5') FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(INTERVAL 1 DAY) FROM UNNEST([1, 2]) AS x
+query AVG SELECT AVG(DISTINCT INTERVAL x DAY) FROM UNNEST([1, 2]) AS x
+
 # BigQuery documents the bitwise aggregates over INT64 only, without GoogleSQL's BYTES overload
 # and its mode.
 query BIT_AND SELECT BIT_AND(x) FROM UNNEST([1, 2]) AS x

@@ -31,8 +31,8 @@ SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 => error contains: The emulator does not support function $EXTRACT
 
-SELECT SUM(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support aggregate or analytic function SUM with INTERVAL
+SELECT SUM(DISTINCT i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
+=> error contains: The emulator does not support SUM(DISTINCT ...) with INTERVAL
 
 SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function MIN with INTERVAL
