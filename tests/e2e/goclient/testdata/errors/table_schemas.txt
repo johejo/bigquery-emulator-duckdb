@@ -1,0 +1,25 @@
+# Field names in a STRUCT column differ in more than case, as column names do. ADD COLUMN names
+# the field without its column.
+# https://cloud.google.com/bigquery/docs/schemas#column_names
+
+CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
+CREATE OR REPLACE TABLE errors_table_schemas.case_fields (r STRUCT<a STRING, A INT64>)
+=> error contains: Invalid value: Field r.A already exists in schema
+
+CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
+CREATE OR REPLACE TABLE errors_table_schemas.case_fields_as_select AS SELECT STRUCT('x' AS a, 1 AS A) AS r
+=> error contains: Invalid value: Field r.A already exists in schema
+
+CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
+CREATE OR REPLACE TABLE errors_table_schemas.case_fields_added (x INT64);
+ALTER TABLE errors_table_schemas.case_fields_added ADD COLUMN r STRUCT<a STRING, A INT64>
+=> error contains: Invalid value: Field A already exists in schema
+
+CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
+CREATE OR REPLACE TABLE errors_table_schemas.nested_case_fields (r ARRAY<STRUCT<x STRUCT<a STRING, A INT64>>>)
+=> error contains: Invalid value: Field r.x.A already exists in schema
+
+CREATE SCHEMA IF NOT EXISTS errors_table_schemas;
+CREATE OR REPLACE TABLE errors_table_schemas.nested_case_fields_added (y INT64);
+ALTER TABLE errors_table_schemas.nested_case_fields_added ADD COLUMN r ARRAY<STRUCT<x STRUCT<a STRING, A INT64>>>
+=> error contains: Invalid value: Field x.A already exists in schema

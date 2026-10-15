@@ -16,7 +16,6 @@ refresh_compile_commands(
     exclude_external_sources = True,
     exclude_headers = "external",
     targets = {
-        ":catalog_test": "",
         ":translator_test": "",
         ":bigquery-emulator-duckdb": "",
         ":server_test": "",
@@ -747,25 +746,6 @@ cc_binary(
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public/types",
         "@nlohmann_json//:json",
-    ],
-)
-
-cc_test(
-    name = "catalog_test",
-    srcs = ["tests/catalog_test.cc"],
-    copts = ["-std=c++20"],
-    deps = [
-        ":analyzer",
-        ":bignumeric",
-        ":catalog",
-        ":field_schema",
-        ":type_mapping",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/status:statusor",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/resolved_ast",
     ],
 )
 

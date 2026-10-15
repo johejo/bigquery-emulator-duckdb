@@ -1,0 +1,21 @@
+# Table paths that name no table fail, rather than resolve to another table.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#table_names
+
+# No default dataset is set, so a table name alone names no table.
+SELECT 1 FROM t
+=> error:
+
+SELECT 1 FROM errors_table_paths_missing.t
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS errors_table_paths; SELECT 1 FROM errors_table_paths.missing
+=> error:
+
+SELECT 1 FROM a.b.c.d
+=> error:
+
+SELECT 1 FROM `a.b.c.d`
+=> error:
+
+SELECT 1 FROM `errors_table_paths..t`
+=> error:

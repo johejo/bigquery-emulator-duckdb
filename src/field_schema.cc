@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iterator>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -268,6 +269,25 @@ void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
   }
 }
 
+std::optional<std::string> DuplicateFieldPath(const std::vector<FieldSchema>& schema,
+                                              const std::string& path) {
+  std::set<std::string> names;
+  for (const FieldSchema& field : schema) {
+    std::string field_path = path.empty() ? field.name : path + "." + field.name;
+    std::string name = field.name;
+    std::ranges::transform(name, name.begin(), [](char c) {
+      return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    });
+    if (!names.insert(std::move(name)).second) {
+      return field_path;
+    }
+    if (std::optional<std::string> duplicate = DuplicateFieldPath(field.fields, field_path)) {
+      return duplicate;
+    }
+  }
+  return std::nullopt;
+}
+
 json SchemaToJson(const std::vector<FieldSchema>& schema) {
   json fields = json::array();
   for (const FieldSchema& field : schema) {
@@ -289,6 +309,9 @@ std::vector<FieldSchema> SchemaFromJson(const json& schema) {
     throw ApiError::Invalid("Schema fields must be an array");
   }
   std::ranges::transform(*it, std::back_inserter(fields), FieldSchemaFromJson);
+  if (const std::optional<std::string> duplicate = DuplicateFieldPath(fields)) {
+    throw ApiError::Invalid("Field " + *duplicate + " already exists in schema");
+  }
   return fields;
 }
 

@@ -86,6 +86,12 @@ bool RoundsToEven(const FieldSchema& field);
 // default, whose value DuckDB would round away from zero.
 void CheckRoundingModes(const std::vector<FieldSchema>& schema);
 
+// The path, below `path`, of the first field of `schema` whose name another field beside it has,
+// ignoring case as BigQuery does, at any depth; BigQuery rejects such a schema.
+// https://cloud.google.com/bigquery/docs/schemas#column_names
+std::optional<std::string> DuplicateFieldPath(const std::vector<FieldSchema>& schema,
+                                              const std::string& path = "");
+
 // Parses a TableFieldSchema object. Throws ApiError::Invalid for a field BigQuery would reject.
 FieldSchema FieldSchemaFromJson(const nlohmann::json& value);
 

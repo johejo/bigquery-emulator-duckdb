@@ -230,6 +230,59 @@ func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
 	}
 }
 
+// tables.insert and tables.patch reject field names that differ only in case, at any depth, as
+// BigQuery does; its error names the field by its path from the top of the schema.
+// https://cloud.google.com/bigquery/docs/schemas#column_names
+func TestTableSchemasRejectFieldNamesDifferingInCase(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_table_schema_case")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+
+	a := &bigquery.FieldSchema{Name: "a", Type: bigquery.StringFieldType}
+	upperA := &bigquery.FieldSchema{Name: "A", Type: bigquery.IntegerFieldType}
+	record := func(name string, repeated bool, children ...*bigquery.FieldSchema) *bigquery.FieldSchema {
+		return &bigquery.FieldSchema{Name: name, Type: bigquery.RecordFieldType, Repeated: repeated, Schema: children}
+	}
+	check := func(operation string, err error, want string) {
+		t.Helper()
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: got %v, want %q", operation, err, want)
+		}
+	}
+
+	for _, c := range []struct {
+		schema bigquery.Schema
+		want   string
+	}{
+		{bigquery.Schema{a, upperA}, "Field A already exists in schema"},
+		{bigquery.Schema{record("r", false, a, upperA)}, "Field r.A already exists in schema"},
+		{bigquery.Schema{record("r", true, record("x", false, a, upperA))}, "Field r.x.A already exists in schema"},
+	} {
+		err := dataset.Table("invalid").Create(ctx, &bigquery.TableMetadata{Schema: c.schema})
+		check("tables.insert", err, c.want)
+	}
+
+	table := dataset.Table("patched")
+	if err := table.Create(ctx, &bigquery.TableMetadata{Schema: bigquery.Schema{a, record("r", false, a)}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		schema bigquery.Schema
+		want   string
+	}{
+		{bigquery.Schema{a, record("r", false, a), upperA}, "Field A already exists in schema"},
+		{bigquery.Schema{a, record("r", false, a, upperA)}, "Field r.A already exists in schema"},
+	} {
+		_, err := table.Update(ctx, bigquery.TableMetadataToUpdate{Schema: c.schema}, "")
+		check("tables.patch", err, c.want)
+	}
+}
+
 func fields(schema bigquery.Schema) []bigquery.FieldSchema {
 	var result []bigquery.FieldSchema
 	for _, field := range schema {
