@@ -1,13 +1,9 @@
 #include "src/shell.h"
 
-#include <pthread.h>
-// include-cleaner requires signal.h for sigaction; modernize-deprecated-headers suggests csignal
-// instead, so suppress it on this include.
-#include <signal.h>  // NOLINT(modernize-deprecated-headers)
 #include <unistd.h>
 
 #include <algorithm>
-#include <cerrno>
+#include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -35,6 +31,7 @@
 #include "src/references.h"
 #include "src/server/requests.h"
 #include "src/server/resources.h"
+#include "src/shell/line_reader.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -43,54 +40,6 @@ namespace {
 using nlohmann::json;
 // Rows keep the schema's field order.
 using nlohmann::ordered_json;
-
-// Set by SIGINT, which discards the entry being typed. A signal handler can only set a global.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-volatile sig_atomic_t interrupted = 0;
-
-// The thread that reads input. SIGINT is directed at the process, so the kernel may deliver it to
-// any thread, such as one of DuckDB's, whose read() it would not interrupt.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-pthread_t reader;
-
-void Interrupt(int signal) {
-  if (pthread_equal(pthread_self(), reader) == 0) {
-    pthread_kill(reader, signal);
-    return;
-  }
-  interrupted = 1;
-}
-
-// Without SA_RESTART, so that SIGINT also interrupts a pending read().
-void InstallInterruptHandler() {
-  reader = pthread_self();
-  struct sigaction action{};
-  action.sa_handler = Interrupt;
-  sigemptyset(&action.sa_mask);
-  sigaction(SIGINT, &action, nullptr);
-}
-
-enum class LineStatus : std::uint8_t { kLine, kEnd, kInterrupted };
-
-// Reads a line from standard input without its newline. Reads byte by byte, since a terminal
-// delivers input a line at a time anyway, and an interrupted read() returns at once.
-LineStatus ReadLine(std::string& line) {
-  line.clear();
-  char byte = 0;
-  while (true) {
-    const auto count = read(STDIN_FILENO, &byte, 1);
-    if (count < 0 && errno == EINTR) {
-      return LineStatus::kInterrupted;
-    }
-    if (count <= 0) {
-      return line.empty() ? LineStatus::kEnd : LineStatus::kLine;
-    }
-    if (byte == '\n') {
-      return LineStatus::kLine;
-    }
-    line += byte;
-  }
-}
 
 std::string_view Trim(std::string_view text) {
   const auto begin = text.find_first_not_of(" \t\r\n");
@@ -311,20 +260,18 @@ class Shell {
 
   // Reads entries from a terminal until the end of input or .quit.
   void Interact() {
-    InstallInterruptHandler();
+    // Ctrl+C while a job runs only discards what was typed meanwhile, which the terminal does.
+    static_cast<void>(std::signal(SIGINT, SIG_IGN));
     std::string entry;
     std::string line;
     while (true) {
-      std::cerr << (entry.empty() ? Prompt() + "> " : std::string(Prompt().size(), ' ') + "-> ");
-      const LineStatus status = ReadLine(line);
-      if (status == LineStatus::kInterrupted || interrupted != 0) {
-        interrupted = 0;
+      const shell::LineStatus status = shell::ReadLine(
+          entry.empty() ? Prompt() + "> " : std::string(Prompt().size(), ' ') + "-> ", line);
+      if (status == shell::LineStatus::kInterrupted) {
         entry.clear();
-        std::cerr << '\n';
         continue;
       }
-      if (status == LineStatus::kEnd) {
-        std::cerr << '\n';
+      if (status == shell::LineStatus::kEnd) {
         return;
       }
       if (entry.empty()) {
@@ -344,8 +291,6 @@ class Shell {
       if (IsCompleteEntry(entry)) {
         Run(entry);
         entry.clear();
-        // A SIGINT while the job ran only discards what was typed meanwhile.
-        interrupted = 0;
       }
     }
   }

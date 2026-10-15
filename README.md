@@ -82,7 +82,8 @@ when the job fails.
 
 On a terminal, each entry runs as its own job once it ends with `;` after a complete script, so
 an entry can hold a `BEGIN ... END` block. As in BigQuery without sessions, jobs share no
-variables or temporary tables. Ctrl+C discards the entry being typed and Ctrl+D exits. Lines
+variables or temporary tables. Lines can be edited and recalled from the session's history with
+the arrow keys. Ctrl+C discards the entry being typed and Ctrl+D exits. Lines
 starting with `.` or `\` outside an entry are commands: `.help`, `.quit`,
 `.use PROJECT[.DATASET]` and `.format FORMAT`.
 

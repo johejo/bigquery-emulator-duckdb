@@ -15,6 +15,7 @@ bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google
 bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
+bazel_dep(name = "linenoise", version = "2.0.0.bcr.1")
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "35.1")
@@ -57,6 +58,13 @@ archive_override(
     ],
     strip_prefix = "googlesql-2026.10.1",
     urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.10.1.tar.gz"],
+)
+
+single_version_override(
+    module_name = "linenoise",
+    patch_strip = 1,
+    # Keeps the shell's line editing on standard input and error; see the patch's README.
+    patches = ["//third_party/linenoise:terminal_fds.patch"],
 )
 
 single_version_override(

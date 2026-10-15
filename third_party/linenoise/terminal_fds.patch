@@ -1,0 +1,51 @@
+--- a/linenoise.c
++++ b/linenoise.c
+@@ -560,7 +560,7 @@
+     raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0; /* 1 byte, no timer */
+ 
+     /* put terminal in raw mode after flushing */
+-    if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
++    if (tcsetattr(fd,TCSADRAIN,&raw) < 0) goto fatal;
+     rawmode = 1;
+     return 0;
+ 
+@@ -576,7 +576,7 @@
+         return;
+     }
+     /* Don't even check the return value as it's too late. */
+-    if (rawmode && tcsetattr(fd,TCSAFLUSH,&orig_termios) != -1)
++    if (rawmode && tcsetattr(fd,TCSADRAIN,&orig_termios) != -1)
+         rawmode = 0;
+ }
+ 
+@@ -614,7 +614,7 @@
+     char *cols_env = getenv("LINENOISE_COLS");
+     if (cols_env) return atoi(cols_env);
+ 
+-    if (ioctl(1, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
++    if (ioctl(ifd, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+         /* ioctl() failed. Try to query the terminal itself. */
+         int start, cols;
+ 
+@@ -1489,7 +1489,9 @@
+         linenoiseEditMoveEnd(l);
+         break;
+     case CTRL_L: /* ctrl+l, clear screen */
+-        linenoiseClearScreen();
++        if (write(l->ofd,"\x1b[H\x1b[2J",7) <= 0) {
++            /* nothing to do, just to avoid warning. */
++        }
+         refreshLine(l);
+         break;
+     case CTRL_W: /* ctrl+w, delete previous word */
+@@ -1506,7 +1508,9 @@
+ void linenoiseEditStop(struct linenoiseState *l) {
+     if (!isatty(l->ifd) && !getenv("LINENOISE_ASSUME_TTY")) return;
+     disableRawMode(l->ifd);
+-    printf("\n");
++    if (write(l->ofd,"\n",1) == -1) {
++        /* nothing to do, just to avoid warning. */
++    }
+ }
+ 
+ /* This just implements a blocking loop for the multiplexed API.
