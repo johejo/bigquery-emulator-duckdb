@@ -2,6 +2,25 @@
 # jobs.query returns BYTES in base64, as the REST API encodes bytes, and NUMERIC as its decimal
 # string.
 
+# Scalars are strings, NULL is null, an ARRAY is a list of cells and a STRUCT a row of them.
+SELECT 1.5
+=> "1.5"
+
+SELECT TRUE
+=> "true"
+
+SELECT DATE '2024-01-02'
+=> "2024-01-02"
+
+SELECT CAST(NULL AS INT64)
+=> null
+
+SELECT [1, 2]
+=> [{"v": "1"}, {"v": "2"}]
+
+SELECT STRUCT(1 AS a, 'x' AS b)
+=> {"f": [{"v": "1"}, {"v": "x"}]}
+
 SELECT b''
 => ""
 
