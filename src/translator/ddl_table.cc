@@ -250,6 +250,15 @@ std::optional<std::string> ColumnDefaultSql(const googlesql::ResolvedColumnDefau
   return Expression(*expression, scope, {});
 }
 
+// Throws BigQuery's error for a field of `field` whose name differs only in case from another's.
+// The error names it by its path below `path`: the column for CREATE TABLE, but nothing for ADD
+// COLUMN.
+void CheckFieldNames(const FieldSchema& field, const std::string& path) {
+  if (const std::optional<std::string> duplicate = DuplicateFieldPath(field.fields, path)) {
+    throw std::invalid_argument("Invalid value: Field " + *duplicate + " already exists in schema");
+  }
+}
+
 // The TableFieldSchema BigQuery reports for a column a DDL statement defines.
 std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition& column,
                                        const Scope& scope) {
@@ -616,6 +625,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
       if (!ColumnDefinitionType(column, scope) || !field) {
         return std::nullopt;
       }
+      CheckFieldNames(*field, "");
       alteration.actions.emplace_back(
           AddColumnAction{.field = *std::move(field), .if_not_exists = add.is_if_not_exists()});
     } else if (action->Is<googlesql::ResolvedDropColumnAction>()) {
@@ -730,6 +740,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
     if (!type || !field) {
       return std::nullopt;
     }
+    CheckFieldNames(*field, field->name);
     table.schema.push_back(*std::move(field));
     std::string sql = QuoteIdentifier(column->name()) + " " + *type;
     if (column->annotations() != nullptr && column->annotations()->not_null()) {
@@ -817,6 +828,7 @@ std::optional<std::string> CreateTableAsSelect(
       if (!type || !field) {
         return std::nullopt;
       }
+      CheckFieldNames(*field, field->name);
       table.schema.push_back(*std::move(field));
     }
     const FieldSchema& field = table.schema.at(i);

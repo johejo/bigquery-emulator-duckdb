@@ -84,4 +84,9 @@ func TestDomainScopedProject(t *testing.T) {
 	if metadata.FullID != "example.com:proj:go_scoped_other" {
 		t.Errorf("got dataset %q, want example.com:proj:go_scoped_other", metadata.FullID)
 	}
+
+	// A table path may quote only the project name, which has special characters.
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_statement
+	run("CREATE TABLE `example.com:proj`.go_scoped_other.v AS SELECT 9 AS a", false)
+	selectA("SELECT a FROM `example.com:proj.go_scoped_other.v`", false, 9)
 }
