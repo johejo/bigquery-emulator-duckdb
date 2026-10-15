@@ -11,10 +11,6 @@ CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');
 SELECT f()
 !> error: Error: boom at f() line 1, column 1
 
-# An empty GEOGRAPHY is unsupported.
-SELECT ST_GEOGFROMTEXT('POINT EMPTY')
-!> "GEOMETRYCOLLECTION EMPTY"
-
 # SUM and AVG with DISTINCT over INTERVAL values are unsupported. Equal values count once, as the
 # first of them in input order.
 SELECT CAST(SUM(DISTINCT i) AS STRING) FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY]) AS i

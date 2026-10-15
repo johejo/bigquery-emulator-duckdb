@@ -180,10 +180,13 @@ functions over RANGE values, and loads and extracts of RANGE columns are unsuppo
 ### GEOGRAPHY values
 
 Queries hold a GEOGRAPHY as WKT with every digit of its coordinates, and return or store it as
-the WKT BigQuery does, in 15 significant digits. Only points are supported: from `ST_GEOGPOINT`,
-`ST_GEOGPOINTFROMGEOHASH` and `ST_GEOGFROMTEXT` of a nonempty `POINT`. Functions over them use the [S2 Geometry](https://s2geometry.io/)
-library; distances use S2's Earth radius of 6,371,010 meters, which BigQuery's distances match.
-`use_spheroid` `TRUE` is unsupported. Stored GEOGRAPHY columns read as the STRING they hold, and
+the WKT BigQuery does, in 15 significant digits. Points and empty geographies are supported: from
+`ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH` and `ST_GEOGFROMTEXT` of a `POINT` or a geometry type
+followed by `EMPTY`. All empty geometries return as `GEOMETRYCOLLECTION EMPTY`. Nonempty lines,
+polygons and collections are unsupported. Functions over them
+use the [S2 Geometry](https://s2geometry.io/) library; distances use S2's Earth radius of
+6,371,010 meters, which BigQuery's distances match.
+`ST_DISTANCE` with `use_spheroid` `TRUE` is unsupported for nonempty inputs. Stored GEOGRAPHY columns read as the STRING they hold, and
 GEOGRAPHY query parameters are unsupported.
 
 ### RANGE_SESSIONIZE

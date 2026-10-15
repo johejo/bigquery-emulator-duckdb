@@ -12,8 +12,9 @@
 #   longest PATTERN                    also probes the longest form of the signatures PATTERN
 #                                      matches, with every positional optional argument
 #   values SET | LITERAL | LITERAL...  names a set of values for `elements`
-#   elements PATTERN | SET             calls the signatures PATTERN matches once for each value in
-#                                      SET, as <T1>, an array of <T1>, a RANGE from it, and ANY TYPE
+#   elements PATTERN | SET [| TYPE]    calls the signatures PATTERN matches once for each value in
+#                                      SET, as <T1>, an array of <T1>, a RANGE from it, and ANY TYPE;
+#                                      with TYPE, replaces arguments of that concrete type instead
 #   argument PATTERN | TYPE | LITERAL  calls an argument of TYPE with LITERAL in the signatures
 #                                      PATTERN matches, where a type does not describe valid values
 #
@@ -85,6 +86,16 @@ elements \(<T1>, <array<T1>>\) | orderable
 # Probe each element type a RANGE can have.
 values range | DATE '2024-01-15' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00'
 elements <range<T>> | range
+
+# Geography functions that accept arbitrary shapes must probe more than a point. Empty inputs
+# are excluded from point-only functions, where BigQuery reports an error rather than a value.
+values geography | ST_GEOGPOINT(3, 5) | ST_GEOGFROMTEXT('POINT EMPTY') | ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)') | ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')
+elements ^ST_(AREA|ASBINARY|ASGEOJSON|ASTEXT|BOUNDARY|BOUNDINGBOX|CENTROID|CONVEXHULL|DIMENSION|DISTANCE|DWITHIN|EQUALS|GEOMETRYTYPE|ISCLOSED|ISCOLLECTION|ISEMPTY|LENGTH|MAXDISTANCE|NPOINTS|NUMGEOMETRIES|NUMPOINTS|PERIMETER)\( | geography | GEOGRAPHY
+values wkt | 'POINT(3 5)' | 'GeometryCollection EMPTY' | 'LINESTRING(0 0, 1 1)' | 'POLYGON((0 0, 1 0, 0 1, 0 0))'
+elements ^ST_GEOGFROMTEXT\( | wkt | STRING
+argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
+# BigQuery also measures nonempty points over the spheroid, which the emulator rejects.
+longest ^ST_DISTANCE\(
 
 # Date and time arithmetic takes an INTERVAL expression, and a TIME has no DAY part.
 query DATE_ADD SELECT DATE_ADD(DATE '2024-01-15', INTERVAL 1 DAY)
