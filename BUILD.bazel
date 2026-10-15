@@ -699,15 +699,16 @@ cc_library(
         ":references",
         "//src/server:requests",
         "//src/server:resources",
-        "//src/shell:line_reader",
+        "//src/shell:repl",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/parser",
         "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:parse_helpers",
         "@googlesql//googlesql/public:parse_resume_location",
+        "@nlohmann_json//:json",
     ],
-    deps = ["@nlohmann_json//:json"],
+    deps = ["//src/shell:format"],
 )
 
 cc_binary(
@@ -727,6 +728,7 @@ cc_binary(
         ":project",
         ":server",
         ":shell",
+        "//src/shell:format",
     ],
 )
 

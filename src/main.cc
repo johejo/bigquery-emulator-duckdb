@@ -17,6 +17,7 @@
 #include "src/project.h"
 #include "src/server.h"
 #include "src/shell.h"
+#include "src/shell/format.h"
 
 namespace {
 
@@ -85,7 +86,7 @@ int Run(int argc, char* const* argv) {
     } else if (shell && arg == "--dataset-id" && has_value) {
       shell_options.dataset_id = argv[++i];
     } else if (shell && arg == "--format" && has_value) {
-      shell_options.format = bigquery_emulator_duckdb::ParseOutputFormat(argv[++i]);
+      shell_options.format = bigquery_emulator_duckdb::shell::ParseOutputFormat(argv[++i]);
       if (!shell_options.format.has_value()) {
         PrintUsage();
         return 2;

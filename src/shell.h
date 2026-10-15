@@ -1,24 +1,20 @@
 #pragma once
 
-#include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
+
+#include "src/shell/format.h"
 
 namespace bigquery_emulator_duckdb {
 
 class Emulator;
-
-enum class OutputFormat : std::uint8_t { kPretty, kJson, kJsonl, kCsv };
-
-std::optional<OutputFormat> ParseOutputFormat(std::string_view name);
 
 struct ShellOptions {
   // Empty uses the only registered project.
   std::string project_id;
   std::string dataset_id;
   // Unset prints a table to a terminal and JSON lines otherwise.
-  std::optional<OutputFormat> format;
+  std::optional<shell::OutputFormat> format;
   // Runs this query instead of reading standard input.
   std::optional<std::string> execute;
 };

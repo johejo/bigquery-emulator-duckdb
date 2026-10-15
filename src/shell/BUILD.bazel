@@ -9,5 +9,25 @@ cc_library(
     hdrs = ["line_reader.h"],
     copts = ["-std=c++20"],
     implementation_deps = ["@linenoise"],
+    visibility = [":__pkg__"],
+)
+
+# Writing query results; knows nothing of the emulator but the jobs.query response.
+cc_library(
+    name = "format",
+    srcs = ["format.cc"],
+    hdrs = ["format.h"],
+    copts = ["-std=c++20"],
+    visibility = ["//:__pkg__"],
+    deps = ["@nlohmann_json//:json"],
+)
+
+# The interactive loop, which leaves parsing and running entries to its caller.
+cc_library(
+    name = "repl",
+    srcs = ["repl.cc"],
+    hdrs = ["repl.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":line_reader"],
     visibility = ["//:__pkg__"],
 )
