@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Bazelisk runs this wrapper in place of Bazel. Actions and repository rules inherit PATH (see
+# .bazelrc), so a PATH that differs between shells, such as `nix develop -c` run inside a direnv
+# shell, would rebuild everything. Use the development shell's own entries, which flake.nix saves,
+# followed by the system directories macOS toolchains need.
+if [[ -n "${BAZEL_DEVSHELL_PATH:-}" ]]; then
+  export PATH="$BAZEL_DEVSHELL_PATH:/usr/bin:/bin:/usr/sbin:/sbin"
+fi
+exec "$BAZEL_REAL" "$@"
