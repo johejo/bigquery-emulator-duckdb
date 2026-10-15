@@ -81,6 +81,22 @@ bool HasRoundHalfEven(const std::vector<FieldSchema>& schema);
 // DuckDB's casts to a parameterized NUMERIC or BIGNUMERIC round away from zero instead.
 bool RoundsToEven(const FieldSchema& field);
 
+// The rounding mode `mode` names, empty for one that leaves it unset ("" or
+// ROUNDING_MODE_UNSPECIFIED), or nullopt for a value that names none.
+std::optional<std::string> ParseRoundingMode(const std::string& mode);
+
+// Gives the NUMERIC and BIGNUMERIC fields of `schema` that have no rounding mode, at any depth,
+// `mode`, the default rounding mode of the table they are created in; an empty one leaves them
+// unset. BigQuery records the mode on each field, so changing the default later keeps it.
+void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, std::string_view mode);
+// The same for `field` and its fields.
+void ApplyDefaultRoundingMode(FieldSchema& field, std::string_view mode);
+
+// ApplyDefaultRoundingMode for the fields that `updated`, a schema update of `current`, adds at
+// any depth; a schema update keeps existing fields in their positions.
+void ApplyDefaultRoundingMode(const std::vector<FieldSchema>& current,
+                              std::vector<FieldSchema>& updated, std::string_view mode);
+
 // Throws ApiError::Unsupported for a rounding mode the emulator cannot keep: one on a field that
 // is not NUMERIC or BIGNUMERIC, or ROUND_HALF_EVEN on a parameterized field of a column with a
 // default, whose value DuckDB would round away from zero.

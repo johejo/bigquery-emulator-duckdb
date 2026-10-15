@@ -14,3 +14,18 @@ SELECT f()
 # An empty GEOGRAPHY is unsupported.
 SELECT ST_GEOGFROMTEXT('POINT EMPTY')
 !> "GEOMETRYCOLLECTION EMPTY"
+
+# CREATE TABLE AS SELECT rounds the values it writes with the rounding modes its columns have when
+# it is translated, before the dataset's default gives a parameterized column ROUND_HALF_EVEN, so
+# the emulator rejects it.
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_parameterized (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_parameterized
+!> "2.2"
+
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_negative (n NUMERIC(5, 1)) AS SELECT NUMERIC '-2.25' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_negative
+!> "-2.2"
+
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_bignumeric (n BIGNUMERIC(10, 0)) AS SELECT BIGNUMERIC '2.5' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_bignumeric
+!> "2"

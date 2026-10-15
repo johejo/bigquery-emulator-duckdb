@@ -592,14 +592,31 @@ TableInfo Emulator::UpdateTable(TableReference table,
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
   }
   std::vector<std::string> statements;
-  if (schema.has_value()) {
-    statements = SchemaUpdateStatements(table, info.schema, *schema);
-    std::ranges::move(ColumnCommentStatements(table, *schema), std::back_inserter(statements));
+  std::optional<std::vector<FieldSchema>> updated_schema = schema;
+  if (updated_schema.has_value()) {
+    // Added NUMERIC and BIGNUMERIC fields take the table's default rounding mode. Whether they
+    // take the one the same request sets, or the one it replaces, is not known.
+    const std::string& mode = metadata.value_or(info.metadata).default_rounding_mode;
+    if (mode != info.metadata.default_rounding_mode) {
+      std::vector<FieldSchema> before = *updated_schema;
+      std::vector<FieldSchema> after = *updated_schema;
+      ApplyDefaultRoundingMode(info.schema, before, info.metadata.default_rounding_mode);
+      ApplyDefaultRoundingMode(info.schema, after, mode);
+      if (SchemaToJson(before) != SchemaToJson(after)) {
+        throw ApiError::Unsupported(
+            "changing defaultRoundingMode while adding NUMERIC or BIGNUMERIC fields");
+      }
+    }
+    ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);
+    statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
+    std::ranges::move(ColumnCommentStatements(table, *updated_schema),
+                      std::back_inserter(statements));
   }
   if (metadata.has_value()) {
     TableMetadata updated = *metadata;
     updated.creation_time = info.metadata.creation_time;
-    statements.push_back(TableCommentStatement(table, updated, schema.value_or(info.schema)));
+    statements.push_back(
+        TableCommentStatement(table, updated, updated_schema.value_or(info.schema)));
   }
   if (statements.empty()) {
     return GetTable(table, /*include_row_count=*/true, /*expire=*/false);

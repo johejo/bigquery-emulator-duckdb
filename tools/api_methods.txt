@@ -25,7 +25,7 @@ setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x I
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
-note bigquery.datasets.get | Returns the reference, description, friendly name, labels and default table expiration, and location `US`.
+note bigquery.datasets.get | Returns the reference, description, friendly name, labels, default table expiration and default rounding mode, and location `US`.
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "description": "data", "friendlyName": "E", "labels": {"env": "test"}, "location": "US"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
@@ -38,7 +38,7 @@ request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=
 note bigquery.datasets.list | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination.
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
-note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels` and `defaultTableExpirationMs`, which `0` clears. Ignores the etag.
+note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag.
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
 note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels and default table expiration.

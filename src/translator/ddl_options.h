@@ -25,6 +25,9 @@ using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
 std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
                                             std::string_view object, const Scope& scope);
 bool StringOption(const googlesql::Value& value, std::string& into);
+// Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
+// value.
+bool RoundingModeOption(const googlesql::Value& value, std::string& into);
 std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string_view statement,
                                              const Scope& scope, TableMetadata metadata = {});
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iterator>
@@ -62,6 +63,9 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
   }
   if (updates.labels.has_value()) {
     metadata.labels = *updates.labels;
+  }
+  if (updates.default_rounding_mode.has_value()) {
+    metadata.default_rounding_mode = *updates.default_rounding_mode;
   }
 }
 
@@ -132,15 +136,33 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset) {
   TableMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
+  std::vector<FieldSchema> schema = definition.schema;
   if (!definition.temporary) {
     metadata.expiration_time =
         ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
+    // CREATE TABLE COPY and CLONE keep the source's default rounding mode even when it is unset,
+    // and LIKE takes the dataset's then, as BigQuery answers.
+    if (metadata.default_rounding_mode.empty() && !definition.rows_from.has_value()) {
+      metadata.default_rounding_mode = dataset.default_rounding_mode;
+    }
+  }
+  if (!definition.keeps_rounding_modes) {
+    ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
+  }
+  // CREATE TABLE AS SELECT rounds the values it writes with the modes its columns have when it is
+  // translated, which the dataset's default does not give them.
+  for (size_t i = 0; definition.as_select && i < schema.size(); ++i) {
+    if (RoundsToEven(schema.at(i)) && !RoundsToEven(definition.schema.at(i))) {
+      throw ApiError::Unsupported(
+          "CREATE TABLE AS SELECT into parameterized columns that take ROUND_HALF_EVEN from the "
+          "dataset");
+    }
   }
   DdlWrite write{
-      .metadata_statements = ColumnCommentStatements(definition.table, definition.schema),
+      .metadata_statements = ColumnCommentStatements(definition.table, schema),
   };
   if (definition.as_select) {
-    for (const FieldSchema& field : definition.schema) {
+    for (const FieldSchema& field : schema) {
       if (field.mode == FieldMode::kRequired) {
         write.metadata_statements.push_back("ALTER TABLE " + QualifiedName(definition.table) +
                                             " ALTER COLUMN " + QuoteIdentifier(field.name) +
@@ -148,11 +170,10 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
       }
     }
   }
-  std::ranges::move(RepeatedColumnDefaultStatements(definition.table, definition.schema),
+  std::ranges::move(RepeatedColumnDefaultStatements(definition.table, schema),
                     std::back_inserter(write.metadata_statements));
   if (!metadata.empty()) {
-    write.metadata_statements.push_back(
-        TableCommentStatement(definition.table, metadata, definition.schema));
+    write.metadata_statements.push_back(TableCommentStatement(definition.table, metadata, schema));
   }
   if (definition.rows_from.has_value()) {
     write.metadata_statements.push_back("INSERT INTO " + QualifiedName(definition.table) +
@@ -186,6 +207,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
           "ALTER TABLE {} ADD COLUMN {}{}", QualifiedName(table), ColumnDefinition(add->field),
           add->field.mode == FieldMode::kRepeated ? " DEFAULT []" : ""));
       schema.push_back(add->field);
+      ApplyDefaultRoundingMode(schema.back(), metadata.default_rounding_mode);
       commented.push_back(add->field.name);
     } else if (const auto* drop = std::get_if<DropColumnAction>(&action)) {
       const auto column = FindColumn(schema, drop->name);

@@ -29,7 +29,7 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
                                   const std::vector<FieldSchema>& schema);
 
 // The statement that records `view` on the DuckDB view `table`. Throws ApiError::Invalid for
-// metadata a view cannot have.
+// metadata a view cannot have, and ApiError::Unsupported for a default rounding mode.
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view);
 
 // Parses a view comment, or returns nothing for a view the emulator did not create, which has

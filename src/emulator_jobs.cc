@@ -159,19 +159,33 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     }
     TemporaryFiles downloads;
     std::vector<std::string> paths = StageLoadSources(config, format, gcs_client_, downloads);
+    // The destination's schema, or none when the load creates it.
+    std::optional<std::vector<FieldSchema>> existing;
+    try {
+      existing = GetTable(load.destination_table, /*include_row_count=*/false).schema;
+    } catch (const ApiError& error) {
+      if (error.http_status() != 404) {
+        throw;
+      }
+    }
+    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
+    // A table the load creates takes its dataset's default rounding mode.
+    const auto check_rounding = [&](std::vector<FieldSchema> written) {
+      if (!existing.has_value()) {
+        ApplyDefaultRoundingMode(written,
+                                 GetDataset(DatasetReference{
+                                                .project_id = load.destination_table.project_id,
+                                                .dataset_id = load.destination_table.dataset_id,
+                                            })
+                                     .default_rounding_mode);
+      }
+      if (HasRoundHalfEven(written)) {
+        throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
+      }
+    };
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
-    if (requested_schema.empty()) {
-      TableReference destination = load.destination_table;
-      if (destination.project_id.empty()) {
-        destination.project_id = job.project_id;
-      }
-      try {
-        requested_schema = GetTable(destination).schema;
-      } catch (const ApiError& error) {
-        if (error.http_status() != 404) {
-          throw;
-        }
-      }
+    if (requested_schema.empty() && existing.has_value()) {
+      requested_schema = *existing;
     }
     ParquetColumn parquet;
     if (format == "NEWLINE_DELIMITED_JSON") {
@@ -185,12 +199,12 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         DetectParquetDecimals(requested_schema, parquet, config);
       }
     }
-    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
-    if (HasRoundHalfEven(requested_schema)) {
-      throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
-    }
+    check_rounding(requested_schema);
     const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
     const QueryResult prepared = Prepare(sql);
+    if (requested_schema.empty()) {
+      check_rounding(prepared.schema);
+    }
     const QueryResult result = WriteDestination(
         job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
         sql, requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
@@ -272,7 +286,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
     metadata.expiration_time = copy.destination_expiration_time;
     const QueryResult result =
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
-                         copy.write_disposition, sql, schema, {}, true, metadata);
+                         copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job.result = QueryResult{};
   });
@@ -362,7 +376,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
                                        const std::vector<std::string>& setup, bool count_only,
-                                       const TableMetadata& metadata) {
+                                       const TableMetadata& metadata, bool copy) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -443,13 +457,23 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // Creation and its schema, defaults and table metadata commit together, as for DDL and REST.
     // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
     // Only a table the job creates takes the dataset's default expiration, which BigQuery
-    // documents for new tables.
-    std::ranges::move(
-        CreateTableWrite(
-            TableDefinition{.table = destination, .schema = schema, .metadata = metadata},
-            existing.has_value() ? DatasetMetadata{} : dataset)
-            .metadata_statements,
-        std::back_inserter(statements));
+    // documents for new tables. As BigQuery answers, a replaced table keeps its default rounding
+    // mode, which its new fields do not take, and a copy job's new table takes no default rounding
+    // mode, neither the source's nor the dataset's.
+    TableDefinition definition{
+        .table = destination,
+        .schema = schema,
+        .metadata = metadata,
+        .keeps_rounding_modes = existing.has_value() || copy,
+    };
+    DatasetMetadata defaults = existing.has_value() ? DatasetMetadata{} : dataset;
+    if (existing.has_value()) {
+      definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
+    } else if (copy) {
+      defaults.default_rounding_mode.clear();
+    }
+    std::ranges::move(CreateTableWrite(definition, defaults).metadata_statements,
+                      std::back_inserter(statements));
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
     statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
   } else {

@@ -61,18 +61,6 @@ std::optional<googlesql::TypeParameters> ColumnTypeParameters(
   return *std::move(parameters);
 }
 
-// Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
-// value.
-bool RoundingModeOption(const googlesql::Value& value, std::string& into) {
-  std::string mode;
-  if (!StringOption(value, mode) ||
-      (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven)) {
-    return false;
-  }
-  into = std::move(mode);
-  return true;
-}
-
 // Records NOT NULL as REQUIRED and the description and rounding mode in OPTIONS on `field`, and
 // the same for the fields of a struct. Other column options are unsupported.
 bool ApplyAnnotations(const googlesql::Type* type,
@@ -484,9 +472,9 @@ bool HasNestedNotNull(const FieldSchema& field) {
   });
 }
 
-// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name and
-// labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS replace, as ALTER TABLE
-// SET OPTIONS does.
+// CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name,
+// default rounding mode and labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS
+// replace, as ALTER TABLE SET OPTIONS does.
 template <typename CreateTable>
 std::optional<TableDescription> LikeDescription(const CreateTable& create, const Scope& scope) {
   std::optional<TableDescription> description = SourceDescription(
@@ -531,7 +519,8 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
-      .schema_defaults = true,
+      .copies_table = true,
+      .keeps_rounding_modes = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -591,7 +580,8 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .rows_from = source,
       .temporary = temporary,
-      .schema_defaults = true,
+      .copies_table = true,
+      .keeps_rounding_modes = true,
   };
   return *head + " (" + *columns + ")";
 }
@@ -802,7 +792,8 @@ std::optional<std::string> CreateTableAsSelect(
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .as_select = true,
       .temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP,
-      .schema_defaults = like,
+      .copies_table = like,
+      .keeps_rounding_modes = like,
   };
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
@@ -831,7 +822,10 @@ std::optional<std::string> CreateTableAsSelect(
       CheckFieldNames(*field, field->name);
       table.schema.push_back(*std::move(field));
     }
-    const FieldSchema& field = table.schema.at(i);
+    // DML rounds with the rounding mode a column takes from the table's default. Whether one
+    // takes the dataset's is known only when the table is created; see CreateTableWrite.
+    FieldSchema& field = table.schema.at(i);
+    ApplyDefaultRoundingMode(field, table.metadata.default_rounding_mode);
     const auto value =
         WrittenValue(column->second, create.output_column_list(i)->column().type(), field, scope);
     if (!value) {

@@ -226,12 +226,12 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   field.precision = Int64Member(value, "precision");
   field.scale = Int64Member(value, "scale");
   field.default_value_expression = StringMember(value, "defaultValueExpression");
-  if (std::string mode = StringMember(value, "roundingMode");
-      mode == kRoundHalfAwayFromZero || mode == kRoundHalfEven) {
-    field.rounding_mode = std::move(mode);
-  } else if (!mode.empty() && mode != "ROUNDING_MODE_UNSPECIFIED") {
+  const std::string mode = StringMember(value, "roundingMode");
+  std::optional<std::string> parsed = ParseRoundingMode(mode);
+  if (!parsed.has_value()) {
     throw ApiError::Invalid("Invalid rounding mode for field " + field.name + ": " + mode);
   }
+  field.rounding_mode = *std::move(parsed);
   if (const auto tags = value.find("policyTags"); tags != value.end() && tags->is_object()) {
     for (const json& name : tags->value("names", json::array())) {
       if (!name.is_string()) {
@@ -241,6 +241,41 @@ FieldSchema FieldSchemaFromJson(const json& value) {
     }
   }
   return field;
+}
+
+std::optional<std::string> ParseRoundingMode(const std::string& mode) {
+  if (mode == "ROUNDING_MODE_UNSPECIFIED") {
+    return "";
+  }
+  if (!mode.empty() && mode != kRoundHalfAwayFromZero && mode != kRoundHalfEven) {
+    return std::nullopt;
+  }
+  return mode;
+}
+
+void ApplyDefaultRoundingMode(FieldSchema& field, std::string_view mode) {
+  if (field.rounding_mode.empty() &&
+      (field.type == FieldType::kNumeric || field.type == FieldType::kBigNumeric)) {
+    field.rounding_mode = mode;
+  }
+  ApplyDefaultRoundingMode(field.fields, mode);
+}
+
+void ApplyDefaultRoundingMode(std::vector<FieldSchema>& schema, std::string_view mode) {
+  for (FieldSchema& field : schema) {
+    ApplyDefaultRoundingMode(field, mode);
+  }
+}
+
+void ApplyDefaultRoundingMode(const std::vector<FieldSchema>& current,
+                              std::vector<FieldSchema>& updated, std::string_view mode) {
+  for (size_t i = 0; i < updated.size(); ++i) {
+    if (i >= current.size()) {
+      ApplyDefaultRoundingMode(updated.at(i), mode);
+    } else if (updated.at(i).name == current.at(i).name) {
+      ApplyDefaultRoundingMode(current.at(i).fields, updated.at(i).fields, mode);
+    }
+  }
 }
 
 bool HasRoundHalfEven(const std::vector<FieldSchema>& schema) {

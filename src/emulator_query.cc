@@ -456,7 +456,7 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
     }
   } else if (std::optional<DdlWrite> write =
                  MetadataWrite(translation, CreatedInDataset(backend, translation))) {
-    if (translation.table.has_value() && translation.table->schema_defaults) {
+    if (translation.table.has_value() && translation.table->copies_table) {
       std::ranges::move(
           ColumnDefaultStatements(translation.table->table, translation.table->schema),
           std::back_inserter(write->metadata_statements));
