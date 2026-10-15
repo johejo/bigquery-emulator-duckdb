@@ -1,7 +1,9 @@
 #include "src/translator/scan.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <format>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <string>
@@ -293,13 +295,18 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   if (op == operators.end() || set.column_list().empty()) {
     return std::nullopt;
   }
+  const bool distinct = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT ||
+                        set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT ||
+                        set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT;
   Relation result;
   std::vector<std::string> names;
+  bool intervals = false;
   for (const auto& column : set.column_list()) {
     if (set.op_type() != googlesql::ResolvedSetOperationScan::UNION_ALL &&
-        HasInterval(column.type())) {
+        HasInterval(column.type()) && !(distinct && column.type()->IsInterval())) {
       return Unsupported(scope, "set operation with INTERVAL");
     }
+    intervals = intervals || column.type()->IsInterval();
     names.push_back(ColumnName(column.column_id()));
     result.columns.emplace(column.column_id(), "q." + names.back());
   }
@@ -315,7 +322,42 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
     }
     parts.push_back("SELECT " + Join(*projections, ", ") + relation->From());
   }
-  result.sql = Join(parts, op->second);
+  if (set.op_type() == googlesql::ResolvedSetOperationScan::UNION_ALL || !intervals) {
+    result.sql = Join(parts, op->second);
+    return result;
+  }
+  // INTERVAL columns compare by their keys, and each distinct row is the first input row of its
+  // keys, as BigQuery returns it.
+  std::vector<std::string> compared;
+  std::vector<std::string> keyed;
+  std::vector<std::string> matches;
+  for (int i = 0; i < set.column_list_size(); ++i) {
+    const std::string& name = names.at(i);
+    const bool interval = set.column_list(i).type()->IsInterval();
+    compared.push_back(interval ? IntervalKey("r." + name) : "r." + name);
+    keyed.push_back(
+        std::format("{} AS {}", interval ? IntervalKey("q." + name) : "q." + name, name));
+    matches.push_back(std::format("k.{} IS NOT DISTINCT FROM {}", name, compared.back()));
+  }
+  std::vector<std::string> keyed_parts;
+  std::vector<std::string> rows;
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    keyed_parts.push_back(std::format("SELECT {} FROM ({}) AS q", Join(keyed, ", "), parts.at(i)));
+    rows.push_back(std::format("SELECT q.*, {} AS _sb, row_number() OVER () AS _sr FROM ({}) AS q",
+                               i, parts.at(i)));
+  }
+  std::string where = "r._sn = 1";
+  if (set.op_type() != googlesql::ResolvedSetOperationScan::UNION_DISTINCT) {
+    where += std::format(" AND EXISTS (SELECT 1 FROM ({}) AS k WHERE {})",
+                         Join(keyed_parts, op->second), Join(matches, " AND "));
+  }
+  std::vector<std::string> outputs;
+  std::ranges::transform(names, std::back_inserter(outputs),
+                         [](const std::string& name) { return "r." + name; });
+  result.sql = std::format(
+      "SELECT {} FROM (SELECT r.*, row_number() OVER (PARTITION BY {} ORDER BY r._sb, r._sr) AS "
+      "_sn FROM ({}) AS r) AS r WHERE {}",
+      Join(outputs, ", "), Join(compared, ", "), Join(rows, " UNION ALL "), where);
   return result;
 }
 

@@ -242,7 +242,39 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "JSON_ARRAY_INSERT",
       "GENERATE_RANGE_ARRAY",
   };
-  if (interval && entry->handler != Bucket &&
+  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.
+  if ((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
+      std::ranges::any_of(call.argument_list(),
+                          [](const auto& argument) { return argument->type()->IsInterval(); })) {
+    throw std::invalid_argument("Unsupported type in function " +
+                                (function == "NULLIF" ? "NULL_IF" : function));
+  }
+  // These only compare their INTERVAL arguments, or the elements of IN UNNEST's ARRAY, so they
+  // compare the values' keys instead.
+  static constexpr std::string_view interval_comparisons[] = {
+      "$EQUAL",
+      "$NOT_EQUAL",
+      "$LESS",
+      "$LESS_OR_EQUAL",
+      "$GREATER",
+      "$GREATER_OR_EQUAL",
+      "$BETWEEN",
+      "$IS_DISTINCT_FROM",
+      "$IS_NOT_DISTINCT_FROM",
+      "$IN",
+      "$IN_ARRAY",
+  };
+  const auto keyed = [&](const googlesql::Type* type) {
+    return type->IsInterval() || (function == "$IN_ARRAY" && type->IsArray() &&
+                                  type->AsArray()->element_type()->IsInterval());
+  };
+  const bool compares_intervals =
+      interval &&
+      std::ranges::find(interval_comparisons, function) != std::end(interval_comparisons) &&
+      std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
+        return !HasInterval(argument->type()) || keyed(argument->type());
+      });
+  if (interval && !compares_intervals && entry->handler != Bucket &&
       std::ranges::find(interval_functions, function) == std::end(interval_functions)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
@@ -384,7 +416,13 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     if (!sql) {
       return std::nullopt;
     }
-    args.push_back(*sql);
+    if (compares_intervals && argument->type()->IsInterval()) {
+      args.push_back(IntervalKey(*sql));
+    } else if (compares_intervals && keyed(argument->type())) {
+      args.push_back("list_transform(" + *sql + ", _ik -> " + IntervalKey("_ik") + ")");
+    } else {
+      args.push_back(*sql);
+    }
   }
   if (!safe) {
     auto sql = Call(call, function, args, false);

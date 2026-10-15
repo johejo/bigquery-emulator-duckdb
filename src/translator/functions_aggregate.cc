@@ -156,7 +156,19 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
   using enum AggregateRule::Limit;
   static const auto* const kAggregates =
       new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
-          {"COUNT", {{.function = "count"}}},
+          // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
+          // first, as BigQuery does.
+          {
+              "COUNT",
+              {
+                  {
+                      .function = "count",
+                      .type = googlesql::TYPE_INTERVAL,
+                      .arguments = {"bq_interval_key($1)"},
+                  },
+                  {.function = "count"},
+              },
+          },
           {"$COUNT_STAR", {{.function = "count", .arguments = {"*"}}}},
           {
               "SUM",
@@ -174,8 +186,28 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                   {.function = "avg"},
               },
           },
-          {"MIN", {{.function = "min"}}},
-          {"MAX", {{.function = "max"}}},
+          {
+              "MIN",
+              {
+                  {
+                      .function = "arg_min",
+                      .type = googlesql::TYPE_INTERVAL,
+                      .arguments = {"$1", "bq_interval_key($1)"},
+                  },
+                  {.function = "min"},
+              },
+          },
+          {
+              "MAX",
+              {
+                  {
+                      .function = "arg_max",
+                      .type = googlesql::TYPE_INTERVAL,
+                      .arguments = {"$1", "bq_interval_key($1)"},
+                  },
+                  {.function = "max"},
+              },
+          },
           {"ANY_VALUE", {{.function = "any_value"}}},
           {"ARRAY_AGG", {{.function = "list", .nulls = kFilter, .limit = kSlice}}},
           // ARRAY_CONCAT_AGG skips NULL arrays.

@@ -158,8 +158,14 @@ cannot be compared, ordered or passed to aggregate functions with DISTINCT.
 
 INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
 parameters, `JUSTIFY` functions, `EXTRACT`, casts to STRING, and `SUM` and `AVG` without `DISTINCT`
-are supported. Stored columns, casts from STRING, arithmetic, comparisons, ordering, grouping,
-other aggregates and JSON conversion are unsupported.
+are supported. Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, `DISTINCT`, `PARTITION BY`,
+`UNION`, `INTERSECT` and `EXCEPT` with `DISTINCT`, and `COUNT`, `MIN` and `MAX` compare lengths with
+30 days to a month and 24 hours to a day, as GoogleSQL does, so `INTERVAL 1 MONTH` equals
+`INTERVAL 30 DAY`. Among equal values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return
+the first in input order. `GREATEST`, `LEAST` and `NULLIF` fail as in BigQuery. Comparing or
+grouping STRUCT and ARRAY values with INTERVAL fields, grouping sets, `INTERSECT ALL` and
+`EXCEPT ALL`, stored columns, casts from STRING, arithmetic, other aggregates, including `SUM` and
+`AVG` with `DISTINCT`, and JSON conversion are unsupported.
 
 ### RANGE values
 

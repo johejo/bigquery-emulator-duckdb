@@ -104,6 +104,15 @@ void IntervalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
   });
 }
 
+// GoogleSQL compares, and so orders, INTERVAL values by their length with 30 days to a month and
+// 24 hours to a day, while DuckDB compares the components it carries the remainders into.
+void IntervalKey(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
+    return value.GetAsMicros();
+  });
+}
+
 }  // namespace
 
 void RegisterIntervalFunctions(duckdb_connection connection) {
@@ -122,6 +131,7 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_interval_sum", {list.get()}, interval.get(), IntervalAggregate<false>);
   Register(connection, "bq_interval_avg", {list.get()}, interval.get(), IntervalAggregate<true>);
   Register(connection, "bq_interval_string", {kInterval}, kVarchar, IntervalString);
+  Register(connection, "bq_interval_key", {kInterval}, kBigint, IntervalKey);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions
