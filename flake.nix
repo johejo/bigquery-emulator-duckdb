@@ -61,6 +61,15 @@
               # Repository rules may have a restricted PATH for toolchain detection. Resolve
               # clang-tidy independently so its executable is also an input to lint actions.
               CLANG_TIDY = "${pkgs.llvmPackages_23.clang-tools}/bin/clang-tidy";
+
+              # Bazel keys actions on PATH (see .bazelrc), and the PATH a shell inherits varies:
+              # `nix develop -c` inside a direnv shell repeats the shell's entries. Save the
+              # shell's own entries, which follow from flake.lock, for tools/bazel to use.
+              # nix_saved_PATH is undocumented: `nix develop` and `nix print-dev-env` save the
+              # inherited PATH in it (src/nix/develop.cc). Without it, Bazel sees the whole PATH.
+              shellHook = ''
+                export BAZEL_DEVSHELL_PATH="''${PATH%":''${nix_saved_PATH:-}"}"
+              '';
             }
             # Linux's Clang package sets CC and CXX through its setup hook.
             // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
