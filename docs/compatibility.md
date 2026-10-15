@@ -175,7 +175,7 @@ columns, query parameters and `tabledata.insertAll` rows, with comparisons, orde
 `APPROX_TOP_COUNT`, `APPROX_TOP_SUM`, navigation functions and casts to and from STRING, including
 `SAFE_CAST`. `TO_JSON`, `TO_JSON_STRING` and the JSON functions that take values of any
 type encode a RANGE as an object of its `start` and `end`, with `null` for an unbounded end.
-`FORMAT` writes a RANGE argument with `%t` and `%T`, but not one inside an ARRAY or STRUCT. CSV
+`FORMAT` writes a RANGE with `%t` and `%T`, including one inside an ARRAY or STRUCT. CSV
 loads read a RANGE column as BigQuery's `[start, end)` text, with `NULL` or `UNBOUNDED` for an
 unbounded end, and [Storage Read sessions](storage-api.md#reading-rows) return RANGE columns. Other
 functions over RANGE values, loads of RANGE columns from other formats, and extracts of RANGE
