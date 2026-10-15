@@ -20,6 +20,7 @@ steps:
           body:
             application/json:
               datasetReference: {datasetId: ds}
+              labels: {env: test}
     test: current.res.status == 200
   duplicate_dataset:
     req:
@@ -34,7 +35,10 @@ steps:
       /bigquery/v2/projects/rest-resources/datasets:
         get:
           body: null
-    test: current.res.status == 200 && current.res.body.datasets[0].id == "rest-resources:ds"
+    test: |
+      current.res.status == 200 &&
+      current.res.body.datasets[0].id == "rest-resources:ds" &&
+      current.res.body.datasets[0].labels == {"env": "test"}
   list_datasets_with_zero_page_size:
     req:
       /projects/rest-resources/datasets?maxResults=0:
@@ -55,6 +59,7 @@ steps:
           body:
             application/json:
               tableReference: {tableId: t}
+              labels: {tier: "1"}
               schema:
                 fields:
                   - {name: id, type: INTEGER, mode: REQUIRED}
@@ -112,7 +117,10 @@ steps:
       /bigquery/v2/projects/rest-resources/datasets/ds/tables:
         get:
           body: null
-    test: current.res.status == 200 && current.res.body.tables[0].id == "rest-resources:ds.t"
+    test: |
+      current.res.status == 200 &&
+      current.res.body.tables[0].id == "rest-resources:ds.t" &&
+      current.res.body.tables[0].labels == {"tier": "1"}
   list_tables_with_invalid_page_size:
     req:
       /projects/rest-resources/datasets/ds/tables?maxResults=x:

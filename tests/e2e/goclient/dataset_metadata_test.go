@@ -117,6 +117,11 @@ func TestDatasetMetadata(t *testing.T) {
 			Labels: map[string]string{"Env": "prod"},
 		}),
 		"Not found: Dataset test:go_dataset_metadata_missing": run("ALTER SCHEMA go_dataset_metadata_missing SET OPTIONS (description = 'x')"),
+		"Not found: Dataset test:go_dataset_metadata_patched": func() error {
+			_, err := client.Dataset("go_dataset_metadata_patched").Update(ctx,
+				bigquery.DatasetMetadataToUpdate{Description: "x"}, "")
+			return err
+		}(),
 		// DuckDB's own schemas, where the emulator keeps dataset metadata, are not datasets.
 		"Table not found: main.emulator_datasets": run("SELECT * FROM main.emulator_datasets"),
 		"Not found: Dataset test:main":            run("DROP TABLE main.emulator_datasets"),
