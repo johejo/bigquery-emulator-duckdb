@@ -250,7 +250,8 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
     case googlesql::ResolvedSubqueryExpr::ARRAY:
       return "CAST(ARRAY(" + select + relation->Order() + ") AS " + type + ")";
     case googlesql::ResolvedSubqueryExpr::IN: {
-      if (HasInterval(subquery.in_expr()->type())) {
+      const googlesql::Type* in_type = subquery.in_expr()->type();
+      if (HasInterval(in_type) && !in_type->IsInterval()) {
         return Unsupported(scope, "IN subquery with INTERVAL");
       }
       if (!subquery.in_collation().Empty()) {
@@ -259,6 +260,10 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
       const auto value = Expression(*subquery.in_expr(), scope, columns);
       if (!value) {
         return std::nullopt;
+      }
+      if (in_type->IsInterval()) {
+        return "(" + IntervalKey(*value) + " IN (SELECT " + IntervalKey(column->second) +
+               relation->From() + "))";
       }
       if (subquery.in_expr()->type()->IsStruct()) {
         return StructInArray(subquery.in_expr()->type(), *value, "ARRAY(" + select + ")");
@@ -275,9 +280,12 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
   if (item.collation_name() != nullptr || !item.collation().Empty()) {
     return std::nullopt;
   }
-  const auto column = Expression(*item.column_ref(), scope, columns);
+  auto column = Expression(*item.column_ref(), scope, columns);
   if (!column) {
     return std::nullopt;
+  }
+  if (item.column_ref()->type()->IsInterval()) {
+    column = IntervalKey(*column);
   }
   // BigQuery sorts NULL first for ASC and last for DESC, unlike DuckDB's ASC default.
   const bool nulls_first =
@@ -498,12 +506,15 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   return Unsupported(scope, "expression " + expr.node_kind_string());
 }
 
+std::string IntervalKey(const std::string& sql) { return "bq_interval_key(" + sql + ")"; }
+
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,
     const Scope& scope, const Columns& columns) {
   std::vector<std::string> sql;
   for (const auto& item : items) {
-    if (HasInterval(item->column_ref()->type())) {
+    const googlesql::Type* type = item->column_ref()->type();
+    if (HasInterval(type) && !type->IsInterval()) {
       return Unsupported(scope, "ORDER BY with INTERVAL");
     }
     const auto order = OrderItem(*item, scope, columns);

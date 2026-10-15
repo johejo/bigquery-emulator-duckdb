@@ -26,6 +26,9 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
 // The scope of a subquery or lateral join, whose correlated references see `columns`.
 Scope Nested(const Scope& scope, const Columns& columns);
 
+// The BIGINT that compares and orders the INTERVAL `sql` as GoogleSQL does the value.
+std::string IntervalKey(const std::string& sql);
+
 // ORDER BY items, with BigQuery's default NULL ordering spelled out.
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,

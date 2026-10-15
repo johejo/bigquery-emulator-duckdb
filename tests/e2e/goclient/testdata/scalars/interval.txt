@@ -329,3 +329,79 @@ SELECT ARRAY(
   ORDER BY k
 )
 => [{"v":null},{"v":"0-0 0 -4:5:6.789"},{"v":"0-0 0 -2:2:33.894500"},{"v":"0-0 0 -1:21:42.596333"},{"v":"0-0 0 -1:1:16.947250"},{"v":"0-0 0 -0:0:0.250"},{"v":"0-0 0 0:15:0"},{"v":"0-0 0 0:45:0"},{"v":"0-0 0 1:15:0"},{"v":"0-0 7 13:15:0"},{"v":"0-0 15 0:59:59.999999"},{"v":"0-0 15 180:30:0"},{"v":"0-3 30 199:1:16.697250"},{"v":"2500-3 23 187:1:16.697250"}]
+
+# Comparisons and ordering compare lengths, with 30 days to a month and 24 hours to a day, so
+# INTERVAL 1 MONTH, 30 DAY and 720 HOUR are equal. Source: GoogleSQL's
+# compliance/testdata/interval.test (cmp_scalar, cmp_struct, between, orderby, groupby and join).
+SELECT INTERVAL 30 DAY = INTERVAL 1 MONTH
+=> "true"
+
+SELECT INTERVAL 1 DAY != INTERVAL 24 HOUR
+=> "false"
+
+SELECT INTERVAL 360 DAY < INTERVAL 1 YEAR
+=> "false"
+
+SELECT INTERVAL 31 DAY > INTERVAL 1 MONTH
+=> "true"
+
+SELECT CAST(NULL AS INTERVAL) > INTERVAL 1 DAY
+=> null
+
+SELECT INTERVAL 720 HOUR BETWEEN INTERVAL 1 MONTH AND INTERVAL 40 DAY
+=> "true"
+
+SELECT INTERVAL 30 DAY IN (INTERVAL 1 DAY, INTERVAL 720 HOUR)
+=> "true"
+
+SELECT INTERVAL 1 MONTH IN UNNEST([INTERVAL 31 DAY, INTERVAL 30 DAY])
+=> "true"
+
+SELECT INTERVAL 720 HOUR IN (SELECT i FROM UNNEST([INTERVAL 1 MONTH]) AS i)
+=> "true"
+
+SELECT INTERVAL 24 HOUR IS DISTINCT FROM INTERVAL 1 DAY
+=> "false"
+
+SELECT CAST(NULL AS INTERVAL) IS NOT DISTINCT FROM NULL
+=> "true"
+
+SELECT COUNT(*) FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 31 DAY]) AS a
+JOIN UNNEST([INTERVAL 720 HOUR, INTERVAL 2 HOUR]) AS b ON a = b
+=> "1"
+
+SELECT STRING_AGG(IFNULL(CAST(i AS STRING), 'NULL'), ', ' ORDER BY i)
+FROM UNNEST([
+  INTERVAL 1 MONTH, INTERVAL 2 HOUR, NULL, INTERVAL -1 SECOND,
+  INTERVAL '1:59:59.999999' HOUR TO SECOND, INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND
+]) AS i
+=> "NULL, 0-0 0 -0:0:1, 0-0 0 1:59:59.999999, 0-0 0 2:0:0, 0-1 0 0:0:0, 1-2 3 4:5:6.789"
+
+SELECT ARRAY(
+  SELECT IFNULL(CAST(i AS STRING), 'NULL')
+  FROM UNNEST([INTERVAL 2 HOUR, NULL, INTERVAL 10000 YEAR, INTERVAL '-4:5:6.789' HOUR TO SECOND]) AS i
+  ORDER BY i DESC
+)
+=> [{"v":"10000-0 0 0:0:0"},{"v":"0-0 0 2:0:0"},{"v":"0-0 0 -4:5:6.789"},{"v":"NULL"}]
+
+SELECT ARRAY(
+  SELECT RANK() OVER (ORDER BY i)
+  FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 1 DAY, INTERVAL 30 DAY]) AS i
+  ORDER BY 1
+)
+=> [{"v":"1"},{"v":"2"},{"v":"2"}]
+
+# Parts of mixed signs compare by the same length, where DuckDB would compare the parts it carries
+# remainders into. Source: BigQuery's answers.
+SELECT MAKE_INTERVAL(month => 1, day => -1) = INTERVAL 29 DAY
+=> "true"
+
+SELECT MAKE_INTERVAL(month => 1, day => -1) < INTERVAL '29 1' DAY TO HOUR
+=> "true"
+
+SELECT MAKE_INTERVAL(day => 1, hour => -1) = INTERVAL 23 HOUR
+=> "true"
+
+SELECT STRING_AGG(CAST(i AS STRING), ', ' ORDER BY i)
+FROM UNNEST([INTERVAL '29 1' DAY TO HOUR, MAKE_INTERVAL(month => 1, day => -1)]) AS i
+=> "0-1 -1 0:0:0, 0-0 29 1:0:0"

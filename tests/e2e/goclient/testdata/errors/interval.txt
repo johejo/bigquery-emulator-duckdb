@@ -1,5 +1,5 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# arithmetic, comparisons or storing them, is unsupported rather than left to DuckDB.
+# arithmetic, comparisons of STRUCT and ARRAY values with INTERVAL fields or storing them, is unsupported rather than left to DuckDB.
 
 SELECT CAST('P9D' AS INTERVAL)
 => error contains: The emulator does not support CAST to INTERVAL
@@ -13,8 +13,11 @@ SELECT CAST(CAST('P9D' AS STRING) AS INTERVAL)
 SELECT MAKE_INTERVAL(day => 7) * 2
 => error contains: The emulator does not support function $MULTIPLY with INTERVAL
 
-SELECT MAKE_INTERVAL(day => 7) = MAKE_INTERVAL(hour => 168)
+SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) = STRUCT(MAKE_INTERVAL(hour => 168) AS i)
 => error contains: The emulator does not support function $EQUAL with INTERVAL
+
+SELECT GREATEST(MAKE_INTERVAL(day => 7), MAKE_INTERVAL(hour => 168))
+=> error contains: The emulator does not support function GREATEST with INTERVAL
 
 SELECT NULLIF(MAKE_INTERVAL(day => 7), MAKE_INTERVAL())
 => error contains: The emulator does not support function NULLIF with INTERVAL
@@ -37,7 +40,7 @@ SELECT SUM(DISTINCT i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 SELECT MIN(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function MIN with INTERVAL
 
-SELECT MAKE_INTERVAL(day => 7) IN (SELECT MAKE_INTERVAL(day => 7))
+SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IN (SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i))
 => error contains: The emulator does not support IN subquery with INTERVAL
 
 SELECT ROW_NUMBER() OVER (PARTITION BY i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
@@ -48,9 +51,6 @@ SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY i
 
 SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support GROUP BY with INTERVAL
-
-SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i ORDER BY i
-=> error contains: The emulator does not support ORDER BY with INTERVAL
 
 SELECT MAKE_INTERVAL(day => 7) UNION DISTINCT SELECT MAKE_INTERVAL(day => 8)
 => error contains: The emulator does not support set operation with INTERVAL
