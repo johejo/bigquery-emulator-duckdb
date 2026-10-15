@@ -100,19 +100,19 @@ struct Hints {
   // The literal for an optional argument in the longest form.
   std::map<std::string, std::string> optional_samples;
   std::map<std::string, std::vector<std::string>> values;
-  // The values <T1> takes in a signature, by the name of a set of values.
-  std::vector<std::pair<Selector, std::string>> elements;
+  // A set of values and, optionally, the concrete argument type that takes them.
+  std::vector<std::pair<Selector, std::pair<std::string, std::string>>> elements;
   // The literal for arguments of a type in a signature.
   std::vector<std::pair<Selector, std::pair<std::string, std::string>>> arguments;
   // The signatures also probed in their longest form.
   std::vector<Selector> longest;
 
   // The values of the last `elements` hint that matches the signature, or one empty value.
-  std::vector<std::string> Elements(const std::string& signature) {
-    std::vector<std::string> result = {""};
-    for (auto& [selector, set] : elements) {
+  std::pair<std::vector<std::string>, std::string> Elements(const std::string& signature) {
+    std::pair<std::vector<std::string>, std::string> result = {{""}, ""};
+    for (auto& [selector, element] : elements) {
       if (selector.Matches(signature)) {
-        result = values.at(set);
+        result = {values.at(element.first), element.second};
       }
     }
     return result;
@@ -190,11 +190,12 @@ Hints ReadHints(const std::string& path,
       (directive == "sample" ? hints.samples : hints.optional_samples)[fields.at(0)] = fields.at(1);
     } else if (directive == "values" && fields.size() >= 2) {
       hints.values[fields.at(0)] = {fields.begin() + 1, fields.end()};
-    } else if (directive == "elements" && fields.size() == 2) {
+    } else if (directive == "elements" && (fields.size() == 2 || fields.size() == 3)) {
       if (!hints.values.contains(fields.at(1))) {
         fail("names values not defined above");
       }
-      hints.elements.emplace_back(Selector(fields.at(0)), fields.at(1));
+      hints.elements.emplace_back(Selector(fields.at(0)),
+                                  std::pair(fields.at(1), fields.size() == 3 ? fields.at(2) : ""));
     } else if (directive == "argument" && fields.size() == 3) {
       hints.arguments.emplace_back(Selector(fields.at(0)), std::pair(fields.at(1), fields.at(2)));
     } else if (directive == "longest" && fields.size() == 1) {
@@ -279,10 +280,11 @@ struct Call {
   std::string untested;
 };
 
-// The call of a signature with <T1> bound to `element`, in the shortest form or the longest.
+// The call of a signature with <T1>, or `element_type`, bound to `element`.
 Call GeneratedCall(const std::string& name, const googlesql::Function& function,
                    const googlesql::FunctionSignature& signature, const std::string& text,
-                   Hints& hints, const std::string& element, bool longest) {
+                   Hints& hints, const std::string& element, const std::string& element_type,
+                   bool longest) {
   // A RANGE of `element` starts at it, and is unbounded where a second element would end it.
   const bool range = IsRangeSignature(signature);
   bool element_used = false;
@@ -305,7 +307,11 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
       sample = hints.Argument(text, type);
     }
     if (!sample && !element.empty()) {
-      if (kind == googlesql::ARG_KIND_EXPR_RANGE_ANY_1) {
+      if (!element_type.empty()) {
+        if (type == element_type) {
+          sample = element;
+        }
+      } else if (kind == googlesql::ARG_KIND_EXPR_RANGE_ANY_1) {
         sample = "RANGE(" + element + ", NULL)";
       } else if (kind == googlesql::ARG_KIND_EXPR_ANY_1) {
         sample = range && element_used ? "NULL" : element;
@@ -347,7 +353,7 @@ Call GeneratedCall(const std::string& name, const googlesql::Function& function,
   };
 }
 
-// The calls of each signature BigQuery has: one for each value <T1> takes, and the longest form
+// The calls of each signature BigQuery has: one for each element value, and the longest form
 // where the hints ask for it.
 std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name,
                                                          const googlesql::Function& function,
@@ -358,16 +364,17 @@ std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name
       continue;
     }
     const std::string text = signature.DebugString(name);
-    std::ranges::transform(
-        hints.Elements(text), std::back_inserter(calls), [&](const std::string& element) {
-          return std::pair(text, GeneratedCall(name, function, signature, text, hints, element,
-                                               /*longest=*/false));
-        });
+    const auto [elements, element_type] = hints.Elements(text);
+    std::ranges::transform(elements, std::back_inserter(calls), [&](const std::string& element) {
+      return std::pair(text,
+                       GeneratedCall(name, function, signature, text, hints, element, element_type,
+                                     /*longest=*/false));
+    });
     const bool optional = std::ranges::any_of(signature.arguments(), [](const auto& argument) {
       return argument.optional() && !argument.has_argument_name();
     });
     if (optional && hints.Longest(text)) {
-      calls.emplace_back(text, GeneratedCall(name, function, signature, text, hints, "",
+      calls.emplace_back(text, GeneratedCall(name, function, signature, text, hints, "", "",
                                              /*longest=*/true));
     }
   }

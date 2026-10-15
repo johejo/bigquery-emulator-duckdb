@@ -35,11 +35,16 @@ namespace {
 // A GEOGRAPHY is WKT, POINT(longitude latitude) with the longitude in [-180, 180], whose
 // coordinates keep the shortest digits that round-trip: BigQuery keeps them, though the WKT it
 // returns has 15. The translator turns a GEOGRAPHY into that WKT with bq_st_astext wherever a
-// query returns or stores one. Only points are supported.
+// query returns or stores one. An empty geography is GEOMETRYCOLLECTION EMPTY.
 struct Point {
   double longitude;
   double latitude;
 };
+
+constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
+
+// No point means an empty geography, which has no geometry type. EachRow handles SQL NULLs.
+using Geography = std::optional<Point>;
 
 // The shortest digits that round-trip, or with `precision` 15 significant digits, as printf's
 // %.15g writes them and BigQuery writes 0.1 + 0.2 as 0.3 and 0.0000001 as 1e-07. BigQuery writes
@@ -85,13 +90,27 @@ std::optional<Point> ReadPoint(std::string_view text) {
   return point;
 }
 
-absl::StatusOr<Point> ParsePoint(std::string_view text) {
+absl::StatusOr<Geography> ParseGeography(std::string_view text) {
+  if (text == kEmpty) {
+    return std::nullopt;
+  }
   const std::optional<Point> point = ReadPoint(text);
   if (!point) {
-    return absl::UnimplementedError("The emulator supports only point GEOGRAPHY values, not " +
-                                    std::string(text));
+    return absl::UnimplementedError(
+        "The emulator does not support GEOGRAPHY values other than points or empty geometries: " +
+        std::string(text));
   }
-  return *point;
+  return point;
+}
+
+absl::StatusOr<Point> ParsePoint(const Arguments& args, idx_t index, std::string_view context) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(index)));
+  if (!geography) {
+    return absl::OutOfRangeError(
+        std::string(context) +
+        " must be a single point geography; an argument was the empty geography.");
+  }
+  return *geography;
 }
 
 S2Point ToS2Point(const Point& point) {
@@ -212,13 +231,20 @@ class WktReader {
   size_t position_ = 0;
 };
 
-// Only points, whose longitude is taken modulo 360 as ST_GEOGPOINT takes it.
+// Points, whose longitude is taken modulo 360 as ST_GEOGPOINT takes it, and empty geometries.
 absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
   const std::string text = args.String(0);
   WktReader reader(text);
-  if (!reader.Word("POINT") || reader.Word("EMPTY")) {
-    return absl::UnimplementedError(
-        "The emulator supports ST_GEOGFROMTEXT only for a nonempty POINT, not " + text);
+  const bool point = reader.Word("POINT");
+  const bool geometry = point || reader.Word("LINESTRING") || reader.Word("POLYGON") ||
+                        reader.Word("MULTIPOINT") || reader.Word("MULTILINESTRING") ||
+                        reader.Word("MULTIPOLYGON") || reader.Word("GEOMETRYCOLLECTION");
+  if (geometry && reader.Word("EMPTY")) {
+    GOOGLESQL_RETURN_IF_ERROR(reader.End());
+    return std::string(kEmpty);
+  }
+  if (!point) {
+    return absl::UnimplementedError("The emulator does not support ST_GEOGFROMTEXT of " + text);
   }
   GOOGLESQL_RETURN_IF_ERROR(reader.Expect("(", "'(' or EMPTY"));
   GOOGLESQL_ASSIGN_OR_RETURN(const double longitude, reader.Number("longitude"));
@@ -253,8 +279,10 @@ bool Antipodal(const Point& a, const Point& b) {
 // difference of the longitudes in degrees, which gives nearly antipodal points and those at a pole
 // the azimuth BigQuery does, unlike S2Earth::GetInitialBearing.
 absl::StatusOr<std::optional<double>> Azimuth(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point a, ParsePoint(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point b, ParsePoint(args.String(1)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Point a,
+                             ParsePoint(args, 0, "ST_Azimuth: Argument to STAzimuth"));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Point b,
+                             ParsePoint(args, 1, "ST_Azimuth: Argument to STAzimuth"));
   if (Same(a, b) || Antipodal(a, b)) {
     return std::nullopt;
   }
@@ -288,57 +316,65 @@ absl::Status CheckSphere(const Arguments& args, idx_t use_spheroid) {
 }
 
 // ST_DISTANCE and ST_MAXDISTANCE, the same between points.
-absl::StatusOr<double> Distance(const Arguments& args) {
+absl::StatusOr<std::optional<double>> Distance(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  // Unlike ST_DWITHIN, both distance functions return NULL before checking use_spheroid.
+  if (!a || !b) {
+    return std::nullopt;
+  }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 2));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point a, ParsePoint(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point b, ParsePoint(args.String(1)));
-  return Meters(a, b);
+  return Meters(*a, *b);
 }
 
 absl::StatusOr<bool> DWithin(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 3));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point a, ParsePoint(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point b, ParsePoint(args.String(1)));
-  return Meters(a, b) <= args.Double(2);
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  return a && b && Meters(*a, *b) <= args.Double(2);
 }
 
 absl::StatusOr<bool> Equals(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point a, ParsePoint(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point b, ParsePoint(args.String(1)));
-  return Same(a, b);
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  return a && b ? Same(*a, *b) : !a && !b;
 }
 
 absl::StatusOr<double> X(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args, 0, "Argument to ST_X"));
   return point.longitude;
 }
 
 absl::StatusOr<double> Y(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args, 0, "Argument to ST_Y"));
   return point.latitude;
 }
 
-// What a function returns for every point, such as ST_DIMENSION's 0.
-template <auto kValue>
-absl::StatusOr<decltype(kValue)> PointConstant(const Arguments& args) {
-  GOOGLESQL_RETURN_IF_ERROR(ParsePoint(args.String(0)).status());
-  return kValue;
+// What a function returns for a point or an empty geography, such as ST_DIMENSION's 0 or -1.
+template <auto kPoint, auto kEmptyValue>
+absl::StatusOr<decltype(kPoint)> GeographyConstant(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  return geography ? kPoint : kEmptyValue;
 }
 
 absl::StatusOr<std::string> GeometryType(const Arguments& args) {
-  GOOGLESQL_RETURN_IF_ERROR(ParsePoint(args.String(0)).status());
-  return std::string("ST_Point");
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  return std::string(geography ? "ST_Point" : "ST_GeometryCollection");
 }
 
-// ST_LENGTH, ST_AREA and ST_PERIMETER, which are 0 for a point.
+// ST_LENGTH, ST_AREA and ST_PERIMETER, which are 0 for a point or an empty geography.
 absl::StatusOr<double> ZeroMeasure(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 1));
-  GOOGLESQL_RETURN_IF_ERROR(ParsePoint(args.String(0)).status());
+  GOOGLESQL_RETURN_IF_ERROR(ParseGeography(args.String(0)).status());
   return 0.0;
 }
 
 absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (!geography) {
+    return std::string(R"({ "type": "GeometryCollection", "geometries": [ ] } )");
+  }
+  const Point point = *geography;
   return R"({ "type": "Point", "coordinates": [)" + Coordinate(point.longitude) + ", " +
          Coordinate(point.latitude) + "] } ";
 }
@@ -346,8 +382,12 @@ absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
 constexpr std::string_view kGeohashDigits = "0123456789bcdefghjkmnpqrstuvwxyz";
 
 // A maxchars outside [1, 20] is taken as 20.
-absl::StatusOr<std::string> Geohash(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
+absl::StatusOr<std::optional<std::string>> Geohash(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (!geography) {
+    return std::nullopt;
+  }
+  const Point point = *geography;
   int64_t length = args.Int(1);
   if (length < 1 || length > 20) {
     length = 20;
@@ -407,7 +447,8 @@ absl::StatusOr<int64_t> CellIdFromPoint(const Arguments& args) {
         "got " +
         std::to_string(level));
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Point point, ParsePoint(args, 0, "S2_CellIdFromPoint: Argument to S2CellIdFromPoint"));
   return std::bit_cast<int64_t>(S2CellId(ToS2Point(point)).parent(static_cast<int>(level)).id());
 }
 
@@ -420,8 +461,8 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
            EachRow<PointFromGeohash>);
   Register(connection, "bq_st_astext", {kVarchar}, kVarchar,
            EachRow<[](const Arguments& args) -> absl::StatusOr<std::string> {
-             GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args.String(0)));
-             return PointWkt(point);
+             GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+             return geography ? PointWkt(*geography) : std::string(kEmpty);
            }>);
   Register(connection, "bq_st_asgeojson", {kVarchar}, kVarchar, EachRow<AsGeoJson>);
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);
@@ -433,11 +474,16 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_x", {kVarchar}, kDouble, EachRow<X>);
   Register(connection, "bq_st_y", {kVarchar}, kDouble, EachRow<Y>);
   Register(connection, "bq_st_geometrytype", {kVarchar}, kVarchar, EachRow<GeometryType>);
-  Register(connection, "bq_st_dimension", {kVarchar}, kBigint, EachRow<PointConstant<int64_t{0}>>);
-  Register(connection, "bq_st_numpoints", {kVarchar}, kBigint, EachRow<PointConstant<int64_t{1}>>);
-  Register(connection, "bq_st_isempty", {kVarchar}, kBoolean, EachRow<PointConstant<false>>);
-  Register(connection, "bq_st_iscollection", {kVarchar}, kBoolean, EachRow<PointConstant<false>>);
-  Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean, EachRow<PointConstant<true>>);
+  Register(connection, "bq_st_dimension", {kVarchar}, kBigint,
+           EachRow<GeographyConstant<int64_t{0}, int64_t{-1}>>);
+  Register(connection, "bq_st_numpoints", {kVarchar}, kBigint,
+           EachRow<GeographyConstant<int64_t{1}, int64_t{0}>>);
+  Register(connection, "bq_st_isempty", {kVarchar}, kBoolean,
+           EachRow<GeographyConstant<false, true>>);
+  Register(connection, "bq_st_iscollection", {kVarchar}, kBoolean,
+           EachRow<GeographyConstant<false, false>>);
+  Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean,
+           EachRow<GeographyConstant<true, false>>);
   Register(connection, "bq_st_zero_measure", {kVarchar, kBoolean, kVarchar}, kDouble,
            EachRow<ZeroMeasure>);
   Register(connection, "bq_st_geohash", {kVarchar, kBigint}, kVarchar, EachRow<Geohash>);

@@ -8,7 +8,7 @@ SELECT ST_DISTANCE(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0), TRUE)
 SELECT TO_JSON_STRING(ST_GEOGPOINT(1, 2))
 => error contains: The emulator does not support function TO_JSON_STRING with GEOGRAPHY
 
-# ST_GEOGFROMTEXT reads only points.
+# ST_GEOGFROMTEXT reads only points and empty geometries.
 
 SELECT ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)')
-=> error contains: The emulator supports ST_GEOGFROMTEXT only for a nonempty POINT
+=> error contains: The emulator does not support ST_GEOGFROMTEXT of LINESTRING
