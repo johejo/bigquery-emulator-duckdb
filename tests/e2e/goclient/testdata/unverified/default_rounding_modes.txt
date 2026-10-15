@@ -1,0 +1,31 @@
+# CREATE TABLE AS SELECT into a dataset with a default rounding mode
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets (Dataset.defaultRoundingMode)
+#
+# Each script creates the dataset unverified_rounding_even, whose default is ROUND_HALF_EVEN, and
+# tables of its own. The dataset stays in the project after the scripts run.
+#
+# The emulator rounds the values CREATE TABLE AS SELECT writes with the rounding modes its columns
+# have when it is translated, before it knows the dataset's default, so it rejects a parameterized
+# column that takes ROUND_HALF_EVEN from the dataset. These cases move to scalars/known_bugs.txt
+# once answered.
+
+# Whether a parameterized column takes the dataset's default: 2.25 and -2.25 round to "2.2" and
+# "-2.2" if it does, and to "2.3" and "-2.3" if it does not.
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_even.ctas_parameterized (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n;
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.ctas_parameterized
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_even.ctas_negative (n NUMERIC(5, 1)) AS SELECT NUMERIC '-2.25' AS n;
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.ctas_negative
+?>
+
+# The same for a BIGNUMERIC column with no digits after the point: 2.5 rounds to "2" if it takes
+# the default, and to "3" if it does not.
+
+CREATE SCHEMA IF NOT EXISTS unverified_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+CREATE OR REPLACE TABLE unverified_rounding_even.ctas_bignumeric (n BIGNUMERIC(10, 0)) AS SELECT BIGNUMERIC '2.5' AS n;
+SELECT CAST(n AS STRING) FROM unverified_rounding_even.ctas_bignumeric
+?>
