@@ -298,6 +298,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                              .project = settings.default_project,
                              .dataset = settings.default_dataset,
                              .temporary = nullptr,
+                             .source = source.get(),
                              .has_session_user = has_session_user_,
                              .evaluate =
                                  [this](const std::string& sql, const googlesql::Type* type) {

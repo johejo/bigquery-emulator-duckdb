@@ -271,6 +271,18 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  std::optional<DatasetMetadata> DescribeDataset(const std::string& project,
+                                                 const std::string& dataset) override {
+    if (IsDuckDbSchema(dataset)) {
+      return std::nullopt;
+    }
+    const QueryResult result = backend_.Execute(DatasetEntriesQuery(project, dataset));
+    if (result.rows.empty()) {
+      return std::nullopt;
+    }
+    return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+  }
+
   std::vector<std::string> ListDatasets(const std::string& project) override {
     return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
   }
