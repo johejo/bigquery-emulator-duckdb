@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -67,6 +68,14 @@ inline FieldSchema AsNullable(FieldSchema field) {
   field.mode = FieldMode::kNullable;
   return field;
 }
+
+// The field that the start or end bound of the RANGE `field` is, named `name`: a NULLABLE field of
+// its element type, whose NULL is an unbounded end, as the Storage Read API gives a RANGE.
+FieldSchema RangeBoundField(const FieldSchema& field, std::string name);
+
+// The bounds of a RANGE cell, "[start, end)" as the emulator returns it, each a cell of the
+// range's element type or nullopt where UNBOUNDED; nullopt for text of another form.
+std::optional<std::array<std::optional<std::string>, 2>> RangeCellBounds(std::string_view text);
 
 // The rounding modes a NUMERIC or BIGNUMERIC field takes.
 inline constexpr std::string_view kRoundHalfAwayFromZero = "ROUND_HALF_AWAY_FROM_ZERO";

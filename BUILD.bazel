@@ -193,6 +193,7 @@ cc_library(
     implementation_deps = [
         ":api_error",
         ":backend",
+        ":field_schema",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public/types",

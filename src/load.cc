@@ -449,8 +449,8 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
                       const json& config, const std::vector<FieldSchema>& schema,
                       const ParquetColumn& parquet) {
-  if (HasType(schema, FieldType::kRange)) {
-    throw ApiError::Unsupported("loading RANGE columns");
+  if (format != "CSV" && HasType(schema, FieldType::kRange)) {
+    throw ApiError::Unsupported("loading RANGE columns from " + format);
   }
   std::vector<std::string> quoted;
   std::ranges::transform(paths, std::back_inserter(quoted), QuoteLiteral);
@@ -463,16 +463,20 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     if (!schema.empty()) {
       sql += ", auto_detect=false";
       std::vector<std::string> columns;
-      // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted.
+      // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted, as
+      // is a RANGE, which has no text form in DuckDB.
       std::vector<std::string> conversions;
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
+        const bool range = field.type == FieldType::kRange;
+        const std::string name = QuoteIdentifier(field.name);
         columns.push_back(QuoteLiteral(field.name) + ": " +
-                          QuoteLiteral(big ? "VARCHAR" : ToDuckDbType(field)));
+                          QuoteLiteral(big || range ? "VARCHAR" : ToDuckDbType(field)));
         conversions.push_back(
-            big ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}",
-                              QuoteIdentifier(field.name), ToDuckDbType(field))
-                : QuoteIdentifier(field.name));
+            big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
+                                  ToDuckDbType(field))
+            : range ? RangeFromText(name, field) + " AS " + name
+                    : name);
       }
       sql += ", columns={" + Join(columns, ", ") + "})";
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);

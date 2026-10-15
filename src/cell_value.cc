@@ -1,6 +1,5 @@
 #include "src/cell_value.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -24,6 +23,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -134,21 +134,15 @@ absl::StatusOr<googlesql::Value> CellValue(const googlesql::Type* type, const js
       return Value::Interval(interval);
     }
     case googlesql::TYPE_RANGE: {
-      // "[start, end)", whose bounds are cells of the element type or UNBOUNDED.
-      const size_t separator = text.find(", ");
-      if (text.size() < 6 || text.front() != '[' || text.back() != ')' ||
-          separator == std::string::npos) {
+      const auto cells = RangeCellBounds(text);
+      if (!cells) {
         return Undecodable(type, text);
       }
       const googlesql::Type* element = type->AsRange()->element_type();
       std::vector<Value> bounds;
-      for (const std::string& bound : {
-               text.substr(1, separator - 1),
-               text.substr(separator + 2, text.size() - separator - 3),
-           }) {
-        GOOGLESQL_ASSIGN_OR_RETURN(
-            bounds.emplace_back(),
-            CellValue(element, bound == "UNBOUNDED" ? json(nullptr) : json(bound)));
+      for (const auto& bound : *cells) {
+        GOOGLESQL_ASSIGN_OR_RETURN(bounds.emplace_back(),
+                                   CellValue(element, bound ? json(*bound) : json(nullptr)));
       }
       return Value::MakeRange(bounds.at(0), bounds.at(1));
     }

@@ -29,6 +29,10 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
 std::string InsertValue(const nlohmann::json& value, const FieldSchema& field,
                         bool ignore_unknown_values);
 
+// The DuckDB value of the RANGE `field` that `text`, a VARCHAR in the form "[start, end)", holds,
+// where NULL and UNBOUNDED are unbounded ends and each other bound is cast to the element type.
+std::string RangeFromText(const std::string& text, const FieldSchema& field);
+
 // The DuckDB value `sql` of the REPEATED `field` with each element replaced by
 // `element(name, element_field, depth + 1)`, where `name` is the lambda's parameter, _e and
 // `depth`, and `element_field` is `field` as NULLABLE.

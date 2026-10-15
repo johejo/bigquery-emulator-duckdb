@@ -177,6 +177,28 @@ json FieldSchema::ToJson() const {
   return field;
 }
 
+FieldSchema RangeBoundField(const FieldSchema& field, std::string name) {
+  if (!field.range_element_type) {
+    throw ApiError::Internal("RANGE field " + field.name + " has no element type");
+  }
+  return {.name = std::move(name), .type = *field.range_element_type};
+}
+
+std::optional<std::array<std::optional<std::string>, 2>> RangeCellBounds(std::string_view text) {
+  const size_t separator = text.find(", ");
+  if (text.size() < 6 || text.front() != '[' || text.back() != ')' ||
+      separator == std::string_view::npos) {
+    return std::nullopt;
+  }
+  const auto bound = [](std::string_view cell) {
+    return cell == "UNBOUNDED" ? std::nullopt : std::optional<std::string>(cell);
+  };
+  return std::array{
+      bound(text.substr(1, separator - 1)),
+      bound(text.substr(separator + 2, text.size() - separator - 3)),
+  };
+}
+
 FieldSchema FieldSchemaFromJson(const json& value) {
   if (!value.is_object()) {
     throw ApiError::Invalid("A schema field must be an object");

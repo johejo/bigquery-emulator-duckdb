@@ -197,6 +197,31 @@ SELECT ARRAY(
   ORDER BY r)
 => [{"v": "[UNBOUNDED, 2021-01-01)"}, {"v": "[2020-01-01, 2020-02-01)"}, {"v": "[2020-01-01, UNBOUNDED)"}]
 
+# BigQuery rejects APPROX_COUNT_DISTINCT, APPROX_TOP_COUNT and APPROX_TOP_SUM over RANGE values,
+# naming the functions it implements them with; confirmed against BigQuery.
+SELECT APPROX_COUNT_DISTINCT(r) FROM UNNEST([
+  RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE<DATE> '[2020-01-01, NULL)',
+  RANGE<DATE> '[2020-01-01, 2020-02-01)']) AS r
+=> error: Unsupported type RANGE for hll_count.init.
+
+SELECT STRING_AGG(CAST(t.value AS STRING) || ' ' || CAST(t.count AS STRING), ', ' ORDER BY o)
+FROM UNNEST((
+  SELECT APPROX_TOP_COUNT(r, 2) FROM UNNEST([
+    RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE<DATE> '[2020-01-01, 2020-02-01)',
+    RANGE<DATE> '[2020-01-01, NULL)', RANGE<DATE> '[UNBOUNDED, 2020-01-01)',
+    RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r)) AS t
+  WITH OFFSET o
+=> error: Unsupported type RANGE for approx_top_count_shard.
+
+SELECT STRING_AGG(CAST(t.value AS STRING) || ' ' || CAST(t.sum AS STRING), ', ' ORDER BY o)
+FROM UNNEST((
+  SELECT APPROX_TOP_SUM(r, w, 2) FROM UNNEST([
+    STRUCT(RANGE<DATE> '[2020-01-01, UNBOUNDED)' AS r, 3 AS w),
+    (RANGE<DATE> '[2020-01-01, 2020-02-01)', 4), (RANGE<DATE> '[UNBOUNDED, 2020-01-01)', 1),
+    (RANGE<DATE> '[2020-01-01, NULL)', 2)]))) AS t
+  WITH OFFSET o
+=> error: Unsupported type RANGE for approx_top_sum_shard.
+
 SELECT CAST('[2020-01-01, 2020-01-02)' AS RANGE<DATE>)
 => "[2020-01-01, 2020-01-02)"
 

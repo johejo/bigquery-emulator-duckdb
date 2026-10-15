@@ -23,7 +23,7 @@ RPC list the forms the emulator rejected.
 
 | RPC | Status | Notes |
 | --- | --- | --- |
-| `CreateReadSession` | Partial | See [Reading rows](storage-api.md#reading-rows). Unsupported: Arrow buffer compression; JSON columns in Arrow; RANGE columns; historical snapshots; response compression; sampling. |
+| `CreateReadSession` | Partial | See [Reading rows](storage-api.md#reading-rows). Unsupported: Arrow buffer compression; JSON columns in Arrow; historical snapshots; response compression; sampling. |
 | `ReadRows` | Partial | Unsupported: serialization options. |
 | `SplitReadStream` | Supported |  |
 

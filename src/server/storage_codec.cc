@@ -1,12 +1,14 @@
 #include "src/server/storage_codec.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -63,6 +65,18 @@ std::string Bytes(const json& value) {
     throw ApiError::Internal("Invalid internal BYTES value");
   }
   return result;
+}
+
+// The bounds of a RANGE cell, each a cell of its element type or null where unbounded.
+std::array<json, 2> RangeBounds(const json& value) {
+  const auto bounds = RangeCellBounds(Text(value));
+  if (!bounds) {
+    throw ApiError::Internal("Invalid internal RANGE value");
+  }
+  std::array<json, 2> cells;
+  std::ranges::transform(*bounds, cells.begin(),
+                         [](const auto& bound) { return bound ? json(*bound) : json(nullptr); });
+  return cells;
 }
 
 int64_t Temporal(const FieldSchema& field, const json& value) {
@@ -173,6 +187,11 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field) {
     case FieldType::kString:
       ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
       break;
+    case FieldType::kRange:
+      ArrowCheck(ArrowSchemaSetTypeStruct(out, 2));
+      ArrowField(out->children[0], RangeBoundField(field, "start"));
+      ArrowField(out->children[1], RangeBoundField(field, "end"));
+      break;
     default:
       throw ApiError::Invalid("Storage Read does not support " +
                               std::string(FieldTypeName(field.type)));
@@ -212,6 +231,14 @@ void ArrowCell(ArrowArray* array, const FieldSchema& field, const json& value) {
       }
       ArrowCheck(ArrowArrayFinishElement(array));
       break;
+    case FieldType::kRange: {
+      const auto bounds = RangeBounds(value);
+      for (size_t i = 0; i < bounds.size(); ++i) {
+        ArrowCell(array->children[i], RangeBoundField(field, ""), bounds.at(i));
+      }
+      ArrowCheck(ArrowArrayFinishElement(array));
+      break;
+    }
     case FieldType::kInteger:
       ArrowCheck(ArrowArrayAppendInt(array, std::stoll(Text(value))));
       break;
@@ -258,7 +285,14 @@ bool AvroName(std::string_view name) {
          std::ranges::all_of(name, [&](char c) { return letter(c) || (c >= '0' && c <= '9'); });
 }
 
-json AvroField(const FieldSchema& field, int& record_id) {
+// The names of the Avro records a schema has defined so far. Its RECORD fields are numbered, and
+// the record of a RANGE is defined once for each element type, then named.
+struct AvroNames {
+  int record_id = 0;
+  std::set<FieldType> ranges = {};
+};
+
+json AvroField(const FieldSchema& field, AvroNames& names) {
   if (field.precision || field.scale) {
     throw ApiError::Invalid("Storage Read does not support parameterized decimals");
   }
@@ -295,13 +329,13 @@ json AvroField(const FieldSchema& field, int& record_id) {
       };
       break;
     case FieldType::kRecord: {
-      const std::string name = "__record_" + std::to_string(++record_id) + "__";
+      const std::string name = "__record_" + std::to_string(++names.record_id) + "__";
       json fields = json::array();
       for (const auto& child : field.fields) {
         if (!AvroName(child.name)) {
           throw ApiError::Invalid("Avro field name is not alphanumeric: " + child.name);
         }
-        fields.push_back({{"name", child.name}, {"type", AvroField(child, record_id)}});
+        fields.push_back({{"name", child.name}, {"type", AvroField(child, names)}});
       }
       type = {{"type", "record"}, {"name", name}, {"fields", std::move(fields)}};
       break;
@@ -316,6 +350,27 @@ json AvroField(const FieldSchema& field, int& record_id) {
     case FieldType::kJson:
       type = {{"type", "string"}, {"sqlType", FieldTypeName(field.type)}};
       break;
+    case FieldType::kRange: {
+      const FieldType element = RangeBoundField(field, "").type;
+      const std::string name = "RANGE_" + std::string(FieldTypeName(element));
+      if (!names.ranges.insert(element).second) {
+        type = "google.sqlType." + name;
+        break;
+      }
+      json fields = json::array();
+      for (const char* bound : {"start", "end"}) {
+        fields.push_back(
+            {{"name", bound}, {"type", AvroField(RangeBoundField(field, bound), names)}});
+      }
+      type = {
+          {"type", "record"},
+          {"name", name},
+          {"namespace", "google.sqlType"},
+          {"sqlType", "RANGE"},
+          {"fields", std::move(fields)},
+      };
+      break;
+    }
     default:
       throw ApiError::Invalid("Storage Read does not support " +
                               std::string(FieldTypeName(field.type)));
@@ -362,6 +417,11 @@ void AvroCell(std::string& out, const FieldSchema& field, const json& value) {
     case FieldType::kRecord:
       for (size_t i = 0; i < field.fields.size(); ++i) {
         AvroCell(out, field.fields.at(i), value.at("f").at(i).at("v"));
+      }
+      return;
+    case FieldType::kRange:
+      for (const json& bound : RangeBounds(value)) {
+        AvroCell(out, RangeBoundField(field, ""), bound);
       }
       return;
     case FieldType::kInteger:
@@ -677,14 +737,14 @@ json ProtoMessage(const Message& message, const std::vector<FieldSchema>& schema
 
 std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow) {
   if (!arrow) {
-    int id = 0;
+    AvroNames names;
     const FieldSchema root{
         .name = "__root__",
         .type = FieldType::kRecord,
         .mode = FieldMode::kRequired,
         .fields = schema,
     };
-    json result = AvroField(root, id);
+    json result = AvroField(root, names);
     result["name"] = "__root__";
     return result.dump();
   }
