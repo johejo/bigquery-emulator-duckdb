@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <iterator>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -413,6 +414,18 @@ std::optional<std::string> AddKeyFromRawBytes(const ScalarCall& call) {
   }
   return "bq_keys_add_aes_gcm_key(" + call.arguments.at(0).sql + ", " + call.arguments.at(2).sql +
          ")";
+}
+
+// TEXT_ANALYZE, whose analyzer and analyzer_options BigQuery requires to be constant. GoogleSQL
+// passes both, the omitted ones as their defaults.
+std::optional<std::string> TextAnalyze(const ScalarCall& call) {
+  for (std::size_t i = 1; i < call.arguments.size(); ++i) {
+    if (!IsConstant(call.Argument(i))) {
+      throw std::invalid_argument("Argument #" + std::to_string(i + 1) +
+                                  " must be constant; error in TEXT_ANALYZE expression");
+    }
+  }
+  return "bq_text_analyze(" + Join(Sqls(call), ", ") + ")";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

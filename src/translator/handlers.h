@@ -28,6 +28,7 @@ std::optional<std::string> ConcatStrings(const ScalarCall& call);
 std::optional<std::string> Format(const ScalarCall& call);
 std::optional<std::string> Extremum(const ScalarCall& call);
 std::optional<std::string> AddKeyFromRawBytes(const ScalarCall& call);
+std::optional<std::string> TextAnalyze(const ScalarCall& call);
 
 // Equality, IN, CASE with a value and NULLIF over STRUCTs, which BigQuery compares field by field
 // with NULL fields propagating NULL; Call in function.cc takes these calls from their rules.

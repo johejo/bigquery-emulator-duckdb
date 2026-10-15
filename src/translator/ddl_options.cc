@@ -15,6 +15,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/table_metadata.h"
@@ -125,7 +126,7 @@ bool ConstantOptionValue(const googlesql::ResolvedExpr& expression, std::string_
                                   "'; failed to evaluate '" + std::string(option) + "' in " +
                                   std::string(object) + " OPTIONS");
     }
-    if (!call->function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
+    if (!IsBuiltinFunction(*call->function())) {
       Unsupported(scope, "function " + name + " in option values");
       return false;
     }

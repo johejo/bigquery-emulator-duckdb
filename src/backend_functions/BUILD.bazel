@@ -88,6 +88,32 @@ cc_library(
 )
 
 cc_library(
+    name = "text_analysis",
+    srcs = ["text_analysis.cc"],
+    hdrs = ["text_analysis.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":register",
+        ":scalar",
+        "//:duckdb_handle",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
+        "@googlesql//googlesql/public/functions:regexp",
+        "@googlesql//googlesql/public/functions:string",
+        # GoogleSQL's regexp brings in the single-header copy, which the include finds first.
+        "@nlohmann_json//:singleheader-json",
+        "@re2",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "datetime",
     srcs = ["datetime.cc"],
     hdrs = ["datetime.h"],

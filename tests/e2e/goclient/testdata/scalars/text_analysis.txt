@@ -1,0 +1,224 @@
+## Text analysis functions
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions
+# The expected values are the examples of the text analysis documentation:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis
+
+# LOG_ANALYZER, the default, splits at delimiters and lowercases ASCII letters.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.')
+=> [{"v": "i"}, {"v": "like"}, {"v": "pie"}, {"v": "you"}, {"v": "like"}, {"v": "pie"}, {"v": "they"}, {"v": "like"}, {"v": "2"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'LOG_ANALYZER')
+=> [{"v": "i"}, {"v": "like"}, {"v": "pie"}, {"v": "you"}, {"v": "like"}, {"v": "pie"}, {"v": "they"}, {"v": "like"}, {"v": "2"}, {"v": "pies"}]
+
+# NO_OP_ANALYZER keeps the text as one term, unchanged.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'NO_OP_ANALYZER')
+=> [{"v": "I like pie, you like-pie, they like 2 PIEs."}]
+
+# PATTERN_ANALYZER's default pattern, \b\w{2,}\b, leaves out one-character words.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'PATTERN_ANALYZER')
+=> [{"v": "like"}, {"v": "pie"}, {"v": "you"}, {"v": "like"}, {"v": "pie"}, {"v": "they"}, {"v": "like"}, {"v": "pies"}]
+
+# Token filters apply in order, and replace the default lowercasing.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-zA-Z]*"], "token_filters": [{"normalizer": {"mode": "LOWER"}}, {"stop_words": ["they", "pie"]}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "you"}, {"v": "like"}, {"v": "like"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"stop_words": ["they", "pie"]}]}')
+=> [{"v": "I"}, {"v": "like"}, {"v": "you"}, {"v": "like"}, {"v": "like"}, {"v": "2"}, {"v": "PIEs"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFKC", "icu_case_folding": true}}, {"stop_words": ["pies", "2"]}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"stop_words": ["pies", "2"]}, {"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFKC", "icu_case_folding": true}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "2"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"stop_words": ["like", "you"]}, {"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFKC", "icu_case_folding": true}}, {"stop_words": ["ño"]}]}')
+=> [{"v": "i"}, {"v": "❶"}, {"v": "2"}, {"v": "pies"}, {"v": "pies"}]
+
+# Normalizer modes.
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "NONE"}}]}')
+=> [{"v": "I"}, {"v": "like"}, {"v": "❶"}, {"v": "②"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "Ño"}, {"v": "PIEs"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "LOWER"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "②"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "Ño"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "UNICODE_LOWER"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "②"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+# ICU_NORMALIZE defaults to NFKC with case folding.
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_case_folding": true}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "2"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_case_folding": false}}]}')
+=> [{"v": "I"}, {"v": "like"}, {"v": "❶"}, {"v": "2"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "Ño"}, {"v": "PIEs"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFC"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "②"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFKC"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "2"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+# NFD and NFKD decompose ñ into n and U+0303.
+SELECT TEXT_ANALYZE('Ño', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFD"}}]}')
+=> [{"v": "ño"}]
+
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFKD"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "2"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+# BAG_OF_WORDS counts each term, NULL included.
+SELECT BAG_OF_WORDS(['I', 'like', 'pie', 'pie', 'pie', NULL])
+=> [{"v": {"f": [{"v": null}, {"v": "1"}]}}, {"v": {"f": [{"v": "I"}, {"v": "1"}]}}, {"v": {"f": [{"v": "like"}, {"v": "1"}]}}, {"v": {"f": [{"v": "pie"}, {"v": "3"}]}}]
+
+SELECT BAG_OF_WORDS(['yum', 'yum', 'pie', NULL])
+=> [{"v": {"f": [{"v": null}, {"v": "1"}]}}, {"v": {"f": [{"v": "pie"}, {"v": "1"}]}}, {"v": {"f": [{"v": "yum"}, {"v": "2"}]}}]
+
+## Answers from BigQuery, where the documentation does not settle them
+# Custom delimiters keep the spaces next to them; there is no empty term after the final period.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'LOG_ANALYZER', analyzer_options => '{"delimiters": [",", ".", "-"]}')
+=> [{"v": "i like pie"}, {"v": " you like"}, {"v": "pie"}, {"v": " they like 2 pies"}]
+
+# A pattern's empty matches are not terms.
+SELECT TEXT_ANALYZE('I like pie, you like-pie, they like 2 PIEs.', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-zA-Z]*"]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "pie"}, {"v": "you"}, {"v": "like"}, {"v": "pie"}, {"v": "they"}, {"v": "like"}, {"v": "pies"}]
+
+# NFD keeps ②, which the documentation shows as 2.
+SELECT TEXT_ANALYZE('I like ❶ ② pies, you like Ño PIEs', analyzer => 'LOG_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFD"}}]}')
+=> [{"v": "i"}, {"v": "like"}, {"v": "❶"}, {"v": "②"}, {"v": "pies"}, {"v": "you"}, {"v": "like"}, {"v": "ño"}, {"v": "pies"}]
+
+# A longer default delimiter takes precedence over its prefix %; %25 is not a delimiter.
+SELECT TEXT_ANALYZE('a%2526b%25c')
+=> [{"v": "a"}, {"v": "b"}, {"v": "25c"}]
+
+# Unicode whitespace, which the default delimiters do not list, does not split terms.
+SELECT TEXT_ANALYZE('a　b c')
+=> [{"v": "a　b c"}]
+
+# \w and \b are ASCII in RE2.
+SELECT TEXT_ANALYZE('héllo wörld', analyzer => 'PATTERN_ANALYZER')
+=> [{"v": "llo"}, {"v": "rld"}]
+
+# A pattern has no capturing groups.
+SELECT TEXT_ANALYZE('abab', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["a(b)"]}')
+=> error: Capturing groups are not allowed for pattern analyzer. Found 1 in pattern 'a(b)'. Error in TEXT_ANALYZE expression
+
+# NULL and empty text.
+SELECT TEXT_ANALYZE(NULL) IS NULL
+=> "true"
+
+SELECT ARRAY_LENGTH(TEXT_ANALYZE(''))
+=> "0"
+
+SELECT TEXT_ANALYZE('', analyzer => 'NO_OP_ANALYZER')
+=> []
+
+# An explicit NULL analyzer or analyzer_options gives no terms.
+SELECT TEXT_ANALYZE('A b', analyzer => NULL)
+=> []
+
+SELECT TEXT_ANALYZE('A b', analyzer => 'LOG_ANALYZER', analyzer_options => NULL)
+=> []
+
+# The analyzer and its options are constant.
+SELECT TEXT_ANALYZE(s, analyzer => a) FROM UNNEST([STRUCT('A b' AS s, 'NO_OP_ANALYZER' AS a)])
+=> error: Argument #2 must be constant; error in TEXT_ANALYZE expression
+
+SELECT TEXT_ANALYZE(s, analyzer_options => o) FROM UNNEST([STRUCT('A b' AS s, '{"delimiters": ["b"]}' AS o)])
+=> error: Argument #3 must be constant; error in TEXT_ANALYZE expression
+
+# The analyzer is named, in upper case.
+SELECT TEXT_ANALYZE('A b', 'NO_OP_ANALYZER')
+=> error contains: No matching signature for function BIGQUERYGOOGLESQL:TEXT_ANALYZE
+
+SELECT TEXT_ANALYZE('A b', analyzer => 'no_op_analyzer')
+=> error: Invalid analyzer_name 'no_op_analyzer'; error in TEXT_ANALYZE expression
+
+# Errors; SAFE. is not supported.
+SELECT TEXT_ANALYZE('a', analyzer => 'X')
+=> error: Invalid analyzer_name 'X'; error in TEXT_ANALYZE expression
+
+SELECT SAFE.TEXT_ANALYZE('a', analyzer => 'X') IS NULL
+=> error: SAFE with function text_analyze is not supported.
+
+SELECT TEXT_ANALYZE('a', analyzer_options => 'not json')
+=> error: Analyzer options must be a valid JSON-formatted string, got: not json; error in TEXT_ANALYZE expression
+
+SELECT TEXT_ANALYZE('a', analyzer_options => '[]')
+=> error contains: Invalid Argument Error: At  of [] - unexpected instance type
+
+SELECT TEXT_ANALYZE('a', analyzer_options => '{"unknown": 1}')
+=> error contains: Invalid Argument Error: At  of {"unknown":1} - validation failed for additional property 'unknown': instance invalid as per false-schema
+
+# NO_OP_ANALYZER takes no options.
+SELECT TEXT_ANALYZE('A b', analyzer => 'NO_OP_ANALYZER', analyzer_options => '{}')
+=> [{"v": "A b"}]
+
+SELECT TEXT_ANALYZE('A b', analyzer => 'NO_OP_ANALYZER', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "LOWER"}}]}')
+=> error contains: Invalid Argument Error: At  of {"token_filters":[{"normalizer":{"mode":"LOWER"}}]} - validation failed for additional property 'token_filters': instance invalid as per false-schema
+
+# delimiters is for LOG_ANALYZER and patterns for PATTERN_ANALYZER.
+SELECT TEXT_ANALYZE('a b', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"delimiters": [" "]}')
+=> error contains: Invalid Argument Error: At  of {"delimiters":[" "]} - validation failed for additional property 'delimiters': instance invalid as per false-schema
+
+SELECT TEXT_ANALYZE('a b', analyzer => 'LOG_ANALYZER', analyzer_options => '{"patterns": ["a"]}')
+=> error contains: Invalid Argument Error: At  of {"patterns":["a"]} - validation failed for additional property 'patterns': instance invalid as per false-schema
+
+# Delimiters are ASCII strings of at most 16 characters.
+SELECT TEXT_ANALYZE('a0123456789abcdefb', analyzer_options => '{"delimiters": ["0123456789abcdef"]}')
+=> [{"v": "a"}, {"v": "b"}]
+
+SELECT TEXT_ANALYZE('a0123456789abcdefgb', analyzer_options => '{"delimiters": ["0123456789abcdefg"]}')
+=> error contains: Invalid Argument Error: At /delimiters/0 of "0123456789abcdefg" - instance is too long as per maxLength: 16
+
+SELECT TEXT_ANALYZE('aéb', analyzer_options => '{"delimiters": ["é"]}')
+=> error: delimiter é in custom LOG_ANALYZER config contains a non-ascii character; error in TEXT_ANALYZE expression
+
+SELECT TEXT_ANALYZE('ab', analyzer_options => '{"delimiters": [""]}')
+=> error contains: Invalid Argument Error: At /delimiters/0 of "" - instance is too short as per minLength:1
+
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"delimiters": []}')
+=> error contains: Invalid Argument Error: At /delimiters of [] - array has too few items
+
+# patterns has one element.
+SELECT TEXT_ANALYZE('ab', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["a", "b"]}')
+=> error contains: Invalid Argument Error: At /patterns of ["a","b"] - array has too many items
+
+SELECT TEXT_ANALYZE('ab', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["("]}')
+=> error: Invalid regular expression pattern '('. Error in TEXT_ANALYZE expression
+
+# stop_words has at least one element, none of them empty, although the documentation allows
+# an empty string.
+SELECT TEXT_ANALYZE('a b', analyzer_options => '{"token_filters": [{"stop_words": []}]}')
+=> error contains: Invalid Argument Error: At /token_filters/0 of {"stop_words":[]} - no subschema has succeeded, but one of them is required to validate. Type: oneOf, number of failed subschemas: 2
+
+SELECT TEXT_ANALYZE('a b', analyzer_options => '{"token_filters": [{"stop_words": [""]}]}')
+=> error contains: Invalid Argument Error: At /token_filters/0 of {"stop_words":[""]} - no subschema has succeeded, but one of them is required to validate. Type: oneOf, number of failed subschemas: 2
+
+# A normalizer's mode is LOWER by default, and other modes ignore the ICU options.
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": [{"normalizer": {}}]}')
+=> [{"v": "a"}, {"v": "b"}]
+
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "UPPER"}}]}')
+=> error contains: Invalid Argument Error: At /token_filters/0 of {"normalizer":{"mode":"UPPER"}} - no subschema has succeeded, but one of them is required to validate. Type: oneOf, number of failed subschemas: 2
+
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "LOWER", "icu_case_folding": true}}]}')
+=> [{"v": "a"}, {"v": "b"}]
+
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE", "icu_normalize_mode": "NFX"}}]}')
+=> error contains: Invalid Argument Error: At /token_filters/0 of {"normalizer":{"icu_normalize_mode":"NFX","mode":"ICU_NORMALIZE"}} - no subschema has succeeded, but one of them is required to validate. Type: oneOf, number of failed subschemas: 2
+
+# token_filters is not empty, and each filter object has one filter.
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": []}')
+=> error contains: Invalid Argument Error: At /token_filters of [] - array has too few items
+
+SELECT TEXT_ANALYZE('A b', analyzer_options => '{"token_filters": [{"stop_words": ["b"], "normalizer": {"mode": "LOWER"}}]}')
+=> error contains: Invalid Argument Error: At /token_filters/0 of {"normalizer":{"mode":"LOWER"},"stop_words":["b"]} - no subschema has succeeded, but one of them is required to validate. Type: oneOf, number of failed subschemas: 2
+
+# BAG_OF_WORDS sorts its terms by their bytes, NULL first.
+SELECT BAG_OF_WORDS(['b', 'a', 'B', 'a', NULL])
+=> [{"v": {"f": [{"v": null}, {"v": "1"}]}}, {"v": {"f": [{"v": "B"}, {"v": "1"}]}}, {"v": {"f": [{"v": "a"}, {"v": "2"}]}}, {"v": {"f": [{"v": "b"}, {"v": "1"}]}}]
+
+# Empty and NULL documents.
+SELECT ARRAY_LENGTH(BAG_OF_WORDS(CAST([] AS ARRAY<STRING>)))
+=> "0"
+
+SELECT BAG_OF_WORDS(CAST(NULL AS ARRAY<STRING>)) IS NULL
+=> "true"

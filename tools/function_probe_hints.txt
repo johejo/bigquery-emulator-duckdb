@@ -259,6 +259,12 @@ query KLL_QUANTILES.EXTRACT_POINT_INT64 SELECT KLL_QUANTILES.EXTRACT_POINT_INT64
 query KLL_QUANTILES.MERGE_POINT_FLOAT64 SELECT KLL_QUANTILES.MERGE_POINT_FLOAT64(s, 0.5) FROM (SELECT KLL_QUANTILES.INIT_FLOAT64(x) AS s FROM UNNEST([1.5, 2.5]) AS x)
 query KLL_QUANTILES.MERGE_POINT_INT64 SELECT KLL_QUANTILES.MERGE_POINT_INT64(s, 0.5) FROM (SELECT KLL_QUANTILES.INIT_INT64(x) AS s FROM UNNEST([1, 2]) AS x)
 
+# Named arguments choose TEXT_ANALYZE's analyzer and its options.
+query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc')
+query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'NO_OP_ANALYZER')
+query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]+"]}')
+query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer_options => '{"delimiters": ["b"], "token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}, {"stop_words": ["a"]}]}')
+
 # Limits the probe's calls do not show.
 note CONTAINS_SUBSTR Takes STRING only.
 note SESSION_USER Requires --session-user; returns the configured identity for every client.

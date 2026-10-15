@@ -155,6 +155,7 @@ cc_library(
     implementation_deps = [
         ":context",
         ":query",
+        "//:catalog",
         "//:duckdb_sql",
         "//:field_schema",
         "//:translated_statement",

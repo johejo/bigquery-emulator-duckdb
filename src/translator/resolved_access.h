@@ -22,6 +22,9 @@ const googlesql::ResolvedExpr& ArgumentOf(const googlesql::ResolvedFunctionCall&
 const googlesql::Type* TypeOf(const googlesql::ResolvedExpr& expr);
 const googlesql::Type* ResultTypeOf(const googlesql::ResolvedFunctionCall& call);
 
+// Whether `expr` is a literal or a query parameter, as BigQuery requires of some arguments.
+bool IsConstant(const googlesql::ResolvedExpr& expr);
+
 // The value of a STRING literal that is not NULL.
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr);
 

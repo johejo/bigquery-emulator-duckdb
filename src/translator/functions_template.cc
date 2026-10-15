@@ -978,6 +978,22 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           {{.arity = 1, .spelling = "!1", .conditions = {}, .defaults = {}, .errors = {"$1"}}},
       },
       {"ARRAY_REVERSE", {{.arity = 1, .spelling = "list_reverse($1)"}}},
+      // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
+      {
+          "BAG_OF_WORDS",
+          {
+              {
+                  .arity = 1,
+                  .spelling =
+                      "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], _s -> "
+                      "list_transform([list_filter(range(1, len(_s) + 1), _i -> _i = 1 OR "
+                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], _b -> list_transform(_b, (_r, _k) -> "
+                      "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], len(_s) + 1) "
+                      "- "
+                      "_r)))[1])[1]",
+              },
+          },
+      },
       {"RANGE_BUCKET", RangeBucket()},
       {"RANGE", RangeConstructor()},
       {"RANGE_START", BoundOrNull(kRangeStart)},

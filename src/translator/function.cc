@@ -14,6 +14,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
@@ -167,15 +168,13 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (const auto* javascript = dynamic_cast<const JavaScriptFunction*>(call.function())) {
     return JavaScriptCall(call, javascript->source(), scope, columns);
   }
-  // CONTAINS_SUBSTR is supplied by our catalog because GoogleSQL lacks this BigQuery builtin.
-  if (!call.function()->IsGoogleSQLBuiltin() && name != "CONTAINS_SUBSTR") {
+  if (!IsBuiltinFunction(*call.function())) {
     return Unsupported(scope, "function " + name);
   }
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
-  if ((name == "SESSION_USER" || name == "ERROR") &&
+  if ((name == "SESSION_USER" || name == "ERROR" || name == "TEXT_ANALYZE") &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
-    throw std::invalid_argument(std::string("SAFE with function ") +
-                                (name == "ERROR" ? "error" : "session_user") +
+    throw std::invalid_argument("SAFE with function " + call.function()->Name() +
                                 " is not supported.");
   }
   if (name == "SESSION_USER" && !scope.context.defaults.has_session_user) {
