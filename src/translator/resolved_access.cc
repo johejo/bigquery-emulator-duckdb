@@ -27,6 +27,10 @@ const googlesql::Type* ResultTypeOf(const googlesql::ResolvedFunctionCall& call)
   return call.type();
 }
 
+bool IsConstant(const googlesql::ResolvedExpr& expr) {
+  return expr.Is<googlesql::ResolvedLiteral>() || expr.Is<googlesql::ResolvedParameter>();
+}
+
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {
   if (!expr.Is<googlesql::ResolvedLiteral>()) {
     return std::nullopt;

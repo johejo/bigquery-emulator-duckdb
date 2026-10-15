@@ -13,6 +13,7 @@
 #include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -35,8 +36,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
-      (!call.function()->IsGoogleSQLBuiltin() && name != "MAX_BY" && name != "MIN_BY") ||
-      call.where_expr() != nullptr) {
+      !IsBuiltinFunction(*call.function()) || call.where_expr() != nullptr) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with modifiers");
   }
   if (aggregate != nullptr &&

@@ -16,6 +16,7 @@
 #include "src/backend_functions/percentile.h"
 #include "src/backend_functions/range.h"
 #include "src/backend_functions/string.h"
+#include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
 
 namespace bigquery_emulator_duckdb {
@@ -75,6 +76,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterBigNumericFunctions(connection.get());
   backend_functions::RegisterMathFunctions(connection.get());
   backend_functions::RegisterStringFunctions(connection.get());
+  backend_functions::RegisterTextAnalysisFunctions(connection.get());
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());

@@ -20,6 +20,7 @@
 #include "src/table_metadata.h"
 
 namespace googlesql {
+class Function;
 class LanguageOptions;
 class Type;
 class TypeFactory;
@@ -30,6 +31,10 @@ namespace bigquery_emulator_duckdb {
 // The language settings shared by the catalog's built-in functions and the analyzer, so that a
 // statement is not rejected for a feature one of them was not told about.
 const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
+
+// Whether `function` is a GoogleSQL built-in or a BigQuery function that GoogleSQL does not ship
+// and the catalog declares in its place, as opposed to a user-defined one.
+bool IsBuiltinFunction(const googlesql::Function& function);
 
 // The schema and metadata of a table as tables.get reports them.
 struct TableDescription {
