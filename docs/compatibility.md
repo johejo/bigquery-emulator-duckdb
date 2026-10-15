@@ -171,9 +171,9 @@ grouping STRUCT and ARRAY values with INTERVAL fields, grouping sets, `INTERSECT
 
 `RANGE<DATE>`, `RANGE<DATETIME>` and `RANGE<TIMESTAMP>` values are supported in queries, stored
 columns, query parameters and `tabledata.insertAll` rows, with comparisons, ordering, grouping,
-`RANGE_BUCKET`, `COUNT`, `MIN`, `MAX`, `ANY_VALUE`, `ARRAY_AGG`, `APPROX_COUNT_DISTINCT`,
-`APPROX_TOP_COUNT`, `APPROX_TOP_SUM`, navigation functions and casts to and from STRING, including
-`SAFE_CAST`. `TO_JSON`, `TO_JSON_STRING` and the JSON functions that take values of any
+`COUNT`, `MIN`, `MAX`, `ANY_VALUE`, `ARRAY_AGG`, navigation functions and casts to and from STRING,
+including `SAFE_CAST`. `RANGE_BUCKET`, `APPROX_COUNT_DISTINCT`, `APPROX_TOP_COUNT` and
+`APPROX_TOP_SUM` fail over RANGE values, as in BigQuery. `TO_JSON`, `TO_JSON_STRING` and the JSON functions that take values of any
 type encode a RANGE as an object of its `start` and `end`, with `null` for an unbounded end.
 `FORMAT` writes a RANGE with `%t` and `%T`, including one inside an ARRAY or STRUCT. CSV
 loads read a RANGE column as BigQuery's `[start, end)` text, with `NULL` or `UNBOUNDED` for an

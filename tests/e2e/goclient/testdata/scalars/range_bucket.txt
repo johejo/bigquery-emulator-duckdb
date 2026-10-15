@@ -151,29 +151,27 @@ SELECT RANGE_BUCKET(CAST(NULL AS INT64), [2, NULL, 1])
 SELECT RANGE_BUCKET(CAST('NaN' AS FLOAT64), [2.0, CAST('NaN' AS FLOAT64), 1.0])
 => null
 
-# RANGE points and boundaries compare as data-types#range_type documents: by their lower bounds,
-# then their upper bounds, with a NULL lower bound first, a NULL upper bound last and two NULL
-# bounds equal.
+# BigQuery rejects RANGE points and boundaries, even NULL ones; confirmed against BigQuery.
 SELECT RANGE_BUCKET(RANGE<DATE> '[2020-02-01, 2020-03-01)', [RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[2020-02-01, 2020-03-01)', RANGE<DATE> '[2020-03-01, 2020-04-01)'])
-=> "2"
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
 SELECT RANGE_BUCKET(RANGE<DATE> '[UNBOUNDED, 2020-01-01)', [RANGE<DATE> '[2019-01-01, 2020-01-01)'])
-=> "0"
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
 SELECT RANGE_BUCKET(RANGE<DATE> '[2020-01-01, UNBOUNDED)', [RANGE<DATE> '[2020-01-01, 2020-02-01)', RANGE<DATE> '[2020-01-02, 2020-01-03)'])
-=> "1"
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
 SELECT RANGE_BUCKET(RANGE<DATE> '[UNBOUNDED, UNBOUNDED)', [RANGE<DATE> '[UNBOUNDED, UNBOUNDED)'])
-=> "1"
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
 SELECT RANGE_BUCKET(RANGE<TIMESTAMP> '[2020-01-01 00:00:00+00, 2020-01-01 00:00:01+00)', [RANGE<TIMESTAMP> '[2020-01-01 00:00:00+00, 2020-01-01 00:00:00.5+00)', RANGE<TIMESTAMP> '[2020-01-01 00:00:00+00, UNBOUNDED)'])
-=> "1"
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
 SELECT RANGE_BUCKET(CAST(NULL AS RANGE<DATE>), [RANGE<DATE> '[2020-01-01, 2020-02-01)'])
-=> null
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
-SELECT SAFE.RANGE_BUCKET(RANGE<DATE> '[2020-01-01, 2020-02-01)', [RANGE<DATE> '[2020-01-01, 2020-02-01)', NULL])
-=> null
+SELECT RANGE_BUCKET(RANGE<DATE> '[2020-01-01, 2020-02-01)', [RANGE<DATE> '[2020-01-01, 2020-02-01)', NULL])
+=> error: Unsupported type RANGE for function RANGE_BUCKET
 
-SELECT SAFE.RANGE_BUCKET(RANGE<DATE> '[2020-01-01, 2020-02-01)', [RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE<DATE> '[2020-01-01, 2020-02-01)'])
-=> null
+SELECT RANGE_BUCKET(RANGE<DATE> '[2020-01-01, 2020-02-01)', [RANGE<DATE> '[2020-01-01, UNBOUNDED)', RANGE<DATE> '[2020-01-01, 2020-02-01)'])
+=> error: Unsupported type RANGE for function RANGE_BUCKET

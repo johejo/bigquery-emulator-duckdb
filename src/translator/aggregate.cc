@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -77,25 +78,24 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                           [](const auto& argument) { return HasEmptyStruct(argument->type()); })) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with STRUCT<>");
   }
-  // These only carry, compare, order or group their values, which DuckDB does to a RANGE's STRUCT
-  // as BigQuery does to its RANGE.
+  // These order, compare or carry a RANGE's STRUCT as BigQuery does its RANGE.
   static constexpr std::string_view range_functions[] = {
-      "COUNT",
-      "MIN",
-      "MAX",
-      "ANY_VALUE",
-      "ARRAY_AGG",
-      "FIRST_VALUE",
-      "LAST_VALUE",
-      "NTH_VALUE",
-      "LAG",
-      "LEAD",
-      "MIN_BY",
-      "MAX_BY",
-      "APPROX_COUNT_DISTINCT",
-      "APPROX_TOP_COUNT",
-      "APPROX_TOP_SUM",
+      "COUNT",      "MIN",       "MAX", "ANY_VALUE", "ARRAY_AGG", "FIRST_VALUE",
+      "LAST_VALUE", "NTH_VALUE", "LAG", "LEAD",      "MIN_BY",    "MAX_BY",
   };
+  // BigQuery rejects these over RANGE values although GoogleSQL accepts them, naming the
+  // functions it implements them with.
+  static const std::map<std::string_view, std::string_view> range_rejections = {
+      {"APPROX_COUNT_DISTINCT", "hll_count.init"},
+      {"APPROX_TOP_COUNT", "approx_top_count_shard"},
+      {"APPROX_TOP_SUM", "approx_top_sum_shard"},
+  };
+  if (const auto rejection = range_rejections.find(name);
+      rejection != range_rejections.end() && !call.argument_list().empty() &&
+      call.argument_list(0)->type()->IsRange()) {
+    throw std::invalid_argument("Unsupported type RANGE for " + std::string(rejection->second) +
+                                ".");
+  }
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasRange(argument->type()); })) &&

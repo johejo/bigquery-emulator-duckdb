@@ -172,9 +172,8 @@ std::vector<Rule> Civil(const std::string& target) {
 }
 
 // RANGE_BUCKET counts boundaries <= the point, including duplicates. GoogleSQL implements it
-// only in the reference evaluator; DuckDB comparisons suffice for these types, including a
-// RANGE's STRUCT, once NULL, NaN and descending boundaries have been rejected. Templates bind
-// both arguments once.
+// only in the reference evaluator; DuckDB comparisons suffice for these scalar types once NULL,
+// NaN and descending boundaries have been rejected. Templates bind both arguments once.
 std::vector<Rule> RangeBucket() {
   std::vector<Rule> rules;
   for (const bool floating : {true, false}) {
@@ -206,7 +205,6 @@ std::vector<Rule> RangeBucket() {
                                   TYPE_TIME,
                                   TYPE_DATETIME,
                                   TYPE_TIMESTAMP,
-                                  TYPE_RANGE,
                               }),
             },
         .defaults = {},

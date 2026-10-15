@@ -165,7 +165,6 @@ constexpr std::string_view kCompares[] = {
     "NULLIF",
     "GREATEST",
     "LEAST",
-    "RANGE_BUCKET",
 };
 
 bool In(std::span<const std::string_view> functions, std::string_view function) {
@@ -301,6 +300,10 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&
       entry->implementation != Implementation::kS2 && !In(kCarries, function)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
+  }
+  // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.
+  if (function == "RANGE_BUCKET" && call.argument_list(0)->type()->IsRange()) {
+    throw std::invalid_argument("Unsupported type RANGE for function RANGE_BUCKET");
   }
   // A RANGE is a STRUCT in DuckDB whose unbounded ends are infinite, so DuckDB carries, compares
   // and orders it as BigQuery does a RANGE. These build or read it, and the JSON and FORMAT
