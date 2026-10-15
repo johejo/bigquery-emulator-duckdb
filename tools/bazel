@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bazelisk invokes this wrapper with BAZEL_REAL pointing to the selected Bazel.
+# Codex prepends per-session helper directories under $CODEX_HOME/tmp to PATH. They
+# are not build tools, and inheriting them through --action_env=PATH would invalidate
+# compilation and link actions in every session. The location is Codex's behavior,
+# not a documented interface; if it moves, builds only lose their cached actions.
+remaining=$PATH
+build_path=
+separator=
+while :; do
+    entry=${remaining%%:*}
+    case "$entry" in
+        "${CODEX_HOME:-$HOME/.codex}"/tmp/*) ;;
+        *)
+            build_path+="$separator$entry"
+            separator=:
+            ;;
+    esac
+    [[ $remaining == *:* ]] || break
+    remaining=${remaining#*:}
+done
+export PATH=$build_path
+
+exec "${BAZEL_REAL:?Run this wrapper through bazelisk}" "$@"
