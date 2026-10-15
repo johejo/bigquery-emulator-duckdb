@@ -1,5 +1,8 @@
 ## Safe calls
 
+SELECT SAFE_CAST('x' AS INT64)
+=> null
+
 SELECT SAFE.LENGTH('abc')
 => "3"
 

@@ -21,6 +21,16 @@ steps:
       current.res.status == 200 &&
       current.res.body.schema.fields[0].type == 'INTEGER' &&
       current.res.body.rows[0].f[0].v == '1'
+  # An undeclared parameter is an invalidQuery error, which bq prints as "Error in query string".
+  undeclared_parameter:
+    req:
+      /bigquery/v2/projects/test/queries:
+        post:
+          body:
+            application/json: {query: SELECT @missing, useLegacySql: false}
+    test: |
+      current.res.status == 400 && current.res.body.error.errors[0].reason == "invalidQuery" &&
+      current.res.body.error.message contains "'missing' not found"
   # The discovery document requires queryParameters to be an array, each
   # parameterType, and its type name. Check the wire forms the Go client cannot emit.
   parameters_not_array:
