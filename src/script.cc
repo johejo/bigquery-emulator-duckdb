@@ -22,6 +22,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "google/protobuf/any.pb.h"
 #include "googlesql/base/status_builder.h"
@@ -131,14 +132,44 @@ absl::Status CheckJavaScriptSignature(const googlesql::FunctionSignature& signat
   return absl::OkStatus();
 }
 
-// The statements of a script that the emulator does not run, with what to call them.
-std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node,
-                                                bool definition = false) {
-  definition = definition || node.node_kind() == googlesql::AST_CREATE_VIEW_STATEMENT ||
-               node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT;
-  if (definition && node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR) {
-    return "system variables in function or view definitions";
+// The first system variable that `node` refers to, if any.
+const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTNode& node) {
+  if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR) {
+    return node.GetAsOrDie<googlesql::ASTSystemVariableExpr>();
   }
+  for (int i = 0; i < node.num_children(); ++i) {
+    if (const auto* variable = FindSystemVariable(*node.child(i))) {
+      return variable;
+    }
+  }
+  return nullptr;
+}
+
+// BigQuery's error for a view or function definition that refers to a system variable, which
+// names only a temporary function.
+absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
+  std::string function;
+  if (statement.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+    const auto* create = statement.GetAsOrDie<googlesql::ASTCreateFunctionStatement>();
+    if (create->is_temp()) {
+      function = absl::StrCat(
+          "; in function ",
+          absl::StrJoin(create->function_declaration()->name()->ToIdentifierVector(), "."));
+    }
+  } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT) {
+    return absl::OkStatus();
+  }
+  const googlesql::ASTSystemVariableExpr* variable = FindSystemVariable(statement);
+  if (variable == nullptr) {
+    return absl::OkStatus();
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Invalid reference to system variable @@",
+                   absl::StrJoin(variable->path()->ToIdentifierVector(), "."), function));
+}
+
+// The statements of a script that the emulator does not run, with what to call them.
+std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
   switch (node.node_kind()) {
     case googlesql::AST_CALL_STATEMENT:
       return "CALL";
@@ -157,7 +188,7 @@ std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node,
       break;
   }
   for (int i = 0; i < node.num_children(); ++i) {
-    if (auto unsupported = UnsupportedStatement(*node.child(i), definition)) {
+    if (auto unsupported = UnsupportedStatement(*node.child(i))) {
       return unsupported;
     }
   }
@@ -598,6 +629,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment,
       bool null_arrays,
       const std::function<absl::Status(const googlesql::ResolvedStatement&)>& check = nullptr) {
+    GOOGLESQL_RETURN_IF_ERROR(CheckDefinition(*segment.node()));
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
     // Transaction control needs no tables, and ROLLBACK must work on an aborted connection.

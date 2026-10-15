@@ -170,6 +170,23 @@ EXCEPTION WHEN ERROR THEN
 END;
 => "oops"
 
+# Answers collected from BigQuery with bqanswers: a handler sees the error of a definition that
+# refers to a system variable. BigQuery prefixes the message with "Query error: " and appends the
+# statement's location, which the emulator does not.
+BEGIN
+  CREATE TEMP FUNCTION f() AS (@@dataset_id);
+EXCEPTION WHEN ERROR THEN
+  SELECT REGEXP_CONTAINS(@@error.message, r'^(Query error: )?Invalid reference to system variable @@dataset_id; in function f( at \[\d+:\d+\])?$');
+END
+=> "true"
+
+BEGIN
+  EXECUTE IMMEDIATE 'CREATE OR REPLACE VIEW scalars.system_variable_view AS SELECT @@dataset_id AS dataset_id';
+EXCEPTION WHEN ERROR THEN
+  SELECT REGEXP_CONTAINS(@@error.message, r'^(Query error: )?Invalid reference to system variable @@dataset_id( at \[\d+:\d+\])?$');
+END
+=> "true"
+
 ## CASE
 
 DECLARE product_id INT64 DEFAULT 1;

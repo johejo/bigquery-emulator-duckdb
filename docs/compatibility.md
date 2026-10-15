@@ -242,7 +242,7 @@ to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` cle
 dataset. Both initially return `NULL` without a request default dataset. These settings belong
 to the current script. With a request default dataset, reading either variable before assigning
 it is unsupported until its initial value is verified against BigQuery.
-Function and view definitions that reference system variables are unsupported.
+As in BigQuery, function and view definitions cannot reference system variables.
 `CALL` and assignments to other system variables are unsupported, and an `EXCEPTION` clause never
 handles an error that the emulator reports as unsupported.
 
