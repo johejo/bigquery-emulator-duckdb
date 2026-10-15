@@ -145,17 +145,17 @@ const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTN
   return nullptr;
 }
 
-// BigQuery's error for a view or function definition that refers to a system variable.
+// BigQuery's error for a view or function definition that refers to a system variable, which
+// names only a temporary function.
 absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
   std::string function;
   if (statement.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
-    function =
-        absl::StrCat("; in function ",
-                     absl::StrJoin(statement.GetAsOrDie<googlesql::ASTCreateFunctionStatement>()
-                                       ->function_declaration()
-                                       ->name()
-                                       ->ToIdentifierVector(),
-                                   "."));
+    const auto* create = statement.GetAsOrDie<googlesql::ASTCreateFunctionStatement>();
+    if (create->is_temp()) {
+      function = absl::StrCat(
+          "; in function ",
+          absl::StrJoin(create->function_declaration()->name()->ToIdentifierVector(), "."));
+    }
   } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT) {
     return absl::OkStatus();
   }

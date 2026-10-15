@@ -40,3 +40,22 @@ CREATE OR REPLACE VIEW errors_dataset_system_variables.v AS SELECT @@dataset_id 
 SET @@dataset_id = 'after';
 SELECT dataset_id FROM errors_dataset_system_variables.v
 => error contains: Invalid reference to system variable @@dataset_id
+
+SET @@dataset_id = 'before';
+CREATE TEMP FUNCTION f() AS (@@dataset_id);
+SELECT 1
+=> error contains: Invalid reference to system variable @@dataset_id; in function f
+
+CREATE TEMP FUNCTION f() AS (@@dataset_id);
+SELECT f()
+=> error contains: Invalid reference to system variable @@dataset_id; in function f
+
+CREATE SCHEMA IF NOT EXISTS errors_dataset_system_variables;
+SET @@dataset_id = 'errors_dataset_system_variables';
+CREATE OR REPLACE FUNCTION errors_dataset_system_variables.f() AS (@@dataset_id);
+SELECT errors_dataset_system_variables.f()
+=> error contains: Invalid reference to system variable @@dataset_id
+
+CREATE TEMP FUNCTION f() AS (@@project_id);
+SELECT f() IS NOT NULL
+=> error contains: Invalid reference to system variable @@project_id; in function f
