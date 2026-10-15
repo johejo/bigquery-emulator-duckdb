@@ -19,6 +19,7 @@
 
 namespace bigquery_emulator_duckdb {
 
+class TableSource;
 struct TemporaryTables;
 
 // The project and dataset that unqualified table and dataset names in DDL belong to, and the
@@ -29,6 +30,9 @@ struct DefaultDataset {
   std::string project;
   std::string dataset;
   const TemporaryTables* temporary = nullptr;
+  // The tables and datasets the statement is analyzed against, such as for the default rounding
+  // mode of the dataset that CREATE TABLE AS SELECT creates a table in.
+  TableSource* source = nullptr;
   // Whether SESSION_USER is available from the execution backend.
   bool has_session_user = false;
   // Runs a DuckDB query that returns one value of `type`, the value of a DDL option that is not

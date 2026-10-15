@@ -629,6 +629,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                .project = settings.default_project,
                                .dataset = settings.default_dataset,
                                .temporary = catalog.temporary.get(),
+                               .source = catalog.source.get(),
                                .has_session_user = host_.has_session_user(),
                                .evaluate =
                                    [this](const std::string& sql, const googlesql::Type* type) {

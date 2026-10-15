@@ -795,6 +795,14 @@ std::optional<std::string> CreateTableAsSelect(
       .copies_table = like,
       .keeps_rounding_modes = like,
   };
+  std::string rounding_mode = table.metadata.default_rounding_mode;
+  if (rounding_mode.empty() && !like && !table.temporary &&
+      scope.context.defaults.source != nullptr) {
+    if (const auto dataset = scope.context.defaults.source->DescribeDataset(target->project_id,
+                                                                            target->dataset_id)) {
+      rounding_mode = dataset->default_rounding_mode;
+    }
+  }
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
@@ -822,10 +830,10 @@ std::optional<std::string> CreateTableAsSelect(
       CheckFieldNames(*field, field->name);
       table.schema.push_back(*std::move(field));
     }
-    // DML rounds with the rounding mode a column takes from the table's default. Whether one
-    // takes the dataset's is known only when the table is created; see CreateTableWrite.
+    // The query's values are rounded with the rounding mode a column takes from the table's
+    // default, or the dataset's, as CreateTableWrite records it.
     FieldSchema& field = table.schema.at(i);
-    ApplyDefaultRoundingMode(field, table.metadata.default_rounding_mode);
+    ApplyDefaultRoundingMode(field, rounding_mode);
     const auto value =
         WrittenValue(column->second, create.output_column_list(i)->column().type(), field, scope);
     if (!value) {

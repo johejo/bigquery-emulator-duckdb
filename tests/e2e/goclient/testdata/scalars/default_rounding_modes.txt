@@ -1,0 +1,15 @@
+# CREATE TABLE AS SELECT into a parameterized column that takes ROUND_HALF_EVEN from the dataset's
+# default rounds the values it writes to even, as BigQuery answers.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_schema_statement
+
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_parameterized (n NUMERIC(5, 1)) AS SELECT NUMERIC '2.25' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_parameterized
+=> "2.2"
+
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_negative (n NUMERIC(5, 1)) AS SELECT NUMERIC '-2.25' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_negative
+=> "-2.2"
+
+CREATE OR REPLACE TABLE scalars_rounding_even.ctas_bignumeric (n BIGNUMERIC(10, 0)) AS SELECT BIGNUMERIC '2.5' AS n;
+SELECT CAST(n AS STRING) FROM scalars_rounding_even.ctas_bignumeric
+=> "2"

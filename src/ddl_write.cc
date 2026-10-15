@@ -150,7 +150,7 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
     ApplyDefaultRoundingMode(schema, metadata.default_rounding_mode);
   }
   // CREATE TABLE AS SELECT rounds the values it writes with the modes its columns have when it is
-  // translated, which the dataset's default does not give them.
+  // translated, which miss a dataset's default set since then.
   for (size_t i = 0; definition.as_select && i < schema.size(); ++i) {
     if (RoundsToEven(schema.at(i)) && !RoundsToEven(definition.schema.at(i))) {
       throw ApiError::Unsupported(

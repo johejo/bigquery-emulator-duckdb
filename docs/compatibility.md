@@ -85,9 +85,8 @@ table with `WRITE_TRUNCATE` keeps its default, which the new fields do not take,
 keeps it too.
 
 A `tables.patch` or `tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields
-is rejected, since which default the fields take is not known. `CREATE TABLE AS SELECT` into a
-parameterized column that takes `ROUND_HALF_EVEN` from the dataset, rather than from the table's
-`OPTIONS`, and loads into a table they create in such a dataset are unsupported.
+is rejected, since which default the fields take is not known. Loads into a table they create in a
+dataset whose default is `ROUND_HALF_EVEN` are unsupported.
 
 DML and `CREATE TABLE AS SELECT` round the values they write to a parameterized column's scale with
 its rounding mode, `ROUND_HALF_AWAY_FROM_ZERO` when unset. Other writes round halfway values away
