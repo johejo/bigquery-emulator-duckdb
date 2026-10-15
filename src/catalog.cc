@@ -190,6 +190,52 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
                 {googlesql::FunctionArgumentType(googlesql::types::StringArrayType())},
                 /*context_id=*/static_cast<int64_t>(0)),
         }));
+    // TF_IDF takes only OVER (); the translator rejects PARTITION BY and SAFE as BigQuery does. The
+    // analyzer checks literal limits, and the backend query parameters.
+    const googlesql::Type* score = nullptr;
+    if (!catalog->type_factory()
+             ->MakeStructType(
+                 {
+                     {"term", googlesql::types::StringType()},
+                     {"tf_idf", googlesql::types::DoubleType()},
+                 },
+                 &score)
+             .ok()) {
+      throw std::runtime_error("failed to make the type of TF_IDF");
+    }
+    const absl::StatusOr<const googlesql::ArrayType*> scores =
+        catalog->type_factory()->MakeArrayType(score);
+    if (!scores.ok()) {
+      throw std::runtime_error(scores.status().ToString());
+    }
+    googlesql::FunctionArgumentTypeOptions max_distinct_tokens(
+        googlesql::FunctionArgumentType::OPTIONAL);
+    googlesql::FunctionArgumentTypeOptions frequency_threshold(
+        googlesql::FunctionArgumentType::OPTIONAL);
+    // Only the legacy constness reports "must be a literal or query parameter", as BigQuery does.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    max_distinct_tokens.set_must_be_constant();
+    frequency_threshold.set_must_be_constant();
+#pragma clang diagnostic pop
+    max_distinct_tokens.set_must_be_non_null().set_min_value(1).set_max_value(1048576);
+    frequency_threshold.set_must_be_non_null().set_min_value(0);
+    catalog->AddOwnedFunction(new googlesql::Function(
+        "tf_idf", kBigQueryGroup, googlesql::Function::ANALYTIC,
+        {
+            googlesql::FunctionSignature(
+                googlesql::FunctionArgumentType(*scores),
+                {
+                    googlesql::FunctionArgumentType(googlesql::types::StringArrayType()),
+                    googlesql::FunctionArgumentType(googlesql::types::Int64Type(),
+                                                    max_distinct_tokens),
+                    googlesql::FunctionArgumentType(googlesql::types::Int64Type(),
+                                                    frequency_threshold),
+                },
+                /*context_id=*/static_cast<int64_t>(0)),
+        },
+        googlesql::FunctionOptions(googlesql::FunctionOptions::ORDER_UNSUPPORTED,
+                                   /*window_framing_support_in=*/false)));
     for (const char* name : {"max_by", "min_by"}) {
       catalog->AddOwnedFunction(new googlesql::Function(
           name, kBigQueryGroup, googlesql::Function::AGGREGATE,

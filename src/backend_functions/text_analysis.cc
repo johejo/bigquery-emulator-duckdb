@@ -2,15 +2,18 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -27,6 +30,7 @@
 #include "googlesql/public/functions/string.h"
 #include "nlohmann/json.hpp"
 #include "re2/re2.h"
+#include "src/backend_error.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
@@ -404,12 +408,293 @@ void TextAnalyze(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
           });
 }
 
+// TF_IDF's largest max_distinct_tokens. The analyzer checks literal limits; CountDocuments checks
+// query parameters with its messages.
+constexpr int64_t kMaxDistinctTokens = 1048576;
+
+// The terms of a document, where NULL is an element without one.
+std::vector<std::optional<std::string>> Terms(const Arguments& arguments, idx_t column) {
+  duckdb_vector vector = arguments.Vector(column);
+  const auto entry = VectorElement<duckdb_list_entry>(vector, arguments.Row());
+  duckdb_vector child = duckdb_list_vector_get_child(vector);
+  uint64_t* validity = duckdb_vector_get_validity(child);
+  std::vector<std::optional<std::string>> terms;
+  terms.reserve(entry.length);
+  for (idx_t i = entry.offset; i < entry.offset + entry.length; ++i) {
+    if (validity == nullptr || duckdb_validity_row_is_valid(validity, i)) {
+      terms.emplace_back(VectorString(child, i));
+    } else {
+      terms.emplace_back(std::nullopt);
+    }
+  }
+  return terms;
+}
+
+// The documents of a TF_IDF window, NULL and empty ones included, how many of them contain each
+// term, and the limits of the dictionary, which are constant.
+struct DocumentCounts {
+  int64_t documents = 0;
+  std::unordered_map<std::string, int64_t> containing;
+  int64_t max_distinct_tokens = 0;
+  int64_t frequency_threshold = 0;
+};
+
+DocumentCounts*& Counts(duckdb_aggregate_state state) {
+  return *reinterpret_cast<DocumentCounts**>(state);
+}
+
+idx_t CountsSize(duckdb_function_info /*info*/) { return sizeof(DocumentCounts*); }
+
+void InitCounts(duckdb_function_info /*info*/, duckdb_aggregate_state state) {
+  Counts(state) = new DocumentCounts();
+}
+
+void DestroyCounts(duckdb_aggregate_state* states, idx_t count) {
+  for (idx_t i = 0; i < count; ++i) {
+    delete Counts(states[i]);
+  }
+}
+
+// Counts each row's document, argument 0, given max_distinct_tokens and frequency_threshold.
+void CountDocuments(duckdb_function_info info, duckdb_data_chunk input,
+                    duckdb_aggregate_state* states) {
+  for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
+    const Arguments arguments(input, row);
+    for (const idx_t column : {1, 2}) {
+      if (arguments.IsNull(column)) {
+        duckdb_aggregate_function_set_error(
+            info,
+            absl::StrCat("Argument ", column + 1, " to BIGQUERYGOOGLESQL:TF_IDF must be non-NULL")
+                .c_str());
+        return;
+      }
+    }
+    DocumentCounts& counts = *Counts(states[row]);
+    counts.max_distinct_tokens = arguments.Int(1);
+    counts.frequency_threshold = arguments.Int(2);
+    if (counts.max_distinct_tokens < 1 || counts.max_distinct_tokens > kMaxDistinctTokens) {
+      duckdb_aggregate_function_set_error(
+          info, absl::StrCat("Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be between 1 and ",
+                             kMaxDistinctTokens)
+                    .c_str());
+      return;
+    }
+    if (counts.frequency_threshold < 0) {
+      duckdb_aggregate_function_set_error(
+          info, "Argument 3 to BIGQUERYGOOGLESQL:TF_IDF must be at least 0");
+      return;
+    }
+    ++counts.documents;
+    if (arguments.IsNull(0)) {
+      continue;
+    }
+    std::set<std::string> distinct;
+    for (std::optional<std::string>& term : Terms(arguments, 0)) {
+      if (term) {
+        distinct.insert(*std::move(term));
+      }
+    }
+    for (const std::string& term : distinct) {
+      ++counts.containing[term];
+    }
+  }
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DuckDB's callback.
+void CombineCounts(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
+                   duckdb_aggregate_state* target, idx_t count) {
+  for (idx_t i = 0; i < count; ++i) {
+    const DocumentCounts& from = *Counts(source[i]);
+    DocumentCounts& to = *Counts(target[i]);
+    to.documents += from.documents;
+    for (const auto& [term, documents] : from.containing) {
+      to.containing[term] += documents;
+    }
+    if (from.documents > 0) {
+      to.max_distinct_tokens = from.max_distinct_tokens;
+      to.frequency_threshold = from.frequency_threshold;
+    }
+  }
+}
+
+// The dictionary of a window as a BLOB: the unknown term's idf, then each term in byte order as
+// its idf, its length and its bytes. A term's idf is ln(1 + documents / (1 + documents containing
+// it)), and the unknown term's is the mean of the dictionary's, or 0 for an empty one.
+std::string Dictionary(const DocumentCounts& counts) {
+  std::vector<std::pair<std::string, int64_t>> terms;
+  for (const auto& [term, documents] : counts.containing) {
+    if (documents >= counts.frequency_threshold) {
+      terms.emplace_back(term, documents);
+    }
+  }
+  // The terms in the most documents make the dictionary, the first in byte order among equals.
+  std::ranges::sort(terms, [](const auto& a, const auto& b) {
+    return a.second != b.second ? a.second > b.second : a.first < b.first;
+  });
+  if (std::cmp_greater(terms.size(), counts.max_distinct_tokens)) {
+    terms.resize(counts.max_distinct_tokens);
+  }
+  std::ranges::sort(terms);
+  std::vector<std::pair<std::string, double>> idfs;
+  idfs.reserve(terms.size());
+  double sum = 0;
+  for (auto& [term, documents] : terms) {
+    const double ratio = static_cast<double>(counts.documents) / static_cast<double>(1 + documents);
+    // BigQuery's scores round as log(1 + x) does, which log1p(x) would not.
+    // cppcheck-suppress unpreciseMathCall
+    sum += idfs.emplace_back(std::move(term), std::log(1 + ratio)).second;
+  }
+  const double unknown = idfs.empty() ? 0 : sum / static_cast<double>(idfs.size());
+  std::string blob;
+  const auto append = [&blob](const auto& value) {
+    blob.append(reinterpret_cast<const char*>(&value), sizeof(value));
+  };
+  append(unknown);
+  for (const auto& [term, idf] : idfs) {
+    append(idf);
+    append(term.size());
+    blob += term;
+  }
+  return blob;
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): DuckDB's callback.
+void FinalizeCounts(duckdb_function_info /*info*/, duckdb_aggregate_state* source,
+                    duckdb_vector result, idx_t count, idx_t offset) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  for (idx_t i = 0; i < count; ++i) {
+    SetResult(result, offset + i, Dictionary(*Counts(source[i])));
+  }
+}
+
+// A dictionary that Dictionary wrote.
+struct ParsedDictionary {
+  double unknown = 0;
+  // The terms in byte order and their idfs.
+  std::vector<std::pair<std::string, double>> terms;
+};
+
+ParsedDictionary ParseDictionary(std::string_view blob) {
+  const auto read = [&blob]<typename T>(T& value) {
+    blob.copy(reinterpret_cast<char*>(&value), sizeof(value));
+    blob.remove_prefix(sizeof(value));
+  };
+  ParsedDictionary dictionary;
+  read(dictionary.unknown);
+  while (!blob.empty()) {
+    double idf = 0;
+    std::size_t size = 0;
+    read(idf);
+    read(size);
+    dictionary.terms.emplace_back(blob.substr(0, size), idf);
+    blob.remove_prefix(size);
+  }
+  return dictionary;
+}
+
+// One element of TF_IDF's result, where a NULL term is the unknown term.
+struct Score {
+  std::optional<std::string> term;
+  double tf_idf = 0;
+};
+
+void SetResult(duckdb_vector output, idx_t row, const Score& score) {
+  duckdb_vector term = duckdb_struct_vector_get_child(output, 0);
+  duckdb_vector_ensure_validity_writable(term);
+  backend_functions::SetResult(term, row, score.term);
+  backend_functions::SetResult(duckdb_struct_vector_get_child(output, 1), row, score.tf_idf);
+}
+
+// The scores of the document in argument 0 over the dictionary in argument 1: the unknown term's
+// first, if the document has NULLs or terms outside the dictionary, then each term's in byte
+// order. A term's tf is its count over the document's length, NULLs included. A NULL document has
+// no scores. The dictionary is parsed again only when it changes from one row to the next.
+void TfIdf(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  std::string blob;
+  // Where the last dictionary's bytes were, which the window's rows share unless it is inlined.
+  const char* last = nullptr;
+  ParsedDictionary dictionary;
+  EachRow(
+      info, input, output,
+      [&](const Arguments& arguments) -> absl::StatusOr<std::vector<Score>> {
+        auto value = VectorElement<duckdb_string_t>(arguments.Vector(1), arguments.Row());
+        const std::string_view current(duckdb_string_t_data(&value), duckdb_string_t_length(value));
+        if (duckdb_string_is_inlined(value) || current.data() != last) {
+          if (current != blob) {
+            blob = current;
+            dictionary = ParseDictionary(blob);
+          }
+          last = duckdb_string_is_inlined(value) ? nullptr : current.data();
+        }
+        std::vector<Score> scores;
+        if (arguments.IsNull(0)) {
+          return scores;
+        }
+        const std::vector<std::optional<std::string>> terms = Terms(arguments, 0);
+        const auto size = static_cast<double>(terms.size());
+        int64_t unknown = 0;
+        std::map<std::string_view, std::pair<int64_t, double>> counts;
+        for (const std::optional<std::string>& term : terms) {
+          const auto known = term ? std::ranges::lower_bound(dictionary.terms, *term, {},
+                                                             &std::pair<std::string, double>::first)
+                                  : dictionary.terms.end();
+          if (known == dictionary.terms.end() || known->first != *term) {
+            ++unknown;
+          } else {
+            auto& [count, idf] = counts[known->first];
+            ++count;
+            idf = known->second;
+          }
+        }
+        if (unknown > 0) {
+          scores.push_back({
+              .term = std::nullopt,
+              .tf_idf = static_cast<double>(unknown) / size * dictionary.unknown,
+          });
+        }
+        for (const auto& [term, count_and_idf] : counts) {
+          const auto& [count, idf] = count_and_idf;
+          scores.push_back(
+              {.term = std::string(term), .tf_idf = static_cast<double>(count) / size * idf});
+        }
+        return scores;
+      },
+      /*nulls=*/false);
+}
+
 }  // namespace
 
 void RegisterTextAnalysisFunctions(duckdb_connection connection) {
   LogicalType const varchar(duckdb_create_logical_type(kVarchar));
   LogicalType const list(duckdb_create_list_type(varchar.get()));
   Register(connection, "bq_text_analyze", {kVarchar, kVarchar, kVarchar}, list.get(), TextAnalyze);
+
+  LogicalType const bigint(duckdb_create_logical_type(kBigint));
+  LogicalType const blob(duckdb_create_logical_type(kBlob));
+  Handle<duckdb_aggregate_function, duckdb_destroy_aggregate_function> const dictionary(
+      duckdb_create_aggregate_function());
+  duckdb_aggregate_function_set_name(dictionary.get(), "bq_tf_idf_dictionary");
+  duckdb_aggregate_function_add_parameter(dictionary.get(), list.get());
+  duckdb_aggregate_function_add_parameter(dictionary.get(), bigint.get());
+  duckdb_aggregate_function_add_parameter(dictionary.get(), bigint.get());
+  duckdb_aggregate_function_set_return_type(dictionary.get(), blob.get());
+  duckdb_aggregate_function_set_functions(dictionary.get(), CountsSize, InitCounts, CountDocuments,
+                                          CombineCounts, FinalizeCounts);
+  duckdb_aggregate_function_set_destructor(dictionary.get(), DestroyCounts);
+  // NULL documents count toward the number of documents.
+  duckdb_aggregate_function_set_special_handling(dictionary.get());
+  if (duckdb_register_aggregate_function(connection, dictionary.get()) == DuckDBError) {
+    throw BackendError("DuckDB failed to register bq_tf_idf_dictionary");
+  }
+
+  LogicalType const dbl(duckdb_create_logical_type(kDouble));
+  std::array<duckdb_logical_type, 2> fields = {varchar.get(), dbl.get()};
+  std::array<const char*, 2> names = {"term", "tf_idf"};
+  LogicalType const score(duckdb_create_struct_type(fields.data(), names.data(), fields.size()));
+  LogicalType const scores(duckdb_create_list_type(score.get()));
+  Register(connection, "bq_tf_idf", std::vector<duckdb_logical_type>{list.get(), blob.get()},
+           scores.get(), TfIdf,
+           /*nulls=*/false);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions
