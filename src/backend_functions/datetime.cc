@@ -239,8 +239,9 @@ absl::Status TimestampToString(int64_t micros, std::string_view time_zone, std::
 }
 
 // The GoogleSQL type of a FORMAT value, which the handler passes as the DuckDB type that stands
-// for it: JSON as a VARCHAR by its alias, a RANGE as the STRUCT IsRange tells from others, and an
-// ARRAY as a LIST. Arrays and structs are made in `factory`; other types are unsupported.
+// for it: JSON as a VARCHAR by its alias, a RANGE or a STRUCT<> as the STRUCT IsRange or
+// IsEmptyStruct tells from others, and an ARRAY as a LIST. Arrays and structs are made in
+// `factory`; other types are unsupported.
 absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
                                                   googlesql::TypeFactory& factory) {
   namespace types = googlesql::types;
@@ -280,6 +281,10 @@ absl::StatusOr<const googlesql::Type*> FormatType(duckdb_logical_type type,
         return element_type == kDate       ? types::DateRangeType()
                : element_type == kDatetime ? types::DatetimeRangeType()
                                            : types::TimestampRangeType();
+      }
+      // A STRUCT<> keeps a placeholder field, which FORMAT does not write.
+      if (IsEmptyStruct(type)) {
+        return types::EmptyStructType();
       }
       // FORMAT writes no field names.
       std::vector<googlesql::StructField> fields;

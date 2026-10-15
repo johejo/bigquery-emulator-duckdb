@@ -325,11 +325,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::find(range_functions, function) == std::end(range_functions)) {
     return Unsupported(scope, "function " + name + " with RANGE");
   }
-  // A STRUCT<> is a STRUCT with a placeholder field in DuckDB, which the JSON backend reads as an
-  // empty STRUCT; others would see the field.
+  // A STRUCT<> is a STRUCT with a placeholder field in DuckDB, which the JSON and FORMAT backends
+  // read as an empty STRUCT; others would see the field.
   static constexpr std::string_view empty_struct_functions[] = {
-      "TO_JSON",  "TO_JSON_STRING",    "JSON_ARRAY",        "JSON_OBJECT",
-      "JSON_SET", "JSON_ARRAY_APPEND", "JSON_ARRAY_INSERT", "$MAKE_ARRAY",
+      "TO_JSON", "TO_JSON_STRING",    "JSON_ARRAY",        "JSON_OBJECT", "JSON_SET",
+      "FORMAT",  "JSON_ARRAY_APPEND", "JSON_ARRAY_INSERT", "$MAKE_ARRAY",
   };
   if ((HasEmptyStruct(call.type()) || std::ranges::any_of(call.argument_list(),
                                                           [](const auto& argument) {
