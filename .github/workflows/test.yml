@@ -55,8 +55,7 @@ jobs:
           restore-keys: go-build-v1-${{ runner.os }}-${{ runner.arch }}-
       # Downloads are content-addressed, so when the dependencies change an earlier main run's cache
       # still serves the unchanged ones, even after their URLs stop working. Bazel never removes old
-      # downloads, so the cache is pruned before it is saved; extracted repositories are collected
-      # by Bazel (see .bazelrc).
+      # downloads; bump the key's version to start over if the cache grows too large.
       - name: Restore Bazel repository cache
         id: repo-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -87,9 +86,6 @@ jobs:
           echo 'common --config=ci' > .bazelrc.local
           echo "common --repo_env=TMP=$RUNNER_TEMP --repo_env=TEMP=$RUNNER_TEMP" >> .bazelrc.local
           mkdir -p "$RUNNER_TEMP/bazel-reports"
-          # Bazel touches each download it uses; older ones went unused in this run, or their
-          # extracted repositories served it instead and keep doing so.
-          touch "$RUNNER_TEMP/repo-cache-start"
       - name: Format check
         run: nix develop --command just fmt-check
       - name: Cppcheck
@@ -148,13 +144,6 @@ jobs:
         with:
           path: ~/.cache/bazel-disk
           key: ${{ steps.disk-cache.outputs.cache-primary-key }}
-      - name: Prune Bazel repository cache
-        if: >-
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-          steps.repo-cache.outputs.cache-hit != 'true'
-        run: |
-          find ~/.cache/bazel-repo/content_addressable -name file ! -newer "$RUNNER_TEMP/repo-cache-start" |
-            while read -r file; do rm -rf "$(dirname "$file")"; done
       - name: Save Bazel repository cache
         if: >-
           github.event_name == 'push' && github.ref == 'refs/heads/main' &&
