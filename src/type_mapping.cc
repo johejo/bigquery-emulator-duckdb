@@ -167,7 +167,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     case googlesql::TYPE_JSON:
       return "JSON";
     case googlesql::TYPE_INTERVAL:
-      return use == TypeUse::kColumn ? std::nullopt : std::optional<std::string>("INTERVAL");
+      return "INTERVAL";
     case googlesql::TYPE_RANGE: {
       const auto element = MapToDuckDb(type->AsRange()->element_type(), nullptr, use);
       return element ? std::optional<std::string>(

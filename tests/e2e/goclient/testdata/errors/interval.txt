@@ -1,15 +1,6 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# arithmetic, comparing or grouping STRUCT and ARRAY values with INTERVAL fields, or storing them,
-# is unsupported rather than left to DuckDB.
-
-SELECT CAST('P9D' AS INTERVAL)
-=> error contains: The emulator does not support CAST to INTERVAL
-
-SELECT SAFE_CAST('P9D' AS INTERVAL)
-=> error contains: The emulator does not support CAST to INTERVAL
-
-SELECT CAST(CAST('P9D' AS STRING) AS INTERVAL)
-=> error contains: The emulator does not support CAST to INTERVAL
+# arithmetic, or comparing or grouping STRUCT and ARRAY values with INTERVAL fields, is unsupported
+# rather than left to DuckDB.
 
 SELECT MAKE_INTERVAL(day => 7) * 2
 => error contains: The emulator does not support function $MULTIPLY with INTERVAL
@@ -49,9 +40,3 @@ SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 
 SELECT MAKE_INTERVAL(day => 7) INTERSECT ALL SELECT MAKE_INTERVAL(day => 8)
 => error contains: The emulator does not support set operation with INTERVAL
-
-CREATE TEMP TABLE intervals (i ARRAY<STRUCT<v INTERVAL>>); SELECT 1
-=> error contains: The emulator does not support stored INTERVAL columns
-
-CREATE TEMP TABLE intervals AS SELECT MAKE_INTERVAL(day => 7) AS i; SELECT 1
-=> error contains: The emulator does not support stored INTERVAL columns

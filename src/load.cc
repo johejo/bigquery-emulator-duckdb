@@ -449,8 +449,11 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
                       const json& config, const std::vector<FieldSchema>& schema,
                       const ParquetColumn& parquet) {
-  if (format != "CSV" && HasType(schema, FieldType::kRange)) {
-    throw ApiError::Unsupported("loading RANGE columns from " + format);
+  for (const FieldType type : {FieldType::kInterval, FieldType::kRange}) {
+    if (format != "CSV" && HasType(schema, type)) {
+      throw ApiError::Unsupported("loading " + std::string(FieldTypeName(type)) + " columns from " +
+                                  format);
+    }
   }
   std::vector<std::string> quoted;
   std::ranges::transform(paths, std::back_inserter(quoted), QuoteLiteral);
@@ -464,19 +467,21 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
       sql += ", auto_detect=false";
       std::vector<std::string> columns;
       // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted, as
-      // is a RANGE, which has no text form in DuckDB.
+      // are a RANGE, which has no text form in DuckDB, and an INTERVAL, whose text form differs.
       std::vector<std::string> conversions;
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
         const bool range = field.type == FieldType::kRange;
+        const bool interval = field.type == FieldType::kInterval;
         const std::string name = QuoteIdentifier(field.name);
         columns.push_back(QuoteLiteral(field.name) + ": " +
-                          QuoteLiteral(big || range ? "VARCHAR" : ToDuckDbType(field)));
+                          QuoteLiteral(big || range || interval ? "VARCHAR" : ToDuckDbType(field)));
         conversions.push_back(
             big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
                                   ToDuckDbType(field))
             : range ? RangeFromText(name, field) + " AS " + name
-                    : name);
+            : interval ? std::format("bq_interval_from_csv({0}) AS {0}", name)
+                       : name);
       }
       sql += ", columns={" + Join(columns, ", ") + "})";
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);

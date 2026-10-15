@@ -539,8 +539,9 @@ void ValidateProto(const Descriptor& descriptor, const std::vector<FieldSchema>&
         std::ranges::any_of(options, [](const auto* option) { return option->is_extension(); })) {
       throw ApiError::Invalid("Storage Write does not support protobuf field annotations");
     }
-    if (field.type == FieldType::kJson || field.type == FieldType::kGeography) {
-      throw ApiError::Invalid("Storage Write does not support JSON or GEOGRAPHY input");
+    if (field.type == FieldType::kJson || field.type == FieldType::kGeography ||
+        field.type == FieldType::kInterval) {
+      throw ApiError::Invalid("Storage Write does not support JSON, GEOGRAPHY or INTERVAL input");
     }
     if (input.is_repeated() != (field.mode == FieldMode::kRepeated) || !ProtoType(field, input)) {
       throw ApiError::Invalid("Writer schema type does not match field: " + field.name);

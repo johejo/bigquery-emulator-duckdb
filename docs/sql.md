@@ -61,7 +61,7 @@ rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
-| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: CAST to INTERVAL other than typed NULL or INTERVAL literals; function $ADD with INTERVAL; function TO_JSON with INTERVAL; stored INTERVAL columns. |
+| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: function $ADD with INTERVAL; function TO_JSON with INTERVAL. |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML

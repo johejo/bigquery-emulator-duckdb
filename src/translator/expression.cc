@@ -183,9 +183,13 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     return std::nullopt;
   }
   if (HasInterval(from) || HasInterval(to)) {
-    return from->IsInterval() && to->IsString()
-               ? std::optional<std::string>("bq_interval_string(" + sql + ")")
-               : std::nullopt;
+    if (from->IsInterval() && to->IsString()) {
+      return "bq_interval_string(" + sql + ")";
+    }
+    if (from->IsString() && to->IsInterval()) {
+      return "bq_interval_from_string(" + sql + ", " + (safe ? "true" : "false") + ")";
+    }
+    return from->IsInterval() && to->IsInterval() ? std::optional<std::string>(sql) : std::nullopt;
   }
   if (!from->IsBigNumericType()) {
     if (const auto converted = ConvertedCast(from, to, sql, safe)) {

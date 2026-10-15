@@ -97,6 +97,34 @@ void IntervalAggregate(duckdb_function_info info, duckdb_data_chunk input, duckd
           });
 }
 
+// CAST from STRING, which takes the canonical form or ISO 8601, and which SAFE_CAST, when the
+// second argument is true, makes NULL on an error.
+void IntervalFromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output,
+          [](const Arguments& args) -> absl::StatusOr<std::optional<duckdb_interval>> {
+            const auto value =
+                googlesql::IntervalValue::Parse(args.String(0), /*allow_nanos=*/false);
+            if (!value.ok()) {
+              if (args.Bool(1)) {
+                return std::nullopt;
+              }
+              return value.status();
+            }
+            return IntervalToDuckDb(*value);
+          });
+}
+
+// A CSV value, which BigQuery documents only as Y-M D H:M:S[.F].
+void IntervalFromCsv(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto value, googlesql::IntervalValue::ParseFromString(
+                                                     args.String(0), googlesql::functions::YEAR,
+                                                     googlesql::functions::SECOND,
+                                                     /*allow_nanos=*/false));
+    return IntervalToDuckDb(value);
+  });
+}
+
 void IntervalString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::string> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
@@ -131,6 +159,9 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_interval_sum", {list.get()}, interval.get(), IntervalAggregate<false>);
   Register(connection, "bq_interval_avg", {list.get()}, interval.get(), IntervalAggregate<true>);
   Register(connection, "bq_interval_string", {kInterval}, kVarchar, IntervalString);
+  Register(connection, "bq_interval_from_string", {kVarchar, kBoolean}, kInterval,
+           IntervalFromString);
+  Register(connection, "bq_interval_from_csv", {kVarchar}, kInterval, IntervalFromCsv);
   Register(connection, "bq_interval_key", {kInterval}, kBigint, IntervalKey);
 }
 
