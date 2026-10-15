@@ -1,12 +1,14 @@
 #include "src/shell.h"
 
-#include <pthread.h>
+#include <fcntl.h>
+#include <poll.h>
 // include-cleaner requires signal.h for sigaction; modernize-deprecated-headers suggests csignal
 // instead, so suppress it on this include.
 #include <signal.h>  // NOLINT(modernize-deprecated-headers)
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
@@ -44,43 +46,73 @@ using nlohmann::json;
 // Rows keep the schema's field order.
 using nlohmann::ordered_json;
 
-// Set by SIGINT, which discards the entry being typed. A signal handler can only set a global.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-volatile sig_atomic_t interrupted = 0;
+// SIGINT, which discards the entry being typed, writes a byte to a pipe, and ReadLine waits on it
+// along with standard input. The byte stays until it is read, so a SIGINT that arrives before
+// poll() is not lost, and it wakes poll() whichever thread the kernel delivers the signal to.
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+int interrupt_reader = -1;
+int interrupt_writer = -1;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
-// The thread that reads input. SIGINT is directed at the process, so the kernel may deliver it to
-// any thread, such as one of DuckDB's, whose read() it would not interrupt.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-pthread_t reader;
-
-void Interrupt(int signal) {
-  if (pthread_equal(pthread_self(), reader) == 0) {
-    pthread_kill(reader, signal);
-    return;
-  }
-  interrupted = 1;
+void Interrupt(int /*signal*/) {
+  const int saved = errno;
+  const char byte = 0;
+  // The pipe does not block, and a full pipe already holds an interrupt.
+  (void)write(interrupt_writer, &byte, 1);
+  errno = saved;
 }
 
-// Without SA_RESTART, so that SIGINT also interrupts a pending read().
 void InstallInterruptHandler() {
-  reader = pthread_self();
+  std::array<int, 2> fds{};
+  if (pipe(fds.data()) != 0) {
+    return;
+  }
+  for (const int fd : fds) {
+    fcntl(fd, F_SETFL, O_NONBLOCK);  // NOLINT(cppcoreguidelines-pro-type-vararg)
+  }
+  interrupt_reader = fds.front();
+  interrupt_writer = fds.back();
   struct sigaction action{};
   action.sa_handler = Interrupt;
   sigemptyset(&action.sa_mask);
+  action.sa_flags = SA_RESTART;
   sigaction(SIGINT, &action, nullptr);
+}
+
+// Discards pending interrupts; returns whether there were any.
+bool TakeInterrupts() {
+  bool taken = false;
+  std::array<char, 64> bytes{};
+  while (read(interrupt_reader, bytes.data(), bytes.size()) > 0) {
+    taken = true;
+  }
+  return taken;
 }
 
 enum class LineStatus : std::uint8_t { kLine, kEnd, kInterrupted };
 
 // Reads a line from standard input without its newline. Reads byte by byte, since a terminal
-// delivers input a line at a time anyway, and an interrupted read() returns at once.
+// delivers input a line at a time anyway, and SIGINT can end the wait between any two bytes.
 LineStatus ReadLine(std::string& line) {
   line.clear();
   char byte = 0;
   while (true) {
+    std::array<pollfd, 2> fds{
+        pollfd{.fd = STDIN_FILENO, .events = POLLIN, .revents = 0},
+        pollfd{.fd = interrupt_reader, .events = POLLIN, .revents = 0},
+    };
+    if (poll(fds.data(), fds.size(), -1) < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return line.empty() ? LineStatus::kEnd : LineStatus::kLine;
+    }
+    if (TakeInterrupts()) {
+      return LineStatus::kInterrupted;
+    }
     const auto count = read(STDIN_FILENO, &byte, 1);
     if (count < 0 && errno == EINTR) {
-      return LineStatus::kInterrupted;
+      continue;
     }
     if (count <= 0) {
       return line.empty() ? LineStatus::kEnd : LineStatus::kLine;
@@ -317,8 +349,7 @@ class Shell {
     while (true) {
       std::cerr << (entry.empty() ? Prompt() + "> " : std::string(Prompt().size(), ' ') + "-> ");
       const LineStatus status = ReadLine(line);
-      if (status == LineStatus::kInterrupted || interrupted != 0) {
-        interrupted = 0;
+      if (status == LineStatus::kInterrupted) {
         entry.clear();
         std::cerr << '\n';
         continue;
@@ -345,7 +376,7 @@ class Shell {
         Run(entry);
         entry.clear();
         // A SIGINT while the job ran only discards what was typed meanwhile.
-        interrupted = 0;
+        TakeInterrupts();
       }
     }
   }
