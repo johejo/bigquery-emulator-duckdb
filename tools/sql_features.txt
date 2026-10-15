@@ -297,6 +297,9 @@ query `FOR ... IN` | FOR r IN (SELECT id, name FROM t) DO SELECT r.id, r.name; E
 query `RAISE`, `RETURN` | BEGIN RAISE USING MESSAGE = 'm'; EXCEPTION WHEN ERROR THEN SELECT @@error.message; END
 query `RAISE`, `RETURN` | SELECT 1; RETURN; SELECT 2
 query System variables | SELECT @@time_zone; SELECT 1
+query System variables | SET @@dataset_id = 'd'; SELECT @@dataset_id
+query System variables | SET @@dataset_project_id = 'probe-project'; SELECT @@dataset_project_id
+note System variables | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query System variables | SET @@time_zone = 'Asia/Tokyo'; SELECT 1
 query `EXECUTE IMMEDIATE` | DECLARE y INT64; EXECUTE IMMEDIATE 'SELECT ? * (? + 2)' INTO y USING 1, 3; SELECT y
 query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE 'INSERT u (id, v) VALUES (@id, @v)' USING 7 AS id, 70 AS v

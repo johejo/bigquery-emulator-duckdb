@@ -9,6 +9,7 @@
 
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
+#include "src/system_variables.h"
 
 namespace googlesql {
 class AnalyzerOptions;
@@ -35,6 +36,8 @@ struct AnalyzerSettings {
   // The script that a statement or expression belongs to, whose system variables, such as
   // @@error.message, the analyzer then knows. Its variables are constants of the catalog.
   const googlesql::ScriptExecutor* script = nullptr;
+  // Additional system variables owned by the emulator rather than ScriptExecutor.
+  const googlesql::SystemVariableValuesMap* system_variables = nullptr;
 };
 
 // A resolved GoogleSQL statement. It owns the analyzer output, which owns the resolved AST, so

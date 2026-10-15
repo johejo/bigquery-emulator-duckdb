@@ -11,6 +11,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -59,6 +60,7 @@
 #include "src/javascript_function.h"
 #include "src/query_parameters.h"
 #include "src/routine_catalog.h"
+#include "src/system_variables.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
 #include "src/type_mapping.h"
@@ -130,17 +132,32 @@ absl::Status CheckJavaScriptSignature(const googlesql::FunctionSignature& signat
 }
 
 // The statements of a script that the emulator does not run, with what to call them.
-std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
+std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node,
+                                                bool definition = false) {
+  definition = definition || node.node_kind() == googlesql::AST_CREATE_VIEW_STATEMENT ||
+               node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT;
+  if (definition && node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR) {
+    return "system variables in function or view definitions";
+  }
   switch (node.node_kind()) {
     case googlesql::AST_CALL_STATEMENT:
       return "CALL";
-    case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT:
-      return "assignment to system variables";
+    case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT: {
+      const auto path = node.GetAsOrDie<googlesql::ASTSystemVariableAssignment>()
+                            ->system_variable()
+                            ->path()
+                            ->ToIdentifierVector();
+      if (path.size() != 1 || (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
+                               !absl::EqualsIgnoreCase(path.front(), "dataset_project_id"))) {
+        return "assignment to system variables other than @@dataset_id and @@dataset_project_id";
+      }
+      break;
+    }
     default:
       break;
   }
   for (int i = 0; i < node.num_children(); ++i) {
-    if (auto unsupported = UnsupportedStatement(*node.child(i))) {
+    if (auto unsupported = UnsupportedStatement(*node.child(i), definition)) {
       return unsupported;
     }
   }
@@ -178,13 +195,16 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
  public:
   ScriptEvaluator(ScriptHost& host, const QueryParameters& parameters,
                   const AnalyzerSettings& settings, const std::vector<std::string>& setup,
-                  const TemporaryTables& temporary, googlesql::TypeFactory& type_factory)
+                  const TemporaryTables& temporary, googlesql::TypeFactory& type_factory,
+                  const std::string& query_project, googlesql::SystemVariableValuesMap& variables)
       : host_(host),
         parameters_(parameters),
         settings_(settings),
         setup_(setup),
         temporary_(temporary),
         type_factory_(type_factory),
+        query_project_(query_project),
+        system_variables_(variables),
         functions_("temporary functions", &type_factory),
         backend_(host.backend().NewSession()) {}
 
@@ -194,6 +214,20 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // The error the last evaluation failed with, if it failed with one of the emulator's errors.
   const std::optional<ApiError>& failure() const { return error_; }
   void ClearFailure() { error_.reset(); }
+
+  absl::Status AssignSystemVariable(googlesql::ScriptExecutor* /*executor*/,
+                                    const googlesql::ASTSystemVariableAssignment* assignment,
+                                    const googlesql::Value& value) override {
+    const auto path = assignment->system_variable()->path()->ToIdentifierVector();
+    const auto variable = system_variables_.find(path);
+    if (variable == system_variables_.end()) {
+      return Unsupported(
+          "assignment to system variables other than @@dataset_id and @@dataset_project_id");
+    }
+    variable->second = value;
+    assigned_system_variables_.insert(path);
+    return absl::OkStatus();
+  }
 
   absl::Status ExecuteStatement(const googlesql::ScriptExecutor& executor,
                                 const googlesql::ScriptSegment& segment) override {
@@ -273,8 +307,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
 
   absl::StatusOr<googlesql::TypeWithParameters> ResolveTypeName(
       const googlesql::ScriptExecutor& executor, const googlesql::ScriptSegment& segment) override {
-    AnalyzerSettings settings = settings_;
-    settings.script = &executor;
+    const AnalyzerSettings settings = Settings(executor);
     std::unique_ptr<TableSource> source = host_.NewTableSource(backend_.get(), /*expire=*/false);
     BigQueryCatalog catalog(*source, &type_factory_, settings.default_project,
                             settings.default_dataset);
@@ -313,7 +346,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         unsupported_dynamic_sql_ = "transactions in EXECUTE IMMEDIATE";
         break;
       default:
-        if (!statement->IsSqlStatement()) {
+        if (auto unsupported = UnsupportedStatement(*statement)) {
+          unsupported_dynamic_sql_ = *std::move(unsupported);
+        } else if (!statement->IsSqlStatement()) {
           unsupported_dynamic_sql_ = "scripting statements in EXECUTE IMMEDIATE";
         }
         break;
@@ -388,6 +423,29 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return googlesql_base::StatusBuilder(status).AttachPayload(googlesql::ScriptException());
   }
 
+  AnalyzerSettings Settings(const googlesql::ScriptExecutor& executor) const {
+    AnalyzerSettings settings = settings_;
+    settings.script = &executor;
+    const auto& project = system_variables_.at({"dataset_project_id"});
+    const auto& dataset = system_variables_.at({"dataset_id"});
+    settings.default_project = project.is_null() ? query_project_ : project.string_value();
+    settings.default_dataset = dataset.is_null() ? "" : dataset.string_value();
+    return settings;
+  }
+
+  googlesql::SystemVariableValuesMap SystemVariables(
+      const googlesql::ScriptExecutor& executor) const {
+    auto variables = executor.GetKnownSystemVariables();
+    // Initial reads with a request default dataset remain unsupported until checked against
+    // BigQuery. Without a request default, both variables are confirmed to start as NULL.
+    for (const auto& [path, value] : system_variables_) {
+      if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path)) {
+        variables.emplace(path, value);
+      }
+    }
+    return variables;
+  }
+
   // The catalog a statement or expression of the script is analyzed against: the script's
   // variables as constants, then its temporary tables and the emulator's tables, which are the
   // defaults that the statement is translated with too.
@@ -400,6 +458,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   };
 
   absl::StatusOr<ScriptCatalog> Catalog(const googlesql::ScriptExecutor& executor,
+                                        const AnalyzerSettings& settings,
                                         bool list_temporary = true) {
     ScriptCatalog catalog;
     catalog.source = host_.NewTableSource(backend_.get(), /*expire=*/list_temporary);
@@ -410,8 +469,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       }
     }
     catalog.tables =
-        std::make_unique<RoutineCatalog>(*catalog.source, &type_factory_, settings_.default_project,
-                                         settings_.default_dataset, catalog.temporary.get());
+        std::make_unique<RoutineCatalog>(*catalog.source, &type_factory_, settings.default_project,
+                                         settings.default_dataset, catalog.temporary.get());
     catalog.variables = std::make_unique<googlesql::SimpleCatalog>("variables", &type_factory_);
     for (const auto& [name, value] : executor.GetCurrentVariables()) {
       std::unique_ptr<googlesql::SimpleConstant> constant;
@@ -515,8 +574,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // passes with USING, which the executor adds to the analyzer options itself.
   absl::StatusOr<QueryParameters> Parameters(const googlesql::ScriptExecutor& executor,
                                              AnalyzerSettings& settings) {
-    settings = settings_;
-    settings.script = &executor;
+    settings = Settings(executor);
     const googlesql::StackFrame* frame = executor.GetCurrentStackFrame();
     if (frame == nullptr || !frame->is_dynamic_sql()) {
       return parameters_;
@@ -546,7 +604,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const bool control = segment.node()->Is<googlesql::ASTBeginStatement>() ||
                          segment.node()->Is<googlesql::ASTCommitStatement>() ||
                          segment.node()->Is<googlesql::ASTRollbackStatement>();
-    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, !control));
+    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings, !control));
     // A function body resolves against tables and previously defined functions, never the
     // script's variables (which would otherwise be captured as constants).
     if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
@@ -623,6 +681,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return QueryResult{};
     }
     std::string unsupported;
+    const auto variables = SystemVariables(executor);
     const std::optional<TranslatedStatement> translation =
         TranslateStatement(analyzed.statement(), parameters,
                            DefaultDataset{
@@ -636,7 +695,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                      return ResultValue(backend_->Execute(sql, setup_, true), type);
                                    },
                            },
-                           &unsupported, &executor.GetKnownSystemVariables());
+                           &unsupported, &variables);
     if (!translation.has_value()) {
       return Unsupported(unsupported);
     }
@@ -654,11 +713,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                                       const googlesql::Type* target_type) {
     AnalyzerSettings settings;
     GOOGLESQL_ASSIGN_OR_RETURN(const QueryParameters parameters, Parameters(executor, settings));
-    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor));
+    GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings));
     GOOGLESQL_ASSIGN_OR_RETURN(const AnalyzerResult analyzed,
                                AnalyzeScriptExpression(sql, segment, target_type, *catalog.catalog,
                                                        type_factory_, settings));
     std::string unsupported;
+    const auto variables = SystemVariables(executor);
     const std::optional<std::string> query =
         TranslateExpression(analyzed.expression(), parameters,
                             DefaultDataset{
@@ -667,7 +727,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                 .temporary = catalog.temporary.get(),
                                 .has_session_user = host_.has_session_user(),
                             },
-                            &unsupported, &executor.GetKnownSystemVariables());
+                            &unsupported, &variables);
     if (!query.has_value()) {
       return Unsupported(unsupported);
     }
@@ -691,6 +751,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   const std::vector<std::string>& setup_;
   const TemporaryTables& temporary_;
   googlesql::TypeFactory& type_factory_;
+  const std::string& query_project_;
+  googlesql::SystemVariableValuesMap& system_variables_;
+  std::set<std::vector<std::string>, googlesql::StringVectorCaseLess> assigned_system_variables_;
   std::vector<FunctionDefinition> definitions_;
   googlesql::SimpleCatalog functions_;
   std::unique_ptr<Backend> backend_;
@@ -707,7 +770,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
 QueryResult RunScript(ScriptHost& host, const std::string& query,
                       const googlesql::ParserOutput& script, const QueryParameters& parameters,
                       const std::string& default_project, const std::string& default_dataset,
-                      const std::vector<std::string>& setup, int64_t number) {
+                      const std::vector<std::string>& setup, const std::string& query_project,
+                      int64_t number) {
   if (!parameters.positional_types().empty()) {
     throw ApiError::UnsupportedQuery("positional parameters in multi-statement queries");
   }
@@ -716,7 +780,23 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
   }
 
   googlesql::TypeFactory type_factory;
-  AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
+  googlesql::SystemVariableValuesMap variables{
+      {
+          {"dataset_project_id"},
+          default_dataset.empty() ? googlesql::Value::NullString()
+                                  : googlesql::Value::String(default_project),
+      },
+      {
+          {"dataset_id"},
+          default_dataset.empty() ? googlesql::Value::NullString()
+                                  : googlesql::Value::String(default_dataset),
+      },
+  };
+  AnalyzerSettings settings{
+      .default_project = default_project,
+      .default_dataset = default_dataset,
+      .system_variables = &variables,
+  };
   for (const FieldSchema& field : parameters.named_types()) {
     absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, &type_factory);
     if (!type.ok()) {
@@ -737,7 +817,8 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
       .dataset = kSessionDataset,
   };
   const TemporaryDatabase database(host.backend(), temporary);
-  ScriptEvaluator evaluator(host, parameters, settings, setup, temporary, type_factory);
+  ScriptEvaluator evaluator(host, parameters, settings, setup, temporary, type_factory,
+                            query_project, variables);
   absl::StatusOr<std::unique_ptr<googlesql::ScriptExecutor>> executor =
       googlesql::ScriptExecutor::CreateFromAST(query, script.script(), options, &evaluator);
   if (!executor.ok()) {

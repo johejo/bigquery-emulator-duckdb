@@ -185,6 +185,9 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
 
   absl::Status FindTable(const absl::Span<const std::string>& path, const googlesql::Table** table,
                          const FindOptions& options) override;
+  absl::Status FindTableWithPathPrefix(absl::Span<const std::string> path,
+                                       const FindOptions& options, int* num_names_consumed,
+                                       const googlesql::Table** table) override;
 
  protected:
   [[nodiscard]] TableSource& source() const { return source_; }

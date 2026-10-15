@@ -126,7 +126,7 @@ rejected.
 | Loops | Supported |  |
 | `FOR ... IN` | Supported |  |
 | `RAISE`, `RETURN` | Supported |  |
-| System variables | Partial | Unsupported: assignment to system variables. |
+| System variables | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: assignment to system variables other than @@dataset_id and @@dataset_project_id. |
 | `EXECUTE IMMEDIATE` | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: scripting statements in EXECUTE IMMEDIATE. |
 | Transactions | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: committing a transaction after a handled error; roll it back instead. |
 | `CALL` | Unsupported |  |

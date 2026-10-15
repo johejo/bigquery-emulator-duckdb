@@ -229,8 +229,15 @@ destination tables or positional parameters.
 
 Multi-statement queries cannot be dry runs. Temporary tables belong to no dataset and are dropped
 when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement, but no scripting statements or
-transaction control. `CALL` and assignments to system variables are unsupported, and an `EXCEPTION`
-clause never handles an error that the emulator reports as unsupported.
+transaction control. Scripts can set and read `@@dataset_id` and `@@dataset_project_id` to change
+name resolution for subsequent statements, including dynamic SQL. Setting `@@dataset_project_id`
+to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
+dataset. Both initially return `NULL` without a request default dataset. These settings belong
+to the current script. With a request default dataset, reading either variable before assigning
+it is unsupported until its initial value is verified against BigQuery.
+Function and view definitions that reference system variables are unsupported.
+`CALL` and assignments to other system variables are unsupported, and an `EXCEPTION` clause never
+handles an error that the emulator reports as unsupported.
 
 Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION` within a
 multi-statement query. Unfinished transactions roll back when the script ends. Transaction modes,

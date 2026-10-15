@@ -428,3 +428,70 @@ DECLARE y INT64 DEFAULT 1;
 EXECUTE IMMEDIATE "SELECT ? + 1" INTO y USING y;
 SELECT y
 => "2"
+
+## Dataset system variables
+# SET and name resolution follow the system variables reference:
+# https://cloud.google.com/bigquery/docs/reference/system-variables
+
+SET @@dataset_id = 'scalars';
+SELECT @@dataset_id
+=> "scalars"
+
+SET @@dataset_project_id = 'example-project';
+SELECT @@dataset_project_id
+=> "example-project"
+
+DECLARE dataset STRING DEFAULT 'scalars';
+SET @@DATASET_ID = dataset;
+SELECT MAX(a) FROM t
+=> "3"
+
+DECLARE n INT64;
+SET @@dataset_id = CONCAT('sca', 'lars');
+SET n = (SELECT MAX(a) FROM t);
+SELECT n
+=> "3"
+
+SET @@dataset_id = 'scalars';
+EXECUTE IMMEDIATE 'SELECT MAX(a) FROM t'
+=> "3"
+
+SET @@dataset_project_id = 'example-project';
+SET @@dataset_project_id = NULL;
+SELECT @@dataset_project_id IS NULL
+=> "true"
+
+SET @@dataset_project_id = 'example-project';
+SET @@dataset_project_id = NULL;
+SET @@dataset_id = 'scalars';
+SELECT MAX(a) FROM t
+=> "3"
+
+SET @@dataset_id = 'no_such_dataset';
+SELECT MAX(a) FROM scalars.t
+=> "3"
+
+# A temporary table still takes precedence over the selected default dataset.
+CREATE TEMP TABLE t AS SELECT 9 AS a;
+SET @@dataset_id = 'scalars';
+SELECT MAX(a) FROM t
+=> "9"
+
+# Assignments must have the documented STRING type.
+SET @@dataset_id = 123;
+SELECT 1
+=> error:
+
+SET @@dataset_project_id = TRUE;
+SELECT 1
+=> error:
+
+# Answers collected from BigQuery with bqanswers: NULL clears the default dataset.
+SET @@dataset_id = 'example_dataset'; SELECT @@dataset_id;
+SET @@dataset_id = NULL; SELECT @@dataset_id
+=> null
+
+SET @@dataset_id = 'scalars';
+SET @@dataset_id = NULL;
+SELECT a FROM t
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).

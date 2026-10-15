@@ -306,6 +306,7 @@ cc_library(
     ],
     deps = [
         ":field_schema",
+        ":system_variables",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer_options",
@@ -600,6 +601,7 @@ cc_library(
         ":field_schema",
         ":javascript_function",
         ":routine_catalog",
+        ":system_variables",
         ":translated_statement",
         ":translator",
         ":type_mapping",
