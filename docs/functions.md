@@ -124,7 +124,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | Supported | DuckDB aggregate |  |
 | [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | Supported | DuckDB aggregate |  |
 | [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | Supported | DuckDB aggregate |  |
-| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function APPROX_TOP_SUM with INTERVAL; aggregate or analytic function APPROX_TOP_SUM with RANGE. |
+| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function APPROX_TOP_SUM with INTERVAL. |
 
 ## Array functions
 
@@ -431,7 +431,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | Supported | GoogleSQL function |  |
 | [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | Supported | GoogleSQL function |  |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | Supported | DuckDB function, renamed |  |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | Partial | DuckDB SQL | Unsupported: function RANGE_BUCKET with INTERVAL; function RANGE_BUCKET with RANGE. |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | Partial | DuckDB SQL | Unsupported: function RANGE_BUCKET with INTERVAL. |
 | [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | Supported | DuckDB SQL |  |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | Supported | SAFE. operator |  |
 | [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | Supported | DuckDB SQL |  |

@@ -4,8 +4,8 @@
 SELECT CAST(r AS JSON) FROM UNNEST([RANGE<DATE> '[2020-01-01, UNBOUNDED)']) AS r
 => error contains: The emulator does not support CAST from RANGE<DATE> to JSON
 
-SELECT APPROX_COUNT_DISTINCT(r) FROM UNNEST([RANGE(DATE '2020-01-01', NULL)]) r
-=> error contains: The emulator does not support aggregate or analytic function APPROX_COUNT_DISTINCT with RANGE
+SELECT APPROX_QUANTILES(r, 2) FROM UNNEST([RANGE(DATE '2020-01-01', NULL)]) r
+=> error contains: The emulator does not support aggregate or analytic function APPROX_QUANTILES with RANGE
 
 # RANGE_SESSIONIZE takes its column names and option only as non-NULL literals.
 WITH ranges AS (SELECT RANGE<DATE> '[2024-01-01, 2024-02-01)' AS r) SELECT COUNT(*) FROM RANGE_SESSIONIZE(TABLE ranges, NULL, [])
