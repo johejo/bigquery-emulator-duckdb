@@ -34,14 +34,14 @@ jobs:
       - name: Configure Go cache paths
         run: |
           echo "GOCACHE=$RUNNER_TEMP/go-build" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$HOME/.cache/go-mod" >> "$GITHUB_ENV"
 
       # Go caches are shared with the Test workflow, which saves them.
       - name: Restore Go module cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.GOMODCACHE }}
-          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
+          path: ~/.cache/go-mod
+          key: go-mod-v2-${{ hashFiles('go.mod', 'go.sum') }}
       - name: Restore Go build cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

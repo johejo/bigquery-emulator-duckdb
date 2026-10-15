@@ -30,19 +30,21 @@ jobs:
       - name: Configure Go cache paths
         run: |
           echo "GOCACHE=$RUNNER_TEMP/go-build" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$HOME/.cache/go-mod" >> "$GITHUB_ENV"
 
       # Only pushes to main save caches; pull requests and the other workflows restore main's.
       # Each key prefix keeps one entry. Caches keyed by commit are saved by every main run; caches
       # keyed by the dependency files are saved only when those change.
 
-      # Starts empty when the dependencies change, since Go never removes old modules.
+      # Starts empty when the dependencies change, since Go never removes old modules. Modules do not
+      # depend on the platform, so one entry, saved by the ARM Linux runner, serves every runner;
+      # the path is spelled the same on each so that they agree on the cache version.
       - name: Restore Go module cache
         id: go-mod-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.GOMODCACHE }}
-          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.mod', 'go.sum') }}
+          path: ~/.cache/go-mod
+          key: go-mod-v2-${{ hashFiles('go.mod', 'go.sum') }}
       # Go checks cached builds against their inputs, so any earlier main run's cache is a useful start.
       - name: Restore Go build cache
         id: go-build-cache
@@ -115,10 +117,10 @@ jobs:
       - name: Save Go module cache
         if: >-
           github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-          steps.go-mod-cache.outputs.cache-hit != 'true'
+          matrix.os == 'ubuntu-26.04-arm' && steps.go-mod-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ env.GOMODCACHE }}
+          path: ~/.cache/go-mod
           key: ${{ steps.go-mod-cache.outputs.cache-primary-key }}
       - name: Save Go build cache
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -164,7 +166,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PREFIX: ${{ runner.os }}-${{ runner.arch }}-
         run: |
-          .github/scripts/prune-caches.sh '${{ steps.go-mod-cache.outputs.cache-primary-key }}' "go-mod-v1-$PREFIX"
+          if [[ '${{ matrix.os }}' == ubuntu-26.04-arm ]]; then
+            .github/scripts/prune-caches.sh '${{ steps.go-mod-cache.outputs.cache-primary-key }}' go-mod-v2-
+          fi
           .github/scripts/prune-caches.sh '${{ steps.go-build-cache.outputs.cache-primary-key }}' "go-build-v1-$PREFIX"
           .github/scripts/prune-caches.sh '${{ steps.disk-cache.outputs.cache-primary-key }}' "bazel-disk-$PREFIX"
           .github/scripts/prune-caches.sh '${{ steps.repo-cache.outputs.cache-primary-key }}' "bazel-repo-v2-$PREFIX"
