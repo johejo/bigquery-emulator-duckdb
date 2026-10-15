@@ -87,3 +87,18 @@ func TestFillAnswersContinuesAfterFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAnswerWritesOneLine(t *testing.T) {
+	for body, want := range map[string]string{
+		"{\"jobComplete\": true, \"rows\": [{\"f\": [{\"v\": [\n  {\n    \"v\": \"1\"\n  }\n]}]}]}": `[{"v":"1"}]`,
+		`{"error": {"message": "Syntax error"}}`:                                                    "error: Syntax error",
+	} {
+		got, err := parseAnswer(strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("parseAnswer(%q) = %q, want %q", body, got, want)
+		}
+	}
+}

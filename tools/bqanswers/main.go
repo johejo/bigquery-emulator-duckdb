@@ -1,7 +1,8 @@
 // Command bqanswers runs on BigQuery each query of a cases file whose "?>" line is still empty,
 // and writes BigQuery's answer after it: the JSON of the cell's "v" as jobs.query returns it, or
-// "error: " and the message. It authenticates as `gcloud auth print-access-token` does. Only a
-// maintainer runs it, since queries on BigQuery are billed.
+// "error: " and the message. The JSON is written on one line, as cases in scalars/ are. It
+// authenticates as `gcloud auth print-access-token` does. Only a maintainer runs it, since
+// queries on BigQuery are billed.
 //
 // A directory processes each of its *.txt files.
 //
@@ -13,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -51,8 +53,13 @@ func answer(token, project, sql string) (string, error) {
 		return "", err
 	}
 	defer response.Body.Close()
+	return parseAnswer(response.Body)
+}
+
+// parseAnswer returns what follows "?> " for a jobs.query response.
+func parseAnswer(body io.Reader) (string, error) {
 	var decoded queryResponse
-	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+	if err := json.NewDecoder(body).Decode(&decoded); err != nil {
 		return "", err
 	}
 	switch {
@@ -63,7 +70,11 @@ func answer(token, project, sql string) (string, error) {
 	case len(decoded.Rows) != 1 || len(decoded.Rows[0].F) != 1:
 		return "", fmt.Errorf("got %d rows, want one cell", len(decoded.Rows))
 	}
-	return string(decoded.Rows[0].F[0].V), nil
+	var cell bytes.Buffer
+	if err := json.Compact(&cell, decoded.Rows[0].F[0].V); err != nil {
+		return "", err
+	}
+	return cell.String(), nil
 }
 
 func main() {
