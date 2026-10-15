@@ -610,13 +610,14 @@ json ValueAsSeconds(const FieldSchema& field, const json& value) {
     return EpochSecondsDouble(std::stoll(value.get<std::string>()));
   }
   if (field.type == FieldType::kRange && field.range_element_type == FieldType::kTimestamp) {
-    const std::string text = value.get<std::string>();
-    const size_t separator = text.find(", ");
-    const auto bound = [](const std::string& micros) {
-      return micros == "UNBOUNDED" ? micros : EpochSecondsString(std::stoll(micros));
+    const auto bounds = RangeCellBounds(value.get<std::string>());
+    if (!bounds) {
+      return value;
+    }
+    const auto bound = [](const std::optional<std::string>& micros) {
+      return micros ? EpochSecondsString(std::stoll(*micros)) : std::string("UNBOUNDED");
     };
-    return "[" + bound(text.substr(1, separator - 1)) + ", " +
-           bound(text.substr(separator + 2, text.size() - separator - 3)) + ")";
+    return "[" + bound(bounds->at(0)) + ", " + bound(bounds->at(1)) + ")";
   }
   if (field.type == FieldType::kRecord) {
     return json{{"f", CellsAsSeconds(field.fields, value.at("f"))}};

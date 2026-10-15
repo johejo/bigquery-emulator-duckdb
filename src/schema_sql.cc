@@ -133,6 +133,15 @@ std::string ToDuckDbType(const FieldSchema& field) {
   return *std::move(type);
 }
 
+std::string RangeFromText(const std::string& text, const FieldSchema& field) {
+  const std::string element = ToDuckDbType(RangeBoundField(field, field.name));
+  return std::format(
+      "list_transform([bq_range_bounds({}, false)], _b -> CASE WHEN _b IS NULL THEN NULL ELSE "
+      "CAST({} AS {}) END)[1]",
+      text, DuckDbRange("CAST(_b[1] AS " + element + ")", "CAST(_b[2] AS " + element + ")"),
+      ToDuckDbType(field));
+}
+
 std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
   const std::string type = ToDuckDbType(field);
   if (value.is_null()) {
@@ -157,11 +166,11 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     if (!value.is_object() || !field.range_element_type.has_value()) {
       throw ApiError::Invalid("Expected an object for field " + field.name);
     }
-    const FieldSchema element{.name = field.name, .type = *field.range_element_type};
     std::vector<std::string> bounds;
     for (const char* name : {"start", "end"}) {
       const auto it = value.find(name);
-      bounds.push_back(InsertValue(it == value.end() ? json(nullptr) : *it, element, false));
+      bounds.push_back(InsertValue(it == value.end() ? json(nullptr) : *it,
+                                   RangeBoundField(field, field.name), false));
     }
     return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
   }

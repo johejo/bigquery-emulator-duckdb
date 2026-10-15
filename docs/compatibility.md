@@ -22,7 +22,7 @@ Parquet DECIMAL wider than 38 digits loads only into BIGNUMERIC, which schema de
 when `decimalTargetTypes` includes it. Query and load jobs cannot partition or cluster their
 destination table, and loads reject `destinationTableProperties`.
 
-Extracts write the whole table to one file and reject INTERVAL and GEOGRAPHY columns. They write a
+Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns. They write a
 BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_LEN_BYTE_ARRAY`.
 
 ## Datasets
@@ -175,8 +175,11 @@ columns, query parameters and `tabledata.insertAll` rows, with comparisons, orde
 `APPROX_TOP_COUNT`, `APPROX_TOP_SUM`, navigation functions and casts to and from STRING, including
 `SAFE_CAST`. `TO_JSON`, `TO_JSON_STRING` and the JSON functions that take values of any
 type encode a RANGE as an object of its `start` and `end`, with `null` for an unbounded end.
-`FORMAT` writes a RANGE argument with `%t` and `%T`, but not one inside an ARRAY or STRUCT. Other
-functions over RANGE values, and loads and extracts of RANGE columns are unsupported.
+`FORMAT` writes a RANGE argument with `%t` and `%T`, but not one inside an ARRAY or STRUCT. CSV
+loads read a RANGE column as BigQuery's `[start, end)` text, with `NULL` or `UNBOUNDED` for an
+unbounded end, and [Storage Read sessions](storage-api.md#reading-rows) return RANGE columns. Other
+functions over RANGE values, loads of RANGE columns from other formats, and extracts of RANGE
+columns are unsupported.
 
 ### GEOGRAPHY values
 

@@ -351,3 +351,102 @@ func TestReadRejectsInvalidAndUnsupportedOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The Storage Read API gives a RANGE as a STRUCT of start and end in Arrow, whose NULL field is an
+// unbounded end, which the Go client reads as a RangeValue:
+// https://docs.cloud.google.com/bigquery/docs/reference/storage#arrow_schema_details
+func TestGoClientStorageReadRange(t *testing.T) {
+	rest, _, _ := clients(t)
+	table(t, rest, "storage_read_range", "id INT64, d RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>")
+	query(t, rest, `INSERT INTO storage_read_range.rows VALUES
+		(1, RANGE<DATE> '[2020-01-01, 2021-01-01)', RANGE<DATETIME> '[2020-01-01 12:00:00, UNBOUNDED)',
+		 RANGE<TIMESTAMP> '[UNBOUNDED, 1970-01-01 00:00:00.000001+00)'),
+		(2, NULL, NULL, NULL)`)
+	if err := rest.EnableStorageReadClient(t.Context(), option.WithEndpoint(os.Getenv("BQ_EMULATOR_GRPC")), option.WithoutAuthentication(), option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials()))); err != nil {
+		t.Fatal(err)
+	}
+	rows := rest.Dataset("storage_read_range").Table("rows").Read(t.Context())
+	got := map[int64][]bigquery.Value{}
+	for {
+		var value []bigquery.Value
+		err := rows.Next(&value)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		got[value[0].(int64)] = value[1:]
+	}
+	date := func(year int, month time.Month, day int) civil.Date {
+		return civil.Date{Year: year, Month: month, Day: day}
+	}
+	want := map[int64][]bigquery.Value{
+		1: {&bigquery.RangeValue{Start: date(2020, 1, 1), End: date(2021, 1, 1)},
+			&bigquery.RangeValue{Start: civil.DateTime{Date: date(2020, 1, 1), Time: civil.Time{Hour: 12}}},
+			&bigquery.RangeValue{End: time.UnixMicro(1).UTC()}},
+		2: {nil, nil, nil},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("values = %v, want %v", got, want)
+	}
+}
+
+// In Avro, the first RANGE of an element type defines the record google.sqlType.RANGE_T, of
+// nullable start and end fields, and later ones name it:
+// https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
+func TestReadAvroRange(t *testing.T) {
+	rest, read, _ := clients(t)
+	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>")
+	query(t, rest, `INSERT INTO storage_read_avro_range.rows VALUES
+		(1, RANGE<DATE> '[1969-12-31, UNBOUNDED)', RANGE<DATE> '[UNBOUNDED, 1970-01-02)')`)
+	s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
+	var schema struct {
+		Fields []struct {
+			Name string
+			Type []json.RawMessage
+		}
+	}
+	if err := json.Unmarshal([]byte(s.GetAvroSchema().Schema), &schema); err != nil {
+		t.Fatal(err)
+	}
+	var record struct {
+		Type, Name, Namespace string
+		SQLType               string `json:"sqlType"`
+		Fields                []struct {
+			Name string
+			Type []json.RawMessage
+		}
+	}
+	if err := json.Unmarshal(schema.Fields[1].Type[1], &record); err != nil {
+		t.Fatal(err)
+	}
+	if record.Type != "record" || record.Name != "RANGE_DATE" || record.Namespace != "google.sqlType" ||
+		record.SQLType != "RANGE" ||
+		len(record.Fields) != 2 || record.Fields[0].Name != "start" || record.Fields[1].Name != "end" ||
+		string(record.Fields[0].Type[0]) != `"null"` || string(record.Fields[1].Type[0]) != `"null"` {
+		t.Fatalf("first RANGE<DATE> schema: %s", schema.Fields[1].Type[1])
+	}
+	if reference := string(schema.Fields[2].Type[1]); reference != `"google.sqlType.RANGE_DATE"` {
+		t.Fatalf("second RANGE<DATE> schema: %s", reference)
+	}
+	codec, err := goavro.NewCodec(s.GetAvroSchema().Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocks := responses(t, read, s.Streams[0].Name, 0)
+	value, remaining, err := codec.NativeFromBinary(blocks[0].GetAvroRows().SerializedBinaryRows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 0 {
+		t.Fatal("unexpected trailing Avro bytes")
+	}
+	row := value.(map[string]any)
+	day := func(value any) string { return union(value).(time.Time).Format("2006-01-02") }
+	d1 := union(row["d1"]).(map[string]any)
+	d2 := union(row["d2"]).(map[string]any)
+	if day(d1["start"]) != "1969-12-31" || d1["end"] != nil || d2["start"] != nil || day(d2["end"]) != "1970-01-02" {
+		t.Fatalf("RANGE values: %v", row)
+	}
+}

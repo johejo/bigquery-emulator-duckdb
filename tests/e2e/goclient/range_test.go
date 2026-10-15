@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -281,5 +282,71 @@ func TestRangeSessionizeElementTypes(t *testing.T) {
 				t.Fatalf("values = %v, want %v", got, want)
 			}
 		})
+	}
+}
+
+// A CSV load writes a RANGE as "[start, end)", quoted for its comma, where NULL and UNBOUNDED are
+// unbounded ends; the values are those of BigQuery's CSV loading documentation:
+// https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
+func TestRangeLoadCSV(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_range_load_csv")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	rangeOf := func(element bigquery.FieldType) *bigquery.RangeElementType {
+		return &bigquery.RangeElementType{Type: element}
+	}
+	source := bigquery.NewReaderSource(strings.NewReader(`1,"[2020-01-01, 2021-01-01)","[2020-01-01 12:00:00, 2020-01-02 00:00:00)","[2020-01-01 00:00:00+00, UNBOUNDED)"
+2,"[UNBOUNDED, 2021-01-01)",,
+3,"[2020-03-01, NULL)",,
+4,"[UNBOUNDED, UNBOUNDED)",,
+`))
+	source.SourceFormat = bigquery.CSV
+	source.Schema = bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		{Name: "d", Type: bigquery.RangeFieldType, RangeElementType: rangeOf(bigquery.DateFieldType)},
+		{Name: "dt", Type: bigquery.RangeFieldType, RangeElementType: rangeOf(bigquery.DateTimeFieldType)},
+		{Name: "ts", Type: bigquery.RangeFieldType, RangeElementType: rangeOf(bigquery.TimestampFieldType)},
+	}
+	job, err := dataset.Table("ranges").LoaderFrom(source).Run(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := job.Wait(ctx); err != nil || status.Err() != nil {
+		t.Fatalf("load: %v %v", err, status.Err())
+	}
+	query := client.Query("SELECT d, dt, ts FROM ranges ORDER BY id")
+	query.DefaultDatasetID = dataset.DatasetID
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	date := func(year int, month time.Month, day int) civil.Date {
+		return civil.Date{Year: year, Month: month, Day: day}
+	}
+	want := [][]bigquery.Value{
+		{&bigquery.RangeValue{Start: date(2020, 1, 1), End: date(2021, 1, 1)},
+			&bigquery.RangeValue{Start: civil.DateTime{Date: date(2020, 1, 1), Time: civil.Time{Hour: 12}},
+				End: civil.DateTime{Date: date(2020, 1, 2)}},
+			&bigquery.RangeValue{Start: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		{&bigquery.RangeValue{End: date(2021, 1, 1)}, nil, nil},
+		{&bigquery.RangeValue{Start: date(2020, 3, 1)}, nil, nil},
+		{&bigquery.RangeValue{}, nil, nil},
+	}
+	for i, values := range want {
+		var got []bigquery.Value
+		if err := rows.Next(&got); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, values) {
+			t.Fatalf("row %d = %v, want %v", i, got, values)
+		}
+	}
+	if err := rows.Next(&[]bigquery.Value{}); err != iterator.Done {
+		t.Fatalf("next = %v, want iterator.Done", err)
 	}
 }
