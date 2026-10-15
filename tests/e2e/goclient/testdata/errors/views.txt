@@ -1,0 +1,11 @@
+# A view's query must resolve when it is created, and a view cannot read itself.
+# https://cloud.google.com/bigquery/docs/views
+
+CREATE SCHEMA IF NOT EXISTS errors_views; CREATE OR REPLACE VIEW errors_views.unresolved AS SELECT missing FROM UNNEST([1]) AS id
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS errors_views; CREATE OR REPLACE VIEW errors_views.circular AS SELECT 1 AS id; CREATE OR REPLACE VIEW errors_views.circular AS SELECT id FROM errors_views.circular
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS errors_views; CREATE OR REPLACE VIEW errors_views.dropped AS SELECT 1 AS id; DROP VIEW errors_views.dropped; SELECT * FROM errors_views.dropped
+=> error:
