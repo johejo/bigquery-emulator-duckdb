@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <memory>
 #include <numbers>
-#include <numeric>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -20,20 +19,26 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
 #include "s2/s1angle.h"
 #include "s2/s1chord_angle.h"
+#include "s2/s2builder.h"
+#include "s2/s2builderutil_s2polyline_vector_layer.h"
+#include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2closest_edge_query.h"
 #include "s2/s2earth.h"
-#include "s2/s2edge_distances.h"
+#include "s2/s2error.h"
+#include "s2/s2furthest_edge_query.h"
 #include "s2/s2latlng.h"
 #include "s2/s2lax_polyline_shape.h"
 #include "s2/s2point.h"
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2pointutil.h"
+#include "s2/s2polyline.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_measures.h"
 #include "src/backend_functions/register.h"
@@ -43,11 +48,10 @@
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
 
-// A GEOGRAPHY is WKT, POINT(longitude latitude) or LINESTRING(longitude latitude, ...) with each
-// longitude in [-180, 180], whose coordinates keep the shortest digits that round-trip: BigQuery
-// keeps them, though the WKT it returns has 15. The translator turns a GEOGRAPHY into that WKT
-// with bq_st_astext wherever a query returns or stores one. An empty geography is
-// GEOMETRYCOLLECTION EMPTY.
+// A GEOGRAPHY holds S2Points, as BigQuery's do: POINT(x y z) or LINESTRING(x y z, ...) with the
+// shortest digits that round-trip, or GEOMETRYCOLLECTION EMPTY. Coordinates are those of
+// S2LatLng, which gives ST_X(ST_GEOGPOINT(0.1 + 0.2, 1)) 0.3000000000000001 as BigQuery does. The
+// translator turns a GEOGRAPHY into WKT with bq_st_astext wherever a query returns or stores one.
 struct Point {
   double longitude;
   double latitude;
@@ -57,7 +61,7 @@ constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
 
 // The vertices of a geography: none for the empty geography, which has no geometry type, one for
 // a point and more for a linestring. EachRow handles SQL NULLs.
-using Geography = std::vector<Point>;
+using Geography = std::vector<S2Point>;
 
 // The shortest digits that round-trip, or with `precision` 15 significant digits, as printf's
 // %.15g writes them and BigQuery writes 0.1 + 0.2 as 0.3 and 0.0000001 as 1e-07. BigQuery writes
@@ -73,37 +77,66 @@ std::string Coordinate(double value, std::optional<int> precision = 15) {
   return text;
 }
 
-// The WKT of `geography`, whose coordinates have `precision` significant digits, by default those
-// of the WKT BigQuery returns.
-std::string Wkt(const Geography& geography, std::optional<int> precision = 15) {
+S2Point ToS2Point(const Point& point) {
+  return S2LatLng::FromDegrees(point.latitude, point.longitude).ToPoint();
+}
+
+Point ToPoint(const S2Point& point) {
+  const S2LatLng latlng(point);
+  return {.longitude = latlng.lng().degrees(), .latitude = latlng.lat().degrees()};
+}
+
+// `geography` as WKT with the vertices `vertex` writes.
+template <typename Vertex>
+std::string Text(const Geography& geography, Vertex vertex) {
   if (geography.empty()) {
     return std::string(kEmpty);
   }
   std::string text = geography.size() == 1 ? "POINT(" : "LINESTRING(";
-  for (const Point& point : geography) {
-    text += (&point == geography.data() ? "" : ", ") + Coordinate(point.longitude, precision) +
-            " " + Coordinate(point.latitude, precision);
+  for (const S2Point& point : geography) {
+    text += (&point == geography.data() ? "" : ", ") + vertex(point);
   }
   return text + ")";
 }
 
-// The GEOGRAPHY of `geography`, keeping every digit.
-std::string GeographyText(const Geography& geography) { return Wkt(geography, std::nullopt); }
+// The WKT BigQuery returns for `geography`, whose coordinates have 15 significant digits.
+std::string Wkt(const Geography& geography) {
+  return Text(geography, [](const S2Point& vertex) {
+    const Point point = ToPoint(vertex);
+    return Coordinate(point.longitude) + " " + Coordinate(point.latitude);
+  });
+}
 
-// Parses `x y`, a vertex as GeographyText writes it.
-std::optional<Point> ReadVertex(std::string_view text) {
-  Point point{};
-  const char* const begin = text.data();
-  const char* const end = begin + text.size();
-  const auto longitude = std::from_chars(begin, end, point.longitude);
-  if (longitude.ec != std::errc() || longitude.ptr == end || *longitude.ptr != ' ') {
+// The GEOGRAPHY of `geography`.
+std::string GeographyText(const Geography& geography) {
+  return Text(geography, [](const S2Point& vertex) {
+    return Coordinate(vertex.x(), std::nullopt) + " " + Coordinate(vertex.y(), std::nullopt) + " " +
+           Coordinate(vertex.z(), std::nullopt);
+  });
+}
+
+// Parses `x y z`, a vertex as GeographyText writes it.
+std::optional<S2Point> ReadVertex(std::string_view text) {
+  std::array<double, 3> coordinates{};
+  const char* position = text.data();
+  const char* const end = position + text.size();
+  for (double& coordinate : coordinates) {
+    if (&coordinate != coordinates.data()) {
+      if (position == end || *position != ' ') {
+        return std::nullopt;
+      }
+      ++position;
+    }
+    const auto result = std::from_chars(position, end, coordinate);
+    if (result.ec != std::errc()) {
+      return std::nullopt;
+    }
+    position = result.ptr;
+  }
+  if (position != end) {
     return std::nullopt;
   }
-  const auto latitude = std::from_chars(longitude.ptr + 1, end, point.latitude);
-  if (latitude.ec != std::errc() || latitude.ptr != end) {
-    return std::nullopt;
-  }
-  return point;
+  return S2Point(coordinates.at(0), coordinates.at(1), coordinates.at(2));
 }
 
 // Parses a GEOGRAPHY as GeographyText writes it.
@@ -119,7 +152,7 @@ absl::StatusOr<Geography> ParseGeography(std::string_view text) {
     Geography geography;
     while (true) {
       const size_t comma = vertices.find(", ");
-      const std::optional<Point> vertex = ReadVertex(vertices.substr(0, comma));
+      const std::optional<S2Point> vertex = ReadVertex(vertices.substr(0, comma));
       if (!vertex) {
         break;
       }
@@ -136,102 +169,99 @@ absl::StatusOr<Geography> ParseGeography(std::string_view text) {
       std::string(text));
 }
 
-absl::StatusOr<Point> ParsePoint(const Arguments& args, idx_t index, std::string_view context) {
+// The point of a single-point geography, or else an error that `context` starts and that says
+// what the geography is, unless `say` is false.
+absl::StatusOr<S2Point> ParsePoint(const Arguments& args, idx_t index, std::string_view context,
+                                   bool say = true) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(index)));
   if (geography.size() != 1) {
-    return absl::OutOfRangeError(
-        std::string(context) + " must be a single point geography" +
-        (geography.empty() ? "; an argument was the empty geography." : "."));
+    return absl::OutOfRangeError(std::string(context) + " must be a single point geography" +
+                                 (!say                ? "."
+                                  : geography.empty() ? "; an argument was the empty geography."
+                                                      : "; an argument contained a line."));
   }
   return geography.front();
-}
-
-S2Point ToS2Point(const Point& point) {
-  return S2LatLng::FromDegrees(point.latitude, point.longitude).ToPoint();
-}
-
-std::vector<S2Point> ToS2Points(const Geography& geography) {
-  std::vector<S2Point> points(geography.size());
-  std::ranges::transform(geography, points.begin(), ToS2Point);
-  return points;
 }
 
 // The shape of a nonempty geography.
 std::unique_ptr<S2Shape> Shape(const Geography& geography) {
   if (geography.size() == 1) {
-    return std::make_unique<S2PointVectorShape>(ToS2Points(geography));
+    return std::make_unique<S2PointVectorShape>(geography);
   }
-  return std::make_unique<S2LaxPolylineShape>(ToS2Points(geography));
+  return std::make_unique<S2LaxPolylineShape>(geography);
 }
 
 // The same point as BigQuery's ST_EQUALS and ST_AZIMUTH take it, within a micrometer in every
 // direction: POINT(0.30000000000000004 0) is POINT(0.3 0), though their distance is not 0, and a
 // pole is the same at every longitude.
-bool Same(const Point& a, const Point& b) {
-  return S2::ApproxEquals(ToS2Point(a), ToS2Point(b), S2Earth::MetersToAngle(1e-6));
+bool Same(const S2Point& a, const S2Point& b) {
+  return S2::ApproxEquals(a, b, S2Earth::MetersToAngle(1e-6));
 }
 
 // BigQuery takes points as antipodal only where their S2Points are exactly opposite, as
 // POINT(-30 0) and POINT(150 0) are and POINT(10 20) and POINT(-170 -20) are not. Compared by
 // component: S2Point's unary minus trips clang-tidy's analyzer inside S2.
-bool Antipodal(const Point& a, const Point& b) {
-  const S2Point p = ToS2Point(a);
-  const S2Point q = ToS2Point(b);
+bool Antipodal(const S2Point& p, const S2Point& q) {
   return p.x() == -q.x() && p.y() == -q.y() && p.z() == -q.z();
 }
 
-// Fails unless `line`, two or more vertices, is a linestring the emulator supports. BigQuery snaps
-// vertices within about a micrometer together, as Same takes them, and splits a line that
-// overlaps itself into a MULTILINESTRING, so the emulator supports only lines whose consecutive
-// vertices differ and which come within that distance of no point twice, but for the start and
-// end of a closed line. An edge between antipodal vertices has no direction, and `failed` names
-// the function for that error.
-absl::Status CheckLine(const Geography& line, std::string_view failed) {
-  for (size_t i = 0; i + 1 < line.size(); ++i) {
-    if (Same(line.at(i), line.at(i + 1))) {
-      return absl::UnimplementedError(
-          "The emulator does not support a LINESTRING with repeated consecutive vertices");
-    }
-    if (Antipodal(line.at(i), line.at(i + 1))) {
-      return absl::OutOfRangeError(std::string(failed) +
-                                   ": Every edge must span strictly less than 180 degrees");
-    }
-  }
-  const std::vector<S2Point> vertices = ToS2Points(line);
-  const int edges = static_cast<int>(vertices.size()) - 1;
-  const bool closed = Same(line.front(), line.back());
-  const S1ChordAngle tolerance(S2Earth::MetersToAngle(1e-6));
-  MutableS2ShapeIndex index;
-  index.Add(std::make_unique<S2LaxPolylineShape>(vertices));
-  S2ClosestEdgeQuery query(&index);
-  query.mutable_options()->set_max_distance(tolerance);
-  for (int i = 0; i < edges; ++i) {
-    const S2Point& a = vertices.at(i);
-    const S2Point& b = vertices.at(i + 1);
-    S2ClosestEdgeQuery::EdgeTarget target(a, b);
-    for (const S2ClosestEdgeQuery::Result& result : query.FindClosestEdges(&target)) {
-      // An edge that shares a vertex with edge i overlaps it where its other vertex lies on it.
-      const int j = result.edge_id();
-      std::optional<S2Point> other;
-      if (j == i) {
-        continue;
-      }
-      if (j == i + 1) {
-        other = vertices.at(i + 2);
-      } else if (j == i - 1) {
-        other = vertices.at(i - 1);
-      } else if (closed && i == 0 && j == edges - 1) {
-        other = vertices.at(edges - 1);
-      } else if (closed && i == edges - 1 && j == 0) {
-        other = vertices.at(1);
-      }
-      if (!other || S2::IsDistanceLess(*other, a, b, tolerance)) {
-        return absl::UnimplementedError(
-            "The emulator does not support a LINESTRING that passes through a point twice");
-      }
+// "point" or "points" after `count`, as BigQuery's errors write it.
+std::string Points(size_t count) {
+  return std::to_string(count) + (count == 1 ? " point" : " points");
+}
+
+// Fails where consecutive `vertices` are antipodal, so that their edge has no direction: their
+// S2Points are opposite, or their coordinates are, as BigQuery takes LINESTRING(0 0, 180 0) and
+// the poles, whose S2Points are not. `failed` prefixes the error.
+absl::Status CheckAntipodal(const std::vector<Point>& vertices, std::string_view failed) {
+  for (size_t i = 0; i + 1 < vertices.size(); ++i) {
+    const Point& a = vertices.at(i);
+    const Point& b = vertices.at(i + 1);
+    if (Antipodal(ToS2Point(a), ToS2Point(b)) ||
+        (a.latitude == -b.latitude &&
+         (std::abs(a.latitude) == 90 ||
+          std::abs(std::remainder(a.longitude - b.longitude, 360.0)) == 180))) {
+      return absl::OutOfRangeError(std::string(failed) + "Invalid linestring: Vertices " +
+                                   std::to_string(i) + " and " + std::to_string(i + 1) +
+                                   " are antipodal");
     }
   }
   return absl::OkStatus();
+}
+
+// The linestring of `vertices`, two or more without antipodal neighbors, as BigQuery builds it
+// with S2Builder: vertices within a micrometer are snapped together, a line folding back on itself
+// merges with itself, and crossing edges are split where they cross. A line that snaps to one
+// point is that point. The emulator does not hold the MULTILINESTRING a line that overlaps itself
+// becomes.
+absl::StatusOr<Geography> BuildLine(const Geography& vertices) {
+  using Layer = s2builderutil::S2PolylineVectorLayer;
+  S2Builder::Options options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
+  options.set_split_crossing_edges(true);
+  S2Builder builder(options);
+  Layer::Options layer_options;
+  layer_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+  layer_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
+  layer_options.set_duplicate_edges(Layer::Options::DuplicateEdges::MERGE);
+  std::vector<std::unique_ptr<S2Polyline>> polylines;
+  builder.StartLayer(std::make_unique<Layer>(&polylines, layer_options));
+  for (size_t i = 0; i + 1 < vertices.size(); ++i) {
+    builder.AddEdge(vertices.at(i), vertices.at(i + 1));
+  }
+  S2Error error;
+  if (!builder.Build(&error)) {
+    return absl::InternalError("S2Builder failed: " + std::string(error.message()));
+  }
+  if (polylines.empty()) {
+    return Geography{vertices.front()};
+  }
+  if (polylines.size() > 1) {
+    return absl::UnimplementedError(
+        "The emulator does not support a LINESTRING that BigQuery splits into a "
+        "MULTILINESTRING");
+  }
+  const absl::Span<const S2Point> line = polylines.front()->vertices_span();
+  return Geography(line.begin(), line.end());
 }
 
 absl::Status CheckFinite(double value, std::string_view name) {
@@ -259,7 +289,8 @@ absl::StatusOr<std::string> GeogPoint(const Arguments& args) {
         "ST_GeogPoint failed: Latitude must be between -90 and 90 degrees. Actual value was " +
         Coordinate(latitude) + "; check if longitude and latitude arguments order is correct");
   }
-  return GeographyText({{.longitude = std::remainder(longitude, 360.0), .latitude = latitude}});
+  return GeographyText(
+      {ToS2Point({.longitude = std::remainder(longitude, 360.0), .latitude = latitude})});
 }
 
 // Reads the WKT of a point or a linestring as ST_GEOGFROMTEXT does, with any case and whitespace,
@@ -366,7 +397,7 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
     return absl::UnimplementedError("The emulator does not support ST_GEOGFROMTEXT of " + text);
   }
   GOOGLESQL_RETURN_IF_ERROR(reader.Expect("(", "'(' or EMPTY"));
-  Geography geography;
+  std::vector<Point> geography;
   while (true) {
     GOOGLESQL_ASSIGN_OR_RETURN(const double longitude, reader.Number("longitude"));
     GOOGLESQL_ASSIGN_OR_RETURN(const double latitude, reader.Number("latitude"));
@@ -384,28 +415,41 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
           "was " +
           Coordinate(vertex.latitude));
     }
+    // BigQuery adds vertices to a line with such a longitude, as the emulator does not.
+    if (line && std::abs(vertex.longitude) > 180) {
+      return absl::UnimplementedError(
+          "The emulator does not support a LINESTRING with a longitude outside [-180, 180]");
+    }
     vertex.longitude = std::remainder(vertex.longitude, 360.0);
   }
-  if (line && geography.size() < 2) {
-    return absl::UnimplementedError("The emulator does not support a LINESTRING with one vertex");
+  Geography vertices(geography.size());
+  std::ranges::transform(geography, vertices.begin(), ToS2Point);
+  if (!line) {
+    return GeographyText(vertices);
   }
-  if (line) {
-    GOOGLESQL_RETURN_IF_ERROR(CheckLine(geography, "ST_GeogFromText failed"));
+  if (geography.size() < 2) {
+    return absl::OutOfRangeError(
+        "ST_GeogFromText failed: Linestring should have at least two points, but had " +
+        Points(geography.size()));
   }
-  return GeographyText(geography);
+  GOOGLESQL_RETURN_IF_ERROR(CheckAntipodal(geography, "ST_GeogFromText failed: "));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography built, BuildLine(vertices));
+  return GeographyText(built);
 }
 
 // NULL for the same and antipodal points. Otherwise the initial bearing over the sphere, from the
 // difference of the longitudes in degrees, which gives nearly antipodal points and those at a pole
 // the azimuth BigQuery does, unlike S2Earth::GetInitialBearing.
 absl::StatusOr<std::optional<double>> Azimuth(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point a,
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point p,
                              ParsePoint(args, 0, "ST_Azimuth: Argument to STAzimuth"));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point b,
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point q,
                              ParsePoint(args, 1, "ST_Azimuth: Argument to STAzimuth"));
-  if (Same(a, b) || Antipodal(a, b)) {
+  if (Same(p, q) || Antipodal(p, q)) {
     return std::nullopt;
   }
+  const Point a = ToPoint(p);
+  const Point b = ToPoint(q);
   const double lat1 = S1Angle::Degrees(a.latitude).radians();
   const double lat2 = S1Angle::Degrees(b.latitude).radians();
   const double lng = S1Angle::Degrees(b.longitude - a.longitude).radians();
@@ -431,17 +475,16 @@ S1ChordAngle MinDistance(const Geography& a, const Geography& b) {
   return query.GetDistance(&target);
 }
 
-// The longest distance between a vertex of `a` and one of `b`, as ST_MAXDISTANCE describes it.
+// The longest distance between nonempty geographies, which BigQuery measures over the edges,
+// though ST_MAXDISTANCE describes vertices.
 S1ChordAngle MaxDistance(const Geography& a, const Geography& b) {
-  const std::vector<S2Point> others = ToS2Points(b);
-  S1ChordAngle distance = S1ChordAngle::Zero();
-  for (const S2Point& p : ToS2Points(a)) {
-    distance = std::accumulate(others.begin(), others.end(), distance,
-                               [&](S1ChordAngle longest, const S2Point& q) {
-                                 return std::max(longest, S1ChordAngle(p, q));
-                               });
-  }
-  return distance;
+  MutableS2ShapeIndex index;
+  index.Add(Shape(a));
+  MutableS2ShapeIndex target_index;
+  target_index.Add(Shape(b));
+  S2FurthestEdgeQuery query(&index);
+  S2FurthestEdgeQuery::ShapeIndexTarget target(&target_index);
+  return query.GetDistance(&target);
 }
 
 // BigQuery's error for use_spheroid TRUE where it is not implemented, which `function`, the
@@ -469,11 +512,31 @@ absl::StatusOr<std::optional<double>> Distance(const Arguments& args) {
   return Meters(args.String(3) == "ST_MAXDISTANCE" ? MaxDistance(a, b) : MinDistance(a, b));
 }
 
+// Between points, the distance itself. A linestring is within the distance where it may be,
+// allowing for the error in measuring it: BigQuery takes a point on an edge, a few nanometers
+// away as S2 measures it, as within 0 meters, and points that far apart as not.
 absl::StatusOr<bool> DWithin(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 3));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
-  return !a.empty() && !b.empty() && Meters(MinDistance(a, b)) <= args.Double(2);
+  if (a.empty() || b.empty()) {
+    return false;
+  }
+  const double limit = args.Double(2);
+  if (a.size() == 1 && b.size() == 1) {
+    return Meters(MinDistance(a, b)) <= limit;
+  }
+  if (!(limit >= 0)) {
+    return false;
+  }
+  MutableS2ShapeIndex index;
+  index.Add(Shape(a));
+  MutableS2ShapeIndex target_index;
+  target_index.Add(Shape(b));
+  S2ClosestEdgeQuery query(&index);
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&target_index);
+  return query.IsConservativeDistanceLessOrEqual(&target,
+                                                 S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
 
 // A point differs from a linestring, which has more than one point.
@@ -487,13 +550,13 @@ absl::StatusOr<bool> Equals(const Arguments& args) {
 }
 
 absl::StatusOr<double> X(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args, 0, "Argument to ST_X"));
-  return point.longitude;
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point point, ParsePoint(args, 0, "Argument to ST_X"));
+  return ToPoint(point).longitude;
 }
 
 absl::StatusOr<double> Y(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point, ParsePoint(args, 0, "Argument to ST_Y"));
-  return point.latitude;
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point point, ParsePoint(args, 0, "Argument to ST_Y"));
+  return ToPoint(point).latitude;
 }
 
 // What `kFunction` returns for the geography of the first argument.
@@ -546,50 +609,51 @@ absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
   if (geography.size() > 1) {
     return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a LINESTRING");
   }
-  const Point point = geography.front();
+  const Point point = ToPoint(geography.front());
   return R"({ "type": "Point", "coordinates": [)" + Coordinate(point.longitude) + ", " +
          Coordinate(point.latitude) + "] } ";
 }
 
-// ST_STARTPOINT, ST_ENDPOINT and ST_POINTN, which the last argument names: the vertex of a
-// linestring at a 1-based index, a negative one counting from the end.
+// ST_STARTPOINT, ST_ENDPOINT and ST_POINTN: the vertex of a linestring at a 1-based index, a
+// negative one counting from the end.
 absl::StatusOr<std::string> PointN(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography line, ParseGeography(args.String(0)));
   const int64_t index = args.Int(1);
-  const std::string function = args.String(2);
   const auto size = static_cast<int64_t>(line.size());
   if (size < 2) {
-    return absl::OutOfRangeError(function + ": Argument must be a linestring");
+    return absl::OutOfRangeError("The input is not a single LINESTRING");
   }
   if (index == 0 || index > size || index < -size) {
-    return absl::OutOfRangeError(function + ": Index " + std::to_string(index) +
-                                 " is out of range for a linestring of " + std::to_string(size) +
-                                 " vertices");
+    return absl::OutOfRangeError("The vertex index " + std::to_string(index) +
+                                 " is out of bounds; input LINESTRING has " + Points(line.size()) +
+                                 ".");
   }
   return GeographyText({line.at(index > 0 ? index - 1 : size + index)});
 }
 
-// The vertices of the points and linestrings of `geographies`, without any the same as the one
-// before, which BigQuery snaps together; a single vertex is a point.
+// The line through the vertices of the points and linestrings of `geographies`, built as
+// ST_GEOGFROMTEXT builds one; a single point is that point.
 absl::StatusOr<std::string> MakeLine(const std::vector<std::string>& geographies) {
-  Geography line;
+  Geography vertices;
   for (const std::string& text : geographies) {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(text));
     if (geography.empty()) {
-      return absl::OutOfRangeError(
-          "ST_MakeLine failed: Each input must be a point or a linestring; an input was the empty "
-          "geography");
+      return absl::OutOfRangeError("ST_MAKELINE arguments must be single points or lines");
     }
-    line.insert(line.end(), geography.begin(), geography.end());
+    vertices.insert(vertices.end(), geography.begin(), geography.end());
   }
-  const auto [repeated, end] = std::ranges::unique(line, Same);
-  line.erase(repeated, end);
-  if (line.empty()) {
-    return absl::UnimplementedError("The emulator does not support ST_MAKELINE of an empty array");
+  if (vertices.empty()) {
+    return absl::OutOfRangeError(
+        "ST_MAKELINE failed: Linestring should have at least two points, but had " +
+        Points(vertices.size()));
   }
-  if (line.size() > 1) {
-    GOOGLESQL_RETURN_IF_ERROR(CheckLine(line, "ST_MakeLine failed"));
+  if (vertices.size() == 1) {
+    return GeographyText(vertices);
   }
+  std::vector<Point> points(vertices.size());
+  std::ranges::transform(vertices, points.begin(), ToPoint);
+  GOOGLESQL_RETURN_IF_ERROR(CheckAntipodal(points, ""));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography line, BuildLine(vertices));
   return GeographyText(line);
 }
 
@@ -601,8 +665,9 @@ absl::StatusOr<std::optional<std::string>> Geohash(const Arguments& args) {
   if (geography.empty()) {
     return std::nullopt;
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(const Point point,
-                             ParsePoint(args, 0, "ST_GeoHash: Argument to ST_GeoHash"));
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point vertex,
+                             ParsePoint(args, 0, "ST_GeoHash: Argument to ST_GeoHash", false));
+  const Point point = ToPoint(vertex);
   int64_t length = args.Int(1);
   if (length < 1 || length > 20) {
     length = 20;
@@ -651,7 +716,7 @@ absl::StatusOr<std::string> PointFromGeohash(const Arguments& args) {
   const auto middle = [&](size_t axis) {
     return (ranges.at(axis).at(0) + ranges.at(axis).at(1)) / 2;
   };
-  return GeographyText({{.longitude = middle(0), .latitude = middle(1)}});
+  return GeographyText({ToS2Point({.longitude = middle(0), .latitude = middle(1)})});
 }
 
 absl::StatusOr<int64_t> CellIdFromPoint(const Arguments& args) {
@@ -663,8 +728,9 @@ absl::StatusOr<int64_t> CellIdFromPoint(const Arguments& args) {
         std::to_string(level));
   }
   GOOGLESQL_ASSIGN_OR_RETURN(
-      const Point point, ParsePoint(args, 0, "S2_CellIdFromPoint: Argument to S2CellIdFromPoint"));
-  return std::bit_cast<int64_t>(S2CellId(ToS2Point(point)).parent(static_cast<int>(level)).id());
+      const S2Point point,
+      ParsePoint(args, 0, "S2_CellIdFromPoint: Argument to S2CellIdFromPoint"));
+  return std::bit_cast<int64_t>(S2CellId(point).parent(static_cast<int>(level)).id());
 }
 
 }  // namespace
@@ -701,7 +767,7 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_length", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Length>);
   Register(connection, "bq_st_zero_measure", {kVarchar, kBoolean, kVarchar}, kDouble,
            EachRow<ZeroMeasure>);
-  Register(connection, "bq_st_pointn", {kVarchar, kBigint, kVarchar}, kVarchar, EachRow<PointN>);
+  Register(connection, "bq_st_pointn", {kVarchar, kBigint}, kVarchar, EachRow<PointN>);
   Register(
       connection, "bq_st_makeline", {kVarchar, kVarchar}, kVarchar,
       EachRow<[](const Arguments& args) { return MakeLine({args.String(0), args.String(1)}); }>);

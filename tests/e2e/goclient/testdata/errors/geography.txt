@@ -3,7 +3,7 @@
 SELECT ST_DISTANCE(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0), TRUE)
 => error contains: The emulator does not support use_spheroid
 
-# A GEOGRAPHY is its WKT in DuckDB, so functions that would read it as a STRING are unsupported.
+# A GEOGRAPHY is text in DuckDB, so functions that would read it as a STRING are unsupported.
 
 SELECT TO_JSON_STRING(ST_GEOGPOINT(1, 2))
 => error contains: The emulator does not support function TO_JSON_STRING with GEOGRAPHY
@@ -17,7 +17,7 @@ SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')
 # hold.
 
 SELECT ST_MAKELINE([ST_MAKELINE(ST_GEOGPOINT(1, 0), ST_GEOGPOINT(10, 0)), ST_MAKELINE(ST_GEOGPOINT(10, 0), ST_GEOGPOINT(5, 0)), ST_MAKELINE(ST_GEOGPOINT(5, 0), ST_GEOGPOINT(5, 4))])
-=> error contains: The emulator does not support a LINESTRING that passes through a point twice
+=> error contains: The emulator does not support a LINESTRING that BigQuery splits into a MULTILINESTRING
 
 # BigQuery adds vertices to the GeoJSON of a line, and compares lines by the points they cover.
 

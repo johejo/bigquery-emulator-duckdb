@@ -195,8 +195,8 @@ columns are unsupported.
 
 ### GEOGRAPHY values
 
-Queries hold a GEOGRAPHY as WKT with every digit of its coordinates, and return or store it as
-the WKT BigQuery does, in 15 significant digits. Points, linestrings and empty geographies are
+Queries hold a GEOGRAPHY as the S2 points of its vertices, as BigQuery does, and return or store
+it as the WKT BigQuery does, in 15 significant digits. Points, linestrings and empty geographies are
 supported: from `ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH`, `ST_MAKELINE` and `ST_GEOGFROMTEXT` of a
 `POINT`, a `LINESTRING` or a geometry type followed by `EMPTY`. All empty geometries return as
 `GEOMETRYCOLLECTION EMPTY`. Polygons, multipart geometries and collections are unsupported.
@@ -205,13 +205,15 @@ Earth radius of 6,371,010 meters, which BigQuery's distances match.
 `ST_DISTANCE` with `use_spheroid` `TRUE` is unsupported for nonempty inputs. Stored GEOGRAPHY columns read as the STRING they hold, and
 GEOGRAPHY query parameters are unsupported.
 
-BigQuery snaps vertices within about a micrometer together and splits a line that overlaps itself
-into a `MULTILINESTRING`. `ST_GEOGFROMTEXT` therefore rejects a linestring with one vertex, with
-consecutive vertices within a micrometer, or that comes that close to a point twice, other than a
-closed line's start and end; `ST_MAKELINE` drops each vertex within a micrometer of the one
-before, as BigQuery does, and rejects the rest of these lines. `ST_ASGEOJSON` of a linestring and
-`ST_EQUALS` of two linestrings are unsupported. `ST_MAXDISTANCE` is the longest distance between
-vertices, as BigQuery documents it.
+`ST_X` and `ST_Y` give a vertex's coordinates as S2 converts them back from its point.
+`ST_GEOGFROMTEXT` and `ST_MAKELINE` build a linestring as BigQuery does
+with S2Builder: vertices within a micrometer snap together, a line that folds back merges with
+itself, crossing edges gain the vertex where they cross, and a line that snaps to one point is a
+`POINT`. A line that BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself,
+and a `LINESTRING` with a longitude outside [-180, 180], to which BigQuery adds vertices, are
+unsupported. `ST_ASGEOJSON` of a linestring and `ST_EQUALS` of two linestrings are unsupported.
+`ST_MAXDISTANCE` measures over edges, as BigQuery does, though its documentation describes
+vertices.
 
 ### RANGE_SESSIONIZE
 

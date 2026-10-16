@@ -279,7 +279,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | Unsupported |  |  |
 | [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | Unsupported |  |  |
 | [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Unsupported |  |  |
-| [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Partial | S2 function | Unsupported: a LINESTRING that passes through a point twice. |
+| [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Partial | S2 function | Unsupported: a LINESTRING that BigQuery splits into a MULTILINESTRING. |
 | [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Unsupported |  |  |
 | [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Unsupported |  |  |
 | [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |

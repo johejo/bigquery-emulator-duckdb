@@ -268,7 +268,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     return Unsupported(scope, "function " + name);
   }
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
-  if ((name == "SESSION_USER" || name == "ERROR" || name == "TEXT_ANALYZE") &&
+  if ((name == "SESSION_USER" || name == "ERROR" || name == "TEXT_ANALYZE" ||
+       name == "ST_GEOHASH") &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
     throw std::invalid_argument("SAFE with function " + call.function()->Name() +
                                 " is not supported.");
@@ -356,7 +357,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !In(kCarries, function) && !In(interval_functions, function)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
-  // A GEOGRAPHY is its WKT in DuckDB, which the S2 functions build and read, and which DuckDB
+  // A GEOGRAPHY is text in DuckDB, which the S2 functions build and read, and which DuckDB
   // carries as BigQuery does; others, such as TO_JSON, would see a STRING.
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
