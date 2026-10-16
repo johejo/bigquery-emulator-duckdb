@@ -254,7 +254,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_DUMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dump) | Unsupported |  |  |
 | [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
 | [`ST_ENDPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_endpoint) | Supported | S2 function |  |
-| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Partial | S2 function | Unsupported: ST_EQUALS of two linestrings; ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
 | [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | Unsupported |  |  |
 | [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Unsupported |  |  |
 | [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Unsupported |  |  |

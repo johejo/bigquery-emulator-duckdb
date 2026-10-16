@@ -209,10 +209,9 @@ GEOGRAPHY query parameters are unsupported.
 `ST_GEOGFROMTEXT` and `ST_MAKELINE` build a linestring as BigQuery does
 with S2Builder: vertices within a micrometer snap together, a line that folds back merges with
 itself, crossing edges gain the vertex where they cross, and a line that snaps to one point is a
-`POINT`. An edge of 165.89 degrees or more gains its midpoint, as BigQuery's do; an edge longer
-than 100 degrees and shorter than that, where it is not known whether BigQuery adds one, and a
-line that BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself, are
-unsupported. `ST_EQUALS` takes geographies as equal where each point of either is within a
+`POINT`. An edge longer than 135 degrees gains its midpoint, as BigQuery's do. A line that
+BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself, is unsupported.
+`ST_EQUALS` takes geographies as equal where each point of either is within a
 micrometer of the other. `ST_ASGEOJSON` of a linestring is unsupported. `ST_MAXDISTANCE` measures
 over edges, as BigQuery does, though its documentation describes vertices.
 

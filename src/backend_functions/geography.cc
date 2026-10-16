@@ -231,11 +231,6 @@ absl::Status CheckAntipodal(const std::vector<Point>& vertices, std::string_view
   return absl::OkStatus();
 }
 
-// BigQuery adds the midpoint of an edge as long as LINESTRING(-170 10, 0 0), about 165.894
-// degrees, and not of one of 100 degrees; between them, it is not known where it starts.
-constexpr double kSplitDegrees = 165.89;
-constexpr double kUnsplitDegrees = 100;
-
 // The linestring of `vertices`, two or more without antipodal neighbors, as BigQuery builds it
 // with S2Builder: vertices within a micrometer are snapped together, a line folding back on itself
 // merges with itself, and crossing edges are split where they cross. A long edge gains its
@@ -247,13 +242,8 @@ absl::StatusOr<Geography> BuildLine(const Geography& vertices) {
     if (i > 0) {
       const S2Point& a = vertices.at(i - 1);
       const S2Point& b = vertices.at(i);
-      const double degrees = S1Angle(a, b).degrees();
-      if (degrees > kUnsplitDegrees && degrees < kSplitDegrees) {
-        return absl::UnimplementedError(
-            "The emulator does not support a LINESTRING edge longer than 100 degrees and shorter "
-            "than 165.89");
-      }
-      if (degrees >= kSplitDegrees) {
+      // BigQuery adds the midpoint of an edge longer than 135 degrees, and splits no half again.
+      if (S1Angle(a, b) > S1Angle::Degrees(135)) {
         split.push_back((a + b).Normalize());
       }
     }
