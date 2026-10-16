@@ -216,6 +216,42 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
   return std::nullopt;
 }
 
+// CAST(`argument` AS ... FORMAT ...) by GoogleSQL's conversion, in UTC unless AT TIME ZONE says
+// otherwise. The analyzer allows FORMAT only between scalar types, and AT TIME ZONE only for a
+// TIMESTAMP.
+std::optional<std::string> FormatCast(const googlesql::ResolvedCast& cast,
+                                      const std::string& argument, const Scope& scope,
+                                      const Columns& columns) {
+  const googlesql::Type* from = cast.expr()->type();
+  const googlesql::Type* to = cast.type();
+  const auto format = Expression(*cast.format(), scope, columns);
+  if (!format) {
+    return std::nullopt;
+  }
+  std::vector<std::string> arguments = {
+      from->IsBigNumericType() ? "CAST(" + argument + " AS VARCHAR)" : argument,
+      *format,
+  };
+  if (from->IsTimestamp() || to->IsTimestamp()) {
+    const auto time_zone = cast.time_zone() != nullptr
+                               ? Expression(*cast.time_zone(), scope, columns)
+                               : std::optional<std::string>("'UTC'");
+    if (!time_zone) {
+      return std::nullopt;
+    }
+    arguments.push_back(*time_zone);
+  }
+  // A format that leaves out the year or month takes the current one.
+  if (to->IsDate() || to->IsDatetime() || to->IsTimestamp()) {
+    arguments.emplace_back("CURRENT_TIMESTAMP");
+  }
+  arguments.emplace_back(cast.return_null_on_error() ? "true" : "false");
+  const auto name = [](const googlesql::Type* type) {
+    return ToLowerAscii(type->TypeName(googlesql::PRODUCT_EXTERNAL));
+  };
+  return "bq_cast_" + name(from) + "_to_" + name(to) + "(" + Join(arguments, ", ") + ")";
+}
+
 std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subquery,
                                     const std::string& type, const Scope& scope,
                                     const Columns& columns) {
@@ -443,28 +479,29 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
   }
   if (expr.Is<googlesql::ResolvedCast>()) {
     const auto* cast = expr.GetAs<googlesql::ResolvedCast>();
-    if (cast->format() != nullptr || cast->time_zone() != nullptr ||
-        cast->extended_cast() != nullptr || !cast->type_modifiers().IsEmpty()) {
-      return Unsupported(scope, "CAST with FORMAT, time zone or type parameters");
+    if (cast->extended_cast() != nullptr || !cast->type_modifiers().IsEmpty()) {
+      return Unsupported(scope, "CAST with type parameters");
     }
     const auto argument = Expression(*cast->expr(), scope, columns);
     if (!argument) {
       return std::nullopt;
     }
     const googlesql::Type* from = cast->expr()->type();
+    const bool safe = cast->return_null_on_error();
     if (cast->type()->IsJson() && HasInternalStructNames(from)) {
       return Unsupported(scope, "CAST to JSON with anonymous or duplicate STRUCT fields");
     }
+    if (cast->format() != nullptr) {
+      return FormatCast(*cast, *argument, scope, columns);
+    }
     if (!from->Equals(cast->type())) {
-      const auto sql =
-          CastValue(from, cast->type(), *argument, cast->return_null_on_error(), scope.context);
+      const auto sql = CastValue(from, cast->type(), *argument, safe, scope.context);
       return sql ? sql
                  : Unsupported(scope, "CAST from " + from->TypeName(googlesql::PRODUCT_EXTERNAL) +
                                           " to " +
                                           cast->type()->TypeName(googlesql::PRODUCT_EXTERNAL));
     }
-    return std::string(cast->return_null_on_error() ? "TRY_CAST(" : "CAST(") + *argument + " AS " +
-           *type + ")";
+    return std::string(safe ? "TRY_CAST(" : "CAST(") + *argument + " AS " + *type + ")";
   }
   if (expr.Is<googlesql::ResolvedFunctionCall>()) {
     const auto sql = Function(*expr.GetAs<googlesql::ResolvedFunctionCall>(), scope, columns);

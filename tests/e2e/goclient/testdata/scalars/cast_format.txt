@@ -1,0 +1,214 @@
+# CAST and SAFE_CAST with FORMAT and AT TIME ZONE.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/format-elements#formatting_syntax
+#
+# Expected values: BigQuery's format-elements examples, unless a comment says otherwise or the
+# case is in an "Answered by BigQuery" section. Inputs come from UNNEST so that the analyzer does
+# not fold the casts.
+
+## BYTES and STRING
+
+SELECT CAST(b AS STRING FORMAT 'ASCII') FROM UNNEST([b'\x48\x65\x6c\x6c\x6f']) b
+=> "Hello"
+
+SELECT CAST(b AS STRING FORMAT 'HEX') FROM UNNEST([b'\x00\x01\xEF\xFF']) b
+=> "0001efff"
+
+SELECT CAST(b AS STRING FORMAT 'BASE8') FROM UNNEST([b'\x02\x11\x3B']) b
+=> "00410473"
+
+SELECT CAST(b AS STRING FORMAT 'BASE64M') FROM UNNEST([b'\xde\xad\xbe\xef']) b
+=> "3q2+7w=="
+
+SELECT CAST(b AS STRING FORMAT 'utf8') FROM UNNEST([b'\x24']) b
+=> "$"
+
+# Bytes that are not valid UTF-8 are an error, which SAFE_CAST makes NULL.
+SELECT CAST(b AS STRING FORMAT 'UTF-8') FROM UNNEST([b'\xff']) b
+=> error:
+
+SELECT SAFE_CAST(b AS STRING FORMAT 'UTF-8') FROM UNNEST([b'\xff']) b
+=> null
+
+SELECT TO_HEX(CAST(s AS BYTES FORMAT 'ASCII')) FROM UNNEST(['Hello']) s
+=> "48656c6c6f"
+
+SELECT TO_HEX(CAST(s AS BYTES FORMAT 'HEX')) FROM UNNEST(['0001efff']) s
+=> "0001efff"
+
+SELECT TO_HEX(CAST(s AS BYTES FORMAT 'BASE8')) FROM UNNEST(['00410473']) s
+=> "02113b"
+
+SELECT TO_HEX(CAST(s AS BYTES FORMAT 'BASE64M')) FROM UNNEST(['3q2+7w==']) s
+=> "deadbeef"
+
+# Characters outside the HEX alphabet are an error.
+SELECT CAST(s AS BYTES FORMAT 'HEX') FROM UNNEST(['xyz']) s
+=> error:
+
+SELECT SAFE_CAST(s AS BYTES FORMAT 'HEX') FROM UNNEST(['xyz']) s
+=> null
+
+SELECT CAST(b AS STRING FORMAT 'HEX') FROM UNNEST([CAST(NULL AS BYTES)]) b
+=> null
+
+## Dates and times as strings
+
+SELECT CAST(d AS STRING FORMAT 'YYYY') FROM UNNEST([DATE '2018-01-30']) d
+=> "2018"
+
+SELECT CAST(d AS STRING FORMAT 'MONTH') FROM UNNEST([DATE '2018-01-30']) d
+=> "JANUARY"
+
+SELECT CAST(d AS STRING FORMAT 'DD') FROM UNNEST([DATE '2018-02-15']) d
+=> "15"
+
+SELECT CAST(t AS STRING FORMAT 'HH24') FROM UNNEST([TIME '21:30:00']) t
+=> "21"
+
+SELECT CAST(t AS STRING FORMAT 'HH12') FROM UNNEST([TIME '21:30:00']) t
+=> "09"
+
+SELECT CAST(t AS STRING FORMAT 'MI') FROM UNNEST([TIME '21:30:00']) t
+=> "30"
+
+SELECT CAST(t AS STRING FORMAT 'SS') FROM UNNEST([TIME '21:30:25.16']) t
+=> "25"
+
+SELECT CAST(t AS STRING FORMAT 'FF2') FROM UNNEST([TIME '21:30:25.16']) t
+=> "16"
+
+SELECT CAST(t AS STRING FORMAT 'FF3') FROM UNNEST([TIME '01:05:07.16']) t
+=> "160"
+
+SELECT CAST(t AS STRING FORMAT 'SSSSS') FROM UNNEST([TIME '01:02:03']) t
+=> "03723"
+
+SELECT CAST(t AS STRING FORMAT 'PM') FROM UNNEST([TIME '21:30:00']) t
+=> "PM"
+
+SELECT CAST(t AS STRING FORMAT 'PM') FROM UNNEST([TIME '01:30:00']) t
+=> "AM"
+
+SELECT CAST(t AS STRING FORMAT 'TZH' AT TIME ZONE 'Asia/Kolkata')
+FROM UNNEST([TIMESTAMP '2008-12-25 00:00:00+00:00']) t
+=> "+05"
+
+SELECT CAST(t AS STRING FORMAT 'TZM' AT TIME ZONE 'Asia/Kolkata')
+FROM UNNEST([TIMESTAMP '2008-12-25 00:00:00+00:00']) t
+=> "30"
+
+# Answered by BigQuery: without AT TIME ZONE, the time zone is UTC.
+SELECT CAST(t AS STRING FORMAT 'TZH:TZM') FROM UNNEST([TIMESTAMP '2008-12-25 00:00:00+00']) t
+=> "+00:00"
+
+# Answered by BigQuery: FFn truncates digits beyond n.
+SELECT CAST(t AS STRING FORMAT 'FF1') FROM UNNEST([TIME '21:30:25.16']) t
+=> "1"
+
+# The format and the time zone can be any STRING expression.
+SELECT CAST(t AS STRING FORMAT f AT TIME ZONE z)
+FROM UNNEST([STRUCT(TIMESTAMP '2008-12-25 00:00:00+00:00' AS t, 'TZH' AS f, 'Asia/Kolkata' AS z)])
+=> "+05"
+
+SELECT CAST(t AS STRING FORMAT 'TZH' AT TIME ZONE z)
+FROM UNNEST([STRUCT(TIMESTAMP '2008-12-25 00:00:00+00:00' AS t, CAST(NULL AS STRING) AS z)])
+=> null
+
+## Strings as dates and times
+
+SELECT CAST(s AS DATE FORMAT 'YY-MM-DD') FROM UNNEST(['18-12-03']) s
+=> "2018-12-03"
+
+SELECT CAST(s AS DATE FORMAT 'MON DD, YYYY') FROM UNNEST(['DEC 03, 2018']) s
+=> "2018-12-03"
+
+SELECT CAST(s AS DATE FORMAT 'MONTH DD, YYYY') FROM UNNEST(['DECEMBER 03, 2018']) s
+=> "2018-12-03"
+
+# A format without the year takes the current one.
+SELECT EXTRACT(YEAR FROM CAST(s AS DATE FORMAT 'MM-DD')) = EXTRACT(YEAR FROM CURRENT_DATE())
+FROM UNNEST(['03-01']) s
+=> "true"
+
+SELECT CAST(s AS TIME FORMAT 'HH24:MI') FROM UNNEST(['15:30']) s
+=> "15:30:00"
+
+SELECT CAST(s AS TIME FORMAT 'HH:MI P.M.') FROM UNNEST(['03:30 P.M.']) s
+=> "15:30:00"
+
+SELECT CAST(s AS TIME FORMAT 'HH:MI A.M.') FROM UNNEST(['03:30 P.M.']) s
+=> "15:30:00"
+
+SELECT CAST(s AS TIME FORMAT 'HH:MI:SS P.M.') FROM UNNEST(['03:30:02 P.M.']) s
+=> "15:30:02"
+
+SELECT CAST(s AS TIME FORMAT 'SSSSS') FROM UNNEST(['03723']) s
+=> "01:02:03"
+
+SELECT CAST(s AS TIME FORMAT 'HH24:MI:SS.FF2') = TIME '01:05:07.16' FROM UNNEST(['01:05:07.16']) s
+=> "true"
+
+# Expected value: conversion_functions#cast_as_timestamp, which parses the string in UTC.
+SELECT CAST(CAST(s AS TIMESTAMP FORMAT 'MM/DD/YYYY HH24:MI:SS.FF3' AT TIME ZONE 'UTC') AS STRING)
+FROM UNNEST(['06/02/2020 17:00:53.110']) s
+=> "2020-06-02 17:00:53.110+00"
+
+SELECT CAST(CAST(s AS TIMESTAMP FORMAT 'MM/DD/YYYY HH24:MI:SS.FF3 TZH') AS STRING)
+FROM UNNEST(['06/02/2020 17:00:53.110 +00']) s
+=> "2020-06-02 17:00:53.110+00"
+
+# Answered by BigQuery: FFn matches n digits, and a TIMESTAMP keeps microseconds.
+SELECT CAST(CAST(s AS TIME FORMAT 'HH24:MI:SS.FF1') AS STRING) FROM UNNEST(['01:05:07.16']) s
+=> error: Illegal non-space trailing data '6' in timestamp string
+
+SELECT CAST(CAST(s AS TIMESTAMP FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9') AS STRING)
+FROM UNNEST(['2020-01-02 03:04:05.123456789']) s
+=> "2020-01-02 03:04:05.123456+00"
+
+SELECT CAST(s AS DATE FORMAT 'YYYY-MM-DD') FROM UNNEST(['2018/12/03']) s
+=> error:
+
+SELECT SAFE_CAST(s AS DATE FORMAT 'YYYY-MM-DD') FROM UNNEST(['2018/12/03']) s
+=> null
+
+## Numbers as strings
+
+# Without a sign element, one extra space is reserved for the sign.
+SELECT CAST(x AS STRING FORMAT '99.99') FROM UNNEST([12.5]) x
+=> " 12.50"
+
+SELECT CAST(x AS STRING FORMAT '99.99') FROM UNNEST([12.5e0]) x
+=> " 12.50"
+
+SELECT CAST(x AS STRING FORMAT '99.99') FROM UNNEST([BIGNUMERIC '12.5']) x
+=> " 12.50"
+
+SELECT CAST(x AS STRING FORMAT 'S99') FROM UNNEST([12]) x
+=> "+12"
+
+SELECT CAST(x AS STRING FORMAT 'S99') FROM UNNEST([-12]) x
+=> "-12"
+
+SELECT CAST(x AS STRING FORMAT '$99') FROM UNNEST([-12]) x
+=> "-$12"
+
+SELECT CAST(x AS STRING FORMAT '9.999EEEE') FROM UNNEST([-123456]) x
+=> "-1.235E+05"
+
+# Answered by BigQuery: positions the value does not fill are spaces, before the sign and
+# currency, and negative zero keeps its sign.
+SELECT CAST(x AS STRING FORMAT '999,999') FROM UNNEST([1234]) x
+=> "   1,234"
+
+SELECT CAST(x AS STRING FORMAT '$99') FROM UNNEST([12]) x
+=> " $12"
+
+SELECT CAST(x AS STRING FORMAT '$999,999.999') FROM UNNEST([NUMERIC '-12345.678']) x
+=> " -$12,345.678"
+
+SELECT CAST(x AS STRING FORMAT '9.9') FROM UNNEST([CAST('-0' AS FLOAT64)]) x
+=> " -.0"
+
+# Answered by BigQuery: SAFE_CAST makes an invalid format NULL.
+SELECT SAFE_CAST(s AS DATE FORMAT 'XYZ') FROM UNNEST(['2020']) s
+=> null

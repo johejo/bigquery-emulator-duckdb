@@ -42,7 +42,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
 | [Conditional expressions](#conditional-expressions) | 5 | 0 | 0 | 0 |
-| [Conversion functions](#conversion-functions) | 2 | 2 | 0 | 0 |
+| [Conversion functions](#conversion-functions) | 4 | 0 | 0 | 0 |
 | [Date functions](#date-functions) | 12 | 0 | 0 | 0 |
 | [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
@@ -168,10 +168,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | Partial |  | Unsupported: CAST with FORMAT, time zone or type parameters. |
+| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | Supported |  |  |
 | [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | Supported | GoogleSQL function |  |
 | [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | Supported | GoogleSQL function |  |
-| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | Partial |  | Unsupported: CAST with FORMAT, time zone or type parameters. |
+| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | Supported |  |  |
 
 ## Date functions
 

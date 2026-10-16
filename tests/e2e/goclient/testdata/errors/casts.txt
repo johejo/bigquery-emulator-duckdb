@@ -1,0 +1,11 @@
+# BigQuery rejects type parameters in CAST and SAFE_CAST, which GoogleSQL accepts; they are for
+# columns and script variables.
+
+SELECT CAST('abcd' AS STRING(3))
+=> error contains: Parameterized types are not allowed in CAST expressions.
+
+SELECT CAST(x AS NUMERIC(3, 2)) FROM UNNEST([1.555]) x
+=> error contains: Parameterized types are not allowed in CAST expressions.
+
+SELECT SAFE_CAST(x AS NUMERIC(3, 2)) FROM UNNEST([123.4]) x
+=> error contains: Parameterized types are not allowed in CAST expressions.
