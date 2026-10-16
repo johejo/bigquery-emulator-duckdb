@@ -17,6 +17,7 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/interval.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -179,9 +180,7 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
     if (!interval.ok()) {
       throw ApiError::Invalid("Invalid INTERVAL query parameter value: " + text);
     }
-    return "bq_interval_parts(" + std::to_string(interval->get_months()) + ", " +
-           std::to_string(interval->get_days()) + ", " + std::to_string(interval->get_micros()) +
-           ")";
+    return IntervalSql(*interval);
   }
   if (name == "BYTES") {
     // BYTES parameters are base64 encoded, which DuckDB decodes back into a BLOB.

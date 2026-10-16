@@ -498,3 +498,65 @@ SELECT CAST(LEAST(INTERVAL 30 DAY, INTERVAL 1 MONTH) AS STRING)
 
 SELECT CAST(NULLIF(INTERVAL 1 MONTH, INTERVAL 30 DAY) AS STRING)
 => error: Unsupported type in function NULL_IF
+
+# CAST from STRING takes the canonical form, in full or in part, or ISO 8601, and fails on other
+# text and out-of-range values. Sources: BigQuery's conversion_functions#cast_as_interval and
+# GoogleSQL's compliance/testdata/interval.test (cast and safe_cast). Values read from UNNEST are
+# cast when the query runs; literals are cast during analysis.
+SELECT CAST('1-2 3 10:20:30.456' AS INTERVAL)
+=> "1-2 3 10:20:30.456"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['1-2 3 10:20:30.456']) AS input
+=> "1-2 3 10:20:30.456"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['1-2']) AS input
+=> "1-2 0 0:0:0"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['10:20:30']) AS input
+=> "0-0 0 10:20:30"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['P1Y2M3D']) AS input
+=> "1-2 3 0:0:0"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['PT10H20M30,456S']) AS input
+=> "0-0 0 10:20:30.456"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['-1-2 -3 -4:5:6.789']) AS input
+=> "-1-2 -3 -4:5:6.789"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['P1Y2M3DT4H5M6.789S']) AS input
+=> "1-2 3 4:5:6.789"
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST([CAST(NULL AS STRING)]) AS input
+=> null
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['1']) AS input
+=> error:
+
+SELECT CAST(input AS INTERVAL) FROM UNNEST(['10001-0']) AS input
+=> error:
+
+SELECT SAFE_CAST(input AS INTERVAL) FROM UNNEST(['PT1H2M']) AS input
+=> "0-0 0 1:2:0"
+
+SELECT SAFE_CAST(input AS INTERVAL) FROM UNNEST(['1']) AS input
+=> null
+
+SELECT SAFE_CAST(input AS INTERVAL) FROM UNNEST(['P1']) AS input
+=> null
+
+SELECT SAFE_CAST('P1' AS INTERVAL)
+=> null
+
+# Tables store INTERVAL columns, also in ARRAYs and STRUCTs, and keep each value's month, day and
+# microsecond parts. Sources: BigQuery's data-types#interval_type literal examples and its FORMAT
+# documentation.
+CREATE TEMP TABLE t (id INT64, i INTERVAL, a ARRAY<STRUCT<v INTERVAL>>);
+INSERT t VALUES (1, INTERVAL 1 MONTH, [STRUCT(INTERVAL 25 HOUR)]), (2, INTERVAL 30 DAY, []);
+UPDATE t SET i = INTERVAL 90 SECOND WHERE id = 2;
+SELECT STRING_AGG(FORMAT('%t %t', i, a), ', ' ORDER BY id) FROM t
+=> "0-1 0 0:0:0 [(0-0 0 25:0:0)], 0-0 0 0:1:30 []"
+
+CREATE TEMP TABLE t AS SELECT INTERVAL -5 DAY AS i, [INTERVAL 6 WEEK] AS a;
+SELECT FORMAT('%t %t', i, a) FROM t
+=> "0-0 -5 0:0:0 [0-0 42 0:0:0]"

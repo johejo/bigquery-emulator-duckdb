@@ -11,12 +11,14 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/interval.h"
 #include "src/references.h"
 #include "src/type_mapping.h"
 
@@ -187,6 +189,14 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
       throw ApiError::Invalid("Invalid BIGNUMERIC value for field " + field.name + ": " + scalar);
     }
     return BigNumericSql(*number);
+  }
+  if (field.type == FieldType::kInterval) {
+    // GoogleSQL parses the text as it does a query parameter's.
+    const auto interval = googlesql::IntervalValue::ParseFromString(scalar, /*allow_nanos=*/false);
+    if (!interval.ok()) {
+      throw ApiError::Invalid("Invalid INTERVAL value for field " + field.name + ": " + scalar);
+    }
+    return IntervalSql(*interval);
   }
   if (field.type == FieldType::kTimestamp && value.is_number()) {
     return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";

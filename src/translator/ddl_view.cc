@@ -63,9 +63,6 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());
-    if (HasInterval(output->column().type())) {
-      return Unsupported(scope, "stored INTERVAL columns");
-    }
     const auto type = DuckDbType(output->column().type());
     if (column == relation->columns.end() || !type) {
       return std::nullopt;

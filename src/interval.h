@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "googlesql/public/interval_value.h"
@@ -10,5 +12,7 @@ namespace bigquery_emulator_duckdb {
 absl::StatusOr<googlesql::IntervalValue> IntervalFromDuckDb(const duckdb_interval& value);
 // The input has already been validated in microsecond mode.
 duckdb_interval IntervalToDuckDb(const googlesql::IntervalValue& value);
+// The DuckDB expression for `value`, which keeps its month, day and microsecond parts apart.
+std::string IntervalSql(const googlesql::IntervalValue& value);
 
 }  // namespace bigquery_emulator_duckdb

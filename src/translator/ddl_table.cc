@@ -128,9 +128,6 @@ void ApplyTypeParameters(const googlesql::Type* type, const googlesql::TypeParam
 
 std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnDefinition& column,
                                                 const Scope& scope) {
-  if (HasInterval(column.type())) {
-    return Unsupported(scope, "stored INTERVAL columns");
-  }
   if (HasCollation(column.annotations())) {
     return Unsupported(scope, "column collation");
   }
