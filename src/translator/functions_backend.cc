@@ -812,10 +812,25 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_ISEMPTY", call("bq_st_isempty", 1)},
       {"ST_ISCOLLECTION", call("bq_st_iscollection", 1)},
       {"ST_ISCLOSED", call("bq_st_isclosed", 1)},
-      {"ST_LENGTH", spheroid("bq_st_zero_measure", {1, 2}, "ST_LENGTH")},
+      {"ST_LENGTH", spheroid("bq_st_length", {1, 2}, "ST_LENGTH")},
       {"ST_AREA", spheroid("bq_st_zero_measure", {1, 2}, "ST_AREA")},
       {"ST_PERIMETER", spheroid("bq_st_zero_measure", {1, 2}, "ST_PERIMETER")},
       {"ST_GEOHASH", call("bq_st_geohash", {1, 2}, {"20"})},
+      {"ST_STARTPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, 1, 'ST_STARTPOINT')"}}},
+      {"ST_ENDPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, -1, 'ST_ENDPOINT')"}}},
+      {"ST_POINTN", {{.arity = 2, .spelling = "bq_st_pointn($1, $2, 'ST_POINTN')"}}},
+      // An array with a NULL element makes NULL.
+      {
+          "ST_MAKELINE",
+          {
+              {.arity = 2, .spelling = "bq_st_makeline($1, $2)"},
+              {
+                  .arity = 1,
+                  .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE "
+                              "bq_st_makeline_array($1) END",
+              },
+          },
+      },
       {"S2_CELLIDFROMPOINT", call("bq_s2_cellidfrompoint", {1, 2}, {"30"})},
   };
   return *kRules;

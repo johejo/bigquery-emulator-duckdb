@@ -96,6 +96,12 @@ elements ^ST_GEOGFROMTEXT\( | wkt | STRING
 argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures nonempty points over the spheroid, which the emulator rejects.
 longest ^ST_DISTANCE\(
+# Linestring accessors take a linestring, and ST_MAKELINE's documented example of lines that
+# overlap makes a MULTILINESTRING.
+argument ^ST_(STARTPOINT|ENDPOINT|POINTN)\( | GEOGRAPHY | ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')
+query ST_MAKELINE SELECT ST_MAKELINE(ST_GEOGPOINT(0, 0), ST_GEOGFROMTEXT('LINESTRING(1 1, 2 2)'))
+query ST_MAKELINE SELECT ST_MAKELINE([ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 1)])
+query ST_MAKELINE SELECT ST_MAKELINE([ST_GEOGFROMTEXT('LINESTRING(1 0, 10 0)'), ST_GEOGFROMTEXT('LINESTRING(10 0, 5 0)'), ST_GEOGFROMTEXT('LINESTRING(5 0, 5 4)')])
 
 # Date and time arithmetic takes an INTERVAL expression, and a TIME has no DAY part.
 query DATE_ADD SELECT DATE_ADD(DATE '2024-01-15', INTERVAL 1 DAY)
