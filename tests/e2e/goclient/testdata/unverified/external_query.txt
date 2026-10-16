@@ -1,0 +1,63 @@
+# EXTERNAL_QUERY on Cloud SQL for PostgreSQL
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#postgresql_mapping
+#
+# Each query needs a connection named postgres in the US multi-region, to a Cloud SQL for
+# PostgreSQL instance; the queries read no tables.
+
+# Whether character keeps the padding that PostgreSQL gives it.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT 'a'::char(3) AS x''')
+?>
+
+# Which digits real keeps once it is FLOAT64.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.1::real AS x')
+?>
+
+# How numeric beyond NUMERIC's scale and range becomes NUMERIC.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.0000000005::numeric AS x')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1e30::numeric AS x')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT 'NaN'::numeric AS x''')
+?>
+
+# How default_type_for_decimal_columns string writes numeric.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.50::numeric(5, 2) AS x', '{"default_type_for_decimal_columns":"string"}')
+?>
+
+# Dates and times outside BigQuery's ranges.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT 'infinity'::date AS x''')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '10000-01-01'::date AS x''')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '24:00:00'::time AS x''')
+?>
+
+# Types the mapping does not list: name, which information_schema is made of, and bit strings.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT 'a'::name AS x''')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT B'101' AS x''')
+?>
+
+# The name of a column that the query does not name, and columns of the same name.
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 + 1')
+?>
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 AS x, 2 AS x')
+?>
+
+# The error for a connection that does not exist.
+
+SELECT * FROM EXTERNAL_QUERY('us.nosuch', 'SELECT 1 AS x')
+?>

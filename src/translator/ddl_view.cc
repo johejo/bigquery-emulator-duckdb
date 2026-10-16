@@ -46,6 +46,14 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   if (ReadsTemporaryTable(*create.query(), scope)) {
     return Unsupported(scope, "views that read temporary tables");
   }
+  // A view would read a database that is attached only once a query has analyzed it.
+  std::vector<const googlesql::ResolvedNode*> tvfs;
+  create.query()->GetDescendantsWithKinds({googlesql::RESOLVED_TVFSCAN}, &tvfs);
+  if (std::ranges::any_of(tvfs, [](const googlesql::ResolvedNode* tvf) {
+        return tvf->GetAs<googlesql::ResolvedTVFScan>()->tvf()->Name() == "external_query";
+      })) {
+    return Unsupported(scope, "views that read EXTERNAL_QUERY");
+  }
   const auto path = TargetTable(create.name_path(), scope, true);
   const std::optional<TableReference> target = scope.context.ddl_target_table;
   const auto relation = Scan(*create.query(), scope);

@@ -34,6 +34,10 @@ build --host_copt=--system-header-prefix=google/
 build --host_copt=--system-header-prefix=googlesql/
 build --host_copt=--system-header-prefix=s2/
 
+# Build libpq against the BoringSSL that gRPC already links, rather than a second TLS library
+# whose symbols would collide with it.
+common --@postgres//:with_ssl=boringssl
+
 # GoogleSQL's py_binary relies on implicit __init__.py creation, which rules_python deprecates. No
 # Python target in the build needs it.
 build --incompatible_default_to_explicit_init_py

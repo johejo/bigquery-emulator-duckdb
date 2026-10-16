@@ -137,6 +137,18 @@ integers. A call past either limit fails its query.
 just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 ```
 
+## External queries
+
+With `--connection PROJECT.LOCATION.CONNECTION=CONNINFO`, `EXTERNAL_QUERY` reaches the PostgreSQL
+database that the libpq connection string or URI `CONNINFO` names, as the Cloud SQL connection
+`PROJECT.LOCATION.CONNECTION`. The option is repeatable and not persisted; credentials stay out of
+the data directory. See [EXTERNAL_QUERY](docs/compatibility.md#external_query) for limits.
+
+```sh
+just run --project='{"projectId":"test"}' \
+  --connection='test.us.orders=postgresql://postgres@localhost:5432/orders'
+```
+
 ## Persistence
 
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
@@ -183,6 +195,8 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
+- `EXTERNAL_QUERY` reaches the PostgreSQL databases that `--connection` configures, rather than
+  connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy

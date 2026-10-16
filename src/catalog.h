@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
@@ -22,6 +23,9 @@
 namespace googlesql {
 class Function;
 class LanguageOptions;
+class TableValuedFunction;
+class TVFInputArgumentType;
+class TVFSignature;
 class Type;
 class TypeFactory;
 }  // namespace googlesql
@@ -89,6 +93,15 @@ class TableSource {
   // The persistent UDF `routine`, or nothing if there is no such routine. None by default.
   virtual std::optional<Routine> FindRoutine(const RoutineReference& /*routine*/) {
     return std::nullopt;
+  }
+
+  // The columns that EXTERNAL_QUERY returns for `query` on the connection `key`, as
+  // ConnectionKey gives it, with NUMERIC columns of `decimal_type`, once the connection is
+  // attached in DuckDB as ExternalDatabaseName(key). An error status for a connection that does
+  // not exist or a query that EXTERNAL_QUERY rejects. No connections by default.
+  virtual absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
+      const std::string& key, const std::string& /*query*/, FieldType /*decimal_type*/) {
+    return absl::NotFoundError("Not found: Connection " + key);
   }
 };
 
@@ -188,6 +201,11 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   absl::Status FindTableWithPathPrefix(absl::Span<const std::string> path,
                                        const FindOptions& options, int* num_names_consumed,
                                        const googlesql::Table** table) override;
+  // EXTERNAL_QUERY, whose columns depend on the database it queries, alongside the built-ins.
+  using googlesql::Catalog::FindTableValuedFunction;
+  absl::Status FindTableValuedFunction(const absl::Span<const std::string>& path,
+                                       const googlesql::TableValuedFunction** function,
+                                       const FindOptions& options) override;
 
  protected:
   [[nodiscard]] TableSource& source() const { return source_; }
@@ -195,6 +213,9 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   [[nodiscard]] const std::string& default_project() const { return default_project_; }
 
  private:
+  absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> ExternalQuerySchema(
+      const std::vector<googlesql::TVFInputArgumentType>& arguments);
+
   TableSource& source_;
   googlesql::TypeFactory* type_factory_;
   std::string default_project_;
@@ -203,6 +224,7 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // Keyed by the normalized path. The analyzer holds on to the Table pointers it is handed,
   // so they must stay valid for as long as the catalog does.
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleTable>> tables_;
+  std::unique_ptr<googlesql::TableValuedFunction> external_query_;
 };
 
 }  // namespace bigquery_emulator_duckdb

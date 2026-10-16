@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
 )
 
 func main() {
@@ -45,7 +46,7 @@ func runn(ctx context.Context, args ...string) error {
 	return command(ctx, "runn", append([]string{"run", "--scopes", "run:exec"}, args...)...).Run()
 }
 
-func startEmulator(ctx context.Context, binary, dataDir string, projects []string, sessionUser string) (*emulatorprocess.Process, error) {
+func startEmulator(ctx context.Context, binary, dataDir string, projects []string, sessionUser string, connections ...string) (*emulatorprocess.Process, error) {
 	port := os.Getenv("BQ_EMULATOR_PORT")
 	if port == "" {
 		port = "0"
@@ -53,6 +54,9 @@ func startEmulator(ctx context.Context, binary, dataDir string, projects []strin
 	args := []string{"--host", "127.0.0.1", "--port", port, "--data-dir", dataDir}
 	if sessionUser != "" {
 		args = append(args, "--session-user="+sessionUser)
+	}
+	for _, connection := range connections {
+		args = append(args, "--connection="+connection)
 	}
 	for _, project := range projects {
 		args = append(args, "--project="+project)
@@ -143,7 +147,7 @@ func run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	filesDir, dataDir := filepath.Join(tmp, "files"), filepath.Join(tmp, "data")
+	filesDir, dataDir, postgresDir := filepath.Join(tmp, "files"), filepath.Join(tmp, "data"), filepath.Join(tmp, "postgres")
 	for _, dir := range []string{filesDir, dataDir} {
 		if err := os.Mkdir(dir, 0700); err != nil {
 			return err
@@ -164,7 +168,16 @@ func run(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"), "jdoe@example.com")
+	startup, cancelStartup := context.WithTimeout(ctx, 15*time.Second)
+	postgres, err := postgresprocess.Start(startup, postgresDir)
+	cancelStartup()
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, postgres.Stop()) }()
+	// EXTERNAL_QUERY cases name the connection us.postgres of the Go client's project.
+	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"), "jdoe@example.com",
+		"test.us.postgres="+postgres.Conninfo)
 	if err != nil {
 		return err
 	}
