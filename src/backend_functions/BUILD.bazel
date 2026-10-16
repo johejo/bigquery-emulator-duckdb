@@ -188,8 +188,10 @@ cc_library(
     implementation_deps = [
         ":register",
         ":scalar",
+        "//:duckdb_handle",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
         "@s2geometry//:s2",
     ],

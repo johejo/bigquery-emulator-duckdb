@@ -195,15 +195,25 @@ columns are unsupported.
 
 ### GEOGRAPHY values
 
-Queries hold a GEOGRAPHY as WKT with every digit of its coordinates, and return or store it as
-the WKT BigQuery does, in 15 significant digits. Points and empty geographies are supported: from
-`ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH` and `ST_GEOGFROMTEXT` of a `POINT` or a geometry type
-followed by `EMPTY`. All empty geometries return as `GEOMETRYCOLLECTION EMPTY`. Nonempty lines,
-polygons and collections are unsupported. Functions over them
-use the [S2 Geometry](https://s2geometry.io/) library; distances use S2's Earth radius of
-6,371,010 meters, which BigQuery's distances match.
+Queries hold a GEOGRAPHY as the S2 points of its vertices, as BigQuery does, and return or store
+it as the WKT BigQuery does, in 15 significant digits. Points, linestrings and empty geographies are
+supported: from `ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH`, `ST_MAKELINE` and `ST_GEOGFROMTEXT` of a
+`POINT`, a `LINESTRING` or a geometry type followed by `EMPTY`. All empty geometries return as
+`GEOMETRYCOLLECTION EMPTY`. Polygons, multipart geometries and collections are unsupported.
+Functions over them use the [S2 Geometry](https://s2geometry.io/) library; distances use S2's
+Earth radius of 6,371,010 meters, which BigQuery's distances match.
 `ST_DISTANCE` with `use_spheroid` `TRUE` is unsupported for nonempty inputs. Stored GEOGRAPHY columns read as the STRING they hold, and
 GEOGRAPHY query parameters are unsupported.
+
+`ST_X` and `ST_Y` give a vertex's coordinates as S2 converts them back from its point.
+`ST_GEOGFROMTEXT` and `ST_MAKELINE` build a linestring as BigQuery does
+with S2Builder: vertices within a micrometer snap together, a line that folds back merges with
+itself, crossing edges gain the vertex where they cross, and a line that snaps to one point is a
+`POINT`. An edge longer than 135 degrees gains its midpoint, as BigQuery's do. A line that
+BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself, is unsupported.
+`ST_EQUALS` takes geographies as equal where each point of either is within a
+micrometer of the other. `ST_ASGEOJSON` of a linestring is unsupported. `ST_MAXDISTANCE` measures
+over edges, as BigQuery does, though its documentation describes vertices.
 
 ### RANGE_SESSIONIZE
 
