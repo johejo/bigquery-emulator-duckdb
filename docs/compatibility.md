@@ -152,7 +152,10 @@ Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, 
 NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts
 of these values to JSON and correlated aggregate subqueries returning them; use JSON functions for
 JSON conversion. As in BigQuery, ARRAYs, and STRUCTs that contain them, can be grouped but
-cannot be compared, ordered or passed to aggregate functions with DISTINCT.
+cannot be compared, ordered or passed to aggregate functions with DISTINCT. BigQuery also rejects
+STRUCT partition keys and STRUCT columns in `UNION DISTINCT`, `INTERSECT DISTINCT` and
+`EXCEPT DISTINCT`; the emulator rejects them too. `INTERSECT ALL` and `EXCEPT ALL` are also rejected,
+as BigQuery only supports `DISTINCT` for those operations.
 
 ### INTERVAL values
 
@@ -168,8 +171,8 @@ Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `
 `DISTINCT` group STRUCT and ARRAY values by the lengths of their INTERVAL fields and elements. Among equal
 values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
 sets the first in the whole input, and `SUM` and `AVG` with `DISTINCT` count the first. `GREATEST`, `LEAST`
-and `NULLIF` fail as in BigQuery. `PARTITION BY` and set operations over STRUCT and ARRAY values with
-INTERVAL fields, `INTERSECT ALL` and `EXCEPT ALL`, arithmetic, other aggregates, JSON conversion, loads of
+and `NULLIF` fail as in BigQuery. `PARTITION BY` and distinct set operations over ARRAY values with
+INTERVAL elements, arithmetic, other aggregates, JSON conversion, loads of
 INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
 unsupported.
 
