@@ -73,9 +73,9 @@ argument ^FORMAT\( | STRING | '%t'
 argument ^JSON_ARRAY_APPEND\( | STRING | '$'
 argument ^JSON_ARRAY_INSERT\( | STRING | '$[0]'
 
-# TOP_SUM preserves arbitrary grouping keys, independently of its weight overload. Include the
-# grouping types the translator rejects, so the report remains Partial. BigQuery rejects RANGE.
-values grouping | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | INTERVAL 1 SECOND | [1, NULL] | STRUCT(BIGNUMERIC '2' AS b)
+# TOP_SUM preserves arbitrary grouping keys, independently of its weight overload.
+# BigQuery rejects INTERVAL and RANGE keys; keep those forms in E2E rejection tests.
+values grouping | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | [1, NULL] | STRUCT(BIGNUMERIC '2' AS b)
 elements ^APPROX_TOP_SUM\( | grouping
 
 # Probe a point and same-typed boundaries across orderable scalar types, rather than declaring the
