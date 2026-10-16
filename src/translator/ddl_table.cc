@@ -832,7 +832,7 @@ std::optional<std::string> CreateTableAsSelect(
     FieldSchema& field = table.schema.at(i);
     ApplyDefaultRoundingMode(field, rounding_mode);
     const auto value =
-        WrittenValue(column->second, create.output_column_list(i)->column().type(), field, scope);
+        WrittenValue(column->second, create.output_column_list(i)->column().type(), field);
     if (!value) {
       return std::nullopt;
     }

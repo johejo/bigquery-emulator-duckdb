@@ -152,6 +152,8 @@ query Column rounding modes | CREATE TABLE n (a NUMERIC(10, 1) OPTIONS (rounding
 query Column rounding modes | CREATE TABLE n (a NUMERIC(10, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')) AS SELECT NUMERIC '2.25' AS a
 query Column rounding modes | CREATE TABLE n (a NUMERIC(10, 1)); ALTER TABLE n ALTER COLUMN a SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')
 query Column rounding modes | CREATE TABLE n (s STRUCT<a NUMERIC(10, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>); INSERT n (s) VALUES (STRUCT(2.25))
+query Column rounding modes | CREATE TABLE n (a ARRAY<NUMERIC(10, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')); INSERT n VALUES ([NUMERIC '2.25']); UPDATE n SET a = [NUMERIC '-2.25'] WHERE TRUE
+query Column rounding modes | CREATE TABLE n (s STRUCT<a NUMERIC(10, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>) AS SELECT STRUCT(NUMERIC '2.25' AS a) AS s
 query Column rounding modes | CREATE TABLE n (a NUMERIC(10, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))
 note Column rounding modes | See [Rounding modes](compatibility.md#rounding-modes).
 query Default rounding modes | CREATE TABLE n (a NUMERIC(10, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); INSERT n (a) VALUES (2.25)

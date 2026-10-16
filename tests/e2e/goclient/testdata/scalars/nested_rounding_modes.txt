@@ -1,0 +1,109 @@
+# Rounding parameterized NUMERIC and BIGNUMERIC fields in STRUCTs and ARRAYs.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_option_list
+#
+# Expected values and errors were confirmed against BigQuery.
+# Each script creates its own table in the scalars fixture.
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_struct_insert (s STRUCT<even NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'), away NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'), plain NUMERIC(5, 1), big BIGNUMERIC(10, 0) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_struct_insert VALUES (STRUCT(NUMERIC '2.25', NUMERIC '-2.25', NUMERIC '2.25', BIGNUMERIC '2.5'));
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_struct_insert
+=> "{\"even\":\"2.2\",\"away\":\"-2.3\",\"plain\":\"2.3\",\"big\":2}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_scalar_array (a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT scalars.nested_rounding_scalar_array VALUES ([NUMERIC '2.25', NUMERIC '-2.25', NUMERIC '2.35']);
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_scalar_array
+=> "[\"2.2\",\"-2.2\",\"2.4\"]"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_struct_array (a ARRAY<STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'), label STRING>>);
+INSERT scalars.nested_rounding_struct_array VALUES ([STRUCT(NUMERIC '2.25', 'first'), STRUCT(NUMERIC '-2.25', 'second'), STRUCT(CAST(NULL AS NUMERIC), 'null')]);
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_struct_array
+=> "[{\"n\":\"2.2\",\"label\":\"first\"},{\"n\":\"-2.2\",\"label\":\"second\"},{\"n\":null,\"label\":\"null\"}]"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_deep_struct (s STRUCT<inner_value STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>, a ARRAY<BIGNUMERIC(10, 0)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_deep_struct VALUES (STRUCT(STRUCT(NUMERIC '2.25'), [BIGNUMERIC '2.5', BIGNUMERIC '-2.5']));
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_deep_struct
+=> "{\"inner_value\":{\"n\":\"2.2\"},\"a\":[2,-2]}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_null_struct (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_null_struct VALUES (NULL);
+SELECT s IS NULL FROM scalars.nested_rounding_null_struct
+=> "true"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_empty_array (a ARRAY<STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>>);
+INSERT scalars.nested_rounding_empty_array VALUES ([]);
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_empty_array
+=> "[]"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_null_array_element (a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT scalars.nested_rounding_null_array_element VALUES ([NUMERIC '2.25', NULL]);
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_null_array_element
+=> error contains: Array cannot have a null element; error in writing field a
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_struct_update (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'), label STRING>);
+INSERT scalars.nested_rounding_struct_update VALUES (STRUCT(NUMERIC '0', 'before'));
+UPDATE scalars.nested_rounding_struct_update SET s = STRUCT(NUMERIC '-2.25', 'after') WHERE TRUE;
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_struct_update
+=> "{\"n\":\"-2.2\",\"label\":\"after\"}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_field_update (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'), away NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO')>);
+INSERT scalars.nested_rounding_field_update VALUES (STRUCT(NUMERIC '0', NUMERIC '0'));
+UPDATE scalars.nested_rounding_field_update SET s.n = NUMERIC '2.25', s.away = NUMERIC '2.25' WHERE TRUE;
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_field_update
+=> "{\"n\":\"2.2\",\"away\":\"2.3\"}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_array_update (a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT scalars.nested_rounding_array_update VALUES ([]);
+UPDATE scalars.nested_rounding_array_update SET a = [NUMERIC '2.25', NUMERIC '-2.25'] WHERE TRUE;
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_array_update
+=> "[\"2.2\",\"-2.2\"]"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_overflow (s STRUCT<n NUMERIC(2, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_overflow VALUES (STRUCT(NUMERIC '9.95'));
+SELECT CAST(s.n AS STRING) FROM scalars.nested_rounding_overflow
+=> error contains: Field s: NUMERIC(2, 1) has precision 2 and scale 1 but got a value that is not in range of [-9.9, 9.9]
+
+# CTAS uses the same rounding for nested fields, including a mode inherited from the table.
+CREATE OR REPLACE TABLE scalars.nested_rounding_ctas (s STRUCT<n NUMERIC(5, 1)>, a ARRAY<BIGNUMERIC(10, 0)>) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT STRUCT(NUMERIC '2.25' AS n) AS s, [BIGNUMERIC '2.5', BIGNUMERIC '-2.5'] AS a;
+SELECT TO_JSON_STRING(t) FROM scalars.nested_rounding_ctas AS t
+=> "{\"s\":{\"n\":\"2.2\"},\"a\":[2,-2]}"
+
+# Additional nested rounding cases for INSERT SELECT, MERGE, NULLs and wide BIGNUMERIC values.
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_insert_select (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_insert_select SELECT STRUCT(n AS different_name) FROM UNNEST([NUMERIC '2.25']) AS n;
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_insert_select
+=> "{\"n\":\"2.2\"}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_merge_values (id INT64, s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_merge_values VALUES (1, STRUCT(NUMERIC '0'));
+MERGE scalars.nested_rounding_merge_values AS t USING (SELECT id, STRUCT(NUMERIC '2.25' AS n) AS s FROM UNNEST([1, 2]) AS id) AS source ON t.id = source.id WHEN MATCHED THEN UPDATE SET s = source.s WHEN NOT MATCHED THEN INSERT (id, s) VALUES (source.id, source.s);
+SELECT TO_JSON_STRING(ARRAY_AGG(s ORDER BY id)) FROM scalars.nested_rounding_merge_values
+=> "[{\"n\":\"2.2\"},{\"n\":\"2.2\"}]"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_null_children (s STRUCT<child STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>, n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_null_children VALUES (STRUCT(CAST(NULL AS STRUCT<n NUMERIC>), CAST(NULL AS NUMERIC)));
+SELECT TO_JSON_STRING(s) FROM scalars.nested_rounding_null_children
+=> "{\"child\":null,\"n\":null}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_wide_numeric (a ARRAY<STRUCT<n BIGNUMERIC(40, 38) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>>, s STRUCT<n NUMERIC(2, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_wide_numeric VALUES ([STRUCT(BIGNUMERIC '1.00000000000000000000000000000000000005')], STRUCT(NUMERIC '9.85'));
+SELECT CONCAT(CAST(a[OFFSET(0)].n AS STRING), ',', CAST(s.n AS STRING)) FROM scalars.nested_rounding_wide_numeric
+=> "1.00000000000000000000000000000000000005,9.8"
+
+# NULL arrays and STRUCT elements when writing nested parameterized rounding fields.
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_null_arrays (a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'), s STRUCT<a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_null_arrays VALUES (CAST(NULL AS ARRAY<NUMERIC>), STRUCT(CAST(NULL AS ARRAY<NUMERIC>)));
+SELECT TO_JSON_STRING(t) FROM scalars.nested_rounding_null_arrays AS t
+=> "{\"a\":[],\"s\":{\"a\":[]}}"
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_null_struct_element (a ARRAY<STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>>);
+INSERT scalars.nested_rounding_null_struct_element VALUES ([STRUCT(NUMERIC '2.25'), CAST(NULL AS STRUCT<n NUMERIC>)]);
+SELECT TO_JSON_STRING(a) FROM scalars.nested_rounding_null_struct_element
+=> error contains: Array cannot have a null element; error in writing field a
+
+CREATE OR REPLACE TABLE scalars.nested_rounding_field_overflow (s STRUCT<n NUMERIC(2, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+INSERT scalars.nested_rounding_field_overflow VALUES (STRUCT(NUMERIC '0'));
+UPDATE scalars.nested_rounding_field_overflow SET s.n = NUMERIC '9.95' WHERE TRUE;
+SELECT CAST(s.n AS STRING) FROM scalars.nested_rounding_field_overflow
+=> error contains: NUMERIC(2, 1) has precision 2 and scale 1 but got a value that is not in range of [-9.9, 9.9]

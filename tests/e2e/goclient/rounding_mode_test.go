@@ -153,11 +153,10 @@ func TestColumnRoundingModes(t *testing.T) {
 
 	// Writes the emulator does not round to even are rejected.
 	for sql, want := range map[string]string{
-		"INSERT t (s) VALUES (STRUCT(NUMERIC '1'))": "",
-		"CREATE TABLE r (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>); INSERT r (s) VALUES (STRUCT(2.25))": "writing a STRUCT or ARRAY with parameterized ROUND_HALF_EVEN values",
-		"CREATE TABLE r (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))":                                     "defaults on parameterized ROUND_HALF_EVEN fields",
-		"CREATE TABLE r (n INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))":                                                       "rounding modes on INTEGER fields",
-		"INSERT api (even) SELECT NUMERIC '2.25'":                                                                                    "",
+		"INSERT t (s) VALUES (STRUCT(NUMERIC '1'))":                                              "",
+		"CREATE TABLE r (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))": "defaults on parameterized ROUND_HALF_EVEN fields",
+		"CREATE TABLE r (n INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))":                   "rounding modes on INTEGER fields",
+		"INSERT api (even) SELECT NUMERIC '2.25'":                                                "",
 	} {
 		err := run(sql)
 		if want == "" {

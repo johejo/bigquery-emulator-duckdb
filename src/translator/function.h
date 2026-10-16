@@ -32,10 +32,10 @@ std::string GeographyWkt(const std::string& value, const googlesql::Type* type, 
 
 // `value`, the SQL of a value of `type` that a statement writes to the column `field`. DuckDB's
 // cast to a parameterized NUMERIC or BIGNUMERIC rounds halfway values away from zero, so the value
-// of a ROUND_HALF_EVEN column is rounded to even first, as ROUND does. Writing a STRUCT or ARRAY
-// with such values is unsupported.
-std::optional<std::string> WrittenValue(std::string value, const googlesql::Type* type,
-                                        const FieldSchema& field, const Scope& scope);
+// of a ROUND_HALF_EVEN field, at any depth in a STRUCT or ARRAY, is rounded to even first, as
+// ROUND does. Container expressions are evaluated once and NULL STRUCTs remain NULL.
+std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
+                                        const FieldSchema& field);
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns);

@@ -93,7 +93,7 @@ std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value,
   if (!sql || field == nullptr) {
     return sql;
   }
-  return WrittenValue(*std::move(sql), value.value()->type(), *field, scope);
+  return WrittenValue(*sql, value.value()->type(), *field);
 }
 
 // The assignments below one column or struct field: either its new value, or the fields of it
@@ -166,8 +166,14 @@ std::optional<std::string> UpdateItems(
     if (!target.names.contains(id) || !target.columns.contains(id)) {
       return Unsupported(scope, "UPDATE target");
     }
-    // A field of a STRUCT column is written as part of the column.
-    const auto value = DmlValue(*item->set_value(), target.fields.at(id), scope, columns);
+    // A field assignment uses that field's rounding mode and scale, rather than its column's.
+    const FieldSchema* written = target.fields.at(id);
+    for (const int index : path) {
+      if (written != nullptr) {
+        written = &written->fields.at(index);
+      }
+    }
+    const auto value = DmlValue(*item->set_value(), written, scope, columns);
     if (!value) {
       return std::nullopt;
     }
@@ -268,7 +274,7 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
       }
       const auto value = fields.at(i) == nullptr
                              ? column->second
-                             : WrittenValue(column->second, output.type(), *fields.at(i), scope);
+                             : WrittenValue(column->second, output.type(), *fields.at(i));
       if (!value) {
         return std::nullopt;
       }

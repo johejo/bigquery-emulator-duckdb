@@ -91,8 +91,11 @@ dataset whose default is `ROUND_HALF_EVEN` are unsupported.
 DML and `CREATE TABLE AS SELECT` round the values they write to a parameterized column's scale with
 its rounding mode, `ROUND_HALF_AWAY_FROM_ZERO` when unset. Other writes round halfway values away
 from zero, so they reject `ROUND_HALF_EVEN` columns: loads, `tabledata.insertAll`, the Storage
-Write API, and query or copy jobs that append to a table of another schema. So do DML writes of a
-STRUCT or ARRAY with parameterized `ROUND_HALF_EVEN` values, and defaults on such columns.
+Write API, and query or copy jobs that append to a table of another schema. Defaults on
+parameterized `ROUND_HALF_EVEN` columns are also unsupported. DML and `CREATE TABLE AS SELECT`
+round parameterized `ROUND_HALF_EVEN` fields within STRUCTs and ARRAYs too, keeping NULL STRUCTs
+and converting NULL arrays containing those fields to empty arrays. NULL elements in those arrays
+are rejected.
 
 ### Column defaults
 
