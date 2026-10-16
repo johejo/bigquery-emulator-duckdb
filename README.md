@@ -66,8 +66,8 @@ See the [Storage API guide](docs/storage-api.md) for writing rows, limits and st
 
 ### Run queries without a server
 
-`shell` runs queries in the process instead of listening. It accepts `--project`, `--data-dir`
-and `--session-user` as the server does, and uses the only registered project unless
+`shell` runs queries in the process instead of listening. It accepts `--project`, `--data-dir`,
+`--session-user` and the [JavaScript UDF limits](#javascript-udf-limits) as the server does, and uses the only registered project unless
 `--project-id` names one. `--dataset-id` sets the default dataset.
 
 ```bash
@@ -124,6 +124,17 @@ the function is unsupported. Stored views use the executing process's identity; 
 
 ```sh
 just run --project='{"projectId":"test"}' --session-user='alice@example.com'
+```
+
+## JavaScript UDF limits
+
+BigQuery documents neither limit exactly, so by default one JavaScript UDF call may run for 5
+minutes, and the calls of one query may allocate 256 MiB on each thread that runs them.
+`--javascript-timeout-ms MS` and `--javascript-memory-mib MIB` change them; both take positive
+integers. A call past either limit fails its query.
+
+```sh
+just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 ```
 
 ## Persistence

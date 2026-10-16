@@ -17,6 +17,7 @@
 #include "duckdb.h"
 #include "quickjs.h"
 #include "src/backend_error.h"
+#include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
 

@@ -17,6 +17,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
+#include "src/backend_functions/javascript_limits.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/project.h"
@@ -181,9 +182,11 @@ class Emulator {
  public:
   // Restores persisted registrations and replaces those explicitly supplied at startup.
   // With no data directory, registrations and data live in memory only. A nonempty
-  // session_user enables SESSION_USER for every client; it is not persisted.
+  // session_user enables SESSION_USER for every client; it is not persisted. JavaScript UDFs run
+  // under `javascript`.
   explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {},
-                    const std::optional<std::string>& session_user = std::nullopt);
+                    const std::optional<std::string>& session_user = std::nullopt,
+                    const backend_functions::JavaScriptLimits& javascript = {});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

@@ -353,7 +353,17 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["//third_party/duckdb"],
+    deps = [
+        ":javascript_limits",
+        "//third_party/duckdb",
+    ],
+)
+
+cc_library(
+    name = "javascript_limits",
+    hdrs = ["javascript_limits.h"],
+    copts = ["-std=c++20"],
+    visibility = ["//:__pkg__"],
 )
 
 cc_library(

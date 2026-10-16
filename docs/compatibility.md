@@ -234,7 +234,8 @@ UDF bodies resolve against previously declared UDFs.
 
 Temporary JavaScript UDFs run in embedded QuickJS. They take BOOL, FLOAT64 and STRING arguments,
 named by JavaScript identifiers, and return those or INT64. State is query-local, with a 5-minute
-call timeout and a 256 MiB allocation limit per query per thread.
+call timeout and a 256 MiB allocation limit per query per thread; see
+[JavaScript UDF limits](../README.md#javascript-udf-limits) to change them.
 
 ### Unsupported forms
 

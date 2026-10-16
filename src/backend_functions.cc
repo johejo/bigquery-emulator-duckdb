@@ -12,6 +12,7 @@
 #include "src/backend_functions/geography.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
+#include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/json.h"
 #include "src/backend_functions/math.h"
 #include "src/backend_functions/percentile.h"
@@ -68,7 +69,8 @@ void RegisterSessionUser(duckdb_connection connection,
 }  // namespace
 
 void RegisterBackendFunctions(duckdb_database database,
-                              const std::optional<std::string>& session_user) {
+                              const std::optional<std::string>& session_user,
+                              const backend_functions::JavaScriptLimits& javascript) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -86,7 +88,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterGeographyFunctions(connection.get());
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
-  backend_functions::RegisterJavaScriptFunctions(connection.get());
+  backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);
 }
 
 }  // namespace bigquery_emulator_duckdb
