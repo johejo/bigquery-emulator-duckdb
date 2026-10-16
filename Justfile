@@ -24,11 +24,11 @@ cppcheck *args:
         --library=googletest --inline-suppr --error-exitcode=1 \
         --suppressions-list=.cppcheck-suppressions {{ args }} src tests tools
 
-# The DuckDB CLI in the dev shell and the libraries linked into the binary come from the same
-# release.
+# The DuckDB CLI in the dev shell, the libraries linked into the binary and the headers the
+# postgres_scanner extension compiles against come from the same release.
 duckdb-version-check:
     nix_version=$(sed -n 's/^ *version = "\(.*\)";$/\1/p' duckdb-bin.nix); \
-    bazel_versions=$(grep -o 'duckdb/releases/download/v[^/]*\|install\.duckdb\.org/v[^/]*' MODULE.bazel | sed 's/.*\/v//' | sort -u); \
+    bazel_versions=$(grep -o 'duckdb/releases/download/v[^/]*\|install\.duckdb\.org/v[^/]*\|duckdb/duckdb/archive/refs/tags/v[0-9.]*[0-9]' MODULE.bazel | sed 's/.*\/v//' | sort -u); \
     if [[ "$bazel_versions" != "$nix_version" ]]; then \
         echo "DuckDB versions differ: duckdb-bin.nix has $nix_version, MODULE.bazel has $(echo $bazel_versions)" >&2; \
         exit 1; \

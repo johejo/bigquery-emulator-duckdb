@@ -406,8 +406,16 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
         .mode = googlesql::ErrorMessageMode::ERROR_MESSAGE_MULTI_LINE_WITH_CARET,
         .attach_error_location_payload = false,
     };
-    throw std::runtime_error(
-        googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status).ToString());
+    const absl::Status formatted =
+        googlesql::MaybeUpdateErrorFromPayload(error_message_options, sql, status);
+    // The analyzer nests an error of the catalog's, such as EXTERNAL_QUERY's, in one of its own.
+    // One that the emulator does not support is the statement's error.
+    const std::string_view formatted_message = formatted.message();
+    if (const size_t nested = formatted_message.find("\nThe emulator does not support ");
+        nested != std::string_view::npos) {
+      throw std::runtime_error(std::string(formatted_message.substr(nested + 1)));
+    }
+    throw std::runtime_error(formatted.ToString());
   }
   if (const auto casts = CheckCastTypeParameters(sql, false); !casts.ok()) {
     throw std::runtime_error(std::string(casts.message()));

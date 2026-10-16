@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/external_query.h"
 #include "src/translator/aggregate.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -28,7 +30,74 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
+// A column of EXTERNAL_QUERY's result, `sql`, as postgres_scanner reads it, converted to the
+// BigQuery type `type` that the catalog gave it. A NUMERIC that postgres_scanner cannot read as a
+// DECIMAL is read as text. Dates and times outside BigQuery's ranges, such as PostgreSQL's
+// infinity or 24:00:00, fail.
+std::string ExternalValue(const googlesql::Type* type, const std::string& sql) {
+  const auto in_range = [&](const std::string& condition, std::string_view name) {
+    return "CASE WHEN " + sql + " IS NULL OR " + condition + " THEN " + sql + " ELSE error('" +
+           std::string(name) + " value out of range: ' || CAST(" + sql + " AS VARCHAR)) END";
+  };
+  switch (type->kind()) {
+    case googlesql::TYPE_BIGNUMERIC:
+      return "CAST(bq_bignumeric_from_string(CAST(" + sql + " AS VARCHAR), false) AS BIGNUM)";
+    case googlesql::TYPE_DATE:
+      return in_range(sql + " BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'", "DATE");
+    case googlesql::TYPE_DATETIME:
+      return in_range(sql +
+                          " BETWEEN TIMESTAMP '0001-01-01 00:00:00' AND TIMESTAMP '9999-12-31 "
+                          "23:59:59.999999'",
+                      "DATETIME");
+    case googlesql::TYPE_TIMESTAMP:
+      return in_range(sql +
+                          " BETWEEN TIMESTAMPTZ '0001-01-01 00:00:00+00' AND TIMESTAMPTZ "
+                          "'9999-12-31 23:59:59.999999+00'",
+                      "TIMESTAMP");
+    case googlesql::TYPE_TIME:
+      return in_range(sql + " < TIME '24:00:00'", "TIME");
+    default:
+      return "CAST(" + sql + " AS " + DuckDbType(type).value_or("VARCHAR") + ")";
+  }
+}
+
+// EXTERNAL_QUERY reads from the database that the catalog attached when it analyzed the query.
+std::optional<Relation> ExternalQueryScan(const googlesql::ResolvedTVFScan& tvf,
+                                          const Scope& scope) {
+  const auto& arguments = tvf.signature()->input_arguments();
+  const auto literal = [&](size_t i) {
+    return arguments.at(i).GetScalarArgType()->literal_value()->string_value();
+  };
+  // The catalog accepted the connection ID.
+  const std::optional<std::string> key = ConnectionKey(literal(0), scope.context.defaults.project);
+  if (!key) {
+    return Unsupported(scope, "EXTERNAL_QUERY connection ID");
+  }
+  std::vector<std::string> names;
+  names.reserve(static_cast<size_t>(tvf.signature()->result_schema().num_columns()));
+  for (int i = 0; i < tvf.signature()->result_schema().num_columns(); ++i) {
+    names.push_back(QuoteIdentifier("_x" + std::to_string(i)));
+  }
+  Relation result;
+  std::vector<std::string> projections;
+  for (int i = 0; i < tvf.column_list_size(); ++i) {
+    const auto& column = tvf.column_list(i);
+    const std::string alias = ColumnName(column.column_id());
+    projections.push_back(ExternalValue(column.type(), "e." + names.at(static_cast<size_t>(
+                                                                  tvf.column_index_list(i)))) +
+                          " AS " + alias);
+    result.columns.emplace(column.column_id(), "q." + alias);
+  }
+  result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
+               " FROM postgres_query(" + QuoteLiteral(ExternalDatabaseName(*key)) + ", " +
+               QuoteLiteral(literal(1)) + ") AS e(" + Join(names, ", ") + ")";
+  return result;
+}
+
 std::optional<Relation> SessionizeScan(const googlesql::ResolvedTVFScan& tvf, const Scope& scope) {
+  if (tvf.tvf()->Name() == "external_query") {
+    return ExternalQueryScan(tvf, scope);
+  }
   if (tvf.tvf()->Name() != "range_sessionize") {
     return Unsupported(scope, "table function " + tvf.tvf()->Name());
   }

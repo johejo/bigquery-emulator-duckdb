@@ -71,6 +71,13 @@ their C++ types. GEOGRAPHY functions, which GoogleSQL does not implement, use th
 [S2 Geometry](https://s2geometry.io/) library over the S2 points that a GEOGRAPHY holds in queries, written as text. GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files for DuckDB.
 
+`EXTERNAL_QUERY` reads PostgreSQL through DuckDB's postgres_scanner extension, which is built
+from source against the C++ headers of the DuckDB release in use and linked into the binary (see
+[third_party/duckdb_postgres](../third_party/duckdb_postgres/README.md)). The catalog prepares the
+query with libpq while the statement is analyzed, maps the result's PostgreSQL types to BigQuery's
+in [external_query.cc](../src/external_query.cc), and attaches the database to DuckDB once; the
+translator reads it with `postgres_query` and converts each column.
+
 Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.
 Their comments hold the original query and result schema as JSON. Creation and metadata writes
 share a transaction, preserving the previous definition on replacement failure.

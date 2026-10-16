@@ -1,0 +1,5 @@
+exports_files([
+    "BUILD.database_connector.bazel",
+    "BUILD.duckdb_postgres.bazel",
+    "BUILD.duckdb_source.bazel",
+])

@@ -18,6 +18,7 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
+#include "src/external_query.h"
 #include "src/project.h"
 
 namespace bigquery_emulator_duckdb {
@@ -48,10 +49,17 @@ std::string ProjectFileName(const std::string& project_id) {
 
 Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
-                   const backend_functions::JavaScriptLimits& javascript)
+                   const backend_functions::JavaScriptLimits& javascript,
+                   const std::vector<ExternalConnection>& connections)
     : backend_(session_user, javascript),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
+  for (const ExternalConnection& connection : connections) {
+    // cppcheck-suppress useStlAlgorithm
+    if (!connections_.conninfo.emplace(connection.key, connection.conninfo).second) {
+      throw std::invalid_argument("Duplicate connection: " + connection.key);
+    }
+  }
   const auto registry = std::filesystem::path(data_dir_) / "projects.json";
   std::map<std::string, Project> registered;
   if (!data_dir_.empty()) {

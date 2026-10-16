@@ -18,6 +18,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/project.h"
@@ -178,15 +179,26 @@ struct ExtractRequest {
 
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
+// The connections that EXTERNAL_QUERY reaches, by key, and those attached so far in the DuckDB
+// database of `backend`.
+struct ExternalConnections {
+  Backend& backend;
+  std::unordered_map<std::string, std::string> conninfo = {};
+  std::mutex mutex = {};
+  std::unordered_set<std::string> attached = {};
+};
+
 class Emulator {
  public:
   // Restores persisted registrations and replaces those explicitly supplied at startup.
   // With no data directory, registrations and data live in memory only. A nonempty
-  // session_user enables SESSION_USER for every client; it is not persisted. JavaScript UDFs run
-  // under `javascript`.
-  explicit Emulator(std::string data_dir = "", const std::vector<Project>& projects = {},
-                    const std::optional<std::string>& session_user = std::nullopt,
-                    const backend_functions::JavaScriptLimits& javascript = {});
+  // session_user enables SESSION_USER for every client; it and `connections`, which
+  // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
+  explicit Emulator(
+      std::string data_dir = "", const std::vector<Project>& projects = {},
+      const std::optional<std::string>& session_user = std::nullopt,
+      const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
+      const std::vector<ExternalConnection>& connections = {});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 
@@ -306,6 +318,7 @@ class Emulator {
   std::recursive_mutex expiration_mutex_;
   Backend backend_;
   bool has_session_user_;
+  ExternalConnections connections_{.backend = backend_};
   GcsClient gcs_client_;
   std::string data_dir_;
   std::mutex mutex_;
