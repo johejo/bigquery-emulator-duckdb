@@ -354,6 +354,13 @@ AggregateRule PercentileDiscRule(googlesql::TypeKind type) {
   };
 }
 
+// TF_IDF scores the document in its first argument over the dictionary of its window, which
+// bq_tf_idf_dictionary builds once.
+std::string TfIdf(const std::string& sql, const std::vector<std::string>& arguments,
+                  const std::string& /*tail*/) {
+  return "bq_tf_idf(" + arguments.at(0) + ", " + sql + ")";
+}
+
 // Functions that only take a window.
 }  // namespace
 
@@ -398,6 +405,17 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
                       .order = kPercentileOrder,
                       .nulls = kFilterUnlessRespected,
                       .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
+                  },
+              },
+          },
+          {
+              "TF_IDF",
+              {
+                  {
+                      .function = "bq_tf_idf_dictionary",
+                      .arguments = {"$1", "$2", "$3"},
+                      .defaults = {"", "32000", "5"},
+                      .finish = TfIdf,
                   },
               },
           },

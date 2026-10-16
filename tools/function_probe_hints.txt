@@ -276,6 +276,11 @@ query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'NO_OP_ANALYZER')
 query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'PATTERN_ANALYZER', analyzer_options => '{"patterns": ["[a-z]+"]}')
 query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer_options => '{"delimiters": ["b"], "token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}, {"stop_words": ["a"]}]}')
 
+# TF_IDF takes only an empty OVER clause.
+query TF_IDF SELECT TF_IDF(f) OVER () FROM (SELECT ['a', 'b'] AS f)
+query TF_IDF SELECT TF_IDF(f, 10) OVER () FROM (SELECT ['a', 'b'] AS f)
+query TF_IDF SELECT TF_IDF(f, 10, 1) OVER () FROM (SELECT ['a', 'b'] AS f)
+
 # Limits the probe's calls do not show.
 note CONTAINS_SUBSTR Takes STRING only.
 note SESSION_USER Requires --session-user; returns the configured identity for every client.

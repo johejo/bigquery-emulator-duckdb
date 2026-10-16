@@ -65,7 +65,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
 | [Statistical aggregate functions](#statistical-aggregate-functions) | 9 | 0 | 0 | 0 |
 | [String functions](#string-functions) | 52 | 0 | 1 | 0 |
-| [Text analysis functions](#text-analysis-functions) | 2 | 0 | 1 | 0 |
+| [Text analysis functions](#text-analysis-functions) | 3 | 0 | 0 | 0 |
 | [Time functions](#time-functions) | 8 | 0 | 0 | 0 |
 | [Time series functions](#time-series-functions) | 3 | 0 | 3 | 0 |
 | [Timestamp functions](#timestamp-functions) | 15 | 0 | 0 | 0 |
@@ -599,7 +599,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | --- | --- | --- | --- |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | Supported | DuckDB SQL |  |
 | [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | Supported | DuckDB SQL, in code |  |
-| [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | Unsupported |  |  |
+| [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | Supported | DuckDB window function |  |
 
 ## Time functions
 

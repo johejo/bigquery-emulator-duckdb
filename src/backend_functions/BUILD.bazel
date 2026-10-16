@@ -95,6 +95,7 @@ cc_library(
     implementation_deps = [
         ":register",
         ":scalar",
+        "//:backend_error",
         "//:duckdb_handle",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",

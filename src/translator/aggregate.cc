@@ -547,6 +547,16 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         return std::nullopt;
       }
       const auto* call = computed->expr()->GetAs<googlesql::ResolvedAnalyticFunctionCall>();
+      // GoogleSQL takes PARTITION BY and SAFE with TF_IDF, which BigQuery rejects after analysis.
+      if (IsBuiltinFunction(*call->function()) && call->function()->Name() == "tf_idf") {
+        if (group->partition_by() != nullptr) {
+          throw std::invalid_argument(
+              "non-empty OVER() clause is disallowed for function 'tf_idf'");
+        }
+        if (call->error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
+          throw std::invalid_argument("SAFE is unsupported with analytic function tf_idf");
+        }
+      }
       const auto type = DuckDbType(call->type());
       const auto over = Window(*group, call->window_frame(), scope, input_columns);
       if (!type || !over) {

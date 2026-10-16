@@ -1,0 +1,243 @@
+## TF_IDF
+# Source: BigQuery's answers to cases that were unverified, the first two the examples of
+# text-analysis-functions#tf_idf and the third ML.TF_IDF's. A term's score is its count over the
+# document's length, NULLs included, times ln(1 + documents / (1 + documents containing it)),
+# where NULL and empty documents count. The dictionary takes the terms in at least
+# frequency_threshold documents, the most documents first and then in byte order, up to
+# max_distinct_tokens. NULLs and other terms are the unknown term, NULL, whose idf is the mean of
+# the dictionary's, or 0 for an empty one.
+#
+# Each query aggregates the window's rows by id so that it returns one value.
+
+# The documentation's examples, the second as ML.TF_IDF's example spells its fourth document.
+
+WITH t AS (
+  SELECT 1 AS id, ['I', 'like', 'pie', 'pie', 'pie', NULL] AS f UNION ALL
+  SELECT 2, ['yum', 'yum', 'pie', NULL] UNION ALL
+  SELECT 3, ['I', 'yum', 'pie', NULL] UNION ALL
+  SELECT 4, ['you', 'like', 'pie', 'too', NULL]
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.1304033435859887"}]}},{"v":{"f":[{"v":"I"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"like"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.29389333245105953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.1956050153789831"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}},{"v":{"f":[{"v":"yum"},{"v":"0.4236489301936017"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":null},{"v":"0.1956050153789831"}]}},{"v":{"f":[{"v":"I"},{"v":"0.21182446509680086"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}},{"v":{"f":[{"v":"yum"},{"v":"0.21182446509680086"}]}}]}]}},{"v":{"f":[{"v":"4"},{"v":[{"v":{"f":[{"v":null},{"v":"0.4694520369095594"}]}},{"v":{"f":[{"v":"like"},{"v":"0.1694595720774407"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.11755733298042381"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['I', 'like', 'pie', 'pie', 'pie', NULL] AS f UNION ALL
+  SELECT 2, ['yum', 'yum', 'pie', NULL] UNION ALL
+  SELECT 3, ['I', 'yum', 'pie', NULL] UNION ALL
+  SELECT 4, ['you', 'like', 'pie', 'too', NULL]
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 3, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.12679902142647365"}]}},{"v":{"f":[{"v":"I"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"like"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.29389333245105953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.5705955964191315"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":null},{"v":"0.380397064279421"}]}},{"v":{"f":[{"v":"I"},{"v":"0.21182446509680086"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}}]}]}},{"v":{"f":[{"v":"4"},{"v":[{"v":{"f":[{"v":null},{"v":"0.45647647713530515"}]}},{"v":{"f":[{"v":"like"},{"v":"0.1694595720774407"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.11755733298042381"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['I', 'like', 'pie', 'pie', 'pie', NULL] AS f UNION ALL
+  SELECT 2, ['yum', 'yum', 'pie', NULL] UNION ALL
+  SELECT 3, ['I', 'yum', 'pie', NULL] UNION ALL
+  SELECT 4, ['you', 'like', 'pie', NULL]
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 3, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.12679902142647365"}]}},{"v":{"f":[{"v":"I"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"like"},{"v":"0.1412163100645339"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.29389333245105953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.5705955964191315"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":null},{"v":"0.380397064279421"}]}},{"v":{"f":[{"v":"I"},{"v":"0.21182446509680086"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}}]}]}},{"v":{"f":[{"v":"4"},{"v":[{"v":{"f":[{"v":null},{"v":"0.380397064279421"}]}},{"v":{"f":[{"v":"like"},{"v":"0.21182446509680086"}]}},{"v":{"f":[{"v":"pie"},{"v":"0.14694666622552977"}]}}]}]}}]
+
+# The unknown term's idf is the dictionary's mean whether the unknown term is NULLs, one term
+# outside the dictionary, terms in different documents, a term repeated within a document or a
+# term in more than one document.
+
+WITH t AS (
+  SELECT 1 AS id, ['a', NULL] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.2554128118829953"}]}},{"v":{"f":[{"v":"a"},{"v":"0.2554128118829953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5108256237659906"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', NULL] AS f UNION ALL
+  SELECT 2, ['a', NULL] UNION ALL
+  SELECT 3, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.27980789396771133"}]}},{"v":{"f":[{"v":"a"},{"v":"0.27980789396771133"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.27980789396771133"}]}},{"v":{"f":[{"v":"a"},{"v":"0.27980789396771133"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5596157879354227"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.2554128118829953"}]}},{"v":{"f":[{"v":"a"},{"v":"0.2554128118829953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5108256237659906"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a', 'c'] UNION ALL
+  SELECT 3, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.27980789396771133"}]}},{"v":{"f":[{"v":"a"},{"v":"0.27980789396771133"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.27980789396771133"}]}},{"v":{"f":[{"v":"a"},{"v":"0.27980789396771133"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5596157879354227"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.3405504158439937"}]}},{"v":{"f":[{"v":"a"},{"v":"0.17027520792199685"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5108256237659906"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a', 'b'] UNION ALL
+  SELECT 3, ['a'] UNION ALL
+  SELECT 4, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 3) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.29389333245105953"}]}},{"v":{"f":[{"v":"a"},{"v":"0.29389333245105953"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.29389333245105953"}]}},{"v":{"f":[{"v":"a"},{"v":"0.29389333245105953"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5877866649021191"}]}}]}]}},{"v":{"f":[{"v":"4"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5877866649021191"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b', NULL] AS f UNION ALL
+  SELECT 2, ['a', 'c'] UNION ALL
+  SELECT 3, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.37307719195694844"}]}},{"v":{"f":[{"v":"a"},{"v":"0.18653859597847422"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.27980789396771133"}]}},{"v":{"f":[{"v":"a"},{"v":"0.27980789396771133"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5596157879354227"}]}}]}]}}]
+
+# A document without the unknown term does not report it.
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.2554128118829953"}]}},{"v":{"f":[{"v":"b"},{"v":"0.34657359027997264"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.5108256237659906"}]}}]}]}}]
+
+# frequency_threshold counts documents, not occurrences.
+
+WITH t AS (
+  SELECT 1 AS id, ['x', 'x'] AS f UNION ALL
+  SELECT 2, ['y']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 2) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}}]
+
+# max_distinct_tokens takes the terms in the most documents, not with the most occurrences, the
+# first in byte order among equals; it is at least 1.
+
+WITH t AS (
+  SELECT 1 AS id, ['x', 'x', 'x'] AS f UNION ALL
+  SELECT 2, ['y'] UNION ALL
+  SELECT 3, ['y']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 1, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.6931471805599453"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"y"},{"v":"0.6931471805599453"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"y"},{"v":"0.6931471805599453"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['b'] AS f UNION ALL
+  SELECT 2, ['a'] UNION ALL
+  SELECT 3, ['B']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 2, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.9162907318741551"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.9162907318741551"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[{"v":{"f":[{"v":"B"},{"v":"0.9162907318741551"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 0, 1) OVER () AS r FROM t)
+=> error: Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be between 1 and 1048576 at [4:72]
+
+# A document's terms come in byte order.
+
+WITH t AS (
+  SELECT 1 AS id, ['b', 'a', 'b', 'B', ''] AS f
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":""},{"v":"0.08109302162163289"}]}},{"v":{"f":[{"v":"B"},{"v":"0.08109302162163289"}]}},{"v":{"f":[{"v":"a"},{"v":"0.08109302162163289"}]}},{"v":{"f":[{"v":"b"},{"v":"0.16218604324326577"}]}}]}]}}]
+
+# The defaults, a frequency_threshold of 5 and max_distinct_tokens of 32000.
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":null},{"v":"0.0"}]}}]}]}}]
+
+# NULL and empty documents have no scores but count toward the number of documents.
+
+WITH t AS (
+  SELECT 1 AS id, ['a'] AS f UNION ALL
+  SELECT 2, ['a', 'b'] UNION ALL
+  SELECT 3, CAST([] AS ARRAY<STRING>) UNION ALL
+  SELECT 4, NULL
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.8472978603872034"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.4236489301936017"}]}},{"v":{"f":[{"v":"b"},{"v":"0.5493061443340549"}]}}]}]}},{"v":{"f":[{"v":"3"},{"v":[]}]}},{"v":{"f":[{"v":"4"},{"v":[]}]}}]
+
+WITH t AS (
+  SELECT 1 AS id, [CAST(NULL AS STRING)] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER () AS r FROM t)
+=> [{"v":{"f":[{"v":"1"},{"v":[{"v":{"f":[{"v":null},{"v":"0.6931471805599453"}]}}]}]}},{"v":{"f":[{"v":"2"},{"v":[{"v":{"f":[{"v":"a"},{"v":"0.6931471805599453"}]}}]}]}}]
+
+# The limits must be literals or query parameters.
+
+SELECT TF_IDF(['a'], x, 1) OVER () FROM UNNEST([10]) AS x
+=> error: Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be a literal or query parameter at [1:22]
+
+SELECT TF_IDF(['a'], 10, x) OVER () FROM UNNEST([1]) AS x
+=> error: Argument 3 to BIGQUERYGOOGLESQL:TF_IDF must be a literal or query parameter at [1:26]
+
+# TF_IDF takes no window but OVER ().
+
+WITH t AS (
+  SELECT 1 AS id, 1 AS g, ['a', 'b'] AS f UNION ALL
+  SELECT 2, 1, ['a'] UNION ALL
+  SELECT 3, 2, ['b']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER (PARTITION BY g) AS r FROM t)
+=> error: non-empty OVER() clause is disallowed for function 'tf_idf'
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER (ORDER BY id) AS r FROM t)
+=> error: Window ORDER BY is not allowed for analytic function tf_idf at [5:85]
+
+WITH t AS (
+  SELECT 1 AS id, ['a', 'b'] AS f UNION ALL
+  SELECT 2, ['a']
+)
+SELECT ARRAY_AGG(STRUCT(id, r) ORDER BY id) FROM (SELECT id, TF_IDF(f, 10, 1) OVER (ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS r FROM t)
+=> error: Window framing clause is not allowed for analytic function tf_idf at [5:85]
+
+# Without OVER.
+
+SELECT TF_IDF(['a'])
+=> error: Analytic function BIGQUERYGOOGLESQL:TF_IDF cannot be called without an OVER clause at [1:8]
+
+# Limits that are NULL, negative or at the bounds of max_distinct_tokens.
+
+SELECT TF_IDF(f, NULL, 1) OVER () FROM (SELECT ['a'] AS f)
+=> error: Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be non-NULL at [1:18]
+
+SELECT TF_IDF(f, 10, NULL) OVER () FROM (SELECT ['a'] AS f)
+=> error: Argument 3 to BIGQUERYGOOGLESQL:TF_IDF must be non-NULL at [1:22]
+
+SELECT TF_IDF(f, -1, 1) OVER () FROM (SELECT ['a'] AS f)
+=> error: Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be between 1 and 1048576 at [1:18]
+
+SELECT TF_IDF(f, 10, -1) OVER () FROM (SELECT ['a'] AS f)
+=> error: Argument 3 to BIGQUERYGOOGLESQL:TF_IDF must be at least 0 at [1:22]
+
+SELECT TF_IDF(f, 1048576, 1) OVER () FROM (SELECT ['a'] AS f)
+=> [{"v":{"f":[{"v":"a"},{"v":"0.4054651081081644"}]}}]
+
+SELECT TF_IDF(f, 1048577, 1) OVER () FROM (SELECT ['a'] AS f)
+=> error: Argument 2 to BIGQUERYGOOGLESQL:TF_IDF must be between 1 and 1048576 at [1:18]
+
+# BigQuery rejects SAFE.
+SELECT SAFE.TF_IDF(f) OVER () FROM (SELECT ['a'] AS f)
+=> error: SAFE is unsupported with analytic function tf_idf
