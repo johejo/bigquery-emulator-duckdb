@@ -122,6 +122,18 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
+  reason: "BigQuery rejects type parameters in CAST, which GoogleSQL accepts"
+  label: "cast_function_test:cast_array_with_large_floating_point_with_type_parameters"
+  label: "cast_function_test:cast_range_with_truncation"
+  label: "cast_function_test:cast_struct_type_parameters_valid_input"
+  label: "cast_function_test:cast_struct_with_large_floating_point_with_type_parameters"
+  label: "numeric_test:numeric_self_cast"
+  label: "numeric_test:truncation_in_array_does_not_change_orderedness"
+  label: "typeof_test:typeof_parameterized_type_expression"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
   reason: "BigQuery rejects query results with a STRUCT<> or an anonymous value table field, which GoogleSQL returns"
   label: "struct_queries_test:struct_with_zero_field"
   label: "union_distinct_queries_test:union_distinct_datatype_struct"
@@ -634,6 +646,9 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR
   reason: "DuckDB fails on a string that is not valid UTF-8 where BigQuery returns a result, or NULL under SAFE"
+  label: "code:SafeCastTo_BYTES_STRING_<@xc2@xa3_dTGF3WUAsUQ_@xc2@xa3>_STRING_<utf-8>"
+  label: "code:SafeCastTo_BYTES_STRING_<@xc2@xa3_dTGF3WUAsUQ_@xc2@xa3>_STRING_<utf8>"
+  label: "code:SafeCastTo_BYTES_STRING_<sd@xffsd>_STRING_<ascii>"
   label: "code:regexp_extract_STRING_<a@xa7@x65q>_STRING_<a>_INT64_1"
   label: "code:regexp_extract_STRING_<a@xa7@x65q>_STRING_<a>_INT64_1_INT64_2"
   label: "code:regexp_extract_STRING_<a@xa7@x65q>_STRING_<a>_INT64_2"
