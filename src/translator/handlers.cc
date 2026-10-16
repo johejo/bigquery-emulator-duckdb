@@ -80,7 +80,8 @@ namespace {
 
 // Whether `left` = `right`, two values of `type`. BigQuery compares STRUCTs field by field by
 // position: FALSE when a pair of fields differs, otherwise NULL when a field is NULL. DuckDB's
-// composite equality takes NULL fields, and NaN, as equal values.
+// composite equality takes NULL fields, and NaN, as equal values. INTERVAL fields compare their
+// lengths, as bq_interval_key computes them.
 std::string Equal(const googlesql::Type* type, const std::string& left, const std::string& right) {
   if (type->IsStruct()) {
     std::vector<std::string> fields;
@@ -94,6 +95,9 @@ std::string Equal(const googlesql::Type* type, const std::string& left, const st
   }
   if (type->IsDouble()) {
     return FloatCompare(left, "=", right);
+  }
+  if (type->IsInterval()) {
+    return "(bq_interval_key(" + left + ") = bq_interval_key(" + right + "))";
   }
   return "(" + left + " = " + right + ")";
 }

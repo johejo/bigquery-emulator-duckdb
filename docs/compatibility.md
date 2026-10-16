@@ -157,18 +157,21 @@ cannot be compared, ordered or passed to aggregate functions with DISTINCT.
 ### INTERVAL values
 
 INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
-parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, and `SUM` and `AVG` without
-`DISTINCT` are supported. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
+parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, and `SUM` and `AVG` are
+supported. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
 `tabledata.insertAll` rows give them as text in the canonical form, in full or in part, as query
 parameters do, and CSV loads read only the full `Y-M D H:M:S[.F]` form BigQuery documents.
-Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, `DISTINCT`, `PARTITION BY`, `UNION`,
-`INTERSECT` and `EXCEPT` with `DISTINCT`, and `COUNT`, `MIN` and `MAX` compare lengths with 30 days
-to a month and 24 hours to a day, as GoogleSQL does, so `INTERVAL 1 MONTH` equals `INTERVAL 30 DAY`. Among equal values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return
-the first in input order. `GREATEST`, `LEAST` and `NULLIF` fail as in BigQuery. Comparing or
-grouping STRUCT and ARRAY values with INTERVAL fields, grouping sets, `INTERSECT ALL` and
-`EXCEPT ALL`, arithmetic, other aggregates, including `SUM` and `AVG` with `DISTINCT`, JSON
-conversion, loads of INTERVAL columns from other formats, extracts of them, and reading them
-through the Storage API are unsupported.
+Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `DISTINCT`, `PARTITION BY`,
+`UNION`, `INTERSECT` and `EXCEPT` with `DISTINCT`, `COUNT`, `MIN` and `MAX`, and `SUM` and `AVG` with
+`DISTINCT` compare lengths with 30 days to a month and 24 hours to a day, as GoogleSQL does, so `INTERVAL 1 MONTH` equals
+`INTERVAL 30 DAY`. STRUCT comparisons compare their INTERVAL fields the same way, and `GROUP BY` and
+`DISTINCT` group STRUCT and ARRAY values by the lengths of their INTERVAL fields and elements. Among equal
+values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
+sets the first in the whole input, and `SUM` and `AVG` with `DISTINCT` count the first. `GREATEST`, `LEAST`
+and `NULLIF` fail as in BigQuery. `PARTITION BY` and set operations over STRUCT and ARRAY values with
+INTERVAL fields, `INTERSECT ALL` and `EXCEPT ALL`, arithmetic, other aggregates, JSON conversion, loads of
+INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
+unsupported.
 
 ### RANGE values
 

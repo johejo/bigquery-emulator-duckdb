@@ -139,7 +139,13 @@ struct AggregateRule {
     // It leaves out the rows whose first argument is NULL unless the call has RESPECT NULLS.
     kFilterUnlessRespected,
   };
-  enum class Distinct : std::uint8_t { kAllowed, kAlways, kUnsupported };
+  enum class Distinct : std::uint8_t {
+    kAllowed,
+    kAlways,
+    kUnsupported,
+    // Only a call with DISTINCT matches the rule, whose function or finish removes the duplicates.
+    kRequired,
+  };
   // How the function takes LIMIT.
   enum class Limit : std::uint8_t {
     kUnsupported,

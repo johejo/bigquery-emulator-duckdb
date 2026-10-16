@@ -255,7 +255,7 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
       return "CAST(ARRAY(" + select + relation->Order() + ") AS " + type + ")";
     case googlesql::ResolvedSubqueryExpr::IN: {
       const googlesql::Type* in_type = subquery.in_expr()->type();
-      if (HasInterval(in_type) && !in_type->IsInterval()) {
+      if (HasInterval(in_type) && !in_type->IsInterval() && !in_type->IsStruct()) {
         return Unsupported(scope, "IN subquery with INTERVAL");
       }
       if (!subquery.in_collation().Empty()) {
@@ -511,6 +511,37 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
 }
 
 std::string IntervalKey(const std::string& sql) { return "bq_interval_key(" + sql + ")"; }
+
+namespace {
+
+std::string NestedIntervalKey(const googlesql::Type* type, const std::string& sql, int depth) {
+  if (!HasInterval(type)) {
+    return sql;
+  }
+  if (type->IsInterval()) {
+    return IntervalKey(sql);
+  }
+  if (type->IsArray()) {
+    const std::string element = "_ik" + std::to_string(depth);
+    return "list_transform(" + sql + ", " + element + " -> " +
+           NestedIntervalKey(type->AsArray()->element_type(), element, depth + 1) + ")";
+  }
+  // row() of a NULL STRUCT's fields would be a STRUCT of NULLs.
+  std::vector<std::string> fields;
+  fields.reserve(type->AsStruct()->num_fields());
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    fields.push_back(
+        NestedIntervalKey(type->AsStruct()->field(i).type,
+                          "struct_extract_at(" + sql + ", " + std::to_string(i + 1) + ")", depth));
+  }
+  return "CASE WHEN " + sql + " IS NOT NULL THEN row(" + Join(fields, ", ") + ") END";
+}
+
+}  // namespace
+
+std::string IntervalKey(const googlesql::Type* type, const std::string& sql) {
+  return NestedIntervalKey(type, sql, 0);
+}
 
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,

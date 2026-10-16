@@ -130,14 +130,15 @@ constexpr char kBigNumericCovarPop[] = "bq_bignumeric_covar_pop";
 constexpr char kBigNumericCovarSamp[] = "bq_bignumeric_covar_samp";
 
 // An INTERVAL aggregate that `kFunction`, of src/backend_functions/interval.cc, computes as
-// GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would equate
-// differently spelled values, such as a month and 30 days.
+// GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would keep any of
+// equal values, such as a month and 30 days, so the DISTINCT functions keep the first of them.
 template <const char* kFunction>
-AggregateRule IntervalAggregate() {
+AggregateRule IntervalAggregate(
+    AggregateRule::Distinct distinct = AggregateRule::Distinct::kAllowed) {
   return {
       .function = "list",
       .type = googlesql::TYPE_INTERVAL,
-      .distinct = AggregateRule::Distinct::kUnsupported,
+      .distinct = distinct,
       .skip_nulls = true,
       .finish =
           [](const std::string& sql, const std::vector<std::string>& /*arguments*/,
@@ -147,6 +148,8 @@ AggregateRule IntervalAggregate() {
 
 constexpr char kIntervalSum[] = "bq_interval_sum";
 constexpr char kIntervalAvg[] = "bq_interval_avg";
+constexpr char kIntervalSumDistinct[] = "bq_interval_sum_distinct";
+constexpr char kIntervalAvgDistinct[] = "bq_interval_avg_distinct";
 
 // Aggregate functions, which also take a window.
 }  // namespace
@@ -174,6 +177,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
               "SUM",
               {
                   {.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
+                  IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
                   IntervalAggregate<kIntervalSum>(),
                   {.function = "sum"},
               },
@@ -182,6 +186,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
               "AVG",
               {
                   BigNumericAggregate<kBigNumericAvg>(1),
+                  IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
                   IntervalAggregate<kIntervalAvg>(),
                   {.function = "avg"},
               },
