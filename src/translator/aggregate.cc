@@ -66,6 +66,10 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                     condition.types.end();
            });
   });
+  // GoogleSQL accepts INTERVAL keys, but BigQuery rejects them after analysis.
+  if (name == "APPROX_TOP_SUM" && type_of(0) == googlesql::TYPE_INTERVAL) {
+    throw std::invalid_argument("Unsupported type INTERVAL for approx_top_sum_shard.");
+  }
   // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
   // DuckDB does.
   if ((rule == entry->aggregates.end() || rule->type != googlesql::TYPE_INTERVAL) &&

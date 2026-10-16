@@ -177,3 +177,12 @@ SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 10000)) FROM UNNEST([1]) x
 
 SELECT ARRAY_LENGTH(APPROX_TOP_SUM(x, 1, 10001)) FROM UNNEST([1]) x
 => error contains: The last argument to approx_top_sum_shard cannot be greater than 10000
+
+# BigQuery rejects INTERVAL keys, although GoogleSQL accepts them. Source: BigQuery answers.
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].value AS STRING)
+FROM UNNEST([STRUCT(INTERVAL 1 MONTH AS x, 2 AS w), (INTERVAL 30 DAY, 3)])
+=> error: Unsupported type INTERVAL for approx_top_sum_shard.
+
+SELECT CAST(APPROX_TOP_SUM(x, w, 1)[OFFSET(0)].value AS STRING)
+FROM UNNEST([STRUCT(INTERVAL 30 DAY AS x, 2 AS w), (INTERVAL 1 MONTH, 3)])
+=> error: Unsupported type INTERVAL for approx_top_sum_shard.

@@ -37,7 +37,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | --- | --- | --- | --- | --- |
 | [AEAD encryption functions](#aead-encryption-functions) | 5 | 7 | 4 | 0 |
 | [Aggregate functions](#aggregate-functions) | 18 | 0 | 0 | 1 |
-| [Approximate aggregate functions](#approximate-aggregate-functions) | 3 | 1 | 0 | 0 |
+| [Approximate aggregate functions](#approximate-aggregate-functions) | 4 | 0 | 0 | 0 |
 | [Array functions](#array-functions) | 11 | 0 | 0 | 0 |
 | [Bit functions](#bit-functions) | 1 | 0 | 0 | 0 |
 | [Built-in table functions](#built-in-table-functions) | 0 | 0 | 1 | 0 |
@@ -124,7 +124,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`APPROX_COUNT_DISTINCT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_count_distinct) | Supported | DuckDB aggregate |  |
 | [`APPROX_QUANTILES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_quantiles) | Supported | DuckDB aggregate |  |
 | [`APPROX_TOP_COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_count) | Supported | DuckDB aggregate |  |
-| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | Partial | DuckDB aggregate | Unsupported: aggregate or analytic function APPROX_TOP_SUM with INTERVAL. |
+| [`APPROX_TOP_SUM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/approximate_aggregate_functions#approx_top_sum) | Supported | DuckDB aggregate |  |
 
 ## Array functions
 
