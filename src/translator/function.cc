@@ -9,7 +9,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "googlesql/public/type.h"
@@ -107,23 +106,76 @@ std::string GeographyWkt(const std::string& value, const googlesql::Type* type, 
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
 }
 
-std::optional<std::string> WrittenValue(std::string value, const googlesql::Type* type,
-                                        const FieldSchema& field, const Scope& scope) {
-  value = GeographyWkt(value, type);
+namespace {
+
+// Bind each container once: rebuilding a STRUCT must not evaluate its expression per field.
+std::optional<std::string> RoundedValue(const std::string& value, const googlesql::Type* type,
+                                        const FieldSchema& field, std::string_view column,
+                                        int depth) {
   if (!RoundsToEven(field)) {
     return value;
   }
-  if (field.type == FieldType::kRecord || field.mode == FieldMode::kRepeated) {
-    return Unsupported(scope,
-                       "writing a STRUCT or ARRAY with parameterized ROUND_HALF_EVEN values");
+  const std::string name = "_round" + std::to_string(depth);
+  if (type->IsArray()) {
+    const auto element =
+        RoundedValue(name, type->AsArray()->element_type(), field, column, depth + 1);
+    if (!element) {
+      return std::nullopt;
+    }
+    return "coalesce(list_transform(" + value + ", " + name + " -> CASE WHEN " + name +
+           " IS NULL THEN error(" +
+           QuoteLiteral("Array cannot have a null element; error in writing field " +
+                        std::string(column)) +
+           ") ELSE " + *element + " END), [])";
   }
-  return TranslateFunction(
+  if (type->IsStruct()) {
+    const auto* structure = type->AsStruct();
+    const std::vector<std::string> names = DuckDbStructFieldNames(structure);
+    std::vector<std::string> fields;
+    for (int i = 0; i < structure->num_fields(); ++i) {
+      const auto rounded =
+          RoundedValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
+                       structure->field(i).type, field.fields.at(i), column, depth + 1);
+      if (!rounded) {
+        return std::nullopt;
+      }
+      fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *rounded);
+    }
+    return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
+           " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+  }
+  auto rounded = TranslateFunction(
       "ROUND",
       {
-          {.sql = std::move(value), .type = type->kind()},
+          {.sql = value, .type = type->kind()},
           {.sql = std::to_string(field.scale.value_or(0)), .type = googlesql::TYPE_INT64},
           {.sql = "NULL", .type = googlesql::TYPE_ENUM, .rounding_mode = "ROUND_HALF_EVEN"},
       });
+  if (!rounded || !type->IsNumericType() || !field.precision.has_value()) {
+    return rounded;
+  }
+  // Check after rounding, before DuckDB's column cast, to report BigQuery's range error.
+  const auto precision = *field.precision;
+  const auto scale = field.scale.value_or(0);
+  std::string bound = precision == scale ? "0" : std::string(precision - scale, '9');
+  if (scale > 0) {
+    bound += "." + std::string(scale, '9');
+  }
+  const std::string message =
+      "Field " + std::string(column) + ": NUMERIC(" + std::to_string(precision) + ", " +
+      std::to_string(scale) + ") has precision " + std::to_string(precision) + " and scale " +
+      std::to_string(scale) + " but got a value that is not in range of [-" + bound + ", " + bound +
+      "]";
+  return "list_transform([" + *rounded + "], " + name + " -> CASE WHEN abs(" + name + ") > CAST(" +
+         QuoteLiteral(bound) + " AS DECIMAL(38,9)) THEN error(" + QuoteLiteral(message) +
+         ") ELSE " + name + " END)[1]";
+}
+
+}  // namespace
+
+std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
+                                        const FieldSchema& field) {
+  return RoundedValue(GeographyWkt(value, type), type, field, field.name, 0);
 }
 
 namespace {
