@@ -23,7 +23,7 @@ SELECT ARRAY_AGG(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL
 
 SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support PARTITION BY with INTERVAL
+=> error contains: Partitioning by expressions of type STRUCT is unsupported
 
 SELECT MAKE_INTERVAL(day => 7) INTERSECT ALL SELECT MAKE_INTERVAL(day => 8)
-=> error contains: The emulator does not support set operation with INTERVAL
+=> error contains: INTERSECT ALL is not supported. Only INTERSECT DISTINCT is supported.

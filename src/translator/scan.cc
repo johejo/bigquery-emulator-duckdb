@@ -6,6 +6,7 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -286,11 +287,18 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
       operators = {
           {googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
           {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
-          {googlesql::ResolvedSetOperationScan::INTERSECT_ALL, " INTERSECT ALL "},
           {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
-          {googlesql::ResolvedSetOperationScan::EXCEPT_ALL, " EXCEPT ALL "},
           {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "},
   };
+  // GoogleSQL accepts these forms, but BigQuery only supports DISTINCT for them.
+  if (set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL ||
+      set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_ALL) {
+    const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL
+                                 ? "INTERSECT"
+                                 : "EXCEPT";
+    throw std::invalid_argument(name + " ALL is not supported. Only " + name +
+                                " DISTINCT is supported.");
+  }
   const auto op = operators.find(set.op_type());
   if (op == operators.end() || set.column_list().empty()) {
     return std::nullopt;
@@ -302,6 +310,14 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
   std::vector<std::string> names;
   bool intervals = false;
   for (const auto& column : set.column_list()) {
+    if (distinct && column.type()->IsStruct()) {
+      const std::string name =
+          set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT       ? "UNION"
+          : set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT ? "INTERSECT"
+                                                                                     : "EXCEPT";
+      throw std::invalid_argument("Type STRUCT is not supported in " + name +
+                                  " DISTINCT operation");
+    }
     if (set.op_type() != googlesql::ResolvedSetOperationScan::UNION_ALL &&
         HasInterval(column.type()) && !(distinct && column.type()->IsInterval())) {
       return Unsupported(scope, "set operation with INTERVAL");

@@ -239,6 +239,9 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {
+      if (ref->type()->IsStruct()) {
+        throw std::invalid_argument("Partitioning by expressions of type STRUCT is unsupported");
+      }
       if (HasInterval(ref->type()) && !ref->type()->IsInterval()) {
         return Unsupported(scope, "PARTITION BY with INTERVAL");
       }
