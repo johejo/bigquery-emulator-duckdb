@@ -316,8 +316,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     throw std::invalid_argument("Unsupported type in function " +
                                 (function == "NULLIF" ? "NULL_IF" : function));
   }
-  // These only compare their INTERVAL arguments, or the elements of IN UNNEST's ARRAY, so they
-  // compare the values' keys instead.
+  // These only compare their INTERVAL arguments or ARRAY elements, so they compare the
+  // values' keys instead.
   static constexpr std::string_view interval_comparisons[] = {
       "$EQUAL",
       "$NOT_EQUAL",
@@ -330,10 +330,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "$IS_NOT_DISTINCT_FROM",
       "$IN",
       "$IN_ARRAY",
+      "RANGE_BUCKET",
   };
   const auto keyed = [&](const googlesql::Type* type) {
-    return type->IsInterval() || (function == "$IN_ARRAY" && type->IsArray() &&
-                                  type->AsArray()->element_type()->IsInterval());
+    return type->IsInterval() || ((function == "$IN_ARRAY" || function == "RANGE_BUCKET") &&
+                                  type->IsArray() && type->AsArray()->element_type()->IsInterval());
   };
   const bool compares_intervals =
       interval &&

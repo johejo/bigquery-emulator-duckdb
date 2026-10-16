@@ -55,7 +55,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
 | [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
 | [KLL functions](#kll-functions) | 0 | 0 | 11 | 0 |
-| [Mathematical functions](#mathematical-functions) | 49 | 1 | 0 | 0 |
+| [Mathematical functions](#mathematical-functions) | 50 | 0 | 0 | 0 |
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
@@ -431,7 +431,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`POW`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#pow) | Supported | GoogleSQL function |  |
 | [`POWER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#power) | Supported | GoogleSQL function |  |
 | [`RAND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#rand) | Supported | DuckDB function, renamed |  |
-| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | Partial | DuckDB SQL | Unsupported: function RANGE_BUCKET with INTERVAL. |
+| [`RANGE_BUCKET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#range_bucket) | Supported | DuckDB SQL |  |
 | [`ROUND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#round) | Supported | DuckDB SQL |  |
 | [`SAFE_ADD`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_add) | Supported | SAFE. operator |  |
 | [`SAFE_DIVIDE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/mathematical_functions#safe_divide) | Supported | DuckDB SQL |  |
