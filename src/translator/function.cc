@@ -289,8 +289,18 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
         return !HasInterval(argument->type()) || keyed(argument->type());
       });
-  if (interval && !compares_intervals && entry->handler != Bucket && !In(kCarries, function) &&
-      !In(interval_functions, function)) {
+  // StructComparison compares STRUCTs field by field, and their INTERVAL fields by their keys.
+  // BigQuery compares no ARRAYs, also in STRUCT fields.
+  static constexpr std::string_view struct_comparisons[] = {
+      "$EQUAL",
+      "$NOT_EQUAL",
+      "$IN",
+      "$IN_ARRAY",
+  };
+  const bool compares_structs =
+      interval && In(struct_comparisons, function) && call.argument_list(0)->type()->IsStruct();
+  if (interval && !compares_intervals && !compares_structs && entry->handler != Bucket &&
+      !In(kCarries, function) && !In(interval_functions, function)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
   // A GEOGRAPHY is its WKT in DuckDB, which the S2 functions build and read, and which DuckDB

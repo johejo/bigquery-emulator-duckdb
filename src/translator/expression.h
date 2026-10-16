@@ -29,6 +29,11 @@ Scope Nested(const Scope& scope, const Columns& columns);
 // The BIGINT that compares and orders the INTERVAL `sql` as GoogleSQL does the value.
 std::string IntervalKey(const std::string& sql);
 
+// The value that compares and groups `sql`, of `type`, as GoogleSQL does the value: INTERVAL
+// values, also in STRUCT fields and ARRAY elements, become their keys. Other values stay as they
+// are.
+std::string IntervalKey(const googlesql::Type* type, const std::string& sql);
+
 // ORDER BY items, with BigQuery's default NULL ordering spelled out.
 std::optional<std::string> OrderItems(
     const std::vector<std::unique_ptr<const googlesql::ResolvedOrderByItem>>& items,

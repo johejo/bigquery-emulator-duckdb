@@ -60,6 +60,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   };
   const auto rule = std::ranges::find_if(entry->aggregates, [&](const AggregateRule& candidate) {
     return (candidate.type == googlesql::TYPE_UNKNOWN || candidate.type == type_of(0)) &&
+           (candidate.distinct != AggregateRule::Distinct::kRequired || call.distinct()) &&
            std::ranges::all_of(candidate.conditions, [&](const Condition& condition) {
              return std::ranges::find(condition.types, type_of(condition.argument - 1)) !=
                     condition.types.end();
@@ -126,11 +127,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     return rule->finish == nullptr ? sql : rule->finish(sql, arguments, tail);
   };
   if (call.distinct() && rule->distinct == AggregateRule::Distinct::kUnsupported) {
-    return Unsupported(scope, name + "(DISTINCT ...)" +
-                                  (rule->type == googlesql::TYPE_INTERVAL ? " with INTERVAL" : ""));
+    return Unsupported(scope, name + "(DISTINCT ...)");
   }
   std::string inner = Join(args, ", ");
-  if (call.distinct() || rule->distinct == AggregateRule::Distinct::kAlways) {
+  if ((call.distinct() && rule->distinct != AggregateRule::Distinct::kRequired) ||
+      rule->distinct == AggregateRule::Distinct::kAlways) {
     inner = "DISTINCT " + inner;
   }
   std::vector<std::string> conditions;
@@ -366,15 +367,10 @@ void ApplyFinishes(Relation& result, const std::map<int, std::string>& finishes)
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
-  // INTERVAL keys group by their keys, and each group returns its first value, as BigQuery does.
+  // Keys with INTERVAL values group by their lengths, and return the first of equal values in input
+  // order, as BigQuery does.
   const bool grouping_sets =
       !aggregate.grouping_set_list().empty() || !aggregate.grouping_call_list().empty();
-  if (std::ranges::any_of(aggregate.group_by_list(), [&](const auto& key) {
-        const googlesql::Type* type = key->column().type();
-        return HasInterval(type) && (grouping_sets || !type->IsInterval());
-      })) {
-    return Unsupported(scope, "GROUP BY with INTERVAL");
-  }
   if (!aggregate.collation_list().empty()) {
     return Unsupported(scope, "GROUP BY with collation");
   }
@@ -400,6 +396,10 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       columns.emplace(id, "q." + ColumnName(id));
     }
     Columns key_columns;
+    // BigQuery returns the first of equal values in the whole input, also in the groups of later
+    // rows, so a key with INTERVAL values becomes that value before the grouping. Values with
+    // different lengths differ in DuckDB too, so DuckDB groups them as BigQuery does.
+    std::vector<std::string> firsts;
     for (const auto& key : aggregate.group_by_list()) {
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
@@ -407,6 +407,11 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       }
       const int id = key->column().column_id();
       inner.push_back(*sql + " AS " + ColumnName(id));
+      if (const googlesql::Type* type = key->expr()->type(); HasInterval(type)) {
+        const std::string column = "q." + ColumnName(id);
+        firsts.push_back("first_value(" + column + ") OVER (PARTITION BY " +
+                         IntervalKey(type, column) + " ORDER BY q._rn) AS " + ColumnName(id));
+      }
       key_columns.emplace(id, "q." + ColumnName(id));
       projections.push_back("q." + ColumnName(id) + " AS " + ColumnName(id));
       result.columns.emplace(id, "q." + ColumnName(id));
@@ -439,10 +444,14 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       projections.push_back("CAST(GROUPING(" + key->second + ") AS BIGINT) AS " + ColumnName(id));
       result.columns.emplace(id, "q." + ColumnName(id));
     }
-    input = Relation{
-        .sql = "SELECT " + (inner.empty() ? "1 AS _unit" : Join(inner, ", ")) + input->From(),
-        .columns = columns,
-    };
+    std::string sql = "SELECT " + (inner.empty() ? "1 AS _unit" : Join(inner, ", "));
+    if (!firsts.empty()) {
+      sql = "SELECT q.* REPLACE (" + Join(firsts, ", ") + ") FROM (" + sql +
+            ", row_number() OVER () AS _rn" + input->From() + ") AS q";
+    } else {
+      sql += input->From();
+    }
+    input = Relation{.sql = sql, .columns = columns};
   } else {
     // HAVING MAX/MIN keeps the rows whose expression reaches the group's maximum or minimum,
     // which a window over the group computes alongside the input.
@@ -452,7 +461,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       if (!sql) {
         return std::nullopt;
       }
-      partition.push_back(key->expr()->type()->IsInterval() ? IntervalKey(*sql) : *sql);
+      partition.push_back(IntervalKey(key->expr()->type(), *sql));
     }
     std::vector<std::string> inner;
     Columns columns;
@@ -489,9 +498,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         return std::nullopt;
       }
       const int id = key->column().column_id();
-      if (key->expr()->type()->IsInterval()) {
+      if (const googlesql::Type* type = key->expr()->type(); HasInterval(type)) {
         projections.push_back("first(" + *sql + ") AS " + ColumnName(id));
-        keys.push_back(IntervalKey(*sql));
+        keys.push_back(IntervalKey(type, *sql));
       } else {
         projections.push_back(*sql + " AS " + ColumnName(id));
         keys.push_back(std::to_string(projections.size()));

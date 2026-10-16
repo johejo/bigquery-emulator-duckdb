@@ -1,12 +1,11 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# arithmetic, or comparing or grouping STRUCT and ARRAY values with INTERVAL fields, is unsupported
-# rather than left to DuckDB.
+# arithmetic, is unsupported rather than left to DuckDB.
 
 SELECT MAKE_INTERVAL(day => 7) * 2
 => error contains: The emulator does not support function $MULTIPLY with INTERVAL
 
-SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) = STRUCT(MAKE_INTERVAL(hour => 168) AS i)
-=> error contains: The emulator does not support function $EQUAL with INTERVAL
+SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVAL(hour => 168) AS i)
+=> error contains: The emulator does not support function $IS_DISTINCT_FROM with INTERVAL
 
 SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
 => error contains: The emulator does not support CAST from STRUCT<i INTERVAL> to JSON
@@ -20,23 +19,11 @@ SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 => error contains: The emulator does not support function $EXTRACT
 
-SELECT SUM(DISTINCT i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support SUM(DISTINCT ...) with INTERVAL
-
 SELECT ARRAY_AGG(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL
 
-SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IN (SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i))
-=> error contains: The emulator does not support IN subquery with INTERVAL
-
 SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support PARTITION BY with INTERVAL
-
-SELECT i FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i GROUP BY ROLLUP(i)
-=> error contains: The emulator does not support GROUP BY with INTERVAL
-
-SELECT DISTINCT STRUCT(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support GROUP BY with INTERVAL
 
 SELECT MAKE_INTERVAL(day => 7) INTERSECT ALL SELECT MAKE_INTERVAL(day => 8)
 => error contains: The emulator does not support set operation with INTERVAL
