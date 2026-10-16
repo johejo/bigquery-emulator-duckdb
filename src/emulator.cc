@@ -15,6 +15,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend_error.h"
+#include "src/backend_functions/javascript_limits.h"
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/project.h"
@@ -46,8 +47,9 @@ std::string ProjectFileName(const std::string& project_id) {
 }  // namespace
 
 Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
-                   const std::optional<std::string>& session_user)
-    : backend_(session_user),
+                   const std::optional<std::string>& session_user,
+                   const backend_functions::JavaScriptLimits& javascript)
+    : backend_(session_user, javascript),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   const auto registry = std::filesystem::path(data_dir_) / "projects.json";
