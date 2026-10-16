@@ -76,10 +76,14 @@ compliance-summary *args:
 reference sql:
     bazelisk run @googlesql//googlesql/tools/execute_query -- --product_mode=external {{ quote(sql) }}
 
-# Writes BigQuery's answers into tests/e2e/goclient/testdata/unverified/*.txt; for maintainers only,
-# since queries on BigQuery are billed.
-bigquery-answers project:
-    go run ./tools/bqanswers {{ quote(project) }} {{ justfile_directory() }}/tests/e2e/goclient/testdata/unverified
+# Writes BigQuery's answers into the given cases files, relative to the current directory, or by
+# default into tests/e2e/goclient/testdata/unverified/*.txt; for maintainers only, since queries on
+# BigQuery are billed.
+[no-cd]
+[positional-arguments]
+bigquery-answers project *files:
+    paths=(); for file in "${@:2}"; do paths+=("$(realpath -- "$file")"); done; \
+    go -C {{ quote(justfile_directory()) }} run ./tools/bqanswers "$1" "${paths[@]:-tests/e2e/goclient/testdata/unverified}"
 
 [positional-arguments]
 run *args:

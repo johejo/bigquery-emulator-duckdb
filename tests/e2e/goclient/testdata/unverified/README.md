@@ -7,6 +7,7 @@ Each query stands alone, without the scalars fixture, and is followed by an empt
 ## Resolving cases
 
 A maintainer fills those in with BigQuery's answers through `just bigquery-answers PROJECT`,
-which processes every `*.txt` file in this directory. Each answered case then moves to
+which processes every `*.txt` file in this directory, or `just bigquery-answers PROJECT FILE...`
+for only the given files. Each answered case then moves to
 [`scalars/`](../scalars/), written with `=>`, or with `!>` to `scalars/known_bugs.txt` where
 the emulator answers otherwise.

@@ -4,9 +4,9 @@
 // authenticates as `gcloud auth print-access-token` does. Only a maintainer runs it, since
 // queries on BigQuery are billed.
 //
-// A directory processes each of its *.txt files.
+// Each path is a cases file or a directory, which processes each of its *.txt files.
 //
-//	bqanswers PROJECT FILE_OR_DIRECTORY
+//	bqanswers PROJECT FILE_OR_DIRECTORY...
 package main
 
 import (
@@ -78,19 +78,23 @@ func parseAnswer(body io.Reader) (string, error) {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: bqanswers PROJECT FILE_OR_DIRECTORY")
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "usage: bqanswers PROJECT FILE_OR_DIRECTORY...")
 		os.Exit(2)
 	}
-	project, path := os.Args[1], os.Args[2]
+	project, paths := os.Args[1], os.Args[2:]
 	token, err := exec.Command("gcloud", "auth", "print-access-token").Output()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gcloud auth print-access-token: %v\n", err)
 		os.Exit(1)
 	}
-	if err := fillAnswers(path, func(sql string) (string, error) {
-		return answer(strings.TrimSpace(string(token)), project, sql)
-	}); err != nil {
+	var failures []error
+	for _, path := range paths {
+		failures = append(failures, fillAnswers(path, func(sql string) (string, error) {
+			return answer(strings.TrimSpace(string(token)), project, sql)
+		}))
+	}
+	if err := errors.Join(failures...); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
