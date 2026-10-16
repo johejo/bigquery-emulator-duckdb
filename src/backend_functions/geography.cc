@@ -26,6 +26,7 @@
 #include "s2/s1angle.h"
 #include "s2/s1chord_angle.h"
 #include "s2/s2builder.h"
+#include "s2/s2builderutil_s2point_vector_layer.h"
 #include "s2/s2builderutil_s2polyline_vector_layer.h"
 #include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
@@ -33,6 +34,7 @@
 #include "s2/s2earth.h"
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
+#include "s2/s2hausdorff_distance_query.h"
 #include "s2/s2latlng.h"
 #include "s2/s2lax_polyline_shape.h"
 #include "s2/s2point.h"
@@ -229,12 +231,34 @@ absl::Status CheckAntipodal(const std::vector<Point>& vertices, std::string_view
   return absl::OkStatus();
 }
 
+// BigQuery adds the midpoint of an edge as long as LINESTRING(-170 10, 0 0), about 165.894
+// degrees, and not of one of 100 degrees; between them, it is not known where it starts.
+constexpr double kSplitDegrees = 165.89;
+constexpr double kUnsplitDegrees = 100;
+
 // The linestring of `vertices`, two or more without antipodal neighbors, as BigQuery builds it
 // with S2Builder: vertices within a micrometer are snapped together, a line folding back on itself
-// merges with itself, and crossing edges are split where they cross. A line that snaps to one
-// point is that point. The emulator does not hold the MULTILINESTRING a line that overlaps itself
-// becomes.
+// merges with itself, and crossing edges are split where they cross. A long edge gains its
+// midpoint, and a line that snaps to one point is the point S2Builder snaps it to. The emulator
+// does not hold the MULTILINESTRING a line that overlaps itself becomes.
 absl::StatusOr<Geography> BuildLine(const Geography& vertices) {
+  Geography split;
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    if (i > 0) {
+      const S2Point& a = vertices.at(i - 1);
+      const S2Point& b = vertices.at(i);
+      const double degrees = S1Angle(a, b).degrees();
+      if (degrees > kUnsplitDegrees && degrees < kSplitDegrees) {
+        return absl::UnimplementedError(
+            "The emulator does not support a LINESTRING edge longer than 100 degrees and shorter "
+            "than 165.89");
+      }
+      if (degrees >= kSplitDegrees) {
+        split.push_back((a + b).Normalize());
+      }
+    }
+    split.push_back(vertices.at(i));
+  }
   using Layer = s2builderutil::S2PolylineVectorLayer;
   S2Builder::Options options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
   options.set_split_crossing_edges(true);
@@ -245,15 +269,21 @@ absl::StatusOr<Geography> BuildLine(const Geography& vertices) {
   layer_options.set_duplicate_edges(Layer::Options::DuplicateEdges::MERGE);
   std::vector<std::unique_ptr<S2Polyline>> polylines;
   builder.StartLayer(std::make_unique<Layer>(&polylines, layer_options));
-  for (size_t i = 0; i + 1 < vertices.size(); ++i) {
-    builder.AddEdge(vertices.at(i), vertices.at(i + 1));
+  for (size_t i = 0; i + 1 < split.size(); ++i) {
+    builder.AddEdge(split.at(i), split.at(i + 1));
+  }
+  // The vertices as S2Builder snaps them, which give a line that snaps to one point.
+  std::vector<S2Point> sites;
+  builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&sites));
+  for (const S2Point& vertex : split) {
+    builder.AddPoint(vertex);
   }
   S2Error error;
   if (!builder.Build(&error)) {
     return absl::InternalError("S2Builder failed: " + std::string(error.message()));
   }
   if (polylines.empty()) {
-    return Geography{vertices.front()};
+    return Geography{sites.front()};
   }
   if (polylines.size() > 1) {
     return absl::UnimplementedError(
@@ -415,11 +445,6 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
           "was " +
           Coordinate(vertex.latitude));
     }
-    // BigQuery adds vertices to a line with such a longitude, as the emulator does not.
-    if (line && std::abs(vertex.longitude) > 180) {
-      return absl::UnimplementedError(
-          "The emulator does not support a LINESTRING with a longitude outside [-180, 180]");
-    }
     vertex.longitude = std::remainder(vertex.longitude, 360.0);
   }
   Geography vertices(geography.size());
@@ -539,14 +564,20 @@ absl::StatusOr<bool> DWithin(const Arguments& args) {
                                                  S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
 
-// A point differs from a linestring, which has more than one point.
+// Geographies are equal where each point of either is within a micrometer of the other, as Same
+// takes points. A point differs from a linestring, which has more than one point.
 absl::StatusOr<bool> Equals(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
-  if (a.size() > 1 && b.size() > 1) {
-    return absl::UnimplementedError("The emulator does not support ST_EQUALS of two linestrings");
+  if (a.size() < 2 || b.size() < 2) {
+    return a.size() == b.size() && (a.empty() || Same(a.front(), b.front()));
   }
-  return a.size() == b.size() && (a.empty() || Same(a.front(), b.front()));
+  MutableS2ShapeIndex index;
+  index.Add(Shape(a));
+  MutableS2ShapeIndex other;
+  other.Add(Shape(b));
+  return S2HausdorffDistanceQuery().GetDistance(&index, &other) <=
+         S1ChordAngle(S2Earth::MetersToAngle(1e-6));
 }
 
 absl::StatusOr<double> X(const Arguments& args) {

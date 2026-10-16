@@ -15,24 +15,6 @@ SELECT f()
 SELECT ST_GEOGFROMTEXT('LINESTRING(1 0, 10 0, 5 0, 5 4)')
 !> "MULTILINESTRING((1 0, 5 0, 10 0), (5 0, 5 4))"
 
-# BigQuery adds a vertex to a LINESTRING with a longitude outside [-180, 180], which the emulator
-# rejects until it is known when.
-SELECT ST_GEOGFROMTEXT('LINESTRING(190 10, 0 0)')
-!> "LINESTRING(-170 10, -80 45, 0 0)"
-
-# ST_EQUALS of two linestrings is unsupported.
-SELECT ST_EQUALS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0)'), ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0)'))
-!> "true"
-
-SELECT ST_EQUALS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0)'), ST_GEOGFROMTEXT('LINESTRING(1 0, 0 0)'))
-!> "true"
-
-SELECT ST_EQUALS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0)'), ST_GEOGFROMTEXT('LINESTRING(0 0, 0.5 0, 1 0)'))
-!> "true"
-
-SELECT ST_EQUALS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0)'), ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'))
-!> "false"
-
 # ST_ASGEOJSON of a linestring is unsupported: S2EdgeTessellator adds the vertices BigQuery does,
 # but one of them differs in its 15th digit.
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'))

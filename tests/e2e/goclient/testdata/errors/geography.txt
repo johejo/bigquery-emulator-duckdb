@@ -19,10 +19,13 @@ SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')
 SELECT ST_MAKELINE([ST_MAKELINE(ST_GEOGPOINT(1, 0), ST_GEOGPOINT(10, 0)), ST_MAKELINE(ST_GEOGPOINT(10, 0), ST_GEOGPOINT(5, 0)), ST_MAKELINE(ST_GEOGPOINT(5, 0), ST_GEOGPOINT(5, 4))])
 => error contains: The emulator does not support a LINESTRING that BigQuery splits into a MULTILINESTRING
 
-# BigQuery adds vertices to the GeoJSON of a line, and compares lines by the points they cover.
+# BigQuery adds vertices to the GeoJSON of a line.
 
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'))
 => error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING
 
-SELECT ST_EQUALS(ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'), ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'))
-=> error contains: The emulator does not support ST_EQUALS of two linestrings
+# BigQuery adds the midpoint of a long edge, from a length between 100 and 165.89 degrees that is
+# not known yet.
+
+SELECT ST_GEOGFROMTEXT('LINESTRING(0 0, 120 0)')
+=> error contains: The emulator does not support a LINESTRING edge longer than 100 degrees
