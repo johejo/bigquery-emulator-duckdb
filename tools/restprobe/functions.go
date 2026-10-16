@@ -2,17 +2,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/probereport"
 )
 
@@ -106,6 +110,19 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 			jobs = append(jobs, job{f, sql})
 		}
 	}
+	// EXTERNAL_QUERY's calls name the connection us.postgres.
+	dir, err := os.MkdirTemp("", "restprobe-postgres-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	startup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	postgres, err := postgresprocess.Start(startup, filepath.Join(dir, "data"))
+	cancel()
+	if err != nil {
+		return err
+	}
+	defer postgres.Stop()
 	emulators := make(chan *emulatorprocess.Process, runtime.NumCPU())
 	defer func() {
 		close(emulators)
@@ -115,7 +132,8 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	}()
 	if err := parallel(cap(emulators), func(int) error {
 		// SESSION_USER needs an identity to run.
-		emulator, err := startEmulator(binary, "--session-user", "jdoe@example.com")
+		emulator, err := startEmulator(binary, "--session-user", "jdoe@example.com",
+			"--connection", "test.us.postgres="+postgres.Conninfo)
 		if err == nil {
 			emulators <- emulator
 		}

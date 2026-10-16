@@ -40,6 +40,8 @@
                   go-tools
                   google-cloud-sdk
                   just
+                  # tools/e2e starts a PostgreSQL server for EXTERNAL_QUERY.
+                  postgresql
                   # GoogleSQL's Bazel launchers need /usr/bin/env python3 before switching to
                   # the rules_python interpreter.
                   python3

@@ -47,7 +47,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Datetime functions](#datetime-functions) | 8 | 0 | 0 | 0 |
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
-| [Federated query functions](#federated-query-functions) | 0 | 0 | 1 | 0 |
+| [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
 | [Geography functions](#geography-functions) | 10 | 18 | 43 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
@@ -221,7 +221,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | Unsupported |  |  |
+| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | Partial | Table function | Reaches PostgreSQL only; see [EXTERNAL_QUERY](compatibility.md#external_query). Unsupported: EXTERNAL_QUERY Postgres type (OID = 1560). |
 
 ## Geography functions
 

@@ -18,6 +18,7 @@
 
 #include "src/backend_functions/javascript_limits.h"
 #include "src/emulator.h"
+#include "src/external_query.h"
 #include "src/project.h"
 #include "src/server.h"
 #include "src/shell.h"
@@ -30,15 +31,20 @@ void PrintUsage() {
       << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--grpc-port PORT] "
          "[--data-dir DIR] [--project "
          "JSON|@FILE]... [--session-user ID] [JAVASCRIPT LIMITS]\n"
+         "       [--connection ID=CONNINFO]...\n"
          "       bigquery-emulator-duckdb shell [--project-id ID] [--dataset-id DATASET] "
          "[--format FORMAT] [-e SQL] [--data-dir DIR] [--project JSON|@FILE]... "
          "[--session-user ID] [JAVASCRIPT LIMITS]\n"
+         "       [--connection ID=CONNINFO]...\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
          "  --javascript-timeout-ms MS  How long one JavaScript UDF call may run (default:\n"
          "                              300000)\n"
          "  --javascript-memory-mib MIB  How much memory JavaScript UDF calls may allocate per\n"
          "                               query on each thread (default: 256)\n"
+         "  --connection ID=CONNINFO  Let EXTERNAL_QUERY reach the PostgreSQL database CONNINFO\n"
+         "                  (a libpq connection string or URI) as the connection ID,\n"
+         "                  PROJECT.LOCATION.CONNECTION (repeatable)\n"
          "  --host HOST     Address to listen on (default: 0.0.0.0)\n"
          "  --port PORT     Port to listen on (default: 9050)\n"
          "  --grpc-port PORT  BigQuery Storage gRPC port (default: 9060; 0 chooses a free port)\n"
@@ -89,6 +95,7 @@ int Run(int argc, char* const* argv) {
   std::optional<std::string> session_user;
   bigquery_emulator_duckdb::backend_functions::JavaScriptLimits javascript;
   std::vector<bigquery_emulator_duckdb::Project> projects;
+  std::vector<bigquery_emulator_duckdb::ExternalConnection> connections;
   for (int i = shell ? 2 : 1; i < argc; ++i) {
     const std::string_view arg = argv[i];
     const bool has_value = i + 1 < argc;
@@ -96,6 +103,10 @@ int Run(int argc, char* const* argv) {
       projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(argv[++i]));
     } else if (arg.starts_with("--project=")) {
       projects.push_back(bigquery_emulator_duckdb::ReadProjectArgument(arg.substr(10)));
+    } else if (arg == "--connection" && has_value) {
+      connections.push_back(bigquery_emulator_duckdb::ParseConnectionArgument(argv[++i]));
+    } else if (arg.starts_with("--connection=")) {
+      connections.push_back(bigquery_emulator_duckdb::ParseConnectionArgument(arg.substr(13)));
     } else if (arg == "--session-user" && has_value) {
       session_user = argv[++i];
     } else if (arg.starts_with("--session-user=")) {
@@ -151,12 +162,14 @@ int Run(int argc, char* const* argv) {
   }
 
   if (shell) {
-    bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript);
+    bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
+                                                connections);
     return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
   }
 
   const sigset_t signals = BlockShutdownSignals();
-  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript);
+  bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
+                                              connections);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Start()) {
     std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "

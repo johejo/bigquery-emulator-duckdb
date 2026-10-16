@@ -28,6 +28,7 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
 #include "src/type_mapping.h"
@@ -377,6 +378,80 @@ BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* ty
       temporary_(temporary) {}
 
 BigQueryCatalog::~BigQueryCatalog() = default;
+
+absl::Status BigQueryCatalog::FindTableValuedFunction(
+    const absl::Span<const std::string>& path, const googlesql::TableValuedFunction** function,
+    const FindOptions& options) {
+  if (path.size() != 1 || !absl::EqualsIgnoreCase(path.front(), "external_query")) {
+    return googlesql::CatalogWrapper::FindTableValuedFunction(path, function, options);
+  }
+  if (external_query_ == nullptr) {
+    const googlesql::FunctionArgumentType string(googlesql::types::StringType());
+    external_query_ = std::make_unique<googlesql::TableValuedFunction>(
+        std::vector<std::string>{"external_query"}, kBigQueryGroup,
+        std::vector<googlesql::FunctionSignature>{
+            googlesql::FunctionSignature(
+                googlesql::ARG_KIND_RELATION,
+                {
+                    string,
+                    string,
+                    googlesql::FunctionArgumentType(googlesql::types::StringType(),
+                                                    googlesql::FunctionArgumentType::OPTIONAL),
+                },
+                /*context_id=*/int64_t{0}),
+        },
+        googlesql::TableValuedFunctionOptions().set_compute_result_type_callback(
+            [this](googlesql::Catalog* /*catalog*/, googlesql::TypeFactory* /*type_factory*/,
+                   const googlesql::FunctionSignature& /*signature*/,
+                   const std::vector<googlesql::TVFInputArgumentType>& arguments,
+                   const googlesql::AnalyzerOptions& /*options*/) {
+              return ExternalQuerySchema(arguments);
+            }));
+  }
+  *function = external_query_.get();
+  return absl::OkStatus();
+}
+
+// The columns of EXTERNAL_QUERY, which the database it queries describes when the query is
+// analyzed. Its arguments must be literals, since the query is prepared then.
+absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> BigQueryCatalog::ExternalQuerySchema(
+    const std::vector<googlesql::TVFInputArgumentType>& arguments) {
+  std::vector<std::string> literals;
+  for (const auto& argument : arguments) {
+    const auto scalar = argument.GetScalarArgType();
+    if (!scalar.ok() || scalar->literal_value() == nullptr) {
+      return absl::InvalidArgumentError(
+          "The emulator does not support EXTERNAL_QUERY arguments that are not literals");
+    }
+    if (scalar->literal_value()->is_null()) {
+      return absl::InvalidArgumentError("EXTERNAL_QUERY arguments must not be NULL");
+    }
+    literals.push_back(scalar->literal_value()->string_value());
+  }
+  const std::optional<std::string> key = ConnectionKey(literals.at(0), default_project_);
+  if (!key.has_value()) {
+    return absl::InvalidArgumentError("Invalid connection ID: " + literals.at(0));
+  }
+  const absl::StatusOr<FieldType> decimal_type =
+      DecimalColumnType(literals.size() == 3 ? literals.at(2) : "{}");
+  if (!decimal_type.ok()) {
+    return decimal_type.status();
+  }
+  const absl::StatusOr<std::vector<FieldSchema>> columns =
+      source_.DescribeExternalQuery(*key, literals.at(1), *decimal_type);
+  if (!columns.ok()) {
+    return columns.status();
+  }
+  std::vector<googlesql::TVFRelation::Column> relation;
+  for (const FieldSchema& column : *columns) {
+    const absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(column, type_factory_);
+    if (!type.ok()) {
+      return type.status();
+    }
+    relation.emplace_back(column.name, *type);
+  }
+  return googlesql::TVFSignature::Create(arguments, googlesql::TVFRelation(std::move(relation)));
+}
 
 absl::Status BigQueryCatalog::FindTable(const absl::Span<const std::string>& path,
                                         const googlesql::Table** table,

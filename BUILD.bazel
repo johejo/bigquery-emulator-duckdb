@@ -229,6 +229,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":duckdb_sql",
+        ":external_query",
         ":type_mapping",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
@@ -426,6 +427,37 @@ cc_library(
 )
 
 cc_library(
+    name = "external_query",
+    srcs = ["src/external_query.cc"],
+    hdrs = ["src/external_query.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+        "@postgres//:libpq",
+    ],
+    deps = [
+        ":field_schema",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "postgres_scanner",
+    srcs = ["src/postgres_scanner.cc"],
+    hdrs = ["src/postgres_scanner.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":backend_error",
+        "@duckdb_postgres//:postgres_scanner",
+        "@duckdb_source//:headers",
+    ],
+    linkstatic = True,
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "backend_error",
     hdrs = ["src/backend_error.h"],
     copts = ["-std=c++20"],
@@ -442,6 +474,7 @@ cc_library(
         ":bignumeric",
         ":duckdb_handle",
         ":interval",
+        ":postgres_scanner",
         ":type_mapping",
         "//third_party/duckdb",
         "@googlesql//googlesql/public:numeric_value",
@@ -583,6 +616,7 @@ cc_library(
     deps = [
         ":api_error",
         ":backend",
+        ":external_query",
         ":field_schema",
         ":gcs",
         ":project",
@@ -738,6 +772,7 @@ cc_binary(
     }),
     deps = [
         ":emulator",
+        ":external_query",
         ":project",
         ":server",
         ":shell",
@@ -794,6 +829,8 @@ cc_test(
     name = "gcs_test",
     srcs = ["tests/gcs_test.cc"],
     copts = ["-std=c++20"],
+    # curl builds with hidden symbols, which google-cloud-cpp's shared libraries cannot reference.
+    linkstatic = True,
     deps = [
         ":api_error",
         ":gcs",

@@ -227,6 +227,25 @@ The range column, partitioning columns and sessionize option must be non-NULL li
 Value tables and INTERVAL or annotated partitioning columns are unsupported. An existing
 `session_range` column is replaced with the computed session range.
 
+### EXTERNAL_QUERY
+
+`EXTERNAL_QUERY` reads from PostgreSQL databases that `--connection` names, standing in for Cloud
+SQL for PostgreSQL connections; the emulator has no Connection API, and connections to MySQL or
+Spanner are not supported. `--connection PROJECT.LOCATION.CONNECTION=CONNINFO` takes a libpq
+connection string or URI; a query names the connection by any form BigQuery accepts, the location
+in any case. The emulator prepares the query on the database when it analyzes the statement, so
+the connection ID, query and options must be literals, and it attaches the database to DuckDB,
+read-only, the first time a query reaches it. DuckDB's
+[postgres_scanner](https://github.com/duckdb/duckdb-postgres) extension reads the results.
+
+Columns take the BigQuery types of BigQuery's PostgreSQL mapping, and the types it lists as
+unsupported fail with BigQuery's error. `name`, which `information_schema` uses, is read as
+STRING. Other types, including `bit` and `bit varying`, which BigQuery reads as BYTES, are
+unsupported, as are columns of the same name. Dates and times outside BigQuery's ranges, such as
+PostgreSQL's `infinity`, fail when read. Of the options, only `default_type_for_decimal_columns`
+is supported. Views that read `EXTERNAL_QUERY` are unsupported, since they would outlive the
+attachment.
+
 ## User-defined functions
 
 ### SQL UDFs

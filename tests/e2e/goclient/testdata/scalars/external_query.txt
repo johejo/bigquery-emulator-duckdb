@@ -1,0 +1,75 @@
+# EXTERNAL_QUERY on Cloud SQL for PostgreSQL, whose types BigQuery converts as its PostgreSQL
+# mapping documents:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#postgresql_mapping
+#
+# tools/e2e connects us.postgres of the project test to an empty PostgreSQL server.
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1::smallint AS x')
+=> "1"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 9223372036854775807::bigint AS x')
+=> "9223372036854775807"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT NULL::integer AS x')
+=> null
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT true AS x')
+=> "true"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::double precision AS x')
+=> "1.5"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 12.34::numeric AS x')
+=> "12.34"
+
+# NUMERIC by default, which divides to 9 decimal places.
+SELECT x / 3 FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1::numeric(10, 2) AS x')
+=> "0.333333333"
+
+SELECT x / 3 FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1::numeric AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
+=> "0.33333333333333333333333333333333333333"
+
+SELECT IS_INF(x) FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::numeric AS x', '{"default_type_for_decimal_columns":"float64"}')
+=> "false"
+
+SELECT CONCAT(x, '!') FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::numeric AS x', '{"default_type_for_decimal_columns":"string"}')
+=> "1.5!"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::numeric AS x', '{"default_type_for_decimal_columns":"numeric"}')
+=> "1.5"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT 'abc'::varchar(5) AS x''')
+=> "abc"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '{"a":1}'::json AS x''')
+=> "{\"a\":1}"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '\\x0102'::bytea AS x''')
+=> "AQI="
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '2026-01-02'::date AS x''')
+=> "2026-01-02"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '03:04:05.123456'::time AS x''')
+=> "03:04:05.123456"
+
+SELECT x FROM EXTERNAL_QUERY('us.postgres', '''SELECT '2026-01-02 03:04:05'::timestamp AS x''')
+=> "2026-01-02T03:04:05"
+
+# Retrieved as UTC.
+SELECT CAST(x AS STRING) FROM EXTERNAL_QUERY('us.postgres', '''SELECT '2026-01-02 03:04:05+09'::timestamptz AS x''')
+=> "2026-01-01 18:04:05+00"
+
+# The connection ID's forms.
+SELECT x FROM EXTERNAL_QUERY('test.us.postgres', 'SELECT 1 AS x')
+=> "1"
+
+SELECT x FROM EXTERNAL_QUERY('projects/test/locations/us/connections/postgres', 'SELECT 1 AS x')
+=> "1"
+
+# BigQuery's documented metadata query.
+SELECT COUNT(*) FROM EXTERNAL_QUERY('us.postgres', '''SELECT * FROM information_schema.tables WHERE table_name = 'pg_class';''')
+=> "1"
+
+SELECT SUM(x) FROM UNNEST([1, 2]) AS x JOIN EXTERNAL_QUERY('us.postgres', 'SELECT 2 AS y') ON x = y
+=> "2"
