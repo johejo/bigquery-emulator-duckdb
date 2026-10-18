@@ -133,7 +133,6 @@ func TestDatasetMetadata(t *testing.T) {
 	}
 
 	for name, err := range map[string]error{
-		"dataset location EU": client.Dataset("go_dataset_metadata_eu").Create(ctx, &bigquery.DatasetMetadata{Location: "EU"}),
 		"must start with a lowercase letter": client.Dataset("go_dataset_metadata_labeled").Create(ctx, &bigquery.DatasetMetadata{
 			Labels: map[string]string{"Env": "prod"},
 		}),

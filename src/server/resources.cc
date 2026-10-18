@@ -521,7 +521,7 @@ json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& met
       {"etag", kEtag},
       {"id", dataset.project_id + ":" + dataset.dataset_id},
       {"datasetReference", DatasetReferenceJson(dataset)},
-      {"location", kLocation},
+      {"location", metadata.Location()},
   };
   resource.update(metadata.ToJson());
   return resource;
@@ -540,7 +540,7 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
             "datasetReference",
             DatasetReferenceJson({.project_id = project_id, .dataset_id = entry.dataset_id}),
         },
-        {"location", kLocation},
+        {"location", entry.metadata.Location()},
     };
     // A list entry carries the friendly name and labels of the metadata.
     item.update(entry.metadata.ToJson());
@@ -565,7 +565,7 @@ json TableResource(const TableInfo& info) {
       {"type", TableTypeName(info.view_query ? TableType::kView : TableType::kTable)},
       {"numRows", std::to_string(info.num_rows)},
       {"numBytes", "0"},
-      {"location", kLocation},
+      {"location", info.location},
   };
   resource.update(info.metadata.ToJson());
   if (info.view_query) {

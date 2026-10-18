@@ -21,6 +21,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
@@ -162,15 +163,26 @@ bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
 
 bool IsRegion(const std::string& part) { return ToLowerAscii(part).starts_with("region-"); }
 
-// The datasets of `project` in the region the qualifier names, if it names one. Every dataset
-// is in the US, as the emulator reports for all of them.
+// The datasets of `project` in the region the qualifier names, or in the US for a view that names
+// none, as BigQuery documents for SCHEMATA; the job reading `view` must run there. None for a
+// region BigQuery does not have.
 std::vector<std::string> DatasetsIn(TableSource& source, const std::string& project,
-                                    const std::vector<std::string>& qualifier) {
-  if (!qualifier.empty() && IsRegion(qualifier.back()) &&
-      ToLowerAscii(qualifier.back()) != "region-us") {
-    return {};
+                                    const std::vector<std::string>& qualifier,
+                                    const std::string& view) {
+  std::string location = kDefaultLocation;
+  if (!qualifier.empty() && IsRegion(qualifier.back())) {
+    std::optional<std::string> region = RegionQualifierLocation(qualifier.back());
+    if (!region.has_value()) {
+      return {};
+    }
+    location = *std::move(region);
   }
-  return source.ListDatasets(project);
+  source.ReferenceLocation("Table " + view, location);
+  std::vector<std::string> datasets = source.ListDatasets(project);
+  std::erase_if(datasets, [&](const std::string& dataset) {
+    return source.DatasetLocation(project, dataset) != location;
+  });
+  return datasets;
 }
 
 // The tables of one dataset, as a view scoped to a dataset or a region lists them.
@@ -421,21 +433,23 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     const std::string project =
         qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
     columns = SchemataColumns();
-    for (const std::string& dataset : DatasetsIn(source, project, qualifier)) {
+    for (const std::string& dataset :
+         DatasetsIn(source, project, qualifier, absl::StrJoin(parts, "."))) {
       const std::optional<DatasetMetadata> metadata = source.DescribeDataset(project, dataset);
       if (!metadata.has_value()) {
         // Dropped since it was listed.
         continue;
       }
+      const std::string location = metadata->Location();
       rows.push_back({
           String(project),
           String(dataset),
           kNull,
           CreationTime(metadata->creation_time),
           kNull,
-          String("US"),
+          String(location),
           String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
-                              "`\nOPTIONS(\n  location=\"us\"\n);")),
+                              "`\nOPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
           kNull,
           kNull,
       });
@@ -463,24 +477,26 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       }
     }
     std::vector<DatasetTables> datasets;
-    const std::vector<std::string> names = DatasetsIn(source, project, qualifier);
     if (dataset.has_value()) {
-      if (std::ranges::find(names, *dataset) == names.end()) {
+      const std::optional<std::string> location = source.DatasetLocation(project, *dataset);
+      if (!location.has_value()) {
         return not_found();
       }
+      source.ReferenceLocation("Dataset " + project + ":" + *dataset, *location);
       datasets.push_back({
           .project = project,
           .dataset = *dataset,
           .tables = source.ListTables(project, *dataset),
       });
     } else {
-      std::ranges::transform(names, std::back_inserter(datasets), [&](const std::string& name) {
-        return DatasetTables{
-            .project = project,
-            .dataset = name,
-            .tables = source.ListTables(project, name),
-        };
-      });
+      std::ranges::transform(DatasetsIn(source, project, qualifier, absl::StrJoin(parts, ".")),
+                             std::back_inserter(datasets), [&](const std::string& name) {
+                               return DatasetTables{
+                                   .project = project,
+                                   .dataset = name,
+                                   .tables = source.ListTables(project, name),
+                               };
+                             });
     }
     columns = view == "TABLES"    ? TablesColumns()
               : view == "COLUMNS" ? ColumnsColumns()

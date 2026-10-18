@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
@@ -27,8 +28,9 @@ struct DdlWrite {
 std::string DatasetMetadataTable(const std::string& project);
 
 // What CREATE SCHEMA and datasets.insert record for a new dataset: its metadata and the time it
-// was created.
-DdlWrite CreateDatasetWrite(const DatasetDefinition& definition);
+// was created. A dataset whose metadata names no location is created in `location`, the job's.
+DdlWrite CreateDatasetWrite(const DatasetDefinition& definition,
+                            const std::string& location = kDefaultLocation);
 
 // The statements that record `metadata` for `dataset`, replacing what was recorded before.
 // Throws ApiError::Invalid for labels BigQuery rejects.
@@ -67,8 +69,9 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
                                                 DatasetMetadata metadata);
 
 // What a translated statement runs besides itself, if it records metadata. `dataset` is the
-// metadata of the dataset a table or view it creates belongs to.
+// metadata of the dataset a table or view it creates belongs to, and `location` that of the job,
+// where CREATE SCHEMA creates a dataset that names no location.
 std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement,
-                                      const DatasetMetadata& dataset);
+                                      const DatasetMetadata& dataset, const std::string& location);
 
 }  // namespace bigquery_emulator_duckdb

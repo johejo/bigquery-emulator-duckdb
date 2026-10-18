@@ -18,8 +18,8 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
-#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -224,19 +224,29 @@ void CheckDatasetFields(const json& dataset) {
       "labels",
       "defaultTableExpirationMs",
       "defaultRoundingMode",
+      "location",
   };
   for (const auto& [key, value] : dataset.items()) {
     if (value.is_null() || ((value.is_object() || value.is_array()) && value.empty()) ||
         std::ranges::find(kKnown, key) != std::end(kKnown)) {
       continue;
     }
-    if (key != "location") {
-      throw ApiError::Unsupported("dataset field " + key);
-    }
-    if (ToUpperAscii(StringValue(value, "location")) != "US") {
-      throw ApiError::Unsupported("dataset location " + value.get<std::string>());
-    }
+    throw ApiError::Unsupported("dataset field " + key);
   }
+}
+
+// The location the Dataset resource `dataset` names, or nothing when it names none.
+std::optional<std::string> DatasetLocationField(const json& dataset) {
+  const json value = Member(dataset, "location");
+  if (value.is_null()) {
+    return std::nullopt;
+  }
+  const std::string location = StringValue(value, "location");
+  std::optional<std::string> canonical = CanonicalLocation(location);
+  if (!canonical.has_value()) {
+    throw ApiError::Invalid("Invalid location: " + location);
+  }
+  return canonical;
 }
 
 // The top-level field of `schema` named `name` in any case, or null.
@@ -400,6 +410,9 @@ json DatasetMetadata::ToJson() const {
   if (!default_rounding_mode.empty()) {
     fields["defaultRoundingMode"] = default_rounding_mode;
   }
+  if (!location.empty()) {
+    fields["location"] = location;
+  }
   return fields;
 }
 
@@ -443,12 +456,19 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
 
 DatasetMetadata DatasetMetadataFromJson(const json& dataset) {
   DatasetMetadata metadata;
+  CheckDatasetFields(dataset);
+  metadata.location = DatasetLocationField(dataset).value_or(kDefaultLocation);
   UpdateDatasetMetadata(metadata, dataset, /*patch=*/false);
   return metadata;
 }
 
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool patch) {
   CheckDatasetFields(body);
+  // Whether BigQuery rejects another location or ignores it is not known.
+  if (const std::optional<std::string> location = DatasetLocationField(body);
+      location.has_value() && *location != metadata.Location()) {
+    throw ApiError::Unsupported("changing the location of a dataset");
+  }
   UpdateDescriptiveFields(metadata, body, patch);
   if (body.contains("defaultTableExpirationMs") || !patch) {
     const bool unset = Member(body, "defaultTableExpirationMs").is_null() ||

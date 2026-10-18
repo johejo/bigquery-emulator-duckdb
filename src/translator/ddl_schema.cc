@@ -23,9 +23,8 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   if (!path || !dataset) {
     return std::nullopt;
   }
-  // The description, friendly name and labels the OPTIONS of a CREATE SCHEMA set. Every dataset is
-  // in the US, so a location elsewhere is unsupported, and so are the other options, which change
-  // how BigQuery treats the dataset's tables.
+  // The metadata the OPTIONS of a CREATE SCHEMA set. A dataset without a location is created in
+  // the job's, which the emulator gives it when the statement runs.
   std::optional<DatasetMetadata> metadata = SchemaOptionsMetadata(create.option_list(), scope);
   if (!metadata) {
     return std::nullopt;

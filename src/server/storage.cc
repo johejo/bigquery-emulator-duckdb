@@ -290,8 +290,13 @@ class ReadService final : public pb::BigQueryRead::Service {
       snapshot->arrow = session.data_format() == pb::ARROW;
       snapshot->schema = StorageReadSchema(snapshot->data.schema, snapshot->arrow);
       snapshot->expiry = Clock::now() + std::chrono::hours(6);
-      response->set_name("projects/" + project + "/locations/" + kLocation + "/sessions/" +
-                         NewId());
+      const std::string location = emulator_
+                                       .GetDataset(DatasetReference{
+                                           .project_id = table.project_id,
+                                           .dataset_id = table.dataset_id,
+                                       })
+                                       .Location();
+      response->set_name("projects/" + project + "/locations/" + location + "/sessions/" + NewId());
       response->set_table(TablePath(table));
       response->set_data_format(session.data_format());
       *response->mutable_read_options() = options;
@@ -742,7 +747,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
     state->metadata.set_name(name);
     state->metadata.set_type(type);
     state->metadata.set_write_mode(pb::WriteStream::INSERT);
-    state->metadata.set_location(kLocation);
+    state->metadata.set_location(info.location);
     if (!IsDefault(name)) {
       Timestamp(state->metadata.mutable_create_time(), Clock::now());
     } else if (info.metadata.creation_time != 0) {

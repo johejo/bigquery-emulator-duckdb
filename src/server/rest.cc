@@ -212,7 +212,7 @@ class RestServer::Impl {
             const auto job = emulator_.RunQuery(ParseQuery(Param(request, "projectId"), body));
             return QueryResponse(*job, ParseQueryPage(body));
           }));
-    // Ignores location and timeoutMs, since jobs finish before they are inserted, and
+    // Ignores timeoutMs, since jobs finish before they are inserted, and
     // formatOptions.timestampOutputFormat.
     Route("bigquery.jobs.getQueryResults",
           {
@@ -225,7 +225,8 @@ class RestServer::Impl {
               "timeoutMs",
           },
           Json([this](const httplib::Request& request, httplib::Response&) {
-            const auto job = emulator_.GetJob(Param(request, "projectId"), Param(request, "jobId"));
+            const auto job = emulator_.GetJob(Param(request, "projectId"), Param(request, "jobId"),
+                                              LocationParam(request));
             return GetQueryResultsResponse(*job, ParseResultPage(request));
           }));
     const auto insert_job =
@@ -263,19 +264,19 @@ class RestServer::Impl {
             const JobListRequest list = ParseJobList(request);
             return JobList(emulator_.ListJobs(Param(request, "projectId")), list);
           }));
-    // jobs.get, jobs.cancel and jobs.delete ignore location, since every job is in the US.
     Route("bigquery.jobs.get", {"location"},
           Json([this](const httplib::Request& request, httplib::Response&) {
-            return JobResource(
-                *emulator_.GetJob(Param(request, "projectId"), Param(request, "jobId")));
+            return JobResource(*emulator_.GetJob(Param(request, "projectId"),
+                                                 Param(request, "jobId"), LocationParam(request)));
           }));
     Route("bigquery.jobs.cancel", {"location"},
           Json([this](const httplib::Request& request, httplib::Response&) {
-            return JobCancelResponse(
-                *emulator_.GetJob(Param(request, "projectId"), Param(request, "jobId")));
+            return JobCancelResponse(*emulator_.GetJob(
+                Param(request, "projectId"), Param(request, "jobId"), LocationParam(request)));
           }));
     Route("bigquery.jobs.delete", {"location"}, NoContent([this](const httplib::Request& request) {
-            emulator_.DeleteJob(Param(request, "projectId"), Param(request, "jobId"));
+            emulator_.DeleteJob(Param(request, "projectId"), Param(request, "jobId"),
+                                LocationParam(request));
           }));
 
     // datasets

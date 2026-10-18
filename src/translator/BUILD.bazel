@@ -159,6 +159,7 @@ cc_library(
         "//:catalog",
         "//:duckdb_sql",
         "//:field_schema",
+        "//:location",
         "//:translated_statement",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:function",

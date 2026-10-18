@@ -1,0 +1,99 @@
+# Dataset and job locations
+# https://cloud.google.com/bigquery/docs/locations
+#
+# Each script creates the datasets it uses, named unverified_locations_*, which stay in the
+# project after the scripts run. The queries name no location, so BigQuery infers each job's.
+#
+# The documentation says that a job fails when it uses a dataset outside its location, but not
+# with which message, nor how the location of a script is inferred.
+
+# The message for a query that uses two locations.
+
+SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA, `region-us`.INFORMATION_SCHEMA.SCHEMATA
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+CREATE OR REPLACE TABLE unverified_locations_eu.t AS SELECT 1 AS x;
+SELECT COUNT(*) FROM unverified_locations_eu.t, `region-us`.INFORMATION_SCHEMA.SCHEMATA
+?>
+
+# A single region does not match the multi-region it lies in.
+
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA, `region-us-central1`.INFORMATION_SCHEMA.SCHEMATA
+?>
+
+# SCHEMATA without a region qualifier is the US region's, also in a job elsewhere.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+CREATE OR REPLACE TABLE unverified_locations_eu.t AS SELECT 1 AS x;
+SELECT COUNT(*) FROM unverified_locations_eu.t, INFORMATION_SCHEMA.SCHEMATA
+?>
+
+# How the location option of CREATE SCHEMA is spelled once stored.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu_lower OPTIONS (location = 'eu');
+SELECT location FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_eu_lower'
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_tokyo OPTIONS (location = 'ASIA-NORTHEAST1');
+SELECT location FROM `region-asia-northeast1`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_tokyo'
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+SELECT REGEXP_EXTRACT(ddl, r'location="[^"]*"') FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_eu'
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_tokyo OPTIONS (location = 'asia-northeast1');
+SELECT REGEXP_EXTRACT(ddl, r'location="[^"]*"') FROM `region-asia-northeast1`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_tokyo'
+?>
+
+# A location BigQuery does not have.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_nowhere OPTIONS (location = 'nowhere');
+SELECT 1
+?>
+
+SELECT COUNT(*) FROM `region-nowhere`.INFORMATION_SCHEMA.SCHEMATA
+?>
+
+# Whether a region qualifier is compared without case.
+
+SELECT COUNT(*) FROM `REGION-EU`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_eu'
+?>
+
+# Where a script runs: CREATE SCHEMA with a location settles it, and a dataset created without one
+# takes it.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu_implicit;
+SELECT location FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'unverified_locations_eu_implicit'
+?>
+
+# A script whose statements name datasets of two locations.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA
+?>
+
+# A dataset that CREATE SCHEMA IF NOT EXISTS names in another location than the job's.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'US');
+SELECT 1
+?>
+
+# ALTER SCHEMA cannot move a dataset.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+ALTER SCHEMA unverified_locations_eu SET OPTIONS (location = 'EU');
+SELECT 1
+?>
+
+# A view in one location that reads a table in another.
+
+CREATE SCHEMA IF NOT EXISTS unverified_locations_eu OPTIONS (location = 'EU');
+CREATE SCHEMA IF NOT EXISTS unverified_locations_us OPTIONS (location = 'US');
+CREATE OR REPLACE TABLE unverified_locations_us.t AS SELECT 1 AS x;
+CREATE OR REPLACE VIEW unverified_locations_eu.v AS SELECT x FROM unverified_locations_us.t;
+SELECT 1
+?>

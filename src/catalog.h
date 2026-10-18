@@ -84,6 +84,18 @@ class TableSource {
   // The datasets of `project`, sorted by name, for INFORMATION_SCHEMA. None by default.
   virtual std::vector<std::string> ListDatasets(const std::string& /*project*/) { return {}; }
 
+  // The location of the dataset `project`.`dataset`, or nothing if there is no such dataset, for
+  // INFORMATION_SCHEMA. Unlike the lookups above, it does not count as the job using the dataset.
+  // Nothing by default.
+  virtual std::optional<std::string> DatasetLocation(const std::string& /*project*/,
+                                                     const std::string& /*dataset*/) {
+    return std::nullopt;
+  }
+
+  // Records that the job uses `name`, such as an INFORMATION_SCHEMA view of a region, which is in
+  // `location`, as JobLocation::Reference does. Does nothing by default.
+  virtual void ReferenceLocation(const std::string& /*name*/, const std::string& /*location*/) {}
+
   // The tables of `project`.`dataset`, sorted by name, for INFORMATION_SCHEMA. None by default.
   virtual std::vector<std::string> ListTables(const std::string& /*project*/,
                                               const std::string& /*dataset*/) {

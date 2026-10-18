@@ -135,6 +135,23 @@ std::string JobId(const json& body) {
   return StringField(reference, "jobId", "job ID");
 }
 
+// The location `object`, such as a job reference, names, or nothing when it names none.
+std::optional<std::string> LocationField(const json& object) {
+  const json location = object.value("location", json());
+  if (location.is_null() || (location.is_string() && location.get<std::string>().empty())) {
+    return std::nullopt;
+  }
+  if (!location.is_string()) {
+    throw ApiError::Invalid("Invalid location: " + location.dump());
+  }
+  return location.get<std::string>();
+}
+
+// The location the job reference of a jobs.insert request names.
+std::optional<std::string> JobLocationField(const json& body) {
+  return LocationField(body.value("jobReference", json::object()));
+}
+
 // Query and load jobs that create their destination table could also partition and cluster it,
 // which the emulator does not support yet.
 void RejectDestinationLayout(const json& config) {
@@ -161,6 +178,7 @@ QueryRequest ParseQueryJob(const std::string& project_id, const json& body) {
   }
   QueryRequest request = ParseQueryConfiguration(project_id, query);
   request.job_id = JobId(body);
+  request.location = JobLocationField(body);
   request.dry_run = config.value("dryRun", false);
   if (query.contains("destinationTable")) {
     request.destination_table = ParseTableReference(query["destinationTable"], "destination table");
@@ -179,6 +197,7 @@ LoadRequest ParseLoadJob(const std::string& project_id, const json& body) {
   LoadRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);
+  request.location = JobLocationField(body);
   request.load.destination_table =
       ParseTableReference(load["destinationTable"], "destination table");
   ParseDispositions(load, request.load);
@@ -210,6 +229,7 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
   CopyRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);
+  request.location = JobLocationField(body);
   request.copy.destination_table =
       ParseTableReference(copy["destinationTable"], "destination table");
   if (copy.contains("sourceTable") == copy.contains("sourceTables")) {
@@ -258,6 +278,7 @@ ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) 
   ExtractRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);
+  request.location = JobLocationField(body);
   request.extract.source_table = ParseTableReference(extract["sourceTable"], "source table");
   // destinationUri is the deprecated spelling of a single destination.
   const json uris = extract.contains("destinationUris")
@@ -280,6 +301,13 @@ ExtractRequest ParseExtractJob(const std::string& project_id, const json& body) 
 
 std::string Param(const httplib::Request& request, const char* name) {
   return request.path_params.at(name);
+}
+
+std::optional<std::string> LocationParam(const httplib::Request& request) {
+  if (!request.has_param("location") || request.get_param_value("location").empty()) {
+    return std::nullopt;
+  }
+  return request.get_param_value("location");
 }
 
 bool QueryParamBool(const httplib::Request& request, const char* name) {
@@ -378,6 +406,7 @@ MediaUpload ParseMultipartUpload(const httplib::Request& request) {
 
 QueryRequest ParseQuery(const std::string& project_id, const json& body) {
   QueryRequest request = ParseQueryConfiguration(project_id, body);
+  request.location = LocationField(body);
   request.dry_run = body.value("dryRun", false);
   return request;
 }

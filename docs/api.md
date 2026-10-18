@@ -21,7 +21,7 @@ emulator rejected.
 
 | Resource | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [datasets](#datasets) | 5 | 1 | 1 |
+| [datasets](#datasets) | 4 | 2 | 1 |
 | [jobs](#jobs) | 5 | 2 | 0 |
 | [models](#models) | 0 | 0 | 4 |
 | [projects](#projects) | 2 | 0 | 0 |
@@ -35,10 +35,10 @@ emulator rejected.
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
 | [`datasets.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/delete) | `DELETE projects/{projectsId}/datasets/{datasetsId}` | Supported |  |
-| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name, labels, default table expiration and default rounding mode, and location `US`. |
-| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: dataset field access; dataset location EU. |
+| [`datasets.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/get) | `GET projects/{projectsId}/datasets/{datasetsId}` | Supported | Returns the reference, description, friendly name, labels, default table expiration, default rounding mode and location. |
+| [`datasets.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/insert) | `POST projects/{projectsId}/datasets` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1; dataset field access. |
 | [`datasets.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list) | `GET projects/{projectsId}/datasets` | Supported | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination. |
-| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Supported | Changes `description`, `friendlyName`, `labels`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. |
+| [`datasets.patch`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/patch) | `PATCH projects/{projectsId}/datasets/{datasetsId}` | Partial | Changes `description`, `friendlyName`, `labels`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. Unsupported: changing the location of a dataset. |
 | [`datasets.undelete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/undelete) | `POST projects/{projectsId}/datasets/{datasetsId}:undelete` | Unsupported |  |
 | [`datasets.update`](https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets/update) | `PUT projects/{projectsId}/datasets/{datasetsId}` | Supported | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels and default table expiration. |
 
@@ -48,11 +48,11 @@ emulator rejected.
 | --- | --- | --- | --- |
 | [`jobs.cancel`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/cancel) | `POST projects/{projectsId}/jobs/{jobsId}/cancel` | Supported | See [Jobs](compatibility.md#jobs). |
 | [`jobs.delete`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/delete) | `DELETE projects/{projectsId}/jobs/{jobsId}/delete` | Supported |  |
-| [`jobs.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/get) | `GET projects/{projectsId}/jobs/{jobsId}` | Supported |  |
-| [`jobs.getQueryResults`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/getQueryResults) | `GET projects/{projectsId}/queries/{queriesId}` | Supported | Ignores `timeoutMs`, `location` and `formatOptions.timestampOutputFormat`. |
-| [`jobs.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; clustering for a destination table; copy operationType CLONE; destinationEncryptionConfiguration; extracting models; load jobs that create or replace ROUND_HALF_EVEN columns; multiple destination URIs. |
+| [`jobs.get`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/get) | `GET projects/{projectsId}/jobs/{jobsId}` | Supported | See [Locations](compatibility.md#locations). |
+| [`jobs.getQueryResults`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/getQueryResults) | `GET projects/{projectsId}/queries/{queriesId}` | Supported | Ignores `timeoutMs` and `formatOptions.timestampOutputFormat`. See [Locations](compatibility.md#locations). |
+| [`jobs.insert`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert) | `POST projects/{projectsId}/jobs` | Partial | See [Jobs](compatibility.md#jobs), [Locations](compatibility.md#locations) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies). Unsupported: Avro extracts; clustering for a destination table; copy operationType CLONE; destinationEncryptionConfiguration; extracting models; load jobs that create or replace ROUND_HALF_EVEN columns; multiple destination URIs. |
 | [`jobs.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/list) | `GET projects/{projectsId}/jobs` | Supported | Ignores `allUsers`. See [Jobs](compatibility.md#jobs). |
-| [`jobs.query`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query) | `POST projects/{projectsId}/queries` | Partial | Ignores `timeoutMs`, `location`, `labels` and `useQueryCache`. Unsupported: destinationEncryptionConfiguration; legacy SQL. |
+| [`jobs.query`](https://cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query) | `POST projects/{projectsId}/queries` | Partial | Ignores `timeoutMs`, `labels` and `useQueryCache`. See [Locations](compatibility.md#locations). Unsupported: destinationEncryptionConfiguration; legacy SQL. |
 
 ## models
 

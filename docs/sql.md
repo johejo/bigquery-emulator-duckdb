@@ -102,7 +102,7 @@ rejected.
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
 | `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL. |
-| `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: CREATE SCHEMA option location. |
+| `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |
 | `CREATE VIEW` | Supported | See [Views](compatibility.md#views). |
