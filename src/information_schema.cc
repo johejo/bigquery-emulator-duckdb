@@ -14,6 +14,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/time/time.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
@@ -49,6 +50,15 @@ Cell String(const std::string& value) { return QuoteLiteral(value); }
 Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 constexpr const char* kEmptyArray = "[]";
+
+// The time a table or view was created, or NULL for one created before the emulator recorded it.
+Cell CreationTime(int64_t millis) {
+  if (millis == 0) {
+    return kNull;
+  }
+  return String(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::FromUnixMillis(millis), absl::UTCTimeZone()));
+}
 
 // An unset description, default or rounding mode, which the table resource omits, is NULL.
 Cell OptionalString(const std::string& value) { return value.empty() ? kNull : String(value); }
@@ -277,15 +287,20 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
         continue;
       }
       if (view == "TABLES") {
+        std::optional<ViewDescription> view_description =
+            source.FindView(dataset.project, dataset.dataset, table);
         const std::optional<std::string> view_query =
-            source.FindViewQuery(dataset.project, dataset.dataset, table);
+            view_description.has_value() ? std::optional(view_description->query) : std::nullopt;
         Cell ddl = kNull;
         // A clone names its base table and the time it was cloned, as snapshot_time_ms.
         std::optional<CloneDefinition> clone;
+        int64_t creation_time =
+            view_description.has_value() ? view_description->metadata.creation_time : 0;
         if (!view_query.has_value()) {
           if (std::optional<TableDescription> description =
                   source.DescribeTable(dataset.project, dataset.dataset, table)) {
             clone = std::move(description->metadata.clone);
+            creation_time = description->metadata.creation_time;
           }
           absl::StatusOr<std::string> table_ddl =
               TableDdl(dataset.project, dataset.dataset, table, *schema, type_factory);
@@ -308,7 +323,7 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
             String("NO"),
             String("NO"),
             String("NO"),
-            kNull,
+            CreationTime(creation_time),
             clone ? String(clone->base_table.project_id) : kNull,
             clone ? String(clone->base_table.dataset_id) : kNull,
             clone ? String(clone->base_table.table_id) : kNull,

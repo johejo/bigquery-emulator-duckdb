@@ -118,7 +118,12 @@ DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset) {
   const TableReference& table = view.table;
   TableMetadata metadata = view.metadata;
-  metadata.expiration_time = ExpirationWithDefault(metadata.expiration_time, NowMillis(), dataset);
+  // A view tables.update replaces keeps the creation time it is given.
+  if (metadata.creation_time == 0) {
+    metadata.creation_time = NowMillis();
+  }
+  metadata.expiration_time =
+      ExpirationWithDefault(metadata.expiration_time, metadata.creation_time, dataset);
   DdlWrite write;
   // DuckDB can create a circular view and only reject it when queried. Bind the new definition
   // before committing so a failed replacement keeps the old view.

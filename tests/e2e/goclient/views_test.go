@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
@@ -22,6 +23,7 @@ func TestViewLifecycle(t *testing.T) {
 	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
 	view := dataset.Table("v")
 	definition := "SELECT 7 AS id, STRUCT('x' AS name, [1, 2] AS tags) AS nested"
+	before := time.Now().Truncate(time.Millisecond)
 	if err := view.Create(ctx, &bigquery.TableMetadata{ViewQuery: definition}); err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +37,40 @@ func TestViewLifecycle(t *testing.T) {
 	if len(metadata.Schema) != 2 || metadata.Schema[0].Type != bigquery.IntegerFieldType ||
 		len(metadata.Schema[1].Schema) != 2 || !metadata.Schema[1].Schema[1].Repeated {
 		t.Fatalf("unexpected view schema: %+v", metadata.Schema)
+	}
+	// A view has a creation time, which INFORMATION_SCHEMA.TABLES reports too, and updates
+	// keep it.
+	if metadata.CreationTime.Before(before) || metadata.CreationTime.After(time.Now()) {
+		t.Fatalf("creation time = %v, want a time during creation", metadata.CreationTime)
+	}
+	creationTime := func() time.Time {
+		t.Helper()
+		query := client.Query("SELECT creation_time FROM go_views.INFORMATION_SCHEMA.TABLES WHERE table_name = 'v'")
+		rows, err := query.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var row []bigquery.Value
+		if err := rows.Next(&row); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := row[0].(time.Time)
+		return got
+	}
+	if got := creationTime(); !got.Equal(metadata.CreationTime) {
+		t.Fatalf("INFORMATION_SCHEMA.TABLES creation_time = %v, want %v", got, metadata.CreationTime)
+	}
+	for _, update := range []bigquery.TableMetadataToUpdate{
+		{Description: "the view"},
+		{ViewQuery: definition + " LIMIT 1"},
+	} {
+		updated, err := view.Update(ctx, update, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !updated.CreationTime.Equal(metadata.CreationTime) || !creationTime().Equal(metadata.CreationTime) {
+			t.Fatalf("update %+v changed creation time from %v to %v", update, metadata.CreationTime, updated.CreationTime)
+		}
 	}
 	// Duplicate creates must preserve the definition and report the HTTP conflict.
 	if err := view.Create(ctx, &bigquery.TableMetadata{ViewQuery: "SELECT 9 AS changed"}); err == nil {
