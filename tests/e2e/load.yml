@@ -1,74 +1,37 @@
-desc: load jobs support GCS wildcards and gzip CSV and JSON from uploads and GCS
-vars:
-  malformed: [gs://load-fixtures, gs://load-fixtures/, gs:///people.jsonl]
+# What a load does is left to tests/e2e/goclient/load_test.go; these steps cover the requests bq
+# builds from its own flags: an inline schema, a schema file and Parquet list inference.
+desc: bq load builds requests the emulator accepts from its schema and format flags
 steps:
   mk_dataset:
     exec:
       command: tests/e2e/bq.sh mk --dataset e2e_load
     test: current.exit_code == 0
-  load_local:
+  load_inline_schema:
     exec:
       command: >-
         tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
         e2e_load.people tests/e2e/data/people.csv id:INTEGER,name:STRING
     test: current.exit_code == 0
-  local_rows:
+  inline_schema_rows:
     exec:
       command: tests/e2e/bq.sh head --format=json e2e_load.people
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
-  # A BIGNUMERIC keeps its 38 fractional digits, which reading it as a DuckDB number would lose.
-  load_bignumeric:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=CSV
-        e2e_load.bignumeric tests/e2e/data/bignumeric.csv id:INTEGER,n:BIGNUMERIC
-    test: current.exit_code == 0
-  bignumeric_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.bignumeric
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"1","n":"578960446186580977117854925043439539266.34992332820282019728792003956564819967"},{"id":"2","n":"-0.00000000000000000000000000000000000001"},{"id":"3","n":null}]'
-  # JSON numbers keep every digit, which reading them as FLOAT64 would lose, at any depth. The
-  # values are the bounds of BIGNUMERIC and NUMERIC that BigQuery documents.
-  load_bignumeric_json:
+  load_schema_file:
     exec:
       command: >-
         tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.bignumeric_json tests/e2e/data/bignumeric.jsonl
-        tests/e2e/data/bignumeric_schema.json
+        e2e_load.people_json gs://load-fixtures/nested/people.jsonl tests/e2e/data/people_schema.json
     test: current.exit_code == 0
-  bignumeric_json_rows:
+  schema_file_rows:
     exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.bignumeric_json
+      command: tests/e2e/bq.sh head --format=json e2e_load.people_json
     test: |
       current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"1","m":"99999999999999999999999999999.999999999","n":"578960446186580977117854925043439539266.34992332820282019728792003956564819967","r":{"ns":["-578960446186580977117854925043439539266.34992332820282019728792003956564819968","0.00000000000000000000000000000000000001"]}},{"id":"2","m":"-99999999999999999999999999999.999999999","n":"-0.00000000000000000000000000000000000001","r":{"ns":[]}},{"id":"3","m":null,"n":null,"r":null}]'
-  # One unit of 10^-38 beyond the largest BIGNUMERIC.
-  bignumeric_json_overflow:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.bignumeric_overflow tests/e2e/data/bignumeric_overflow.jsonl n:BIGNUMERIC
-    test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Invalid BIGNUMERIC value'
+      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
   # three_level_list.parquet has a column a, a standard three-level LIST of INT64, of one row
   # [1, 2]. bq sends --parquet_enable_list_inference as parquetOptions.enable_list_inference.
-  load_parquet_list:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=PARQUET
-        e2e_load.parquet_list tests/e2e/data/three_level_list.parquet
-    test: current.exit_code == 0
-  parquet_list_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.parquet_list
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"a":{"list":[{"element":"1"},{"element":"2"}]}}]'
   load_parquet_list_inference:
     exec:
       command: >-
@@ -81,161 +44,6 @@ steps:
     test: |
       current.exit_code == 0 &&
       trim(current.stdout) == '[{"a":["1","2"]}]'
-  load_gcs:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.people gs://load-fixtures/nested/people.jsonl
-    test: current.exit_code == 0
-  rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.people
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"},{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
-  load_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard 'gs://load-fixtures/wildcard/*-part.jsonl' id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  wildcard_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.wildcard
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
-  # https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
-  load_filename_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.filename 'gs://load-fixtures/wildcard-spec/fed-sample*.jsonl' id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  filename_excludes_subfolders:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.filename
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"3","name":"carol"}]'
-  load_prefix_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.prefix 'gs://load-fixtures/wildcard-spec/fed-sample*' id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  prefix_includes_subfolders:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.prefix
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"},{"id":"3","name":"carol"}]'
-  load_extension_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.extension 'gs://load-fixtures/wildcard-spec/*.jsonl' id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  extension_includes_subfolders:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.extension
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"},{"id":"3","name":"carol"}]'
-  # Object names are escaped in requests, and listing prefixes in queries.
-  load_special_names:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.special 'gs://load-fixtures/special/a b+%1.jsonl' id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  load_special_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.special 'gs://load-fixtures/special/a b+%*'
-    test: current.exit_code == 0
-  special_rows:
-    exec:
-      command: tests/e2e/bq.sh query --format=json --nouse_legacy_sql 'SELECT * FROM e2e_load.special ORDER BY id'
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"5","name":"eve"},{"id":"5","name":"eve"},{"id":"6","name":"frank"}]'
-  load_gzip_upload:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
-        e2e_load.gzip tests/e2e/gcs/load-fixtures/compressed/people.csv.gz id:INTEGER,name:STRING
-    test: current.exit_code == 0
-  load_gzip_gcs:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --source_format=CSV --skip_leading_rows=1
-        e2e_load.gzip gs://load-fixtures/compressed/people.csv.gz
-    test: current.exit_code == 0
-  gzip_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.gzip
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"1","name":"alice"},{"id":"2","name":"bob"},{"id":"1","name":"alice"},{"id":"2","name":"bob"}]'
-  no_match:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard 'gs://load-fixtures/missing/*.jsonl'
-    test: current.exit_code != 0 && current.stdout contains 'No GCS objects match'
-  multiple_wildcards:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard 'gs://load-fixtures/*/*.jsonl'
-    test: current.exit_code != 0 && current.stdout contains 'Only one wildcard'
-  bucket_wildcard:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard 'gs://load-*/nested/people.jsonl'
-    test: current.exit_code != 0
-  # bq wraps long messages, so newlines are folded back into spaces before matching.
-  missing_object:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard gs://load-fixtures/missing.jsonl
-    test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Could not read GCS object: gs://load-fixtures/missing.jsonl'
-  missing_bucket:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard 'gs://missing-bucket/*.jsonl'
-    test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Could not list GCS objects: gs://missing-bucket/*.jsonl'
-  malformed_uris:
-    loop:
-      count: len(vars.malformed)
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard '{{ vars.malformed[i] }}'
-    test: |
-      current.exit_code != 0 &&
-      replace(current.stdout, "\n", " ") contains 'Invalid GCS URI: ' + vars.malformed[i]
-  corrupt_gzip:
-    exec:
-      command: >-
-        tests/e2e/bq.sh load --replace --source_format=NEWLINE_DELIMITED_JSON
-        e2e_load.wildcard gs://load-fixtures/wildcard/broken.jsonl
-    test: current.exit_code != 0
-  failed_load_preserves_rows:
-    exec:
-      command: tests/e2e/bq.sh head --format=json e2e_load.wildcard
-    test: |
-      current.exit_code == 0 &&
-      trim(current.stdout) == '[{"id":"3","name":"carol"},{"id":"4","name":"dave"}]'
   cleanup:
     exec:
       command: tests/e2e/bq.sh rm -r -f -d e2e_load
