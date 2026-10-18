@@ -37,6 +37,7 @@
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
+#include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -352,6 +353,20 @@ class DuckDbTableSource : public TableSource {
   Backend& backend_;
   ExternalConnections& connections_;
 };
+
+// The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. DuckDB's
+// casts round halfway values away from zero, so the values of ROUND_HALF_EVEN fields are read
+// unrounded and rounded to even, as BigQuery rounds the rows it streams.
+std::string RoundedInsertValue(const json& value, const FieldSchema& field,
+                               bool ignore_unknown_values) {
+  const FieldSchema unrounded = WithoutRoundingParameters(field);
+  const std::optional<std::string> rounded = TranslateAppendedValue(
+      InsertValue(value, unrounded, ignore_unknown_values), unrounded, field);
+  if (!rounded.has_value()) {
+    throw ApiError::Unsupported("tabledata.insertAll into ROUND_HALF_EVEN columns");
+  }
+  return *rounded;
+}
 
 }  // namespace
 
@@ -878,10 +893,6 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
     throw ApiError::Invalid("Cannot insert into a view: " + TableName(table));
   }
   const std::vector<FieldSchema>& schema = info.schema;
-  // Rows are written with DuckDB's casts, which round halfway values away from zero.
-  if (HasRoundHalfEven(schema)) {
-    throw ApiError::Unsupported("tabledata.insertAll into ROUND_HALF_EVEN columns");
-  }
   std::vector<InsertError> errors;
   std::vector<std::string> statements;
   std::vector<size_t> indexes;
@@ -903,8 +914,8 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
       for (const FieldSchema& field : schema) {
         columns.push_back(QuoteIdentifier(field.name));
         const auto it = values.find(field.name);
-        literals.push_back(it == values.end() ? "DEFAULT"
-                                              : InsertValue(*it, field, ignore_unknown_values));
+        literals.push_back(
+            it == values.end() ? "DEFAULT" : RoundedInsertValue(*it, field, ignore_unknown_values));
       }
       std::string statement = "INSERT INTO ";
       statement += QualifiedName(table);

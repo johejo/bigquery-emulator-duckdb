@@ -87,16 +87,15 @@ keeps it too.
 A `tables.patch` or `tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields
 is rejected, since which default the fields take is not known.
 
-DML, `CREATE TABLE AS SELECT`, and query and load jobs that append to an existing table round the
-values they write to a parameterized column's scale with its rounding mode,
+DML, `CREATE TABLE AS SELECT`, query and load jobs that append to an existing table, and
+`tabledata.insertAll` round the values they write to a parameterized column's scale with its rounding mode,
 `ROUND_HALF_AWAY_FROM_ZERO` when unset, and fail on a value out of its range. They round
 parameterized `ROUND_HALF_EVEN` fields within STRUCTs and ARRAYs too, keeping NULL STRUCTs and
 converting NULL arrays containing those fields to empty arrays. NULL elements in those arrays are
 rejected. Other writes round halfway values away from zero, so they reject `ROUND_HALF_EVEN`
 columns: loads that create a table or replace one with `WRITE_TRUNCATE`, since BigQuery rounds
 2.25 to 2.3 in a field that takes `ROUND_HALF_EVEN` from the dataset's default, copy jobs that
-append to a table of another schema, which BigQuery rejects, `tabledata.insertAll` and the Storage
-Write API. Defaults on parameterized `ROUND_HALF_EVEN` columns are also unsupported.
+append to a table of another schema, which BigQuery rejects, and the Storage Write API. Defaults on parameterized `ROUND_HALF_EVEN` columns are also unsupported.
 
 ### Column defaults
 
