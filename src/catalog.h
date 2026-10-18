@@ -88,6 +88,10 @@ class TableSource {
   // default.
   virtual bool HasProject(const std::string& /*project*/) { return true; }
 
+  // The ID of the project that `project` names, by its ID or by its number. `project` itself by
+  // default, and for a project the emulator does not hold.
+  [[nodiscard]] virtual std::string ProjectId(const std::string& project) const { return project; }
+
   // The location of the dataset `project`.`dataset`, or nothing if there is no such dataset, for
   // INFORMATION_SCHEMA. Unlike the lookups above, it does not count as the job using the dataset.
   // Nothing by default.
@@ -177,10 +181,13 @@ class BigQueryTable : public googlesql::SimpleTable {
 std::vector<std::string> SplitTablePath(absl::Span<const std::string> path);
 
 // Normalizes a table path to {project, dataset, table}, splitting it with SplitTablePath first.
-// Missing parts come from the defaults. Returns an empty vector for a path it cannot interpret.
+// Missing parts come from the defaults, and a project number becomes the ID of the project
+// `source` holds by it, when `source` is not null. Returns an empty vector for a path it cannot
+// interpret.
 std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
                                             const std::string& default_project,
-                                            const std::string& default_dataset);
+                                            const std::string& default_dataset,
+                                            const TableSource* source);
 
 // The dataset qualifier that names a temporary table explicitly, as `_SESSION.name`.
 inline constexpr char kSessionDataset[] = "_SESSION";
@@ -203,7 +210,8 @@ std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path
 std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
                                           const std::string& default_project,
                                           const std::string& default_dataset,
-                                          const TemporaryTables* temporary);
+                                          const TemporaryTables* temporary,
+                                          const TableSource* source);
 
 // A catalog whose tables come from a TableSource and whose functions and types are the
 // GoogleSQL built-ins. Tables are looked up lazily, when the analyzer first refers to them,

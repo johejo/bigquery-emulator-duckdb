@@ -108,8 +108,9 @@ Optional fields are `friendlyName` and `numericId`, both strings. Numbers must b
 uint64 decimals without leading zeros. Invalid or unknown fields and conflicting registrations
 are startup errors.
 
-`projects.list` includes registered projects without datasets. REST references accept configured
-numbers as aliases, but responses use project IDs. Unregistered projects return 404.
+`projects.list` includes registered projects without datasets. REST references and SQL
+qualifiers accept configured numbers as aliases, but responses and INFORMATION_SCHEMA use project
+IDs. Unregistered projects return 404.
 `projects.getServiceAccount` returns `bq-NUMBER@bigquery-encryption.iam.gserviceaccount.com`, the
 form BigQuery uses, from the configured `numericId`, and rejects a project without one.
 

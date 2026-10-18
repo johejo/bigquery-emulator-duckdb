@@ -68,7 +68,7 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
   if (parts.size() != 2 && parts.size() != 3) {
     return builtin;
   }
-  const std::vector<std::string> key = NormalizeTablePath(parts, default_project(), "");
+  const std::vector<std::string> key = NormalizeTablePath(parts, default_project(), "", &source());
   if (key.empty()) {
     return builtin;
   }

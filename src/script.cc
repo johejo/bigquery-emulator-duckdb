@@ -387,12 +387,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       const int64_t /*num_arguments*/) override {
     loaded_procedure_status_ = absl::OkStatus();
     const auto settings = Settings(executor);
+    const auto source = host_.NewTableSource(backend_.get(), false);
     const auto parts = NormalizeTablePath(SplitTablePath(path), settings.default_project,
-                                          settings.default_dataset);
+                                          settings.default_dataset, source.get());
     if (parts.size() != 3) {
       return absl::NotFoundError("Procedure name must include a dataset");
     }
-    const auto source = host_.NewTableSource(backend_.get(), false);
     const auto routine = source->FindRoutine(
         {.project_id = parts.at(0), .dataset_id = parts.at(1), .routine_id = parts.at(2)});
     if (!routine || routine->resource.at("routineType") != "PROCEDURE") {
