@@ -55,6 +55,32 @@ steps:
     test: |
       current.exit_code != 0 &&
       replace(current.stdout, "\n", " ") contains 'Invalid BIGNUMERIC value'
+  # three_level_list.parquet has a column a, a standard three-level LIST of INT64, of one row
+  # [1, 2]. bq sends --parquet_enable_list_inference as parquetOptions.enable_list_inference.
+  load_parquet_list:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=PARQUET
+        e2e_load.parquet_list tests/e2e/data/three_level_list.parquet
+    test: current.exit_code == 0
+  parquet_list_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.parquet_list
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"a":{"list":[{"element":"1"},{"element":"2"}]}}]'
+  load_parquet_list_inference:
+    exec:
+      command: >-
+        tests/e2e/bq.sh load --source_format=PARQUET --parquet_enable_list_inference
+        e2e_load.parquet_list_inference tests/e2e/data/three_level_list.parquet
+    test: current.exit_code == 0
+  parquet_list_inference_rows:
+    exec:
+      command: tests/e2e/bq.sh head --format=json e2e_load.parquet_list_inference
+    test: |
+      current.exit_code == 0 &&
+      trim(current.stdout) == '[{"a":["1","2"]}]'
   load_gcs:
     exec:
       command: >-

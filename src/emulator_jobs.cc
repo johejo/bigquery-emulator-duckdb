@@ -245,13 +245,15 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (format == "NEWLINE_DELIMITED_JSON") {
       paths = StageJsonNumerics(paths, requested_schema, downloads);
     } else if (format == "PARQUET") {
+      // bq names the option as the API's proto does, which BigQuery accepts too.
       const json options = config.value("parquetOptions", json::object());
-      ParquetSources sources =
-          StageParquetDecimals(paths, downloads, options.value("enableListInference", false));
+      const bool list_inference =
+          options.value("enableListInference", options.value("enable_list_inference", false));
+      ParquetSources sources = StageParquetDecimals(paths, downloads, list_inference);
       paths = std::move(sources.paths);
       parquet = std::move(sources.columns);
       if (requested_schema.empty() && parquet.HasWideDecimal()) {
-        requested_schema = Prepare(LoadQuery(format, paths, config, {})).schema;
+        requested_schema = Prepare(LoadQuery(format, paths, config, {}, parquet)).schema;
         DetectParquetDecimals(requested_schema, parquet, config);
       }
     }

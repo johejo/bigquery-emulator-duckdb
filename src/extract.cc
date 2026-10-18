@@ -355,7 +355,8 @@ void AnnotateParquetBigNumerics(const std::string& path, const std::vector<Field
     return;
   }
   ThriftValue metadata = ReadParquetMetadata(path);
-  const ParquetColumn columns = ParquetColumns(metadata);
+  // DuckDB writes a REPEATED field as a standard LIST group.
+  const ParquetColumn columns = ParquetColumns(metadata, /*list_inference=*/true);
   std::vector<ThriftValue>& elements = metadata.Field(parquet::kSchema)->elements;
   std::vector<size_t> leaves;
   for (size_t i = 0; i < schema.size(); ++i) {

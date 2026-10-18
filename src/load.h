@@ -37,8 +37,8 @@ struct ParquetSources {
 // a DOUBLE, so a file with one is copied into `downloads` with the DECIMAL annotations of those
 // columns removed from its footer, for DuckDB to read their bytes and LoadQuery to convert them
 // exactly. Throws ApiError::Invalid for a file that is not Parquet, and for files whose schemas
-// differ when one has such a column. Without `list_inference`, BigQuery loads a LIST group as a
-// RECORD of its repeated field, which the emulator does not, so a file with one is unsupported.
+// differ when one has such a column. The columns take the shape BigQuery loads with or without
+// `list_inference`.
 ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
                                     TemporaryFiles& downloads, bool list_inference);
 

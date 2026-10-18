@@ -88,7 +88,7 @@ TEST(ParquetMetadataTest, RewritesAndReadsBackAFooter) {
   EXPECT_EQ(read.Field(parquet::kSchema)->elements.size(), 19);
   EXPECT_EQ(read.Field(9)->type, Type::kTrue);
   EXPECT_EQ(read.Field(40)->bytes, "x");
-  const ParquetColumn columns = ParquetColumns(read);
+  const ParquetColumn columns = ParquetColumns(read, /*list_inference=*/true);
   ASSERT_EQ(columns.children.size(), 18);
   EXPECT_EQ(columns.children.back().name, "c17");
 
@@ -117,7 +117,8 @@ TEST(ParquetMetadataTest, TellsWideDecimals) {
       Element("schema", 0, 3), Element("s", kOptional, 1), wide, narrow, Element("i", kOptional, 0),
   };
   const ParquetColumn columns =
-      ParquetColumns(ThriftValue::Struct({{.id = parquet::kSchema, .value = List(schema)}}));
+      ParquetColumns(ThriftValue::Struct({{.id = parquet::kSchema, .value = List(schema)}}),
+                     /*list_inference=*/true);
   EXPECT_TRUE(columns.HasWideDecimal());
   const ParquetColumn& w = columns.children.at(0).children.at(0);
   EXPECT_TRUE(w.IsWideDecimal());

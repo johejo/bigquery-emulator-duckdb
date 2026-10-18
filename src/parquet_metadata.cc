@@ -11,7 +11,6 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -309,9 +308,11 @@ bool Annotated(const ThriftValue& element, int16_t member, const std::vector<int
 }
 
 // The column of the SchemaElement at `next` and its descendants, which follow it in depth-first
-// order, leaving `next` after them. The elements of a LIST group follow DuckDB's reading of the
-// format's backward compatibility rules.
-ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int depth) {
+// order, leaving `next` after them. The elements of a LIST group follow the format's backward
+// compatibility rules, and without `list_inference` a LIST group is a STRUCT of its repeated
+// field, as BigQuery loads them.
+ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int depth,
+                     bool list_inference) {
   if (depth > kMaxDepth) {
     Invalid("schema nested too deeply");
   }
@@ -341,7 +342,7 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
     std::vector<size_t> elements;
     for (int64_t i = 0; i < count; ++i) {
       elements.push_back(next);
-      column.children.push_back(Column(schema, next, depth + 1));
+      column.children.push_back(Column(schema, next, depth + 1, list_inference));
     }
     if (Annotated(element, parquet::kLogicalMap,
                   {parquet::kConvertedMap, parquet::kConvertedMapKeyValue})) {
@@ -353,20 +354,36 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
               parquet::kRepeated) {
         column.kind = ParquetColumn::Kind::kMap;
       } else {
-        // DuckDB reads a repeated group of one field as that field's list, even where the
-        // format's rules, and BigQuery, take the group's name to mark it as an element struct of
-        // one field.
+        // A repeated group of one field is that field's list, unless its name marks it as an
+        // element struct of one field. DuckDB reads either as the field's list.
         ParquetColumn item = child.children.front();
+        bool null_elements = false;
         if (item.kind == ParquetColumn::Kind::kStruct && item.children.size() == 1) {
-          if (child.name == "array" || child.name == column.name + "_tuple") {
-            throw ApiError::Unsupported(
-                "loading Parquet lists whose repeated group named array or <list>_tuple is a "
-                "STRUCT of one field");
+          if (list_inference && child.name != "array" && child.name != column.name + "_tuple") {
+            item = item.children.front();
+            null_elements =
+                IntField(schema.at(item.element), parquet::kElementRepetition).value_or(0) ==
+                parquet::kOptional;
+          } else {
+            item.unwrapped = true;
           }
-          item = item.children.front();
         }
-        column.kind = ParquetColumn::Kind::kList;
-        column.children = {std::move(item)};
+        if (list_inference) {
+          if (item.kind == ParquetColumn::Kind::kList) {
+            throw ApiError::Invalid(
+                "list of lists is not supported with LIST logical type inference enabled");
+          }
+          column.kind = ParquetColumn::Kind::kList;
+          column.nullable =
+              IntField(element, parquet::kElementRepetition).value_or(0) == parquet::kOptional;
+          column.null_elements = null_elements;
+          column.children = {std::move(item)};
+        } else {
+          ParquetColumn list = child;
+          list.children = {std::move(item)};
+          column.children = {std::move(list)};
+          column.unwrapped = true;
+        }
       }
     }
   }
@@ -434,6 +451,11 @@ bool ParquetColumn::IsInteger() const {
          (logical == 0 || logical == parquet::kLogicalInteger);
 }
 
+bool ParquetColumn::Reshaped() const {
+  return unwrapped || null_elements ||
+         std::ranges::any_of(children, [](const ParquetColumn& child) { return child.Reshaped(); });
+}
+
 bool ParquetColumn::HasWideDecimal() const {
   return IsWideDecimal() || std::ranges::any_of(children, [](const ParquetColumn& child) {
            return child.HasWideDecimal();
@@ -479,20 +501,10 @@ void RewriteParquetMetadata(const std::string& path, const ThriftValue& metadata
   std::filesystem::resize_file(path, start + footer.size());
 }
 
-bool HasListGroup(const ThriftValue& metadata) {
-  const ThriftValue* schema = metadata.Field(parquet::kSchema);
-  return schema != nullptr &&
-         std::ranges::any_of(
-             schema->elements | std::views::drop(1), [](const ThriftValue& element) {
-               return IntField(element, parquet::kElementChildren).value_or(0) > 0 &&
-                      Annotated(element, parquet::kLogicalList, {parquet::kConvertedList});
-             });
-}
-
-ParquetColumn ParquetColumns(const ThriftValue& metadata) {
+ParquetColumn ParquetColumns(const ThriftValue& metadata, bool list_inference) {
   const std::vector<ThriftValue>& schema = Schema(metadata);
   size_t next = 0;
-  ParquetColumn root = Column(schema, next, 0);
+  ParquetColumn root = Column(schema, next, 0, list_inference);
   if (root.kind != ParquetColumn::Kind::kStruct) {
     Invalid("schema root is not a group");
   }
