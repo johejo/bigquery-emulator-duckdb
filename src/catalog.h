@@ -46,6 +46,13 @@ struct TableDescription {
   TableMetadata metadata;
 };
 
+// A view as INFORMATION_SCHEMA describes it: its GoogleSQL query, empty when it is unknown, and
+// its metadata.
+struct ViewDescription {
+  std::string query;
+  TableMetadata metadata;
+};
+
 // Resolves a BigQuery table reference to its schema. The emulator implements it on top of the
 // metadata it keeps in DuckDB.
 class TableSource {
@@ -82,11 +89,11 @@ class TableSource {
     return {};
   }
 
-  // The GoogleSQL query of `project`.`dataset`.`table` if it is a view, empty for a view whose
-  // query is unknown, or nothing for a table. For INFORMATION_SCHEMA; no views by default.
-  virtual std::optional<std::string> FindViewQuery(const std::string& /*project*/,
-                                                   const std::string& /*dataset*/,
-                                                   const std::string& /*table*/) {
+  // The view `project`.`dataset`.`table`, or nothing for a table. For INFORMATION_SCHEMA; no
+  // views by default.
+  virtual std::optional<ViewDescription> FindView(const std::string& /*project*/,
+                                                  const std::string& /*dataset*/,
+                                                  const std::string& /*table*/) {
     return std::nullopt;
   }
 

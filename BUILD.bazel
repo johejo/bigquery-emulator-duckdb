@@ -233,6 +233,7 @@ cc_library(
         ":type_mapping",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",

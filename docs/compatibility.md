@@ -48,7 +48,9 @@ Tables keep a description, friendly name, labels, expiration and [default roundi
 mode](#rounding-modes), and columns a description and a rounding mode, which DDL `OPTIONS` and the
 `tables` methods set; other options, such as partition expiration, are unsupported. Expiration comes from
 REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
-that creates its destination; a copy job with one to an existing table is rejected.
+that creates its destination; a copy job with one to an existing table is rejected. Tables and
+views created before the emulator recorded creation times have none: `tables.get` omits
+`creationTime`, and `INFORMATION_SCHEMA.TABLES` returns NULL.
 
 A DDL option's value is a literal or a constant expression of query parameters and the supported
 scalar functions, which the backend evaluates when the statement runs; the functions BigQuery

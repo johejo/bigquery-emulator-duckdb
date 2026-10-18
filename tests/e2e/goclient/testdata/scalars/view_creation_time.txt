@@ -1,0 +1,10 @@
+# The creation time of a view, as BigQuery answers.
+# https://cloud.google.com/bigquery/docs/information-schema-tables
+
+# CREATE OR REPLACE VIEW gives the view a creation time of its own.
+DECLARE created TIMESTAMP;
+CREATE OR REPLACE VIEW scalars.replaced_view_creation_time AS SELECT 1 AS x;
+SET created = (SELECT creation_time FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = 'replaced_view_creation_time');
+CREATE OR REPLACE VIEW scalars.replaced_view_creation_time AS SELECT 2 AS x;
+SELECT creation_time = created FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = 'replaced_view_creation_time'
+=> "false"

@@ -115,6 +115,11 @@ func (p creationPaths) view(table string) tableView {
 		p.t.Fatalf("%s: %v", table, err)
 	}
 	name := bigquery.QueryParameter{Name: "table", Value: table}
+	// INFORMATION_SCHEMA.TABLES reports the creation time tables.get does.
+	created := p.read("SELECT creation_time FROM INFORMATION_SCHEMA.TABLES WHERE table_name = @table", name)
+	if len(created) != 1 || len(created[0]) != 1 || !metadata.CreationTime.Equal(timeValue(created[0][0])) {
+		p.t.Errorf("%s: INFORMATION_SCHEMA.TABLES creation_time = %v, want %v", table, created, metadata.CreationTime)
+	}
 	// BigQuery documents a column without a default as NULL; IFNULL reads either spelling the
 	// same. Whether a REPEATED column is nullable is not documented, so arrays are left out.
 	return tableView{
@@ -130,6 +135,12 @@ func (p creationPaths) view(table string) tableView {
 		FieldPaths: p.read(`SELECT field_path, IFNULL(description, '')
 		  FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = @table ORDER BY field_path`, name),
 	}
+}
+
+// `value` as a time, or the zero time for NULL.
+func timeValue(value bigquery.Value) time.Time {
+	t, _ := value.(time.Time)
+	return t
 }
 
 // The columns and field paths INFORMATION_SCHEMA reports for the top-level INT64 and STRING

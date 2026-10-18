@@ -298,15 +298,21 @@ class DuckDbTableSource : public TableSource {
         TablesQuery(DatasetReference{.project_id = project, .dataset_id = dataset})));
   }
 
-  std::optional<std::string> FindViewQuery(const std::string& project, const std::string& dataset,
-                                           const std::string& table) override {
+  std::optional<ViewDescription> FindView(const std::string& project, const std::string& dataset,
+                                          const std::string& table) override {
     const std::optional<json> comment = ViewComment(
         backend_, TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
     if (!comment.has_value()) {
       return std::nullopt;
     }
-    const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
-    return metadata.has_value() ? metadata->query : "";
+    std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
+    if (!metadata.has_value()) {
+      return ViewDescription{};
+    }
+    return ViewDescription{
+        .query = std::move(metadata->query),
+        .metadata = std::move(metadata->metadata),
+    };
   }
 
   std::optional<Routine> FindRoutine(const RoutineReference& routine) override {
@@ -642,10 +648,14 @@ TableInfo Emulator::UpdateTable(TableReference table,
       // Every view the emulator keeps is GoogleSQL.
       json definition = {{"query", *info.view_query}, {"useLegacySql", false}};
       definition.update(*view);
-      WriteView(table, definition, metadata.value_or(info.metadata), /*replace=*/true);
+      TableMetadata updated = metadata.value_or(info.metadata);
+      updated.creation_time = info.metadata.creation_time;
+      WriteView(table, definition, updated, /*replace=*/true);
     } else if (metadata.has_value()) {
+      TableMetadata updated = *metadata;
+      updated.creation_time = info.metadata.creation_time;
       Execute(ViewCommentStatement(
-          table, {.query = *info.view_query, .schema = info.schema, .metadata = *metadata}));
+          table, {.query = *info.view_query, .schema = info.schema, .metadata = updated}));
     }
     return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
   }
