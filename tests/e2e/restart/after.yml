@@ -55,11 +55,11 @@ steps:
       current.res.status == 200 &&
       current.res.body.schema.fields == [
         {"name": "a", "type": "JSON", "mode": "REQUIRED", "description": "a"},
-        {"name": "b", "type": "STRING", "mode": "NULLABLE"},
-        {"name": "c", "type": "INTEGER", "mode": "NULLABLE"},
-        {"name": "d", "type": "STRING", "mode": "NULLABLE"},
-        {"name": "e", "type": "STRING", "mode": "NULLABLE"},
-        {"name": "f", "type": "FLOAT", "mode": "NULLABLE"}]
+        {"name": "b", "type": "STRING"},
+        {"name": "c", "type": "INTEGER"},
+        {"name": "d", "type": "STRING"},
+        {"name": "e", "type": "STRING"},
+        {"name": "f", "type": "FLOAT"}]
   decimal_bignumeric:
     req:
       /projects/test/datasets/persist/tables/decimal_bignumeric:

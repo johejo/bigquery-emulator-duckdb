@@ -422,9 +422,12 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     }
     QueryResult result;
     if (!request.dry_run) {
+      // A destination table reports the mode of each field, as a query result does.
+      std::vector<FieldSchema> written = *translation.result_schema;
+      SetModesGiven(written);
       result = WriteDestination(request.project_id, *request.destination_table,
                                 request.create_disposition, request.write_disposition,
-                                translation.sql, *translation.result_schema, setup);
+                                translation.sql, written, setup);
     } else if (!AlterationStatements(translation).has_value()) {
       // A dry run checks an alteration against the table or dataset without running it.
       result = Prepare(translation.sql, setup);
