@@ -1,7 +1,7 @@
 ## - with INTERVAL operands and results
 # Sources: BigQuery's operators reference (datetime subtraction and interval arithmetic
 # operators); GoogleSQL's compliance/functions_testlib_interval.cc (interval, date, datetime and
-# timestamp subtractions, NULLs and overflow).
+# timestamp subtractions, NULLs and overflow); BigQuery answers.
 
 SELECT DATE '2021-05-20' - DATE '2020-04-19'
 => "0-0 396 0:0:0"
@@ -41,6 +41,17 @@ SELECT TIMESTAMP '0001-01-01 00:00:00+00' - TIMESTAMP '9999-12-31 23:59:59.99999
 SELECT TIMESTAMP '1970-01-01 10:20:30+00' - CAST(NULL AS TIMESTAMP)
 => null
 
+# TIME differences are time; BigQuery subtracts them although its operators reference does not
+# list them. Source: BigQuery answers.
+SELECT TIME '10:20:30.456789' - TIME '01:02:03.987654'
+=> "0-0 0 9:18:26.469135"
+
+SELECT TIME '00:00:00' - TIME '23:59:59.999999'
+=> "0-0 0 -23:59:59.999999"
+
+SELECT TIME '01:02:03' - CAST(NULL AS TIME)
+=> null
+
 SELECT CAST(DATE '2021-04-20' - INTERVAL 25 HOUR AS STRING)
 => "2021-04-18 23:00:00"
 
@@ -61,6 +72,11 @@ SELECT DATETIME '0001-01-31 00:00:00' - INTERVAL 1 MONTH
 
 SELECT DATETIME '9999-01-01 00:00:00' - INTERVAL -1 YEAR
 => error:
+
+# As +, - adds the negated months, then the days, in turn, and the first step fails although the
+# result is in range. Source: BigQuery answers.
+SELECT DATETIME '0001-01-15 00:00:00' - INTERVAL '0-1 -30 0:0:0' YEAR TO SECOND
+=> error: Adding -1 MONTH to datetime 0001-01-15 00:00:00 causes overflow
 
 SELECT DATETIME '2000-01-01 00:00:00' - CAST(NULL AS INTERVAL)
 => null

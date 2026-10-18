@@ -634,8 +634,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               {.arity = 2, .spelling = "($1 + $2)"},
           },
       },
-      // - subtracts an INTERVAL as + adds its negation. GoogleSQL also subtracts TIME values,
-      // which BigQuery does not document, so the last rule leaves them out.
+      // - subtracts an INTERVAL as + adds its negation.
       {
           "$SUBTRACT",
           {
@@ -677,9 +676,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               },
               {
                   .arity = 2,
-                  .spelling = "($1 - $2)",
-                  .conditions = {Is(2, {TYPE_INT64, TYPE_UINT64, TYPE_NUMERIC, TYPE_DOUBLE})},
+                  .spelling = "bq_subtract_times($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIME})},
               },
+              {.arity = 2, .spelling = "($1 - $2)"},
           },
       },
       // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20

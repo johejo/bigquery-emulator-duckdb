@@ -129,8 +129,8 @@ void AddTimestampInterval(duckdb_function_info info, duckdb_data_chunk input,
   });
 }
 
-// DATE - DATE, DATETIME - DATETIME and TIMESTAMP - TIMESTAMP. GoogleSQL gives the difference of
-// dates in days, of timestamps in time, and of datetimes in days and time.
+// DATE - DATE, DATETIME - DATETIME, TIMESTAMP - TIMESTAMP and TIME - TIME. GoogleSQL gives the
+// difference of dates in days, of datetimes in days and time, and of the others in time.
 void SubtractDates(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
@@ -145,6 +145,15 @@ void SubtractDatetimes(duckdb_function_info info, duckdb_data_chunk input, duckd
     GOOGLESQL_ASSIGN_OR_RETURN(const auto right, DatetimeFromMicros(args.Int(1)));
     GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
                                googlesql::functions::IntervalDiffDatetimes(left, right));
+    return IntervalToDuckDb(result);
+  });
+}
+
+void SubtractTimes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(
+        const auto result, googlesql::functions::IntervalDiffTimes(TimeFromMicros(args.Int(0)),
+                                                                   TimeFromMicros(args.Int(1))));
     return IntervalToDuckDb(result);
   });
 }
@@ -283,6 +292,7 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_subtract_dates", {kDate, kDate}, kInterval, SubtractDates);
   Register(connection, "bq_subtract_datetimes", {kDatetime, kDatetime}, kInterval,
            SubtractDatetimes);
+  Register(connection, "bq_subtract_times", {kTime, kTime}, kInterval, SubtractTimes);
   Register(connection, "bq_subtract_timestamps", {kTimestamp, kTimestamp}, kInterval,
            SubtractTimestamps);
 }
