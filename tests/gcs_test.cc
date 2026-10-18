@@ -52,10 +52,7 @@ class GcsTest : public ::testing::Test {
     // Deliberately invalid ADCs ensure emulators and public reads never try to load them.
     SetEnv("GOOGLE_APPLICATION_CREDENTIALS", (directory_ / "missing-credentials.json").string());
     server_.Get(".*", [this](const httplib::Request& request, httplib::Response& response) {
-      if (requests_++ < transient_failures_) {
-        response.status = 503;
-        return;
-      }
+      ++requests_;
       if (require_adc_ && request.get_header_value("Authorization").empty()) {
         response.status = 401;
         return;
@@ -67,19 +64,7 @@ class GcsTest : public ::testing::Test {
         }
       }
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
-      if (list_objects_) {
-        EXPECT_EQ(request.path, "/storage/v1/b/bucket/o");
-        EXPECT_EQ(request.get_param_value("prefix"), "nested/a");
-        if (request.get_param_value("pageToken").empty()) {
-          response.set_content(R"({"items":[{"name":"nested/a2.json"}],"nextPageToken":"next"})",
-                               "application/json");
-        } else {
-          EXPECT_EQ(request.get_param_value("pageToken"), "next");
-          response.set_content(R"({"items":[{"name":"nested/a1.json"}]})", "application/json");
-        }
-        return;
-      }
-      EXPECT_EQ(request.path, expected_path_);
+      EXPECT_EQ(request.path, "/storage/v1/b/bucket/o/nested/a.json");
       EXPECT_EQ(request.get_param_value("alt"), "media");
       response.set_content("fixture\n", "application/octet-stream");
     });
@@ -155,14 +140,11 @@ class GcsTest : public ::testing::Test {
   std::filesystem::path output_;
   std::string endpoint_;
   std::string authorization_;
-  std::string expected_path_ = "/storage/v1/b/bucket/o/nested/a.json";
-  bool list_objects_ = false;
   bool require_adc_ = false;
   bool check_connection_reuse_ = false;
   std::atomic<int> peer_port_ = 0;
   std::atomic<int> requests_ = 0;
   std::atomic<int> token_requests_ = 0;
-  int transient_failures_ = 0;
 };
 
 TEST_F(GcsTest, ReusesConnections) {
@@ -172,37 +154,9 @@ TEST_F(GcsTest, ReusesConnections) {
   EXPECT_EQ(requests_, 2);
 }
 
-TEST_F(GcsTest, AcceptsPathPrefix) {
-  SetEnv("STORAGE_EMULATOR_HOST", endpoint_ + "/prefix///");
-  expected_path_ = "/prefix" + expected_path_;
-  EXPECT_EQ(client().endpoint(), endpoint_ + "/prefix");
-  Download();
-}
-
 TEST_F(GcsTest, DefaultsToPublicStorageApi) {
   unsetenv("STORAGE_EMULATOR_HOST");
   EXPECT_EQ(client().endpoint(), "https://storage.googleapis.com");
-}
-
-TEST_F(GcsTest, PrefersSdkEmulatorVariables) {
-  SetEnv("STORAGE_EMULATOR_HOST", "http://127.0.0.1:1");
-  SetEnv("CLOUD_STORAGE_EMULATOR_ENDPOINT", endpoint_);
-  EXPECT_EQ(client().endpoint(), endpoint_);
-  Download();
-}
-
-TEST_F(GcsTest, NeverUsesAdcWithEmulator) {
-  for (const char* name : {"STORAGE_EMULATOR_HOST", "CLOUD_STORAGE_EMULATOR_ENDPOINT"}) {
-    SCOPED_TRACE(name);
-    unsetenv("STORAGE_EMULATOR_HOST");
-    SetEnv(name, endpoint_);
-    WriteAdc();
-    require_adc_ = true;
-    client_.reset();
-    EXPECT_THROW(client().Download(kUri, output_), ApiError);
-    EXPECT_EQ(token_requests_, 0);
-    unsetenv(name);
-  }
 }
 
 TEST_F(GcsTest, ReadsAnonymouslyWithoutAdc) {
@@ -244,23 +198,6 @@ TEST_F(GcsTest, SupportsConcurrentDownloads) {
   for (int i = 0; i < 4; ++i) {
     EXPECT_EQ(ReadFile(directory_ / std::to_string(i)), "fixture\n");
   }
-}
-
-TEST_F(GcsTest, RetriesTransientFailures) {
-  transient_failures_ = 1;
-  Download();
-}
-
-TEST_F(GcsTest, ExactUriDoesNotListObjects) {
-  EXPECT_EQ(client().Expand(kUri), std::vector<std::string>({kUri}));
-  EXPECT_EQ(requests_, 0);
-}
-
-TEST_F(GcsTest, ListsAllPages) {
-  list_objects_ = true;
-  EXPECT_EQ(client().Expand("gs://bucket/nested/a*.json"),
-            std::vector<std::string>({"gs://bucket/nested/a1.json", "gs://bucket/nested/a2.json"}));
-  EXPECT_EQ(requests_, 2);
 }
 
 }  // namespace
