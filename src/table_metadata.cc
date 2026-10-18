@@ -407,7 +407,15 @@ TableMetadata TableMetadataFromJson(const json& table) {
   return metadata;
 }
 
+void RejectEncryptionConfiguration(const json& body, const char* key, const std::string& what) {
+  if (const json value = Member(body, key); !value.is_null() && value != json::object()) {
+    throw ApiError::Unsupported(what);
+  }
+}
+
 void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) {
+  RejectEncryptionConfiguration(body, "encryptionConfiguration",
+                                "table field encryptionConfiguration");
   TableMetadata partitioning;
   ParsePartitioning(body, partitioning);
   if (partitioning.partitioned() &&
