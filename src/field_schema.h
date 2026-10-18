@@ -48,6 +48,9 @@ struct FieldSchema {
   std::string name = {};
   FieldType type = FieldType::kString;
   FieldMode mode = FieldMode::kNullable;
+  // Whether the mode was given, as in tables.insert or a load job; tables.get omits a NULLABLE mode
+  // otherwise, as for a column of a DDL statement.
+  bool mode_given = false;
   std::vector<FieldSchema> fields = {};  // Populated for RECORD.
   // rangeElementType.type for RANGE: DATE, DATETIME or TIMESTAMP.
   std::optional<FieldType> range_element_type = {};
@@ -123,5 +126,12 @@ FieldSchema FieldSchemaFromJson(const nlohmann::json& value);
 // A TableSchema object: {"fields": [...]}.
 nlohmann::json SchemaToJson(const std::vector<FieldSchema>& schema);
 std::vector<FieldSchema> SchemaFromJson(const nlohmann::json& schema);
+
+// Marks the mode of each field of `schema`, at any depth, as given, as BigQuery reports it for a
+// query result.
+void SetModesGiven(std::vector<FieldSchema>& schema);
+
+// Whether `a` and `b` are the same schema, whether or not their modes were given.
+bool SameSchema(std::vector<FieldSchema> a, std::vector<FieldSchema> b);
 
 }  // namespace bigquery_emulator_duckdb

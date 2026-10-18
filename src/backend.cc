@@ -678,7 +678,11 @@ void RunSetup(duckdb_connection connection, const std::vector<std::string>& setu
 
 }  // namespace
 
-json QueryResult::SchemaToJson() const { return bigquery_emulator_duckdb::SchemaToJson(schema); }
+json QueryResult::SchemaToJson() const {
+  std::vector<FieldSchema> given = schema;
+  SetModesGiven(given);
+  return bigquery_emulator_duckdb::SchemaToJson(given);
+}
 
 bool HasTimestampField(const std::vector<FieldSchema>& schema) {
   return std::ranges::any_of(schema, [](const FieldSchema& field) {

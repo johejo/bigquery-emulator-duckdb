@@ -143,7 +143,10 @@ std::string_view FieldModeName(FieldMode mode) {
 }
 
 json FieldSchema::ToJson() const {
-  json field = {{"name", name}, {"type", FieldTypeName(type)}, {"mode", FieldModeName(mode)}};
+  json field = {{"name", name}, {"type", FieldTypeName(type)}};
+  if (mode_given || mode != FieldMode::kNullable) {
+    field["mode"] = FieldModeName(mode);
+  }
   if (range_element_type.has_value()) {
     field["rangeElementType"] = {{"type", FieldTypeName(*range_element_type)}};
   }
@@ -223,6 +226,7 @@ FieldSchema FieldSchemaFromJson(const json& value) {
       throw ApiError::Invalid("Invalid value for mode: " + mode + " is not a valid value");
     }
     field.mode = *parsed;
+    field.mode_given = true;
   }
   if (field.type == FieldType::kRange) {
     const auto it = value.find("rangeElementType");
@@ -353,6 +357,19 @@ json SchemaToJson(const std::vector<FieldSchema>& schema) {
     fields.push_back(field.ToJson());
   }
   return json{{"fields", std::move(fields)}};
+}
+
+void SetModesGiven(std::vector<FieldSchema>& schema) {
+  for (FieldSchema& field : schema) {
+    field.mode_given = true;
+    SetModesGiven(field.fields);
+  }
+}
+
+bool SameSchema(std::vector<FieldSchema> a, std::vector<FieldSchema> b) {
+  SetModesGiven(a);
+  SetModesGiven(b);
+  return SchemaToJson(a) == SchemaToJson(b);
 }
 
 std::vector<FieldSchema> SchemaFromJson(const json& schema) {

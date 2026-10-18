@@ -205,9 +205,15 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (requested_schema.empty()) {
       check_rounding(prepared.schema);
     }
-    const QueryResult result = WriteDestination(
-        job.project_id, load.destination_table, load.create_disposition, load.write_disposition,
-        sql, requested_schema.empty() ? prepared.schema : requested_schema, {}, true);
+    std::vector<FieldSchema> written =
+        requested_schema.empty() ? prepared.schema : requested_schema;
+    // A table a load creates reports the mode of each field, given or detected.
+    if (!existing.has_value()) {
+      SetModesGiven(written);
+    }
+    const QueryResult result =
+        WriteDestination(job.project_id, load.destination_table, load.create_disposition,
+                         load.write_disposition, sql, written, {}, true);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job.result = QueryResult{};
   });
@@ -254,7 +260,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       }
       if (sql.empty()) {
         schema = table.schema;
-      } else if (SchemaToJson(table.schema) != SchemaToJson(schema)) {
+      } else if (!SameSchema(table.schema, schema)) {
         throw ApiError::Invalid("Source tables have different schemas");
       }
       sql += (sql.empty() ? "" : " UNION ALL ") + std::string("SELECT * FROM ") +
@@ -418,8 +424,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   // Appended rows are written with DuckDB's casts, which round halfway values away from zero; only
   // a copy from a table of the same schema has nothing to round.
   if (existing.has_value() && write != WriteDisposition::kWriteTruncate &&
-      HasRoundHalfEven(existing->schema) &&
-      SchemaToJson(existing->schema) != SchemaToJson(schema)) {
+      HasRoundHalfEven(existing->schema) && !SameSchema(existing->schema, schema)) {
     throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
   }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.

@@ -58,11 +58,11 @@ steps:
       !("numRows" in current.res.body) &&
       current.res.body.schema.fields == [
         {"name": "user_id", "type": "INTEGER", "mode": "REQUIRED", "description": "key"},
-        {"name": "profile", "type": "RECORD", "mode": "NULLABLE", "description": "person",
-         "fields": [{"name": "address", "type": "RECORD", "mode": "NULLABLE",
-                     "fields": [{"name": "city", "type": "STRING", "mode": "NULLABLE"}]}]},
+        {"name": "profile", "type": "RECORD", "description": "person",
+         "fields": [{"name": "address", "type": "RECORD",
+                     "fields": [{"name": "city", "type": "STRING"}]}]},
         {"name": "items", "type": "RECORD", "mode": "REPEATED",
-         "fields": [{"name": "sku", "type": "STRING", "mode": "NULLABLE"}]}
+         "fields": [{"name": "sku", "type": "STRING"}]}
       ] && current.res.body.description == "metadata"
   duplicate_and_parent:
     req:
@@ -92,8 +92,8 @@ steps:
       current.res.status == 200 && len(current.res.body.schema.fields) == 1 &&
       current.res.body.schema.fields[0].fields[0].name == "name" &&
       current.res.body.schema.fields[0].fields[1].fields == [
-        {"name": "city", "type": "STRING", "mode": "NULLABLE"},
-        {"name": "zip", "type": "STRING", "mode": "NULLABLE"}
+        {"name": "city", "type": "STRING"},
+        {"name": "zip", "type": "STRING"}
       ]
   empty_selection:
     req:

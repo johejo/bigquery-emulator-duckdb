@@ -1,0 +1,334 @@
+desc: a table reports a NULLABLE mode only where it was given, relaxed, or written by a load that creates it or a query, and a query result always does
+runners:
+  req: ${BQ_EMULATOR_API}
+vars:
+  nullable: [{"name": "c", "type": "STRING", "mode": "NULLABLE"},
+             {"name": "s", "type": "RECORD", "mode": "NULLABLE",
+              "fields": [{"name": "x", "type": "INTEGER", "mode": "NULLABLE"}]}]
+  omitted: [{"name": "c", "type": "STRING"},
+            {"name": "s", "type": "RECORD", "fields": [{"name": "x", "type": "INTEGER"}]}]
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_field_mode}
+    test: current.res.status == 200
+  given:
+    req:
+      /projects/test/datasets/rest_field_mode/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: given}
+              schema:
+                fields:
+                  - {name: c, type: STRING, mode: NULLABLE}
+                  - name: s
+                    type: RECORD
+                    mode: NULLABLE
+                    fields: [{name: x, type: INTEGER, mode: NULLABLE}]
+    test: current.res.status == 200
+  get_given:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/given:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.nullable
+  not_given:
+    req:
+      /projects/test/datasets/rest_field_mode/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: not_given}
+              schema:
+                fields:
+                  - {name: c, type: STRING}
+                  - {name: s, type: RECORD, fields: [{name: x, type: INTEGER}]}
+    test: current.res.status == 200
+  get_not_given:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/not_given:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.omitted
+  patch:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/not_given:
+        patch:
+          body:
+            application/json:
+              schema:
+                fields:
+                  - {name: c, type: STRING}
+                  - {name: s, type: RECORD, fields: [{name: x, type: INTEGER}]}
+                  - {name: added, type: STRING}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields ==
+        [vars.omitted[0], vars.omitted[1], {"name": "added", "type": "STRING"}]
+  alter:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                ALTER TABLE rest_field_mode.not_given ADD COLUMN altered STRING;
+                ALTER TABLE rest_field_mode.not_given ALTER COLUMN c SET OPTIONS (description = 'd')
+              useLegacySql: false
+    test: current.res.status == 200
+  get_altered:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/not_given:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        {"name": "c", "type": "STRING", "description": "d"},
+        vars.omitted[1],
+        {"name": "added", "type": "STRING"},
+        {"name": "altered", "type": "STRING"}]
+  ddl:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE TABLE rest_field_mode.ddl (c STRING, s STRUCT<x INT64>, r STRING NOT NULL);
+                CREATE TABLE rest_field_mode.ctas AS SELECT 'v' AS c, STRUCT(1 AS x) AS s;
+                CREATE VIEW rest_field_mode.view AS SELECT c FROM rest_field_mode.not_given
+              useLegacySql: false
+    test: current.res.status == 200
+  get_ddl:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/ddl:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        vars.omitted[0], vars.omitted[1], {"name": "r", "type": "STRING", "mode": "REQUIRED"}]
+  get_ctas:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/ctas:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.omitted
+  get_view:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/view:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [{"name": "c", "type": "STRING"}]
+  query_result:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT 'v' AS c, STRUCT(1 AS x) AS s
+              useLegacySql: false
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.nullable
+  load:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                load:
+                  sourceUris: [gs://load-fixtures/nested/people.jsonl]
+                  sourceFormat: NEWLINE_DELIMITED_JSON
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: loaded}
+                  schema:
+                    fields:
+                      - {name: id, type: INTEGER}
+                      - {name: name, type: STRING}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_loaded:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/loaded:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        {"name": "id", "type": "INTEGER", "mode": "NULLABLE"},
+        {"name": "name", "type": "STRING", "mode": "NULLABLE"}]
+  # A load that detects the schema reports the mode as well.
+  load_detected:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                load:
+                  sourceUris: [gs://load-fixtures/nested/people.jsonl]
+                  sourceFormat: NEWLINE_DELIMITED_JSON
+                  autodetect: true
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: detected}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_detected:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/detected:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && len(current.res.body.schema.fields) > 0 &&
+      all(current.res.body.schema.fields, {.mode == "NULLABLE"})
+  # A load into an existing table, appending or replacing it, does not report the mode.
+  people:
+    req:
+      /projects/test/datasets/rest_field_mode/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: people}
+              schema:
+                fields: [{name: id, type: INTEGER}, {name: name, type: STRING}]
+    test: current.res.status == 200
+  load_append:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                load:
+                  sourceUris: [gs://load-fixtures/nested/people.jsonl]
+                  sourceFormat: NEWLINE_DELIMITED_JSON
+                  writeDisposition: WRITE_APPEND
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: people}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_appended:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/people:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        {"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]
+  load_truncate:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                load:
+                  sourceUris: [gs://load-fixtures/nested/people.jsonl]
+                  sourceFormat: NEWLINE_DELIMITED_JSON
+                  writeDisposition: WRITE_TRUNCATE
+                  schema:
+                    fields: [{name: id, type: INTEGER}, {name: name, type: STRING}]
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: people}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_truncated:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/people:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [
+        {"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]
+  # A field relaxed to NULLABLE by tables.patch reports the mode.
+  required:
+    req:
+      /projects/test/datasets/rest_field_mode/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: required}
+              schema: {fields: [{name: r, type: STRING, mode: REQUIRED}]}
+    test: current.res.status == 200
+  patch_relaxed:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/required:
+        patch:
+          body:
+            application/json:
+              schema: {fields: [{name: r, type: STRING, mode: NULLABLE}]}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields == [{"name": "r", "type": "STRING", "mode": "NULLABLE"}]
+  # A copy keeps the source's schema as reported.
+  copy:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {projectId: test, datasetId: rest_field_mode, tableId: not_given}
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: copied}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_copied:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/copied:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields[0:2] == [
+        {"name": "c", "type": "STRING", "description": "d"}, vars.omitted[1]]
+  # A query's destination table reports the mode, as its result does.
+  query_destination:
+    req:
+      /projects/test/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                query:
+                  query: SELECT 'v' AS c, STRUCT(1 AS x) AS s
+                  useLegacySql: false
+                  destinationTable: {projectId: test, datasetId: rest_field_mode, tableId: destination}
+    test: current.res.status == 200 && current.res.body.status.state == "DONE"
+  get_destination:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/destination:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.nullable
+  to_update:
+    req:
+      /projects/test/datasets/rest_field_mode/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: updated}
+              schema:
+                fields:
+                  - {name: c, type: STRING}
+                  - {name: s, type: RECORD, fields: [{name: x, type: INTEGER}]}
+    test: current.res.status == 200
+  update:
+    req:
+      /projects/test/datasets/rest_field_mode/tables/updated:
+        put:
+          body:
+            application/json:
+              tableReference: {projectId: test, datasetId: rest_field_mode, tableId: updated}
+              schema:
+                fields:
+                  - {name: c, type: STRING}
+                  - {name: s, type: RECORD, fields: [{name: x, type: INTEGER}]}
+    test: current.res.status == 200 && current.res.body.schema.fields == vars.omitted
+  cleanup:
+    req:
+      /projects/test/datasets/rest_field_mode?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204
