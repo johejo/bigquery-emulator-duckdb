@@ -590,7 +590,50 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
-      {"$ADD", {BigNumericOperator("bq_bignumeric_add", 2), {.arity = 2, .spelling = "($1 + $2)"}}},
+      // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
+      // the range; see src/backend_functions/interval.cc.
+      {
+          "$ADD",
+          {
+              BigNumericOperator("bq_bignumeric_add", 2),
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_intervals($1, $2)",
+                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_date_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_date_interval($2, $1)",
+                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_DATE})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_datetime_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATETIME})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_datetime_interval($2, $1)",
+                  .conditions = {Is(2, {TYPE_DATETIME})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIMESTAMP})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_add_timestamp_interval($2, $1)",
+                  .conditions = {Is(2, {TYPE_TIMESTAMP})},
+              },
+              {.arity = 2, .spelling = "($1 + $2)"},
+          },
+      },
       {
           "$SUBTRACT",
           {BigNumericOperator("bq_bignumeric_subtract", 2), {.arity = 2, .spelling = "($1 - $2)"}},

@@ -8,10 +8,14 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/time/time.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
+#include "googlesql/public/civil_time.h"
+#include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/datetime.pb.h"
 #include "googlesql/public/interval_value.h"
+#include "src/backend_functions/datetime.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
@@ -22,8 +26,8 @@ namespace {
 
 constexpr duckdb_type kInterval = DUCKDB_TYPE_INTERVAL;
 
-absl::StatusOr<googlesql::IntervalValue> ReadInterval(const Arguments& args) {
-  return IntervalFromDuckDb(VectorElement<duckdb_interval>(args.Vector(0), args.Row()));
+absl::StatusOr<googlesql::IntervalValue> ReadInterval(const Arguments& args, idx_t column = 0) {
+  return IntervalFromDuckDb(VectorElement<duckdb_interval>(args.Vector(column), args.Row()));
 }
 
 void MakeInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -67,6 +71,51 @@ void JustifyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_
     GOOGLESQL_ASSIGN_OR_RETURN(const auto value, ReadInterval(args));
     GOOGLESQL_ASSIGN_OR_RETURN(const auto result, Justify(value));
     return IntervalToDuckDb(result);
+  });
+}
+
+// The + operator over INTERVAL values. GoogleSQL adds the months, then the days, then the time,
+// and fails when a step leaves the range, so these add them through GoogleSQL rather than with
+// DuckDB's +, which checks only the result.
+void AddIntervals(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto left, ReadInterval(args));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto right, ReadInterval(args, 1));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result, left + right);
+    return IntervalToDuckDb(result);
+  });
+}
+
+// DATE + INTERVAL, which is a DATETIME.
+void AddDateInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    googlesql::DatetimeValue result;
+    GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddDate(args.Date(0), interval, &result));
+    return MicrosFromDatetime(result);
+  });
+}
+
+void AddDatetimeInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(args.Int(0)));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    googlesql::DatetimeValue result;
+    GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddDatetime(datetime, interval, &result));
+    return MicrosFromDatetime(result);
+  });
+}
+
+// GoogleSQL rejects intervals with months, and names the time zone only in its errors, where
+// BigQuery's default is UTC.
+void AddTimestampInterval(duckdb_function_info info, duckdb_data_chunk input,
+                          duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    absl::Time result;
+    GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddTimestamp(
+        absl::FromUnixMicros(args.Int(0)), absl::UTCTimeZone(), interval, &result));
+    return absl::ToUnixMicros(result);
   });
 }
 
@@ -177,6 +226,12 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            IntervalFromString);
   Register(connection, "bq_interval_from_csv", {kVarchar}, kInterval, IntervalFromCsv);
   Register(connection, "bq_interval_key", {kInterval}, kBigint, IntervalKey);
+  Register(connection, "bq_add_intervals", {kInterval, kInterval}, kInterval, AddIntervals);
+  Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime, AddDateInterval);
+  Register(connection, "bq_add_datetime_interval", {kDatetime, kInterval}, kDatetime,
+           AddDatetimeInterval);
+  Register(connection, "bq_add_timestamp_interval", {kTimestamp, kInterval}, kTimestamp,
+           AddTimestampInterval);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

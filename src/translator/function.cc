@@ -303,6 +303,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   // INTERVAL values are DuckDB intervals, which these build and read.
   static constexpr std::string_view interval_functions[] = {
+      "$ADD",
       "$INTERVAL",
       "$EXTRACT",
       "MAKE_INTERVAL",
