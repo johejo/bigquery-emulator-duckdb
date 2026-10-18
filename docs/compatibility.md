@@ -39,8 +39,9 @@ dataset with a default table expiration, by DDL, `tables.insert` or a job that c
 destination, expires that long after its creation time unless it sets an expiration of its own.
 Changing the default leaves existing tables as they are, and a job that replaces an existing table
 with `WRITE_TRUNCATE` does not apply it. Temporary tables of scripts do not take it either.
-`default_table_expiration_days` is rounded to milliseconds. `INFORMATION_SCHEMA.SCHEMATA` returns NULL creation times and
-NULL for options other than the location.
+`default_table_expiration_days` is rounded to milliseconds. `INFORMATION_SCHEMA.SCHEMATA` returns NULL last modified times
+and NULL for options other than the location. Datasets created before the emulator recorded
+creation times have none: `datasets.get` omits `creationTime`, and `SCHEMATA` returns NULL.
 
 ## Tables
 

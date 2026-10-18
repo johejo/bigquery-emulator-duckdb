@@ -26,6 +26,10 @@ struct DdlWrite {
 // dataset's schema.
 std::string DatasetMetadataTable(const std::string& project);
 
+// What CREATE SCHEMA and datasets.insert record for a new dataset: its metadata and the time it
+// was created.
+DdlWrite CreateDatasetWrite(const DatasetDefinition& definition);
+
 // The statements that record `metadata` for `dataset`, replacing what was recorded before.
 // Throws ApiError::Invalid for labels BigQuery rejects.
 std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,

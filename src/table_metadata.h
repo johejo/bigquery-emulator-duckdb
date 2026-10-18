@@ -78,10 +78,13 @@ struct DatasetMetadata {
   std::map<std::string, std::string> labels;
   std::optional<int64_t> default_table_expiration_ms;
   std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
+  // Output only and recorded with the dataset.
+  int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old datasets.
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
-           !default_table_expiration_ms.has_value() && default_rounding_mode.empty();
+           !default_table_expiration_ms.has_value() && default_rounding_mode.empty() &&
+           creation_time == 0;
   }
 
   // The fields of a Dataset resource that it sets.

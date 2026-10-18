@@ -74,7 +74,8 @@ class TableSource {
   }
 
   // The metadata of the dataset `project`.`dataset`, or nothing if there is no such dataset. For
-  // the default rounding mode that CREATE TABLE AS SELECT rounds with; none by default.
+  // the default rounding mode that CREATE TABLE AS SELECT rounds with and INFORMATION_SCHEMA;
+  // none by default.
   virtual std::optional<DatasetMetadata> DescribeDataset(const std::string& /*project*/,
                                                          const std::string& /*dataset*/) {
     return std::nullopt;
