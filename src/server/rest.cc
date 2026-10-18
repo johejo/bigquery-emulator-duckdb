@@ -200,6 +200,10 @@ class RestServer::Impl {
             }
             return ProjectList(emulator_.ListProjects(), page);
           }));
+    Route("bigquery.projects.getServiceAccount", {},
+          Json([this](const httplib::Request& request, httplib::Response&) {
+            return ServiceAccountResponse(emulator_.ListProjects(), Param(request, "projectId"));
+          }));
 
     // jobs
     Route("bigquery.jobs.query", {},

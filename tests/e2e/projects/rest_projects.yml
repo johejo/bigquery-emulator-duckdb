@@ -102,6 +102,34 @@ steps:
           body: null
     test: |
       current.res.status == 200 && current.res.body == steps.dataset.res.body
+  service_account:
+    req:
+      /projects/z-configured/serviceAccount:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.kind == "bigquery#getServiceAccountResponse" && current.res.body.email == "bq-123456789012@bigquery-encryption.iam.gserviceaccount.com"
+  service_account_by_number:
+    req:
+      /bigquery/v2/projects/123456789012/serviceAccount:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body == steps.service_account.res.body
+  service_account_without_number:
+    req:
+      /projects/p00/serviceAccount:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains "numericId"
+  service_account_missing:
+    req:
+      /projects/missing/serviceAccount:
+        get:
+          body: null
+    test: |
+      current.res.status == 404
   delete_dataset:
     req:
       /projects/123456789012/datasets/ds:

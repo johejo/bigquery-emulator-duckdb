@@ -41,6 +41,10 @@ nlohmann::json JobCancelResponse(const Job& job);
 nlohmann::json QueryResponse(const Job& job, const ResultPage& page);
 nlohmann::json GetQueryResultsResponse(const Job& job, const ResultPage& page);
 nlohmann::json ProjectList(const std::vector<Project>& projects, const ListPage& page);
+// The KMS service account of the project `project_id` names among `projects`, which BigQuery
+// names after the project number.
+nlohmann::json ServiceAccountResponse(const std::vector<Project>& projects,
+                                      std::string_view project_id);
 
 nlohmann::json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata);
 // `entries` and `tables` are sorted by id; the lists carry the page of them `page` asks for.

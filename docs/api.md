@@ -24,7 +24,7 @@ emulator rejected.
 | [datasets](#datasets) | 5 | 1 | 1 |
 | [jobs](#jobs) | 5 | 2 | 0 |
 | [models](#models) | 0 | 0 | 4 |
-| [projects](#projects) | 1 | 0 | 1 |
+| [projects](#projects) | 2 | 0 | 0 |
 | [routines](#routines) | 3 | 2 | 3 |
 | [rowAccessPolicies](#rowaccesspolicies) | 0 | 0 | 8 |
 | [tabledata](#tabledata) | 1 | 1 | 0 |
@@ -67,7 +67,7 @@ emulator rejected.
 
 | Method | HTTP request | Status | Notes |
 | --- | --- | --- | --- |
-| [`projects.getServiceAccount`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/getServiceAccount) | `GET projects/{projectsId}/serviceAccount` | Unsupported |  |
+| [`projects.getServiceAccount`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/getServiceAccount) | `GET projects/{projectsId}/serviceAccount` | Supported | Names the account after the configured project number; see [Projects](../README.md#projects). |
 | [`projects.list`](https://cloud.google.com/bigquery/docs/reference/rest/v2/projects/list) | `GET projects` | Supported | Lists explicitly registered projects without checking authentication or IAM. Defaults to 50 entries per page. Project numbers and friendly names are returned when configured. |
 
 ## routines
