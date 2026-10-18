@@ -1,0 +1,137 @@
+desc: tables.insert accepts the schema field forms BigQuery accepts and rejects the others as it does
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_table_schema}
+    test: current.res.status == 200
+  # Type names are matched in any case and written with their legacy names, and int64 fields such
+  # as maxLength take a JSON number but are written as strings.
+  type_names:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: type_names}
+              schema:
+                fields:
+                  - name: s
+                    type: struct
+                    fields:
+                      - {name: a, type: int64}
+                      - {name: b, type: Bool}
+                  - {name: c, type: STRING, maxLength: 5}
+    test: |
+      current.res.status == 200 &&
+      current.res.body.schema.fields[0].type == "RECORD" &&
+      current.res.body.schema.fields[0].fields[0].type == "INTEGER" &&
+      current.res.body.schema.fields[0].fields[1].type == "BOOLEAN" &&
+      current.res.body.schema.fields[1].maxLength == "5"
+  missing_type:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: missing_type}
+              schema: {fields: [{name: c}]}
+    test: current.res.status == 400 && current.res.body.error.message == "Field c missing type"
+  optional_mode:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: optional_mode}
+              schema: {fields: [{name: c, type: STRING, mode: OPTIONAL}]}
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.message == "Invalid value for mode: OPTIONAL is not a valid value"
+  missing_name:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: missing_name}
+              schema: {fields: [{type: STRING}]}
+    test: current.res.status == 400
+  unknown_type:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: unknown_type}
+              schema: {fields: [{name: c, type: NOPE}]}
+    test: current.res.status == 400
+  invalid_max_length:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: invalid_max_length}
+              schema: {fields: [{name: c, type: STRING, maxLength: x}]}
+    test: current.res.status == 400
+  # A RANGE has an element type of DATE, DATETIME or TIMESTAMP:
+  # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#range_type
+  range_without_element_type:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: range_without_element_type}
+              schema: {fields: [{name: r, type: RANGE}]}
+    test: current.res.status == 400
+  range_of_time:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: range_of_time}
+              schema: {fields: [{name: r, type: RANGE, rangeElementType: {type: TIME}}]}
+    test: current.res.status == 400
+  # Known bugs: each step asserts that the emulator does not give BigQuery's answer yet, so a fix
+  # fails it; then assert the answer instead.
+  # BigQuery keeps a rangeElementType on a field that is not a RANGE.
+  known_bug_element_type_of_date:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: element_type_of_date}
+              schema: {fields: [{name: d, type: DATE, rangeElementType: {type: DATE}}]}
+    test: |
+      !(current.res.status == 200 &&
+        current.res.body.schema.fields[0].rangeElementType?.type == "DATE")
+  # BigQuery rejects policy tags of a taxonomy that does not exist.
+  known_bug_missing_policy_tag:
+    req:
+      /projects/test/datasets/rest_table_schema/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: missing_policy_tag}
+              schema:
+                fields:
+                  - name: c
+                    type: STRING
+                    policyTags: {names: [projects/p/locations/us/taxonomies/1/policyTags/2]}
+    test: |
+      current.res.body.error?.message != "Not found: Project p"
+  cleanup:
+    req:
+      /projects/test/datasets/rest_table_schema?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204
