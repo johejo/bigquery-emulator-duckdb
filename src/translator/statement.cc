@@ -62,6 +62,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedCreateProcedureStmt>()) {
+    return CreateProcedure(*statement.GetAs<googlesql::ResolvedCreateProcedureStmt>(), scope);
+  }
   if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
     return CreateFunction(*statement.GetAs<googlesql::ResolvedCreateFunctionStmt>(), scope);
   }
@@ -146,6 +149,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+  }
+  if (statement.Is<googlesql::ResolvedCreateProcedureStmt>()) {
+    return "CREATE_PROCEDURE";
   }
   if (statement.Is<googlesql::ResolvedCreateFunctionStmt>()) {
     return "CREATE_FUNCTION";

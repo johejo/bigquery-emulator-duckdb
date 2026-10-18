@@ -27,11 +27,11 @@ namespace {
 std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& path,
                                               const Scope& scope) {
   if (SplitTablePath(path).size() < 2) {
-    return Unsupported(scope, "persistent function name " + Join(path, ".") + " without a dataset");
+    return Unsupported(scope, "persistent routine name " + Join(path, ".") + " without a dataset");
   }
   const auto parts = NormalizeTablePath(path, scope.context.defaults.project, "");
   if (parts.empty()) {
-    return Unsupported(scope, "function name " + Join(path, "."));
+    return Unsupported(scope, "routine name " + Join(path, "."));
   }
   scope.context.ddl_target_routine = RoutineReference{
       .project_id = parts.at(0),
@@ -152,6 +152,88 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
       create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
   return std::string(replace ? "CREATE OR REPLACE MACRO " : "CREATE MACRO ") +
          QualifiedName(*target) + "() AS NULL";
+}
+
+// Strict mode needs catalog-dependent validation of every statement without executing it.
+// Until that exists, require callers to explicitly request syntax-only validation.
+std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProcedureStmt& create,
+                                           const Scope& scope) {
+  if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
+      !create.language().empty() || create.connection_list() != nullptr ||
+      create.external_security() != googlesql::ResolvedCreateStatement::SQL_SECURITY_UNSPECIFIED) {
+    return Unsupported(scope, "non-SQL or temporary procedures and procedure security");
+  }
+  const auto target = TargetRoutine(create.name_path(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  const std::string now = std::to_string(absl::ToUnixMillis(absl::Now()));
+  nlohmann::json resource{
+      {"routineType", "PROCEDURE"},
+      {"language", "SQL"},
+      {"arguments", nlohmann::json::array()},
+      {"definitionBody", create.procedure_body()},
+      {"creationTime", now},
+      {"lastModifiedTime", now},
+  };
+  bool syntax_only = false;
+  for (const auto& option : create.option_list()) {
+    const auto value = OptionValue(*option, "procedure", scope);
+    if (!value) {
+      return std::nullopt;
+    }
+    const std::string name = ToLowerAscii(option->name());
+    std::string description;
+    if (name == "strict_mode" && value->type()->IsBool() && !value->is_null()) {
+      syntax_only = !value->bool_value();
+      resource["strictMode"] = value->bool_value();
+    } else if (name == "description" && StringOption(*value, description)) {
+      if (!value->is_null()) {
+        resource["description"] = description;
+      }
+    } else {
+      return Unsupported(scope, "CREATE PROCEDURE option " + option->name());
+    }
+  }
+  if (!syntax_only) {
+    return Unsupported(scope, "procedures without OPTIONS(strict_mode = FALSE)");
+  }
+  for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
+    const auto& argument = create.signature().argument(static_cast<int>(i));
+    if ((argument.options().procedure_argument_mode() != googlesql::FunctionEnums::IN &&
+         argument.options().procedure_argument_mode() != googlesql::FunctionEnums::NOT_SET) ||
+        argument.type() == nullptr) {
+      return Unsupported(scope, "procedure arguments other than fixed-type IN arguments");
+    }
+    auto type = StandardSqlDataType(argument.type());
+    if (!type) {
+      return Unsupported(scope, "procedure argument type " + argument.type()->DebugString());
+    }
+    resource["arguments"].push_back({
+        {"name", create.argument_name_list(static_cast<int>(i))},
+        {"mode", "IN"},
+        {"dataType", *std::move(type)},
+    });
+  }
+  scope.context.routine = RoutineDefinition{
+      .routine = {.reference = *target, .resource = std::move(resource)},
+      .if_not_exists =
+          create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS,
+  };
+  return std::string(create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE
+                         ? "CREATE OR REPLACE MACRO "
+                         : "CREATE MACRO ") +
+         QualifiedName(*target) + "() AS NULL";
+}
+
+std::optional<std::string> DropProcedure(const googlesql::ResolvedDropStmt& drop,
+                                         const Scope& scope) {
+  const auto target = TargetRoutine(drop.name_path(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  return std::string(drop.is_if_exists() ? "DROP MACRO IF EXISTS " : "DROP MACRO ") +
+         QualifiedName(*target);
 }
 
 std::optional<std::string> DropFunction(const googlesql::ResolvedDropFunctionStmt& drop,

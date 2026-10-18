@@ -82,7 +82,7 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
   }
   std::optional<Routine> routine = source().FindRoutine(
       {.project_id = key.at(0), .dataset_id = key.at(1), .routine_id = key.at(2)});
-  if (!routine.has_value()) {
+  if (!routine.has_value() || routine->resource.at("routineType") != "SCALAR_FUNCTION") {
     return builtin;
   }
   GOOGLESQL_ASSIGN_OR_RETURN(std::unique_ptr<googlesql::Function> resolved, Resolve(*routine));
@@ -92,6 +92,11 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
 }
 
 absl::Status RoutineCatalog::CheckRoutine(const Routine& routine) {
+  if (routine.resource.at("routineType") == "PROCEDURE") {
+    // CREATE PROCEDURE resolves the signature and checks the body's syntax. Strict mode,
+    // which would also resolve its statements, is rejected by the translator.
+    return absl::OkStatus();
+  }
   return Resolve(routine).status();
 }
 

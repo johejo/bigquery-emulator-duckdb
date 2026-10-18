@@ -649,6 +649,7 @@ cc_library(
         ":duckdb_sql",
         ":field_schema",
         ":javascript_function",
+        ":routine",
         ":routine_catalog",
         ":system_variables",
         ":translated_statement",

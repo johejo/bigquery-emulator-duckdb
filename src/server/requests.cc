@@ -613,13 +613,26 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
       continue;
     }
     if (name != "routineType" && name != "language" && name != "arguments" &&
-        name != "returnType" && name != "definitionBody" && name != "description") {
+        name != "returnType" && name != "definitionBody" && name != "description" &&
+        name != "strictMode") {
       throw ApiError::Unsupported("routine field " + name);
     }
     resource[name] = value;
   }
-  if (StringField(resource, "routineType", "routine type") != "SCALAR_FUNCTION") {
-    throw ApiError::Unsupported("routines other than SQL scalar functions");
+  const bool procedure = StringField(resource, "routineType", "routine type") == "PROCEDURE";
+  if (!procedure && StringField(resource, "routineType", "routine type") != "SCALAR_FUNCTION") {
+    throw ApiError::Unsupported("routines other than SQL scalar functions and procedures");
+  }
+  if (procedure) {
+    if (!resource.contains("strictMode") || !resource["strictMode"].is_boolean() ||
+        resource["strictMode"].get<bool>()) {
+      throw ApiError::Unsupported("procedures without strictMode = false");
+    }
+    if (resource.contains("returnType")) {
+      throw ApiError::Invalid("Procedures cannot have returnType");
+    }
+  } else if (resource.contains("strictMode")) {
+    throw ApiError::Unsupported("strictMode on scalar functions");
   }
   if (resource.contains("language") &&
       StringField(resource, "language", "routine language") != "SQL") {
@@ -643,11 +656,19 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
       throw ApiError::Invalid("Invalid routine argument");
     }
     for (const auto& [name, value] : argument.items()) {
-      if (name != "name" && name != "argumentKind" && name != "dataType") {
+      if (name != "name" && name != "argumentKind" && name != "dataType" &&
+          !(procedure && name == "mode")) {
         throw ApiError::Unsupported("routine argument field " + name);
       }
     }
+    if (procedure && argument.contains("mode") &&
+        StringField(argument, "mode", "argument mode") != "IN") {
+      throw ApiError::Unsupported("procedure arguments other than IN arguments");
+    }
     const std::string kind = StringField(argument, "argumentKind", "argument kind");
+    if (procedure && kind == "ANY_TYPE") {
+      throw ApiError::Unsupported("procedure arguments of ANY TYPE");
+    }
     if (!kind.empty() && kind != "FIXED_TYPE" && kind != "ANY_TYPE") {
       throw ApiError::Unsupported("routine argument kind " + kind);
     }

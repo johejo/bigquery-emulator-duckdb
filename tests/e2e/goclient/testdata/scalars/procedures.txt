@@ -1,0 +1,127 @@
+# CREATE PROCEDURE's IN arguments and variable scope:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+# strict_mode=FALSE checks syntax only; IN arguments are local variables.
+CREATE OR REPLACE PROCEDURE scalars.proc_in(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = x + 1; SELECT x; END;
+CALL scalars.proc_in(41)
+=> "42"
+
+DECLARE x INT64 DEFAULT 7;
+CREATE OR REPLACE PROCEDURE scalars.proc_local(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = 99; END;
+CALL scalars.proc_local(x);
+SELECT x
+=> "7"
+
+# A typed NULL stays NULL on entry.
+CREATE OR REPLACE PROCEDURE scalars.proc_null(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x IS NULL; END;
+CALL scalars.proc_null(NULL)
+=> "true"
+
+# Temporary tables created by a procedure live for the script, including its caller.
+CREATE OR REPLACE PROCEDURE scalars.proc_temp(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP TABLE proc_rows AS SELECT x AS n; END;
+CALL scalars.proc_temp(8);
+SELECT n FROM proc_rows
+=> "8"
+
+# RETURN exits only the procedure. IN arguments accept expressions.
+CREATE OR REPLACE PROCEDURE scalars.proc_return(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN RETURN; SELECT x; END;
+CALL scalars.proc_return(1 + 2);
+SELECT 5
+=> "5"
+
+# Syntax-only validation permits references resolved when the procedure is called.
+CREATE OR REPLACE PROCEDURE scalars.proc_late() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT n FROM _SESSION.proc_late_rows; END;
+CREATE TEMP TABLE proc_late_rows AS SELECT 9 AS n;
+CALL scalars.proc_late()
+=> "9"
+
+# Procedure variables cannot read the caller's variables.
+DECLARE caller_only INT64 DEFAULT 3;
+CREATE OR REPLACE PROCEDURE scalars.proc_no_capture() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT caller_only; END;
+CALL scalars.proc_no_capture()
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.proc_bad_arity(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x; END;
+CALL scalars.proc_bad_arity()
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.proc_bad_type(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x; END;
+CALL scalars.proc_bad_type(STRUCT(1 AS a))
+=> error:
+
+# GoogleSQL's procedure parser checks declarations even with strict mode disabled.
+CREATE OR REPLACE PROCEDURE scalars.proc_bad_syntax() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT 1; DECLARE x INT64; END;
+SELECT 1
+=> error:
+
+# The default project inside a procedure is its owner's project, including domain-scoped IDs.
+CREATE SCHEMA IF NOT EXISTS `example.com:proj`.proc_owner;
+CREATE OR REPLACE TABLE `example.com:proj`.proc_owner.t AS SELECT 11 AS n;
+CREATE OR REPLACE PROCEDURE `example.com:proj`.proc_owner.read_table() OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP TABLE proc_owner_rows AS SELECT n FROM proc_owner.t; END;
+CALL `example.com:proj`.proc_owner.read_table();
+DROP SCHEMA `example.com:proj`.proc_owner CASCADE;
+SELECT n FROM _SESSION.proc_owner_rows
+=> "11"
+
+# CALL can nest, with each frame keeping its own arguments.
+CREATE OR REPLACE PROCEDURE scalars.proc_inner(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x + 1; END;
+CREATE OR REPLACE PROCEDURE scalars.proc_outer(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN CALL scalars.proc_inner(x + 1); END;
+CALL scalars.proc_outer(40)
+=> "42"
+
+# A procedure sees a caller-created temporary table, and its writes stay in the same script.
+CREATE OR REPLACE PROCEDURE scalars.proc_write(x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN INSERT _SESSION.proc_write_rows VALUES (x); END;
+CREATE TEMP TABLE proc_write_rows (n INT64);
+CALL scalars.proc_write(4);
+SELECT SUM(n) FROM proc_write_rows
+=> "4"
+
+# IN arguments support the documented ARRAY and STRUCT types, including NULL elements.
+CREATE OR REPLACE PROCEDURE scalars.proc_struct(x STRUCT<values ARRAY<INT64>>)
+OPTIONS(strict_mode=FALSE) BEGIN SELECT x.values[OFFSET(1)] IS NULL; END;
+CALL scalars.proc_struct(STRUCT([1, NULL] AS values))
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_empty_array(x ARRAY<INT64>)
+OPTIONS(strict_mode=FALSE) BEGIN SELECT ARRAY_LENGTH(x); END;
+CALL scalars.proc_empty_array([])
+=> "0"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_null_array(x ARRAY<INT64>)
+OPTIONS(strict_mode=FALSE) BEGIN SELECT x IS NULL; END;
+CALL scalars.proc_null_array(CAST(NULL AS ARRAY<INT64>))
+=> "true"
+
+# Answers collected from BigQuery with bqanswers: a procedure does not inherit the default
+# dataset for table resolution, even though it can read the caller's @@dataset_id value.
+CREATE OR REPLACE PROCEDURE scalars.proc_default_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT MAX(a) FROM t; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_default_dataset()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
+CREATE OR REPLACE PROCEDURE scalars.proc_system_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@dataset_id; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_system_dataset()
+=> "scalars"
+
+# Answers collected from BigQuery with bqanswers: caller temporary SQL UDFs are visible.
+CREATE TEMP FUNCTION caller_function(x INT64) AS (x + 1);
+CREATE OR REPLACE PROCEDURE scalars.proc_caller_function() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT caller_function(1); END;
+CALL scalars.proc_caller_function()
+=> "2"

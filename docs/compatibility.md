@@ -291,14 +291,34 @@ dataset. Both initially return `NULL` without a request default dataset. These s
 to the current script. With a request default dataset, reading either variable before assigning
 it is unsupported until its initial value is verified against BigQuery.
 As in BigQuery, function and view definitions cannot reference system variables.
-`CALL` and assignments to other system variables are unsupported, and an `EXCEPTION` clause never
-handles an error that the emulator reports as unsupported.
+Assignments to other system variables are unsupported. An `EXCEPTION` clause never handles an
+error that the emulator reports as unsupported.
 
 Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION` within a
 multi-statement query. Unfinished transactions roll back when the script ends. Transaction modes,
 SQL UDF declarations inside transactions, writes to multiple projects (or both permanent and
 temporary tables), and committing after a handled error are unsupported; roll back a failed
 transaction.
+
+## Stored procedures
+
+SQL procedures support `CREATE PROCEDURE`, `CREATE OR REPLACE PROCEDURE`, `CREATE PROCEDURE IF NOT
+EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN` arguments. Definitions must explicitly
+set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the Routine API): only syntax is
+checked at creation, and statements resolve when called. Strict mode's default validation,
+`OUT` and `INOUT` arguments, non-SQL procedures, and options other than `strict_mode` and
+`description` are unsupported. Procedure names in DDL must include their dataset.
+
+The Routine API stores and returns the same definitions as DDL, including descriptions and
+argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
+project. Permanent tables must include their datasets: the caller's default dataset does not
+apply inside a procedure. The caller's `@@dataset_id` value can still be read from the body.
+Temporary tables and temporary UDFs are shared with the calling script. Local variables and
+`IN` argument assignments stay within the procedure, and caller variables are not visible in
+the body. Query parameters, function declarations, system-variable assignments, reads of system
+variables other than `@@dataset_id`, and dynamic SQL inside procedures are unsupported.
+`EXECUTE IMMEDIATE` cannot execute a `CALL`.
+CALL queries do not support dry runs, destination tables or positional query parameters.
 
 ## Approximate aggregates
 

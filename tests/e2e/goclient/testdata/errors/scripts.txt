@@ -8,7 +8,7 @@ BEGIN EXECUTE IMMEDIATE 'BEGIN TRANSACTION'; EXCEPTION WHEN ERROR THEN SELECT 1;
 => error contains: The emulator does not support
 
 CALL d.p(); SELECT 1
-=> error contains: The emulator does not support
+=> error:
 
 BEGIN TRANSACTION; CREATE TEMP FUNCTION f(x INT64) AS (x); ROLLBACK TRANSACTION
 => error contains: The emulator does not support

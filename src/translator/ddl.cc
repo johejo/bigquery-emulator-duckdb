@@ -12,6 +12,9 @@ namespace bigquery_emulator_duckdb::translator {
 
 std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope) {
   const std::string object_type = ToUpperAscii(drop.object_type());
+  if (object_type == "PROCEDURE") {
+    return DropProcedure(drop, scope);
+  }
   const bool is_schema = object_type == "SCHEMA";
   if (object_type != "TABLE" && object_type != "VIEW" && !is_schema) {
     return Unsupported(scope, "DROP " + object_type);

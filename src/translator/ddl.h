@@ -10,6 +10,7 @@ class ResolvedAlterSchemaStmt;
 class ResolvedAlterTableSetOptionsStmt;
 class ResolvedAlterTableStmt;
 class ResolvedCreateFunctionStmt;
+class ResolvedCreateProcedureStmt;
 class ResolvedCreateSchemaStmt;
 class ResolvedCreateTableAsSelectStmt;
 class ResolvedCreateTableStmt;
@@ -40,6 +41,10 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
 // A persistent SQL UDF, which the emulator records on a DuckDB macro of its dataset; see Routine.
 std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctionStmt& create,
                                           const Scope& scope);
+std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProcedureStmt& create,
+                                           const Scope& scope);
+std::optional<std::string> DropProcedure(const googlesql::ResolvedDropStmt& drop,
+                                         const Scope& scope);
 std::optional<std::string> DropFunction(const googlesql::ResolvedDropFunctionStmt& drop,
                                         const Scope& scope);
 

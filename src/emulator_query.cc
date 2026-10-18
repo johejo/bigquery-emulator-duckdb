@@ -164,7 +164,8 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
   // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
   const auto& statements = output->script()->statement_list();
   if (statements.size() == 1 && statements.at(0)->IsSqlStatement() &&
-      statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT) {
+      statements.at(0)->node_kind() != googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT &&
+      statements.at(0)->node_kind() != googlesql::AST_CALL_STATEMENT) {
     const auto* create = statements.at(0)->GetAsOrNull<googlesql::ASTCreateFunctionStatement>();
     if (create == nullptr || !create->is_temp()) {
       return nullptr;
@@ -176,6 +177,9 @@ std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
 // TEMP declarations followed by one SELECT are a SELECT job; other statement lists are SCRIPT.
 std::string ScriptStatementType(const googlesql::ParserOutput& script) {
   const auto& statements = script.script()->statement_list();
+  if (statements.size() == 1 && statements.at(0)->node_kind() == googlesql::AST_CALL_STATEMENT) {
+    return "CALL";
+  }
   if (statements.size() == 1 &&
       statements.at(0)->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
     return "CREATE_FUNCTION";
@@ -447,6 +451,15 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    Backend* session) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
+  if (translation.ddl_target_routine) {
+    const auto source = NewTableSource(&backend, false);
+    const auto previous = source->FindRoutine(*translation.ddl_target_routine);
+    const bool procedure = translation.statement_type == "CREATE_PROCEDURE" ||
+                           translation.statement_type == "DROP_PROCEDURE";
+    if (previous && (previous->resource.at("routineType") == "PROCEDURE") != procedure) {
+      throw ApiError::Unsupported("replacing or dropping a routine of a different type");
+    }
+  }
   std::optional<std::vector<FieldSchema>> schema;
   if (translation.result_schema.has_value()) {
     schema = UniqueResultNames(*translation.result_schema);
