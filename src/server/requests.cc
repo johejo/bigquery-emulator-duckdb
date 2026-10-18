@@ -95,6 +95,8 @@ QueryRequest ParseQueryConfiguration(const std::string& project_id, const json& 
   if (config.contains("useLegacySql") && config["useLegacySql"] == true) {
     throw ApiError::Unsupported("legacy SQL; set useLegacySql to false");
   }
+  RejectEncryptionConfiguration(config, "destinationEncryptionConfiguration",
+                                "destinationEncryptionConfiguration");
   QueryRequest request;
   request.project_id = project_id;
   request.query = config["query"].get<std::string>();
@@ -181,6 +183,8 @@ LoadRequest ParseLoadJob(const std::string& project_id, const json& body) {
       ParseTableReference(load["destinationTable"], "destination table");
   ParseDispositions(load, request.load);
   RejectDestinationLayout(load);
+  RejectEncryptionConfiguration(load, "destinationEncryptionConfiguration",
+                                "destinationEncryptionConfiguration");
   // A new table's description, friendly name and labels, which must match an existing table's.
   if (load.contains("destinationTableProperties") &&
       !load["destinationTableProperties"].is_null()) {
@@ -222,6 +226,8 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
     }
   }
   ParseDispositions(copy, request.copy);
+  RejectEncryptionConfiguration(copy, "destinationEncryptionConfiguration",
+                                "destinationEncryptionConfiguration");
   // An RFC 3339 timestamp, as Timestamp is in JSON.
   if (const json expiration = copy.value("destinationExpirationTime", json());
       !expiration.is_null()) {

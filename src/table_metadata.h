@@ -129,6 +129,11 @@ std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expir
 // ASCII are allowed.
 void ValidateLabels(const std::map<std::string, std::string>& labels);
 
+// Throws ApiError::Unsupported with `what` when `body` sets the EncryptionConfiguration `key`,
+// since the emulator does not encrypt tables with Cloud KMS keys. Null or {} leaves it unset.
+void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
+                                   const std::string& what);
+
 // Throws ApiError::Invalid for partitioning or clustering that `schema` cannot have: a field it
 // lacks, or of a type, mode or depth BigQuery rejects, more than 4 clustering fields, or a range
 // that is empty or has more than 10,000 partitions.
