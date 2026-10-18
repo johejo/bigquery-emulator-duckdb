@@ -225,7 +225,9 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     if (format == "NEWLINE_DELIMITED_JSON") {
       paths = StageJsonNumerics(paths, requested_schema, downloads);
     } else if (format == "PARQUET") {
-      ParquetSources sources = StageParquetDecimals(paths, downloads);
+      const json options = config.value("parquetOptions", json::object());
+      ParquetSources sources =
+          StageParquetDecimals(paths, downloads, options.value("enableListInference", false));
       paths = std::move(sources.paths);
       parquet = std::move(sources.columns);
       if (requested_schema.empty() && parquet.HasWideDecimal()) {

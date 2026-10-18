@@ -11,6 +11,7 @@
 #include <iterator>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -352,11 +353,16 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
               parquet::kRepeated) {
         column.kind = ParquetColumn::Kind::kMap;
       } else {
-        // A repeated group of one field is that field's list, unless its name marks it as an
-        // element struct of one field.
+        // DuckDB reads a repeated group of one field as that field's list, even where the
+        // format's rules, and BigQuery, take the group's name to mark it as an element struct of
+        // one field.
         ParquetColumn item = child.children.front();
-        if (item.kind == ParquetColumn::Kind::kStruct && item.children.size() == 1 &&
-            child.name != "array" && child.name != column.name + "_tuple") {
+        if (item.kind == ParquetColumn::Kind::kStruct && item.children.size() == 1) {
+          if (child.name == "array" || child.name == column.name + "_tuple") {
+            throw ApiError::Unsupported(
+                "loading Parquet lists whose repeated group named array or <list>_tuple is a "
+                "STRUCT of one field");
+          }
           item = item.children.front();
         }
         column.kind = ParquetColumn::Kind::kList;
@@ -471,6 +477,16 @@ void RewriteParquetMetadata(const std::string& path, const ThriftValue& metadata
     }
   }
   std::filesystem::resize_file(path, start + footer.size());
+}
+
+bool HasListGroup(const ThriftValue& metadata) {
+  const ThriftValue* schema = metadata.Field(parquet::kSchema);
+  return schema != nullptr &&
+         std::ranges::any_of(
+             schema->elements | std::views::drop(1), [](const ThriftValue& element) {
+               return IntField(element, parquet::kElementChildren).value_or(0) > 0 &&
+                      Annotated(element, parquet::kLogicalList, {parquet::kConvertedList});
+             });
 }
 
 ParquetColumn ParquetColumns(const ThriftValue& metadata) {

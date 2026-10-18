@@ -145,7 +145,11 @@ struct ParquetColumn {
   [[nodiscard]] const ParquetColumn* Child(std::string_view field) const;
 };
 
-// The columns of `metadata`, a FileMetaData, as the fields of a STRUCT.
+// The columns of `metadata`, a FileMetaData, as the fields of a STRUCT. Throws
+// ApiError::Unsupported for a LIST that DuckDB reads otherwise than the format's rules.
 ParquetColumn ParquetColumns(const ThriftValue& metadata);
+
+// Whether a group of the schema of `metadata`, a FileMetaData, is annotated as a LIST.
+bool HasListGroup(const ThriftValue& metadata);
 
 }  // namespace bigquery_emulator_duckdb
