@@ -308,6 +308,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "FORMAT",
       "JSON_ARRAY_APPEND",
       "JSON_ARRAY_INSERT",
+      "TO_JSON",
+      "TO_JSON_STRING",
       "GENERATE_RANGE_ARRAY",
   };
   // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.

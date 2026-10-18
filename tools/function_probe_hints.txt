@@ -68,7 +68,7 @@ optional STRING | 'UTC'
 # types rather than declaring the arbitrary signature supported from INT64 alone, with valid paths
 # or a format specifier.
 values any | 2 | 2.0 | NUMERIC '2' | BIGNUMERIC '2' | TRUE | 'abc' | b'abc' | DATE '2024-01-15' | TIME '10:20:30' | DATETIME '2024-01-15 10:20:30' | TIMESTAMP '2024-01-15 10:20:30+00' | INTERVAL 1 SECOND | JSON '[1]' | [1, NULL] | STRUCT(BIGNUMERIC '2' AS b) | STRUCT() | RANGE<DATE> '[2024-01-01, 2024-02-01)'
-elements ^(FORMAT|JSON_ARRAY_APPEND|JSON_ARRAY_INSERT)\( | any
+elements ^(FORMAT|JSON_ARRAY_APPEND|JSON_ARRAY_INSERT|TO_JSON|TO_JSON_STRING)\( | any
 argument ^FORMAT\( | STRING | '%t'
 argument ^JSON_ARRAY_APPEND\( | STRING | '$'
 argument ^JSON_ARRAY_INSERT\( | STRING | '$[0]'

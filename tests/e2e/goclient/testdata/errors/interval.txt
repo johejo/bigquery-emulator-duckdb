@@ -10,8 +10,8 @@ SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVA
 SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
 => error contains: The emulator does not support CAST from STRUCT<i INTERVAL> to JSON
 
-SELECT TO_JSON_STRING([MAKE_INTERVAL(day => 7)])
-=> error contains: The emulator does not support function TO_JSON_STRING with INTERVAL
+SELECT JSON_OBJECT('i', MAKE_INTERVAL(day => 7))
+=> error contains: The emulator does not support function JSON_OBJECT with INTERVAL
 
 SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function $EXTRACT

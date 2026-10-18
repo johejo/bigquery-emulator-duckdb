@@ -1,0 +1,47 @@
+## TO_JSON and TO_JSON_STRING with INTERVAL values
+# Expected values: BigQuery's JSON encodings table, which encodes an INTERVAL as an ISO 8601
+# duration string; GoogleSQL compliance functions_testlib_tojson.cc
+# (AddIntervalValueTestCases), which agrees with it, for mixed signs and fractional seconds.
+# NULL values and containers follow the table's NULL, ARRAY and STRUCT rows.
+
+SELECT TO_JSON_STRING(INTERVAL '10:20:30.52' HOUR TO SECOND)
+=> "\"PT10H20M30.52S\""
+
+SELECT TO_JSON_STRING(INTERVAL 1 SECOND)
+=> "\"PT1S\""
+
+SELECT TO_JSON_STRING(INTERVAL -25 MONTH)
+=> "\"P-2Y-1M\""
+
+SELECT TO_JSON_STRING(INTERVAL '1 5:30' DAY TO MINUTE)
+=> "\"P1DT5H30M\""
+
+SELECT TO_JSON_STRING(INTERVAL '1-2 -3 4:5:6' YEAR TO SECOND)
+=> "\"P1Y2M-3DT4H5M6S\""
+
+SELECT TO_JSON_STRING(INTERVAL '-12:34:56.789' HOUR TO SECOND)
+=> "\"PT-12H-34M-56.789S\""
+
+SELECT TO_JSON_STRING(INTERVAL '-0-1 0 -0:2:0' YEAR TO SECOND)
+=> "\"P-1MT-2M\""
+
+SELECT TO_JSON_STRING(INTERVAL 0 YEAR)
+=> "\"P0Y\""
+
+SELECT TO_JSON_STRING(CAST(NULL AS INTERVAL))
+=> "null"
+
+SELECT TO_JSON_STRING([INTERVAL 1 SECOND, NULL])
+=> "[\"PT1S\",null]"
+
+SELECT TO_JSON_STRING(STRUCT(INTERVAL 1 SECOND AS i), true)
+=> "{\n  \"i\": \"PT1S\"\n}"
+
+SELECT TO_JSON_STRING(TO_JSON(INTERVAL -25 MONTH))
+=> "\"P-2Y-1M\""
+
+SELECT JSON_TYPE(TO_JSON(STRUCT([INTERVAL 1 SECOND] AS a)).a[0])
+=> "string"
+
+SELECT TO_JSON_STRING(TO_JSON(INTERVAL 1 SECOND, stringify_wide_numbers => TRUE))
+=> "\"PT1S\""
