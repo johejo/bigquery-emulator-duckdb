@@ -20,7 +20,7 @@ std::optional<std::string> TargetTable(const std::vector<std::string>& path, con
                                        bool create) {
   const DefaultDataset& defaults = scope.context.defaults;
   const auto parts = ResolveTablePath(path, defaults.project, defaults.dataset,
-                                      create ? nullptr : defaults.temporary);
+                                      create ? nullptr : defaults.temporary, defaults.source);
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
@@ -34,8 +34,9 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   // the same way for CREATE/DROP SCHEMA and table references.
   std::vector<std::string> table_path = path;
   table_path.emplace_back("_dataset_path_placeholder");
-  const auto parts = NormalizeTablePath(table_path, scope.context.defaults.project,
-                                        scope.context.defaults.dataset);
+  const auto parts =
+      NormalizeTablePath(table_path, scope.context.defaults.project, scope.context.defaults.dataset,
+                         scope.context.defaults.source);
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }

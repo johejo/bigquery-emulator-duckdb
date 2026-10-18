@@ -29,7 +29,8 @@ std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& pa
   if (SplitTablePath(path).size() < 2) {
     return Unsupported(scope, "persistent routine name " + Join(path, ".") + " without a dataset");
   }
-  const auto parts = NormalizeTablePath(path, scope.context.defaults.project, "");
+  const auto parts =
+      NormalizeTablePath(path, scope.context.defaults.project, "", scope.context.defaults.source);
   if (parts.empty()) {
     return Unsupported(scope, "routine name " + Join(path, "."));
   }

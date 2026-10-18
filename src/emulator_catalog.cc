@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -284,8 +285,14 @@ std::optional<std::string> ConnectionLocation(const std::string& key) {
 // connection it finds counts as one the job uses, in `location` when it is set.
 class DuckDbTableSource : public TableSource {
  public:
-  DuckDbTableSource(Backend& backend, ExternalConnections& connections, JobLocation* location)
-      : backend_(backend), connections_(connections), location_(location) {}
+  // `project_ids` maps each project's ID and number to its ID, as Emulator::ResolveProject does.
+  DuckDbTableSource(Backend& backend, ExternalConnections& connections,
+                    const std::unordered_map<std::string, std::string>& project_ids,
+                    JobLocation* location)
+      : backend_(backend),
+        connections_(connections),
+        project_ids_(project_ids),
+        location_(location) {}
 
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
@@ -352,6 +359,11 @@ class DuckDbTableSource : public TableSource {
                 .Execute("SELECT 1 FROM duckdb_databases() WHERE database_name = " +
                          QuoteLiteral(project))
                 .rows.empty();
+  }
+
+  [[nodiscard]] std::string ProjectId(const std::string& project) const override {
+    const auto found = project_ids_.find(project);
+    return found == project_ids_.end() ? project : found->second;
   }
 
   std::optional<std::string> DatasetLocation(const std::string& project,
@@ -458,6 +470,7 @@ class DuckDbTableSource : public TableSource {
 
   Backend& backend_;
   ExternalConnections& connections_;
+  const std::unordered_map<std::string, std::string>& project_ids_;
   JobLocation* location_;
   // DatasetLocation's answers, by project:dataset.
   std::map<std::string, std::string> locations_;
@@ -585,7 +598,7 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
-  return std::make_unique<DuckDbTableSource>(backend, connections_, location);
+  return std::make_unique<DuckDbTableSource>(backend, connections_, project_ids_, location);
 }
 
 std::vector<std::string> Emulator::ListDatasets(std::string project_id) {

@@ -459,8 +459,9 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     if (qualifier.size() == 2 && (IsRegion(qualifier.at(0)) || !IsRegion(qualifier.at(1)))) {
       return not_found();
     }
-    const std::string project =
-        qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
+    const std::string project = qualifier.empty() || IsRegion(qualifier.at(0))
+                                    ? default_project
+                                    : source.ProjectId(qualifier.at(0));
     if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
       return *std::move(invalid);
     }
@@ -505,7 +506,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
         if (IsRegion(qualifier.at(0))) {
           return not_found();
         }
-        project = qualifier.at(0);
+        project = source.ProjectId(qualifier.at(0));
         if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
           return *std::move(invalid);
         }

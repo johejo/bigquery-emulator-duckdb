@@ -1,0 +1,25 @@
+# A project's number as a SQL qualifier, as BigQuery answers: it names the project as its ID
+# does, and INFORMATION_SCHEMA names the project by its ID, test. The test project's number is
+# 123456789012.
+# https://cloud.google.com/bigquery/docs/resource-hierarchy#projects
+
+SELECT COUNT(*) FROM `123456789012.scalars.t`
+=> "4"
+
+SELECT COUNT(*) FROM `123456789012`.scalars.t
+=> "4"
+
+SELECT COUNT(*) FROM `123456789012`.`region-us`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = "scalars"
+=> "1"
+
+SELECT LOGICAL_AND(catalog_name = "test") FROM `123456789012`.`region-us`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = "scalars"
+=> "true"
+
+SELECT COUNT(*) FROM `123456789012`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = "scalars"
+=> "1"
+
+SELECT COUNT(*) FROM `123456789012`.scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = "t"
+=> "1"
+
+SELECT LOGICAL_AND(table_catalog = "test") FROM `123456789012`.scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = "t"
+=> "true"
