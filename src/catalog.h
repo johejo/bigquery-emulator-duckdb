@@ -84,6 +84,10 @@ class TableSource {
   // The datasets of `project`, sorted by name, for INFORMATION_SCHEMA. None by default.
   virtual std::vector<std::string> ListDatasets(const std::string& /*project*/) { return {}; }
 
+  // Whether the emulator holds the project `project`, for INFORMATION_SCHEMA. Every project by
+  // default.
+  virtual bool HasProject(const std::string& /*project*/) { return true; }
+
   // The location of the dataset `project`.`dataset`, or nothing if there is no such dataset, for
   // INFORMATION_SCHEMA. Unlike the lookups above, it does not count as the job using the dataset.
   // Nothing by default.

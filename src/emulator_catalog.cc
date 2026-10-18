@@ -347,6 +347,13 @@ class DuckDbTableSource : public TableSource {
     return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
   }
 
+  bool HasProject(const std::string& project) override {
+    return !backend_
+                .Execute("SELECT 1 FROM duckdb_databases() WHERE database_name = " +
+                         QuoteLiteral(project))
+                .rows.empty();
+  }
+
   std::optional<std::string> DatasetLocation(const std::string& project,
                                              const std::string& dataset) override {
     if (IsDuckDbSchema(dataset)) {

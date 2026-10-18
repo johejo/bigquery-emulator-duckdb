@@ -28,3 +28,8 @@ ALTER SCHEMA scalars SET OPTIONS (location = 'US')
 
 ALTER SCHEMA scalars SET OPTIONS (location = 'EU')
 => error contains: Unknown option: location
+
+# BigQuery reads a region qualifier whose prefix is not in lower case as a project ID, which it
+# rejects.
+SELECT COUNT(*) FROM `REGION-EU`.INFORMATION_SCHEMA.SCHEMATA
+=> error contains: Invalid project ID 'REGION-EU'. Project IDs must contain 6-63 lowercase letters, digits, or dashes.

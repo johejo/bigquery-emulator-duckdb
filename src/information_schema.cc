@@ -161,6 +161,31 @@ bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
   return ToUpperAscii(a) == ToUpperAscii(b);
 }
 
+// Whether `project` is spelled as BigQuery requires of a project ID: 6 to 63 lowercase letters,
+// digits or dashes, starting with a letter and not ending with a dash, after an optional domain.
+bool ValidProjectId(const std::string& project) {
+  const size_t colon = project.rfind(':');
+  const std::string id = colon == std::string::npos ? project : project.substr(colon + 1);
+  const auto allowed = [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+  };
+  return id.size() >= 6 && id.size() <= 63 && id.front() >= 'a' && id.front() <= 'z' &&
+         id.back() != '-' && std::ranges::all_of(id, allowed);
+}
+
+// The error BigQuery gives for a project qualifier that is no project ID, such as `REGION-EU`.
+// The emulator's own projects, which need not be spelled so, are left alone.
+std::optional<absl::Status> InvalidProject(TableSource& source, const std::string& project) {
+  if (ValidProjectId(project) || source.HasProject(project)) {
+    return std::nullopt;
+  }
+  return absl::InvalidArgumentError(
+      "Invalid project ID '" + project +
+      "'. Project IDs must contain 6-63 lowercase letters, digits, or dashes. Some project IDs "
+      "also include domain name separated by a colon. IDs must start with a letter and may not "
+      "end with a dash.");
+}
+
 // BigQuery reads `REGION-EU` as a project, not a region.
 bool IsRegion(const std::string& part) { return part.starts_with(kRegionPrefix); }
 
@@ -436,6 +461,9 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     }
     const std::string project =
         qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
+    if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
+      return *std::move(invalid);
+    }
     columns = SchemataColumns();
     absl::StatusOr<std::vector<std::string>> datasets = DatasetsIn(source, project, qualifier);
     if (!datasets.ok()) {
@@ -478,6 +506,9 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
           return not_found();
         }
         project = qualifier.at(0);
+        if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
+          return *std::move(invalid);
+        }
       }
       if (!IsRegion(qualifier.back())) {
         dataset = qualifier.back();
