@@ -634,9 +634,53 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               {.arity = 2, .spelling = "($1 + $2)"},
           },
       },
+      // - subtracts an INTERVAL as + adds its negation.
       {
           "$SUBTRACT",
-          {BigNumericOperator("bq_bignumeric_subtract", 2), {.arity = 2, .spelling = "($1 - $2)"}},
+          {
+              BigNumericOperator("bq_bignumeric_subtract", 2),
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_intervals($1, $2)",
+                  .conditions = {Is(1, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_date_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_dates($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_DATE})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_datetime_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATETIME}), Is(2, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_datetimes($1, $2)",
+                  .conditions = {Is(1, {TYPE_DATETIME})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_timestamp_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIMESTAMP}), Is(2, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_timestamps($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIMESTAMP})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "bq_subtract_times($1, $2)",
+                  .conditions = {Is(1, {TYPE_TIME})},
+              },
+              {.arity = 2, .spelling = "($1 - $2)"},
+          },
       },
       // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20
       // integer digits, and divides them as DOUBLE values; GoogleSQL computes the NUMERIC result,

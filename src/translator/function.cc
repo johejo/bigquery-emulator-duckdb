@@ -303,20 +303,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   // INTERVAL values are DuckDB intervals, which these build and read.
   static constexpr std::string_view interval_functions[] = {
-      "$ADD",
-      "$INTERVAL",
-      "$EXTRACT",
-      "MAKE_INTERVAL",
-      "JUSTIFY_HOURS",
-      "JUSTIFY_DAYS",
-      "JUSTIFY_INTERVAL",
-      "ERROR",
-      "FORMAT",
-      "JSON_ARRAY_APPEND",
-      "JSON_ARRAY_INSERT",
-      "TO_JSON",
-      "TO_JSON_STRING",
-      "GENERATE_RANGE_ARRAY",
+      "$ADD",         "$SUBTRACT",         "$INTERVAL",
+      "$EXTRACT",     "MAKE_INTERVAL",     "JUSTIFY_HOURS",
+      "JUSTIFY_DAYS", "JUSTIFY_INTERVAL",  "ERROR",
+      "FORMAT",       "JSON_ARRAY_APPEND", "JSON_ARRAY_INSERT",
+      "TO_JSON",      "TO_JSON_STRING",    "GENERATE_RANGE_ARRAY",
   };
   // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.
   if ((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
