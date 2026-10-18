@@ -1,0 +1,40 @@
+## Unary - with an INTERVAL operand
+# Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
+# compliance/functions_testlib_interval.cc (interval unary minus).
+
+SELECT -INTERVAL 0 DAY
+=> "0-0 0 0:0:0"
+
+SELECT -INTERVAL -987654 MICROSECOND
+=> "0-0 0 0:0:0.987654"
+
+SELECT -INTERVAL 1000 SECOND
+=> "0-0 0 -0:16:40"
+
+SELECT -INTERVAL 12345 HOUR
+=> "0-0 0 -12345:0:0"
+
+SELECT -INTERVAL -321 DAY
+=> "0-0 321 0:0:0"
+
+SELECT -INTERVAL 2 MONTH
+=> "-0-2 0 0:0:0"
+
+# Each component's range is symmetric, so negation never overflows.
+SELECT -INTERVAL -10000 YEAR
+=> "10000-0 0 0:0:0"
+
+SELECT -INTERVAL 87840000 HOUR
+=> "0-0 0 -87840000:0:0"
+
+SELECT -INTERVAL '0-0 0 100:200:300' YEAR TO SECOND
+=> "0-0 0 -103:25:0"
+
+SELECT -MAKE_INTERVAL(-123, 456, -789)
+=> "85-0 789 0:0:0"
+
+SELECT -MAKE_INTERVAL(1, -2, 3, -4, 5, -6)
+=> "-0-10 -3 3:55:6"
+
+SELECT -CAST(NULL AS INTERVAL)
+=> null
