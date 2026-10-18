@@ -5,12 +5,14 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 )
 
 // Datasets keep the description, friendly name and labels that datasets.insert, CREATE SCHEMA
-// OPTIONS and datasets.patch give them, and forget them when they are dropped.
+// OPTIONS and datasets.patch give them, and forget them when they are dropped. Each has the
+// creation time it was created with, which INFORMATION_SCHEMA.SCHEMATA reports too.
 func TestDatasetMetadata(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -29,6 +31,7 @@ func TestDatasetMetadata(t *testing.T) {
 		Description, Name string
 		Labels            map[string]string
 	}
+	created := map[string]time.Time{}
 	check := func(dataset *bigquery.Dataset, want metadata) {
 		t.Helper()
 		got, err := dataset.Metadata(ctx)
@@ -37,6 +40,23 @@ func TestDatasetMetadata(t *testing.T) {
 		}
 		if g := (metadata{got.Description, got.Name, got.Labels}); !reflect.DeepEqual(g, want) {
 			t.Fatalf("%s: got %+v, want %+v", dataset.DatasetID, g, want)
+		}
+		if first, ok := created[dataset.DatasetID]; got.CreationTime.IsZero() || ok && !got.CreationTime.Equal(first) {
+			t.Fatalf("%s: creation time = %v, want %v", dataset.DatasetID, got.CreationTime, first)
+		}
+		created[dataset.DatasetID] = got.CreationTime
+		query := client.Query("SELECT creation_time FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = @name")
+		query.Parameters = []bigquery.QueryParameter{{Name: "name", Value: dataset.DatasetID}}
+		rows, err := query.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var row []bigquery.Value
+		if err := rows.Next(&row); err != nil {
+			t.Fatal(err)
+		}
+		if schemata := timeValue(row[0]); !schemata.Equal(got.CreationTime) {
+			t.Fatalf("%s: SCHEMATA creation_time = %v, want %v", dataset.DatasetID, schemata, got.CreationTime)
 		}
 	}
 
@@ -95,6 +115,7 @@ func TestDatasetMetadata(t *testing.T) {
 	if err := run("CREATE SCHEMA go_dataset_metadata_ddl"); err != nil {
 		t.Fatal(err)
 	}
+	delete(created, ddl.DatasetID)
 	check(ddl, metadata{})
 	// DROP SCHEMA refuses a dataset that holds tables unless it says CASCADE.
 	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#drop_schema_statement

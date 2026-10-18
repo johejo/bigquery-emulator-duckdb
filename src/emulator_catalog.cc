@@ -117,7 +117,12 @@ DatasetMetadata ParseDatasetMetadata(const json& recorded) {
   if (!recorded.is_string()) {
     return {};
   }
-  return DatasetMetadataFromJson(json::parse(recorded.get<std::string>()));
+  const json object = json::parse(recorded.get<std::string>());
+  DatasetMetadata metadata = DatasetMetadataFromJson(object);
+  if (object.contains("creationTime") && object["creationTime"].is_string()) {
+    metadata.creation_time = std::stoll(object["creationTime"].get<std::string>());
+  }
+  return metadata;
 }
 
 // The tables and views of `dataset` by name.
@@ -482,7 +487,8 @@ DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
 
 void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {
   dataset.project_id = ResolveProject(dataset.project_id);
-  const std::vector<std::string> statements = DatasetMetadataStatements(dataset, metadata);
+  const std::vector<std::string> statements =
+      CreateDatasetWrite({.dataset = dataset, .metadata = metadata}).metadata_statements;
   try {
     backend_.ExecuteDdl("CREATE SCHEMA " + QualifiedName(dataset), statements, "");
   } catch (const BackendError& error) {

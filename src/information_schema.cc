@@ -51,7 +51,8 @@ Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 constexpr const char* kEmptyArray = "[]";
 
-// The time a table or view was created, or NULL for one created before the emulator recorded it.
+// The time a dataset, table or view was created, or NULL for one created before the emulator
+// recorded it.
 Cell CreationTime(int64_t millis) {
   if (millis == 0) {
     return kNull;
@@ -421,13 +422,16 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
         qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
     columns = SchemataColumns();
     for (const std::string& dataset : DatasetsIn(source, project, qualifier)) {
-      // The row layout reads directly as the information schema's column order.
-      // cppcheck-suppress useStlAlgorithm
+      const std::optional<DatasetMetadata> metadata = source.DescribeDataset(project, dataset);
+      if (!metadata.has_value()) {
+        // Dropped since it was listed.
+        continue;
+      }
       rows.push_back({
           String(project),
           String(dataset),
           kNull,
-          kNull,
+          CreationTime(metadata->creation_time),
           kNull,
           String("US"),
           String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,

@@ -42,16 +42,6 @@ std::string DatasetExists(const DatasetReference& dataset) {
       QuoteLiteral(dataset.project_id), QuoteLiteral(dataset.dataset_id));
 }
 
-DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
-  DdlWrite write{
-      .metadata_statements = DatasetMetadataStatements(definition.dataset, definition.metadata),
-  };
-  if (definition.if_not_exists) {
-    write.skip_query = "SELECT 1 WHERE " + DatasetExists(definition.dataset);
-  }
-  return write;
-}
-
 // The options `updates` sets on the table's or dataset's `metadata`.
 template <typename Metadata>
 void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
@@ -89,6 +79,18 @@ bool HasDefaultTypeConstraints(const FieldSchema& field) {
 }
 
 }  // namespace
+
+DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
+  DatasetMetadata metadata = definition.metadata;
+  metadata.creation_time = NowMillis();
+  DdlWrite write{
+      .metadata_statements = DatasetMetadataStatements(definition.dataset, metadata),
+  };
+  if (definition.if_not_exists) {
+    write.skip_query = "SELECT 1 WHERE " + DatasetExists(definition.dataset);
+  }
+  return write;
+}
 
 std::string DatasetMetadataTable(const std::string& project) {
   return QuoteIdentifier(project) + ".main.emulator_datasets";
