@@ -1,5 +1,0 @@
-# GoogleSQL adds the months, then the days, and fails on 10000-01-15 although the result is in
-# range.
-SELECT DATETIME '9999-12-15 00:00:00' + INTERVAL '0-1 -30 0:0:0' YEAR TO SECOND
-?>
-

@@ -1,7 +1,7 @@
 ## + with INTERVAL operands
 # Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
 # compliance/functions_testlib_interval.cc (interval, datetime and timestamp additions, NULLs and
-# overflow).
+# overflow); BigQuery answers.
 
 SELECT CAST(DATE '2021-04-20' + INTERVAL 25 HOUR AS STRING)
 => "2021-04-21 01:00:00"
@@ -32,6 +32,11 @@ SELECT DATETIME '9999-12-01 00:00:00' + INTERVAL 1 MONTH
 
 SELECT DATETIME '0001-12-31 00:00:00' + INTERVAL -1 YEAR
 => error:
+
+# The months, then the days, are added in turn, and the first step fails although the result is
+# in range. Source: BigQuery answers.
+SELECT DATETIME '9999-12-15 00:00:00' + INTERVAL '0-1 -30 0:0:0' YEAR TO SECOND
+=> error: Adding 1 MONTH to datetime 9999-12-15 00:00:00 causes overflow
 
 SELECT DATETIME '2000-01-01 00:00:00' + CAST(NULL AS INTERVAL)
 => null
