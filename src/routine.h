@@ -9,8 +9,8 @@
 
 namespace bigquery_emulator_duckdb {
 
-// A persistent SQL UDF, as the fields of BigQuery's Routine resource describe it: routineType,
-// language, arguments, returnType (absent when the function infers it at each call),
+// A persistent SQL UDF or procedure, as the fields of BigQuery's Routine resource describe it:
+// routineType, language, arguments, returnType (absent when the function infers it at each call),
 // definitionBody, description, creationTime and lastModifiedTime. The emulator records `resource`
 // as JSON in the comment of a DuckDB macro named after the routine in its dataset's schema, so
 // that the routine lives and dies with the dataset; the macro itself is never called. Each query
@@ -33,7 +33,7 @@ std::string RoutinesQuery(const DatasetReference& dataset);
 // The comment of the routine `routine`, a single row if it exists.
 std::string RoutineQuery(const RoutineReference& routine);
 
-// The CREATE FUNCTION statement that defines `routine`, which the emulator analyzes to call it.
+// The CREATE FUNCTION or CREATE PROCEDURE statement that defines `routine`.
 // Throws ApiError::Invalid for a resource it cannot spell, such as an unknown type.
 std::string RoutineStatement(const Routine& routine);
 

@@ -1,0 +1,47 @@
+# Explicitly unsupported procedure forms must fail without side effects.
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_strict() BEGIN SELECT 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_strict_true() OPTIONS(strict_mode=TRUE) BEGIN SELECT 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_out(OUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_inout(INOUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x = x + 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_system() OPTIONS(strict_mode=FALSE) BEGIN SET @@dataset_id = 'other'; END;
+BEGIN CALL errors_procedures.proc_system(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_function() OPTIONS(strict_mode=FALSE) BEGIN CREATE TEMP FUNCTION f() AS (1); END;
+BEGIN CALL errors_procedures.proc_function(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_dynamic() OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT 1'; END;
+BEGIN CALL errors_procedures.proc_dynamic(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
+# Unbound named parameters can be rejected before CALL is reached.
+# https://cloud.google.com/bigquery/docs/parameterized-queries
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_parameters() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @caller_parameter; END;
+BEGIN CALL errors_procedures.proc_parameters(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS errors_procedures;
+CREATE TEMP FUNCTION caller_function(x INT64) AS (x + 1);
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_caller_function() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT caller_function(1); END;
+BEGIN CALL errors_procedures.proc_caller_function(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support

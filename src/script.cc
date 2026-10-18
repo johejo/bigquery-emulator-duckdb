@@ -60,6 +60,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/query_parameters.h"
+#include "src/routine.h"
 #include "src/routine_catalog.h"
 #include "src/system_variables.h"
 #include "src/translated_statement.h"
@@ -170,22 +171,15 @@ absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
 
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
-  switch (node.node_kind()) {
-    case googlesql::AST_CALL_STATEMENT:
-      return "CALL";
-    case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT: {
-      const auto path = node.GetAsOrDie<googlesql::ASTSystemVariableAssignment>()
-                            ->system_variable()
-                            ->path()
-                            ->ToIdentifierVector();
-      if (path.size() != 1 || (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
-                               !absl::EqualsIgnoreCase(path.front(), "dataset_project_id"))) {
-        return "assignment to system variables other than @@dataset_id and @@dataset_project_id";
-      }
-      break;
+  if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT) {
+    const auto path = node.GetAsOrDie<googlesql::ASTSystemVariableAssignment>()
+                          ->system_variable()
+                          ->path()
+                          ->ToIdentifierVector();
+    if (path.size() != 1 || (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
+                             !absl::EqualsIgnoreCase(path.front(), "dataset_project_id"))) {
+      return "assignment to system variables other than @@dataset_id and @@dataset_project_id";
     }
-    default:
-      break;
   }
   for (int i = 0; i < node.num_children(); ++i) {
     if (auto unsupported = UnsupportedStatement(*node.child(i))) {
@@ -362,6 +356,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // there, which OnProcedureEntered then rejects before the statement runs.
   bool IsAllowedAsDynamicSql(const googlesql::ASTStatement* statement) override {
     unsupported_dynamic_sql_.reset();
+    loaded_procedure_status_ = absl::OkStatus();
     switch (statement->node_kind()) {
       case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
       case googlesql::AST_CALL_STATEMENT:
@@ -387,16 +382,34 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return true;
   }
 
-  // Called as EXECUTE IMMEDIATE enters its statement, which is the only procedure the emulator
-  // runs. An unsupported construct fails the script, which the script cannot handle.
+  absl::StatusOr<std::unique_ptr<googlesql::ProcedureDefinition>> LoadProcedure(
+      const googlesql::ScriptExecutor& executor, const absl::Span<const std::string>& path,
+      const int64_t /*num_arguments*/) override {
+    loaded_procedure_status_ = absl::OkStatus();
+    const auto settings = Settings(executor);
+    const auto parts = NormalizeTablePath(SplitTablePath(path), settings.default_project,
+                                          settings.default_dataset);
+    if (parts.size() != 3) {
+      return absl::NotFoundError("Procedure name must include a dataset");
+    }
+    const auto source = host_.NewTableSource(backend_.get(), false);
+    const auto routine = source->FindRoutine(
+        {.project_id = parts.at(0), .dataset_id = parts.at(1), .routine_id = parts.at(2)});
+    if (!routine || routine->resource.at("routineType") != "PROCEDURE") {
+      return absl::NotFoundError("Procedure is not found");
+    }
+    return LoadProcedureDefinition(*routine, *source);
+  }
+
+  // These callbacks run before the new frame is pushed. Defer the body check from
+  // LoadProcedure until entry, where unsupported errors propagate without becoming catchable.
   absl::Status OnProcedureEntered(const googlesql::ScriptExecutor& /*executor*/,
                                   const absl::Span<const std::string>& /*path*/) override {
-    const std::optional<std::string> unsupported =
-        std::exchange(unsupported_dynamic_sql_, std::nullopt);
-    if (unsupported.has_value()) {
+    const auto unsupported = std::exchange(unsupported_dynamic_sql_, std::nullopt);
+    if (unsupported) {
       return Unsupported(*unsupported);
     }
-    return absl::OkStatus();
+    return std::exchange(loaded_procedure_status_, absl::OkStatus());
   }
 
   absl::StatusOr<int64_t> GetIteratorMemoryUsage(
@@ -419,6 +432,50 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
  private:
   static absl::Status Unsupported(std::string_view what) {
     return absl::UnimplementedError(absl::StrCat(kUnsupported, what));
+  }
+
+  absl::StatusOr<std::unique_ptr<googlesql::ProcedureDefinition>> LoadProcedureDefinition(
+      const Routine& routine, TableSource& source) {
+    try {
+      RoutineCatalog catalog(source, &type_factory_, routine.reference.project_id, "");
+      const auto analyzed = AnalyzeGoogleSql(RoutineStatement(routine), catalog, type_factory_,
+                                             {.default_project = routine.reference.project_id});
+      const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
+      std::unique_ptr<googlesql::ParserOutput> parsed;
+      GOOGLESQL_RETURN_IF_ERROR(googlesql::ParseScript(
+          create.procedure_body(), googlesql::ParserOptions(GoogleSqlLanguageOptions()),
+          {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &parsed));
+      loaded_procedure_status_ = CheckProcedureBody(*parsed->script());
+      return std::make_unique<googlesql::ProcedureDefinition>(
+          routine.reference.project_id + "." + routine.reference.dataset_id + "." +
+              routine.reference.routine_id,
+          create.signature(), create.argument_name_list(), create.procedure_body());
+    } catch (const std::exception& error) {
+      return absl::InvalidArgumentError(error.what());
+    }
+  }
+
+  absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
+    // These need separate procedure scopes and verified system-variable behavior.
+    if (node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
+        node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR ||
+        node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT ||
+        node.node_kind() == googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT ||
+        node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
+      return Unsupported(
+          "function declarations, system variables, dynamic SQL and query parameters inside "
+          "procedures");
+    }
+    if (const auto* call = node.GetAsOrNull<googlesql::ASTFunctionCall>()) {
+      const googlesql::Function* function = nullptr;
+      if (functions_.FindFunction(call->function()->ToIdentifierVector(), &function).ok()) {
+        return Unsupported("references to caller temporary UDFs inside procedures");
+      }
+    }
+    for (int i = 0; i < node.num_children(); ++i) {
+      GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i)));
+    }
+    return absl::OkStatus();
   }
 
   // Runs `body`, turning what it throws into a status. A failure the script may handle gets a
@@ -461,6 +518,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const auto& dataset = system_variables_.at({"dataset_id"});
     settings.default_project = project.is_null() ? query_project_ : project.string_value();
     settings.default_dataset = dataset.is_null() ? "" : dataset.string_value();
+    if (const auto name = executor.GetCurrentProcedureName(); !name.empty()) {
+      settings.default_project = SplitTablePath({std::string(name)}).front();
+      settings.default_dataset.clear();
+      settings.named_parameters.clear();
+    }
     return settings;
   }
 
@@ -509,8 +571,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
           googlesql::SimpleConstant::Create({name.ToString()}, value, &constant));
       catalog.variables->AddOwnedConstant(std::move(constant));
     }
-    GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
-        "script", {catalog.variables.get(), &functions_, catalog.tables.get()}, &catalog.catalog));
+    std::vector<googlesql::Catalog*> catalogs{catalog.variables.get()};
+    if (executor.GetCurrentProcedureName().empty()) {
+      catalogs.push_back(&functions_);
+    }
+    catalogs.push_back(catalog.tables.get());
+    GOOGLESQL_RETURN_IF_ERROR(
+        googlesql::MultiCatalog::Create("script", catalogs, &catalog.catalog));
     return catalog;
   }
 
@@ -608,7 +675,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     settings = Settings(executor);
     const googlesql::StackFrame* frame = executor.GetCurrentStackFrame();
     if (frame == nullptr || !frame->is_dynamic_sql()) {
-      return parameters_;
+      return executor.GetCurrentProcedureName().empty() ? parameters_ : QueryParameters();
     }
     settings.named_parameters.clear();
     const auto& values = executor.GetCurrentParameterValues();
@@ -795,6 +862,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   std::optional<ApiError> error_;
   // What the emulator does not support in the statement that EXECUTE IMMEDIATE is about to run.
   std::optional<std::string> unsupported_dynamic_sql_;
+  // Checked while loading, propagated on entry before any procedure statement executes.
+  absl::Status loaded_procedure_status_;
 };
 
 }  // namespace

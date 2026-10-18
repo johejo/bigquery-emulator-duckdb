@@ -1,0 +1,130 @@
+desc: SQL procedure strictMode and argument modes survive API creation, updates and DDL
+# Fields follow https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
+# The Go client does not expose strictMode, so check it through the HTTP runner.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/rest-routines/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: procedures}
+    test: current.res.status == 200
+  create:
+    req:
+      /projects/rest-routines/datasets/procedures/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: false
+              description: initial
+              arguments: [{name: x, mode: IN, dataType: {typeKind: INT64}}]
+              definitionBody: 'BEGIN SELECT x; END'
+    test: |
+      current.res.status == 200 && current.res.body.strictMode == false &&
+      current.res.body.arguments[0].mode == "IN"
+  call:
+    req:
+      /projects/rest-routines/queries:
+        post:
+          body:
+            application/json:
+              useLegacySql: false
+              query: 'CALL procedures.p(3)'
+    test: current.res.status == 200 && !("errors" in current.res.body)
+  update:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: false
+              definitionBody: 'BEGIN SELECT 2; END'
+    test: |
+      current.res.status == 200 && current.res.body.strictMode == false &&
+      !("description" in current.res.body) && len(current.res.body.arguments) == 0 &&
+      current.res.body.creationTime == steps.create.res.body.creationTime
+  change_type:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: SCALAR_FUNCTION
+              definitionBody: '1'
+    test: current.res.status == 400
+  strict_true:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: true
+              definitionBody: 'BEGIN SELECT 1; END'
+    test: current.res.status == 400
+  out_argument:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: false
+              arguments: [{name: x, mode: OUT, dataType: {typeKind: INT64}}]
+              definitionBody: 'BEGIN SET x = 1; END'
+    test: current.res.status == 400
+  syntax_error:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: false
+              definitionBody: 'BEGIN SELECT; END'
+    test: current.res.status == 400
+  unchanged:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        get:
+          body: null
+    test: current.res.status == 200 && current.res.body.definitionBody == 'BEGIN SELECT 2; END'
+  ddl:
+    req:
+      /projects/rest-routines/queries:
+        post:
+          body:
+            application/json:
+              useLegacySql: false
+              query: >-
+                CREATE OR REPLACE PROCEDURE procedures.p(IN x STRING)
+                OPTIONS(strict_mode=FALSE, description='from DDL') BEGIN SELECT x; END
+    test: current.res.status == 200 && !("errors" in current.res.body)
+  list:
+    req:
+      /projects/rest-routines/datasets/procedures/routines?filter=routineType:PROCEDURE&readMask=strictMode,description,arguments:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && len(current.res.body.routines) == 1 &&
+      current.res.body.routines[0].strictMode == false &&
+      current.res.body.routines[0].description == "from DDL" &&
+      current.res.body.routines[0].arguments[0].mode == "IN" &&
+      current.res.body.routines[0].arguments[0].dataType.typeKind == "STRING"
+  delete:
+    req:
+      /projects/rest-routines/datasets/procedures?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

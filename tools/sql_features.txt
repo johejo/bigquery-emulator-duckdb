@@ -273,6 +273,13 @@ query `DROP FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x); DROP FUNCTION d.f
 query `DROP FUNCTION` | DROP FUNCTION IF EXISTS d.missing
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
+query `CREATE PROCEDURE` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE, description='procedure') BEGIN SELECT x; END
+query `CREATE PROCEDURE` | CREATE PROCEDURE d.p(OUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x=1; END
+note `CREATE PROCEDURE` | See [Stored procedures](compatibility.md#stored-procedures).
+query `DROP PROCEDURE` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END; DROP PROCEDURE d.p
+query `DROP PROCEDURE` | DROP PROCEDURE IF EXISTS d.missing
+query `DROP PROCEDURE` | SET @@dataset_id = 'd'; DROP PROCEDURE IF EXISTS missing
+note `DROP PROCEDURE` | See [Stored procedures](compatibility.md#stored-procedures).
 
 section Multi-statement queries
 
@@ -313,7 +320,9 @@ query Transactions | BEGIN TRANSACTION; INSERT u (id, v) VALUES (6, 60); COMMIT 
 query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; ROLLBACK TRANSACTION
 query Transactions | BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
 note Transactions | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
-query `CALL` | CALL d.p(); SELECT 1
+query `CALL` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE) BEGIN SELECT x; END; CALL d.p(1)
+query `CALL` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT @@dataset_id; END; CALL d.p()
+note `CALL` | See [Stored procedures](compatibility.md#stored-procedures).
 
 section INFORMATION_SCHEMA
 

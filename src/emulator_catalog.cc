@@ -48,18 +48,29 @@ using nlohmann::json;
 // namespaces such as NET and SAFE are still allowed.
 void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
   std::unique_ptr<googlesql::ParserOutput> parsed;
-  const auto status =
-      googlesql::ParseExpression(routine.resource.at("definitionBody").get<std::string>(),
-                                 googlesql::ParserOptions(GoogleSqlLanguageOptions()), &parsed);
+  const bool procedure = routine.resource.at("routineType") == "PROCEDURE";
+  const std::string body = routine.resource.at("definitionBody").get<std::string>();
+  const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
+  const auto status = procedure
+                          ? googlesql::ParseScript(
+                                body, options, {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &parsed)
+                          : googlesql::ParseExpression(body, options, &parsed);
   if (!status.ok()) {
     throw ApiError::Invalid(std::string(status.message()));
   }
   googlesql::TypeFactory types;
   BigQueryCatalog builtins(source, &types, "", "");
-  std::vector<const googlesql::ASTNode*> nodes{parsed->expression()};
+  std::vector<const googlesql::ASTNode*> nodes{
+      procedure ? static_cast<const googlesql::ASTNode*>(parsed->script()) : parsed->expression(),
+  };
   while (!nodes.empty()) {
     const auto* node = nodes.back();
     nodes.pop_back();
+    if (const auto* call = node->GetAsOrNull<googlesql::ASTCallStatement>();
+        call != nullptr &&
+        SplitTablePath(call->procedure_name()->ToIdentifierVector()).size() != 3) {
+      throw ApiError::Unsupported("API procedure bodies with CALL references without a project ID");
+    }
     if (const auto* call = node->GetAsOrNull<googlesql::ASTFunctionCall>()) {
       std::vector<std::string> path = SplitTablePath(call->function()->ToIdentifierVector());
       if (!path.empty() && ToLowerAscii(path.front()) == "safe") {
@@ -798,6 +809,9 @@ Routine Emulator::WriteRoutine(Routine routine, bool update) {
   std::optional<Routine> previous;
   if (update) {
     previous = GetRoutine(reference);
+    if (previous->resource.at("routineType") != routine.resource.at("routineType")) {
+      throw ApiError::Unsupported("changing a routine's type");
+    }
   }
   try {
     const auto source = NewTableSource();
