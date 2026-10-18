@@ -38,10 +38,3 @@ CREATE OR REPLACE PROCEDURE errors_procedures.proc_parameters() OPTIONS(strict_m
 BEGIN SELECT @caller_parameter; END;
 BEGIN CALL errors_procedures.proc_parameters(); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error:
-
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE TEMP FUNCTION caller_function(x INT64) AS (x + 1);
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_caller_function() OPTIONS(strict_mode=FALSE)
-BEGIN SELECT caller_function(1); END;
-BEGIN CALL errors_procedures.proc_caller_function(); EXCEPTION WHEN ERROR THEN SELECT 1; END
-=> error contains: The emulator does not support

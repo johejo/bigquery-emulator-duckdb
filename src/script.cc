@@ -455,22 +455,21 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
   }
 
-  absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
-    // These need separate procedure scopes and verified system-variable behavior.
+  static absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
+    // Only reads of @@dataset_id have been checked against BigQuery in a procedure.
+    if (const auto* variable = node.GetAsOrNull<googlesql::ASTSystemVariableExpr>()) {
+      const auto path = variable->path()->ToIdentifierVector();
+      if (path.size() != 1 || !absl::EqualsIgnoreCase(path.front(), "dataset_id")) {
+        return Unsupported("system variables other than @@dataset_id inside procedures");
+      }
+    }
     if (node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
-        node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR ||
         node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT ||
         node.node_kind() == googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT ||
         node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
       return Unsupported(
-          "function declarations, system variables, dynamic SQL and query parameters inside "
-          "procedures");
-    }
-    if (const auto* call = node.GetAsOrNull<googlesql::ASTFunctionCall>()) {
-      const googlesql::Function* function = nullptr;
-      if (functions_.FindFunction(call->function()->ToIdentifierVector(), &function).ok()) {
-        return Unsupported("references to caller temporary UDFs inside procedures");
-      }
+          "function declarations, system variable assignments, dynamic SQL and query parameters "
+          "inside procedures");
     }
     for (int i = 0; i < node.num_children(); ++i) {
       GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i)));
@@ -571,13 +570,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
           googlesql::SimpleConstant::Create({name.ToString()}, value, &constant));
       catalog.variables->AddOwnedConstant(std::move(constant));
     }
-    std::vector<googlesql::Catalog*> catalogs{catalog.variables.get()};
-    if (executor.GetCurrentProcedureName().empty()) {
-      catalogs.push_back(&functions_);
-    }
-    catalogs.push_back(catalog.tables.get());
-    GOOGLESQL_RETURN_IF_ERROR(
-        googlesql::MultiCatalog::Create("script", catalogs, &catalog.catalog));
+    GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
+        "script", {catalog.variables.get(), &functions_, catalog.tables.get()}, &catalog.catalog));
     return catalog;
   }
 

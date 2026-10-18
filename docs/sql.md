@@ -130,7 +130,7 @@ rejected.
 | System variables | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: assignment to system variables other than @@dataset_id and @@dataset_project_id. |
 | `EXECUTE IMMEDIATE` | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: scripting statements in EXECUTE IMMEDIATE. |
 | Transactions | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: committing a transaction after a handled error; roll it back instead. |
-| `CALL` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: function declarations, system variables, dynamic SQL and query parameters inside procedures. |
+| `CALL` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: function declarations, system variable assignments, dynamic SQL and query parameters inside procedures. |
 
 ## INFORMATION_SCHEMA
 

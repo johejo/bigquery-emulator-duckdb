@@ -104,3 +104,24 @@ CREATE OR REPLACE PROCEDURE scalars.proc_null_array(x ARRAY<INT64>)
 OPTIONS(strict_mode=FALSE) BEGIN SELECT x IS NULL; END;
 CALL scalars.proc_null_array(CAST(NULL AS ARRAY<INT64>))
 => "true"
+
+# Answers collected from BigQuery with bqanswers: a procedure does not inherit the default
+# dataset for table resolution, even though it can read the caller's @@dataset_id value.
+CREATE OR REPLACE PROCEDURE scalars.proc_default_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT MAX(a) FROM t; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_default_dataset()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
+CREATE OR REPLACE PROCEDURE scalars.proc_system_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@dataset_id; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_system_dataset()
+=> "scalars"
+
+# Answers collected from BigQuery with bqanswers: caller temporary SQL UDFs are visible.
+CREATE TEMP FUNCTION caller_function(x INT64) AS (x + 1);
+CREATE OR REPLACE PROCEDURE scalars.proc_caller_function() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT caller_function(1); END;
+CALL scalars.proc_caller_function()
+=> "2"

@@ -311,12 +311,13 @@ checked at creation, and statements resolve when called. Strict mode's default v
 
 The Routine API stores and returns the same definitions as DDL, including descriptions and
 argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
-project. Qualify permanent tables and routines with their datasets; unqualified permanent
-references inside procedures are unsupported until default-dataset behavior is verified.
-Temporary tables are shared with the calling script. Local variables and `IN` argument
-assignments stay within the procedure, and caller variables are not visible in the body.
-References to caller temporary UDFs or query parameters, function declarations, system variables
-and dynamic SQL inside procedures are unsupported. `EXECUTE IMMEDIATE` cannot execute a `CALL`.
+project. Permanent tables must include their datasets: the caller's default dataset does not
+apply inside a procedure. The caller's `@@dataset_id` value can still be read from the body.
+Temporary tables and temporary UDFs are shared with the calling script. Local variables and
+`IN` argument assignments stay within the procedure, and caller variables are not visible in
+the body. Query parameters, function declarations, system-variable assignments, reads of system
+variables other than `@@dataset_id`, and dynamic SQL inside procedures are unsupported.
+`EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 
 ## Approximate aggregates
