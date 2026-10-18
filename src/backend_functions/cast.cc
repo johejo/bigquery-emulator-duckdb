@@ -52,6 +52,14 @@ absl::StatusOr<std::string> FormatString(const Value& value, std::string_view fo
   return out.string_value();
 }
 
+// CAST(bytes AS STRING), which fails for bytes that are not UTF-8.
+absl::StatusOr<std::string> BytesToUtf8(std::string_view bytes) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Value out,
+                             googlesql::CastValue(Value::Bytes(bytes), absl::UTCTimeZone(),
+                                                  GoogleSqlLanguageOptions(), types::StringType()));
+  return out.string_value();
+}
+
 absl::StatusOr<std::string> BytesToString(std::string_view bytes, std::string_view format) {
   return FormatString(Value::Bytes(bytes), format);
 }
@@ -136,6 +144,8 @@ void RegisterCastFunctions(duckdb_connection connection) {
   LogicalType const numeric(duckdb_create_decimal_type(38, 9));
   LogicalType const varchar(duckdb_create_logical_type(kVarchar));
   LogicalType const boolean(duckdb_create_logical_type(kBoolean));
+  Register(connection, "bq_bytes_to_string", {kBlob, kBoolean}, kVarchar,
+           Apply<BytesToUtf8, kSafe>);
   // Each cast with FORMAT takes the value, the format, the time zone for a cast from or to
   // TIMESTAMP, the current timestamp for a cast to DATE, DATETIME or TIMESTAMP and whether it is
   // SAFE_CAST.

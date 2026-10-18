@@ -28,11 +28,14 @@ namespace {
 
 // A cast of `sql` between scalar types `from` and `to` by GoogleSQL's conversion, where DuckDB's
 // cast differs: DuckDB writes numbers and times in other formats, such as a DECIMAL padded with
-// zeros to its scale, and reads dates and times in more formats than BigQuery. `safe` makes a
-// conversion's errors NULL.
+// zeros to its scale, reads dates and times in more formats than BigQuery, and casts between
+// STRING and BLOB through escapes rather than UTF-8. `safe` makes a conversion's errors NULL.
 std::optional<std::string> ConvertedCast(const googlesql::Type* from, const googlesql::Type* to,
                                          const std::string& sql, bool safe) {
   if (to->IsString()) {
+    if (from->IsBytes()) {
+      return "bq_bytes_to_string(" + sql + ", " + (safe ? "true" : "false") + ")";
+    }
     if (from->IsNumericType()) {
       return "bq_decimal_string(CAST(" + sql + " AS VARCHAR))";
     }
@@ -50,6 +53,9 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
     }
   }
   if (from->IsString()) {
+    if (to->IsBytes()) {
+      return "encode(" + sql + ")";
+    }
     const std::string arguments = "(" + sql + ", " + (safe ? "true" : "false") + ")";
     if (to->IsDate()) {
       return "bq_string_to_date" + arguments;

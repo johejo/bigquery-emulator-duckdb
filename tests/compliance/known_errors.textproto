@@ -1304,17 +1304,8 @@ known_errors {
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "CHR(0), SPLIT of NULL and other string functions differ"
-  label: "strings_test:format_utf8"
-  label: "strings_test:format_with_utf8"
   label: "strings_test:split_nulls"
   label: "strings_test:strings_function_chr"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casting BYTES that are not valid UTF-8 to STRING succeeds instead of failing"
-  label: "cast_function_test:cast_invalid_utf8_bytes_to_string_1"
-  label: "cast_function_test:cast_invalid_utf8_bytes_to_string_2"
 }
 
 known_errors {
@@ -1337,8 +1328,6 @@ known_errors {
   label: "code:CastTo_INT64_FLOAT64_-2@5"
   label: "code:CastTo_INT64_FLOAT64_2@5"
   label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
-  label: "code:CastTo_STRING_BYTES_<@x00@n>"
-  label: "code:CastTo_STRING_BYTES_<@xd7>"
 }
 
 known_errors {
@@ -1479,13 +1468,6 @@ known_errors {
   mode: ALLOW_ERROR
   reason: "LIMIT and OFFSET beyond DuckDB's maximum fail"
   label: "limit_queries_test:expr_limit_max_offset"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "MD5, SHA1, SHA256 and SHA512 of a STRING with non-ASCII characters fail to convert it to BYTES"
-  label: "hash_test:hash_functions_1"
-  label: "hash_test:hash_functions_with_hex"
 }
 
 known_errors {
@@ -1686,8 +1668,6 @@ known_errors {
   label: "code:SafeCastTo_INT64_FLOAT64_2@5"
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1@844674407370955e19"
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1e29"
-  label: "code:SafeCastTo_STRING_BYTES_<@x00@n>"
-  label: "code:SafeCastTo_STRING_BYTES_<@xd7>"
 }
 
 known_errors {
