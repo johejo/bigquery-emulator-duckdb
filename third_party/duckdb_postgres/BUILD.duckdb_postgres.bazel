@@ -1,0 +1,20 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# The postgres_scanner extension as a static library. It is registered on a database with
+# DuckDB::LoadStaticExtension<PostgresScannerExtension>() rather than loaded from a file.
+cc_library(
+    name = "postgres_scanner",
+    srcs = glob([
+        "src/*.cpp",
+        "src/storage/*.cpp",
+    ]),
+    hdrs = glob(["src/include/**/*.hpp"]),
+    includes = ["src/include"],
+    deps = [
+        "@duckdb_database_connector//:database_connector",
+        "@duckdb_source//:headers",
+        "@postgres//:libpq",
+    ],
+)

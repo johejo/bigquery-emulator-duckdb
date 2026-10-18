@@ -1,0 +1,11 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "database_connector",
+    srcs = glob(["src/attached/*.cpp"]),
+    hdrs = glob(["src/include/**/*.hpp"]),
+    includes = ["src/include"],
+    deps = ["@duckdb_source//:headers"],
+)

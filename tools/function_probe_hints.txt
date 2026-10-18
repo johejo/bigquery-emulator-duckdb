@@ -283,6 +283,12 @@ query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer => 'PATTERN_ANALYZER', an
 query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer_options => '{"delimiters": ["b"], "token_filters": [{"normalizer": {"mode": "ICU_NORMALIZE"}}, {"stop_words": ["a"]}]}')
 
 # TF_IDF takes only an empty OVER clause.
+# tools/restprobe connects us.postgres to an empty PostgreSQL server. BigQuery reads bit strings
+# as BYTES, which the emulator rejects.
+query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 AS x')
+query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::numeric AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
+query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT B'101' AS x''')
+
 query TF_IDF SELECT TF_IDF(f) OVER () FROM (SELECT ['a', 'b'] AS f)
 query TF_IDF SELECT TF_IDF(f, 10) OVER () FROM (SELECT ['a', 'b'] AS f)
 query TF_IDF SELECT TF_IDF(f, 10, 1) OVER () FROM (SELECT ['a', 'b'] AS f)
@@ -292,3 +298,4 @@ note CONTAINS_SUBSTR Takes STRING only.
 note SESSION_USER Requires --session-user; returns the configured identity for every client.
 
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.
+note EXTERNAL_QUERY Reaches PostgreSQL only; see [EXTERNAL_QUERY](compatibility.md#external_query).

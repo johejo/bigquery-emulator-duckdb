@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/strings.h"
@@ -27,6 +29,7 @@
 #include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
@@ -230,7 +233,8 @@ void GeographyAsString(std::vector<FieldSchema>& schema) {
 // Serves the analyzer the tables the emulator keeps in DuckDB.
 class DuckDbTableSource : public TableSource {
  public:
-  explicit DuckDbTableSource(Backend& backend) : backend_(backend) {}
+  DuckDbTableSource(Backend& backend, ExternalConnections& connections)
+      : backend_(backend), connections_(connections) {}
 
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
@@ -315,8 +319,38 @@ class DuckDbTableSource : public TableSource {
     return ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
   }
 
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a connection and its query.
+  absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(const std::string& key,
+                                                                 const std::string& query,
+                                                                 FieldType decimal_type) override {
+    const auto connection = connections_.conninfo.find(key);
+    if (connection == connections_.conninfo.end()) {
+      return absl::NotFoundError("Not found: Connection " + key);
+    }
+    absl::StatusOr<std::vector<FieldSchema>> columns =
+        DescribePostgresQuery(connection->second, query, decimal_type);
+    if (!columns.ok()) {
+      return columns;
+    }
+    // Attached once, when first queried rather than at startup, when the database may not be
+    // up yet. The database's own connection attaches it outside any session's transaction.
+    const std::scoped_lock lock(connections_.mutex);
+    if (!connections_.attached.contains(key)) {
+      try {
+        connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second) + " AS " +
+                                     QuoteIdentifier(ExternalDatabaseName(key)) +
+                                     " (TYPE postgres, READ_ONLY)");
+      } catch (const BackendError& error) {
+        return absl::InvalidArgumentError(error.what());
+      }
+      connections_.attached.insert(key);
+    }
+    return columns;
+  }
+
  private:
   Backend& backend_;
+  ExternalConnections& connections_;
 };
 
 }  // namespace
@@ -394,7 +428,7 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
-  return std::make_unique<DuckDbTableSource>(backend);
+  return std::make_unique<DuckDbTableSource>(backend, connections_);
 }
 
 std::vector<std::string> Emulator::ListDatasets(std::string project_id) {

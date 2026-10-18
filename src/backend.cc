@@ -27,6 +27,7 @@
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
+#include "src/postgres_scanner.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -704,6 +705,7 @@ struct Backend::Database {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
     RegisterBackendFunctions(handle.get(), session_user, javascript);
+    RegisterPostgresScanner(handle.get());
   }
 
   [[nodiscard]] Connection Connect() const {

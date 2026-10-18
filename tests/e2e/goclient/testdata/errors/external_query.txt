@@ -1,0 +1,35 @@
+# EXTERNAL_QUERY rejects the PostgreSQL types that BigQuery's mapping lists as unsupported:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#unsupported_data_types
+#
+# tools/e2e connects us.postgres of the project test to an empty PostgreSQL server.
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT '12.34'::float8::numeric::money''')
+=> error contains: Postgres type (OID = 790) isn't supported now
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT '00000000-0000-0000-0000-000000000000'::uuid AS x''')
+=> error contains: Postgres type (OID = 2950) isn't supported now
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT '{}'::jsonb AS x''')
+=> error contains: Postgres type (OID = 3802) isn't supported now
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT '1 day'::interval AS x''')
+=> error contains: Postgres type (OID = 1186) isn't supported now
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT nosuch')
+=> error:
+
+SELECT * FROM EXTERNAL_QUERY('us.nosuch', 'SELECT 1 AS x')
+=> error:
+
+# What BigQuery reads bit strings as is not documented.
+SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT B'101' AS x''')
+=> error contains: The emulator does not support EXTERNAL_QUERY Postgres type (OID = 1560)
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 AS x', '{"query_execution_priority":"low"}')
+=> error contains: The emulator does not support EXTERNAL_QUERY option query_execution_priority
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', CONCAT('SELECT 1', ' AS x'))
+=> error contains: The emulator does not support EXTERNAL_QUERY arguments that are not literals
+
+SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 AS x, 2 AS x')
+=> error contains: The emulator does not support EXTERNAL_QUERY columns of the same name
