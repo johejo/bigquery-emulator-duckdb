@@ -12,6 +12,7 @@
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -360,6 +361,32 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json&
   field.type = FieldType::kBigNumeric;
 }
 
+// `field` with each BIGNUMERIC in it, at any depth, a STRING. DuckDB's JSON reader cannot read a
+// BIGNUM, which it would for a cast of a column it detects as JSON, as it does when every value is
+// null, so a load reads those values as text, which StageJsonNumerics writes them as.
+FieldSchema BigNumericsAsStrings(FieldSchema field) {
+  if (field.type == FieldType::kBigNumeric) {
+    field.type = FieldType::kString;
+    field.precision.reset();
+    field.scale.reset();
+    field.rounding_mode.clear();
+  }
+  for (FieldSchema& child : field.fields) {
+    child = BigNumericsAsStrings(std::move(child));
+  }
+  return field;
+}
+
+// The value of `field` that the column `name` of a NEWLINE_DELIMITED_JSON file holds.
+std::string JsonValue(const std::string& name, const FieldSchema& field) {
+  const FieldSchema read = BigNumericsAsStrings(field);
+  const std::string type = ToDuckDbType(field);
+  if (read.type == field.type && !HasType(field.fields, FieldType::kBigNumeric)) {
+    return std::format("CAST({} AS {})", name, type);
+  }
+  return std::format("CAST(CAST({} AS {}) AS {})", name, ToDuckDbType(read), type);
+}
+
 }  // namespace
 
 ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
@@ -489,6 +516,14 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     sql += ')';
   } else if (format == "NEWLINE_DELIMITED_JSON") {
     sql = std::format("SELECT * FROM read_json({}, format='newline_delimited')", files);
+    // A column no row has is NULL: UNION ALL BY NAME, which matches names without case, adds it.
+    if (!schema.empty()) {
+      std::vector<std::string> nulls;
+      std::ranges::transform(schema, std::back_inserter(nulls), [](const FieldSchema& field) {
+        return "NULL AS " + QuoteIdentifier(field.name);
+      });
+      sql = std::format("SELECT {} WHERE false UNION ALL BY NAME {}", Join(nulls, ", "), sql);
+    }
   } else {
     sql = std::format("SELECT * FROM read_parquet({})", files);
   }
@@ -499,7 +534,7 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
       columns.push_back(std::format("{} AS {}",
                                     format == "PARQUET"
                                         ? ParquetValue(name, field, parquet.Child(field.name), 0)
-                                        : std::format("CAST({} AS {})", name, ToDuckDbType(field)),
+                                        : JsonValue(name, field),
                                     name));
     }
     sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);
