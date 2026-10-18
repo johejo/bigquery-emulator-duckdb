@@ -14,8 +14,12 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "googlesql/parser/parse_tree.h"
 #include "googlesql/parser/parser.h"
+#include "googlesql/public/analyzer.h"
+#include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "src/analyzer.h"
@@ -28,6 +32,7 @@
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/routine_catalog.h"
@@ -198,23 +203,26 @@ std::string ScriptStatementType(const googlesql::ParserOutput& script) {
 
 }  // namespace
 
+// Runs the statements of a script as parts of one job, in `location`.
 class Emulator::ScriptHostImpl : public ScriptHost {
  public:
-  explicit ScriptHostImpl(Emulator& emulator) : emulator_(emulator) {}
+  ScriptHostImpl(Emulator& emulator, JobLocation& location)
+      : emulator_(emulator), location_(location) {}
 
   Backend& backend() override { return emulator_.backend_; }
   [[nodiscard]] bool has_session_user() const override { return emulator_.has_session_user_; }
   std::unique_ptr<TableSource> NewTableSource(Backend* session, bool expire) override {
-    return emulator_.NewTableSource(session, expire);
+    return emulator_.NewTableSource(session, expire, &location_);
   }
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays,
                            Backend* session) override {
-    return emulator_.RunStatement(translation, setup, null_arrays, session);
+    return emulator_.RunStatement(translation, setup, null_arrays, session, &location_);
   }
 
  private:
   Emulator& emulator_;
+  JobLocation& location_;
 };
 
 QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
@@ -282,7 +290,7 @@ QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& 
 
 TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
                                         const std::string& default_project,
-                                        const std::string& default_dataset) {
+                                        const std::string& default_dataset, JobLocation* location) {
   AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
@@ -291,7 +299,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   for (const FieldSchema& field : parameters.positional_types()) {
     settings.positional_parameters.push_back(ParameterType(field, type_factory));
   }
-  const auto source = NewTableSource();
+  const auto source = NewTableSource(nullptr, true, location);
   RoutineCatalog catalog(*source, &type_factory, settings.default_project,
                          settings.default_dataset);
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
@@ -315,6 +323,72 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   }
   CheckRoutine(*translated, catalog);
   return *std::move(translated);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a query, then its defaults.
+void Emulator::InferLocation(const std::string& query, const std::string& default_project,
+                             const std::string& default_dataset, JobLocation& location) {
+  googlesql::TableNamesSet names;
+  if (!googlesql::ExtractTableNamesFromScript(
+           query, googlesql::AnalyzerOptions(GoogleSqlLanguageOptions()), &names)
+           .ok()) {
+    return;
+  }
+  std::set<std::string> locations;
+  for (const std::vector<std::string>& name : names) {
+    // A quoted name such as `project.dataset.table` is one identifier of the path.
+    std::vector<std::string> parts;
+    for (const std::string& identifier : name) {
+      const std::vector<std::string> split = absl::StrSplit(identifier, '.');
+      parts.insert(parts.end(), split.begin(), split.end());
+    }
+    std::optional<std::string> region;
+    for (const std::string& part : parts) {
+      if (!region.has_value()) {
+        region = RegionQualifierLocation(part);
+      }
+    }
+    if (region.has_value()) {
+      locations.insert(*std::move(region));
+      continue;
+    }
+    // The dataset of an INFORMATION_SCHEMA view, or that of a table. SCHEMATA without a region
+    // qualifier is the US region's.
+    const auto schema = std::ranges::find_if(
+        parts, [](const std::string& part) { return ToUpperAscii(part) == "INFORMATION_SCHEMA"; });
+    if (schema != parts.end() && schema + 1 != parts.end() &&
+        ToUpperAscii(*(schema + 1)) == "SCHEMATA") {
+      locations.insert(kDefaultLocation);
+      continue;
+    }
+    if (schema != parts.end()) {
+      parts.erase(schema, parts.end());
+    } else if (!parts.empty()) {
+      parts.pop_back();
+    }
+    DatasetReference dataset{.project_id = default_project, .dataset_id = default_dataset};
+    if (!parts.empty()) {
+      dataset.dataset_id = parts.back();
+      if (parts.size() > 1) {
+        dataset.project_id = absl::StrJoin(parts.begin(), parts.end() - 1, ".");
+      }
+    }
+    if (dataset.dataset_id.empty()) {
+      continue;
+    }
+    try {
+      dataset.project_id = ResolveProject(dataset.project_id);
+    } catch (const ApiError&) {
+      continue;
+    }
+    if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
+      locations.insert(*found);
+    }
+  }
+  // Names of several locations leave the job in the US, as BigQuery answers.
+  if (!locations.empty()) {
+    location.Infer(locations.size() == 1 ? *locations.begin() : std::string(kDefaultLocation));
+  }
 }
 
 std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference& table,
@@ -362,6 +436,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
 
 std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
   request.project_id = ResolveProject(request.project_id);
+  JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
@@ -372,7 +447,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
       .create_disposition = request.create_disposition,
       .write_disposition = request.write_disposition,
   };
-  return RunJob(std::move(job), [&](Job& job) {
+  return RunJob(std::move(job), location, [&](Job& job) {
     if (request.destination_table) {
       auto& project = request.destination_table->project_id;
       project = ResolveProject(project.empty() ? request.project_id : project);
@@ -394,6 +469,16 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     }
 
     std::get<QueryJob>(job.configuration).destination_table = request.destination_table;
+    InferLocation(request.query, settings.default_project, settings.default_dataset, location);
+    if (request.destination_table.has_value()) {
+      const DatasetReference dataset{
+          .project_id = request.destination_table->project_id,
+          .dataset_id = request.destination_table->dataset_id,
+      };
+      if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
+        location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);
+      }
+    }
 
     if (const auto script = ParseScript(request.query)) {
       std::get<QueryJob>(job.configuration).statement_type = ScriptStatementType(*script);
@@ -403,24 +488,26 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
       if (request.destination_table.has_value()) {
         throw ApiError::Invalid("Cannot set destination table in multi-statement queries");
       }
-      ScriptHostImpl host(*this);
+      ScriptHostImpl host(*this, location);
       job.result =
           RunScript(host, request.query, *script, request.parameters, settings.default_project,
                     settings.default_dataset, setup, request.project_id, next_script_number_++);
       return;
     }
-    const TranslatedStatement translation = Translate(
-        request.query, request.parameters, settings.default_project, settings.default_dataset);
+    const TranslatedStatement translation =
+        Translate(request.query, request.parameters, settings.default_project,
+                  settings.default_dataset, &location);
     auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;
     query.ddl_target_dataset = translation.ddl_target_dataset;
     query.ddl_target_routine = translation.ddl_target_routine;
     if (!request.dry_run && !request.destination_table.has_value()) {
-      job.result = RunStatement(translation, setup, request.null_arrays);
+      job.result = RunStatement(translation, setup, request.null_arrays, nullptr, &location);
       return;
     }
     CheckDdlTarget(translation);
+    UseTargets(backend_, translation, location);
     if (request.destination_table.has_value() && !translation.result_schema.has_value()) {
       throw ApiError::Invalid("Cannot set destination table in jobs with DML/DDL statements");
     }
@@ -448,7 +535,7 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
 
 QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    const std::vector<std::string>& setup, bool null_arrays,
-                                   Backend* session) {
+                                   Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
   if (translation.ddl_target_routine) {
@@ -460,6 +547,11 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
       throw ApiError::Unsupported("replacing or dropping a routine of a different type");
     }
   }
+  JobLocation unchecked;
+  if (location == nullptr) {
+    location = &unchecked;
+  }
+  UseTargets(backend, translation, *location);
   std::optional<std::vector<FieldSchema>> schema;
   if (translation.result_schema.has_value()) {
     schema = UniqueResultNames(*translation.result_schema);
@@ -472,7 +564,9 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                          setup);
     }
   } else if (std::optional<DdlWrite> write =
-                 MetadataWrite(translation, CreatedInDataset(backend, translation))) {
+                 MetadataWrite(translation, CreatedInDataset(backend, translation),
+                               translation.dataset.has_value() ? location->Resolve()
+                                                               : std::string(kDefaultLocation))) {
     if (translation.table.has_value() && translation.table->copies_table) {
       std::ranges::move(
           ColumnDefaultStatements(translation.table->table, translation.table->schema),

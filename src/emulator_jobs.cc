@@ -27,6 +27,7 @@
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/load.h"
+#include "src/location.h"
 #include "src/parquet_metadata.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
@@ -76,7 +77,23 @@ void ReadUnrounded(std::vector<FieldSchema>& schema, const std::vector<FieldSche
   }
 }
 
+// Whether a request that names `location`, or none, finds `job`: without a location, BigQuery
+// finds a job only in the US or EU multi-region.
+bool InLocation(const Job& job, const std::optional<std::string>& location) {
+  if (!location.has_value()) {
+    return job.location == "US" || job.location == "EU";
+  }
+  return CanonicalLocation(*location) == job.location;
+}
+
 }  // namespace
+
+void Emulator::UseDataset(JobLocation& location, const TableReference& table) {
+  const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
+  if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
+    location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);
+  }
+}
 
 std::string_view DispositionName(CreateDisposition disposition) {
   switch (disposition) {
@@ -126,7 +143,7 @@ std::optional<WriteDisposition> ParseWriteDisposition(std::string_view name) {
   return std::nullopt;
 }
 
-std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
+std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocation& location,
                                             const std::function<void(Job&)>& body) {
   job->creation_time_ms = NowMillis();
   {
@@ -154,6 +171,7 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
     job->error = job->query() != nullptr ? ApiError::InvalidQuery(error.what())
                                          : ApiError::Invalid(error.what());
   }
+  job->location = location.Resolve();
   job->end_time_ms = NowMillis();
 
   if (job->dry_run()) {
@@ -168,16 +186,18 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job,
 
 std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
   request.project_id = ResolveProject(request.project_id);
+  JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.load;
-  return RunJob(std::move(job), [&](Job& job) {
+  return RunJob(std::move(job), location, [&](Job& job) {
     auto& load = std::get<LoadJob>(job.configuration);
     load.destination_table.project_id = ResolveProject(load.destination_table.project_id.empty()
                                                            ? request.project_id
                                                            : load.destination_table.project_id);
     load.configuration["destinationTable"]["projectId"] = load.destination_table.project_id;
+    UseDataset(location, load.destination_table);
 
     const json& config = load.configuration;
     const std::string format = config.value("sourceFormat", "CSV");
@@ -260,11 +280,12 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
 
 std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
   request.project_id = ResolveProject(request.project_id);
+  JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.copy;
-  return RunJob(std::move(job), [&](Job& job) {
+  return RunJob(std::move(job), location, [&](Job& job) {
     auto& copy = std::get<CopyJob>(job.configuration);
     for (TableReference& source : copy.source_tables) {
       source.project_id =
@@ -285,6 +306,19 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
 
     if (copy.source_tables.empty()) {
       throw ApiError::Invalid("Source table is required");
+    }
+    for (const TableReference& source : copy.source_tables) {
+      UseDataset(location, source);
+    }
+    // BigQuery copies tables across locations as well, which the emulator does not.
+    if (const std::optional<std::string> destination =
+            DatasetLocation(backend_,
+                            {
+                                .project_id = copy.destination_table.project_id,
+                                .dataset_id = copy.destination_table.dataset_id,
+                            });
+        destination.has_value() && *destination != location.Resolve()) {
+      throw ApiError::Unsupported("copying tables to a dataset in another location");
     }
     std::vector<FieldSchema> schema;
     std::string sql;
@@ -339,16 +373,18 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
 
 std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
   request.project_id = ResolveProject(request.project_id);
+  JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
   job->job_id = request.job_id;
   job->configuration = request.extract;
-  return RunJob(std::move(job), [&](Job& job) {
+  return RunJob(std::move(job), location, [&](Job& job) {
     auto& extract = std::get<ExtractJob>(job.configuration);
     extract.source_table.project_id =
         ResolveProject(extract.source_table.project_id.empty() ? request.project_id
                                                                : extract.source_table.project_id);
     extract.configuration["sourceTable"]["projectId"] = extract.source_table.project_id;
+    UseDataset(location, extract.source_table);
 
     const json& config = extract.configuration;
     const std::string format = config.value("destinationFormat", "CSV");
@@ -551,11 +587,12 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
 }
 
-std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id) {
+std::shared_ptr<const Job> Emulator::GetJob(std::string project_id, const std::string& job_id,
+                                            const std::optional<std::string>& location) {
   project_id = ResolveProject(project_id);
   std::scoped_lock const lock(mutex_);
   const auto it = jobs_.find(JobKey(project_id, job_id));
-  if (it == jobs_.end()) {
+  if (it == jobs_.end() || !InLocation(*it->second, location)) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
   }
   return it->second;
@@ -580,12 +617,15 @@ std::vector<std::shared_ptr<const Job>> Emulator::ListJobs(std::string project_i
   return result;
 }
 
-void Emulator::DeleteJob(std::string project_id, const std::string& job_id) {
+void Emulator::DeleteJob(std::string project_id, const std::string& job_id,
+                         const std::optional<std::string>& location) {
   project_id = ResolveProject(project_id);
   std::scoped_lock const lock(mutex_);
-  if (jobs_.erase(JobKey(project_id, job_id)) == 0) {
+  const auto it = jobs_.find(JobKey(project_id, job_id));
+  if (it == jobs_.end() || !InLocation(*it->second, location)) {
     throw ApiError::NotFound("Not found: Job " + project_id + ":" + job_id);
   }
+  jobs_.erase(it);
 }
 
 }  // namespace bigquery_emulator_duckdb

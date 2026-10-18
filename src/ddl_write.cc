@@ -80,9 +80,12 @@ bool HasDefaultTypeConstraints(const FieldSchema& field) {
 
 }  // namespace
 
-DdlWrite CreateDatasetWrite(const DatasetDefinition& definition) {
+DdlWrite CreateDatasetWrite(const DatasetDefinition& definition, const std::string& location) {
   DatasetMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
+  if (metadata.location.empty()) {
+    metadata.location = location;
+  }
   DdlWrite write{
       .metadata_statements = DatasetMetadataStatements(definition.dataset, metadata),
   };
@@ -327,7 +330,7 @@ std::vector<std::string> AlterDatasetStatements(const DatasetAlteration& alterat
 }
 
 std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement,
-                                      const DatasetMetadata& dataset) {
+                                      const DatasetMetadata& dataset, const std::string& location) {
   if (statement.table.has_value()) {
     return CreateTableWrite(*statement.table, dataset);
   }
@@ -335,7 +338,7 @@ std::optional<DdlWrite> MetadataWrite(const TranslatedStatement& statement,
     return CreateViewWrite(*statement.view, dataset);
   }
   if (statement.dataset.has_value()) {
-    return CreateDatasetWrite(*statement.dataset);
+    return CreateDatasetWrite(*statement.dataset, location);
   }
   if (statement.statement_type == "DROP_SCHEMA" && statement.ddl_target_dataset.has_value()) {
     return DropDatasetWrite(*statement.ddl_target_dataset);

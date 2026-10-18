@@ -25,9 +25,11 @@ setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x I
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
-note bigquery.datasets.get | Returns the reference, description, friendly name, labels, default table expiration and default rounding mode, and location `US`.
+note bigquery.datasets.get | Returns the reference, description, friendly name, labels, default table expiration, default rounding mode and location.
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "description": "data", "friendlyName": "E", "labels": {"env": "test"}, "location": "US"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "asia-northeast1"}
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "aws-us-east-1"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "access": [{"role": "READER", "specialGroup": "projectReaders"}]}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
@@ -38,6 +40,7 @@ request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=
 note bigquery.datasets.list | Filters by label value or key presence (`labels.key` or `labels.key:*`), combining up to ten unique keys with AND before pagination.
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
+request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"location": "EU"}
 note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag.
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
@@ -47,8 +50,10 @@ request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | See [Jobs](compatibility.md#jobs).
 request bigquery.jobs.delete | DELETE /bigquery/v2/projects/test/jobs/j/delete
 request bigquery.jobs.get | GET /bigquery/v2/projects/test/jobs/j
+request bigquery.jobs.get | GET /bigquery/v2/projects/test/jobs/j?location=US
+note bigquery.jobs.get | See [Locations](compatibility.md#locations).
 request bigquery.jobs.getQueryResults | GET /bigquery/v2/projects/test/queries/j?maxResults=1&startIndex=0
-note bigquery.jobs.getQueryResults | Ignores `timeoutMs`, `location` and `formatOptions.timestampOutputFormat`.
+note bigquery.jobs.getQueryResults | Ignores `timeoutMs` and `formatOptions.timestampOutputFormat`. See [Locations](compatibility.md#locations).
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1", "useLegacySql": false}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}, "clustering": {"fields": ["x"]}}}}
@@ -59,19 +64,21 @@ request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configurat
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "h"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}, "operationType": "CLONE"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"jobReference": {"location": "US"}, "configuration": {"query": {"query": "SELECT 1", "useLegacySql": false}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.avro"], "destinationFormat": "AVRO"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/a-*.csv", "$DIR/b-*.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceModel": {"projectId": "test", "datasetId": "d", "modelId": "m"}, "destinationUris": ["$DIR/m"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "q"}, "destinationEncryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}}}
-note bigquery.jobs.insert | See [Jobs](compatibility.md#jobs) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies).
+note bigquery.jobs.insert | See [Jobs](compatibility.md#jobs), [Locations](compatibility.md#locations) and [Loads, extracts and copies](compatibility.md#loads-extracts-and-copies).
 request bigquery.jobs.list | GET /bigquery/v2/projects/test/jobs?maxResults=1&projection=full&stateFilter=done
 note bigquery.jobs.list | Ignores `allUsers`. See [Jobs](compatibility.md#jobs).
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT @x AS x", "useLegacySql": false, "parameterMode": "NAMED", "queryParameters": [{"name": "x", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}}]}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "dryRun": true}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": true}
 request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": false, "destinationEncryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
-note bigquery.jobs.query | Ignores `timeoutMs`, `location`, `labels` and `useQueryCache`.
+request bigquery.jobs.query | POST /bigquery/v2/projects/test/queries {"query": "SELECT 1", "useLegacySql": false, "location": "EU"}
+note bigquery.jobs.query | Ignores `timeoutMs`, `labels` and `useQueryCache`. See [Locations](compatibility.md#locations).
 
 request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f

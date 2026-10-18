@@ -5,6 +5,7 @@
 #include <exception>
 #include <format>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -31,6 +32,7 @@
 #include "src/emulator.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/schema_sql.h"
@@ -247,11 +249,43 @@ void GeographyAsString(std::vector<FieldSchema>& schema) {
   }
 }
 
-// Serves the analyzer the tables the emulator keeps in DuckDB.
+// The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
+std::optional<std::string> LocationOf(Backend& backend, const DatasetReference& dataset) {
+  if (IsDuckDbSchema(dataset.dataset_id)) {
+    return std::nullopt;
+  }
+  QueryResult result;
+  try {
+    result = backend.Execute(DatasetEntriesQuery(dataset.project_id, dataset.dataset_id));
+  } catch (const BackendError&) {
+    // A database that is no project, such as the one holding a script's temporary tables.
+    return std::nullopt;
+  }
+  if (result.rows.empty()) {
+    return std::nullopt;
+  }
+  return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]).Location();
+}
+
+// The location of the connection `key`, as ConnectionKey gives it: PROJECT.LOCATION.CONNECTION,
+// where only the project may have dots.
+std::optional<std::string> ConnectionLocation(const std::string& key) {
+  const size_t connection = key.rfind('.');
+  const size_t location = connection == std::string::npos || connection == 0
+                              ? std::string::npos
+                              : key.rfind('.', connection - 1);
+  if (location == std::string::npos) {
+    return std::nullopt;
+  }
+  return CanonicalLocation(key.substr(location + 1, connection - location - 1));
+}
+
+// Serves the analyzer the tables the emulator keeps in DuckDB. Each table, dataset, routine and
+// connection it finds counts as one the job uses, in `location` when it is set.
 class DuckDbTableSource : public TableSource {
  public:
-  DuckDbTableSource(Backend& backend, ExternalConnections& connections)
-      : backend_(backend), connections_(connections) {}
+  DuckDbTableSource(Backend& backend, ExternalConnections& connections, JobLocation* location)
+      : backend_(backend), connections_(connections), location_(location) {}
 
   std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
                                                     const std::string& dataset,
@@ -264,6 +298,7 @@ class DuckDbTableSource : public TableSource {
           backend_,
           TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
       GeographyAsString(schema);
+      Use(project, dataset);
       return schema;
     } catch (const BackendError&) {
       return std::nullopt;
@@ -283,10 +318,12 @@ class DuckDbTableSource : public TableSource {
       if (!comment.has_value()) {
         return std::nullopt;
       }
-      return TableDescription{
+      TableDescription description{
           .schema = TableSchema(backend_, reference),
           .metadata = CommentMetadata(*comment),
       };
+      Use(project, dataset);
+      return description;
     } catch (const BackendError&) {
       return std::nullopt;
     }
@@ -301,11 +338,43 @@ class DuckDbTableSource : public TableSource {
     if (result.rows.empty()) {
       return std::nullopt;
     }
-    return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+    DatasetMetadata metadata = ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+    Use(project, dataset);
+    return metadata;
   }
 
   std::vector<std::string> ListDatasets(const std::string& project) override {
     return FirstColumnStrings(backend_.Execute(DatasetsQuery(project)));
+  }
+
+  bool HasProject(const std::string& project) override {
+    return !backend_
+                .Execute("SELECT 1 FROM duckdb_databases() WHERE database_name = " +
+                         QuoteLiteral(project))
+                .rows.empty();
+  }
+
+  std::optional<std::string> DatasetLocation(const std::string& project,
+                                             const std::string& dataset) override {
+    if (IsDuckDbSchema(dataset)) {
+      return std::nullopt;
+    }
+    const std::string key = project + ":" + dataset;
+    if (const auto it = locations_.find(key); it != locations_.end()) {
+      return it->second;
+    }
+    std::optional<std::string> location =
+        LocationOf(backend_, {.project_id = project, .dataset_id = dataset});
+    if (location.has_value()) {
+      locations_[key] = *location;
+    }
+    return location;
+  }
+
+  void ReferenceLocation(const std::string& name, const std::string& location) override {
+    if (location_ != nullptr) {
+      location_->Reference(name, location);
+    }
   }
 
   std::vector<std::string> ListTables(const std::string& project,
@@ -339,7 +408,9 @@ class DuckDbTableSource : public TableSource {
     if (result.rows.empty()) {
       return std::nullopt;
     }
-    return ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+    std::optional<Routine> found = ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+    Use(routine.project_id, routine.dataset_id);
+    return found;
   }
 
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a connection and its query.
@@ -349,6 +420,9 @@ class DuckDbTableSource : public TableSource {
     const auto connection = connections_.conninfo.find(key);
     if (connection == connections_.conninfo.end()) {
       return absl::NotFoundError("Not found: Connection " + key);
+    }
+    if (const std::optional<std::string> location = ConnectionLocation(key); location.has_value()) {
+      ReferenceLocation("Connection " + key, *location);
     }
     absl::StatusOr<std::vector<FieldSchema>> columns =
         DescribePostgresQuery(connection->second, query, decimal_type);
@@ -372,8 +446,21 @@ class DuckDbTableSource : public TableSource {
   }
 
  private:
+  // Records that the job uses `project`.`dataset`, which exists.
+  void Use(const std::string& project, const std::string& dataset) {
+    if (location_ == nullptr) {
+      return;
+    }
+    if (const std::optional<std::string> location = DatasetLocation(project, dataset)) {
+      location_->Reference("Dataset " + project + ":" + dataset, *location);
+    }
+  }
+
   Backend& backend_;
   ExternalConnections& connections_;
+  JobLocation* location_;
+  // DatasetLocation's answers, by project:dataset.
+  std::map<std::string, std::string> locations_;
 };
 
 // The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. DuckDB's
@@ -460,12 +547,45 @@ DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
                              : ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
 }
 
-std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire) {
+std::optional<std::string> Emulator::DatasetLocation(Backend& backend,
+                                                     const DatasetReference& dataset) {
+  return LocationOf(backend, dataset);
+}
+
+void Emulator::UseTargets(Backend& backend, const TranslatedStatement& translation,
+                          JobLocation& location) {
+  const auto use = [&](const DatasetReference& dataset) {
+    if (const std::optional<std::string> found = DatasetLocation(backend, dataset)) {
+      location.Reference("Dataset " + dataset.project_id + ":" + dataset.dataset_id, *found);
+    }
+  };
+  if (const auto& definition = translation.dataset) {
+    // The location CREATE SCHEMA names does not settle the job's, as BigQuery answers, even for a
+    // dataset that IF NOT EXISTS keeps.
+    const std::string& named = definition->metadata.location;
+    if (!named.empty() && named != location.Resolve()) {
+      throw ApiError::InvalidQuery("Location specified in query " + named +
+                                   " is not consistent with current execution region " +
+                                   location.Resolve());
+    }
+  } else if (const auto& target = translation.ddl_target_dataset) {
+    use(*target);
+  }
+  if (const auto& target = translation.ddl_target_table) {
+    use({.project_id = target->project_id, .dataset_id = target->dataset_id});
+  }
+  if (const auto& target = translation.ddl_target_routine) {
+    use({.project_id = target->project_id, .dataset_id = target->dataset_id});
+  }
+}
+
+std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire,
+                                                      JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   if (expire) {
     ExpireTables(backend, expiration_mutex_);
   }
-  return std::make_unique<DuckDbTableSource>(backend, connections_);
+  return std::make_unique<DuckDbTableSource>(backend, connections_, location);
 }
 
 std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
@@ -574,12 +694,13 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
 TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool expire) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetReference dataset{.project_id = table.project_id, .dataset_id = table.dataset_id};
-  GetDataset(dataset);
+  const std::string location = GetDataset(dataset).Location();
   if (expire) {
     ExpireTables(backend_, expiration_mutex_, dataset);
   }
   TableInfo info;
   info.reference = table;
+  info.location = location;
   if (const std::optional<json> comment = ViewComment(backend_, table); comment.has_value()) {
     std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
     if (!metadata.has_value()) {
@@ -732,13 +853,15 @@ void Emulator::WriteView(TableReference table, const json& definition,
   if (query.empty()) {
     throw ApiError::Invalid("View query is required");
   }
+  // A view reads only tables in its own dataset's location.
+  JobLocation location(dataset.Location());
   try {
     const TranslatedStatement translation =
         Translate(std::string(replace ? "CREATE OR REPLACE VIEW " : "CREATE VIEW ") +
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id) +
                       " AS " + query,
-                  {}, table.project_id, "");
+                  {}, table.project_id, "", &location);
     if (!translation.view.has_value()) {
       throw ApiError::Internal("CREATE VIEW was not translated to a view");
     }

@@ -15,9 +15,11 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/api_error.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
@@ -150,6 +152,24 @@ std::string OptionObject(std::string_view statement) {
   return ToLowerAscii(statement.substr(statement.find(' ') + 1));
 }
 
+// A location as CanonicalLocation spells it; NULL leaves it unset.
+bool LocationOption(const googlesql::Value& value, std::string& into) {
+  std::string location;
+  if (!StringOption(value, location)) {
+    return false;
+  }
+  if (location.empty()) {
+    into.clear();
+    return true;
+  }
+  std::optional<std::string> canonical = CanonicalLocation(location);
+  if (!canonical.has_value()) {
+    throw ApiError::InvalidQuery("Invalid location '" + location + "'");
+  }
+  into = *std::move(canonical);
+  return true;
+}
+
 }  // namespace
 
 // The value an option of `object`, such as a table, assigns: a literal, or a constant expression,
@@ -222,15 +242,14 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
   return metadata;
 }
 
-// The description, friendly name, labels, default table expiration and default rounding mode the
-// OPTIONS of a CREATE SCHEMA set. Every dataset is in the US, so a location elsewhere is
-// unsupported, and so are the other options, which change how BigQuery treats the dataset's tables.
+// The description, friendly name, labels, default table expiration, default rounding mode and
+// location the OPTIONS of a CREATE SCHEMA set. The other options are unsupported, since they change
+// how BigQuery treats the dataset's tables. Throws ApiError for a location BigQuery does not have.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
   DatasetMetadata metadata;
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
     const std::optional<googlesql::Value> value = OptionValue(*option, "schema", scope);
-    std::string location;
     const bool applied =
         value.has_value() &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
@@ -240,8 +259,7 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
           DaysOption(*value, metadata.default_table_expiration_ms)) ||
          (name == "default_rounding_mode" &&
           RoundingModeOption(*value, metadata.default_rounding_mode)) ||
-         (name == "location" && StringOption(*value, location) &&
-          (value->is_null() || ToUpperAscii(location) == "US")));
+         (name == "location" && LocationOption(*value, metadata.location)));
     if (!applied) {
       return Unsupported(scope, "CREATE SCHEMA option " + option->name());
     }
@@ -256,6 +274,10 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
                 OptionUpdates& updates) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
+    // A dataset cannot move, and BigQuery takes no location in ALTER SCHEMA.
+    if (statement == "ALTER SCHEMA" && name == "location") {
+      throw ApiError::InvalidQuery("Unknown option: " + option->name());
+    }
     const std::optional<googlesql::Value> value =
         OptionValue(*option, OptionObject(statement), scope);
     const bool applied =

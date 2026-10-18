@@ -15,6 +15,21 @@ constructs fail as `invalidQuery`, naming the construct.
 Multi-statement queries create no child jobs: `jobs.list` leaves out the ones BigQuery lists and
 rejects the `parentJobId` of a multi-statement query.
 
+### Locations
+
+A job runs in the location its request names, `location` for `jobs.query` and
+`jobReference.location` for `jobs.insert`. Otherwise it runs where the datasets and
+`INFORMATION_SCHEMA` regions its query names are, as BigQuery infers it before running the query,
+and in the `US` when they are in several locations or it names none; `INFORMATION_SCHEMA.SCHEMATA`
+without a region qualifier is the `US` region's. A query that names none, such as one built by
+`EXECUTE IMMEDIATE`, runs where the first dataset or connection it uses is. Every dataset a job
+reads or writes must be in that location: a job that uses one elsewhere fails with `notFound`, and
+the location that `CREATE SCHEMA` names must be the job's too. Copies to a dataset in another
+location, which BigQuery supports, are unsupported. `jobs.get`, `jobs.getQueryResults`,
+`jobs.cancel` and `jobs.delete` find a job outside the `US` and `EU` multi-regions only when the
+request names its location. A view created with `tables.insert` reads only tables in its dataset's
+location.
+
 ### Loads, extracts and copies
 
 Loads and extracts also accept local paths. Loads read CSV, newline-delimited JSON and Parquet. A
@@ -29,8 +44,13 @@ BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_
 
 ## Datasets
 
-Every dataset is in the `US` location, so the `INFORMATION_SCHEMA` region qualifier `` `region-us`
-`` covers every dataset of the project, and any other region none.
+A dataset is in the location that `datasets.insert` or `CREATE SCHEMA` names, the `US` unless
+`datasets.insert` names one, and the [job's location](#locations) unless `CREATE SCHEMA` does. The
+locations are those BigQuery lists for datasets, compared without case; BigQuery Omni locations are
+unsupported. A dataset cannot move: `ALTER SCHEMA SET OPTIONS` rejects a location as BigQuery does,
+and `datasets.patch` and `datasets.update` reject another location as unsupported. A table is in its dataset's location, and the
+`INFORMATION_SCHEMA` region qualifier `` `region-REGION` ``, whose `region-` is in lower case,
+covers the datasets of the project in that location.
 
 Datasets keep a description, friendly name, labels, default table expiration and [default rounding
 mode](#rounding-modes), which `CREATE SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such

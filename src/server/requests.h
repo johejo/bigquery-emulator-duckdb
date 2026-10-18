@@ -107,6 +107,8 @@ struct MediaUpload {
 using JobRequest = std::variant<QueryRequest, LoadRequest, CopyRequest, ExtractRequest>;
 
 std::string Param(const httplib::Request& request, const char* name);
+// The location query parameter of a request for a job, or nothing when it has none.
+std::optional<std::string> LocationParam(const httplib::Request& request);
 bool QueryParamBool(const httplib::Request& request, const char* name);
 DatasetReference DatasetFromPath(const httplib::Request& request);
 TableReference TableFromPath(const httplib::Request& request);

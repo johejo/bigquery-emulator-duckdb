@@ -21,6 +21,7 @@
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/location.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
@@ -34,9 +35,6 @@ struct TranslatedStatement;
 
 // JobStatistics2.statementType of a multi-statement query.
 inline constexpr char kScriptStatementType[] = "SCRIPT";
-
-// The location of every dataset, table and job. The emulator does not model locations.
-inline constexpr char kLocation[] = "US";
 
 // What kind of table a dataset holds. The emulator creates only tables and views.
 enum class TableType : std::uint8_t { kTable, kView };
@@ -56,6 +54,7 @@ struct TableInfo {
   TableReference reference;
   std::vector<FieldSchema> schema;
   TableMetadata metadata;
+  std::string location = kDefaultLocation;  // The location of the table's dataset.
   int64_t num_rows = 0;
   int64_t storage_id = 0;  // DuckDB table OID; distinguishes a dropped/recreated destination.
   std::optional<std::string> view_query;
@@ -126,7 +125,7 @@ struct ExtractJob {
 struct Job {
   std::string project_id;
   std::string job_id;
-  std::string location = kLocation;
+  std::string location = kDefaultLocation;
   std::variant<QueryJob, LoadJob, CopyJob, ExtractJob> configuration;
   // The rows a load or copy job wrote.
   int64_t output_rows = 0;
@@ -145,6 +144,8 @@ struct Job {
 // A query to run as a job.
 struct QueryRequest {
   std::string project_id;
+  // Where the job runs, as the request names it; see JobLocation.
+  std::optional<std::string> location;
   std::string query;
   std::optional<DatasetReference> default_dataset;
   std::string job_id;  // Generated when empty.
@@ -161,18 +162,21 @@ struct QueryRequest {
 
 struct LoadRequest {
   std::string project_id;
+  std::optional<std::string> location;
   std::string job_id;  // Generated when empty.
   LoadJob load;
 };
 
 struct CopyRequest {
   std::string project_id;
+  std::optional<std::string> location;
   std::string job_id;  // Generated when empty.
   CopyJob copy;
 };
 
 struct ExtractRequest {
   std::string project_id;
+  std::optional<std::string> location;
   std::string job_id;  // Generated when empty.
   ExtractJob extract;
 };
@@ -211,9 +215,13 @@ class Emulator {
   std::shared_ptr<const Job> RunLoad(LoadRequest request);
   std::shared_ptr<const Job> RunCopy(CopyRequest request);
   std::shared_ptr<const Job> RunExtract(ExtractRequest request);
-  std::shared_ptr<const Job> GetJob(std::string project_id, const std::string& job_id);
+  // A job in `location`, as a request names it. A request that names none finds a job in the US
+  // or EU multi-region, as BigQuery requires the location of any other.
+  std::shared_ptr<const Job> GetJob(std::string project_id, const std::string& job_id,
+                                    const std::optional<std::string>& location = std::nullopt);
   std::vector<std::shared_ptr<const Job>> ListJobs(std::string project_id);
-  void DeleteJob(std::string project_id, const std::string& job_id);
+  void DeleteJob(std::string project_id, const std::string& job_id,
+                 const std::optional<std::string>& location = std::nullopt);
 
   std::vector<std::string> ListDatasets(std::string project_id);
   // The datasets of ListDatasets, each with its metadata.
@@ -265,10 +273,26 @@ class Emulator {
 
   // The registered project's DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
-  // Keeps the catalog, types and resolved AST alive until translation finishes.
+  // Keeps the catalog, types and resolved AST alive until translation finishes. What the query
+  // uses counts toward `location` when it is set.
   TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
                                 const std::string& default_project,
-                                const std::string& default_dataset);
+                                const std::string& default_dataset,
+                                JobLocation* location = nullptr);
+  // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
+  static std::optional<std::string> DatasetLocation(Backend& backend,
+                                                    const DatasetReference& dataset);
+  // Takes for `location` the location of the datasets and INFORMATION_SCHEMA regions that the
+  // table names of the script `query` name, as BigQuery infers a job's location before running
+  // it, or the US when they name several. Names of no dataset that exists are left out.
+  void InferLocation(const std::string& query, const std::string& default_project,
+                     const std::string& default_dataset, JobLocation& location);
+  // Records that a job in `location` uses the dataset of `table`, if it exists.
+  void UseDataset(JobLocation& location, const TableReference& table);
+  // Records the datasets that the DDL statement `translation` targets as used by the job in
+  // `location`. The location a CREATE SCHEMA names must be the job's.
+  static void UseTargets(Backend& backend, const TranslatedStatement& translation,
+                         JobLocation& location);
   // What gives the columns of `table`, created with `schema` rather than by CREATE TABLE, the
   // defaults of their defaultValueExpression, translated as CREATE TABLE ... DEFAULT translates
   // them. Throws ApiError::Invalid for an expression BigQuery would reject or the emulator cannot
@@ -279,9 +303,10 @@ class Emulator {
                       bool null_arrays = false);
   // Runs `translation` as a query job without a destination table does, recording the metadata
   // of a DDL statement, and returns its result with the schema the translation gives it.
+  // A dataset that CREATE SCHEMA creates without a location is created in the job's.
   QueryResult RunStatement(const TranslatedStatement& translation,
                            const std::vector<std::string>& setup, bool null_arrays = false,
-                           Backend* session = nullptr);
+                           Backend* session = nullptr, JobLocation* location = nullptr);
   // Rejects DDL targets in DuckDB's internal schemas.
   static void CheckDdlTarget(const TranslatedStatement& translation);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
@@ -292,16 +317,19 @@ class Emulator {
   // The metadata of the dataset the table or view that `translation` creates belongs to, as
   // `backend` sees it, or none for any other statement, a temporary table or a missing dataset.
   static DatasetMetadata CreatedInDataset(Backend& backend, const TranslatedStatement& translation);
-  // A catalog source for the tables, views and datasets the emulator holds.
-  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true);
+  // A catalog source for the tables, views and datasets the emulator holds; what it finds counts
+  // toward `location` when it is set.
+  std::unique_ptr<TableSource> NewTableSource(Backend* session = nullptr, bool expire = true,
+                                              JobLocation* location = nullptr);
   QueryResult Prepare(const std::string& sql, const std::vector<std::string>& setup = {});
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,
                  const TableMetadata& metadata, bool replace);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
-  // the finished job. A failure in `body` becomes the job's error. Dry runs are not registered.
-  std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job,
+  // the finished job, which runs where `location` settles. A failure in `body` becomes the job's
+  // error. Dry runs are not registered.
+  std::shared_ptr<const Job> RunJob(std::shared_ptr<Job> job, JobLocation& location,
                                     const std::function<void(Job&)>& body);
   // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`
   // with the given dispositions. A table the write creates takes `metadata`; a write to an

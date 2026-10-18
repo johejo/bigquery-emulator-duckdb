@@ -233,7 +233,8 @@ query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (description = 'x', friendly_name = 'E', labels = [('k', 'v')])
-query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU')
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU'); SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'aws-us-east-1')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (default_table_expiration_days = 1)
 note `CREATE SCHEMA` | See [Datasets](compatibility.md#datasets).
 query `DROP SCHEMA` | DROP SCHEMA IF EXISTS e
@@ -331,6 +332,7 @@ section INFORMATION_SCHEMA
 
 query `SCHEMATA` | SELECT schema_name, ddl FROM INFORMATION_SCHEMA.SCHEMATA
 query `SCHEMATA` | SELECT schema_name FROM `test.region-us.INFORMATION_SCHEMA.SCHEMATA`
+query `SCHEMATA` | SELECT schema_name FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA
 note `SCHEMATA` | See [Datasets](compatibility.md#datasets).
 query `TABLES` | SELECT table_name, table_type, ddl FROM d.INFORMATION_SCHEMA.TABLES
 query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES

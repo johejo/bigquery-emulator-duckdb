@@ -8,6 +8,7 @@
 
 #include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/references.h"
 
 namespace bigquery_emulator_duckdb {
@@ -80,11 +81,17 @@ struct DatasetMetadata {
   std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   // Output only and recorded with the dataset.
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old datasets.
+  // As CanonicalLocation spells it; empty for a dataset recorded before datasets had locations,
+  // which were all in the US.
+  std::string location;
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
            !default_table_expiration_ms.has_value() && default_rounding_mode.empty() &&
-           creation_time == 0;
+           creation_time == 0 && location.empty();
+  }
+  [[nodiscard]] std::string Location() const {
+    return location.empty() ? kDefaultLocation : location;
   }
 
   // The fields of a Dataset resource that it sets.
@@ -105,16 +112,17 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // cloneDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
 
-// The metadata of the Dataset resource `dataset`. Every dataset is in the US, so a location
-// elsewhere is unsupported, and so is any other field with a value besides those that identify
-// the dataset or that the server reports, since they change how BigQuery treats the dataset's
-// tables. Throws ApiError::Invalid for those, for a field of the wrong type and for a label
-// BigQuery rejects.
+// The metadata of the Dataset resource `dataset`, in the US unless it names another location. Any
+// other field with a value besides those that identify the dataset or that the server reports is
+// unsupported, since they change how BigQuery treats the dataset's tables. Throws
+// ApiError::Invalid for those, for a field of the wrong type, for a location BigQuery does not
+// have and for a label BigQuery rejects.
 DatasetMetadata DatasetMetadataFromJson(const nlohmann::json& dataset);
 
 // datasets.patch (`patch`) or datasets.update applied to `metadata`, as UpdateTableMetadata does
 // for tables; a defaultTableExpirationMs of 0 clears it, as BigQuery documents for datasets.patch.
-// Throws as DatasetMetadataFromJson does.
+// A location must be the dataset's own, since a dataset cannot move. Throws as
+// DatasetMetadataFromJson does.
 void UpdateDatasetMetadata(DatasetMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // Throws ApiError::Invalid for a default table expiration BigQuery rejects: one shorter than an

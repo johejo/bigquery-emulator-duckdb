@@ -21,6 +21,7 @@
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/location.h"
 #include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
@@ -160,17 +161,57 @@ bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
   return ToUpperAscii(a) == ToUpperAscii(b);
 }
 
-bool IsRegion(const std::string& part) { return ToLowerAscii(part).starts_with("region-"); }
+// Whether `project` is spelled as BigQuery requires of a project ID: 6 to 63 lowercase letters,
+// digits or dashes, starting with a letter and not ending with a dash, after an optional domain.
+bool ValidProjectId(const std::string& project) {
+  const size_t colon = project.rfind(':');
+  const std::string id = colon == std::string::npos ? project : project.substr(colon + 1);
+  const auto allowed = [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+  };
+  return id.size() >= 6 && id.size() <= 63 && id.front() >= 'a' && id.front() <= 'z' &&
+         id.back() != '-' && std::ranges::all_of(id, allowed);
+}
 
-// The datasets of `project` in the region the qualifier names, if it names one. Every dataset
-// is in the US, as the emulator reports for all of them.
-std::vector<std::string> DatasetsIn(TableSource& source, const std::string& project,
-                                    const std::vector<std::string>& qualifier) {
-  if (!qualifier.empty() && IsRegion(qualifier.back()) &&
-      ToLowerAscii(qualifier.back()) != "region-us") {
-    return {};
+// The error BigQuery gives for a project qualifier that is no project ID, such as `REGION-EU`.
+// The emulator's own projects, which need not be spelled so, are left alone.
+std::optional<absl::Status> InvalidProject(TableSource& source, const std::string& project) {
+  if (ValidProjectId(project) || source.HasProject(project)) {
+    return std::nullopt;
   }
-  return source.ListDatasets(project);
+  return absl::InvalidArgumentError(
+      "Invalid project ID '" + project +
+      "'. Project IDs must contain 6-63 lowercase letters, digits, or dashes. Some project IDs "
+      "also include domain name separated by a colon. IDs must start with a letter and may not "
+      "end with a dash.");
+}
+
+// BigQuery reads `REGION-EU` as a project, not a region.
+bool IsRegion(const std::string& part) { return part.starts_with(kRegionPrefix); }
+
+// The datasets of `project` in the region the qualifier names, or in the US for a view that names
+// none, as BigQuery documents for SCHEMATA; the job must run there. An error for a region BigQuery
+// does not have.
+absl::StatusOr<std::vector<std::string>> DatasetsIn(TableSource& source, const std::string& project,
+                                                    const std::vector<std::string>& qualifier) {
+  std::string location = kDefaultLocation;
+  std::string region_name = "region-us";
+  if (!qualifier.empty() && IsRegion(qualifier.back())) {
+    region_name = qualifier.back();
+    std::optional<std::string> region = RegionQualifierLocation(region_name);
+    if (!region.has_value()) {
+      return absl::InvalidArgumentError("Unrecognized region: " +
+                                        region_name.substr(kRegionPrefix.size()));
+    }
+    location = *std::move(region);
+  }
+  // BigQuery names a region of another location as a dataset of the project.
+  source.ReferenceLocation("Dataset " + project + ":" + region_name, location);
+  std::vector<std::string> datasets = source.ListDatasets(project);
+  std::erase_if(datasets, [&](const std::string& dataset) {
+    return source.DatasetLocation(project, dataset) != location;
+  });
+  return datasets;
 }
 
 // The tables of one dataset, as a view scoped to a dataset or a region lists them.
@@ -420,22 +461,30 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     }
     const std::string project =
         qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
+    if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
+      return *std::move(invalid);
+    }
     columns = SchemataColumns();
-    for (const std::string& dataset : DatasetsIn(source, project, qualifier)) {
+    absl::StatusOr<std::vector<std::string>> datasets = DatasetsIn(source, project, qualifier);
+    if (!datasets.ok()) {
+      return datasets.status();
+    }
+    for (const std::string& dataset : *datasets) {
       const std::optional<DatasetMetadata> metadata = source.DescribeDataset(project, dataset);
       if (!metadata.has_value()) {
         // Dropped since it was listed.
         continue;
       }
+      const std::string location = metadata->Location();
       rows.push_back({
           String(project),
           String(dataset),
           kNull,
           CreationTime(metadata->creation_time),
           kNull,
-          String("US"),
+          String(location),
           String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
-                              "`\nOPTIONS(\n  location=\"us\"\n);")),
+                              "`\nOPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
           kNull,
           kNull,
       });
@@ -457,24 +506,32 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
           return not_found();
         }
         project = qualifier.at(0);
+        if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
+          return *std::move(invalid);
+        }
       }
       if (!IsRegion(qualifier.back())) {
         dataset = qualifier.back();
       }
     }
     std::vector<DatasetTables> datasets;
-    const std::vector<std::string> names = DatasetsIn(source, project, qualifier);
     if (dataset.has_value()) {
-      if (std::ranges::find(names, *dataset) == names.end()) {
+      const std::optional<std::string> location = source.DatasetLocation(project, *dataset);
+      if (!location.has_value()) {
         return not_found();
       }
+      source.ReferenceLocation("Dataset " + project + ":" + *dataset, *location);
       datasets.push_back({
           .project = project,
           .dataset = *dataset,
           .tables = source.ListTables(project, *dataset),
       });
     } else {
-      std::ranges::transform(names, std::back_inserter(datasets), [&](const std::string& name) {
+      absl::StatusOr<std::vector<std::string>> names = DatasetsIn(source, project, qualifier);
+      if (!names.ok()) {
+        return names.status();
+      }
+      std::ranges::transform(*names, std::back_inserter(datasets), [&](const std::string& name) {
         return DatasetTables{
             .project = project,
             .dataset = name,

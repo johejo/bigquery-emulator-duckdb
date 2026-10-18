@@ -156,9 +156,11 @@ cc_library(
     implementation_deps = [
         ":context",
         ":query",
+        "//:api_error",
         "//:catalog",
         "//:duckdb_sql",
         "//:field_schema",
+        "//:location",
         "//:translated_statement",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:function",
