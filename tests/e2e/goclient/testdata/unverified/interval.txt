@@ -1,0 +1,13 @@
+# INTERVAL arithmetic
+
+# Whether BigQuery subtracts TIME values, which its operators reference does not list but
+# GoogleSQL does.
+
+SELECT TIME '10:20:30.456789' - TIME '01:02:03.987654'
+?>
+
+# Whether - subtracts the months, then the days, in turn, as + adds them, so that the first step
+# fails although the result is in range, and BigQuery's message.
+
+SELECT DATETIME '0001-01-15 00:00:00' - INTERVAL '0-1 -30 0:0:0' YEAR TO SECOND
+?>

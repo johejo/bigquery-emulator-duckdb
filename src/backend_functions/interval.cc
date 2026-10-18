@@ -74,32 +74,41 @@ void JustifyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_
   });
 }
 
-// The + operator over INTERVAL values. GoogleSQL adds the months, then the days, then the time,
-// and fails when a step leaves the range, so these add them through GoogleSQL rather than with
-// DuckDB's +, which checks only the result.
+// The + and - operators over INTERVAL values. GoogleSQL adds the months, then the days, then the
+// time, and fails when a step leaves the range, so these add them through GoogleSQL rather than
+// with DuckDB's + and -, which check only the result. Like GoogleSQL, - adds the negated INTERVAL.
+template <bool kSubtract>
+absl::StatusOr<googlesql::IntervalValue> ReadOperand(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+  return kSubtract ? -interval : interval;
+}
+
+template <bool kSubtract>
 void AddIntervals(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto left, ReadInterval(args));
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto right, ReadInterval(args, 1));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto right, ReadOperand<kSubtract>(args));
     GOOGLESQL_ASSIGN_OR_RETURN(const auto result, left + right);
     return IntervalToDuckDb(result);
   });
 }
 
 // DATE + INTERVAL, which is a DATETIME.
+template <bool kSubtract>
 void AddDateInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadOperand<kSubtract>(args));
     googlesql::DatetimeValue result;
     GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddDate(args.Date(0), interval, &result));
     return MicrosFromDatetime(result);
   });
 }
 
+template <bool kSubtract>
 void AddDatetimeInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(args.Int(0)));
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadOperand<kSubtract>(args));
     googlesql::DatetimeValue result;
     GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddDatetime(datetime, interval, &result));
     return MicrosFromDatetime(result);
@@ -108,14 +117,44 @@ void AddDatetimeInterval(duckdb_function_info info, duckdb_data_chunk input, duc
 
 // GoogleSQL rejects intervals with months, and names the time zone only in its errors, where
 // BigQuery's default is UTC.
+template <bool kSubtract>
 void AddTimestampInterval(duckdb_function_info info, duckdb_data_chunk input,
                           duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<int64_t> {
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args, 1));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadOperand<kSubtract>(args));
     absl::Time result;
     GOOGLESQL_RETURN_IF_ERROR(googlesql::functions::AddTimestamp(
         absl::FromUnixMicros(args.Int(0)), absl::UTCTimeZone(), interval, &result));
     return absl::ToUnixMicros(result);
+  });
+}
+
+// DATE - DATE, DATETIME - DATETIME and TIMESTAMP - TIMESTAMP. GoogleSQL gives the difference of
+// dates in days, of timestamps in time, and of datetimes in days and time.
+void SubtractDates(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
+                               googlesql::functions::IntervalDiffDates(args.Date(0), args.Date(1)));
+    return IntervalToDuckDb(result);
+  });
+}
+
+void SubtractDatetimes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto left, DatetimeFromMicros(args.Int(0)));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto right, DatetimeFromMicros(args.Int(1)));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
+                               googlesql::functions::IntervalDiffDatetimes(left, right));
+    return IntervalToDuckDb(result);
+  });
+}
+
+void SubtractTimestamps(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result, googlesql::functions::IntervalDiffTimestamps(
+                                                      absl::FromUnixMicros(args.Int(0)),
+                                                      absl::FromUnixMicros(args.Int(1))));
+    return IntervalToDuckDb(result);
   });
 }
 
@@ -226,12 +265,26 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            IntervalFromString);
   Register(connection, "bq_interval_from_csv", {kVarchar}, kInterval, IntervalFromCsv);
   Register(connection, "bq_interval_key", {kInterval}, kBigint, IntervalKey);
-  Register(connection, "bq_add_intervals", {kInterval, kInterval}, kInterval, AddIntervals);
-  Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime, AddDateInterval);
+  Register(connection, "bq_add_intervals", {kInterval, kInterval}, kInterval, AddIntervals<false>);
+  Register(connection, "bq_subtract_intervals", {kInterval, kInterval}, kInterval,
+           AddIntervals<true>);
+  Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime,
+           AddDateInterval<false>);
+  Register(connection, "bq_subtract_date_interval", {kDate, kInterval}, kDatetime,
+           AddDateInterval<true>);
   Register(connection, "bq_add_datetime_interval", {kDatetime, kInterval}, kDatetime,
-           AddDatetimeInterval);
+           AddDatetimeInterval<false>);
+  Register(connection, "bq_subtract_datetime_interval", {kDatetime, kInterval}, kDatetime,
+           AddDatetimeInterval<true>);
   Register(connection, "bq_add_timestamp_interval", {kTimestamp, kInterval}, kTimestamp,
-           AddTimestampInterval);
+           AddTimestampInterval<false>);
+  Register(connection, "bq_subtract_timestamp_interval", {kTimestamp, kInterval}, kTimestamp,
+           AddTimestampInterval<true>);
+  Register(connection, "bq_subtract_dates", {kDate, kDate}, kInterval, SubtractDates);
+  Register(connection, "bq_subtract_datetimes", {kDatetime, kDatetime}, kInterval,
+           SubtractDatetimes);
+  Register(connection, "bq_subtract_timestamps", {kTimestamp, kTimestamp}, kInterval,
+           SubtractTimestamps);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions
