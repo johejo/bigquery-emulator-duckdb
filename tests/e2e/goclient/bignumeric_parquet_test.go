@@ -89,6 +89,7 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 	targets ...bigquery.DecimalTargetType) error {
 	source := bigquery.NewGCSReference(path)
 	source.SourceFormat = bigquery.Parquet
+	source.ParquetOptions = &bigquery.ParquetOptions{EnableListInference: true}
 	source.Schema = s
 	loader := table.LoaderFrom(source)
 	loader.DecimalTargetTypes = targets

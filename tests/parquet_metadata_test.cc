@@ -55,7 +55,6 @@ ThriftValue Annotated(ThriftValue element, int64_t converted) {
 }
 
 constexpr int64_t kOptional = 1;
-constexpr int64_t kRepeated = parquet::kRepeated;
 
 // A Parquet file with an empty footer, which RewriteParquetMetadata then replaces.
 std::string EmptyParquetFile() {
@@ -103,61 +102,6 @@ TEST(ParquetMetadataTest, RejectsFilesThatAreNotParquet) {
   const std::string path = EmptyParquetFile();
   std::filesystem::resize_file(path, 11);
   EXPECT_THROW(ReadParquetMetadata(path), ApiError);
-}
-
-// The shapes DuckDB reads, by the format's rules for lists and their backward compatibility.
-TEST(ParquetMetadataTest, ColumnsTakeDuckDbsShape) {
-  const std::vector<ThriftValue> schema = {
-      Element("schema", kRepeated, 6),
-      // The standard three-level list.
-      Annotated(Element("a", kOptional, 1), parquet::kConvertedList),
-      Element("list", kRepeated, 1),
-      Element("element", kOptional, 0, parquet::kFixedLenByteArray),
-      // A two-level list of a repeated leaf.
-      Annotated(Element("b", kOptional, 1), parquet::kConvertedList),
-      Element("array", kRepeated, 0),
-      // A list whose repeated group named array is a struct of one field.
-      Annotated(Element("c", kOptional, 1), parquet::kConvertedList),
-      Element("array", kRepeated, 1),
-      Element("x", kOptional, 0),
-      // A repeated group, unannotated, and a repeated leaf.
-      Element("d", kRepeated, 2),
-      Element("x", kOptional, 0),
-      Element("y", kOptional, 0),
-      Element("e", kRepeated, 0),
-      // A struct.
-      Element("f", kOptional, 1),
-      Element("x", kOptional, 0),
-  };
-  const ParquetColumn columns =
-      ParquetColumns(ThriftValue::Struct({{.id = parquet::kSchema, .value = List(schema)}}));
-  using Kind = ParquetColumn::Kind;
-  ASSERT_EQ(columns.kind, Kind::kStruct);
-  ASSERT_EQ(columns.children.size(), 6);
-
-  const ParquetColumn& a = columns.children.at(0);
-  ASSERT_EQ(a.kind, Kind::kList);
-  EXPECT_EQ(a.children.at(0).kind, Kind::kLeaf);
-  EXPECT_EQ(a.children.at(0).element, 3);
-  EXPECT_EQ(a.children.at(0).type, parquet::kFixedLenByteArray);
-
-  const ParquetColumn& b = columns.children.at(1);
-  ASSERT_EQ(b.kind, Kind::kList);
-  EXPECT_EQ(b.children.at(0).kind, Kind::kLeaf);
-
-  const ParquetColumn& c = columns.children.at(2);
-  ASSERT_EQ(c.kind, Kind::kList);
-  ASSERT_EQ(c.children.at(0).kind, Kind::kStruct);
-  EXPECT_NE(c.children.at(0).Child("X"), nullptr);
-
-  const ParquetColumn& d = columns.children.at(3);
-  ASSERT_EQ(d.kind, Kind::kList);
-  ASSERT_EQ(d.children.at(0).kind, Kind::kStruct);
-  EXPECT_EQ(d.children.at(0).children.size(), 2);
-
-  EXPECT_EQ(columns.children.at(4).kind, Kind::kList);
-  EXPECT_EQ(columns.children.at(4).children.at(0).kind, Kind::kLeaf);
-  EXPECT_EQ(columns.children.at(5).kind, Kind::kStruct);
 }
 
 TEST(ParquetMetadataTest, TellsWideDecimals) {

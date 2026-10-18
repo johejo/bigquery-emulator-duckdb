@@ -390,10 +390,14 @@ std::string JsonValue(const std::string& name, const FieldSchema& field) {
 }  // namespace
 
 ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
-                                    TemporaryFiles& downloads) {
+                                    TemporaryFiles& downloads, bool list_inference) {
   ParquetSources sources;
   for (const std::string& path : paths) {
     ThriftValue metadata = ReadParquetMetadata(path);
+    if (!list_inference && HasListGroup(metadata)) {
+      throw ApiError::Unsupported(
+          "loading Parquet LIST columns without parquetOptions.enableListInference");
+    }
     const ParquetColumn columns = ParquetColumns(metadata);
     if (sources.paths.empty()) {
       sources.columns = columns;
