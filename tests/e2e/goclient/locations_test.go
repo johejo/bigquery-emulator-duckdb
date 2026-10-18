@@ -3,6 +3,7 @@ package goclient
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -97,6 +98,15 @@ func TestLocations(t *testing.T) {
 		} else if got != c.want {
 			t.Errorf("%s in %q: ran in %q, want %q", c.sql, c.location, got, c.want)
 		}
+	}
+	// A job whose names span two locations runs in the US, and names the dataset of the other.
+	if _, err := run("SELECT COUNT(*) FROM eu.t, `region-us`.INFORMATION_SCHEMA.SCHEMATA", ""); err == nil ||
+		!strings.Contains(err.Error(), "Not found: Dataset go-locations:eu was not found in location US") {
+		t.Errorf("a query of EU and US: error = %v", err)
+	}
+	// Only the prefix of a region qualifier must be in lower case.
+	if got, err := run("SELECT COUNT(*) FROM `region-EU`.INFORMATION_SCHEMA.SCHEMATA", ""); err != nil || got != "EU" {
+		t.Errorf("region-EU: ran in %q, %v; want EU", got, err)
 	}
 	// It fails when it uses a dataset elsewhere.
 	for _, c := range []struct{ sql, location string }{

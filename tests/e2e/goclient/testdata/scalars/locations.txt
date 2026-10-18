@@ -21,3 +21,10 @@ SELECT 1
 CREATE SCHEMA IF NOT EXISTS scalars_locations_nowhere OPTIONS (location = 'nowhere');
 SELECT 1
 => error contains: Invalid location 'nowhere'
+
+# ALTER SCHEMA takes no location, the dataset's own or another.
+ALTER SCHEMA scalars SET OPTIONS (location = 'US')
+=> error contains: Unknown option: location
+
+ALTER SCHEMA scalars SET OPTIONS (location = 'EU')
+=> error contains: Unknown option: location

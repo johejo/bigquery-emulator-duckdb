@@ -274,6 +274,10 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
                 OptionUpdates& updates) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
+    // A dataset cannot move, and BigQuery takes no location in ALTER SCHEMA.
+    if (statement == "ALTER SCHEMA" && name == "location") {
+      throw ApiError::InvalidQuery("Unknown option: " + option->name());
+    }
     const std::optional<googlesql::Value> value =
         OptionValue(*option, OptionObject(statement), scope);
     const bool applied =

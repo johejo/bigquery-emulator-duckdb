@@ -47,7 +47,8 @@ BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_
 A dataset is in the location that `datasets.insert` or `CREATE SCHEMA` names, the `US` unless
 `datasets.insert` names one, and the [job's location](#locations) unless `CREATE SCHEMA` does. The
 locations are those BigQuery lists for datasets, compared without case; BigQuery Omni locations are
-unsupported, and so is changing a dataset's location. A table is in its dataset's location, and the
+unsupported. A dataset cannot move: `ALTER SCHEMA SET OPTIONS` rejects a location as BigQuery does,
+and `datasets.patch` and `datasets.update` reject another location as unsupported. A table is in its dataset's location, and the
 `INFORMATION_SCHEMA` region qualifier `` `region-REGION` ``, whose `region-` is in lower case,
 covers the datasets of the project in that location.
 
