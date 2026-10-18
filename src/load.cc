@@ -315,6 +315,47 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
       field.name));
 }
 
+// The DuckDB value `sql` of `column` in the shape BigQuery loads it, with each unwrapped STRUCT
+// put back around the field DuckDB reads in its place, a NULL list empty and a null element of a
+// list an error. A lambda takes the name _p and its `depth`. An `element` of a list is a repeated
+// group, which is never NULL.
+std::string ParquetShape(const std::string& sql, const ParquetColumn& column, int depth,
+                         bool element) {
+  if (!column.Reshaped()) {
+    return sql;
+  }
+  if (column.kind == ParquetColumn::Kind::kList) {
+    const std::string name = "_p" + std::to_string(depth);
+    std::string value = ParquetShape(name, column.children.front(), depth + 1, true);
+    if (column.null_elements) {
+      value = std::format(
+          "CASE WHEN {} IS NULL THEN error({}) ELSE {} END", name,
+          QuoteLiteral("Array cannot have a null element; error in writing field " + column.name),
+          value);
+    }
+    std::string list =
+        value == name ? sql : std::format("list_transform({}, {} -> {})", sql, name, value);
+    return column.nullable ? std::format("coalesce({}, [])", list) : list;
+  }
+  if (column.kind != ParquetColumn::Kind::kStruct) {
+    throw ApiError::Unsupported(
+        "loading a Parquet MAP with a STRUCT of one field that DuckDB reads as the field");
+  }
+  std::vector<std::string> fields;
+  for (const ParquetColumn& child : column.children) {
+    const std::string value =
+        column.unwrapped ? sql
+                         : std::format("struct_extract({}, {})", sql, QuoteLiteral(child.name));
+    fields.push_back(std::format("{} := {}", QuoteIdentifier(child.name),
+                                 ParquetShape(value, child, depth, false)));
+  }
+  std::string packed = std::format("struct_pack({})", Join(fields, ", "));
+  if (element && column.unwrapped) {
+    return packed;
+  }
+  return std::format("CASE WHEN {} IS NULL THEN NULL ELSE {} END", sql, packed);
+}
+
 // The schema elements of the wide DECIMAL leaves of `column`.
 void WideDecimals(const ParquetColumn& column, std::vector<size_t>& elements) {
   if (column.IsWideDecimal()) {
@@ -394,11 +435,7 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
   ParquetSources sources;
   for (const std::string& path : paths) {
     ThriftValue metadata = ReadParquetMetadata(path);
-    if (!list_inference && HasListGroup(metadata)) {
-      throw ApiError::Unsupported(
-          "loading Parquet LIST columns without parquetOptions.enableListInference");
-    }
-    const ParquetColumn columns = ParquetColumns(metadata);
+    const ParquetColumn columns = ParquetColumns(metadata, list_inference);
     if (sources.paths.empty()) {
       sources.columns = columns;
     } else if (columns != sources.columns &&
@@ -406,6 +443,10 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
       throw ApiError::Unsupported(
           "loading Parquet files whose schemas differ when one has a DECIMAL "
           "wider than 38 digits");
+    } else if (columns != sources.columns && (columns.Reshaped() || sources.columns.Reshaped())) {
+      throw ApiError::Unsupported(
+          "loading Parquet files whose schemas differ when one has a STRUCT of one field that "
+          "DuckDB reads as the field or a nullable LIST");
     }
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
@@ -530,6 +571,16 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     }
   } else {
     sql = std::format("SELECT * FROM read_parquet({})", files);
+    std::vector<std::string> shaped;
+    for (const ParquetColumn& column : parquet.children) {
+      if (column.Reshaped()) {
+        const std::string name = QuoteIdentifier(column.name);
+        shaped.push_back(std::format("{} AS {}", ParquetShape(name, column, 0, false), name));
+      }
+    }
+    if (!shaped.empty()) {
+      sql = std::format("SELECT * REPLACE ({}) FROM read_parquet({})", Join(shaped, ", "), files);
+    }
   }
   if (!schema.empty() && format != "CSV") {
     std::vector<std::string> columns;

@@ -103,6 +103,7 @@ inline constexpr int64_t kInt32 = 1;
 inline constexpr int64_t kInt64 = 2;
 inline constexpr int64_t kByteArray = 6;
 inline constexpr int64_t kFixedLenByteArray = 7;
+inline constexpr int64_t kOptional = 1;
 inline constexpr int64_t kRepeated = 2;
 inline constexpr int64_t kConvertedMap = 1;
 inline constexpr int64_t kConvertedMapKeyValue = 2;
@@ -113,7 +114,7 @@ inline constexpr int64_t kConvertedFirstInteger = 11;
 inline constexpr int64_t kConvertedLastInteger = 18;
 }  // namespace parquet
 
-// A column of a Parquet file in the shape DuckDB reads it: a group is a STRUCT, and a LIST group
+// A column of a Parquet file in the shape BigQuery loads it: a group is a STRUCT, and a LIST group
 // or a repeated field a LIST.
 struct ParquetColumn {
   enum class Kind : uint8_t { kLeaf, kStruct, kList, kMap };
@@ -122,6 +123,12 @@ struct ParquetColumn {
   Kind kind = Kind::kLeaf;
   // kStruct: the fields. kList: the element, whose name is the list's.
   std::vector<ParquetColumn> children;
+  // A kStruct of one field that DuckDB reads as that field.
+  bool unwrapped = false;
+  // A kList that can be NULL, which BigQuery loads as empty.
+  bool nullable = false;
+  // A kList whose elements can be null, which BigQuery rejects.
+  bool null_elements = false;
   // The index of its SchemaElement in FileMetaData's schema.
   size_t element = 0;
   // kLeaf: its physical type, its ConvertedType or -1, the member of its LogicalType or 0, and
@@ -139,17 +146,17 @@ struct ParquetColumn {
   [[nodiscard]] bool IsWideDecimal() const;
   // An INT32 or INT64 that DuckDB reads as an integer.
   [[nodiscard]] bool IsInteger() const;
+  // Whether this column or a descendant is unwrapped, nullable or has null_elements, which a load
+  // handles after DuckDB reads it.
+  [[nodiscard]] bool Reshaped() const;
   // Whether this column or a descendant is a wide DECIMAL.
   [[nodiscard]] bool HasWideDecimal() const;
   // The field of a kStruct named `field` in any case, or null.
   [[nodiscard]] const ParquetColumn* Child(std::string_view field) const;
 };
 
-// The columns of `metadata`, a FileMetaData, as the fields of a STRUCT. Throws
-// ApiError::Unsupported for a LIST that DuckDB reads otherwise than the format's rules.
-ParquetColumn ParquetColumns(const ThriftValue& metadata);
-
-// Whether a group of the schema of `metadata`, a FileMetaData, is annotated as a LIST.
-bool HasListGroup(const ThriftValue& metadata);
+// The columns of `metadata`, a FileMetaData, as the fields of a STRUCT, with or without
+// BigQuery's `list_inference`.
+ParquetColumn ParquetColumns(const ThriftValue& metadata, bool list_inference);
 
 }  // namespace bigquery_emulator_duckdb

@@ -19,9 +19,9 @@ rejects the `parentJobId` of a multi-statement query.
 
 Loads and extracts also accept local paths. Loads read CSV, newline-delimited JSON and Parquet. A
 Parquet DECIMAL wider than 38 digits loads only into BIGNUMERIC, which schema detection picks only
-when `decimalTargetTypes` includes it. Parquet LIST columns load only with
-`parquetOptions.enableListInference`, and not when the list's repeated group is named `array` or
-`<list>_tuple` and holds one field. Query and load jobs cannot partition or cluster their
+when `decimalTargetTypes` includes it. Parquet files whose schemas differ do not load
+when one has a nullable LIST, or a group of one field that DuckDB reads as the field, as a LIST
+is without `parquetOptions.enableListInference`. Query and load jobs cannot partition or cluster their
 destination table, and loads reject `destinationTableProperties`.
 
 Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns. They write a
