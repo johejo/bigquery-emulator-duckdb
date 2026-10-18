@@ -523,3 +523,29 @@ SELECT SAFE_CONVERT_BYTES_TO_STRING(b'\xc2')
 
 SELECT SAFE_CONVERT_BYTES_TO_STRING(CAST(NULL AS BYTES))
 => null
+
+## Casts between STRING and BYTES
+# A cast converts through UTF-8, where DuckDB's reads and writes escapes such as \xAA. The
+# columns keep the analyzer from folding the casts.
+
+SELECT TO_HEX(CAST(b AS BYTES)) FROM t WHERE a = 3
+=> "e38182"
+
+SELECT TO_HEX(MD5(CAST(x AS BYTES))) FROM UNNEST(['abcABCжщфЖЩФ']) AS x
+=> "cbd14d089f78b5c01f5e488d934c1edc"
+
+SELECT CAST(CAST(b AS BYTES) AS STRING) FROM t WHERE a = 3
+=> "あ"
+
+SELECT CAST(raw AS STRING) FROM t WHERE a = 1
+=> "a"
+
+SELECT CAST(raw AS STRING) FROM t WHERE a = 2
+=> null
+
+# Bytes that are not UTF-8 are an error.
+SELECT CAST(raw AS STRING) FROM t WHERE a = 3
+=> error:
+
+SELECT SAFE_CAST(raw AS STRING) FROM t WHERE a = 3
+=> null
