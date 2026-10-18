@@ -163,8 +163,9 @@ as BigQuery only supports `DISTINCT` for those operations.
 ### INTERVAL values
 
 INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
-parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, and `SUM` and `AVG` are
-supported. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
+parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, `TO_JSON` and `TO_JSON_STRING`,
+which encode them as ISO 8601 durations, and `SUM` and `AVG` are supported. Tables store INTERVAL
+columns, also in ARRAYs and STRUCTs.
 `tabledata.insertAll` rows give them as text in the canonical form, in full or in part, as query
 parameters do, and CSV loads read only the full `Y-M D H:M:S[.F]` form BigQuery documents.
 Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `DISTINCT`, `PARTITION BY`,
@@ -175,7 +176,7 @@ Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `
 values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
 sets the first in the whole input, and `SUM` and `AVG` with `DISTINCT` count the first. `GREATEST`, `LEAST`
 and `NULLIF` fail as in BigQuery. `PARTITION BY` and distinct set operations over ARRAY values with
-INTERVAL elements, arithmetic, other aggregates, JSON conversion, loads of
+INTERVAL elements, arithmetic, other aggregates, other JSON conversions, loads of
 INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
 unsupported.
 
