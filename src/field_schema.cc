@@ -208,17 +208,19 @@ FieldSchema FieldSchemaFromJson(const json& value) {
   if (field.name.empty()) {
     throw ApiError::Invalid("A schema field is missing a name");
   }
-  if (const std::string type = StringMember(value, "type"); !type.empty()) {
-    const std::optional<FieldType> parsed = ParseFieldType(type);
-    if (!parsed.has_value()) {
-      throw ApiError::Invalid("Unsupported field type: " + type);
-    }
-    field.type = *parsed;
+  const std::string type = StringMember(value, "type");
+  if (type.empty()) {
+    throw ApiError::Invalid("Field " + field.name + " missing type");
   }
+  const std::optional<FieldType> parsed_type = ParseFieldType(type);
+  if (!parsed_type.has_value()) {
+    throw ApiError::Invalid("Unsupported field type: " + type);
+  }
+  field.type = *parsed_type;
   if (const std::string mode = StringMember(value, "mode"); !mode.empty()) {
     const std::optional<FieldMode> parsed = ParseFieldMode(mode);
     if (!parsed.has_value()) {
-      throw ApiError::Invalid("Unsupported field mode: " + mode);
+      throw ApiError::Invalid("Invalid value for mode: " + mode + " is not a valid value");
     }
     field.mode = *parsed;
   }

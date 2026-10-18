@@ -42,7 +42,7 @@ produce the success marker.
 
 ## Tests
 
-`//:clang_tidy_test` inspects the real `field_schema_test`, `query_parameters` and `httplib`
+`//:clang_tidy_test` inspects the real `parquet_metadata_test`, `query_parameters` and `httplib`
 targets. It checks configuration and executable inputs, C++20 flags, httplib's public settings
 and private-define isolation, and implementation dependencies' lint outputs. It is included in
 `just test`; `just tidy` executes the actual lint actions.
