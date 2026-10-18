@@ -232,7 +232,7 @@ query `CREATE SCHEMA` | CREATE SCHEMA e
 query `CREATE SCHEMA` | CREATE SCHEMA IF NOT EXISTS d
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'US')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (description = 'x', friendly_name = 'E', labels = [('k', 'v')])
-query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU')
+query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'EU'); SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (location = 'aws-us-east-1')
 query `CREATE SCHEMA` | CREATE SCHEMA e OPTIONS (default_table_expiration_days = 1)
 note `CREATE SCHEMA` | See [Datasets](compatibility.md#datasets).

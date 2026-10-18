@@ -15,6 +15,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/api_error.h"
 #include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -163,7 +164,7 @@ bool LocationOption(const googlesql::Value& value, std::string& into) {
   }
   std::optional<std::string> canonical = CanonicalLocation(location);
   if (!canonical.has_value()) {
-    return false;
+    throw ApiError::InvalidQuery("Invalid location '" + location + "'");
   }
   into = *std::move(canonical);
   return true;
@@ -243,7 +244,7 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
 
 // The description, friendly name, labels, default table expiration, default rounding mode and
 // location the OPTIONS of a CREATE SCHEMA set. The other options are unsupported, since they change
-// how BigQuery treats the dataset's tables, and so is a location BigQuery does not have.
+// how BigQuery treats the dataset's tables. Throws ApiError for a location BigQuery does not have.
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
   DatasetMetadata metadata;
   for (const auto& option : options) {

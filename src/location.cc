@@ -104,11 +104,10 @@ std::optional<std::string> RequestedLocation(const std::optional<std::string>& l
 }
 
 std::optional<std::string> RegionQualifierLocation(std::string_view qualifier) {
-  constexpr std::string_view kPrefix = "region-";
-  if (!ToLowerAscii(qualifier).starts_with(kPrefix)) {
+  if (!qualifier.starts_with(kRegionPrefix)) {
     return std::nullopt;
   }
-  return KnownLocation(ToLowerAscii(qualifier.substr(kPrefix.size())));
+  return KnownLocation(ToLowerAscii(qualifier.substr(kRegionPrefix.size())));
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): what is used, then where it is.

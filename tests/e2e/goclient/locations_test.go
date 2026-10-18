@@ -37,6 +37,10 @@ func TestLocations(t *testing.T) {
 	cleanup("ddl_eu")
 	cleanup("ddl_job")
 	cleanup("ddl_us")
+	cleanup("ddl_eu_alone")
+	cleanup("ddl_eu_lower")
+	cleanup("ddl_eu_implicit")
+	cleanup("ddl_tokyo_upper")
 	// run runs sql in `location`, or where BigQuery infers it, and returns the job's location.
 	run := func(sql, location string) (string, error) {
 		t.Helper()
@@ -106,8 +110,10 @@ func TestLocations(t *testing.T) {
 		}
 	}
 
-	// CREATE SCHEMA creates a dataset in the location it names, or else in the job's.
-	if _, err := run("CREATE SCHEMA ddl_eu OPTIONS (location = 'EU')", ""); err != nil {
+	// CREATE SCHEMA creates a dataset in the location it names, which must be the job's, or else in
+	// the job's. A job that names no other dataset runs in the US, so CREATE SCHEMA alone does not
+	// settle it, as BigQuery answers.
+	if _, err := run("CREATE SCHEMA ddl_eu OPTIONS (location = 'EU')", "EU"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := run("CREATE SCHEMA ddl_job", "asia-northeast1"); err != nil {
@@ -116,7 +122,33 @@ func TestLocations(t *testing.T) {
 	if _, err := run("CREATE SCHEMA ddl_us OPTIONS (location = 'US')", "EU"); err == nil {
 		t.Error("CREATE SCHEMA in another location than the job's succeeded, want an error")
 	}
-	for id, want := range map[string]string{"ddl_eu": "EU", "ddl_job": "asia-northeast1"} {
+	if _, err := run("CREATE SCHEMA ddl_eu_alone OPTIONS (location = 'EU')", ""); err == nil {
+		t.Error("CREATE SCHEMA in EU of a job in the US succeeded, want an error")
+	}
+	// A script runs where its INFORMATION_SCHEMA region is, and a dataset it creates without a
+	// location takes the script's; a location is stored as BigQuery spells it.
+	for _, sql := range []string{
+		"CREATE SCHEMA ddl_eu_lower OPTIONS (location = 'eu'); CREATE SCHEMA ddl_eu_implicit; " +
+			"SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA",
+		"CREATE SCHEMA ddl_tokyo_upper OPTIONS (location = 'ASIA-NORTHEAST1'); " +
+			"SELECT COUNT(*) FROM `region-asia-northeast1`.INFORMATION_SCHEMA.SCHEMATA",
+	} {
+		if _, err := run(sql, ""); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	// A script whose CREATE SCHEMA names another location than the region it reads fails.
+	if _, err := run("CREATE SCHEMA ddl_us OPTIONS (location = 'US'); "+
+		"SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA", ""); err == nil {
+		t.Error("CREATE SCHEMA in the US of a script in EU succeeded, want an error")
+	}
+	for id, want := range map[string]string{
+		"ddl_eu":          "EU",
+		"ddl_job":         "asia-northeast1",
+		"ddl_eu_lower":    "EU",
+		"ddl_eu_implicit": "EU",
+		"ddl_tokyo_upper": "asia-northeast1",
+	} {
 		metadata, err := client.Dataset(id).Metadata(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -149,10 +181,17 @@ func TestLocations(t *testing.T) {
 			{"us", "US"},
 		},
 		"SELECT schema_name, location FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA ORDER BY schema_name": {
-			{"ddl_eu", "EU"}, {"eu", "EU"},
+			{"ddl_eu", "EU"}, {"ddl_eu_implicit", "EU"}, {"ddl_eu_lower", "EU"}, {"eu", "EU"},
 		},
 		"SELECT schema_name FROM `region-asia-northeast1`.INFORMATION_SCHEMA.SCHEMATA ORDER BY schema_name": {
-			{"ddl_job"}, {"tokyo"},
+			{"ddl_job"}, {"ddl_tokyo_upper"}, {"tokyo"},
+		},
+		// The DDL spells the location in lower case.
+		"SELECT REGEXP_EXTRACT(ddl, r'location=\"[^\"]*\"') FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'ddl_eu_lower'": {
+			{`location="eu"`},
+		},
+		"SELECT REGEXP_EXTRACT(ddl, r'location=\"[^\"]*\"') FROM `region-asia-northeast1`.INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = 'ddl_tokyo_upper'": {
+			{`location="asia-northeast1"`},
 		},
 	} {
 		if got := read(sql); !reflect.DeepEqual(got, want) {

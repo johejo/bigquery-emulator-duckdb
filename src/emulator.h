@@ -282,15 +282,15 @@ class Emulator {
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);
-  // Takes for `location` the location of the first dataset that a table name of the script
-  // `query` names, as BigQuery infers a job's location from the datasets a query names before
-  // running it. Names that are not tables, or name none that exists, are left out.
+  // Takes for `location` the location of the datasets and INFORMATION_SCHEMA regions that the
+  // table names of the script `query` name, as BigQuery infers a job's location before running
+  // it, or the US when they name several. Names of no dataset that exists are left out.
   void InferLocation(const std::string& query, const std::string& default_project,
                      const std::string& default_dataset, JobLocation& location);
   // Records that a job in `location` uses the dataset of `table`, if it exists.
   void UseDataset(JobLocation& location, const TableReference& table);
   // Records the datasets that the DDL statement `translation` targets as used by the job in
-  // `location`; the dataset a CREATE SCHEMA creates is used in the location it names.
+  // `location`. The location a CREATE SCHEMA names must be the job's.
   static void UseTargets(Backend& backend, const TranslatedStatement& translation,
                          JobLocation& location);
   // What gives the columns of `table`, created with `schema` rather than by CREATE TABLE, the

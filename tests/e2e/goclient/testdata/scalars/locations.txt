@@ -1,0 +1,23 @@
+# Job locations, as BigQuery answers. A job that names INFORMATION_SCHEMA regions of several
+# locations runs in the US, and names a region of another location as a dataset of the project.
+# https://cloud.google.com/bigquery/docs/locations
+
+SELECT COUNT(*) FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA, `region-us`.INFORMATION_SCHEMA.SCHEMATA
+=> error contains: :region-eu was not found in location US
+
+# A single region does not match the multi-region it lies in.
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA, `region-us-central1`.INFORMATION_SCHEMA.SCHEMATA
+=> error contains: :region-us-central1 was not found in location US
+
+SELECT COUNT(*) FROM `region-nowhere`.INFORMATION_SCHEMA.SCHEMATA
+=> error contains: Unrecognized region: nowhere
+
+# The location CREATE SCHEMA names must be the job's, which a job that names no dataset has in the
+# US.
+CREATE SCHEMA IF NOT EXISTS scalars_locations_eu OPTIONS (location = 'EU');
+SELECT 1
+=> error contains: Location specified in query EU is not consistent with current execution region US
+
+CREATE SCHEMA IF NOT EXISTS scalars_locations_nowhere OPTIONS (location = 'nowhere');
+SELECT 1
+=> error contains: Invalid location 'nowhere'

@@ -15,6 +15,9 @@ inline constexpr char kDefaultLocation[] = "US";
 // ApiError::Unsupported for a BigQuery Omni location, whose datasets hold only external tables.
 std::optional<std::string> CanonicalLocation(std::string_view location);
 
+// How an INFORMATION_SCHEMA region qualifier starts, in lower case only.
+inline constexpr std::string_view kRegionPrefix = "region-";
+
 // The location a `region-REGION` qualifier of INFORMATION_SCHEMA names, or nothing for another
 // qualifier or a region BigQuery does not have.
 std::optional<std::string> RegionQualifierLocation(std::string_view qualifier);

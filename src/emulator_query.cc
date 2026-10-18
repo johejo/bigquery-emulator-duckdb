@@ -334,10 +334,8 @@ void Emulator::InferLocation(const std::string& query, const std::string& defaul
            .ok()) {
     return;
   }
+  std::set<std::string> locations;
   for (const std::vector<std::string>& name : names) {
-    if (location.settled().has_value()) {
-      return;
-    }
     // A quoted name such as `project.dataset.table` is one identifier of the path.
     std::vector<std::string> parts;
     for (const std::string& identifier : name) {
@@ -351,7 +349,7 @@ void Emulator::InferLocation(const std::string& query, const std::string& defaul
       }
     }
     if (region.has_value()) {
-      location.Infer(*region);
+      locations.insert(*std::move(region));
       continue;
     }
     // The dataset of an INFORMATION_SCHEMA view, or that of a table. SCHEMATA without a region
@@ -360,7 +358,7 @@ void Emulator::InferLocation(const std::string& query, const std::string& defaul
         parts, [](const std::string& part) { return ToUpperAscii(part) == "INFORMATION_SCHEMA"; });
     if (schema != parts.end() && schema + 1 != parts.end() &&
         ToUpperAscii(*(schema + 1)) == "SCHEMATA") {
-      location.Infer(kDefaultLocation);
+      locations.insert(kDefaultLocation);
       continue;
     }
     if (schema != parts.end()) {
@@ -384,8 +382,12 @@ void Emulator::InferLocation(const std::string& query, const std::string& defaul
       continue;
     }
     if (const std::optional<std::string> found = DatasetLocation(backend_, dataset)) {
-      location.Infer(*found);
+      locations.insert(*found);
     }
+  }
+  // Names of several locations leave the job in the US, as BigQuery answers.
+  if (!locations.empty()) {
+    location.Infer(locations.size() == 1 ? *locations.begin() : std::string(kDefaultLocation));
   }
 }
 

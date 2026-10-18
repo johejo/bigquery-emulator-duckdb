@@ -553,12 +553,13 @@ void Emulator::UseTargets(Backend& backend, const TranslatedStatement& translati
     }
   };
   if (const auto& definition = translation.dataset) {
-    // Whether CREATE SCHEMA IF NOT EXISTS uses a dataset that exists in another location is not
-    // known, so only the location the statement names counts.
-    if (!definition->metadata.location.empty()) {
-      location.Reference(
-          "Dataset " + definition->dataset.project_id + ":" + definition->dataset.dataset_id,
-          definition->metadata.location);
+    // The location CREATE SCHEMA names does not settle the job's, as BigQuery answers, even for a
+    // dataset that IF NOT EXISTS keeps.
+    const std::string& named = definition->metadata.location;
+    if (!named.empty() && named != location.Resolve()) {
+      throw ApiError::InvalidQuery("Location specified in query " + named +
+                                   " is not consistent with current execution region " +
+                                   location.Resolve());
     }
   } else if (const auto& target = translation.ddl_target_dataset) {
     use(*target);

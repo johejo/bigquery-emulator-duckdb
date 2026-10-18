@@ -161,23 +161,27 @@ bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
   return ToUpperAscii(a) == ToUpperAscii(b);
 }
 
-bool IsRegion(const std::string& part) { return ToLowerAscii(part).starts_with("region-"); }
+// BigQuery reads `REGION-EU` as a project, not a region.
+bool IsRegion(const std::string& part) { return part.starts_with(kRegionPrefix); }
 
 // The datasets of `project` in the region the qualifier names, or in the US for a view that names
-// none, as BigQuery documents for SCHEMATA; the job reading `view` must run there. None for a
-// region BigQuery does not have.
-std::vector<std::string> DatasetsIn(TableSource& source, const std::string& project,
-                                    const std::vector<std::string>& qualifier,
-                                    const std::string& view) {
+// none, as BigQuery documents for SCHEMATA; the job must run there. An error for a region BigQuery
+// does not have.
+absl::StatusOr<std::vector<std::string>> DatasetsIn(TableSource& source, const std::string& project,
+                                                    const std::vector<std::string>& qualifier) {
   std::string location = kDefaultLocation;
+  std::string region_name = "region-us";
   if (!qualifier.empty() && IsRegion(qualifier.back())) {
-    std::optional<std::string> region = RegionQualifierLocation(qualifier.back());
+    region_name = qualifier.back();
+    std::optional<std::string> region = RegionQualifierLocation(region_name);
     if (!region.has_value()) {
-      return {};
+      return absl::InvalidArgumentError("Unrecognized region: " +
+                                        region_name.substr(kRegionPrefix.size()));
     }
     location = *std::move(region);
   }
-  source.ReferenceLocation("Table " + view, location);
+  // BigQuery names a region of another location as a dataset of the project.
+  source.ReferenceLocation("Dataset " + project + ":" + region_name, location);
   std::vector<std::string> datasets = source.ListDatasets(project);
   std::erase_if(datasets, [&](const std::string& dataset) {
     return source.DatasetLocation(project, dataset) != location;
@@ -433,8 +437,11 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     const std::string project =
         qualifier.empty() || IsRegion(qualifier.at(0)) ? default_project : qualifier.at(0);
     columns = SchemataColumns();
-    for (const std::string& dataset :
-         DatasetsIn(source, project, qualifier, absl::StrJoin(parts, "."))) {
+    absl::StatusOr<std::vector<std::string>> datasets = DatasetsIn(source, project, qualifier);
+    if (!datasets.ok()) {
+      return datasets.status();
+    }
+    for (const std::string& dataset : *datasets) {
       const std::optional<DatasetMetadata> metadata = source.DescribeDataset(project, dataset);
       if (!metadata.has_value()) {
         // Dropped since it was listed.
@@ -489,14 +496,17 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
           .tables = source.ListTables(project, *dataset),
       });
     } else {
-      std::ranges::transform(DatasetsIn(source, project, qualifier, absl::StrJoin(parts, ".")),
-                             std::back_inserter(datasets), [&](const std::string& name) {
-                               return DatasetTables{
-                                   .project = project,
-                                   .dataset = name,
-                                   .tables = source.ListTables(project, name),
-                               };
-                             });
+      absl::StatusOr<std::vector<std::string>> names = DatasetsIn(source, project, qualifier);
+      if (!names.ok()) {
+        return names.status();
+      }
+      std::ranges::transform(*names, std::back_inserter(datasets), [&](const std::string& name) {
+        return DatasetTables{
+            .project = project,
+            .dataset = name,
+            .tables = source.ListTables(project, name),
+        };
+      });
     }
     columns = view == "TABLES"    ? TablesColumns()
               : view == "COLUMNS" ? ColumnsColumns()

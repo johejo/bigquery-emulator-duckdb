@@ -18,15 +18,17 @@ rejects the `parentJobId` of a multi-statement query.
 ### Locations
 
 A job runs in the location its request names, `location` for `jobs.query` and
-`jobReference.location` for `jobs.insert`. Otherwise it runs where the datasets its query names
-are, as BigQuery infers it before running the query, or else in the location of the first dataset,
-`region-REGION` qualifier or connection it uses, and in the `US` when it uses none. Every dataset a
-job reads or writes must be in that location: a query that uses one elsewhere fails with
-`notFound`, and so does a load, extract or copy. `INFORMATION_SCHEMA.SCHEMATA` without a region
-qualifier is the `US` region's. Copies to a dataset in another location, which BigQuery supports,
-are unsupported. `jobs.get`, `jobs.getQueryResults`, `jobs.cancel` and `jobs.delete` find a job
-outside the `US` and `EU` multi-regions only when the request names its location. A view created
-with `tables.insert` reads only tables in its dataset's location.
+`jobReference.location` for `jobs.insert`. Otherwise it runs where the datasets and
+`INFORMATION_SCHEMA` regions its query names are, as BigQuery infers it before running the query,
+and in the `US` when they are in several locations or it names none; `INFORMATION_SCHEMA.SCHEMATA`
+without a region qualifier is the `US` region's. A query that names none, such as one built by
+`EXECUTE IMMEDIATE`, runs where the first dataset or connection it uses is. Every dataset a job
+reads or writes must be in that location: a job that uses one elsewhere fails with `notFound`, and
+the location that `CREATE SCHEMA` names must be the job's too. Copies to a dataset in another
+location, which BigQuery supports, are unsupported. `jobs.get`, `jobs.getQueryResults`,
+`jobs.cancel` and `jobs.delete` find a job outside the `US` and `EU` multi-regions only when the
+request names its location. A view created with `tables.insert` reads only tables in its dataset's
+location.
 
 ### Loads, extracts and copies
 
@@ -46,8 +48,8 @@ A dataset is in the location that `datasets.insert` or `CREATE SCHEMA` names, th
 `datasets.insert` names one, and the [job's location](#locations) unless `CREATE SCHEMA` does. The
 locations are those BigQuery lists for datasets, compared without case; BigQuery Omni locations are
 unsupported, and so is changing a dataset's location. A table is in its dataset's location, and the
-`INFORMATION_SCHEMA` region qualifier `` `region-REGION` `` covers the datasets of the project in
-that location.
+`INFORMATION_SCHEMA` region qualifier `` `region-REGION` ``, whose `region-` is in lower case,
+covers the datasets of the project in that location.
 
 Datasets keep a description, friendly name, labels, default table expiration and [default rounding
 mode](#rounding-modes), which `CREATE SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such
