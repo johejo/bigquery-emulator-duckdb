@@ -1219,13 +1219,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ARRAY_TO_STRING ignores a NULL delimiter or NULL text for STRING instead of returning NULL"
-  label: "code:array_to_string_ARRAY<STRING>_<@@a@@, @@b@@>_STRING_<,>_STRING_NULL"
-  label: "code:array_to_string_ARRAY<STRING>_<@@a@@, @@b@@>_STRING_NULL"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "AVG over windows overflows on large NUMERIC values, and differs on frames with extreme offsets or special values"
   label: "analytic_avg_test:analytic_avg_range_preceding_preceding_5"
@@ -1326,15 +1319,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "Casts between TIMESTAMP and TIME fail in DuckDB, and DATE_ADD and DATE_DIFF on DATETIME differ"
+  reason: "Casts between TIMESTAMP and TIME fail in DuckDB"
   label: "civil_time_test:datetime_timestamp_date_time_casts"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casts between TIMESTAMP and TIME fail in DuckDB, and DATE_ADD on DATETIME differs"
-  label: "civil_time_test:datetime_in_date_add_sub"
-  label: "civil_time_test:datetime_in_date_trunc"
 }
 
 known_errors {
@@ -1364,136 +1350,11 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "DATE_ADD on a TIMESTAMP truncates it to its date"
-  label: "code:date_add_TIMESTAMP_1430438400000000_INT64_-1_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_1430438400000000_INT64_1_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_1430438400000000_INT64_456_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_1457859661123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1457859661123400_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1457863261123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1457863261123400_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478419261123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478419261123400_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478422861123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478422861123400_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478426461123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_1478426461123400_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_253401955140000000_INT64_4_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_253402282800000000_INT64_4_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_253402300500000000_INT64_4_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_253402300795000000_INT64_4_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685481345678_INT64_-1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_946685481345678_INT64_-1_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_946685481345678_INT64_-1_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_946685481345678_INT64_-1_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-11_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-1_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-1_STRING_<MILLISECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-22_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-345_STRING_<MILLISECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_-678_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<MILLISECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_0_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<MILLISECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_1_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_322_STRING_<MICROSECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_38_STRING_<SECOND>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_49_STRING_<MINUTE>"
-  label: "code:date_add_TIMESTAMP_946685482345678_INT64_655_STRING_<MILLISECOND>"
-  label: "code:date_add_TIMESTAMP_946703482345678_INT64_15_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_946703482345678_INT64_15_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_946703482345678_INT64_49_STRING_<DAY>"
-  label: "code:date_add_TIMESTAMP_946703482345678_INT64_49_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_946707082345678_INT64_-11_STRING_<HOUR>"
-  label: "code:date_add_TIMESTAMP_947052682345678_INT64_-11_STRING_<DAY>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "SAFE.ERROR fails, as BigQuery does, where the reference implementation returns NULL"
   label: "code:safe_error_mode__safe_error_STRING_<message>"
   label: "code:safe_error_mode__safe_error_STRING_NULL"
   label: "misc_test:cast_safe_error_as_string"
   label: "misc_test:default_safe_error_int64"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "DATE_DIFF on TIMESTAMPs counts the unit boundaries crossed rather than the whole units elapsed"
-  label: "code:date_diff_TIMESTAMP_1_TIMESTAMP_3600000000_STRING_<HOUR>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "DATE_SUB on a TIMESTAMP truncates it to its date"
-  label: "code:date_sub_TIMESTAMP_1430438400000000_INT64_-1_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_1430438400000000_INT64_-456_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_1430438400000000_INT64_1_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_1457859661123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1457859661123400_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1457863261123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1457863261123400_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478419261123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478419261123400_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478422861123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478422861123400_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478426461123400_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_1478426461123400_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_253401955140000000_INT64_-4_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_253402282800000000_INT64_-4_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_253402300500000000_INT64_-4_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_253402300795000000_INT64_-4_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685481345678_INT64_1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_946685481345678_INT64_1_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_946685481345678_INT64_1_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_946685481345678_INT64_1_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<MILLISECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-1_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-322_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-38_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-49_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_-655_STRING_<MILLISECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<MILLISECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_0_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_11_STRING_<MINUTE>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_1_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_1_STRING_<MILLISECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_22_STRING_<SECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_345_STRING_<MILLISECOND>"
-  label: "code:date_sub_TIMESTAMP_946685482345678_INT64_678_STRING_<MICROSECOND>"
-  label: "code:date_sub_TIMESTAMP_946703482345678_INT64_-15_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_946703482345678_INT64_-15_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_946703482345678_INT64_-49_STRING_<DAY>"
-  label: "code:date_sub_TIMESTAMP_946703482345678_INT64_-49_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_946707082345678_INT64_11_STRING_<HOUR>"
-  label: "code:date_sub_TIMESTAMP_947052682345678_INT64_11_STRING_<DAY>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "DATE_TRUNC on a TIMESTAMP truncates it to its date"
-  label: "code:date_trunc_TIMESTAMP_11111_STRING_<MICROSECOND>"
-  label: "code:date_trunc_TIMESTAMP_11111_STRING_<MILLISECOND>"
-  label: "code:date_trunc_TIMESTAMP_111_STRING_<MICROSECOND>"
-  label: "code:date_trunc_TIMESTAMP_1234567_STRING_<MICROSECOND>"
-  label: "code:date_trunc_TIMESTAMP_1234567_STRING_<MILLISECOND>"
-  label: "code:date_trunc_TIMESTAMP_1234567_STRING_<SECOND>"
 }
 
 known_errors {
@@ -1533,12 +1394,6 @@ known_errors {
   reason: "DuckDB rejects a LEFT JOIN of UNNEST whose condition does not compare both sides"
   label: "unnest_queries_test:unnest_6"
   label: "unnest_queries_test:unnest_7"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ERROR(NULL) returns NULL instead of failing"
-  label: "code:error_STRING_NULL"
 }
 
 known_errors {
@@ -1915,12 +1770,6 @@ known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "TIMESTAMP converts a civil time repeated at a daylight saving change to its later instant rather than its earlier one"
   label: "code:timestamp_DATETIME_2015-11-01 01:30:00_STRING_<America/_gHqr2K5IEYY__Angeles>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "TIMESTAMP_DIFF counts the unit boundaries crossed rather than the whole units elapsed"
-  label: "code:timestamp_diff_TIMESTAMP_1_TIMESTAMP_3600000000_STRING_<HOUR>"
 }
 
 known_errors {

@@ -331,12 +331,14 @@ constexpr ResultRange kTimestampRange = {
 // INTERVAL n PART resolves to two arguments, the count and the date part. The three argument
 // form of the date arithmetic functions is the two argument `spelling` of an INTERVAL value with
 // $2 multiplied out to that part. A result outside `range`, which DuckDB's wider types can hold,
-// fails as in BigQuery.
+// fails as in BigQuery. Each rule applies only under `conditions`.
 std::vector<Rule> WithInterval(const std::string& spelling,
-                               const std::optional<ResultRange>& range = std::nullopt) {
-  const auto rule = [&range](Arity arity, const std::string& result,
-                             std::vector<Condition> conditions) {
-    Rule rule{.arity = arity, .spelling = result, .conditions = std::move(conditions)};
+                               const std::optional<ResultRange>& range = std::nullopt,
+                               const std::vector<Condition>& conditions = {}) {
+  const auto rule = [&range, &conditions](Arity arity, const std::string& result,
+                                          std::vector<Condition> part) {
+    Rule rule{.arity = arity, .spelling = result, .conditions = conditions};
+    rule.conditions.insert(rule.conditions.end(), part.begin(), part.end());
     if (range.has_value()) {
       rule.spelling = "CASE WHEN " + result + " NOT BETWEEN " + std::string(range->min) + " AND " +
                       std::string(range->max) + " THEN !1 ELSE " + result + " END";
@@ -817,8 +819,23 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       // Date and time arithmetic: DuckDB uses the operators and puts the date part first, as a
       // string rather than as a keyword.
-      {"DATE_ADD", WithInterval("CAST($1 + $2 AS DATE)", kDateRange)},
-      {"DATE_SUB", WithInterval("CAST($1 - $2 AS DATE)", kDateRange)},
+      // DATE_ADD and DATE_SUB also take a DATETIME or a TIMESTAMP, and return its type.
+      {
+          "DATE_ADD",
+          Concat({
+              WithInterval("CAST($1 + $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
+              WithInterval("($1 + $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
+              WithInterval("($1 + $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
+          }),
+      },
+      {
+          "DATE_SUB",
+          Concat({
+              WithInterval("CAST($1 - $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
+              WithInterval("($1 - $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
+              WithInterval("($1 - $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
+          }),
+      },
       {"DATETIME_ADD", WithInterval("($1 + $2)", kDatetimeRange)},
       {"DATETIME_SUB", WithInterval("($1 - $2)", kDatetimeRange)},
       {"TIMESTAMP_ADD", WithInterval("($1 + $2)", kTimestampRange)},
@@ -829,7 +846,9 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"$EXTRACT", Extract()},
       {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
       // DATE and DATETIME differences count the boundaries crossed, which is DuckDB's date_diff,
-      // while TIMESTAMP differences below a day count whole units, which is its date_sub.
+      // while TIMESTAMP differences below a day count whole units, which is its date_sub. Its
+      // date_sub of TIMESTAMPTZ goes through milliseconds, so TIMESTAMPs are compared as UTC
+      // civil times.
       {
           "DATE_DIFF",
           Concat({
@@ -837,7 +856,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               {
                   {
                       .arity = 3,
-                      .spelling = "date_sub(#3, $2, $1)",
+                      .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
                       .conditions = {Is(1, {TYPE_TIMESTAMP}), SubDay(3)},
                   },
               },
@@ -846,15 +865,36 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       },
       {"DATETIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
       // Every TIMESTAMP and TIME difference counts whole units.
-      {"TIMESTAMP_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_sub(#3, $2, $1)"}}})},
+      {
+          "TIMESTAMP_DIFF",
+          Concat({
+              WeekDiff(),
+              {
+                  {
+                      .arity = 3,
+                      .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
+                      .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                  },
+                  {.arity = 3, .spelling = "date_sub(#3, $2, $1)"},
+              },
+          }),
+      },
       {"TIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_sub(#3, $2, $1)"}}})},
-      // date_trunc() widens a DATE to a TIMESTAMP, which DATE_TRUNC does not.
+      // date_trunc() widens a DATE to a TIMESTAMP, which DATE_TRUNC does not. DATE_TRUNC also
+      // takes a DATETIME or a TIMESTAMP, and returns its type.
       {
           "DATE_TRUNC",
           Concat({
               WeekTrunc("DATE"),
               WeekTrunc(),
-              {{.arity = 2, .spelling = "CAST(date_trunc(#2, $1) AS DATE)"}},
+              {
+                  {
+                      .arity = 2,
+                      .spelling = "CAST(date_trunc(#2, $1) AS DATE)",
+                      .conditions = {Is(1, {TYPE_DATE})},
+                  },
+                  {.arity = 2, .spelling = "date_trunc(#2, $1)"},
+              },
               ZonedTrunc(),
           }),
       },
@@ -977,7 +1017,15 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
 
       {
           "ERROR",
-          {{.arity = 1, .spelling = "!1", .conditions = {}, .defaults = {}, .errors = {"$1"}}},
+          {
+              {
+                  .arity = 1,
+                  .spelling = "!1",
+                  .conditions = {},
+                  .defaults = {},
+                  .errors = {"coalesce($1, 'ERROR function called with NULL value')"},
+              },
+          },
       },
       {"ARRAY_REVERSE", {{.arity = 1, .spelling = "list_reverse($1)"}}},
       // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
@@ -1003,18 +1051,20 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"RANGE_CONTAINS", RangeContains()},
       {"RANGE_OVERLAPS", {{.arity = 2, .spelling = Overlap()}}},
       {"RANGE_INTERSECT", RangeIntersect()},
-      // DuckDB's array_to_string() skips NULL elements and has no NULL text.
+      // DuckDB's array_to_string() skips NULL elements, has no NULL text, and ignores a NULL
+      // delimiter.
       {
           "ARRAY_TO_STRING",
           {
               {
                   .arity = 2,
-                  .spelling = "array_to_string($1, $2)",
+                  .spelling = "if($2 IS NULL, NULL, array_to_string($1, $2))",
                   .conditions = {Is(2, {TYPE_STRING})},
               },
               {
                   .arity = 3,
-                  .spelling = "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2)",
+                  .spelling = "if($2 IS NULL OR $3 IS NULL, NULL, "
+                              "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2))",
                   .conditions = {Is(2, {TYPE_STRING})},
               },
               // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with ||,
