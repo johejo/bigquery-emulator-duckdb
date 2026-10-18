@@ -37,6 +37,11 @@ std::string GeographyWkt(const std::string& value, const googlesql::Type* type, 
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
                                         const FieldSchema& field);
 
+// `value`, the SQL of a value of `type` already in the form a query returns, rounded for the
+// column `field` as WrittenValue rounds it.
+std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,
+                                         const FieldSchema& field);
+
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns);
 

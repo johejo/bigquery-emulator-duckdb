@@ -371,10 +371,14 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":analyzer",
+        ":field_schema",
+        ":type_mapping",
         "//src/translator:context",
         "//src/translator:literal",
         "//src/translator:query",
         "//src/translator:statement",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:type",
     ],
     deps = [

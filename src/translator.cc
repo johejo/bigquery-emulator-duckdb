@@ -1,6 +1,7 @@
 #include "src/translator.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -9,16 +10,21 @@
 #include <variant>
 #include <vector>
 
+#include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "src/analyzer.h"
+#include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/system_variables.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
+#include "src/translator/function.h"
 #include "src/translator/literal.h"
 #include "src/translator/statement.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -103,6 +109,51 @@ std::optional<QueryParameters> TranslateParameters(
     }
   }
   return QueryParameters(named, std::move(positional));
+}
+
+namespace {
+
+// Whether values of `source` have the shape of `destination` where it rounds to even: NUMERIC or
+// BIGNUMERIC values, in arrays where it has them, and STRUCT fields of the same names in order.
+bool RoundsAs(const FieldSchema& source, const FieldSchema& destination) {
+  if (!RoundsToEven(destination)) {
+    return true;
+  }
+  if ((source.mode == FieldMode::kRepeated) != (destination.mode == FieldMode::kRepeated)) {
+    return false;
+  }
+  if (destination.type != FieldType::kRecord) {
+    return source.type == FieldType::kNumeric || source.type == FieldType::kBigNumeric;
+  }
+  if (source.type != FieldType::kRecord || source.fields.size() != destination.fields.size()) {
+    return false;
+  }
+  for (std::size_t i = 0; i < source.fields.size(); ++i) {
+    if (!absl::EqualsIgnoreCase(source.fields.at(i).name, destination.fields.at(i).name) ||
+        !RoundsAs(source.fields.at(i), destination.fields.at(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+std::optional<std::string> TranslateAppendedValue(const std::string& value,
+                                                  const FieldSchema& source,
+                                                  const FieldSchema& destination) {
+  if (!RoundsToEven(destination)) {
+    return value;
+  }
+  if (!RoundsAs(source, destination)) {
+    return std::nullopt;
+  }
+  googlesql::TypeFactory type_factory;
+  const absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(source, &type_factory);
+  if (!type.ok()) {
+    return std::nullopt;
+  }
+  return translator::RoundedToEven(value, *type, destination);
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -33,6 +33,7 @@
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
 #include "src/translated_statement.h"
+#include "src/translator.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -47,6 +48,32 @@ int64_t NowMillis() {
 
 std::string JobKey(const std::string& project_id, const std::string& job_id) {
   return project_id + ":" + job_id;
+}
+
+// The field of `schema` named `name`, which BigQuery compares without case.
+std::vector<FieldSchema>::const_iterator FindField(const std::vector<FieldSchema>& schema,
+                                                   const std::string& name) {
+  return std::ranges::find_if(schema, [&](const FieldSchema& field) {
+    return std::ranges::equal(field.name, name, [](unsigned char a, unsigned char b) {
+      return std::tolower(a) == std::tolower(b);
+    });
+  });
+}
+
+// Removes the precision and scale of the fields of `schema` that `destination` rounds to even, so
+// that a load reads their values unrounded and WriteDestination rounds them.
+void ReadUnrounded(std::vector<FieldSchema>& schema, const std::vector<FieldSchema>& destination) {
+  for (FieldSchema& field : schema) {
+    const auto column = FindField(destination, field.name);
+    if (column == destination.end()) {
+      continue;
+    }
+    if (column->rounding_mode == kRoundHalfEven && column->precision.has_value()) {
+      field.precision.reset();
+      field.scale.reset();
+    }
+    ReadUnrounded(field.fields, column->fields);
+  }
 }
 
 }  // namespace
@@ -168,9 +195,16 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         throw;
       }
     }
-    // Loaded values are written with DuckDB's casts, which round halfway values away from zero.
-    // A table the load creates takes its dataset's default rounding mode.
+    // Values a load appends to ROUND_HALF_EVEN fields are read unrounded and rounded to even as
+    // WriteDestination writes them. A table the load creates takes its dataset's default rounding
+    // mode, but BigQuery stores 2.25 as 2.3 in a NUMERIC(5, 1) field that takes ROUND_HALF_EVEN
+    // from it, so loads that create or replace such fields are unsupported.
+    const bool appends =
+        existing.has_value() && load.write_disposition != WriteDisposition::kWriteTruncate;
     const auto check_rounding = [&](std::vector<FieldSchema> written) {
+      if (appends) {
+        return;
+      }
       if (!existing.has_value()) {
         ApplyDefaultRoundingMode(written,
                                  GetDataset(DatasetReference{
@@ -180,7 +214,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
                                      .default_rounding_mode);
       }
       if (HasRoundHalfEven(written)) {
-        throw ApiError::Unsupported("load jobs into ROUND_HALF_EVEN columns");
+        throw ApiError::Unsupported("load jobs that create or replace ROUND_HALF_EVEN columns");
       }
     };
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
@@ -200,6 +234,9 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       }
     }
     check_rounding(requested_schema);
+    if (appends) {
+      ReadUnrounded(requested_schema, *existing);
+    }
     const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
     const QueryResult prepared = Prepare(sql);
     if (requested_schema.empty()) {
@@ -421,11 +458,25 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
     throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
   }
-  // Appended rows are written with DuckDB's casts, which round halfway values away from zero; only
-  // a copy from a table of the same schema has nothing to round.
+  // Appended rows are written with DuckDB's casts, which round halfway values away from zero, so
+  // the values of ROUND_HALF_EVEN fields are rounded to even first, as BigQuery rounds those a
+  // query or a load appends. A copy from a table of the same schema has nothing to round, and
+  // BigQuery rejects a copy from another.
+  std::string appended = "*";
   if (existing.has_value() && write != WriteDisposition::kWriteTruncate &&
       HasRoundHalfEven(existing->schema) && !SameSchema(existing->schema, schema)) {
-    throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
+    std::vector<std::string> columns;
+    for (const FieldSchema& field : schema) {
+      const std::string name = QuoteIdentifier(field.name);
+      const auto column = FindField(existing->schema, field.name);
+      const std::optional<std::string> value =
+          column == existing->schema.end() ? name : TranslateAppendedValue(name, field, *column);
+      if (copy || !value.has_value()) {
+        throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
+      }
+      columns.push_back(*value + " AS " + name);
+    }
+    appended = Join(columns, ", ");
   }
   // Whether BigQuery replaces an existing table's metadata, or keeps it, is not known.
   if (existing.has_value() && !metadata.empty()) {
@@ -485,7 +536,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     if (write == WriteDisposition::kWriteTruncateData) {
       statements.push_back("DELETE FROM " + target);
     }
-    statements.push_back("INSERT INTO " + target + " BY NAME SELECT * FROM " + result_table);
+    statements.push_back("INSERT INTO " + target + " BY NAME SELECT " + appended + " FROM " +
+                         result_table);
   }
   statements.emplace_back("COMMIT");
   statements.push_back("SELECT " + std::string(count_only ? "count(*)" : "*") + " FROM " +
