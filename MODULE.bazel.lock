@@ -876,7 +876,7 @@
     },
     "@@googlesql+//bazel:http_archive_deps.bzl%googlesql_http_archive_deps": {
       "general": {
-        "bzlTransitiveDigest": "9fLQ3QDdgW6/5gYX0wWz7wJw9gFKlksBnsxvBpW0WhM=",
+        "bzlTransitiveDigest": "463JJ0RKVu6TJhX01epS8YSPcJUqsF3JDbPMFG3Sfao=",
         "usagesDigest": "tOJUFB+7Qxm/gkyLMNck2pJ4TlTkSSVpltvfXkpPb2w=",
         "recordedInputs": [
           "REPO_MAPPING:googlesql+,bazel_tools bazel_tools"
@@ -923,7 +923,7 @@
             "attributes": {
               "patch_cmds": [
                 "sed -i.bak 's/absl::Nonnull<\\([^>]*\\)>/\\1/g' file_based_test_driver/file_based_test_driver.h file_based_test_driver/file_based_test_driver.cc && rm -f file_based_test_driver/*.bak",
-                "perl -pi -e 's/stat\\(filespec\\.data\\(\\)/stat(filespec_str.c_str()/; s/stat\\(filename\\.data\\(\\)/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h"
+                "sed -i.bak -e 's/stat(filespec\\.data()/stat(filespec_str.c_str()/' -e 's/stat(filename\\.data()/stat(filename_str.c_str()/' file_based_test_driver/base/file_util_oss.h && rm -f file_based_test_driver/base/file_util_oss.h.bak"
               ],
               "sha256": "de4a12e88731198ef89ce3438b8c57ccea9185ac30ece9da1165f224ec02c8b1",
               "strip_prefix": "file-based-test-driver-ec67daf4282c1bbe025e1b88512d540b03687efd",
