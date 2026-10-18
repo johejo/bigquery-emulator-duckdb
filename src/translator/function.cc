@@ -175,7 +175,12 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
 
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
                                         const FieldSchema& field) {
-  return RoundedValue(GeographyWkt(value, type), type, field, field.name, 0);
+  return RoundedToEven(GeographyWkt(value, type), type, field);
+}
+
+std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,
+                                         const FieldSchema& field) {
+  return RoundedValue(value, type, field, field.name, 0);
 }
 
 namespace {

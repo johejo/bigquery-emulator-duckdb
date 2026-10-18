@@ -171,21 +171,110 @@ func TestColumnRoundingModes(t *testing.T) {
 	if insert == nil || !strings.Contains(insert.Error(), "tabledata.insertAll into ROUND_HALF_EVEN columns") {
 		t.Errorf("insertAll: error = %v", insert)
 	}
-	source := bigquery.NewReaderSource(strings.NewReader("{\"even\": 2.25}\n"))
-	source.SourceFormat = bigquery.JSON
-	if err := wait(ctx, dataset.Table("api").LoaderFrom(source)); err == nil ||
-		!strings.Contains(err.Error(), "load jobs into ROUND_HALF_EVEN columns") {
-		t.Errorf("load: error = %v", err)
-	}
-	query := client.Query("SELECT NUMERIC '2.25' AS even, BIGNUMERIC '1' AS away")
-	query.Dst = dataset.Table("api")
-	query.WriteDisposition = bigquery.WriteAppend
-	if err := wait(ctx, query); err == nil || !strings.Contains(err.Error(), "appending rows of another schema to ROUND_HALF_EVEN columns") {
-		t.Errorf("query append: error = %v", err)
-	}
 	// A copy writes values that are already rounded.
 	if err := wait(ctx, dataset.Table("copied").CopierFrom(dataset.Table("api"))); err != nil {
 		t.Errorf("copy: %v", err)
+	}
+}
+
+// Query and load jobs that append to a table round the values of its fields with their rounding
+// modes, as DML does, and fail on a value out of a field's range, as BigQuery answers.
+func TestAppendedRoundingModes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_appended_rounding_mode")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	numeric := func(name string, typ bigquery.FieldType, precision, scale int64, mode bigquery.RoundingMode) *bigquery.FieldSchema {
+		return &bigquery.FieldSchema{Name: name, Type: typ, Precision: precision, Scale: scale, RoundingMode: mode}
+	}
+	flat := bigquery.Schema{
+		{Name: "id", Type: bigquery.IntegerFieldType},
+		numeric("even", bigquery.NumericFieldType, 5, 1, bigquery.RoundHalfEven),
+		numeric("away", bigquery.NumericFieldType, 5, 1, ""),
+		numeric("big", bigquery.BigNumericFieldType, 10, 0, bigquery.RoundHalfEven),
+		numeric("big_away", bigquery.BigNumericFieldType, 10, 0, ""),
+	}
+	array := numeric("a", bigquery.NumericFieldType, 5, 1, bigquery.RoundHalfEven)
+	array.Repeated = true
+	nested := append(append(bigquery.Schema{}, flat...),
+		&bigquery.FieldSchema{Name: "s", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
+			numeric("n", bigquery.NumericFieldType, 5, 1, bigquery.RoundHalfEven),
+		}},
+		array)
+	for name, schema := range map[string]bigquery.Schema{"flat": flat, "nested": nested} {
+		if err := dataset.Table(name).Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	appendQuery := func(table, sql string) error {
+		query := client.Query(sql)
+		query.Dst = dataset.Table(table)
+		query.WriteDisposition = bigquery.WriteAppend
+		return wait(ctx, query)
+	}
+	load := func(table string, format bigquery.DataFormat, data string) error {
+		source := bigquery.NewReaderSource(strings.NewReader(data))
+		source.SourceFormat = format
+		return wait(ctx, dataset.Table(table).LoaderFrom(source))
+	}
+
+	if err := appendQuery("nested", `SELECT 1 AS id, NUMERIC '2.25' AS even, NUMERIC '2.25' AS away,
+		BIGNUMERIC '2.5' AS big, STRUCT(NUMERIC '2.25' AS n) AS s,
+		[NUMERIC '2.25', NUMERIC '-2.25', NUMERIC '2.35'] AS a`); err != nil {
+		t.Fatalf("query append: %v", err)
+	}
+	if err := load("nested", bigquery.JSON, `{"id": 2, "even": 2.25, "away": 2.25, "big": 2.5, "big_away": 2.5, "s": {"n": 2.25}, "a": [2.25, -2.25, 2.35]}
+{"id": 3, "even": "-2.25", "away": "2.25"}
+`); err != nil {
+		t.Fatalf("JSON load: %v", err)
+	}
+	if err := load("flat", bigquery.CSV, "4,2.25,2.25,2.5,2.5\n5,-2.25,,,\n"); err != nil {
+		t.Fatalf("CSV load: %v", err)
+	}
+	query := client.Query(`SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(big AS STRING),
+		CAST(big_away AS STRING), CAST(s.n AS STRING),
+		ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset), ',')
+		FROM go_appended_rounding_mode.nested
+		UNION ALL
+		SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(big AS STRING),
+		CAST(big_away AS STRING), NULL, NULL FROM go_appended_rounding_mode.flat
+		ORDER BY id`)
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got [][]bigquery.Value
+	for {
+		var row []bigquery.Value
+		if err := rows.Next(&row); err != nil {
+			break
+		}
+		got = append(got, row)
+	}
+	want := [][]bigquery.Value{
+		{int64(1), "2.2", "2.3", "2", nil, "2.2", "2.2,-2.2,2.4"},
+		{int64(2), "2.2", "2.3", "2", "3", "2.2", "2.2,-2.2,2.4"},
+		{int64(3), "-2.2", "2.3", nil, nil, nil, ""},
+		{int64(4), "2.2", "2.3", "2", "3", nil, nil},
+		{int64(5), "-2.2", nil, nil, nil, nil, nil},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("appended rows = %v, want %v", got, want)
+	}
+
+	const outOfRange = "NUMERIC(5, 1) has precision 5 and scale 1 but got a value that is not in range of [-9999.9, 9999.9]"
+	for name, err := range map[string]error{
+		"query append": appendQuery("flat", "SELECT NUMERIC '9999.95' AS even"),
+		"CSV load":     load("flat", bigquery.CSV, "6,9999.95,,,\n"),
+		"JSON load":    load("flat", bigquery.JSON, `{"id": 6, "even": 9999.95, "away": 1, "big": 1, "big_away": 1}`+"\n"),
+	} {
+		if err == nil || !strings.Contains(err.Error(), outOfRange) {
+			t.Errorf("%s of 9999.95: error = %v, want one containing %q", name, err, outOfRange)
+		}
 	}
 }
 
@@ -284,7 +373,7 @@ func TestDefaultRoundingModes(t *testing.T) {
 	source.SourceFormat = bigquery.JSON
 	source.Schema = api
 	if err := wait(ctx, dataset.Table("loaded").LoaderFrom(source)); err == nil ||
-		!strings.Contains(err.Error(), "load jobs into ROUND_HALF_EVEN columns") {
+		!strings.Contains(err.Error(), "load jobs that create or replace ROUND_HALF_EVEN columns") {
 		t.Errorf("load: error = %v", err)
 	}
 

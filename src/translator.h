@@ -18,6 +18,8 @@ class Value;
 
 namespace bigquery_emulator_duckdb {
 
+struct FieldSchema;
+
 // Translates queries: projections, table reads, filters, ordering, limits, joins, CTEs,
 // aggregation, analytic functions, set operations, UNNEST and subqueries, with supported
 // expressions, INSERT, UPDATE, DELETE and MERGE, and CREATE TABLE [AS SELECT], CREATE SCHEMA,
@@ -47,5 +49,14 @@ std::optional<QueryParameters> TranslateParameters(
     const std::variant<std::vector<googlesql::Value>, std::map<std::string, googlesql::Value>>&
         values,
     std::string* unsupported);
+
+// `value`, the SQL of a column of `source` that a job appends to the existing column
+// `destination`, with the values of its ROUND_HALF_EVEN fields rounded to their scale as DML
+// rounds them; DuckDB's casts round halfway values away from zero. nullopt when the emulator
+// cannot round them, such as values that are not NUMERIC or BIGNUMERIC or STRUCT fields in
+// another order.
+std::optional<std::string> TranslateAppendedValue(const std::string& value,
+                                                  const FieldSchema& source,
+                                                  const FieldSchema& destination);
 
 }  // namespace bigquery_emulator_duckdb
