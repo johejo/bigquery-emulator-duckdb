@@ -181,17 +181,51 @@ cc_library(
 )
 
 cc_library(
+    name = "geography_value",
+    srcs = ["geography_value.cc"],
+    hdrs = ["geography_value.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/types:span",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@s2geometry//:s2",
+    ],
+)
+
+cc_library(
+    name = "geography_wkt",
+    srcs = ["geography_wkt.cc"],
+    hdrs = ["geography_wkt.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@googlesql//googlesql/base:status",
+        "@s2geometry//:s2",
+    ],
+    linkstatic = True,
+    deps = [
+        ":geography_value",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
     name = "geography",
     srcs = ["geography.cc"],
     hdrs = ["geography.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":geography_value",
+        ":geography_wkt",
         ":register",
         ":scalar",
         "//:duckdb_handle",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
         "@s2geometry//:s2",
     ],
