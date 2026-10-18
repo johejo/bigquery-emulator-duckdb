@@ -3,8 +3,8 @@ package goclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"math/big"
 	"net/http"
 	"os"
 	"reflect"
@@ -13,6 +13,13 @@ import (
 
 	"cloud.google.com/go/bigquery"
 )
+
+// jsonRow is a tabledata.insertAll row the client sends as it is.
+type jsonRow map[string]bigquery.Value
+
+func (r jsonRow) Save() (map[string]bigquery.Value, string, error) {
+	return r, bigquery.NoDedupeID, nil
+}
 
 // wait runs a job and returns its error.
 func wait(ctx context.Context, runner interface {
@@ -167,18 +174,15 @@ func TestColumnRoundingModes(t *testing.T) {
 			t.Errorf("%s: error = %v, want one containing %q", sql, err, want)
 		}
 	}
-	insert := dataset.Table("api").Inserter().Put(ctx, &bigquery.ValuesSaver{Schema: api, Row: []bigquery.Value{big.NewRat(9, 4), nil}})
-	if insert == nil || !strings.Contains(insert.Error(), "tabledata.insertAll into ROUND_HALF_EVEN columns") {
-		t.Errorf("insertAll: error = %v", insert)
-	}
 	// A copy writes values that are already rounded.
 	if err := wait(ctx, dataset.Table("copied").CopierFrom(dataset.Table("api"))); err != nil {
 		t.Errorf("copy: %v", err)
 	}
 }
 
-// Query and load jobs that append to a table round the values of its fields with their rounding
-// modes, as DML does, and fail on a value out of a field's range, as BigQuery answers.
+// Query and load jobs that append to a table and tabledata.insertAll round the values of its fields
+// with their rounding modes, as DML does, and fail on a value out of a field's range, as BigQuery
+// answers.
 func TestAppendedRoundingModes(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
@@ -235,6 +239,21 @@ func TestAppendedRoundingModes(t *testing.T) {
 	if err := load("flat", bigquery.CSV, "4,2.25,2.25,2.5,2.5\n5,-2.25,,,\n"); err != nil {
 		t.Fatalf("CSV load: %v", err)
 	}
+	// Rows go to tabledata.insertAll as given: JSON numbers or strings.
+	insert := func(rows ...jsonRow) error {
+		var savers []bigquery.ValueSaver
+		for _, row := range rows {
+			savers = append(savers, row)
+		}
+		return dataset.Table("nested").Inserter().Put(ctx, savers)
+	}
+	if err := insert(
+		jsonRow{"id": 6, "even": 2.25, "away": 2.25, "big": 2.5, "big_away": 2.5,
+			"s": map[string]any{"n": 2.25}, "a": []any{2.25, -2.25, 2.35}},
+		jsonRow{"id": 7, "even": "-2.25", "away": "2.25", "a": []any{"2.35"}},
+	); err != nil {
+		t.Fatalf("insertAll: %v", err)
+	}
 	query := client.Query(`SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(big AS STRING),
 		CAST(big_away AS STRING), CAST(s.n AS STRING),
 		ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset), ',')
@@ -261,6 +280,8 @@ func TestAppendedRoundingModes(t *testing.T) {
 		{int64(3), "-2.2", "2.3", nil, nil, nil, ""},
 		{int64(4), "2.2", "2.3", "2", "3", nil, nil},
 		{int64(5), "-2.2", nil, nil, nil, nil, nil},
+		{int64(6), "2.2", "2.3", "2", "3", "2.2", "2.2,-2.2,2.4"},
+		{int64(7), "-2.2", "2.3", nil, nil, nil, "2.4"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("appended rows = %v, want %v", got, want)
@@ -275,6 +296,11 @@ func TestAppendedRoundingModes(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), outOfRange) {
 			t.Errorf("%s of 9999.95: error = %v, want one containing %q", name, err, outOfRange)
 		}
+	}
+	var rowErrors bigquery.PutMultiError
+	if err := insert(jsonRow{"id": 8, "even": 9999.95}); !errors.As(err, &rowErrors) ||
+		len(rowErrors) != 1 || !strings.Contains(rowErrors[0].Error(), outOfRange) {
+		t.Errorf("insertAll of 9999.95: error = %v, want a row error containing %q", err, outOfRange)
 	}
 }
 

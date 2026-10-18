@@ -317,6 +317,17 @@ bool RoundsToEven(const FieldSchema& field) {
          std::ranges::any_of(field.fields, RoundsToEven);
 }
 
+FieldSchema WithoutRoundingParameters(FieldSchema field) {
+  if (field.rounding_mode == kRoundHalfEven) {
+    field.precision.reset();
+    field.scale.reset();
+  }
+  for (FieldSchema& child : field.fields) {
+    child = WithoutRoundingParameters(std::move(child));
+  }
+  return field;
+}
+
 void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
   for (const FieldSchema& field : schema) {
     if (!field.rounding_mode.empty() && field.type != FieldType::kNumeric &&

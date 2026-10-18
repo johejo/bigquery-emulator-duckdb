@@ -85,13 +85,16 @@ inline constexpr std::string_view kRoundHalfAwayFromZero = "ROUND_HALF_AWAY_FROM
 inline constexpr std::string_view kRoundHalfEven = "ROUND_HALF_EVEN";
 
 // Whether a field of `schema`, at any depth, rounds halfway values to even. DuckDB's casts round
-// them away from zero, so only DML and CREATE TABLE AS SELECT, which round typed values before
-// the cast, write such fields; loaded values can need rounding even without a precision.
+// them away from zero, so only writes that round values before the cast write such fields.
 bool HasRoundHalfEven(const std::vector<FieldSchema>& schema);
 
 // Whether values written to `field`, or to a field of it, are rounded to even to a scale, which
 // DuckDB's casts to a parameterized NUMERIC or BIGNUMERIC round away from zero instead.
 bool RoundsToEven(const FieldSchema& field);
+
+// `field` without the precision and scale of the fields in it, at any depth, that round to even,
+// so that a write reads their values unrounded and rounds them itself.
+FieldSchema WithoutRoundingParameters(FieldSchema field);
 
 // The rounding mode `mode` names, empty for one that leaves it unset ("" or
 // ROUNDING_MODE_UNSPECIFIED), or nullopt for a value that names none.
