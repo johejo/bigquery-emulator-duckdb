@@ -53,6 +53,12 @@ SELECT ARRAY_CONCAT(['a'], CAST(NULL AS ARRAY<STRING>)) IS NULL
 SELECT ARRAY_TO_STRING(ARRAY_REVERSE(['a', 'b']), ',')
 => "b,a"
 
+SELECT ARRAY_TO_STRING(['a', 'b'], NULL)
+=> null
+
+SELECT ARRAY_TO_STRING(['a', 'b'], ',', NULL)
+=> null
+
 SELECT ARRAY_FIRST([4, 5])
 => "4"
 

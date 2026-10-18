@@ -40,3 +40,6 @@ SELECT SAFE.ABS(1 / 0)
 # BigQuery rejects SAFE.ERROR although GoogleSQL accepts it.
 SELECT SAFE.ERROR('boom')
 => error: SAFE with function error is not supported.
+
+SELECT ERROR(NULL)
+=> error:
