@@ -11,3 +11,9 @@ steps:
       current.exit_code == 0 &&
       current.stdout contains '"numericId":"123456789012"' &&
       current.stdout contains '"friendlyName":"Local test"'
+  bq_encryption_service_account:
+    exec:
+      command: tests/e2e/bq.sh show --encryption_service_account --format=json
+    test: |
+      current.exit_code == 0 &&
+      current.stdout contains '{"ServiceAccountID":"bq-123456789012@bigquery-encryption.iam.gserviceaccount.com"}'

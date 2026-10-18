@@ -110,6 +110,8 @@ are startup errors.
 
 `projects.list` includes registered projects without datasets. REST references accept configured
 numbers as aliases, but responses use project IDs. Unregistered projects return 404.
+`projects.getServiceAccount` returns `bq-NUMBER@bigquery-encryption.iam.gserviceaccount.com`, the
+form BigQuery uses, from the configured `numericId`, and rejects a project without one.
 
 With `--data-dir`, registrations are stored in `projects.json` and restored at startup without
 `--project`. Explicit registrations replace the same project's saved metadata, clearing optional

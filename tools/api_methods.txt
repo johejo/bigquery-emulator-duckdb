@@ -126,4 +126,6 @@ note bigquery.tables.update | See [Schema changes](compatibility.md#schema-chang
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
 
 request bigquery.projects.list | GET /bigquery/v2/projects?maxResults=1
+request bigquery.projects.getServiceAccount | GET /bigquery/v2/projects/test/serviceAccount
+note bigquery.projects.getServiceAccount | Names the account after the configured project number; see [Projects](../README.md#projects).
 note bigquery.projects.list | Lists explicitly registered projects without checking authentication or IAM. Defaults to 50 entries per page. Project numbers and friendly names are returned when configured.

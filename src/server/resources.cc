@@ -501,6 +501,20 @@ json ProjectList(const std::vector<Project>& projects, const ListPage& page) {
   return response;
 }
 
+json ServiceAccountResponse(const std::vector<Project>& projects, std::string_view project_id) {
+  const auto project = std::ranges::find(projects, project_id, &Project::project_id);
+  if (project == projects.end()) {
+    throw ApiError::NotFound("Not found: Project " + std::string(project_id));
+  }
+  if (!project->numeric_id) {
+    throw ApiError::Unsupported("the service account of a project without a numericId");
+  }
+  return {
+      {"kind", "bigquery#getServiceAccountResponse"},
+      {"email", "bq-" + *project->numeric_id + "@bigquery-encryption.iam.gserviceaccount.com"},
+  };
+}
+
 json DatasetResource(const DatasetReference& dataset, const DatasetMetadata& metadata) {
   json resource{
       {"kind", "bigquery#dataset"},

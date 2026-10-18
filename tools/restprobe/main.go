@@ -65,7 +65,7 @@ func startEmulator(binary string, args ...string) (*emulatorprocess.Process, err
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return emulatorprocess.Start(ctx, binary, "", append([]string{"--host", "127.0.0.1", "--port", "0",
-		"--project", `{"projectId":"test"}`}, args...)...)
+		"--project", `{"projectId":"test","numericId":"123456789012"}`}, args...)...)
 }
 
 // parallel calls run(i) for each i below n, as many at a time as there are CPUs, and returns the
