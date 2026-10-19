@@ -1,5 +1,4 @@
-# EXECUTE IMMEDIATE rejects multiple INTO rows, outer variables and nested control statements,
-# also inside a BEGIN...END block.
+# EXECUTE IMMEDIATE rejects multiple INTO rows, outer variables and nested control statements.
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
 
 DECLARE x INT64; EXECUTE IMMEDIATE "SELECT * FROM UNNEST([1, 2])" INTO x
@@ -14,5 +13,7 @@ EXECUTE IMMEDIATE "EXECUTE IMMEDIATE 'SELECT 1'"
 EXECUTE IMMEDIATE "IF TRUE THEN SELECT 1; END IF"
 => error:
 
-EXECUTE IMMEDIATE "BEGIN IF TRUE THEN SELECT 1; END IF; END"
-=> error:
+# Answers collected from BigQuery with bqanswers: BigQuery rejects BEGIN...END blocks too, although
+# the reference says a query statement may contain one.
+EXECUTE IMMEDIATE "BEGIN SELECT 1; END"
+=> error contains: SQL created by EXECUTE IMMEDIATE contains unsupported statement type: BeginEndBlock

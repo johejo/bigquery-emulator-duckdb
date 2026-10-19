@@ -446,16 +446,6 @@ EXECUTE IMMEDIATE "SELECT ? + 1" INTO y USING y;
 SELECT y
 => "2"
 
-# The statement can be a BEGIN...END block of statements.
-EXECUTE IMMEDIATE "BEGIN SELECT 1; END"
-=> "1"
-
-CREATE TEMP TABLE dynamic_block (n INT64);
-EXECUTE IMMEDIATE "BEGIN INSERT dynamic_block VALUES (1); INSERT dynamic_block VALUES (@n); END"
-USING 2 AS n;
-SELECT SUM(n) FROM dynamic_block
-=> "3"
-
 ## Dataset system variables
 # SET and name resolution follow the system variables reference:
 # https://cloud.google.com/bigquery/docs/reference/system-variables
