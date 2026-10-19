@@ -15,9 +15,6 @@ class Type;
 
 namespace bigquery_emulator_duckdb::translator {
 
-// Whether a value, including its nested fields, uses positional internal struct names.
-bool HasInternalStructNames(const googlesql::Type* type);
-
 // Expressions, in expression.cc.
 
 std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const Scope& scope,

@@ -457,6 +457,9 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     std::string line(message.substr(0, message.find('\n')));
     bool checked = std::ranges::any_of(
         kChecked, [&](std::string_view prefix) { return message.starts_with(prefix); });
+    // Of the invalid casts, those to JSON have been checked.
+    checked = checked || (line.starts_with("Invalid cast from ") &&
+                          line.find(" to JSON [at ") != std::string::npos);
     // BigQuery names the element type of a RANGE that FORMAT rejects, and INTERVAL for an INTERVAL,
     // also for one in an ARRAY or, for INTERVAL, in a STRUCT of one field, and says INT64 where
     // GoogleSQL says integer; these errors have been checked as well.

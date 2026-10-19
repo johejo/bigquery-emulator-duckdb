@@ -263,3 +263,38 @@ SELECT AS STRUCT 1, STRUCT()
 # A STRUCT whose field names are those the emulator gives a RANGE's bounds stays a STRUCT.
 SELECT TO_JSON_STRING(STRUCT(DATE '2020-01-01' AS `$start`, DATE '2020-01-02' AS `$end`))
 => "{\"$start\":\"2020-01-01\",\"$end\":\"2020-01-02\"}"
+
+# Correlated aggregate subqueries return STRUCTs with anonymous and duplicate fields; these answers
+# are BigQuery's.
+SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM UNNEST([2]) AS a
+=> {"f":[{"v":"1"},{"v":"2"}]}
+
+SELECT TO_JSON_STRING((SELECT AS STRUCT SUM(a), COUNT(a) AS n, MAX(k) AS n FROM UNNEST([1, 2, 3]) AS k)) FROM UNNEST([1]) AS a
+=> "{\"\":3,\"n\":3,\"n\":3}"
+
+# IS DISTINCT FROM takes the fields of a STRUCT but not the STRUCT itself, and only a JSON value is
+# cast to JSON; these answers are BigQuery's.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#is_distinct
+SELECT STRUCT(1 AS a, 2 AS b) IS DISTINCT FROM STRUCT(1 AS a, 2 AS b)
+=> error: IS DISTINCT FROM can't be used with arguments of type STRUCT
+
+SELECT STRUCT(1, 2) IS DISTINCT FROM STRUCT(1, 2)
+=> error: IS DISTINCT FROM can't be used with arguments of type STRUCT
+
+SELECT STRUCT(1 AS a, NULL AS a) IS NOT DISTINCT FROM STRUCT(1 AS a, NULL AS a)
+=> error: IS NOT DISTINCT FROM can't be used with arguments of type STRUCT
+
+SELECT CAST(STRUCT(1 AS a, 2 AS b) AS JSON)
+=> error: Invalid cast from STRUCT<a INT64, b INT64> to JSON at [1:13]
+
+SELECT CAST(STRUCT(1, 2) AS JSON)
+=> error: Invalid cast from STRUCT<INT64, INT64> to JSON at [1:13]
+
+SELECT CAST(1 AS JSON)
+=> error: Invalid cast from INT64 to JSON at [1:13]
+
+SELECT CAST('{"a": 1}' AS JSON)
+=> error: Invalid cast from STRING to JSON at [1:13]
+
+SELECT CAST(JSON '{"a": 1}' AS JSON)
+=> "{\"a\":1}"

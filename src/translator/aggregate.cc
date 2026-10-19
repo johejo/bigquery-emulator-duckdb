@@ -380,6 +380,34 @@ void ApplyFinishes(Relation& result, const std::map<int, std::string>& finishes)
   result.sql = "SELECT " + Join(projections, ", ") + result.From();
 }
 
+// GoogleSQL aggregates enclosing columns over the subquery's rows, but DuckDB evaluates an
+// aggregate whose arguments read only enclosing columns in the enclosing query. Repeating those
+// columns in the input makes DuckDB bind them there, to the same values; the scope returned
+// names them for the aggregate calls.
+Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, const Scope& scope,
+                            Relation& input) {
+  Scope local = scope;
+  std::vector<std::string> projections = {"q.*"};
+  for (const auto& computed : aggregate.aggregate_list()) {
+    std::vector<const googlesql::ResolvedNode*> refs;
+    computed->expr()->GetDescendantsWithKinds({googlesql::RESOLVED_COLUMN_REF}, &refs);
+    for (const auto* node : refs) {
+      const auto* ref = node->GetAs<googlesql::ResolvedColumnRef>();
+      const int id = ref->column().column_id();
+      const auto outer = local.outer.find(id);
+      if (!ref->is_correlated() || outer == local.outer.end() || outer->second != ColumnName(id)) {
+        continue;
+      }
+      outer->second = QuoteIdentifier("_l" + std::to_string(id));
+      projections.push_back(ColumnName(id) + " AS " + outer->second);
+    }
+  }
+  if (projections.size() > 1) {
+    input.sql = "SELECT " + Join(projections, ", ") + input.From();
+  }
+  return local;
+}
+
 }  // namespace
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
@@ -525,6 +553,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       result.columns.emplace(id, "q." + ColumnName(id));
     }
   }
+  const Scope aggregate_scope = WithCorrelatedColumns(aggregate, scope, *input);
   for (const auto& computed : aggregate.aggregate_list()) {
     const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
     const auto type = DuckDbType(computed->expr()->type());
@@ -533,7 +562,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     }
     const auto having = havings.find(call);
     const std::size_t previous = intermediates.size();
-    const auto sql = NonScalarCall(*call, call, "", scope, input->columns,
+    const auto sql = NonScalarCall(*call, call, "", aggregate_scope, input->columns,
                                    having == havings.end() ? "" : having->second, &intermediates);
     if (!sql) {
       return std::nullopt;

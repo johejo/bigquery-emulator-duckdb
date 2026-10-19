@@ -19,7 +19,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 29 | 4 | 1 |
+| [Queries](#queries) | 31 | 2 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
@@ -39,7 +39,7 @@ rejected.
 | `WITH` | Supported |  |
 | `WITH RECURSIVE` | Supported |  |
 | Subqueries | Supported |  |
-| Correlated subqueries | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: correlated aggregate subquery with anonymous or duplicate STRUCT fields. |
+| Correlated subqueries | Supported |  |
 | Aggregates and `GROUP BY` | Supported |  |
 | `GROUP BY ALL` | Supported |  |
 | `GROUPING SETS`, `ROLLUP`, `CUBE` | Supported |  |
@@ -55,7 +55,7 @@ rejected.
 | `SELECT AS STRUCT`, `SELECT AS VALUE` | Supported |  |
 | `* EXCEPT`, `* REPLACE` | Supported |  |
 | `.*` of a struct | Supported |  |
-| STRUCT constructors and casts | Partial | See [STRUCT values](compatibility.md#struct-values). Unsupported: CAST to JSON with anonymous or duplicate STRUCT fields. |
+| STRUCT constructors and casts | Supported | See [STRUCT values](compatibility.md#struct-values). |
 | Struct field and array element access | Supported |  |
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |

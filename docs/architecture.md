@@ -48,7 +48,10 @@ derived tables with columns named by resolved IDs; output names are applied at t
 avoid alias collisions. Translation accounts for differences such as NULL ordering and result types.
 
 The sources in [src/translator/](../src/translator/) share a statement-wide `Context` and a
-`Scope` describing what each scan can see. `DuckDbStructFieldNames` maps anonymous or duplicate
+`Scope` describing what each scan can see. A subquery names enclosing columns without a
+qualifier; an aggregate scan repeats those its aggregates read as columns of its input, since DuckDB
+would evaluate an aggregate that reads only enclosing columns in the enclosing query.
+`DuckDbStructFieldNames` maps anonymous or duplicate
 STRUCT names to positional internal names. Construction, casts and field access use that mapping;
 JSON functions receive the original names separately so they preserve JSON keys. Comparisons of
 STRUCTs access fields by position instead, since DuckDB's composite equality takes NULL fields as
