@@ -4,6 +4,9 @@
 BEGIN EXECUTE IMMEDIATE 'BEGIN TRANSACTION'; EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support
 
+BEGIN EXECUTE IMMEDIATE "SET @@dataset_project_id = 'other'"; EXCEPTION WHEN ERROR THEN SELECT 1; END
+=> error contains: The emulator does not support
+
 CALL d.p(); SELECT 1
 => error:
 

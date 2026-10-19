@@ -2,12 +2,9 @@
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
 #
 # BigQuery rejects BEGIN...END blocks, although the reference says a query statement may contain
-# one. It does not document whether the statement may declare a variable, assign a system
-# variable or control a transaction. The emulator rejects these as unsupported until they settle.
-
-EXECUTE IMMEDIATE "SET @@dataset_id = 'unverified'";
-SELECT @@dataset_id
-?> "unverified"
+# one, and runs an assignment to @@dataset_id. It does not document whether the statement may
+# declare a variable, assign @@dataset_project_id or control a transaction. The emulator rejects
+# these as unsupported until they settle.
 
 EXECUTE IMMEDIATE "DECLARE y INT64 DEFAULT 2"
 ?> error: SQL created by EXECUTE IMMEDIATE contains unsupported statement type: VariableDeclaration at [1:19]

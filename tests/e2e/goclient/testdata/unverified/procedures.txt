@@ -1,56 +1,26 @@
 # Scopes inside procedures
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
 #
-# Each script creates the dataset unverified_procedures and procedures of its own. The dataset
-# stays in the project after the scripts run. The emulator rejects temporary functions and
-# system variable assignments in procedures until these settle where they belong.
+# Each script creates the dataset unverified_procedures and procedures and tables of its own. The
+# dataset stays in the project after the scripts run. BigQuery has answered that a procedure sets
+# @@dataset_id for the whole script; these ask what else follows from it.
 
-# Whether a temporary function declared in a procedure runs there, and after the procedure
-# returns.
+# Whether a procedure resolves unqualified table names against the @@dataset_id it sets. The
+# emulator resolves them against no default dataset, as it does for the caller's @@dataset_id.
 
 CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.call_function() OPTIONS(strict_mode=FALSE)
-BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); SELECT declared_in_procedure(); END;
-CALL unverified_procedures.call_function()
+CREATE OR REPLACE TABLE unverified_procedures.t AS SELECT 1 AS n;
+CREATE OR REPLACE PROCEDURE unverified_procedures.set_dataset_tables() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'unverified_procedures'; SELECT n FROM t; END;
+CALL unverified_procedures.set_dataset_tables()
 ?>
 
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.declare_function() OPTIONS(strict_mode=FALSE)
-BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); END;
-CALL unverified_procedures.declare_function();
-SELECT declared_in_procedure()
-?>
-
-# Whether a procedure can set @@dataset_id, and whether its caller sees the value.
+# Whether a procedure sets @@dataset_project_id for the whole script. The emulator rejects the
+# assignment in procedures until this settles.
 
 CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.read_set_dataset() OPTIONS(strict_mode=FALSE)
-BEGIN SET @@dataset_id = 'unverified_procedures'; SELECT @@dataset_id; END;
-CALL unverified_procedures.read_set_dataset()
-?>
-
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.set_dataset() OPTIONS(strict_mode=FALSE)
-BEGIN SET @@dataset_id = 'unverified_procedures'; END;
-CALL unverified_procedures.set_dataset();
-SELECT @@dataset_id
-?>
-
-# What the caller's variable holds when the procedure never assigns its OUT argument, and when
-# the procedure fails after assigning it.
-
-DECLARE v INT64 DEFAULT 5;
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.out_unassigned(OUT x INT64)
-OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END;
-CALL unverified_procedures.out_unassigned(v);
-SELECT v
-?>
-
-DECLARE v INT64 DEFAULT 5;
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.out_failed(OUT x INT64)
-OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; SELECT ERROR('fail'); END;
-BEGIN CALL unverified_procedures.out_failed(v); EXCEPTION WHEN ERROR THEN SELECT 0; END;
-SELECT v
+CREATE OR REPLACE PROCEDURE unverified_procedures.set_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_project_id = 'example-project'; END;
+CALL unverified_procedures.set_dataset_project();
+SELECT @@dataset_project_id
 ?>

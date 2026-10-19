@@ -136,6 +136,18 @@ bool IsProjectId(const std::vector<std::string>& path) {
   return path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "project_id");
 }
 
+// Whether the system variable assignment `node` assigns @@dataset_id, which BigQuery lets
+// procedures and dynamic SQL set for the whole script, or the read-only @@project_id, which fails
+// there as it does elsewhere.
+bool AssignsDatasetId(const googlesql::ASTNode& node) {
+  const auto path = node.GetAsOrDie<googlesql::ASTSystemVariableAssignment>()
+                        ->system_variable()
+                        ->path()
+                        ->ToIdentifierVector();
+  return IsProjectId(path) ||
+         (path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "dataset_id"));
+}
+
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
   if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT) {
@@ -176,6 +188,11 @@ bool AllowedAsDynamicSql(const googlesql::ASTStatement& statement,
     case googlesql::AST_COMMIT_STATEMENT:
     case googlesql::AST_ROLLBACK_STATEMENT:
       unsupported = "transactions in EXECUTE IMMEDIATE";
+      return true;
+    case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT:
+      if (!AssignsDatasetId(statement)) {
+        unsupported = "assignment to system variables other than @@dataset_id in EXECUTE IMMEDIATE";
+      }
       return true;
     default:
       unsupported = UnsupportedStatement(statement);
@@ -482,12 +499,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
             "system variables other than @@dataset_id and @@project_id inside procedures");
       }
     }
-    if (node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
-        node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT ||
-        (!dynamic && node.node_kind() == googlesql::AST_PARAMETER_EXPR)) {
+    if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT && !AssignsDatasetId(node)) {
       return Unsupported(
-          "function declarations, system variable assignments and query parameters inside "
-          "procedures");
+          "assignment to system variables other than @@dataset_id inside procedures");
+    }
+    if (!dynamic && node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
+      return Unsupported("query parameters inside procedures");
     }
     for (int i = 0; i < node.num_children(); ++i) {
       GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i), dynamic));

@@ -180,3 +180,49 @@ CALL `example.com:proj`.proc_owner_dynamic.read_table();
 DROP SCHEMA `example.com:proj`.proc_owner_dynamic CASCADE;
 SELECT n FROM _SESSION.proc_owner_dynamic_rows
 => "12"
+
+# Answers collected from BigQuery with bqanswers: a temporary function that a procedure declares
+# belongs to the script, and so does the @@dataset_id that a procedure sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_call_function() OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); SELECT declared_in_procedure(); END;
+CALL scalars.proc_call_function()
+=> "1"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_declare_function() OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); END;
+CALL scalars.proc_declare_function();
+SELECT declared_in_procedure()
+=> "1"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_set_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; SELECT @@dataset_id; END;
+CALL scalars.proc_read_set_dataset()
+=> "scalars"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; END;
+CALL scalars.proc_set_dataset();
+SELECT @@dataset_id
+=> "scalars"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_tables() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; END;
+CALL scalars.proc_set_dataset_tables();
+SELECT MAX(a) FROM t
+=> "3"
+
+# Answers collected from BigQuery with bqanswers: an OUT argument that the procedure never assigns
+# leaves the caller's variable NULL, and a procedure that fails leaves it unchanged.
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_unassigned(OUT x INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END;
+CALL scalars.proc_out_unassigned(v);
+SELECT v
+=> null
+
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_failed(OUT x INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; SELECT ERROR('fail'); END;
+BEGIN CALL scalars.proc_out_failed(v); EXCEPTION WHEN ERROR THEN SELECT 0; END;
+SELECT v
+=> "5"

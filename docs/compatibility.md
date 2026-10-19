@@ -357,10 +357,11 @@ destination tables or positional parameters.
 ## Scripts and transactions
 
 Multi-statement queries cannot be dry runs. Temporary tables belong to no dataset and are dropped
-when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement, but no scripting statements or
-transaction control; like BigQuery, it rejects `BEGIN...END` blocks. Scripts can set and read `@@dataset_id` and `@@dataset_project_id` to change
-name resolution for subsequent statements, including dynamic SQL. Setting `@@dataset_project_id`
-to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
+when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement or an assignment to
+`@@dataset_id`, but no other scripting statements or transaction control; like BigQuery, it
+rejects `BEGIN...END` blocks. Scripts can set and read `@@dataset_id` and `@@dataset_project_id`
+to change name resolution for subsequent statements, including dynamic SQL. Setting
+`@@dataset_project_id` to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
 dataset. Both initially return `NULL` without a request default dataset. These settings belong
 to the current script. With a request default dataset, reading either variable before assigning
 it is unsupported until its initial value is verified against BigQuery. Queries, including
@@ -374,30 +375,33 @@ Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRA
 multi-statement query. Unfinished transactions roll back when the script ends. Transaction modes,
 SQL UDF declarations inside transactions, writes to multiple projects (or both permanent and
 temporary tables), and committing after a handled error are unsupported; roll back a failed
-transaction.
+transaction. DuckDB aborts a transaction on an error and has no savepoints, so the emulator cannot
+keep the statements before the error as BigQuery's commit does.
 
 ## Stored procedures
 
 SQL procedures support `CREATE PROCEDURE`, `CREATE OR REPLACE PROCEDURE`, `CREATE PROCEDURE IF NOT
 EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN`, `OUT` and `INOUT` arguments.
 Definitions must explicitly set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the
-Routine API): only syntax is checked at creation, and statements resolve when called. Strict mode's default validation,
-`ANY TYPE` arguments, non-SQL procedures, and options other than `strict_mode` and `description`
-are unsupported. Procedure names in DDL must include their dataset.
+Routine API): only syntax is checked at creation, and statements resolve when called. Strict
+mode's default validation, `ANY TYPE` arguments, non-SQL procedures, and options other than
+`strict_mode` and `description` are unsupported. Procedure names in DDL must include their dataset.
 
 The Routine API stores and returns the same definitions as DDL, including descriptions and
 argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
 project. Permanent tables must include their datasets: the caller's default dataset does not
-apply inside a procedure. The caller's `@@dataset_id` value can still be read from the body.
-Temporary tables and temporary UDFs are shared with the calling script. Local variables and
-`IN` argument assignments stay within the procedure, and caller variables are not visible in
-the body, and `@@project_id` is the project that runs the script. `OUT` arguments start as
-`NULL`, and when the procedure returns, the variables passed as `OUT` and `INOUT` arguments
-take the arguments' last values. Dynamic SQL inside a procedure resolves names as the procedure
-does and sees only the query parameters of its `USING` clause. Query parameters, function
-declarations, system-variable assignments and reads of system variables other than
-`@@dataset_id` and `@@project_id` inside procedures, including their dynamic SQL, are
-unsupported.
+apply inside a procedure. The emulator does not apply an `@@dataset_id` that the procedure sets
+there either, which is not yet verified against BigQuery. Temporary tables, temporary UDFs and
+`@@dataset_id` belong to the whole script: a procedure sees the caller's, and the caller sees
+those the procedure creates or sets. Local variables and `IN` argument
+assignments stay within the procedure, caller variables are not visible in the body, and
+`@@project_id` is the project that runs the script. `OUT` arguments start as `NULL`, and when the
+procedure returns, the variables passed as `OUT` and `INOUT` arguments take the arguments' last
+values; a procedure that fails leaves them unchanged. Dynamic SQL inside a procedure resolves
+names as the procedure does and sees only the query parameters of its `USING` clause. Query
+parameters, assignments to system variables other than `@@dataset_id`, and reads of system
+variables other than `@@dataset_id` and `@@project_id` inside procedures, including their dynamic
+SQL, are unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 

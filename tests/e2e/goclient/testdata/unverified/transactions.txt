@@ -2,8 +2,12 @@
 # https://cloud.google.com/bigquery/docs/transactions
 #
 # BigQuery documents that an exception handler may commit the transaction, but not what it keeps
-# of the statements before the error, or of the statement that failed. The emulator rejects
-# COMMIT after a handled error until these settle.
+# of the statements before the error, or of the statement that failed.
+#
+# BigQuery has answered these: the commit keeps the statements before the error and nothing of the
+# statement that failed. The emulator still rejects COMMIT after a handled error, since DuckDB
+# aborts the transaction on the error and has no savepoints to roll back to. The cases move to an
+# end-to-end test once the emulator commits there.
 
 CREATE TEMP TABLE committed (n INT64);
 BEGIN
@@ -14,7 +18,7 @@ EXCEPTION WHEN ERROR THEN
   COMMIT TRANSACTION;
 END;
 SELECT COUNT(*) FROM committed
-?>
+?> "1"
 
 CREATE TEMP TABLE committed (n INT64);
 BEGIN
@@ -25,4 +29,4 @@ EXCEPTION WHEN ERROR THEN
   COMMIT TRANSACTION;
 END;
 SELECT COUNT(*) FROM committed
-?>
+?> "1"
