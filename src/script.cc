@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <set>
@@ -475,14 +476,20 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // Checks the body of a procedure, or with `dynamic` a statement that EXECUTE IMMEDIATE runs in
   // one, whose query parameters are those of its USING clause.
   static absl::Status CheckProcedureBody(const googlesql::ASTNode& node, bool dynamic = false) {
-    // Only reads of @@dataset_id have been checked against BigQuery in a procedure, and
-    // @@project_id is documented as the project that runs the script.
+    // The reads that have been checked against BigQuery in a procedure, where @@error is that of
+    // a handler in the procedure.
     if (const auto* variable = node.GetAsOrNull<googlesql::ASTSystemVariableExpr>()) {
       const auto path = variable->path()->ToIdentifierVector();
-      if (path.size() != 1 ||
-          (!absl::EqualsIgnoreCase(path.front(), "dataset_id") && !IsProjectId(path))) {
+      const auto is = [&](std::initializer_list<std::string_view> names) {
+        return std::ranges::equal(path, names, [](const std::string& a, std::string_view b) {
+          return absl::EqualsIgnoreCase(a, b);
+        });
+      };
+      if (!is({"dataset_id"}) && !is({"dataset_project_id"}) && !is({"project_id"}) &&
+          !is({"time_zone"}) && !is({"error", "message"})) {
         return Unsupported(
-            "system variables other than @@dataset_id and @@project_id inside procedures");
+            "system variables other than @@dataset_id, @@dataset_project_id, @@project_id, "
+            "@@time_zone and @@error.message inside procedures");
       }
     }
     if (const auto* assignment = node.GetAsOrNull<googlesql::ASTSystemVariableAssignment>()) {

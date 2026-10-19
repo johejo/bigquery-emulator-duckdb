@@ -241,3 +241,30 @@ BEGIN SET @@dataset_project_id = @@project_id; END;
 CALL scalars.proc_set_dataset_project();
 SELECT @@dataset_project_id = @@project_id
 => "true"
+
+# Answers collected from BigQuery with bqanswers: a procedure reads the caller's
+# @@dataset_project_id, the script's @@time_zone, and the @@error of its own handlers, and its
+# dynamic SQL does not resolve table names against the caller's @@dataset_id.
+SET @@dataset_project_id = @@project_id;
+CREATE OR REPLACE PROCEDURE scalars.proc_read_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@dataset_project_id = @@project_id; END;
+CALL scalars.proc_read_dataset_project()
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_time_zone() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@time_zone; END;
+CALL scalars.proc_read_time_zone()
+=> "UTC"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_error() OPTIONS(strict_mode=FALSE)
+BEGIN BEGIN SELECT ERROR('fail'); EXCEPTION WHEN ERROR THEN
+  SELECT REGEXP_CONTAINS(@@error.message, r'^(Query error: )?fail( at \[.+\])?$');
+END; END;
+CALL scalars.proc_read_error()
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_dynamic_tables() OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT MAX(a) FROM t'; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_dynamic_tables()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
