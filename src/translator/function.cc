@@ -306,6 +306,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       "$ADD",
       "$SUBTRACT",
       "$UNARY_MINUS",
+      "$MULTIPLY",
       "$INTERVAL",
       "$EXTRACT",
       "MAKE_INTERVAL",
@@ -326,6 +327,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                           [](const auto& argument) { return argument->type()->IsInterval(); })) {
     throw std::invalid_argument("Unsupported type in function " +
                                 (function == "NULLIF" ? "NULL_IF" : function));
+  }
+  // BigQuery multiplies INTERVAL values only by INT64 values, although GoogleSQL takes FLOAT64.
+  if (function == "$MULTIPLY" && interval &&
+      std::ranges::any_of(call.argument_list(),
+                          [](const auto& argument) { return argument->type()->IsDouble(); })) {
+    throw std::invalid_argument("No matching signature for operator *");
   }
   // These only compare their INTERVAL arguments or ARRAY elements, so they compare the
   // values' keys instead.

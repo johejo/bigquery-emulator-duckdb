@@ -61,7 +61,7 @@ rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
-| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: function $MULTIPLY with INTERVAL. |
+| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: function $DIVIDE with INTERVAL. |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML

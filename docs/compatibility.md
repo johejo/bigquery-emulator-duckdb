@@ -190,9 +190,10 @@ as BigQuery only supports `DISTINCT` for those operations.
 INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
 parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, `TO_JSON` and `TO_JSON_STRING`,
 which encode them as ISO 8601 durations, `SUM` and `AVG`, `+`, `-` and unary `-` with INTERVAL
-operands, and `-` between DATE, DATETIME, TIMESTAMP or TIME values are supported. `+` adds an INTERVAL's months, days
+operands, `*` between INTERVAL and INT64 values, and `-` between DATE, DATETIME, TIMESTAMP or TIME values are supported. `+` adds an INTERVAL's months, days
 and time in turn, as GoogleSQL does, and fails where a step leaves the range, also when the result
-is within it; `-` adds the negated INTERVAL, and TIMESTAMP values take no months or years. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
+is within it; `-` adds the negated INTERVAL, and TIMESTAMP values take no months or years. `*` multiplies the months, days and time apart, and
+fails where one leaves the range. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
 `tabledata.insertAll` rows give them as text in the canonical form, in full or in part, as query
 parameters do, and CSV loads read only the full `Y-M D H:M:S[.F]` form BigQuery documents.
 Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `DISTINCT`, `PARTITION BY`,

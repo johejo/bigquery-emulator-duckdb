@@ -1,8 +1,8 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
 # arithmetic, is unsupported rather than left to DuckDB.
 
-SELECT MAKE_INTERVAL(day => 7) * 2
-=> error contains: The emulator does not support function $MULTIPLY with INTERVAL
+SELECT MAKE_INTERVAL(day => 14) / 2
+=> error contains: The emulator does not support function $DIVIDE with INTERVAL
 
 SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVAL(hour => 168) AS i)
 => error contains: The emulator does not support function $IS_DISTINCT_FROM with INTERVAL
