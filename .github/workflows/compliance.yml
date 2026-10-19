@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [0, 1, 2, 3]
+        group: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Use the same Nix runtime libraries and time zones as the build runner.
@@ -157,7 +157,7 @@ jobs:
           SHARD_GROUP: ${{ matrix.group }}
         run: >-
           nix develop --command "$RUNNER_TEMP/compliance/complianceci" run
-          "$RUNNER_TEMP/compliance" "$RUNNER_TEMP/compliance-logs" "$SHARD_GROUP" 4
+          "$RUNNER_TEMP/compliance" "$RUNNER_TEMP/compliance-logs" "$SHARD_GROUP" 8
       - name: Upload shard logs
         if: success() || failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
