@@ -87,11 +87,11 @@ class TableSource {
   }
 
   // The columns that EXTERNAL_QUERY returns for `query` on the connection `key`, as
-  // ConnectionKey gives it, with NUMERIC columns of `decimal_type`, once the connection is
-  // attached in DuckDB as ExternalDatabaseName(key). An error status for a connection that does
+  // ConnectionKey gives it, with the given JSON options, once its DuckDB
+  // table macro ExternalDatabaseName(key) is registered. An error status for a connection that does
   // not exist or a query that EXTERNAL_QUERY rejects. No connections by default.
   virtual absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
-      const std::string& key, const std::string& /*query*/, FieldType /*decimal_type*/) {
+      const std::string& key, const std::string& /*query*/, const std::string& /*options*/) {
     return absl::NotFoundError("Not found: Connection " + key);
   }
 };

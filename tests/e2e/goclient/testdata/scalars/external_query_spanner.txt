@@ -1,0 +1,75 @@
+# Spanner's documented mapping preserves these scalar values and truncates TIMESTAMP nanos:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping
+# tools/e2e connects test.us.spanner to an empty GoogleSQL database in the Spanner emulator.
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', 'SELECT 9223372036854775807 AS x')
+=> "9223372036854775807"
+
+SELECT x FROM EXTERNAL_QUERY('test.us.spanner', 'SELECT -9223372036854775808 AS x')
+=> "-9223372036854775808"
+
+SELECT x FROM EXTERNAL_QUERY('projects/test/locations/us/connections/spanner', 'SELECT TRUE AS x')
+=> "true"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', 'SELECT 1.5 AS x')
+=> "1.5"
+
+SELECT IS_NAN(x) FROM EXTERNAL_QUERY('us.spanner', '''SELECT CAST('NaN' AS FLOAT64) AS x''')
+=> "true"
+
+SELECT IS_INF(x) FROM EXTERNAL_QUERY('us.spanner', '''SELECT CAST('Infinity' AS FLOAT64) AS x''')
+=> "true"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', '''SELECT '日本語' AS x''')
+=> "日本語"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', '''SELECT '' AS x''')
+=> ""
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', r'''SELECT b'\x00\xff' AS x''')
+=> "AP8="
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', r'''SELECT b'' AS x''')
+=> ""
+
+SELECT x / 3 FROM EXTERNAL_QUERY('us.spanner', '''SELECT NUMERIC '1' AS x''')
+=> "0.333333333"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', '''SELECT NUMERIC '99999999999999999999999999999.999999999' AS x''')
+=> "99999999999999999999999999999.999999999"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', '''SELECT DATE '0001-01-01' AS x''')
+=> "0001-01-01"
+
+SELECT x FROM EXTERNAL_QUERY('us.spanner', '''SELECT DATE '9999-12-31' AS x''')
+=> "9999-12-31"
+
+SELECT CAST(x AS STRING) FROM EXTERNAL_QUERY('us.spanner', '''SELECT TIMESTAMP '2026-01-02 03:04:05.123456789+00' AS x''')
+=> "2026-01-02 03:04:05.123456+00"
+
+SELECT CAST(x AS STRING) FROM EXTERNAL_QUERY('us.spanner', '''SELECT TIMESTAMP '1969-12-31 23:59:59.123456789+00' AS x''')
+=> "1969-12-31 23:59:59.123456+00"
+
+SELECT JSON_VALUE(x, '$.a') FROM EXTERNAL_QUERY('us.spanner', '''SELECT JSON '{"a":1}' AS x''')
+=> "1"
+
+SELECT x IS NULL FROM EXTERNAL_QUERY('us.spanner', '''SELECT JSON 'null' AS x''')
+=> "false"
+
+SELECT b IS NULL AND i IS NULL AND f IS NULL AND s IS NULL AND raw IS NULL AND d IS NULL AND ts IS NULL AND n IS NULL AND j IS NULL FROM EXTERNAL_QUERY('us.spanner', 'SELECT CAST(NULL AS BOOL) AS b, CAST(NULL AS INT64) AS i, CAST(NULL AS FLOAT64) AS f, CAST(NULL AS STRING) AS s, CAST(NULL AS BYTES) AS raw, CAST(NULL AS DATE) AS d, CAST(NULL AS TIMESTAMP) AS ts, CAST(NULL AS NUMERIC) AS n, CAST(NULL AS JSON) AS j')
+=> "true"
+
+SELECT COUNT(*) FROM EXTERNAL_QUERY('us.spanner', 'SELECT x FROM UNNEST(ARRAY<INT64>[]) AS x')
+=> "0"
+
+SELECT SUM(x) FROM EXTERNAL_QUERY('us.spanner', 'SELECT x FROM UNNEST(GENERATE_ARRAY(1, 5000)) AS x')
+=> "12502500"
+
+SELECT SUM(x) FROM UNNEST([1, 2]) AS x JOIN EXTERNAL_QUERY('us.spanner', 'SELECT 2 AS y') ON x = y
+=> "2"
+
+SELECT TYPEOF(n) FROM EXTERNAL_QUERY('us.spanner', '''SELECT NUMERIC '1' AS n''')
+=> "NUMERIC"
+
+SELECT CONCAT(TYPEOF(b), ',', TYPEOF(i), ',', TYPEOF(f), ',', TYPEOF(s), ',', TYPEOF(raw), ',', TYPEOF(d), ',', TYPEOF(ts), ',', TYPEOF(n), ',', TYPEOF(j)) FROM EXTERNAL_QUERY('us.spanner', 'SELECT CAST(NULL AS BOOL) AS b, CAST(NULL AS INT64) AS i, CAST(NULL AS FLOAT64) AS f, CAST(NULL AS STRING) AS s, CAST(NULL AS BYTES) AS raw, CAST(NULL AS DATE) AS d, CAST(NULL AS TIMESTAMP) AS ts, CAST(NULL AS NUMERIC) AS n, CAST(NULL AS JSON) AS j')
+=> "BOOL,INT64,FLOAT64,STRING,BYTES,DATE,TIMESTAMP,NUMERIC,JSON"

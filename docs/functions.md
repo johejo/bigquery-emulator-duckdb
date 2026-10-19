@@ -221,7 +221,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | Partial | Table function | Reaches PostgreSQL only; see [EXTERNAL_QUERY](compatibility.md#external_query). Unsupported: EXTERNAL_QUERY Postgres type (OID = 1560). |
+| [`EXTERNAL_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#external_query) | Partial | Table function | For external database support and limits, see [EXTERNAL_QUERY](compatibility.md#external_query). Unsupported: EXTERNAL_QUERY Postgres type (OID = 1560). |
 
 ## Geography functions
 

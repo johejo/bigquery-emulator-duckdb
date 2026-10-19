@@ -38,6 +38,7 @@
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/schema_sql.h"
+#include "src/spanner_query.h"
 #include "src/table_comments.h"
 #include "src/table_metadata.h"
 #include "src/table_path.h"
@@ -451,10 +452,10 @@ class DuckDbTableSource : public TableSource {
     return found;
   }
 
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a connection and its query.
-  absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(const std::string& key,
-                                                                 const std::string& query,
-                                                                 FieldType decimal_type) override {
+  // NOLINTBEGIN(bugprone-easily-swappable-parameters): a connection and its query options.
+  absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
+      const std::string& key, const std::string& query, const std::string& options) override {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     const auto connection = connections_.conninfo.find(key);
     if (connection == connections_.conninfo.end()) {
       return absl::NotFoundError("Not found: Connection " + key);
@@ -462,19 +463,37 @@ class DuckDbTableSource : public TableSource {
     if (const std::optional<std::string> location = ConnectionLocation(key); location.has_value()) {
       ReferenceLocation("Connection " + key, *location);
     }
+    const bool spanner = connection->second.starts_with("spanner://");
     absl::StatusOr<std::vector<FieldSchema>> columns =
-        DescribePostgresQuery(connection->second, query, decimal_type);
+        [&]() -> absl::StatusOr<std::vector<FieldSchema>> {
+      if (spanner) {
+        return DescribeSpannerQuery(connection->second.substr(10), query, options);
+      }
+      const auto decimal_type = DecimalColumnType(options);
+      if (!decimal_type.ok()) {
+        return decimal_type.status();
+      }
+      return DescribePostgresQuery(connection->second, query, *decimal_type);
+    }();
     if (!columns.ok()) {
       return columns;
     }
-    // Attached once, when first queried rather than at startup, when the database may not be
-    // up yet. The database's own connection attaches it outside any session's transaction.
+    // Registered once, when first queried rather than at startup, when the database may not
+    // be up yet. The shared backend registers it outside any session's transaction.
     const std::scoped_lock lock(connections_.mutex);
     if (!connections_.attached.contains(key)) {
       try {
-        connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second) + " AS " +
-                                     QuoteIdentifier(ExternalDatabaseName(key)) +
-                                     " (TYPE postgres, READ_ONLY)");
+        const std::string name = QuoteIdentifier(ExternalDatabaseName(key));
+        std::string read;
+        if (spanner) {
+          read = "bq_spanner_query(" + QuoteLiteral(connection->second.substr(10)) + ", sql)";
+        } else {
+          connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second) + " AS " +
+                                       name + " (TYPE postgres, READ_ONLY)");
+          read = "postgres_query(" + QuoteLiteral(ExternalDatabaseName(key)) + ", sql)";
+        }
+        connections_.backend.Execute("CREATE MACRO memory.main." + name +
+                                     "(sql) AS TABLE SELECT * FROM " + read);
       } catch (const BackendError& error) {
         return absl::InvalidArgumentError(error.what());
       }

@@ -20,6 +20,7 @@
 #include "src/backend_functions/string.h"
 #include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
+#include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -76,6 +77,7 @@ void RegisterBackendFunctions(duckdb_database database,
     throw BackendError("DuckDB failed to connect");
   }
   RegisterSessionUser(connection.get(), session_user);
+  RegisterSpannerQuery(connection.get());
   backend_functions::RegisterBigNumericFunctions(connection.get());
   backend_functions::RegisterMathFunctions(connection.get());
   backend_functions::RegisterStringFunctions(connection.get());

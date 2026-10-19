@@ -80,6 +80,12 @@ query with libpq while the statement is analyzed, maps the result's PostgreSQL t
 in [external_query.cc](../src/external_query.cc), and attaches the database to DuckDB once; the
 translator reads it with `postgres_query` and converts each column.
 
+Both backends expose a per-connection DuckDB table macro to the translator. Spanner's `PLAN`
+RPC supplies result metadata without running the query; the public google-cloud-cpp RowStream
+API does not expose this metadata. Execution uses google-cloud-cpp's Spanner client to stream
+rows into a DuckDB C API table function, with one reader and bounded chunks. Dates and
+timestamps use DuckDB's native types; decimal and JSON text are cast to their resolved types.
+
 Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.
 For query analysis, `RoutineCatalog` resolves their stored GoogleSQL definitions anew against
 the view's project and dataset, and supplies SQL views for GoogleSQL to inline. Persistent SQL

@@ -89,7 +89,7 @@ std::optional<Relation> ExternalQueryScan(const googlesql::ResolvedTVFScan& tvf,
     result.columns.emplace(column.column_id(), "q." + alias);
   }
   result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
-               " FROM postgres_query(" + QuoteLiteral(ExternalDatabaseName(*key)) + ", " +
+               " FROM memory.main." + QuoteIdentifier(ExternalDatabaseName(*key)) + "(" +
                QuoteLiteral(literal(1)) + ") AS e(" + Join(names, ", ") + ")";
   return result;
 }

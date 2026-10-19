@@ -8,16 +8,15 @@
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 
-// EXTERNAL_QUERY reads from PostgreSQL databases that --connection names, through DuckDB's
-// postgres_scanner extension.
+// EXTERNAL_QUERY reads from PostgreSQL or Spanner databases that --connection names.
 
 namespace bigquery_emulator_duckdb {
 
-// A Cloud SQL for PostgreSQL connection that EXTERNAL_QUERY can name, and the database it reaches.
+// A connection that EXTERNAL_QUERY can name, and the external database it reaches.
 struct ExternalConnection {
   // The connection's PROJECT.LOCATION.CONNECTION, as ConnectionKey gives it.
   std::string key;
-  // A libpq connection string or URI.
+  // A libpq connection string or URI, or spanner://projects/P/instances/I/databases/D.
   std::string conninfo;
 };
 
@@ -31,7 +30,7 @@ ExternalConnection ParseConnectionArgument(std::string_view argument);
 std::optional<std::string> ConnectionKey(std::string_view connection_id,
                                          const std::string& default_project);
 
-// The DuckDB database that the connection `key` is attached as, which a project ID cannot name.
+// The internal DuckDB attachment and table macro name, which a project ID cannot name.
 std::string ExternalDatabaseName(const std::string& key);
 
 // The type that EXTERNAL_QUERY's options give PostgreSQL's NUMERIC: NUMERIC unless
