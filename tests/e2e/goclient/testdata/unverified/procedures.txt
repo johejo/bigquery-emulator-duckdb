@@ -1,43 +1,24 @@
-# System variables inside procedures
-# https://cloud.google.com/bigquery/docs/reference/system-variables
+# Query parameters inside procedures
+# https://cloud.google.com/bigquery/docs/parameterized-queries
 #
 # Each script creates the dataset unverified_procedures and procedures of its own. The dataset
-# stays in the project after the scripts run. The emulator reads @@dataset_id and @@project_id in
-# procedures, and rejects reads of other system variables there until these settle.
+# stays in the project after the scripts run. The emulator rejects query parameters in procedure
+# bodies until these settle.
 
-# Whether a procedure reads the @@dataset_project_id that its caller sets.
-
-SET @@dataset_project_id = @@project_id;
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.read_dataset_project() OPTIONS(strict_mode=FALSE)
-BEGIN SELECT @@dataset_project_id = @@project_id; END;
-CALL unverified_procedures.read_dataset_project()
-?>
-
-# What a procedure reads of @@time_zone.
+# Whether a procedure reads a query parameter of the request that calls it.
 
 CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.read_time_zone() OPTIONS(strict_mode=FALSE)
-BEGIN SELECT @@time_zone; END;
-CALL unverified_procedures.read_time_zone()
-?>
+CREATE OR REPLACE PROCEDURE unverified_procedures.read_parameter() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @p; END;
+CALL unverified_procedures.read_parameter()
+param> {"name": "p", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}}
+?> error: Query error: Query parameter is not allowed in the body of procedure 'unverified_procedures.read_parameter': @p at [3:14]
 
-# What an exception handler in a procedure reads of @@error.
-
-CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE PROCEDURE unverified_procedures.read_error() OPTIONS(strict_mode=FALSE)
-BEGIN BEGIN SELECT ERROR('fail'); EXCEPTION WHEN ERROR THEN SELECT @@error.message; END; END;
-CALL unverified_procedures.read_error()
-?>
-
-# Whether dynamic SQL in a procedure resolves table names against the caller's @@dataset_id. The
-# emulator resolves them as the procedure's own statements, which BigQuery does not resolve
-# against it.
+# Whether a procedure that names no parameter runs when the request that calls it has some.
 
 CREATE SCHEMA IF NOT EXISTS unverified_procedures;
-CREATE OR REPLACE TABLE unverified_procedures.t AS SELECT 1 AS n;
-CREATE OR REPLACE PROCEDURE unverified_procedures.dynamic_tables() OPTIONS(strict_mode=FALSE)
-BEGIN EXECUTE IMMEDIATE 'SELECT n FROM t'; END;
-SET @@dataset_id = 'unverified_procedures';
-CALL unverified_procedures.dynamic_tables()
-?>
+CREATE OR REPLACE PROCEDURE unverified_procedures.ignore_parameter() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT 1; END;
+CALL unverified_procedures.ignore_parameter()
+param> {"name": "p", "parameterType": {"type": "INT64"}, "parameterValue": {"value": "1"}}
+?> "1"

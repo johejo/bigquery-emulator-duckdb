@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ func TestFillAnswers(t *testing.T) {
 				contents["b.txt"] = "SELECT 3\n?> \"answer\"\n"
 			}
 			var queries []string
-			if err := fillAnswers(path, func(sql string) (string, error) {
+			if err := fillAnswers(path, func(sql string, _ []json.RawMessage) (string, error) {
 				queries = append(queries, sql)
 				return `"answer"`, nil
 			}); err != nil {
@@ -65,7 +66,7 @@ func TestFillAnswersContinuesAfterFailure(t *testing.T) {
 		}
 	}
 	failure := errors.New("query failed")
-	err := fillAnswers(dir, func(sql string) (string, error) {
+	err := fillAnswers(dir, func(sql string, _ []json.RawMessage) (string, error) {
 		if sql == "SELECT 1" {
 			return "", failure
 		}
@@ -85,6 +86,29 @@ func TestFillAnswersContinuesAfterFailure(t *testing.T) {
 		if string(got) != want {
 			t.Errorf("%s = %q, want %q", name, got, want)
 		}
+	}
+}
+
+func TestFillAnswersSendsParameters(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "a.txt")
+	content := "SELECT @p\nparam> {\"name\": \"p\"}\n?>\n\nSELECT 2\n?>\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var got [][]string
+	if err := fillAnswers(path, func(sql string, parameters []json.RawMessage) (string, error) {
+		query := []string{sql}
+		for _, parameter := range parameters {
+			query = append(query, string(parameter))
+		}
+		got = append(got, query)
+		return `"answer"`, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"SELECT @p", `{"name": "p"}`}, {"SELECT 2"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("queries = %q, want %q", got, want)
 	}
 }
 
