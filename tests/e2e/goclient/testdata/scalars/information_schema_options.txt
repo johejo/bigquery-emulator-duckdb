@@ -56,6 +56,10 @@ CREATE SCHEMA IF NOT EXISTS scalars_options_plain;
 SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_plain'
 => "location STRING \"us\""
 
+CREATE SCHEMA IF NOT EXISTS scalars_options_eu OPTIONS (location = 'EU');
+SELECT option_value FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_eu' AND option_name = 'location'
+=> "\"eu\""
+
 CREATE OR REPLACE TABLE scalars.options_plain (x INT64);
 SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_plain'
 => null
