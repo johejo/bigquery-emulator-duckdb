@@ -5,6 +5,10 @@
 SELECT @@project_id
 => "test"
 
+# Answers collected from BigQuery with bqanswers: system variable names are case-insensitive.
+SELECT @@PROJECT_ID = @@project_id
+=> "true"
+
 SELECT 1;
 SELECT @@project_id
 => "test"

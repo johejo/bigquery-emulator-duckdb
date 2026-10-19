@@ -144,8 +144,9 @@ std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) 
                           ->system_variable()
                           ->path()
                           ->ToIdentifierVector();
-    if (path.size() != 1 || (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
-                             !absl::EqualsIgnoreCase(path.front(), "dataset_project_id"))) {
+    if (path.size() != 1 ||
+        (!absl::EqualsIgnoreCase(path.front(), "dataset_id") &&
+         !absl::EqualsIgnoreCase(path.front(), "dataset_project_id") && !IsProjectId(path))) {
       return "assignment to system variables other than @@dataset_id and @@dataset_project_id";
     }
   }
@@ -212,8 +213,11 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                     const googlesql::ASTSystemVariableAssignment* assignment,
                                     const googlesql::Value& value) override {
     const auto path = assignment->system_variable()->path()->ToIdentifierVector();
+    if (IsProjectId(path)) {
+      return googlesql::AssignmentToReadOnlySystemVariable(assignment);
+    }
     const auto variable = system_variables_.find(path);
-    if (variable == system_variables_.end() || IsProjectId(path)) {
+    if (variable == system_variables_.end()) {
       return Unsupported(
           "assignment to system variables other than @@dataset_id and @@dataset_project_id");
     }

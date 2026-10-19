@@ -313,7 +313,8 @@ to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` cle
 dataset. Both initially return `NULL` without a request default dataset. These settings belong
 to the current script. With a request default dataset, reading either variable before assigning
 it is unsupported until its initial value is verified against BigQuery. Queries, including
-single statements, can read the read-only `@@project_id`, the project that runs the query.
+single statements, can read `@@project_id`, the project that runs the query, which, as in
+BigQuery, cannot be assigned.
 As in BigQuery, function and view definitions cannot reference system variables.
 Assignments to other system variables are unsupported. An `EXCEPTION` clause never handles an
 error that the emulator reports as unsupported.
