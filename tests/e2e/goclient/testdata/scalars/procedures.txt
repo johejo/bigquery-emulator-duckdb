@@ -125,3 +125,152 @@ CREATE OR REPLACE PROCEDURE scalars.proc_caller_function() OPTIONS(strict_mode=F
 BEGIN SELECT caller_function(1); END;
 CALL scalars.proc_caller_function()
 => "2"
+
+# OUT and INOUT arguments, from CREATE PROCEDURE's documentation:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+DECLARE accumulator INT64 DEFAULT 0;
+CREATE OR REPLACE PROCEDURE scalars.proc_add_delta(INOUT x INT64, delta INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = x + delta; END;
+CALL scalars.proc_add_delta(accumulator, 5);
+CALL scalars.proc_add_delta(accumulator, 3);
+SELECT accumulator
+=> "8"
+
+# An OUT argument starts as NULL, and the caller's variable takes the last value assigned to it.
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_null(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x IS NULL; END;
+CALL scalars.proc_out_null(v)
+=> "true"
+
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_last(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = 3; SET x = 4; END;
+CALL scalars.proc_out_last(v);
+SELECT v
+=> "4"
+
+# OUT and INOUT arguments take variables, each passed once.
+CREATE OR REPLACE PROCEDURE scalars.proc_out_value(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = 1; END;
+CALL scalars.proc_out_value(1)
+=> error:
+
+DECLARE v INT64;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_twice(OUT x INT64, INOUT y INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; END;
+CALL scalars.proc_out_twice(v, v)
+=> error:
+
+# Procedures run dynamic SQL, with the parameters of its USING clause, resolving names against
+# the procedure's project.
+DECLARE v INT64;
+CREATE OR REPLACE PROCEDURE scalars.proc_dynamic_into(OUT y INT64) OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT ? + 1' INTO y USING 1; END;
+CALL scalars.proc_dynamic_into(v);
+SELECT v
+=> "2"
+
+CREATE SCHEMA IF NOT EXISTS `example.com:proj`.proc_owner_dynamic;
+CREATE OR REPLACE TABLE `example.com:proj`.proc_owner_dynamic.t AS SELECT 12 AS n;
+CREATE OR REPLACE PROCEDURE `example.com:proj`.proc_owner_dynamic.read_table()
+OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'CREATE TEMP TABLE proc_owner_dynamic_rows AS SELECT n FROM proc_owner_dynamic.t'; END;
+CALL `example.com:proj`.proc_owner_dynamic.read_table();
+DROP SCHEMA `example.com:proj`.proc_owner_dynamic CASCADE;
+SELECT n FROM _SESSION.proc_owner_dynamic_rows
+=> "12"
+
+# Answers collected from BigQuery with bqanswers: a temporary function that a procedure declares
+# belongs to the script, and so does the @@dataset_id that a procedure sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_call_function() OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); SELECT declared_in_procedure(); END;
+CALL scalars.proc_call_function()
+=> "1"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_declare_function() OPTIONS(strict_mode=FALSE)
+BEGIN CREATE TEMP FUNCTION declared_in_procedure() AS (1); END;
+CALL scalars.proc_declare_function();
+SELECT declared_in_procedure()
+=> "1"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_set_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; SELECT @@dataset_id; END;
+CALL scalars.proc_read_set_dataset()
+=> "scalars"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; END;
+CALL scalars.proc_set_dataset();
+SELECT @@dataset_id
+=> "scalars"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_tables() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; END;
+CALL scalars.proc_set_dataset_tables();
+SELECT MAX(a) FROM t
+=> "3"
+
+# Answers collected from BigQuery with bqanswers: the procedure itself does not resolve table names
+# against the @@dataset_id it sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_own_tables() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; SELECT MAX(a) FROM t; END;
+CALL scalars.proc_set_dataset_own_tables()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
+# Answers collected from BigQuery with bqanswers: an OUT argument that the procedure never assigns
+# leaves the caller's variable NULL, and a procedure that fails leaves it unchanged.
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_unassigned(OUT x INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END;
+CALL scalars.proc_out_unassigned(v);
+SELECT v
+=> null
+
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_failed(OUT x INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; SELECT ERROR('fail'); END;
+BEGIN CALL scalars.proc_out_failed(v); EXCEPTION WHEN ERROR THEN SELECT 0; END;
+SELECT v
+=> "5"
+
+# Answers collected from BigQuery with bqanswers: so does the @@dataset_project_id that a
+# procedure sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_project_id = @@project_id; END;
+CALL scalars.proc_set_dataset_project();
+SELECT @@dataset_project_id = @@project_id
+=> "true"
+
+# Answers collected from BigQuery with bqanswers: a procedure reads the caller's
+# @@dataset_project_id, the script's @@time_zone, and the @@error of its own handlers, and its
+# dynamic SQL does not resolve table names against the caller's @@dataset_id.
+SET @@dataset_project_id = @@project_id;
+CREATE OR REPLACE PROCEDURE scalars.proc_read_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@dataset_project_id = @@project_id; END;
+CALL scalars.proc_read_dataset_project()
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_time_zone() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@time_zone; END;
+CALL scalars.proc_read_time_zone()
+=> "UTC"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_read_error() OPTIONS(strict_mode=FALSE)
+BEGIN BEGIN SELECT ERROR('fail'); EXCEPTION WHEN ERROR THEN
+  SELECT REGEXP_CONTAINS(@@error.message, r'^(Query error: )?fail( at \[.+\])?$');
+END; END;
+CALL scalars.proc_read_error()
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_dynamic_tables() OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT MAX(a) FROM t'; END;
+SET @@dataset_id = 'scalars';
+CALL scalars.proc_dynamic_tables()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
+# Answers collected from BigQuery with bqanswers: CREATE PROCEDURE rejects query parameters in the
+# body, even without strict mode.
+CREATE OR REPLACE PROCEDURE scalars.proc_parameter() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @p; END
+=> error contains: Query parameter is not allowed in the body of procedure 'scalars.proc_parameter': @p

@@ -72,3 +72,31 @@ func TestSqlProcedureMetadata(t *testing.T) {
 		t.Error("dropped procedure is still visible")
 	}
 }
+
+// A CALL runs with query parameters that the procedure does not read, as BigQuery answered.
+// testdata/scalars/procedures.txt covers bodies that name parameters, which CREATE PROCEDURE
+// rejects.
+func TestCallWithQueryParameters(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_procedure_parameters")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	if _, _, err := runScript(t, client, "", `CREATE PROCEDURE go_procedure_parameters.p()
+        OPTIONS(strict_mode=FALSE) BEGIN SELECT 1; END`); err != nil {
+		t.Fatal(err)
+	}
+	query := client.Query("CALL go_procedure_parameters.p()")
+	query.Parameters = []bigquery.QueryParameter{{Name: "p", Value: int64(1)}}
+	rows, err := query.Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row []bigquery.Value
+	if err := rows.Next(&row); err != nil || len(row) != 1 || row[0] != int64(1) {
+		t.Errorf("got %v, %v; want [1]", row, err)
+	}
+}

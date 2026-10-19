@@ -446,6 +446,35 @@ EXECUTE IMMEDIATE "SELECT ? + 1" INTO y USING y;
 SELECT y
 => "2"
 
+# Answers collected from BigQuery with bqanswers: dynamic SQL sets @@dataset_id for the script.
+EXECUTE IMMEDIATE "SET @@dataset_id = 'unverified'";
+SELECT @@dataset_id
+=> "unverified"
+
+EXECUTE IMMEDIATE "SET @@dataset_id = 'scalars'";
+SELECT MAX(a) FROM t
+=> "3"
+
+# Answers collected from BigQuery with bqanswers: dynamic SQL controls transactions and sets
+# @@dataset_project_id for the script.
+CREATE TEMP TABLE dynamic_transaction (n INT64);
+EXECUTE IMMEDIATE "BEGIN TRANSACTION";
+INSERT dynamic_transaction VALUES (1);
+EXECUTE IMMEDIATE "COMMIT TRANSACTION";
+SELECT COUNT(*) FROM dynamic_transaction
+=> "1"
+
+CREATE TEMP TABLE dynamic_rollback (n INT64);
+BEGIN TRANSACTION;
+INSERT dynamic_rollback VALUES (1);
+EXECUTE IMMEDIATE "ROLLBACK TRANSACTION";
+SELECT COUNT(*) FROM dynamic_rollback
+=> "0"
+
+EXECUTE IMMEDIATE "SET @@dataset_project_id = @@project_id";
+SELECT @@dataset_project_id = @@project_id
+=> "true"
+
 ## Dataset system variables
 # SET and name resolution follow the system variables reference:
 # https://cloud.google.com/bigquery/docs/reference/system-variables

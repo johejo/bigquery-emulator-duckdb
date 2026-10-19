@@ -4,6 +4,9 @@
 // authenticates as `gcloud auth print-access-token` does. Only a maintainer runs it, since
 // queries on BigQuery are billed.
 //
+// Lines starting with "param> " between a query and its "?>" line each give a named query
+// parameter, as JSON of an entry of the request's queryParameters.
+//
 // A directory processes each of its *.txt files.
 //
 //	bqanswers PROJECT FILE_OR_DIRECTORY
@@ -36,19 +39,24 @@ type queryResponse struct {
 
 // answer runs sql on BigQuery and returns what follows "?> ", or an error when BigQuery does not
 // return exactly one cell.
-func answer(token, project, sql string) (string, error) {
-	body, err := json.Marshal(map[string]any{"query": sql, "useLegacySql": false, "timeoutMs": 60000})
+func answer(token, project, sql string, parameters []json.RawMessage) (string, error) {
+	request := map[string]any{"query": sql, "useLegacySql": false, "timeoutMs": 60000}
+	if len(parameters) > 0 {
+		request["parameterMode"] = "NAMED"
+		request["queryParameters"] = parameters
+	}
+	body, err := json.Marshal(request)
 	if err != nil {
 		return "", err
 	}
 	url := fmt.Sprintf("https://bigquery.googleapis.com/bigquery/v2/projects/%s/queries", project)
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	post, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
-	request.Header.Set("Authorization", "Bearer "+token)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
+	post.Header.Set("Authorization", "Bearer "+token)
+	post.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(post)
 	if err != nil {
 		return "", err
 	}
@@ -88,15 +96,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gcloud auth print-access-token: %v\n", err)
 		os.Exit(1)
 	}
-	if err := fillAnswers(path, func(sql string) (string, error) {
-		return answer(strings.TrimSpace(string(token)), project, sql)
+	if err := fillAnswers(path, func(sql string, parameters []json.RawMessage) (string, error) {
+		return answer(strings.TrimSpace(string(token)), project, sql, parameters)
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func fillAnswers(path string, query func(string) (string, error)) error {
+func fillAnswers(path string, query func(string, []json.RawMessage) (string, error)) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -117,7 +125,7 @@ func fillAnswers(path string, query func(string) (string, error)) error {
 	return errors.Join(failures...)
 }
 
-func fillFile(path string, query func(string) (string, error)) error {
+func fillFile(path string, query func(string, []json.RawMessage) (string, error)) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -125,18 +133,25 @@ func fillFile(path string, query func(string) (string, error)) error {
 	lines := strings.Split(string(content), "\n")
 	var failures []error
 	var sql []string
+	var parameters []json.RawMessage
 	for i, text := range lines {
 		switch {
 		case text == "?>":
-			got, err := query(strings.Join(sql, "\n"))
+			got, err := query(strings.Join(sql, "\n"), parameters)
 			if err != nil {
 				failures = append(failures, fmt.Errorf("%s:%d: %w", path, i+1, err))
 			} else {
 				lines[i] = "?> " + got
 			}
-			sql = nil
+			sql, parameters = nil, nil
 		case strings.HasPrefix(text, "?> "):
-			sql = nil
+			sql, parameters = nil, nil
+		case strings.HasPrefix(text, "param> "):
+			parameter := json.RawMessage(strings.TrimPrefix(text, "param> "))
+			if !json.Valid(parameter) {
+				failures = append(failures, fmt.Errorf("%s:%d: invalid parameter JSON", path, i+1))
+			}
+			parameters = append(parameters, parameter)
 		case text == "" || strings.HasPrefix(text, "#"):
 			if len(sql) > 0 {
 				sql = append(sql, text)

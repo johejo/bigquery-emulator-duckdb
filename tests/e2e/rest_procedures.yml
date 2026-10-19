@@ -71,7 +71,40 @@ steps:
               strictMode: true
               definitionBody: 'BEGIN SELECT 1; END'
     test: current.res.status == 400
-  out_argument:
+  output_arguments:
+    req:
+      /projects/rest-routines/datasets/procedures/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: output}
+              routineType: PROCEDURE
+              strictMode: false
+              arguments:
+                - {name: x, mode: OUT, dataType: {typeKind: INT64}}
+                - {name: y, mode: INOUT, dataType: {typeKind: INT64}}
+              definitionBody: 'BEGIN SET x = y; SET y = y + 1; END'
+    test: |
+      current.res.status == 200 && current.res.body.arguments[0].mode == "OUT" &&
+      current.res.body.arguments[1].mode == "INOUT"
+  call_output_arguments:
+    req:
+      /projects/rest-routines/queries:
+        post:
+          body:
+            application/json:
+              useLegacySql: false
+              query: >-
+                DECLARE x INT64; DECLARE y INT64 DEFAULT 1;
+                CALL procedures.output(x, y); SELECT FORMAT('%d %d', x, y)
+    test: current.res.status == 200 && current.res.body.rows[0].f[0].v == "1 2"
+  delete_output_arguments:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/output:
+        delete:
+          body: null
+    test: current.res.status == 204
+  argument_mode:
     req:
       /projects/rest-routines/datasets/procedures/routines/p:
         put:
@@ -80,7 +113,7 @@ steps:
               routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
               routineType: PROCEDURE
               strictMode: false
-              arguments: [{name: x, mode: OUT, dataType: {typeKind: INT64}}]
+              arguments: [{name: x, mode: BOTH, dataType: {typeKind: INT64}}]
               definitionBody: 'BEGIN SET x = 1; END'
     test: current.res.status == 400
   syntax_error:
@@ -108,7 +141,7 @@ steps:
             application/json:
               useLegacySql: false
               query: >-
-                CREATE OR REPLACE PROCEDURE procedures.p(IN x STRING)
+                CREATE OR REPLACE PROCEDURE procedures.p(IN x STRING, INOUT y INT64, OUT z INT64)
                 OPTIONS(strict_mode=FALSE, description='from DDL') BEGIN SELECT x; END
     test: current.res.status == 200 && !("errors" in current.res.body)
   list:
@@ -121,6 +154,8 @@ steps:
       current.res.body.routines[0].strictMode == false &&
       current.res.body.routines[0].description == "from DDL" &&
       current.res.body.routines[0].arguments[0].mode == "IN" &&
+      current.res.body.routines[0].arguments[1].mode == "INOUT" &&
+      current.res.body.routines[0].arguments[2].mode == "OUT" &&
       current.res.body.routines[0].arguments[0].dataType.typeKind == "STRING"
   delete:
     req:

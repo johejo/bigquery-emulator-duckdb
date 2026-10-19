@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -77,6 +78,18 @@ std::optional<nlohmann::json> StandardSqlDataType(const googlesql::Type* type) {
     return std::nullopt;
   }
   return nlohmann::json{{"typeKind", type->TypeName(googlesql::PRODUCT_EXTERNAL)}};
+}
+
+// The Routine API's name for `mode`; an argument without one is an IN argument.
+std::string_view ProcedureArgumentMode(googlesql::FunctionEnums::ProcedureArgumentMode mode) {
+  switch (mode) {
+    case googlesql::FunctionEnums::OUT:
+      return "OUT";
+    case googlesql::FunctionEnums::INOUT:
+      return "INOUT";
+    default:
+      return "IN";
+  }
 }
 
 }  // namespace
@@ -275,10 +288,8 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
   }
   for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
     const auto& argument = create.signature().argument(static_cast<int>(i));
-    if ((argument.options().procedure_argument_mode() != googlesql::FunctionEnums::IN &&
-         argument.options().procedure_argument_mode() != googlesql::FunctionEnums::NOT_SET) ||
-        argument.type() == nullptr) {
-      return Unsupported(scope, "procedure arguments other than fixed-type IN arguments");
+    if (argument.type() == nullptr) {
+      return Unsupported(scope, "procedure arguments of ANY TYPE");
     }
     auto type = StandardSqlDataType(argument.type());
     if (!type) {
@@ -286,7 +297,7 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
     }
     resource["arguments"].push_back({
         {"name", create.argument_name_list(static_cast<int>(i))},
-        {"mode", "IN"},
+        {"mode", ProcedureArgumentMode(argument.options().procedure_argument_mode())},
         {"dataType", *std::move(type)},
     });
   }

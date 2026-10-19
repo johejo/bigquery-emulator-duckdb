@@ -121,7 +121,7 @@ std::string RoutineHead(const Routine& routine) {
   std::vector<std::string> arguments;
   std::ranges::transform(resource.value("arguments", json::array()), std::back_inserter(arguments),
                          [&](const json& argument) {
-                           return (procedure ? "IN " : "") +
+                           return (procedure ? argument.value("mode", "IN") + " " : "") +
                                   googlesql::ToIdentifierLiteral(argument.value("name", "")) + " " +
                                   (argument.value("argumentKind", "") == "ANY_TYPE"
                                        ? "ANY TYPE"

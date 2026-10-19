@@ -22,7 +22,7 @@ rejected.
 | [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
-| [Multi-statement queries](#multi-statement-queries) | 9 | 4 | 0 |
+| [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 7 | 0 | 0 |
 
 ## Queries
@@ -112,7 +112,7 @@ rejected.
 | `DROP FUNCTION` | Supported |  |
 | `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |
 | `DROP TABLE FUNCTION` | Supported |  |
-| `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments other than fixed-type IN arguments; procedures without OPTIONS(strict_mode = FALSE). |
+| `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedures without OPTIONS(strict_mode = FALSE). |
 | `DROP PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: persistent routine name missing without a dataset. |
 
 ## Multi-statement queries
@@ -129,9 +129,9 @@ rejected.
 | `FOR ... IN` | Supported |  |
 | `RAISE`, `RETURN` | Supported |  |
 | System variables | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: assignment to system variables other than @@dataset_id and @@dataset_project_id. |
-| `EXECUTE IMMEDIATE` | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: scripting statements in EXECUTE IMMEDIATE. |
+| `EXECUTE IMMEDIATE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | Transactions | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: committing a transaction after a handled error; roll it back instead. |
-| `CALL` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: function declarations, system variable assignments, dynamic SQL and query parameters inside procedures. |
+| `CALL` | Supported | See [Stored procedures](compatibility.md#stored-procedures). |
 
 ## INFORMATION_SCHEMA
 

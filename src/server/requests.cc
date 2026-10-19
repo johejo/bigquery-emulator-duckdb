@@ -696,9 +696,11 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
         throw ApiError::Unsupported("routine argument field " + name);
       }
     }
-    if (procedure && argument.contains("mode") &&
-        StringField(argument, "mode", "argument mode") != "IN") {
-      throw ApiError::Unsupported("procedure arguments other than IN arguments");
+    if (procedure && argument.contains("mode")) {
+      const std::string mode = StringField(argument, "mode", "argument mode");
+      if (mode != "IN" && mode != "OUT" && mode != "INOUT") {
+        throw ApiError::Unsupported("procedure argument mode " + mode);
+      }
     }
     const std::string kind = StringField(argument, "argumentKind", "argument kind");
     if ((procedure || tvf) && kind == "ANY_TYPE") {
