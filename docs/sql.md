@@ -19,7 +19,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 31 | 2 | 1 |
+| [Queries](#queries) | 32 | 1 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
@@ -46,7 +46,7 @@ rejected.
 | Aggregate `ORDER BY` | Supported |  |
 | Aggregate `LIMIT` | Supported |  |
 | Aggregate `IGNORE NULLS` | Supported |  |
-| Aggregate `HAVING MAX` / `MIN` | Partial | Unsupported: aggregate ANY_VALUE with HAVING or GROUP BY. |
+| Aggregate `HAVING MAX` / `MIN` | Supported |  |
 | Window functions | Supported |  |
 | `QUALIFY` | Supported |  |
 | Set operations | Supported |  |

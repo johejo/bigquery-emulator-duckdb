@@ -166,6 +166,14 @@ SELECT TO_JSON_STRING(ARRAY(SELECT ANY_VALUE(b HAVING MIN a) FROM t WHERE a IS N
   GROUP BY MOD(a, 2) ORDER BY MOD(a, 2)))
 => "[\"yy\",\"x\"]"
 
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a > 1 AS big, ANY_VALUE(b HAVING MIN a) AS b,
+  GROUPING(a > 1) AS g FROM t WHERE a IS NOT NULL GROUP BY ROLLUP(big) ORDER BY g, big))
+=> "[{\"big\":false,\"b\":\"x\",\"g\":0},{\"big\":true,\"b\":\"yy\",\"g\":0},{\"big\":null,\"b\":\"x\",\"g\":1}]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a > 1 AS big, SUM(a HAVING MAX MOD(a, 2)) AS s
+  FROM t WHERE a IS NOT NULL GROUP BY CUBE(big) ORDER BY big NULLS LAST))
+=> "[{\"big\":false,\"s\":1},{\"big\":true,\"s\":3},{\"big\":null,\"s\":4}]"
+
 SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT a > 1 AS big, COUNT(*) AS n, GROUPING(a > 1) AS g
   FROM t WHERE a IS NOT NULL GROUP BY ROLLUP(big) ORDER BY g, big))
 => "[{\"big\":false,\"n\":1,\"g\":0},{\"big\":true,\"n\":2,\"g\":0},{\"big\":null,\"n\":3,\"g\":1}]"
