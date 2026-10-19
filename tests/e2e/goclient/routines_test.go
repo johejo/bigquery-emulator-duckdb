@@ -216,8 +216,6 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 		"CREATE FUNCTION go_routines_unsupported.js(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'",
 		"CREATE FUNCTION go_routines_unsupported.g(x INT64) OPTIONS (library = ['gs://a/b.js']) AS (x)",
 		"CREATE FUNCTION go_routines_unsupported.g(x INT64) DETERMINISTIC AS (x)",
-		// A view would keep the body it inlines when the function changes.
-		"CREATE VIEW go_routines_unsupported.v AS SELECT go_routines_unsupported.f(1) AS y",
 	} {
 		_, _, err := runScript(t, client, "", sql)
 		if err == nil || !strings.Contains(err.Error(), "The emulator does not support") {

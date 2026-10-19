@@ -155,6 +155,80 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
          QualifiedName(*target) + "() AS NULL";
 }
 
+std::optional<std::string> CreateTableFunction(
+    const googlesql::ResolvedCreateTableFunctionStmt& create, const Scope& scope) {
+  if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
+      create.language() != "SQL" || create.query() == nullptr || create.is_value_table() ||
+      create.connection_list() != nullptr ||
+      create.sql_security() != googlesql::ResolvedCreateStatement::SQL_SECURITY_UNSPECIFIED) {
+    return Unsupported(scope, "non-SQL, temporary or value-table TVFs and TVF security");
+  }
+  const std::optional<RoutineReference> target = TargetRoutine(create.name_path(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  const std::string now = std::to_string(absl::ToUnixMillis(absl::Now()));
+  nlohmann::json resource{
+      {"routineType", "TABLE_VALUED_FUNCTION"},
+      {"language", "SQL"},
+      {"arguments", nlohmann::json::array()},
+      {"definitionBody", create.code()},
+      {"creationTime", now},
+      {"lastModifiedTime", now},
+  };
+  // A function's only option is its description, which BigQuery keeps as metadata.
+  for (const auto& option : create.option_list()) {
+    const std::optional<googlesql::Value> value = OptionValue(*option, "function", scope);
+    std::string description;
+    if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
+        !StringOption(*value, description)) {
+      return Unsupported(scope, "CREATE TABLE FUNCTION option " + option->name());
+    }
+    if (value->is_null()) {
+      resource.erase("description");
+    } else {
+      resource["description"] = description;
+    }
+  }
+  const googlesql::FunctionSignature& signature = create.signature();
+  for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
+    if (!signature.argument(static_cast<int>(i)).required()) {
+      return Unsupported(scope, "optional or repeated TVF arguments");
+    }
+    const googlesql::Type* type = signature.argument(static_cast<int>(i)).type();
+    nlohmann::json argument{{"name", create.argument_name_list(static_cast<int>(i))}};
+    if (type == nullptr) {
+      return Unsupported(scope, "TVF arguments other than fixed scalar types");
+    }
+    if (auto data_type = StandardSqlDataType(type)) {
+      argument["dataType"] = *std::move(data_type);
+    } else {
+      return Unsupported(scope, "TVF arguments of type " + type->DebugString());
+    }
+    resource["arguments"].push_back(std::move(argument));
+  }
+  if (create.has_explicit_return_schema()) {
+    nlohmann::json columns = nlohmann::json::array();
+    for (const auto& output : create.output_column_list()) {
+      auto type = StandardSqlDataType(output->column().type());
+      if (!type) {
+        return Unsupported(scope, "TVF result types other than BigQuery types");
+      }
+      columns.push_back({{"name", output->name()}, {"type", *std::move(type)}});
+    }
+    resource["returnTableType"] = {{"columns", std::move(columns)}};
+  }
+  scope.context.routine = RoutineDefinition{
+      .routine = {.reference = *target, .resource = std::move(resource)},
+      .if_not_exists =
+          (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
+  };
+  const bool replace =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
+  return std::string(replace ? "CREATE OR REPLACE MACRO " : "CREATE MACRO ") +
+         QualifiedName(*target) + "() AS NULL";
+}
+
 // Strict mode needs catalog-dependent validation of every statement without executing it.
 // Until that exists, require callers to explicitly request syntax-only validation.
 std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProcedureStmt& create,
@@ -229,6 +303,16 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
 
 std::optional<std::string> DropProcedure(const googlesql::ResolvedDropStmt& drop,
                                          const Scope& scope) {
+  const auto target = TargetRoutine(drop.name_path(), scope);
+  if (!target) {
+    return std::nullopt;
+  }
+  return std::string(drop.is_if_exists() ? "DROP MACRO IF EXISTS " : "DROP MACRO ") +
+         QualifiedName(*target);
+}
+
+std::optional<std::string> DropTableFunction(const googlesql::ResolvedDropTableFunctionStmt& drop,
+                                             const Scope& scope) {
   const auto target = TargetRoutine(drop.name_path(), scope);
   if (!target) {
     return std::nullopt;

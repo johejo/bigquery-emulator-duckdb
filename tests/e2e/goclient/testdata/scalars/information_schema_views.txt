@@ -1,0 +1,38 @@
+# INFORMATION_SCHEMA.VIEWS columns and values documented by BigQuery.
+# https://cloud.google.com/bigquery/docs/information-schema-views
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_definition AS SELECT 1 AS x;
+SELECT view_definition FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_definition'
+=> "SELECT 1 AS x"
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_options AS SELECT 1 AS x;
+SELECT check_option IS NULL AND use_standard_sql = 'YES' FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_options'
+=> "true"
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_path AS SELECT 1 AS x;
+SELECT table_catalog = @@project_id AND table_schema = 'scalars' FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_path'
+=> "true"
+
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 't'
+=> "0"
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_region AS SELECT 1 AS x;
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.VIEWS WHERE table_schema = 'scalars' AND table_name = 'infoschema_view_region'
+=> "1"
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_updated AS SELECT 1 AS x;
+CREATE OR REPLACE VIEW scalars.infoschema_view_updated AS SELECT 'updated' AS x;
+SELECT view_definition FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_updated'
+=> "SELECT 'updated' AS x"
+
+CREATE OR REPLACE VIEW scalars.infoschema_view_deleted AS SELECT 1 AS x;
+DROP VIEW scalars.infoschema_view_deleted;
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_deleted'
+=> "0"
+
+# Reading a stored definition does not resolve its table dependencies.
+CREATE OR REPLACE TABLE scalars.infoschema_view_source (x INT64);
+CREATE OR REPLACE VIEW scalars.infoschema_view_missing_source AS SELECT x FROM scalars.infoschema_view_source;
+DROP TABLE scalars.infoschema_view_source;
+SELECT view_definition FROM scalars.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'infoschema_view_missing_source'
+=> "SELECT x FROM scalars.infoschema_view_source"

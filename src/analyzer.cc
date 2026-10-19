@@ -27,6 +27,7 @@
 #include "googlesql/public/error_helpers.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/sql_function.h"
+#include "googlesql/public/sql_view.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/templated_sql_function.h"
 #include "googlesql/public/types/type_factory.h"
@@ -184,37 +185,72 @@ absl::Status CheckCastTypeParameters(std::string_view sql, bool expression) {
   return absl::OkStatus();
 }
 
+// COPY and CLONE require a base-table scan, so reject views before their inlining changes
+// the scan's shape. LIKE likewise needs the source's stored metadata rather than its query.
+absl::Status CheckViewSource(const googlesql::Table* table, std::string_view operation) {
+  if (dynamic_cast<const googlesql::SQLView*>(table) == nullptr) {
+    return absl::OkStatus();
+  }
+  const auto path = SplitTablePath({table->FullName()});
+  if (operation == "LIKE") {
+    return absl::InvalidArgumentError(absl::StrCat("Invalid value: Cannot CREATE TABLE LIKE `",
+                                                   path.at(1), ".", path.at(2),
+                                                   "`, which is VIEW."));
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Invalid value: Cannot clone ", path.at(0), ":", path.at(1), ".", path.at(2),
+                   " which has type VIEW. Allowed types: [",
+                   operation == "CLONE" ? "TABLE, SNAPSHOT" : "TABLE", "]"));
+}
+
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
 absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSettings& settings,
                                                            googlesql::ErrorMessageMode mode) {
   googlesql::AnalyzerOptions options;
   options.set_language(GoogleSqlLanguageOptions());
   options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_FUNCTIONS);
+  options.enable_rewrite(googlesql::REWRITE_INLINE_SQL_TVFS);
   // Keep the inliner's argument bindings as expressions. Turning them into uncorrelated
   // scalar subqueries would let DuckDB evaluate RAND() just once for an entire input table.
   if (settings.script != nullptr) {
     options.disable_rewrite(googlesql::REWRITE_WITH_EXPR);
   }
-  // A view keeps its original GoogleSQL text, which cannot call a job-local function once
-  // that job ends, while the DuckDB view would keep the body of a persistent one as it was when
-  // the view was created. ALTER COLUMN defaults cannot call UDFs either. Check before
+  // Stored views cannot call job-local functions. Persistent functions are resolved anew
+  // when the view is read. ALTER COLUMN defaults cannot call UDFs either. Check before
   // inlining erases the function calls.
-  options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) {
+  options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) -> absl::Status {
     const auto* statement = output.resolved_statement();
+    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateTableStmt>()) {
+      const auto* create = statement->GetAs<googlesql::ResolvedCreateTableStmt>();
+      GOOGLESQL_RETURN_IF_ERROR(CheckViewSource(create->like_table(), "LIKE"));
+      for (const auto& [scan, operation] :
+           {std::pair{create->clone_from(), "CLONE"}, std::pair{create->copy_from(), "COPY"}}) {
+        if (scan != nullptr && scan->Is<googlesql::ResolvedTableScan>()) {
+          GOOGLESQL_RETURN_IF_ERROR(
+              CheckViewSource(scan->GetAs<googlesql::ResolvedTableScan>()->table(), operation));
+        }
+      }
+    }
+    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
+      GOOGLESQL_RETURN_IF_ERROR(CheckViewSource(
+          statement->GetAs<googlesql::ResolvedCreateTableAsSelectStmt>()->like_table(), "LIKE"));
+    }
     if (statement != nullptr && (statement->Is<googlesql::ResolvedCreateViewStmt>() ||
                                  statement->Is<googlesql::ResolvedAlterTableStmt>())) {
       std::vector<const googlesql::ResolvedNode*> calls;
       statement->GetDescendantsSatisfying(
           &googlesql::ResolvedNode::Is<googlesql::ResolvedFunctionCall>, &calls);
-      if (std::ranges::any_of(calls, [](const auto* node) {
+      if (std::ranges::any_of(calls, [statement](const auto* node) {
             const auto* function =
                 node->template GetAs<googlesql::ResolvedFunctionCall>()->function();
-            return function->template Is<googlesql::SQLFunction>() ||
-                   function->template Is<googlesql::TemplatedSQLFunction>();
+            const bool sql = function->template Is<googlesql::SQLFunction>() ||
+                             function->template Is<googlesql::TemplatedSQLFunction>();
+            return sql && (statement->Is<googlesql::ResolvedAlterTableStmt>() ||
+                           function->FunctionNamePath().size() == 1);
           })) {
         return absl::UnimplementedError(
             statement->Is<googlesql::ResolvedCreateViewStmt>()
-                ? "The emulator does not support views that call SQL UDFs"
+                ? "The emulator does not support views that call temporary SQL UDFs"
                 : "The emulator does not support ALTER TABLE expressions that call SQL UDFs");
       }
     }
@@ -365,7 +401,8 @@ absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
           "; in function ",
           absl::StrJoin(create->function_declaration()->name()->ToIdentifierVector(), "."));
     }
-  } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT) {
+  } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT &&
+             statement.node_kind() != googlesql::AST_CREATE_TABLE_FUNCTION_STATEMENT) {
     return absl::OkStatus();
   }
   const googlesql::ASTSystemVariableExpr* variable = FindSystemVariable(statement);

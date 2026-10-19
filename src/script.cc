@@ -677,7 +677,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     GOOGLESQL_ASSIGN_OR_RETURN(ScriptCatalog catalog, Catalog(executor, settings, !control));
     // A function body resolves against tables and previously defined functions, never the
     // script's variables (which would otherwise be captured as constants).
-    if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+    if (segment.node()->node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
+        segment.node()->node_kind() == googlesql::AST_CREATE_TABLE_FUNCTION_STATEMENT) {
       GOOGLESQL_RETURN_IF_ERROR(googlesql::MultiCatalog::Create(
           "function body", {&functions_, catalog.tables.get()}, &catalog.catalog));
     }
@@ -771,6 +772,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     if (translation->routine.has_value()) {
       GOOGLESQL_RETURN_IF_ERROR(catalog.tables->CheckRoutine(translation->routine->routine));
+    }
+    if (translation->view) {
+      GOOGLESQL_RETURN_IF_ERROR(
+          catalog.tables->CheckView(translation->view->table, translation->view->query));
     }
     return host_.RunStatement(*translation, setup_, null_arrays, backend_.get());
   }

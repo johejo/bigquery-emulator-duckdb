@@ -55,6 +55,17 @@ steps:
               query: CREATE FUNCTION persist.add_one(x INT64) AS (x + 1)
               useLegacySql: false
     test: current.res.status == 200
+  table_function_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE TABLE FUNCTION persist.added(x INT64) AS (SELECT persist.add_one(x) AS y);
+                CREATE VIEW persist.routine_view AS SELECT y FROM persist.added(1)
+              useLegacySql: false
+    test: current.res.status == 200
   # restart/stopped.yml rewrites these tables' column comments and types as another DuckDB client
   # or an earlier emulator would leave them.
   column_comments:

@@ -52,19 +52,23 @@ using nlohmann::json;
 void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
   std::unique_ptr<googlesql::ParserOutput> parsed;
   const bool procedure = routine.resource.at("routineType") == "PROCEDURE";
+  const bool tvf = routine.resource.at("routineType") == "TABLE_VALUED_FUNCTION";
   const std::string body = routine.resource.at("definitionBody").get<std::string>();
   const googlesql::ParserOptions options(GoogleSqlLanguageOptions());
   const auto status = procedure
                           ? googlesql::ParseScript(
                                 body, options, {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &parsed)
-                          : googlesql::ParseExpression(body, options, &parsed);
+                      : tvf ? googlesql::ParseStatement(body, options, &parsed)
+                            : googlesql::ParseExpression(body, options, &parsed);
   if (!status.ok()) {
     throw ApiError::Invalid(std::string(status.message()));
   }
   googlesql::TypeFactory types;
   BigQueryCatalog builtins(source, &types, "", "");
   std::vector<const googlesql::ASTNode*> nodes{
-      procedure ? static_cast<const googlesql::ASTNode*>(parsed->script()) : parsed->expression(),
+      procedure ? static_cast<const googlesql::ASTNode*>(parsed->script())
+      : tvf     ? static_cast<const googlesql::ASTNode*>(parsed->statement())
+                : parsed->expression(),
   };
   while (!nodes.empty()) {
     const auto* node = nodes.back();
@@ -410,6 +414,25 @@ class DuckDbTableSource : public TableSource {
         .query = std::move(metadata->query),
         .metadata = std::move(metadata->metadata),
     };
+  }
+
+  std::vector<Routine> ListRoutines(const DatasetReference& dataset) override {
+    std::vector<Routine> routines;
+    if (IsDuckDbSchema(dataset.dataset_id)) {
+      return routines;
+    }
+    for (const json& row : backend_.Execute(RoutinesQuery(dataset)).rows) {
+      if (auto routine = ParseRoutineComment(
+              {
+                  .project_id = dataset.project_id,
+                  .dataset_id = dataset.dataset_id,
+                  .routine_id = row["f"][0]["v"].get<std::string>(),
+              },
+              row["f"][1]["v"])) {
+        routines.push_back(*std::move(routine));
+      }
+    }
+    return routines;
   }
 
   std::optional<Routine> FindRoutine(const RoutineReference& routine) override {

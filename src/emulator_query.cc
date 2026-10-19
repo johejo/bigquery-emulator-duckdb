@@ -65,15 +65,20 @@ void RoutineError(const TranslatedStatement& translation, const BackendError& er
   }
 }
 
-// Resolves the body of the routine a CREATE FUNCTION defines as its calls will, which the
-// statement's own analysis does not: against the routine's project, with no default dataset.
-void CheckRoutine(const TranslatedStatement& translation, RoutineCatalog& catalog) {
-  if (!translation.routine.has_value()) {
-    return;
+// Checks stored definitions in their own context, without the job's defaults or local objects.
+void CheckDefinitions(const TranslatedStatement& translation, RoutineCatalog& catalog) {
+  if (translation.routine) {
+    if (const absl::Status status = catalog.CheckRoutine(translation.routine->routine);
+        !status.ok()) {
+      throw ApiError::InvalidQuery(std::string(status.message()));
+    }
   }
-  if (const absl::Status status = catalog.CheckRoutine(translation.routine->routine);
-      !status.ok()) {
-    throw ApiError::InvalidQuery(std::string(status.message()));
+  if (translation.view) {
+    if (const absl::Status status =
+            catalog.CheckView(translation.view->table, translation.view->query);
+        !status.ok()) {
+      throw ApiError::InvalidQuery(std::string(status.message()));
+    }
   }
 }
 
@@ -327,7 +332,7 @@ TranslatedStatement Emulator::Translate(
   if (!translated.has_value()) {
     throw ApiError::UnsupportedQuery(unsupported);
   }
-  CheckRoutine(*translated, catalog);
+  CheckDefinitions(*translated, catalog);
   return *std::move(translated);
 }
 
@@ -550,9 +555,14 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
   if (translation.ddl_target_routine) {
     const auto source = NewTableSource(&backend, false);
     const auto previous = source->FindRoutine(*translation.ddl_target_routine);
-    const bool procedure = translation.statement_type == "CREATE_PROCEDURE" ||
-                           translation.statement_type == "DROP_PROCEDURE";
-    if (previous && (previous->resource.at("routineType") == "PROCEDURE") != procedure) {
+    const std::string type = translation.statement_type == "CREATE_PROCEDURE" ||
+                                     translation.statement_type == "DROP_PROCEDURE"
+                                 ? "PROCEDURE"
+                             : translation.statement_type == "CREATE_TABLE_FUNCTION" ||
+                                     translation.statement_type == "DROP_TABLE_FUNCTION"
+                                 ? "TABLE_VALUED_FUNCTION"
+                                 : "SCALAR_FUNCTION";
+    if (previous && previous->resource.at("routineType") != type) {
       throw ApiError::Unsupported("replacing or dropping a routine of a different type");
     }
   }

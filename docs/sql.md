@@ -21,9 +21,9 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 16 | 10 | 5 |
+| [DDL](#ddl) | 17 | 11 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 9 | 4 | 0 |
-| [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
+| [INFORMATION_SCHEMA](#information_schema) | 7 | 0 | 0 |
 
 ## Queries
 
@@ -108,9 +108,10 @@ rejected.
 | `CREATE VIEW` | Supported | See [Views](compatibility.md#views). |
 | `DROP VIEW` | Supported |  |
 | `CREATE MATERIALIZED VIEW` | Unsupported |  |
-| `CREATE FUNCTION` | Partial | See [User-defined functions](compatibility.md#user-defined-functions). Unsupported: JavaScript UDF arguments of type DATE; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; persistent non-SQL UDFs; views that call SQL UDFs; volatile SQL UDF arguments with subquery bodies. |
+| `CREATE FUNCTION` | Partial | See [User-defined functions](compatibility.md#user-defined-functions). Unsupported: JavaScript UDF arguments of type DATE; OR REPLACE and IF NOT EXISTS for temporary SQL UDFs; function IFERROR; persistent non-SQL UDFs; volatile SQL UDF arguments with subquery bodies. |
 | `DROP FUNCTION` | Supported |  |
-| `CREATE TABLE FUNCTION` | Unsupported |  |
+| `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |
+| `DROP TABLE FUNCTION` | Supported |  |
 | `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments other than fixed-type IN arguments; procedures without OPTIONS(strict_mode = FALSE). |
 | `DROP PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: persistent routine name missing without a dataset. |
 
@@ -140,3 +141,6 @@ rejected.
 | `TABLES` | Supported |  |
 | `COLUMNS` | Supported |  |
 | `COLUMN_FIELD_PATHS` | Supported |  |
+| `VIEWS` | Supported |  |
+| `ROUTINES` | Supported |  |
+| `PARAMETERS` | Supported |  |

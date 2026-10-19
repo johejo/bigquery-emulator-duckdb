@@ -83,18 +83,20 @@ note bigquery.jobs.query | Ignores `timeoutMs`, `labels` and `useQueryCache`. Se
 request bigquery.routines.delete | DELETE /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.get | GET /bigquery/v2/projects/test/datasets/d/routines/f
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"api"},"routineType":"SCALAR_FUNCTION","definitionBody":"x + 1","arguments":[{"name":"x","dataType":{"typeKind":"INT64"}}]}
+request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"tvf"},"routineType":"TABLE_VALUED_FUNCTION","definitionBody":"SELECT x AS y","arguments":[{"name":"x","dataType":{"typeKind":"INT64"}}]}
+request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"explicit_tvf"},"routineType":"TABLE_VALUED_FUNCTION","definitionBody":"SELECT 1 AS y","returnTableType":{"columns":[{"name":"y","type":{"typeKind":"INT64"}}]}}
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"proc"},"routineType":"PROCEDURE","definitionBody":"BEGIN SELECT 1; END","strictMode":false}
 request bigquery.routines.insert | POST /bigquery/v2/projects/test/datasets/d/routines {"routineReference":{"projectId":"test","datasetId":"d","routineId":"strict"},"routineType":"PROCEDURE","definitionBody":"BEGIN SELECT 1; END"}
 request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","definitionBody":"1","description":"updated"}
 request bigquery.routines.update | PUT /bigquery/v2/projects/test/datasets/d/routines/f {"routineReference":{"projectId":"test","datasetId":"d","routineId":"f"},"routineType":"SCALAR_FUNCTION","language":"JAVASCRIPT","definitionBody":"return 1"}
-note bigquery.routines.insert | Supports SQL scalar UDFs and SQL procedures; routine references in API bodies need a project ID. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
+note bigquery.routines.insert | Supports SQL scalar UDFs, table functions and SQL procedures; routine references in API bodies need a project ID. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
 note bigquery.routines.update | Preserves the creation time. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?maxResults=1
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:SCALAR_FUNCTION
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?readMask=definitionBody,arguments,returnType
 request bigquery.routines.list | GET /bigquery/v2/projects/test/datasets/d/routines?filter=routineType:PROCEDURE&readMask=*
 note bigquery.routines.list | Supports `routineType:{RoutineType}` filters and `readMask` field projection; always returns the routine reference.
-note bigquery.routines.get | Describes persistent SQL UDFs and procedures. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
+note bigquery.routines.get | Describes persistent SQL UDFs, table functions and procedures. See [User-defined functions](compatibility.md#user-defined-functions) and [Stored procedures](compatibility.md#stored-procedures).
 
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "skipInvalidRows": true, "ignoreUnknownValues": true}
 request bigquery.tabledata.insertAll | POST /bigquery/v2/projects/test/datasets/d/tables/t/insertAll {"rows": [{"json": {"id": 2}}], "templateSuffix": "_x"}

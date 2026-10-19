@@ -9,12 +9,12 @@
 
 namespace bigquery_emulator_duckdb {
 
-// A persistent SQL UDF or procedure, as the fields of BigQuery's Routine resource describe it:
-// routineType, language, arguments, returnType (absent when the function infers it at each call),
-// definitionBody, description, creationTime and lastModifiedTime. The emulator records `resource`
-// as JSON in the comment of a DuckDB macro named after the routine in its dataset's schema, so
-// that the routine lives and dies with the dataset; the macro itself is never called. Each query
-// that calls the routine resolves its body anew, as BigQuery does.
+// A persistent SQL UDF, table function or procedure, as the fields of BigQuery's Routine resource
+// describe it: routineType, language, arguments, returnType (absent when the function infers it at
+// each call), definitionBody, description, creationTime and lastModifiedTime. The emulator records
+// `resource` as JSON in the comment of a DuckDB macro named after the routine in its dataset's
+// schema, so that the routine lives and dies with the dataset; the macro itself is never called.
+// Each query that calls the routine resolves its body anew, as BigQuery does.
 struct Routine {
   RoutineReference reference;
   nlohmann::json resource;
@@ -33,7 +33,16 @@ std::string RoutinesQuery(const DatasetReference& dataset);
 // The comment of the routine `routine`, a single row if it exists.
 std::string RoutineQuery(const RoutineReference& routine);
 
-// The CREATE FUNCTION or CREATE PROCEDURE statement that defines `routine`.
+// The GoogleSQL spelling of a StandardSqlDataType resource.
+std::string StandardSqlTypeName(const nlohmann::json& type);
+
+// The GoogleSQL spelling of a StandardSqlTableType resource.
+std::string StandardSqlTableTypeName(const nlohmann::json& type);
+
+// The canonical INFORMATION_SCHEMA.ROUTINES DDL of a routine.
+std::string RoutineDdl(const Routine& routine);
+
+// The CREATE FUNCTION, CREATE TABLE FUNCTION or CREATE PROCEDURE statement defining `routine`.
 // Throws ApiError::Invalid for a resource it cannot spell, such as an unknown type.
 std::string RoutineStatement(const Routine& routine);
 

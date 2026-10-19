@@ -79,7 +79,12 @@ in [external_query.cc](../src/external_query.cc), and attaches the database to D
 translator reads it with `postgres_query` and converts each column.
 
 Logical views store translated SQL and explicit GoogleSQL output types in native DuckDB views.
-Their comments hold the original query and result schema as JSON. Creation and metadata writes
+For query analysis, `RoutineCatalog` resolves their stored GoogleSQL definitions anew against
+the view's project and dataset, and supplies SQL views for GoogleSQL to inline. Persistent SQL
+UDFs and table functions resolve in the same shared dependency state, without job-local objects;
+the state owns their analyses and catalog objects and detects recursive dependencies. Table
+functions use the same macro-comment storage as persistent scalar functions and procedures.
+View comments hold the original query and result schema as JSON. Creation and metadata writes
 share a transaction, preserving the previous definition on replacement failure.
 
 Column comments hold TableFieldSchema metadata; table comments hold descriptions, friendly names,

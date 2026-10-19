@@ -171,7 +171,11 @@ than clearing it.
 ### Views
 
 Logical views keep their GoogleSQL definition, schema, description, friendly name, labels and
-expiration; other view options are unsupported. Temporary, recursive and value-table views, and
+expiration; other view options are unsupported. `INFORMATION_SCHEMA.VIEWS` returns their original
+GoogleSQL definitions at dataset or region scope. Each query resolves a view
+against its own project and dataset, including the current definitions of persistent SQL UDFs
+and table functions. A changed UDF return type is reflected in query results; the stored view
+schema is unchanged. Temporary, recursive and value-table views, and
 views that read temporary tables, are unsupported.
 
 ## Types
@@ -311,9 +315,26 @@ FUNCTION [IF NOT EXISTS] dataset.name` or `routines.insert`/`routines.update`, a
 until `DROP FUNCTION` or `routines.delete`. Each query that calls a SQL UDF inlines its body.
 
 Persistent UDF definitions and descriptions are returned by `routines.get` and `routines.list`.
+`INFORMATION_SCHEMA.ROUTINES` and `PARAMETERS` describe persistent SQL UDFs, table functions and
+procedures, at dataset or region scope. A UDF without an explicit return type has NULL `data_type`
+and no result row in `PARAMETERS`; ANY TYPE arguments are reported as `ANY TYPE`.
+An explicit TVF return schema appears as `TABLE<...>` in `ROUTINES.data_type`; TVFs have no
+result row in `PARAMETERS`.
 Bodies resolve on each call against the UDF's project: table and UDF names need datasets, and
 temporary UDFs cannot be called. `ANY TYPE` bodies resolve for each call's argument types; temporary
 UDF bodies resolve against previously declared UDFs.
+
+### Table functions
+
+`CREATE [OR REPLACE] TABLE FUNCTION [IF NOT EXISTS] dataset.name` defines a SQL table function
+with fixed scalar argument types, optionally with `RETURNS TABLE<...>` and a description.
+The API also accepts an explicit `returnTableType`.
+`DROP TABLE FUNCTION` removes it. `routines.insert`, `routines.update`, `routines.get`,
+`routines.list` and `routines.delete` use the same definitions. The body resolves on each call
+against the routine's project, with dataset-qualified dependencies and no job-local objects.
+Views may call table functions, and their bodies may call persistent SQL UDFs and other table
+functions. Temporary, non-SQL, templated, table-argument and value-table functions, and security
+clauses are unsupported.
 
 ### JavaScript UDFs
 
@@ -326,7 +347,7 @@ call timeout and a 256 MiB allocation limit per query per thread; see
 
 Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `OR REPLACE` and `IF NOT
 EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent UDF's
-description, the `library` option, and views that call SQL UDFs are unsupported. Subquery bodies do
+description, the `library` option, and views that call temporary SQL UDFs are unsupported. Subquery bodies do
 not support volatile arguments. Queries with TEMP function declarations do not support dry runs,
 destination tables or positional parameters.
 
