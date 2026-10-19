@@ -289,8 +289,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((function == "$IS_DISTINCT_FROM" || function == "$IS_NOT_DISTINCT_FROM") &&
       call.argument_list(0)->type()->IsStruct()) {
     throw std::invalid_argument(
-        "IS DISTINCT FROM is not supported for type " +
-        call.argument_list(0)->type()->TypeName(googlesql::PRODUCT_EXTERNAL));
+        std::string(function == "$IS_DISTINCT_FROM" ? "IS DISTINCT FROM" : "IS NOT DISTINCT FROM") +
+        " can't be used with arguments of type STRUCT");
   }
   // BigQuery multiplies INTERVAL values only by INT64 values, although GoogleSQL takes FLOAT64.
   if (function == "$MULTIPLY" && interval &&
