@@ -694,16 +694,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_multiply_numeric($1, $2)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
               },
-              // See src/backend_functions/interval.cc.
+              // See src/backend_functions/interval.cc; src/translator/function.cc rejects FLOAT64
+              // operands as BigQuery does.
               {
                   .arity = 2,
                   .spelling = "bq_multiply_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_INTERVAL})},
+                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
               },
               {
                   .arity = 2,
                   .spelling = "bq_multiply_interval($2, $1)",
-                  .conditions = {Is(2, {TYPE_INTERVAL})},
+                  .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INTERVAL})},
               },
               {.arity = 2, .spelling = "($1 * $2)"},
           },

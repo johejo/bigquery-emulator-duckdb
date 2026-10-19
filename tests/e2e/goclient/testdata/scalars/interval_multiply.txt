@@ -47,6 +47,16 @@ SELECT 3 * INTERVAL 2 DAY
 SELECT CAST(NULL AS INT64) * INTERVAL 1 DAY
 => null
 
+# BigQuery takes no FLOAT64 operand, although GoogleSQL does. Source: BigQuery answers.
+SELECT INTERVAL 1 MONTH * 3.5
+=> error contains: No matching signature for operator *
+
+SELECT 4.5 * INTERVAL 2 HOUR
+=> error contains: No matching signature for operator *
+
+SELECT INTERVAL 1 SECOND * (1.0 / 3.0)
+=> error contains: No matching signature for operator *
+
 SELECT INTERVAL 2 YEAR * 10000
 => error: Interval field months '240000' is out of range -120000 to 120000
 
