@@ -1,0 +1,32 @@
+# / between INTERVAL and INT64 values
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#interval_arithmetic_operators
+#
+# Whether BigQuery truncates a quotient finer than a microsecond toward zero, as GoogleSQL does
+# without nanosecond precision, and how it reports a division by zero.
+
+SELECT INTERVAL 1 MICROSECOND / 2
+?> "0-0 0 0:0:0"
+
+SELECT INTERVAL -1 MICROSECOND / 2
+?> "0-0 0 0:0:0"
+
+SELECT INTERVAL 1 SECOND / 3
+?> "0-0 0 0:0:0.333333"
+
+SELECT INTERVAL -1 SECOND / 3
+?> "0-0 0 -0:0:0.333333"
+
+SELECT INTERVAL 1 YEAR / 0
+?> error: Interval division by zero
+
+SELECT 6 / INTERVAL 2 DAY
+?> error: No matching signature for operator /
+  Argument types: INT64, INTERVAL
+  Signature: FLOAT64 / FLOAT64
+    Argument 2: Unable to coerce type INTERVAL to expected type FLOAT64
+  Signature: NUMERIC / NUMERIC
+    Argument 2: Unable to coerce type INTERVAL to expected type NUMERIC
+  Signature: BIGNUMERIC / BIGNUMERIC
+    Argument 2: Unable to coerce type INTERVAL to expected type BIGNUMERIC
+  Signature: INTERVAL / INT64
+    Argument 1: Unable to coerce type INT64 to expected type INTERVAL at [1:8]

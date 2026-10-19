@@ -1,0 +1,61 @@
+## / between INTERVAL and INT64 values
+# Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
+# compliance/functions_testlib_interval.cc (interval divide).
+
+SELECT INTERVAL 10 YEAR / 3
+=> "3-4 0 0:0:0"
+
+# The remainder of the months carries into the days, and theirs into the time.
+SELECT INTERVAL 1 MONTH / 12
+=> "0-0 2 12:0:0"
+
+SELECT INTERVAL 1 YEAR / 2
+=> "0-6 0 0:0:0"
+
+SELECT INTERVAL 1 YEAR / -2
+=> "-0-6 0 0:0:0"
+
+SELECT INTERVAL 1 MONTH / 2
+=> "0-0 15 0:0:0"
+
+SELECT INTERVAL 1 MONTH / -2
+=> "0-0 -15 0:0:0"
+
+SELECT INTERVAL 1 DAY / 2
+=> "0-0 0 12:0:0"
+
+SELECT INTERVAL 1 HOUR / -2
+=> "0-0 0 -0:30:0"
+
+SELECT INTERVAL 1 SECOND / 2
+=> "0-0 0 0:0:0.500"
+
+SELECT INTERVAL 1 SECOND / -2
+=> "0-0 0 -0:0:0.500"
+
+SELECT MAKE_INTERVAL(2, 2, 2, 2, 2, 2) / 2
+=> "1-1 1 1:1:1"
+
+SELECT MAKE_INTERVAL(2, 2, 2, 2, 2, 2) / -2
+=> "-1-1 -1 -1:1:1"
+
+SELECT INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND / 2
+=> "0-7 1 14:2:33.394500"
+
+SELECT INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND / 3
+=> "0-4 21 1:21:42.263"
+
+SELECT INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND / 10
+=> "0-1 12 7:36:30.678900"
+
+SELECT INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND / 100
+=> "0-0 4 5:33:39.067890"
+
+SELECT CAST(NULL AS INTERVAL) / 1
+=> null
+
+SELECT INTERVAL 1 YEAR / CAST(NULL AS INT64)
+=> null
+
+SELECT CAST(NULL AS INTERVAL) / 0
+=> null

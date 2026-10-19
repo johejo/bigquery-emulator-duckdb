@@ -61,7 +61,7 @@ rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
-| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: function $DIVIDE with INTERVAL. |
+| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: aggregate or analytic function ARRAY_AGG with INTERVAL; function JSON_OBJECT with INTERVAL. |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML

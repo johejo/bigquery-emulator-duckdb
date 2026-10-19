@@ -103,6 +103,17 @@ void MultiplyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb
   });
 }
 
+// INTERVAL / INT64. GoogleSQL divides the months, carries the remainder into the days and theirs
+// into the time, and truncates the time to microseconds.
+void DivideInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result,
+                               interval.Divide(args.Int(1), /*round_to_micros=*/true));
+    return IntervalToDuckDb(result);
+  });
+}
+
 // DATE + INTERVAL, which is a DATETIME.
 template <bool kSubtract>
 void AddDateInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -288,6 +299,7 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_subtract_intervals", {kInterval, kInterval}, kInterval,
            AddIntervals<true>);
   Register(connection, "bq_multiply_interval", {kInterval, kBigint}, kInterval, MultiplyInterval);
+  Register(connection, "bq_divide_interval", {kInterval, kBigint}, kInterval, DivideInterval);
   Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime,
            AddDateInterval<false>);
   Register(connection, "bq_subtract_date_interval", {kDate, kInterval}, kDatetime,
