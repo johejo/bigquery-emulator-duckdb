@@ -237,8 +237,9 @@ unsupported.
 columns, query parameters, `tabledata.insertAll` rows, CSV loads and
 [Storage Read sessions](storage-api.md#reading-rows). Functions other than the range functions,
 casts, comparisons, the JSON functions, `FORMAT`, and `COUNT`, `MIN`, `MAX`, `ANY_VALUE`,
-`ARRAY_AGG` and navigation functions are unsupported over them, as are loads of RANGE columns from
-other formats and extracts of RANGE columns.
+`ARRAY_AGG` and navigation functions are unsupported over them, as are extracts of RANGE columns.
+Loads of RANGE columns from JSON and Parquet fail, as in BigQuery, except that BigQuery loads a
+Parquet group of `start` and `end` as NULL, which the emulator rejects.
 
 ### GEOGRAPHY values
 
