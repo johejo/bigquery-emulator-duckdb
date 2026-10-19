@@ -280,6 +280,12 @@ note `CREATE FUNCTION` | See [User-defined functions](compatibility.md#user-defi
 query `DROP FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x); DROP FUNCTION d.f
 query `DROP FUNCTION` | DROP FUNCTION IF EXISTS d.missing
 query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS SELECT x AS y
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS (SELECT x AS y); SELECT y FROM d.f(1)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) RETURNS TABLE<y INT64> AS (SELECT x AS y); SELECT y FROM d.f(1)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x ANY TYPE) AS (SELECT x AS y)
+query `CREATE TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x TABLE<id INT64>) AS (SELECT id FROM x)
+query `DROP TABLE FUNCTION` | CREATE TABLE FUNCTION d.f(x INT64) AS (SELECT x AS y); DROP TABLE FUNCTION d.f
+note `CREATE TABLE FUNCTION` | See [Table functions](compatibility.md#table-functions).
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p() BEGIN SELECT 1; END
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE, description='procedure') BEGIN SELECT x; END
 query `CREATE PROCEDURE` | CREATE PROCEDURE d.p(OUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x=1; END
@@ -346,3 +352,9 @@ query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SC
 query `COLUMNS` | SELECT column_name, ordinal_position, data_type FROM d.INFORMATION_SCHEMA.COLUMNS
 query `COLUMNS` | SELECT * FROM `region-us`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = 't'
 query `COLUMN_FIELD_PATHS` | SELECT field_path, data_type FROM d.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
+query `VIEWS` | CREATE VIEW d.v AS SELECT 1 AS x; SELECT table_name, view_definition, check_option, use_standard_sql FROM d.INFORMATION_SCHEMA.VIEWS
+query `VIEWS` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.VIEWS
+query `ROUTINES` | CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1); SELECT routine_name, routine_type, data_type FROM d.INFORMATION_SCHEMA.ROUTINES
+query `PARAMETERS` | CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1); SELECT specific_name, ordinal_position, parameter_name, data_type FROM d.INFORMATION_SCHEMA.PARAMETERS
+query `ROUTINES` | SELECT routine_name FROM `region-us`.INFORMATION_SCHEMA.ROUTINES
+query `PARAMETERS` | SELECT specific_name, ordinal_position FROM `region-us`.INFORMATION_SCHEMA.PARAMETERS

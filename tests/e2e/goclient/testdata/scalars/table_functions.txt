@@ -1,0 +1,29 @@
+# SQL table functions with scalar parameters and optional explicit return schemas.
+# https://cloud.google.com/bigquery/docs/table-functions
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_function_statement
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_filter(lower_bound INT64) AS (SELECT a FROM scalars.t WHERE a > lower_bound);
+SELECT COUNT(*) FROM scalars.tvf_filter(2)
+=> "1"
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_null(x INT64) AS (SELECT x AS y);
+SELECT y FROM scalars.tvf_null(NULL)
+=> null
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_explicit(x INT64) RETURNS TABLE<y FLOAT64> AS (SELECT x AS y);
+SELECT TYPEOF(y) FROM scalars.tvf_explicit(1)
+=> "FLOAT64"
+
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_array(x ARRAY<STRING>) AS (SELECT ARRAY_LENGTH(x) AS y);
+SELECT y FROM scalars.tvf_array(['a', 'b'])
+=> "2"
+
+# As documented, a column takes precedence over a table-function parameter of the same name.
+CREATE OR REPLACE TABLE FUNCTION scalars.tvf_shadow(a INT64) AS (SELECT a FROM scalars.t WHERE a > a);
+SELECT COUNT(*) FROM scalars.tvf_shadow(0)
+=> "0"
+
+# View columns, like table columns, are case-insensitive identifiers.
+CREATE OR REPLACE VIEW scalars.view_column_case AS SELECT 1 AS MixedCase;
+SELECT mixedcase FROM scalars.view_column_case
+=> "1"

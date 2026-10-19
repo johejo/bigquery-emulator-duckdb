@@ -118,6 +118,9 @@ class TableSource {
     return std::nullopt;
   }
 
+  // The persistent routines of a dataset, sorted by name. None by default.
+  virtual std::vector<Routine> ListRoutines(const DatasetReference& /*dataset*/) { return {}; }
+
   // The persistent UDF `routine`, or nothing if there is no such routine. None by default.
   virtual std::optional<Routine> FindRoutine(const RoutineReference& /*routine*/) {
     return std::nullopt;

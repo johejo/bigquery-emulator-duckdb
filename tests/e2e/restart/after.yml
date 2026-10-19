@@ -44,6 +44,18 @@ steps:
             application/json: {query: 'SELECT persist.add_one(a) AS b FROM persist.t', useLegacySql: false}
     test: |
       current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "2"}]}]
+  table_function_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE OR REPLACE FUNCTION persist.add_one(x INT64) AS (x + 2);
+                SELECT y FROM persist.routine_view
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "3"}]}]
   # A column keeps the field derived from its DuckDB type unless its comment is a field the
   # emulator wrote for it.
   column_comments:

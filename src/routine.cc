@@ -112,7 +112,9 @@ std::string RoutineQuery(const RoutineReference& routine) {
       QuoteLiteral(routine.routine_id));
 }
 
-std::string RoutineStatement(const Routine& routine) {
+namespace {
+
+std::string RoutineHead(const Routine& routine) {
   const json& resource = routine.resource;
   const bool procedure = resource.at("routineType") == "PROCEDURE";
   const RoutineReference& reference = routine.reference;
@@ -126,19 +128,77 @@ std::string RoutineStatement(const Routine& routine) {
                                        : SqlTypeName(argument.value("dataType", json::object())));
                          });
   std::string statement =
-      std::format("CREATE {} {}.{}.{}({})", procedure ? "PROCEDURE" : "FUNCTION",
+      std::format("CREATE {} {}.{}.{}({})",
+                  procedure                                               ? "PROCEDURE"
+                  : resource.at("routineType") == "TABLE_VALUED_FUNCTION" ? "TABLE FUNCTION"
+                                                                          : "FUNCTION",
                   googlesql::ToIdentifierLiteral(reference.project_id),
                   googlesql::ToIdentifierLiteral(reference.dataset_id),
                   googlesql::ToIdentifierLiteral(reference.routine_id), Join(arguments, ", "));
-  if (procedure) {
+  if (resource.contains("returnTableType")) {
+    statement += " RETURNS " + StandardSqlTableTypeName(resource.at("returnTableType"));
+  } else if (resource.contains("returnType")) {
+    statement += " RETURNS " + SqlTypeName(resource["returnType"]);
+  }
+  return statement;
+}
+
+}  // namespace
+
+std::string StandardSqlTypeName(const json& type) { return SqlTypeName(type); }
+
+std::string StandardSqlTableTypeName(const json& type) {
+  if (!type.is_object() || type.size() != 1 || !type.contains("columns") ||
+      !type.at("columns").is_array() || type.at("columns").empty()) {
+    throw ApiError::Invalid("Invalid routine returnTableType");
+  }
+  if (std::ranges::any_of(type.at("columns"), [](const json& column) {
+        return !column.is_object() || column.size() != 2 || !column.contains("name") ||
+               !column.at("name").is_string() || column.at("name").get<std::string>().empty() ||
+               !column.contains("type");
+      })) {
+    throw ApiError::Invalid("Invalid routine returnTableType column");
+  }
+  std::vector<std::string> columns;
+  std::ranges::transform(type.at("columns"), std::back_inserter(columns), [](const json& column) {
+    return googlesql::ToIdentifierLiteral(column.at("name").get<std::string>()) + " " +
+           SqlTypeName(column.at("type"));
+  });
+  return "TABLE<" + Join(columns, ", ") + ">";
+}
+
+std::string RoutineStatement(const Routine& routine) {
+  const json& resource = routine.resource;
+  const std::string statement = RoutineHead(routine);
+  if (resource.at("routineType") == "PROCEDURE") {
     return statement + " OPTIONS(strict_mode = FALSE) " +
            resource.at("definitionBody").get<std::string>();
   }
-  if (resource.contains("returnType")) {
-    statement += " RETURNS " + SqlTypeName(resource["returnType"]);
-  }
   // On a line of its own, so that a comment at the end of the body cannot hide the parenthesis.
   return statement + " AS (" + resource.value("definitionBody", "") + "\n)";
+}
+
+std::string RoutineDdl(const Routine& routine) {
+  const json& resource = routine.resource;
+  std::string ddl = RoutineHead(routine);
+  std::vector<std::string> options;
+  if (resource.contains("description")) {
+    options.push_back("  description=" +
+                      googlesql::ToStringLiteral(resource.at("description").get<std::string>()));
+  }
+  if (resource.contains("strictMode")) {
+    options.push_back(std::string("  strict_mode=") +
+                      (resource.at("strictMode").get<bool>() ? "true" : "false"));
+  }
+  if (!options.empty()) {
+    ddl += "\nOPTIONS(\n" + Join(options, ",\n") + ")";
+  }
+  const std::string body = resource.at("definitionBody").get<std::string>();
+  if (resource.at("routineType") == "PROCEDURE") {
+    return ddl + "\n" + body + ";";
+  }
+  return ddl + (resource.at("routineType") == "TABLE_VALUED_FUNCTION" ? "\nAS\n" + body + ";"
+                                                                      : "\nAS (\n" + body + "\n);");
 }
 
 }  // namespace bigquery_emulator_duckdb

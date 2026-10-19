@@ -72,6 +72,18 @@ func TestViewLifecycle(t *testing.T) {
 			t.Fatalf("update %+v changed creation time from %v to %v", update, metadata.CreationTime, updated.CreationTime)
 		}
 	}
+	// API changes and INFORMATION_SCHEMA.VIEWS describe the same stored definition.
+	definitions, err := client.Query("SELECT view_definition, use_standard_sql, check_option FROM go_views.INFORMATION_SCHEMA.VIEWS WHERE table_name = 'v'").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var definitionRow []bigquery.Value
+	if err := definitions.Next(&definitionRow); err != nil {
+		t.Fatal(err)
+	}
+	if want := []bigquery.Value{definition + " LIMIT 1", "YES", nil}; !reflect.DeepEqual(definitionRow, want) {
+		t.Fatalf("INFORMATION_SCHEMA.VIEWS = %v, want %v", definitionRow, want)
+	}
 	// Duplicate creates must preserve the definition and report the HTTP conflict.
 	if err := view.Create(ctx, &bigquery.TableMetadata{ViewQuery: "SELECT 9 AS changed"}); err == nil {
 		t.Fatal("duplicate view creation succeeded")

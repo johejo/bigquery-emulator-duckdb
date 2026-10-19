@@ -22,6 +22,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/location.h"
+#include "src/routine.h"
 #include "src/table_metadata.h"
 #include "src/type_mapping.h"
 
@@ -105,6 +106,57 @@ const std::vector<ViewColumn>& TablesColumns() {
       {.name = "default_collation_name", .type = FieldType::kString},
       {.name = "sync_status", .type = FieldType::kJson},
       {.name = "upsert_stream_apply_watermark", .type = FieldType::kTimestamp},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& ViewsColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "table_catalog", .type = FieldType::kString},
+      {.name = "table_schema", .type = FieldType::kString},
+      {.name = "table_name", .type = FieldType::kString},
+      {.name = "view_definition", .type = FieldType::kString},
+      {.name = "check_option", .type = FieldType::kString},
+      {.name = "use_standard_sql", .type = FieldType::kString},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& RoutinesColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "specific_catalog", .type = FieldType::kString},
+      {.name = "specific_schema", .type = FieldType::kString},
+      {.name = "specific_name", .type = FieldType::kString},
+      {.name = "routine_catalog", .type = FieldType::kString},
+      {.name = "routine_schema", .type = FieldType::kString},
+      {.name = "routine_name", .type = FieldType::kString},
+      {.name = "routine_type", .type = FieldType::kString},
+      {.name = "data_type", .type = FieldType::kString},
+      {.name = "routine_body", .type = FieldType::kString},
+      {.name = "routine_definition", .type = FieldType::kString},
+      {.name = "external_language", .type = FieldType::kString},
+      {.name = "is_deterministic", .type = FieldType::kString},
+      {.name = "security_type", .type = FieldType::kString},
+      {.name = "created", .type = FieldType::kTimestamp},
+      {.name = "last_altered", .type = FieldType::kTimestamp},
+      {.name = "ddl", .type = FieldType::kString},
+      {.name = "connection", .type = FieldType::kString},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& ParametersColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "specific_catalog", .type = FieldType::kString},
+      {.name = "specific_schema", .type = FieldType::kString},
+      {.name = "specific_name", .type = FieldType::kString},
+      {.name = "ordinal_position", .type = FieldType::kInteger},
+      {.name = "parameter_mode", .type = FieldType::kString},
+      {.name = "is_result", .type = FieldType::kString},
+      {.name = "parameter_name", .type = FieldType::kString},
+      {.name = "data_type", .type = FieldType::kString},
+      {.name = "parameter_default", .type = FieldType::kString},
+      {.name = "is_aggregate", .type = FieldType::kString},
   };
   return *kColumns;
 }
@@ -315,6 +367,74 @@ absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& t
   return absl::OkStatus();
 }
 
+std::vector<Row> RoutineRows(TableSource& source, const std::vector<DatasetTables>& datasets,
+                             const std::string& view) {
+  std::vector<Row> rows;
+  for (const auto& dataset : datasets) {
+    for (const Routine& routine :
+         source.ListRoutines({.project_id = dataset.project, .dataset_id = dataset.dataset})) {
+      const auto& resource = routine.resource;
+      const auto& reference = routine.reference;
+      const bool procedure = resource.at("routineType") == "PROCEDURE";
+      const bool tvf = resource.at("routineType") == "TABLE_VALUED_FUNCTION";
+      const Cell result = resource.contains("returnType")
+                              ? String(StandardSqlTypeName(resource.at("returnType")))
+                              : kNull;
+      const Row identity{
+          String(reference.project_id),
+          String(reference.dataset_id),
+          String(reference.routine_id),
+      };
+      if (view == "ROUTINES") {
+        Row row = identity;
+        row.insert(row.end(), identity.begin(), identity.end());
+        const Row metadata{
+            String(procedure ? "PROCEDURE"
+                   : tvf     ? "TABLE FUNCTION"
+                             : "FUNCTION"),
+            resource.contains("returnTableType")
+                ? String(StandardSqlTableTypeName(resource.at("returnTableType")))
+                : result,
+            String("SQL"),
+            String(resource.at("definitionBody").get<std::string>()),
+            kNull,
+            kNull,
+            kNull,
+            CreationTime(std::stoll(resource.at("creationTime").get<std::string>())),
+            CreationTime(std::stoll(resource.at("lastModifiedTime").get<std::string>())),
+            String(RoutineDdl(routine)),
+            kNull,
+        };
+        row.insert(row.end(), metadata.begin(), metadata.end());
+        rows.push_back(std::move(row));
+        continue;
+      }
+      const auto parameter = [&](int64_t ordinal, Cell mode, bool is_result, Cell name, Cell type) {
+        Row row = identity;
+        const Row metadata{
+            Int(ordinal),    std::move(mode), String(is_result ? "YES" : "NO"),
+            std::move(name), std::move(type), kNull,
+            kNull,
+        };
+        row.insert(row.end(), metadata.begin(), metadata.end());
+        rows.push_back(std::move(row));
+      };
+      if (result) {
+        parameter(0, kNull, true, kNull, result);
+      }
+      int64_t ordinal = 0;
+      for (const auto& argument : resource.at("arguments")) {
+        parameter(++ordinal, procedure ? String(argument.value("mode", "IN")) : kNull, false,
+                  String(argument.at("name").get<std::string>()),
+                  String(argument.value("argumentKind", "") == "ANY_TYPE"
+                             ? "ANY TYPE"
+                             : StandardSqlTypeName(argument.at("dataType"))));
+      }
+    }
+  }
+  return rows;
+}
+
 absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
                                            const std::vector<DatasetTables>& datasets,
                                            const std::string& view,
@@ -322,6 +442,22 @@ absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
   std::vector<Row> rows;
   for (const DatasetTables& dataset : datasets) {
     for (const std::string& table : dataset.tables) {
+      if (view == "VIEWS") {
+        const std::optional<ViewDescription> description =
+            source.FindView(dataset.project, dataset.dataset, table);
+        if (description.has_value()) {
+          rows.push_back({
+              String(dataset.project),
+              String(dataset.dataset),
+              String(table),
+              OptionalString(description->query),
+              kNull,
+              // Views without an emulator definition have an unknown SQL dialect too.
+              description->query.empty() ? kNull : String("YES"),
+          });
+        }
+        continue;
+      }
       const std::optional<std::vector<FieldSchema>> schema =
           source.FindTable(dataset.project, dataset.dataset, table);
       if (!schema.has_value()) {
@@ -490,7 +626,8 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
           kNull,
       });
     }
-  } else if (view == "TABLES" || view == "COLUMNS" || view == "COLUMN_FIELD_PATHS") {
+  } else if (view == "TABLES" || view == "VIEWS" || view == "COLUMNS" ||
+             view == "COLUMN_FIELD_PATHS" || view == "ROUTINES" || view == "PARAMETERS") {
     // Scoped to a dataset or to a region: [PROJECT.](DATASET | `region-REGION`).
     std::string project = default_project;
     std::optional<std::string> dataset;
@@ -540,14 +677,20 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
         };
       });
     }
-    columns = view == "TABLES"    ? TablesColumns()
-              : view == "COLUMNS" ? ColumnsColumns()
-                                  : ColumnFieldPathsColumns();
-    absl::StatusOr<std::vector<Row>> table_rows = TableRows(source, datasets, view, type_factory);
-    if (!table_rows.ok()) {
-      return table_rows.status();
+    if (view == "ROUTINES" || view == "PARAMETERS") {
+      columns = view == "ROUTINES" ? RoutinesColumns() : ParametersColumns();
+      rows = RoutineRows(source, datasets, view);
+    } else {
+      columns = view == "VIEWS"     ? ViewsColumns()
+                : view == "TABLES"  ? TablesColumns()
+                : view == "COLUMNS" ? ColumnsColumns()
+                                    : ColumnFieldPathsColumns();
+      absl::StatusOr<std::vector<Row>> table_rows = TableRows(source, datasets, view, type_factory);
+      if (!table_rows.ok()) {
+        return table_rows.status();
+      }
+      rows = *std::move(table_rows);
     }
-    rows = *std::move(table_rows);
   } else {
     return not_found();
   }

@@ -106,6 +106,25 @@ func TestInformationSchema(t *testing.T) {
 		}
 	}
 
+	// An empty VIEWS result still exposes all six STRING columns.
+	emptyViews, err := client.Query("SELECT * FROM b.INFORMATION_SCHEMA.VIEWS").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var emptyRow []bigquery.Value
+	if err := emptyViews.Next(&emptyRow); err != iterator.Done {
+		t.Fatalf("empty VIEWS: row = %v, error = %v", emptyRow, err)
+	}
+	wantNames := []string{"table_catalog", "table_schema", "table_name", "view_definition", "check_option", "use_standard_sql"}
+	if len(emptyViews.Schema) != len(wantNames) {
+		t.Fatalf("VIEWS schema = %v", emptyViews.Schema)
+	}
+	for i, field := range emptyViews.Schema {
+		if field.Name != wantNames[i] || field.Type != bigquery.StringFieldType || field.Repeated || field.Required {
+			t.Errorf("VIEWS column %d = %+v", i, field)
+		}
+	}
+
 	for sql, want := range map[string]string{
 		"SELECT * FROM missing.INFORMATION_SCHEMA.TABLES":    "not found: missing.INFORMATION_SCHEMA.TABLES",
 		"SELECT * FROM INFORMATION_SCHEMA.TABLES":            "must be qualified with a dataset",

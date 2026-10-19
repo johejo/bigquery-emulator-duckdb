@@ -1,0 +1,64 @@
+# Persistent routine and view dependencies, as BigQuery answers.
+# Cases use distinct objects in the scalars fixture dataset.
+# https://cloud.google.com/bigquery/docs/user-defined-functions
+# https://cloud.google.com/bigquery/docs/table-functions
+
+# A persistent UDF whose body changes after a view is created.
+CREATE OR REPLACE FUNCTION scalars.dep_changed(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE VIEW scalars.dep_changed_view AS SELECT scalars.dep_changed(10) AS x;
+CREATE OR REPLACE FUNCTION scalars.dep_changed(x INT64) RETURNS INT64 AS (x + 2);
+SELECT x FROM scalars.dep_changed_view
+=> "12"
+
+# An incompatible return type change: also establishes whether the view keeps its stored schema.
+CREATE OR REPLACE FUNCTION scalars.dep_retyped(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE VIEW scalars.dep_retyped_view AS SELECT scalars.dep_retyped(10) AS x;
+CREATE OR REPLACE FUNCTION scalars.dep_retyped(x INT64) RETURNS STRING AS (CAST(x AS STRING));
+SELECT x FROM scalars.dep_retyped_view
+=> "10"
+
+# A dep_removed dependency.
+CREATE OR REPLACE FUNCTION scalars.dep_removed(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE VIEW scalars.dep_removed_view AS SELECT scalars.dep_removed(10) AS x;
+DROP FUNCTION scalars.dep_removed;
+SELECT x FROM scalars.dep_removed_view
+=> error contains: Function not found: scalars.dep_removed
+
+# Transitive dependencies through another UDF and another view.
+CREATE OR REPLACE FUNCTION scalars.dep_inner_f(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE FUNCTION scalars.dep_outer_f(x INT64) RETURNS INT64 AS (scalars.dep_inner_f(x));
+CREATE OR REPLACE VIEW scalars.dep_inner_v AS SELECT scalars.dep_outer_f(10) AS x;
+CREATE OR REPLACE VIEW scalars.dep_outer_v AS SELECT x FROM scalars.dep_inner_v;
+CREATE OR REPLACE FUNCTION scalars.dep_inner_f(x INT64) RETURNS INT64 AS (x + 2);
+SELECT x FROM scalars.dep_outer_v
+=> "12"
+
+# The corresponding dependency in a table function, called through a view.
+CREATE OR REPLACE FUNCTION scalars.dep_tvf_udf(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE TABLE FUNCTION scalars.dep_tvf(x INT64) AS (SELECT scalars.dep_tvf_udf(x) AS y);
+CREATE OR REPLACE VIEW scalars.dep_tvf_view AS SELECT y FROM scalars.dep_tvf(10);
+CREATE OR REPLACE FUNCTION scalars.dep_tvf_udf(x INT64) RETURNS INT64 AS (x + 2);
+SELECT y FROM scalars.dep_tvf_view
+=> "12"
+
+# Replacing the table function after a view has been created.
+CREATE OR REPLACE TABLE FUNCTION scalars.dep_changed_tvf(x INT64) AS (SELECT x + 1 AS y);
+CREATE OR REPLACE VIEW scalars.dep_changed_tvf_view AS SELECT y FROM scalars.dep_changed_tvf(10);
+CREATE OR REPLACE TABLE FUNCTION scalars.dep_changed_tvf(x INT64) AS (SELECT x + 2 AS y);
+SELECT y FROM scalars.dep_changed_tvf_view
+=> "12"
+
+# A dep_changed argument type after view creation.
+CREATE OR REPLACE FUNCTION scalars.dep_rearg(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE VIEW scalars.dep_rearg_view AS SELECT scalars.dep_rearg(10) AS x;
+CREATE OR REPLACE FUNCTION scalars.dep_rearg(x STRING) RETURNS INT64 AS (LENGTH(x));
+SELECT x FROM scalars.dep_rearg_view
+=> error contains: No matching signature for function
+
+# Recreating a dropped routine under the same name.
+CREATE OR REPLACE FUNCTION scalars.dep_recreated(x INT64) RETURNS INT64 AS (x + 1);
+CREATE OR REPLACE VIEW scalars.dep_recreated_view AS SELECT scalars.dep_recreated(10) AS x;
+DROP FUNCTION scalars.dep_recreated;
+CREATE FUNCTION scalars.dep_recreated(x INT64) RETURNS INT64 AS (x + 2);
+SELECT x FROM scalars.dep_recreated_view
+=> "12"
