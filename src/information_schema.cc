@@ -326,16 +326,10 @@ struct ViewContext {
   std::vector<DatasetReference> datasets;
 };
 
-// The rows of a view: rows given cell by cell, and DuckDB queries that compute more, each
-// selecting the view's columns in order.
-struct ViewRows {
-  std::vector<Row> rows;
-  std::vector<std::string> queries;
-};
-
 // Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
 // typed even when every row has NULL in it.
-absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns, const ViewRows& rows) {
+absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
+                                    const std::vector<Row>& rows) {
   std::vector<std::string> names;
   std::vector<std::string> projections;
   for (size_t i = 0; i < columns.size(); ++i) {
@@ -347,25 +341,20 @@ absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns, cons
     projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
                           QuoteIdentifier(columns.at(i).name));
   }
-  std::vector<std::string> sources = rows.queries;
-  if (!rows.rows.empty()) {
-    std::vector<std::string> values;
-    for (const Row& row : rows.rows) {
-      std::vector<std::string> cells;
-      std::ranges::transform(row, std::back_inserter(cells),
-                             [](const Cell& cell) { return cell.value_or("NULL"); });
-      values.push_back("(" + absl::StrJoin(cells, ", ") + ")");
-    }
-    sources.push_back("SELECT * FROM (VALUES " + absl::StrJoin(values, ", ") + ")");
+  std::vector<std::string> values;
+  for (const Row& row : rows) {
+    std::vector<std::string> cells;
+    std::ranges::transform(row, std::back_inserter(cells),
+                           [](const Cell& cell) { return cell.value_or("NULL"); });
+    values.push_back("(" + absl::StrJoin(cells, ", ") + ")");
   }
-  const bool empty = sources.empty();
-  if (empty) {
-    sources.push_back("SELECT " +
-                      absl::StrJoin(std::vector<std::string>(columns.size(), "NULL"), ", "));
+  if (rows.empty()) {
+    values.push_back("(" + absl::StrJoin(std::vector<std::string>(columns.size(), "NULL"), ", ") +
+                     ")");
   }
-  return "SELECT " + absl::StrJoin(projections, ", ") + " FROM (" +
-         absl::StrJoin(sources, " UNION ALL ") + ") AS v(" + absl::StrJoin(names, ", ") + ")" +
-         (empty ? " WHERE false" : "");
+  return "SELECT " + absl::StrJoin(projections, ", ") + " FROM (VALUES " +
+         absl::StrJoin(values, ", ") + ") AS v(" + absl::StrJoin(names, ", ") + ")" +
+         (rows.empty() ? " WHERE false" : "");
 }
 
 absl::StatusOr<std::string> TypeName(const FieldSchema& field,
@@ -482,8 +471,8 @@ void AppendOptions(const Row& identity, std::vector<Option> options, std::vector
   });
 }
 
-absl::StatusOr<ViewRows> SchemataRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     const std::optional<DatasetMetadata> metadata =
         context.source.DescribeDataset(dataset.project_id, dataset.dataset_id);
@@ -492,7 +481,7 @@ absl::StatusOr<ViewRows> SchemataRows(const ViewContext& context) {
       continue;
     }
     const std::string location = metadata->Location();
-    result.rows.push_back(Concat(
+    rows.push_back(Concat(
         Identity(dataset),
         {
             kNull,
@@ -505,11 +494,11 @@ absl::StatusOr<ViewRows> SchemataRows(const ViewContext& context) {
             kNull,
         }));
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> SchemataOptionsRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     const std::optional<DatasetMetadata> metadata =
         context.source.DescribeDataset(dataset.project_id, dataset.dataset_id);
@@ -518,6 +507,12 @@ absl::StatusOr<ViewRows> SchemataOptionsRows(const ViewContext& context) {
     }
     std::vector<Option> options = CommonOptions(metadata->description, metadata->friendly_name,
                                                 metadata->labels, metadata->default_rounding_mode);
+    // Every dataset lists its location, in lower case as SCHEMATA's DDL spells it.
+    options.push_back({
+        .name = "location",
+        .type = "STRING",
+        .value = StringOptionValue(ToLowerAscii(metadata->Location())),
+    });
     if (metadata->default_table_expiration_ms.has_value()) {
       constexpr double kMillisPerDay = 24.0 * 60 * 60 * 1000;
       options.push_back({
@@ -527,13 +522,13 @@ absl::StatusOr<ViewRows> SchemataOptionsRows(const ViewContext& context) {
                                       kMillisPerDay),
       });
     }
-    AppendOptions(Identity(dataset), std::move(options), result.rows);
+    AppendOptions(Identity(dataset), std::move(options), rows);
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> TablesRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     const std::string& project = dataset.project_id;
     for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
@@ -567,7 +562,7 @@ absl::StatusOr<ViewRows> TablesRows(const ViewContext& context) {
       } else if (!view_query->empty()) {
         ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query));
       }
-      result.rows.push_back(
+      rows.push_back(
           Concat(Identity(dataset, table), {
                                                String(view_query.has_value() ? "VIEW"
                                                       : clone.has_value()    ? "CLONE"
@@ -594,11 +589,11 @@ absl::StatusOr<ViewRows> TablesRows(const ViewContext& context) {
                                            }));
     }
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> TableOptionsRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     const std::string& project = dataset.project_id;
     for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
@@ -622,10 +617,10 @@ absl::StatusOr<ViewRows> TableOptionsRows(const ViewContext& context) {
             .value = "TIMESTAMP \"" + FormatMillis(*metadata->expiration_time) + "\"",
         });
       }
-      AppendOptions(Identity(dataset, table), std::move(options), result.rows);
+      AppendOptions(Identity(dataset, table), std::move(options), rows);
     }
   }
-  return result;
+  return rows;
 }
 
 // The ID of the partition of a row of a table partitioned as `metadata` says, as a DuckDB
@@ -656,11 +651,12 @@ std::string PartitionId(const TableMetadata& metadata) {
   return "NULL";
 }
 
-// Counts the rows of each partition of each table. The emulator keeps no storage statistics, so
-// the byte counts are 0, as tables.get reports numBytes, and no partition has a last modified
-// time.
-absl::StatusOr<ViewRows> PartitionsRows(const ViewContext& context) {
-  ViewRows result;
+// Counts the rows of each partition of each table while the query is analyzed, as the other views
+// read metadata, so that a table dropped meanwhile is left out. The emulator keeps no storage
+// statistics, so the byte counts are 0, as tables.get reports numBytes, and no partition has a
+// last modified time.
+absl::StatusOr<std::vector<Row>> PartitionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     const std::string& project = dataset.project_id;
     for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
@@ -670,34 +666,32 @@ absl::StatusOr<ViewRows> PartitionsRows(const ViewContext& context) {
       if (!description.has_value()) {
         continue;
       }
-      std::vector<std::string> cells;
-      std::ranges::transform(Identity(dataset, table), std::back_inserter(cells),
-                             [](const Cell& cell) { return *cell; });
-      const bool partitioned = description->metadata.partitioned();
-      cells.insert(cells.end(), {
-                                    partitioned ? "partition_id" : "NULL",
-                                    "COUNT(*)",
-                                    "0",
-                                    "0",
-                                    "NULL",
-                                    "'ACTIVE'",
-                                });
-      const std::string reference = QualifiedName(TableReference{
-          .project_id = project,
-          .dataset_id = dataset.dataset_id,
-          .table_id = table,
-      });
-      // A table that is not partitioned has one partition, even when it is empty.
-      result.queries.push_back("SELECT " + absl::StrJoin(cells, ", ") + " FROM (SELECT " +
-                               PartitionId(description->metadata) + " AS partition_id FROM " +
-                               reference + ")" + (partitioned ? " GROUP BY partition_id" : ""));
+      // A table without rows has no partitions, even one that is not partitioned.
+      const std::optional<std::vector<std::pair<std::optional<std::string>, int64_t>>> counts =
+          context.source.CountRows(
+              {.project_id = project, .dataset_id = dataset.dataset_id, .table_id = table},
+              PartitionId(description->metadata));
+      if (!counts.has_value()) {
+        continue;
+      }
+      for (const auto& [partition, count] : *counts) {
+        rows.push_back(
+            Concat(Identity(dataset, table), {
+                                                 partition.has_value() ? String(*partition) : kNull,
+                                                 Int(count),
+                                                 Int(0),
+                                                 Int(0),
+                                                 kNull,
+                                                 String("ACTIVE"),
+                                             }));
+      }
     }
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> ViewsRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     for (const std::string& table :
          context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
@@ -706,7 +700,7 @@ absl::StatusOr<ViewRows> ViewsRows(const ViewContext& context) {
       if (!description.has_value()) {
         continue;
       }
-      result.rows.push_back(
+      rows.push_back(
           Concat(Identity(dataset, table), {
                                                OptionalString(description->query),
                                                kNull,
@@ -716,11 +710,11 @@ absl::StatusOr<ViewRows> ViewsRows(const ViewContext& context) {
                                            }));
     }
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> ColumnsRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     for (const std::string& table :
          context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
@@ -735,36 +729,36 @@ absl::StatusOr<ViewRows> ColumnsRows(const ViewContext& context) {
         if (!type.ok()) {
           return type.status();
         }
-        result.rows.push_back(Concat(Identity(dataset, table),
-                                     {
-                                         String(field.name),
-                                         Int(static_cast<int64_t>(i) + 1),
-                                         String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
-                                         String(*type),
-                                         String("NEVER"),
-                                         kNull,
-                                         kNull,
-                                         String("NO"),
-                                         kNull,
-                                         String("NO"),
-                                         String("NO"),
-                                         kNull,
-                                         kNull,
-                                         OptionalString(field.default_value_expression),
-                                         OptionalString(field.rounding_mode),
-                                         kEmptyArray,
-                                         String("NO"),
-                                         kNull,
-                                         kNull,
-                                         kNull,
-                                         kNull,
-                                         kNull,
-                                         kNull,
-                                     }));
+        rows.push_back(Concat(Identity(dataset, table),
+                              {
+                                  String(field.name),
+                                  Int(static_cast<int64_t>(i) + 1),
+                                  String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
+                                  String(*type),
+                                  String("NEVER"),
+                                  kNull,
+                                  kNull,
+                                  String("NO"),
+                                  kNull,
+                                  String("NO"),
+                                  String("NO"),
+                                  kNull,
+                                  kNull,
+                                  OptionalString(field.default_value_expression),
+                                  OptionalString(field.rounding_mode),
+                                  kEmptyArray,
+                                  String("NO"),
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                              }));
       }
     }
   }
-  return result;
+  return rows;
 }
 
 // Appends a COLUMN_FIELD_PATHS row for `field` and for each field nested in it. The fields of
@@ -795,8 +789,8 @@ absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
   return absl::OkStatus();
 }
 
-absl::StatusOr<ViewRows> ColumnFieldPathsRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     for (const std::string& table :
          context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
@@ -807,25 +801,25 @@ absl::StatusOr<ViewRows> ColumnFieldPathsRows(const ViewContext& context) {
       }
       for (const FieldSchema& field : *schema) {
         if (absl::Status status = AppendFieldPaths(Identity(dataset, table), field.name, field.name,
-                                                   field, context.type_factory, result.rows);
+                                                   field, context.type_factory, rows);
             !status.ok()) {
           return status;
         }
       }
     }
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> RoutinesRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     for (const Routine& routine : context.source.ListRoutines(dataset)) {
       const auto& resource = routine.resource;
       const Row identity = Identity(dataset, routine.reference.routine_id);
       Row row = Concat(identity, identity);
       const auto type = resource.at("routineType").get<std::string>();
-      result.rows.push_back(
+      rows.push_back(
           Concat(std::move(row),
                  {
                      String(type == "PROCEDURE"               ? "PROCEDURE"
@@ -848,26 +842,26 @@ absl::StatusOr<ViewRows> RoutinesRows(const ViewContext& context) {
                  }));
     }
   }
-  return result;
+  return rows;
 }
 
-absl::StatusOr<ViewRows> ParametersRows(const ViewContext& context) {
-  ViewRows result;
+absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context) {
+  std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
     for (const Routine& routine : context.source.ListRoutines(dataset)) {
       const auto& resource = routine.resource;
       const bool procedure = resource.at("routineType") == "PROCEDURE";
       const Row identity = Identity(dataset, routine.reference.routine_id);
       const auto parameter = [&](int64_t ordinal, Cell mode, bool is_result, Cell name, Cell type) {
-        result.rows.push_back(Concat(identity, {
-                                                   Int(ordinal),
-                                                   std::move(mode),
-                                                   String(is_result ? "YES" : "NO"),
-                                                   std::move(name),
-                                                   std::move(type),
-                                                   kNull,
-                                                   kNull,
-                                               }));
+        rows.push_back(Concat(identity, {
+                                            Int(ordinal),
+                                            std::move(mode),
+                                            String(is_result ? "YES" : "NO"),
+                                            std::move(name),
+                                            std::move(type),
+                                            kNull,
+                                            kNull,
+                                        }));
       };
       if (resource.contains("returnType")) {
         parameter(0, kNull, true, kNull, String(StandardSqlTypeName(resource.at("returnType"))));
@@ -882,7 +876,7 @@ absl::StatusOr<ViewRows> ParametersRows(const ViewContext& context) {
       }
     }
   }
-  return result;
+  return rows;
 }
 
 // Which qualifiers name the resources a view describes.
@@ -900,7 +894,7 @@ struct ViewDefinition {
   std::string_view name;
   ViewScope scope;
   const std::vector<ViewColumn>& (*columns)();
-  absl::StatusOr<ViewRows> (*rows)(const ViewContext&);
+  absl::StatusOr<std::vector<Row>> (*rows)(const ViewContext&);
 };
 
 constexpr std::array kViews = {
@@ -1029,7 +1023,13 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       if (!IsRegion(qualifier.back())) {
         dataset = qualifier.back();
       } else if (definition->scope == ViewScope::kDataset) {
-        return not_found();
+        // BigQuery's answer for a region qualifier on a view it has only for datasets.
+        const std::string table =
+            project + ":" +
+            absl::StrJoin(parts.begin() + (qualifier.size() == 2 ? 1 : 0), parts.end(), ".");
+        return absl::PermissionDeniedError("Access Denied: Table " + table +
+                                           ": User does not have permission to query table " +
+                                           table + ", or perhaps it does not exist.");
       }
     }
     if (dataset.has_value()) {
@@ -1050,7 +1050,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
   }
 
   const std::vector<ViewColumn>& columns = definition->columns();
-  absl::StatusOr<ViewRows> rows = definition->rows(context);
+  absl::StatusOr<std::vector<Row>> rows = definition->rows(context);
   if (!rows.ok()) {
     return rows.status();
   }

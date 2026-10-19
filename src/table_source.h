@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -68,6 +70,14 @@ class TableSource {
   virtual std::vector<std::string> ListTables(const std::string& /*project*/,
                                               const std::string& /*dataset*/) {
     return {};
+  }
+
+  // The number of rows of `table` for each value of `key`, a DuckDB expression of type VARCHAR
+  // over its columns, for INFORMATION_SCHEMA.PARTITIONS; nothing if there is no such table. Groups
+  // without rows are left out. Nothing by default.
+  virtual std::optional<std::vector<std::pair<std::optional<std::string>, int64_t>>> CountRows(
+      const TableReference& /*table*/, const std::string& /*key*/) {
+    return std::nullopt;
   }
 
   // The view `project`.`dataset`.`table`, or nothing for a table. For INFORMATION_SCHEMA; no

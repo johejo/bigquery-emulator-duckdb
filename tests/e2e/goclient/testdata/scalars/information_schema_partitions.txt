@@ -43,3 +43,22 @@ INSERT scalars.partitions_tier VALUES (DATE '2021-07-12');
 SELECT storage_tier FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_tier'
 => "ACTIVE"
 
+
+# BigQuery's answers to cases its documentation leaves open.
+
+# A table without rows has no partitions, even one that is not partitioned.
+CREATE OR REPLACE TABLE scalars.partitions_empty (x INT64);
+SELECT FORMAT('%t', ARRAY(SELECT AS STRUCT partition_id, total_rows FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_empty'))
+=> "[]"
+
+CREATE OR REPLACE TABLE scalars.partitions_empty_daily (d DATE) PARTITION BY d;
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_empty_daily'
+=> "0"
+
+CREATE OR REPLACE VIEW scalars.partitions_view AS SELECT 1 AS x;
+SELECT COUNT(*) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_view'
+=> "0"
+
+# PARTITIONS has no region qualifier.
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.PARTITIONS
+=> error contains: :region-us.INFORMATION_SCHEMA.PARTITIONS: User does not have permission to query table

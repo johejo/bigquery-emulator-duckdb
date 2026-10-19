@@ -402,6 +402,31 @@ class DuckDbTableSource : public TableSource {
         TablesQuery(DatasetReference{.project_id = project, .dataset_id = dataset})));
   }
 
+  std::optional<std::vector<std::pair<std::optional<std::string>, int64_t>>> CountRows(
+      const TableReference& table, const std::string& key) override {
+    if (IsDuckDbSchema(table.dataset_id)) {
+      return std::nullopt;
+    }
+    QueryResult result;
+    try {
+      result = backend_.Execute("SELECT k, COUNT(*) FROM (SELECT " + key + " AS k FROM " +
+                                QualifiedName(table) + ") GROUP BY k");
+    } catch (const BackendError&) {
+      // Dropped since it was listed.
+      return std::nullopt;
+    }
+    std::vector<std::pair<std::optional<std::string>, int64_t>> counts;
+    counts.reserve(result.rows.size());
+    std::ranges::transform(result.rows, std::back_inserter(counts), [](const json& row) {
+      const json& value = row["f"][0]["v"];
+      return std::pair{
+          value.is_null() ? std::nullopt : std::optional(value.get<std::string>()),
+          std::stoll(row["f"][1]["v"].get<std::string>()),
+      };
+    });
+    return counts;
+  }
+
   std::optional<ViewDescription> FindView(const std::string& project, const std::string& dataset,
                                           const std::string& table) override {
     const std::optional<json> comment = ViewComment(

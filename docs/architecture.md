@@ -33,8 +33,7 @@ with names bound and expressions typed. The frontend is independent of DuckDB ex
 - [information_schema.cc](../src/information_schema.cc) computes view rows during analysis;
   the translated query carries those rows to DuckDB. Each view is an entry of `kViews`: its
   name, the qualifiers that scope it, its columns and the function that builds its rows from the
-  datasets the qualifier selects, as literal rows or as DuckDB queries, such as PARTITIONS'
-  row counts over the stored tables.
+  datasets the qualifier selects, through `TableSource`, which counts PARTITIONS' rows too.
 - [analyzer.cc](../src/analyzer.cc) uses the parser's language options, reports analysis failures
   as `invalidQuery`, and supplies query result schemas from resolved output columns.
 

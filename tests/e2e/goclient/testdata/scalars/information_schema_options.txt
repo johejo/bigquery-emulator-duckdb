@@ -48,3 +48,30 @@ SELECT CONCAT(option_type, ' ', option_value) FROM scalars.INFORMATION_SCHEMA.TA
 CREATE OR REPLACE TABLE scalars.options_named (x INT64) OPTIONS (friendly_name = 'test data');
 SELECT CONCAT(option_type, ' ', option_value) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_named' AND option_name = 'friendly_name'
 => "STRING \"test data\""
+
+# BigQuery's answers to cases its documentation leaves open.
+
+# A dataset that sets no options lists its location, and a table none.
+CREATE SCHEMA IF NOT EXISTS scalars_options_plain;
+SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_plain'
+=> "location STRING \"us\""
+
+CREATE OR REPLACE TABLE scalars.options_plain (x INT64);
+SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_plain'
+=> null
+
+CREATE SCHEMA IF NOT EXISTS scalars_options_rounding OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+SELECT FORMAT('%s %s', option_type, option_value) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_rounding' AND option_name = 'default_rounding_mode'
+=> "STRING \"ROUND_HALF_EVEN\""
+
+CREATE OR REPLACE TABLE scalars.options_rounding (x NUMERIC) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+SELECT FORMAT('%s %s', option_type, option_value) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_rounding' AND option_name = 'default_rounding_mode'
+=> "STRING \"ROUND_HALF_EVEN\""
+
+CREATE OR REPLACE TABLE scalars.options_quoted (x INT64) OPTIONS (description = 'a "b" \'c\' \\ \n d');
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_quoted' AND option_name = 'description'
+=> "\"a \\\"b\\\" 'c' \\\\ \\n d\""
+
+CREATE SCHEMA IF NOT EXISTS scalars_options_days OPTIONS (default_table_expiration_days = 3.75);
+SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_days' AND option_name = 'default_table_expiration_days'
+=> "3.75"
