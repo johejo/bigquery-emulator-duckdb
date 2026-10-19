@@ -190,8 +190,9 @@ as BigQuery only supports `DISTINCT` for those operations.
 ### INTERVAL values
 
 INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
-parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, `TO_JSON` and `TO_JSON_STRING`,
-which encode them as ISO 8601 durations, `SUM` and `AVG`, `+`, `-` and unary `-` with INTERVAL
+parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, `TO_JSON`, `TO_JSON_STRING`
+and `JSON_OBJECT`, which encode them as ISO 8601 durations, `SUM` and `AVG`, `ARRAY_AGG` without
+`DISTINCT`, `+`, `-` and unary `-` with INTERVAL
 operands, `*` between INTERVAL and INT64 values, `/` of an INTERVAL by an INT64, and `-` between DATE, DATETIME, TIMESTAMP or TIME values are supported. `+` adds an INTERVAL's months, days
 and time in turn, as GoogleSQL does, and fails where a step leaves the range, also when the result
 is within it; `-` adds the negated INTERVAL, and TIMESTAMP values take no months or years. `*` multiplies the months, days and time apart, and
@@ -207,7 +208,8 @@ Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `
 values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
 sets the first in the whole input, and `SUM` and `AVG` with `DISTINCT` count the first. `GREATEST`, `LEAST`
 and `NULLIF` fail as in BigQuery. `PARTITION BY` and distinct set operations over ARRAY values with
-INTERVAL elements, other arithmetic, other aggregates, other JSON conversions, loads of
+INTERVAL elements, `ARRAY_AGG` with `DISTINCT` or over STRUCT values with INTERVAL fields, other
+arithmetic, other aggregates, other JSON conversions, loads of
 INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
 unsupported.
 

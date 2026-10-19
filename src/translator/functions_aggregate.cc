@@ -214,7 +214,21 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
               },
           },
           {"ANY_VALUE", {{.function = "any_value"}}},
-          {"ARRAY_AGG", {{.function = "list", .nulls = kFilter, .limit = kSlice}}},
+          // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
+          // days.
+          {
+              "ARRAY_AGG",
+              {
+                  {
+                      .function = "list",
+                      .type = googlesql::TYPE_INTERVAL,
+                      .nulls = kFilter,
+                      .distinct = AggregateRule::Distinct::kUnsupported,
+                      .limit = kSlice,
+                  },
+                  {.function = "list", .nulls = kFilter, .limit = kSlice},
+              },
+          },
           // ARRAY_CONCAT_AGG skips NULL arrays.
           {
               "ARRAY_CONCAT_AGG",
