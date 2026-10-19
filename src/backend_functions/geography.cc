@@ -23,13 +23,23 @@
 #include "s2/mutable_s2shape_index.h"
 #include "s2/s1angle.h"
 #include "s2/s1chord_angle.h"
+#include "s2/s2boolean_operation.h"
+#include "s2/s2builder.h"
+#include "s2/s2builderutil_lax_polygon_layer.h"
+#include "s2/s2builderutil_s2point_vector_layer.h"
+#include "s2/s2builderutil_s2polyline_vector_layer.h"
+#include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2closest_edge_query.h"
 #include "s2/s2earth.h"
+#include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
 #include "s2/s2hausdorff_distance_query.h"
+#include "s2/s2lax_polygon_shape.h"
 #include "s2/s2point.h"
+#include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
+#include "s2/s2polyline.h"
 #include "s2/s2shape_measures.h"
 #include "src/backend_functions/geography_value.h"
 #include "src/backend_functions/geography_wkt.h"
@@ -218,6 +228,140 @@ absl::StatusOr<bool> Equals(const Arguments& args) {
   other.Add(Shape(b));
   return S2HausdorffDistanceQuery().GetDistance(&index, &other) <=
          S1ChordAngle(S2Earth::MetersToAngle(1e-6));
+}
+
+// A geography as S2Builder outputs it, in the layer for its kind.
+struct Snapped {
+  std::vector<S2Point> points;
+  std::vector<std::unique_ptr<S2Polyline>> polylines;
+  std::unique_ptr<S2LaxPolygonShape> polygon = std::make_unique<S2LaxPolygonShape>();
+};
+
+// Adds nonempty `geography` to `builder` in a layer of its own that outputs to `output`.
+void AddLayer(S2Builder& builder, const Geography& geography, Snapped& output) {
+  switch (geography.kind) {
+    case Kind::kEmpty:
+      break;
+    case Kind::kPoint:
+      builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
+      builder.AddPoint(geography.vertices.front());
+      break;
+    case Kind::kLineString: {
+      // One walk, which gains no endpoints where a vertex is added.
+      s2builderutil::S2PolylineVectorLayer::Options options;
+      options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+      builder.StartLayer(
+          std::make_unique<s2builderutil::S2PolylineVectorLayer>(&output.polylines, options));
+      builder.AddPolyline(geography.vertices);
+      break;
+    }
+    case Kind::kPolygon:
+      builder.StartLayer(std::make_unique<s2builderutil::LaxPolygonLayer>(output.polygon.get()));
+      builder.AddPolygon(*ToS2Polygon(geography));
+      break;
+  }
+}
+
+// Adds the shapes of `snapped` to `index`.
+void AddShapes(Snapped snapped, MutableS2ShapeIndex& index) {
+  if (!snapped.points.empty()) {
+    index.Add(std::make_unique<S2PointVectorShape>(std::move(snapped.points)));
+  }
+  for (std::unique_ptr<S2Polyline>& polyline : snapped.polylines) {
+    index.Add(std::make_unique<S2Polyline::OwningShape>(std::move(polyline)));
+  }
+  if (snapped.polygon->num_loops() > 0) {
+    index.Add(std::move(snapped.polygon));
+  }
+}
+
+// Whether `predicate` holds for nonempty `a` and `b` as BigQuery's predicates take them: snapped
+// together, so that a vertex of one within a micrometer of a vertex or an edge of the other
+// meets it there.
+template <typename Predicate>
+absl::StatusOr<bool> Relate(const Geography& a, const Geography& b, Predicate predicate) {
+  S2Builder builder{
+      S2Builder::Options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)))};
+  Snapped snapped_a;
+  Snapped snapped_b;
+  AddLayer(builder, a, snapped_a);
+  AddLayer(builder, b, snapped_b);
+  S2Error error;
+  if (!builder.Build(&error)) {
+    return absl::InternalError("S2Builder failed: " + std::string(error.message()));
+  }
+  MutableS2ShapeIndex index_a;
+  AddShapes(std::move(snapped_a), index_a);
+  MutableS2ShapeIndex index_b;
+  AddShapes(std::move(snapped_b), index_b);
+  return predicate(index_a, index_b);
+}
+
+// Whether `a` and `b` share a point or, with `interiors`, a point of their interiors as OGC
+// defines them: a polygon's without its rings, a linestring's without its endpoints unless it
+// ends where it starts, and a point's, which is the point.
+bool Meet(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b, bool interiors) {
+  using Operation = S2BooleanOperation;
+  Operation::Options options;
+  options.set_polygon_model(interiors ? Operation::PolygonModel::OPEN
+                                      : Operation::PolygonModel::CLOSED);
+  options.set_polyline_model(interiors ? Operation::PolylineModel::OPEN
+                                       : Operation::PolylineModel::CLOSED);
+  options.set_polyline_loops_have_boundaries(false);
+  return Operation::Intersects(a, b, options);
+}
+
+// Whether no point of `b` lies outside `a`, whose rings and endpoints it covers.
+bool Cover(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
+  using Operation = S2BooleanOperation;
+  Operation::Options options;
+  options.set_polygon_model(Operation::PolygonModel::CLOSED);
+  options.set_polyline_model(Operation::PolylineModel::CLOSED);
+  return Operation::Contains(a, b, options);
+}
+
+absl::StatusOr<bool> Intersects(const Geography& a, const Geography& b) {
+  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+    return false;
+  }
+  return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
+    return Meet(x, y, false);
+  });
+}
+
+// The geographies meet only where the boundary of one is.
+absl::StatusOr<bool> Touches(const Geography& a, const Geography& b) {
+  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+    return false;
+  }
+  return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
+    return Meet(x, y, false) && !Meet(x, y, true);
+  });
+}
+
+absl::StatusOr<bool> Covers(const Geography& a, const Geography& b) {
+  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+    return false;
+  }
+  return Relate(a, b, Cover);
+}
+
+// `a` covers `b`, and their interiors meet, so a geography does not contain its boundary.
+absl::StatusOr<bool> Contains(const Geography& a, const Geography& b) {
+  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+    return false;
+  }
+  return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
+    return Cover(x, y) && Meet(x, y, true);
+  });
+}
+
+// What `kPredicate` says of the geographies of the first two arguments.
+template <auto kPredicate>
+absl::StatusOr<bool> OfGeographies(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  return kPredicate(a, b);
 }
 
 absl::StatusOr<double> X(const Arguments& args) {
@@ -499,6 +643,14 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_dwithin", {kVarchar, kVarchar, kDouble, kBoolean, kVarchar}, kBoolean,
            EachRow<DWithin>);
   Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean, EachRow<Equals>);
+  Register(connection, "bq_st_intersects", {kVarchar, kVarchar}, kBoolean,
+           EachRow<OfGeographies<Intersects>>);
+  Register(connection, "bq_st_touches", {kVarchar, kVarchar}, kBoolean,
+           EachRow<OfGeographies<Touches>>);
+  Register(connection, "bq_st_covers", {kVarchar, kVarchar}, kBoolean,
+           EachRow<OfGeographies<Covers>>);
+  Register(connection, "bq_st_contains", {kVarchar, kVarchar}, kBoolean,
+           EachRow<OfGeographies<Contains>>);
   Register(connection, "bq_st_x", {kVarchar}, kDouble, EachRow<X>);
   Register(connection, "bq_st_y", {kVarchar}, kDouble, EachRow<Y>);
   Register(connection, "bq_st_geometrytype", {kVarchar}, kVarchar,
