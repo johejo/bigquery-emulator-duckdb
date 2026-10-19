@@ -137,6 +137,6 @@ rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | `SCHEMATA` | Supported | See [Datasets](compatibility.md#datasets). |
-| `TABLES` | Supported | Creation times are NULL. |
-| `COLUMNS` | Supported | Every column is nullable. |
+| `TABLES` | Supported |  |
+| `COLUMNS` | Supported |  |
 | `COLUMN_FIELD_PATHS` | Supported |  |
