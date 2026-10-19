@@ -34,6 +34,9 @@ with names bound and expressions typed. The frontend is independent of DuckDB ex
   the translated query carries those rows to DuckDB. Each view is an entry of `kViews`: its
   name, the qualifiers that scope it, its columns and the function that builds its rows from the
   datasets the qualifier selects, through `TableSource`, which counts PARTITIONS' rows too.
+  Dataset, table and routine views have separate sources, each keeping its columns beside its
+  row builder. They build as `:information_schema`, which `:catalog` uses through
+  `implementation_deps`.
 - [analyzer.cc](../src/analyzer.cc) uses the parser's language options, reports analysis failures
   as `invalidQuery`, and supplies query result schemas from resolved output columns.
 

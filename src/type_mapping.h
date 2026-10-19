@@ -63,6 +63,11 @@ bool HasGeography(const googlesql::Type* type);
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory);
 
+// The name of the GoogleSQL type of the column that `field` describes, as BigQuery spells it in
+// DDL and INFORMATION_SCHEMA, such as ARRAY<STRUCT<a INT64>>.
+absl::StatusOr<std::string> GoogleSqlTypeName(const FieldSchema& field,
+                                              googlesql::TypeFactory* type_factory);
+
 // The inverse of GoogleSqlType: describes a column of GoogleSQL type `type` the way BigQuery
 // reports it in a TableSchema. Struct fields without a name get BigQuery's `_field_n`. Fails
 // for a type BigQuery has no TableFieldSchema for, such as an array of arrays or STRUCT<>.
