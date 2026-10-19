@@ -31,7 +31,9 @@ with names bound and expressions typed. The frontend is independent of DuckDB ex
 - [type_mapping.cc](../src/type_mapping.cc) maps TableFieldSchema, GoogleSQL and DuckDB types.
   DuckDB column, parameter and expression types are derived from GoogleSQL types.
 - [information_schema.cc](../src/information_schema.cc) computes view rows during analysis;
-  the translated query carries those rows to DuckDB.
+  the translated query carries those rows to DuckDB. Each view is an entry of `kViews`: its
+  name, the qualifiers that scope it, its columns and the function that builds its rows from the
+  datasets the qualifier selects, through `TableSource`, which counts PARTITIONS' rows too.
 - [analyzer.cc](../src/analyzer.cc) uses the parser's language options, reports analysis failures
   as `invalidQuery`, and supplies query result schemas from resolved output columns.
 

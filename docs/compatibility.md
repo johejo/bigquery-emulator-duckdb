@@ -60,7 +60,8 @@ destination, expires that long after its creation time unless it sets an expirat
 Changing the default leaves existing tables as they are, and a job that replaces an existing table
 with `WRITE_TRUNCATE` does not apply it. Temporary tables of scripts do not take it either.
 `default_table_expiration_days` is rounded to milliseconds. `INFORMATION_SCHEMA.SCHEMATA` returns NULL last modified times
-and NULL for options other than the location. Datasets created before the emulator recorded
+and NULL for options other than the location; `SCHEMATA_OPTIONS` lists the options a dataset
+keeps and sets. Datasets created before the emulator recorded
 creation times have none: `datasets.get` omits `creationTime`, and `SCHEMATA` returns NULL.
 
 ## Tables
@@ -73,7 +74,8 @@ mode](#rounding-modes), and columns a description and a rounding mode, which DDL
 REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
 that creates its destination; a copy job with one to an existing table is rejected. Tables and
 views created before the emulator recorded creation times have none: `tables.get` omits
-`creationTime`, and `INFORMATION_SCHEMA.TABLES` returns NULL.
+`creationTime`, and `INFORMATION_SCHEMA.TABLES` returns NULL. `INFORMATION_SCHEMA.TABLE_OPTIONS`
+lists the options a table or view keeps and sets.
 
 A DDL option's value is a literal or a constant expression of query parameters and the supported
 scalar functions, which the backend evaluates when the statement runs; the functions BigQuery
@@ -86,6 +88,9 @@ including before query analysis, and are treated as missing.
 
 Tables keep partitioning on a column or an integer range, and clustering. Ingestion-time
 partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) is unsupported, and partitions do not expire.
+`INFORMATION_SCHEMA.PARTITIONS` counts the rows of each partition when it is queried. The emulator
+keeps no storage statistics, so its byte counts are 0, as `tables.get` reports `numBytes`, its
+`last_modified_time` is NULL, and every partition is in `ACTIVE` storage.
 
 ### Rounding modes
 

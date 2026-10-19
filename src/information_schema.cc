@@ -1,12 +1,16 @@
 #include "src/information_schema.h"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -17,12 +21,14 @@
 #include "absl/time/time.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "src/catalog.h"
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/location.h"
+#include "src/references.h"
 #include "src/routine.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
@@ -55,14 +61,19 @@ Cell Int(int64_t value) { return std::to_string(value); }
 const Cell kNull;
 constexpr const char* kEmptyArray = "[]";
 
+// A time in milliseconds since the Unix epoch as INFORMATION_SCHEMA spells it.
+std::string FormatMillis(int64_t millis) {
+  return absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::FromUnixMillis(millis),
+                          absl::UTCTimeZone());
+}
+
 // The time a dataset, table or view was created, or NULL for one created before the emulator
 // recorded it.
 Cell CreationTime(int64_t millis) {
   if (millis == 0) {
     return kNull;
   }
-  return String(
-      absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::FromUnixMillis(millis), absl::UTCTimeZone()));
+  return String(FormatMillis(millis));
 }
 
 // An unset description, default or rounding mode, which the table resource omits, is NULL.
@@ -79,6 +90,17 @@ const std::vector<ViewColumn>& SchemataColumns() {
       {.name = "ddl", .type = FieldType::kString},
       {.name = "default_collation_name", .type = FieldType::kString},
       {.name = "sync_status", .type = FieldType::kJson},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& SchemataOptionsColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "catalog_name", .type = FieldType::kString},
+      {.name = "schema_name", .type = FieldType::kString},
+      {.name = "option_name", .type = FieldType::kString},
+      {.name = "option_type", .type = FieldType::kString},
+      {.name = "option_value", .type = FieldType::kString},
   };
   return *kColumns;
 }
@@ -108,6 +130,33 @@ const std::vector<ViewColumn>& TablesColumns() {
       {.name = "default_collation_name", .type = FieldType::kString},
       {.name = "sync_status", .type = FieldType::kJson},
       {.name = "upsert_stream_apply_watermark", .type = FieldType::kTimestamp},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& TableOptionsColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "table_catalog", .type = FieldType::kString},
+      {.name = "table_schema", .type = FieldType::kString},
+      {.name = "table_name", .type = FieldType::kString},
+      {.name = "option_name", .type = FieldType::kString},
+      {.name = "option_type", .type = FieldType::kString},
+      {.name = "option_value", .type = FieldType::kString},
+  };
+  return *kColumns;
+}
+
+const std::vector<ViewColumn>& PartitionsColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "table_catalog", .type = FieldType::kString},
+      {.name = "table_schema", .type = FieldType::kString},
+      {.name = "table_name", .type = FieldType::kString},
+      {.name = "partition_id", .type = FieldType::kString},
+      {.name = "total_rows", .type = FieldType::kInteger},
+      {.name = "total_logical_bytes", .type = FieldType::kInteger},
+      {.name = "total_billable_bytes", .type = FieldType::kInteger},
+      {.name = "last_modified_time", .type = FieldType::kTimestamp},
+      {.name = "storage_tier", .type = FieldType::kString},
   };
   return *kColumns;
 }
@@ -246,8 +295,8 @@ bool IsRegion(const std::string& part) { return part.starts_with(kRegionPrefix);
 // The datasets of `project` in the region the qualifier names, or in the US for a view that names
 // none, as BigQuery documents for SCHEMATA; the job must run there. An error for a region BigQuery
 // does not have.
-absl::StatusOr<std::vector<std::string>> DatasetsIn(TableSource& source, const std::string& project,
-                                                    const std::vector<std::string>& qualifier) {
+absl::StatusOr<std::vector<DatasetReference>> DatasetsIn(
+    TableSource& source, const std::string& project, const std::vector<std::string>& qualifier) {
   std::string location = kDefaultLocation;
   std::string region_name = "region-us";
   if (!qualifier.empty() && IsRegion(qualifier.back())) {
@@ -261,18 +310,20 @@ absl::StatusOr<std::vector<std::string>> DatasetsIn(TableSource& source, const s
   }
   // BigQuery names a region of another location as a dataset of the project.
   source.ReferenceLocation("Dataset " + project + ":" + region_name, location);
-  std::vector<std::string> datasets = source.ListDatasets(project);
-  std::erase_if(datasets, [&](const std::string& dataset) {
-    return source.DatasetLocation(project, dataset) != location;
-  });
+  std::vector<DatasetReference> datasets;
+  for (std::string& dataset : source.ListDatasets(project)) {
+    if (source.DatasetLocation(project, dataset) == location) {
+      datasets.push_back({.project_id = project, .dataset_id = std::move(dataset)});
+    }
+  }
   return datasets;
 }
 
-// The tables of one dataset, as a view scoped to a dataset or a region lists them.
-struct DatasetTables {
-  std::string project;
-  std::string dataset;
-  std::vector<std::string> tables;
+// What a view describes: the datasets its qualifier selects.
+struct ViewContext {
+  TableSource& source;
+  googlesql::TypeFactory* type_factory;
+  std::vector<DatasetReference> datasets;
 };
 
 // Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
@@ -337,31 +388,400 @@ std::string ViewDdl(const std::string& project, const std::string& dataset,
   return "CREATE VIEW `" + project + "." + dataset + "." + table + "`\nAS " + query + ";";
 }
 
+// The cells that name a dataset or a table in a row: its project, dataset and, for a table, its
+// name.
+Row Identity(const DatasetReference& dataset) {
+  return {String(dataset.project_id), String(dataset.dataset_id)};
+}
+
+Row Identity(const DatasetReference& dataset, const std::string& table) {
+  return {String(dataset.project_id), String(dataset.dataset_id), String(table)};
+}
+
+// `identity` followed by `cells`.
+Row Concat(Row identity, const Row& cells) {
+  identity.insert(identity.end(), cells.begin(), cells.end());
+  return identity;
+}
+
+// An option as SCHEMATA_OPTIONS and TABLE_OPTIONS list it: its name, its type and its value as
+// a GoogleSQL literal.
+struct Option {
+  std::string name;
+  std::string type;
+  std::string value;
+};
+
+std::string StringOptionValue(const std::string& value) {
+  return googlesql::ToDoubleQuotedStringLiteral(value);
+}
+
+// A FLOAT64 option value in its shortest round-trip form, with a fraction as BigQuery shows it,
+// such as 90.0.
+std::string Float64OptionValue(double value) {
+  std::array<char, 32> buffer{};
+  const std::to_chars_result result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+  std::string text(buffer.data(), result.ptr);
+  if (text.find_first_of(".e") == std::string::npos) {
+    text += ".0";
+  }
+  return text;
+}
+
+// The options that metadata of a dataset, a table or a view sets, which are common to both.
+std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,
+                                  const std::map<std::string, std::string>& labels,
+                                  const std::string& default_rounding_mode) {
+  std::vector<Option> options;
+  if (!default_rounding_mode.empty()) {
+    options.push_back({
+        .name = "default_rounding_mode",
+        .type = "STRING",
+        .value = StringOptionValue(default_rounding_mode),
+    });
+  }
+  if (!description.empty()) {
+    options.push_back(
+        {.name = "description", .type = "STRING", .value = StringOptionValue(description)});
+  }
+  if (!friendly_name.empty()) {
+    options.push_back(
+        {.name = "friendly_name", .type = "STRING", .value = StringOptionValue(friendly_name)});
+  }
+  if (!labels.empty()) {
+    std::vector<std::string> entries;
+    std::ranges::transform(labels, std::back_inserter(entries), [](const auto& label) {
+      return "STRUCT(" + StringOptionValue(label.first) + ", " + StringOptionValue(label.second) +
+             ")";
+    });
+    options.push_back({
+        .name = "labels",
+        .type = "ARRAY<STRUCT<STRING, STRING>>",
+        .value = "[" + absl::StrJoin(entries, ", ") + "]",
+    });
+  }
+  return options;
+}
+
+void AppendOptions(const Row& identity, std::vector<Option> options, std::vector<Row>& rows) {
+  std::ranges::sort(options, {}, &Option::name);
+  std::ranges::transform(options, std::back_inserter(rows), [&](const Option& option) {
+    return Concat(identity, {String(option.name), String(option.type), String(option.value)});
+  });
+}
+
+absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    const std::optional<DatasetMetadata> metadata =
+        context.source.DescribeDataset(dataset.project_id, dataset.dataset_id);
+    if (!metadata.has_value()) {
+      // Dropped since it was listed.
+      continue;
+    }
+    const std::string location = metadata->Location();
+    rows.push_back(Concat(
+        Identity(dataset),
+        {
+            kNull,
+            CreationTime(metadata->creation_time),
+            kNull,
+            String(location),
+            String(absl::StrCat("CREATE SCHEMA `", dataset.project_id, ".", dataset.dataset_id,
+                                "`\nOPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
+            kNull,
+            kNull,
+        }));
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    const std::optional<DatasetMetadata> metadata =
+        context.source.DescribeDataset(dataset.project_id, dataset.dataset_id);
+    if (!metadata.has_value()) {
+      continue;
+    }
+    std::vector<Option> options = CommonOptions(metadata->description, metadata->friendly_name,
+                                                metadata->labels, metadata->default_rounding_mode);
+    // Every dataset lists its location, in lower case as SCHEMATA's DDL spells it.
+    options.push_back({
+        .name = "location",
+        .type = "STRING",
+        .value = StringOptionValue(ToLowerAscii(metadata->Location())),
+    });
+    if (metadata->default_table_expiration_ms.has_value()) {
+      constexpr double kMillisPerDay = 24.0 * 60 * 60 * 1000;
+      options.push_back({
+          .name = "default_table_expiration_days",
+          .type = "FLOAT64",
+          .value = Float64OptionValue(static_cast<double>(*metadata->default_table_expiration_ms) /
+                                      kMillisPerDay),
+      });
+    }
+    AppendOptions(Identity(dataset), std::move(options), rows);
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    const std::string& project = dataset.project_id;
+    for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
+      const std::optional<std::vector<FieldSchema>> schema =
+          context.source.FindTable(project, dataset.dataset_id, table);
+      if (!schema.has_value()) {
+        // Dropped since it was listed.
+        continue;
+      }
+      std::optional<ViewDescription> view_description =
+          context.source.FindView(project, dataset.dataset_id, table);
+      const std::optional<std::string> view_query =
+          view_description.has_value() ? std::optional(view_description->query) : std::nullopt;
+      Cell ddl = kNull;
+      // A clone names its base table and the time it was cloned, as snapshot_time_ms.
+      std::optional<CloneDefinition> clone;
+      int64_t creation_time =
+          view_description.has_value() ? view_description->metadata.creation_time : 0;
+      if (!view_query.has_value()) {
+        if (std::optional<TableDescription> description =
+                context.source.DescribeTable(project, dataset.dataset_id, table)) {
+          clone = std::move(description->metadata.clone);
+          creation_time = description->metadata.creation_time;
+        }
+        absl::StatusOr<std::string> table_ddl =
+            TableDdl(project, dataset.dataset_id, table, *schema, context.type_factory);
+        if (!table_ddl.ok()) {
+          return table_ddl.status();
+        }
+        ddl = String(*table_ddl);
+      } else if (!view_query->empty()) {
+        ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query));
+      }
+      rows.push_back(
+          Concat(Identity(dataset, table), {
+                                               String(view_query.has_value() ? "VIEW"
+                                                      : clone.has_value()    ? "CLONE"
+                                                                             : "BASE TABLE"),
+                                               view_query.has_value() ? kNull : String("NATIVE"),
+                                               String(view_query.has_value() ? "NO" : "YES"),
+                                               String("NO"),
+                                               String("NO"),
+                                               String("NO"),
+                                               CreationTime(creation_time),
+                                               clone ? String(clone->base_table.project_id) : kNull,
+                                               clone ? String(clone->base_table.dataset_id) : kNull,
+                                               clone ? String(clone->base_table.table_id) : kNull,
+                                               clone ? String(clone->clone_time) : kNull,
+                                               kNull,
+                                               kNull,
+                                               kNull,
+                                               kNull,
+                                               kNull,
+                                               ddl,
+                                               kNull,
+                                               kNull,
+                                               kNull,
+                                           }));
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    const std::string& project = dataset.project_id;
+    for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
+      std::optional<TableMetadata> metadata;
+      if (std::optional<ViewDescription> view =
+              context.source.FindView(project, dataset.dataset_id, table)) {
+        metadata = std::move(view->metadata);
+      } else if (std::optional<TableDescription> description =
+                     context.source.DescribeTable(project, dataset.dataset_id, table)) {
+        metadata = std::move(description->metadata);
+      } else {
+        continue;
+      }
+      std::vector<Option> options =
+          CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
+                        metadata->default_rounding_mode);
+      if (metadata->expiration_time.has_value()) {
+        options.push_back({
+            .name = "expiration_timestamp",
+            .type = "TIMESTAMP",
+            .value = "TIMESTAMP \"" + FormatMillis(*metadata->expiration_time) + "\"",
+        });
+      }
+      AppendOptions(Identity(dataset, table), std::move(options), rows);
+    }
+  }
+  return rows;
+}
+
+// The ID of the partition of a row of a table partitioned as `metadata` says, as a DuckDB
+// expression: NULL for a table that is not partitioned.
+std::string PartitionId(const TableMetadata& metadata) {
+  if (metadata.time_partitioning.has_value()) {
+    const std::string column = QuoteIdentifier(metadata.time_partitioning->field);
+    const std::string& type = metadata.time_partitioning->type;
+    const std::string format = type == "HOUR"    ? "%Y%m%d%H"
+                               : type == "MONTH" ? "%Y%m"
+                               : type == "YEAR"  ? "%Y"
+                                                 : "%Y%m%d";
+    // Partition boundaries are in UTC, which DuckDB's session time zone is.
+    return "CASE WHEN " + column + " IS NULL THEN '__NULL__' WHEN CAST(" + column +
+           " AS DATE) NOT BETWEEN DATE '1960-01-01' AND DATE '2159-12-31' THEN "
+           "'__UNPARTITIONED__' ELSE strftime(" +
+           column + ", '" + format + "') END";
+  }
+  if (const std::optional<RangePartitioning>& range = metadata.range_partitioning) {
+    const std::string column = QuoteIdentifier(range->field);
+    const std::string start = std::to_string(range->start);
+    const std::string interval = std::to_string(range->interval);
+    return "CASE WHEN " + column + " IS NULL THEN '__NULL__' WHEN " + column + " < " + start +
+           " OR " + column + " >= " + std::to_string(range->end) +
+           " THEN '__UNPARTITIONED__' ELSE CAST(" + start + " + (" + column + " - " + start +
+           ") // " + interval + " * " + interval + " AS VARCHAR) END";
+  }
+  return "NULL";
+}
+
+// Counts the rows of each partition of each table while the query is analyzed, as the other views
+// read metadata, so that a table dropped meanwhile is left out. The emulator keeps no storage
+// statistics, so the byte counts are 0, as tables.get reports numBytes, and no partition has a
+// last modified time.
+absl::StatusOr<std::vector<Row>> PartitionsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    const std::string& project = dataset.project_id;
+    for (const std::string& table : context.source.ListTables(project, dataset.dataset_id)) {
+      // Views have no partitions.
+      const std::optional<TableDescription> description =
+          context.source.DescribeTable(project, dataset.dataset_id, table);
+      if (!description.has_value()) {
+        continue;
+      }
+      // A table without rows has no partitions, even one that is not partitioned.
+      const std::optional<std::vector<std::pair<std::optional<std::string>, int64_t>>> counts =
+          context.source.CountRows(
+              {.project_id = project, .dataset_id = dataset.dataset_id, .table_id = table},
+              PartitionId(description->metadata));
+      if (!counts.has_value()) {
+        continue;
+      }
+      for (const auto& [partition, count] : *counts) {
+        rows.push_back(
+            Concat(Identity(dataset, table), {
+                                                 partition.has_value() ? String(*partition) : kNull,
+                                                 Int(count),
+                                                 Int(0),
+                                                 Int(0),
+                                                 kNull,
+                                                 String("ACTIVE"),
+                                             }));
+      }
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<ViewDescription> description =
+          context.source.FindView(dataset.project_id, dataset.dataset_id, table);
+      if (!description.has_value()) {
+        continue;
+      }
+      rows.push_back(
+          Concat(Identity(dataset, table), {
+                                               OptionalString(description->query),
+                                               kNull,
+                                               // Views without an emulator definition have an
+                                               // unknown SQL dialect too.
+                                               description->query.empty() ? kNull : String("YES"),
+                                           }));
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<std::vector<FieldSchema>> schema =
+          context.source.FindTable(dataset.project_id, dataset.dataset_id, table);
+      if (!schema.has_value()) {
+        continue;
+      }
+      for (size_t i = 0; i < schema->size(); ++i) {
+        const FieldSchema& field = schema->at(i);
+        absl::StatusOr<std::string> type = TypeName(field, context.type_factory);
+        if (!type.ok()) {
+          return type.status();
+        }
+        rows.push_back(Concat(Identity(dataset, table),
+                              {
+                                  String(field.name),
+                                  Int(static_cast<int64_t>(i) + 1),
+                                  String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
+                                  String(*type),
+                                  String("NEVER"),
+                                  kNull,
+                                  kNull,
+                                  String("NO"),
+                                  kNull,
+                                  String("NO"),
+                                  String("NO"),
+                                  kNull,
+                                  kNull,
+                                  OptionalString(field.default_value_expression),
+                                  OptionalString(field.rounding_mode),
+                                  kEmptyArray,
+                                  String("NO"),
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                                  kNull,
+                              }));
+      }
+    }
+  }
+  return rows;
+}
+
 // Appends a COLUMN_FIELD_PATHS row for `field` and for each field nested in it. The fields of
 // a repeated record are described by their own types, as BigQuery does.
-absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& table,
-                              const std::string& column, const std::string& path,
-                              const FieldSchema& field, googlesql::TypeFactory* type_factory,
-                              std::vector<Row>& rows) {
+absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
+                              const std::string& path, const FieldSchema& field,
+                              googlesql::TypeFactory* type_factory, std::vector<Row>& rows) {
   absl::StatusOr<std::string> type = TypeName(field, type_factory);
   if (!type.ok()) {
     return type.status();
   }
-  rows.push_back({
-      String(dataset.project),
-      String(dataset.dataset),
-      String(table),
-      String(column),
-      String(path),
-      String(*type),
-      OptionalString(field.description),
-      kNull,
-      OptionalString(field.rounding_mode),
-      kEmptyArray,
-  });
+  rows.push_back(Concat(identity, {
+                                      String(column),
+                                      String(path),
+                                      String(*type),
+                                      OptionalString(field.description),
+                                      kNull,
+                                      OptionalString(field.rounding_mode),
+                                      kEmptyArray,
+                                  }));
   for (const FieldSchema& child : field.fields) {
-    if (absl::Status status = AppendFieldPaths(dataset, table, column, path + "." + child.name,
-                                               child, type_factory, rows);
+    if (absl::Status status =
+            AppendFieldPaths(identity, column, path + "." + child.name, child, type_factory, rows);
         !status.ok()) {
       return status;
     }
@@ -369,60 +789,82 @@ absl::Status AppendFieldPaths(const DatasetTables& dataset, const std::string& t
   return absl::OkStatus();
 }
 
-std::vector<Row> RoutineRows(TableSource& source, const std::vector<DatasetTables>& datasets,
-                             const std::string& view) {
+absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context) {
   std::vector<Row> rows;
-  for (const auto& dataset : datasets) {
-    for (const Routine& routine :
-         source.ListRoutines({.project_id = dataset.project, .dataset_id = dataset.dataset})) {
-      const auto& resource = routine.resource;
-      const auto& reference = routine.reference;
-      const bool procedure = resource.at("routineType") == "PROCEDURE";
-      const bool tvf = resource.at("routineType") == "TABLE_VALUED_FUNCTION";
-      const Cell result = resource.contains("returnType")
-                              ? String(StandardSqlTypeName(resource.at("returnType")))
-                              : kNull;
-      const Row identity{
-          String(reference.project_id),
-          String(reference.dataset_id),
-          String(reference.routine_id),
-      };
-      if (view == "ROUTINES") {
-        Row row = identity;
-        row.insert(row.end(), identity.begin(), identity.end());
-        const Row metadata{
-            String(procedure ? "PROCEDURE"
-                   : tvf     ? "TABLE FUNCTION"
-                             : "FUNCTION"),
-            resource.contains("returnTableType")
-                ? String(StandardSqlTableTypeName(resource.at("returnTableType")))
-                : result,
-            String("SQL"),
-            String(resource.at("definitionBody").get<std::string>()),
-            kNull,
-            kNull,
-            kNull,
-            CreationTime(std::stoll(resource.at("creationTime").get<std::string>())),
-            CreationTime(std::stoll(resource.at("lastModifiedTime").get<std::string>())),
-            String(RoutineDdl(routine)),
-            kNull,
-        };
-        row.insert(row.end(), metadata.begin(), metadata.end());
-        rows.push_back(std::move(row));
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<std::vector<FieldSchema>> schema =
+          context.source.FindTable(dataset.project_id, dataset.dataset_id, table);
+      if (!schema.has_value()) {
         continue;
       }
+      for (const FieldSchema& field : *schema) {
+        if (absl::Status status = AppendFieldPaths(Identity(dataset, table), field.name, field.name,
+                                                   field, context.type_factory, rows);
+            !status.ok()) {
+          return status;
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const Routine& routine : context.source.ListRoutines(dataset)) {
+      const auto& resource = routine.resource;
+      const Row identity = Identity(dataset, routine.reference.routine_id);
+      Row row = Concat(identity, identity);
+      const auto type = resource.at("routineType").get<std::string>();
+      rows.push_back(
+          Concat(std::move(row),
+                 {
+                     String(type == "PROCEDURE"               ? "PROCEDURE"
+                            : type == "TABLE_VALUED_FUNCTION" ? "TABLE FUNCTION"
+                                                              : "FUNCTION"),
+                     resource.contains("returnTableType")
+                         ? String(StandardSqlTableTypeName(resource.at("returnTableType")))
+                     : resource.contains("returnType")
+                         ? String(StandardSqlTypeName(resource.at("returnType")))
+                         : kNull,
+                     String("SQL"),
+                     String(resource.at("definitionBody").get<std::string>()),
+                     kNull,
+                     kNull,
+                     kNull,
+                     CreationTime(std::stoll(resource.at("creationTime").get<std::string>())),
+                     CreationTime(std::stoll(resource.at("lastModifiedTime").get<std::string>())),
+                     String(RoutineDdl(routine)),
+                     kNull,
+                 }));
+    }
+  }
+  return rows;
+}
+
+absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const Routine& routine : context.source.ListRoutines(dataset)) {
+      const auto& resource = routine.resource;
+      const bool procedure = resource.at("routineType") == "PROCEDURE";
+      const Row identity = Identity(dataset, routine.reference.routine_id);
       const auto parameter = [&](int64_t ordinal, Cell mode, bool is_result, Cell name, Cell type) {
-        Row row = identity;
-        const Row metadata{
-            Int(ordinal),    std::move(mode), String(is_result ? "YES" : "NO"),
-            std::move(name), std::move(type), kNull,
-            kNull,
-        };
-        row.insert(row.end(), metadata.begin(), metadata.end());
-        rows.push_back(std::move(row));
+        rows.push_back(Concat(identity, {
+                                            Int(ordinal),
+                                            std::move(mode),
+                                            String(is_result ? "YES" : "NO"),
+                                            std::move(name),
+                                            std::move(type),
+                                            kNull,
+                                            kNull,
+                                        }));
       };
-      if (result) {
-        parameter(0, kNull, true, kNull, result);
+      if (resource.contains("returnType")) {
+        parameter(0, kNull, true, kNull, String(StandardSqlTypeName(resource.at("returnType"))));
       }
       int64_t ordinal = 0;
       for (const auto& argument : resource.at("arguments")) {
@@ -437,136 +879,86 @@ std::vector<Row> RoutineRows(TableSource& source, const std::vector<DatasetTable
   return rows;
 }
 
-absl::StatusOr<std::vector<Row>> TableRows(TableSource& source,
-                                           const std::vector<DatasetTables>& datasets,
-                                           const std::string& view,
-                                           googlesql::TypeFactory* type_factory) {
-  std::vector<Row> rows;
-  for (const DatasetTables& dataset : datasets) {
-    for (const std::string& table : dataset.tables) {
-      if (view == "VIEWS") {
-        const std::optional<ViewDescription> description =
-            source.FindView(dataset.project, dataset.dataset, table);
-        if (description.has_value()) {
-          rows.push_back({
-              String(dataset.project),
-              String(dataset.dataset),
-              String(table),
-              OptionalString(description->query),
-              kNull,
-              // Views without an emulator definition have an unknown SQL dialect too.
-              description->query.empty() ? kNull : String("YES"),
-          });
-        }
-        continue;
-      }
-      const std::optional<std::vector<FieldSchema>> schema =
-          source.FindTable(dataset.project, dataset.dataset, table);
-      if (!schema.has_value()) {
-        // Dropped since it was listed.
-        continue;
-      }
-      if (view == "TABLES") {
-        std::optional<ViewDescription> view_description =
-            source.FindView(dataset.project, dataset.dataset, table);
-        const std::optional<std::string> view_query =
-            view_description.has_value() ? std::optional(view_description->query) : std::nullopt;
-        Cell ddl = kNull;
-        // A clone names its base table and the time it was cloned, as snapshot_time_ms.
-        std::optional<CloneDefinition> clone;
-        int64_t creation_time =
-            view_description.has_value() ? view_description->metadata.creation_time : 0;
-        if (!view_query.has_value()) {
-          if (std::optional<TableDescription> description =
-                  source.DescribeTable(dataset.project, dataset.dataset, table)) {
-            clone = std::move(description->metadata.clone);
-            creation_time = description->metadata.creation_time;
-          }
-          absl::StatusOr<std::string> table_ddl =
-              TableDdl(dataset.project, dataset.dataset, table, *schema, type_factory);
-          if (!table_ddl.ok()) {
-            return table_ddl.status();
-          }
-          ddl = String(*table_ddl);
-        } else if (!view_query->empty()) {
-          ddl = String(ViewDdl(dataset.project, dataset.dataset, table, *view_query));
-        }
-        rows.push_back({
-            String(dataset.project),
-            String(dataset.dataset),
-            String(table),
-            String(view_query.has_value() ? "VIEW"
-                   : clone.has_value()    ? "CLONE"
-                                          : "BASE TABLE"),
-            view_query.has_value() ? kNull : String("NATIVE"),
-            String(view_query.has_value() ? "NO" : "YES"),
-            String("NO"),
-            String("NO"),
-            String("NO"),
-            CreationTime(creation_time),
-            clone ? String(clone->base_table.project_id) : kNull,
-            clone ? String(clone->base_table.dataset_id) : kNull,
-            clone ? String(clone->base_table.table_id) : kNull,
-            clone ? String(clone->clone_time) : kNull,
-            kNull,
-            kNull,
-            kNull,
-            kNull,
-            kNull,
-            ddl,
-            kNull,
-            kNull,
-            kNull,
-        });
-        continue;
-      }
-      for (size_t i = 0; i < schema->size(); ++i) {
-        const FieldSchema& field = (*schema).at(i);
-        if (view == "COLUMN_FIELD_PATHS") {
-          if (absl::Status status = AppendFieldPaths(dataset, table, field.name, field.name, field,
-                                                     type_factory, rows);
-              !status.ok()) {
-            return status;
-          }
-          continue;
-        }
-        absl::StatusOr<std::string> type = TypeName(field, type_factory);
-        if (!type.ok()) {
-          return type.status();
-        }
-        rows.push_back({
-            String(dataset.project),
-            String(dataset.dataset),
-            String(table),
-            String(field.name),
-            Int(static_cast<int64_t>(i) + 1),
-            String(field.mode == FieldMode::kRequired ? "NO" : "YES"),
-            String(*type),
-            String("NEVER"),
-            kNull,
-            kNull,
-            String("NO"),
-            kNull,
-            String("NO"),
-            String("NO"),
-            kNull,
-            kNull,
-            OptionalString(field.default_value_expression),
-            OptionalString(field.rounding_mode),
-            kEmptyArray,
-            String("NO"),
-            kNull,
-            kNull,
-            kNull,
-            kNull,
-            kNull,
-            kNull,
-        });
-      }
-    }
-  }
-  return rows;
-}
+// Which qualifiers name the resources a view describes.
+enum class ViewScope : std::uint8_t {
+  // [PROJECT.][`region-REGION`.]VIEW: the datasets of a project in a region, the US by default.
+  kProject,
+  // [PROJECT.](DATASET | `region-REGION`).VIEW, or the default dataset.
+  kDatasetOrRegion,
+  // [PROJECT.]DATASET.VIEW, or the default dataset.
+  kDataset,
+};
+
+// An INFORMATION_SCHEMA view: its scope, its columns and the function that computes its rows.
+struct ViewDefinition {
+  std::string_view name;
+  ViewScope scope;
+  const std::vector<ViewColumn>& (*columns)();
+  absl::StatusOr<std::vector<Row>> (*rows)(const ViewContext&);
+};
+
+constexpr std::array kViews = {
+    ViewDefinition{
+        .name = "SCHEMATA",
+        .scope = ViewScope::kProject,
+        .columns = SchemataColumns,
+        .rows = SchemataRows,
+    },
+    ViewDefinition{
+        .name = "SCHEMATA_OPTIONS",
+        .scope = ViewScope::kProject,
+        .columns = SchemataOptionsColumns,
+        .rows = SchemataOptionsRows,
+    },
+    ViewDefinition{
+        .name = "TABLES",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = TablesColumns,
+        .rows = TablesRows,
+    },
+    ViewDefinition{
+        .name = "TABLE_OPTIONS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = TableOptionsColumns,
+        .rows = TableOptionsRows,
+    },
+    ViewDefinition{
+        .name = "PARTITIONS",
+        .scope = ViewScope::kDataset,
+        .columns = PartitionsColumns,
+        .rows = PartitionsRows,
+    },
+    ViewDefinition{
+        .name = "VIEWS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = ViewsColumns,
+        .rows = ViewsRows,
+    },
+    ViewDefinition{
+        .name = "COLUMNS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = ColumnsColumns,
+        .rows = ColumnsRows,
+    },
+    ViewDefinition{
+        .name = "COLUMN_FIELD_PATHS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = ColumnFieldPathsColumns,
+        .rows = ColumnFieldPathsRows,
+    },
+    ViewDefinition{
+        .name = "ROUTINES",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = RoutinesColumns,
+        .rows = RoutinesRows,
+    },
+    ViewDefinition{
+        .name = "PARAMETERS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = ParametersColumns,
+        .rows = ParametersRows,
+    },
+};
 
 }  // namespace
 
@@ -586,14 +978,14 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
   const auto not_found = [&parts] {
     return absl::NotFoundError("Table not found: " + absl::StrJoin(parts, "."));
   };
-  if (qualifier.size() > 2) {
+  const auto* const definition =
+      std::ranges::find(kViews, std::string_view(view), &ViewDefinition::name);
+  if (qualifier.size() > 2 || definition == kViews.end()) {
     return not_found();
   }
 
-  std::vector<ViewColumn> columns;
-  std::vector<Row> rows;
-  if (view == "SCHEMATA") {
-    // Scoped to a project, optionally with a region: [PROJECT.][`region-REGION`.]
+  ViewContext context{.source = source, .type_factory = type_factory, .datasets = {}};
+  if (definition->scope == ViewScope::kProject) {
     if (qualifier.size() == 2 && (IsRegion(qualifier.at(0)) || !IsRegion(qualifier.at(1)))) {
       return not_found();
     }
@@ -603,34 +995,12 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     if (std::optional<absl::Status> invalid = InvalidProject(source, project)) {
       return *std::move(invalid);
     }
-    columns = SchemataColumns();
-    absl::StatusOr<std::vector<std::string>> datasets = DatasetsIn(source, project, qualifier);
+    absl::StatusOr<std::vector<DatasetReference>> datasets = DatasetsIn(source, project, qualifier);
     if (!datasets.ok()) {
       return datasets.status();
     }
-    for (const std::string& dataset : *datasets) {
-      const std::optional<DatasetMetadata> metadata = source.DescribeDataset(project, dataset);
-      if (!metadata.has_value()) {
-        // Dropped since it was listed.
-        continue;
-      }
-      const std::string location = metadata->Location();
-      rows.push_back({
-          String(project),
-          String(dataset),
-          kNull,
-          CreationTime(metadata->creation_time),
-          kNull,
-          String(location),
-          String(absl::StrCat("CREATE SCHEMA `", project, ".", dataset,
-                              "`\nOPTIONS(\n  location=\"", ToLowerAscii(location), "\"\n);")),
-          kNull,
-          kNull,
-      });
-    }
-  } else if (view == "TABLES" || view == "VIEWS" || view == "COLUMNS" ||
-             view == "COLUMN_FIELD_PATHS" || view == "ROUTINES" || view == "PARAMETERS") {
-    // Scoped to a dataset or to a region: [PROJECT.](DATASET | `region-REGION`).
+    context.datasets = *std::move(datasets);
+  } else {
     std::string project = default_project;
     std::optional<std::string> dataset;
     if (qualifier.empty()) {
@@ -652,52 +1022,39 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
       }
       if (!IsRegion(qualifier.back())) {
         dataset = qualifier.back();
+      } else if (definition->scope == ViewScope::kDataset) {
+        // BigQuery's answer for a region qualifier on a view it has only for datasets.
+        const std::string table =
+            project + ":" +
+            absl::StrJoin(parts.begin() + (qualifier.size() == 2 ? 1 : 0), parts.end(), ".");
+        return absl::PermissionDeniedError("Access Denied: Table " + table +
+                                           ": User does not have permission to query table " +
+                                           table + ", or perhaps it does not exist.");
       }
     }
-    std::vector<DatasetTables> datasets;
     if (dataset.has_value()) {
       const std::optional<std::string> location = source.DatasetLocation(project, *dataset);
       if (!location.has_value()) {
         return not_found();
       }
       source.ReferenceLocation("Dataset " + project + ":" + *dataset, *location);
-      datasets.push_back({
-          .project = project,
-          .dataset = *dataset,
-          .tables = source.ListTables(project, *dataset),
-      });
+      context.datasets.push_back({.project_id = project, .dataset_id = *dataset});
     } else {
-      absl::StatusOr<std::vector<std::string>> names = DatasetsIn(source, project, qualifier);
-      if (!names.ok()) {
-        return names.status();
+      absl::StatusOr<std::vector<DatasetReference>> datasets =
+          DatasetsIn(source, project, qualifier);
+      if (!datasets.ok()) {
+        return datasets.status();
       }
-      std::ranges::transform(*names, std::back_inserter(datasets), [&](const std::string& name) {
-        return DatasetTables{
-            .project = project,
-            .dataset = name,
-            .tables = source.ListTables(project, name),
-        };
-      });
+      context.datasets = *std::move(datasets);
     }
-    if (view == "ROUTINES" || view == "PARAMETERS") {
-      columns = view == "ROUTINES" ? RoutinesColumns() : ParametersColumns();
-      rows = RoutineRows(source, datasets, view);
-    } else {
-      columns = view == "VIEWS"     ? ViewsColumns()
-                : view == "TABLES"  ? TablesColumns()
-                : view == "COLUMNS" ? ColumnsColumns()
-                                    : ColumnFieldPathsColumns();
-      absl::StatusOr<std::vector<Row>> table_rows = TableRows(source, datasets, view, type_factory);
-      if (!table_rows.ok()) {
-        return table_rows.status();
-      }
-      rows = *std::move(table_rows);
-    }
-  } else {
-    return not_found();
   }
 
-  absl::StatusOr<std::string> sql = ViewSql(columns, rows);
+  const std::vector<ViewColumn>& columns = definition->columns();
+  absl::StatusOr<std::vector<Row>> rows = definition->rows(context);
+  if (!rows.ok()) {
+    return rows.status();
+  }
+  absl::StatusOr<std::string> sql = ViewSql(columns, *rows);
   if (!sql.ok()) {
     return sql.status();
   }
