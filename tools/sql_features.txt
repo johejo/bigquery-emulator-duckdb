@@ -315,6 +315,7 @@ query `RAISE`, `RETURN` | SELECT 1; RETURN; SELECT 2
 query System variables | SELECT @@time_zone; SELECT 1
 query System variables | SET @@dataset_id = 'd'; SELECT @@dataset_id
 query System variables | SET @@dataset_project_id = 'probe-project'; SELECT @@dataset_project_id
+query System variables | SELECT schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE catalog_name = @@project_id
 note System variables | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query System variables | SET @@time_zone = 'Asia/Tokyo'; SELECT 1
 query `EXECUTE IMMEDIATE` | DECLARE y INT64; EXECUTE IMMEDIATE 'SELECT ? * (? + 2)' INTO y USING 1, 3; SELECT y

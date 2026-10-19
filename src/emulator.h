@@ -26,6 +26,7 @@
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/system_variables.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
@@ -274,11 +275,12 @@ class Emulator {
   // The registered project's DuckDB file path, or ":memory:".
   std::string ProjectDatabase(const std::string& project_id) const;
   // Keeps the catalog, types and resolved AST alive until translation finishes. What the query
-  // uses counts toward `location` when it is set.
-  TranslatedStatement Translate(const std::string& query, const QueryParameters& parameters,
-                                const std::string& default_project,
-                                const std::string& default_dataset,
-                                JobLocation* location = nullptr);
+  // uses counts toward `location` when it is set. The query can read `system_variables`.
+  TranslatedStatement Translate(
+      const std::string& query, const QueryParameters& parameters,
+      const std::string& default_project, const std::string& default_dataset,
+      JobLocation* location = nullptr,
+      const googlesql::SystemVariableValuesMap* system_variables = nullptr);
   // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
   static std::optional<std::string> DatasetLocation(Backend& backend,
                                                     const DatasetReference& dataset);

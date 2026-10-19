@@ -312,7 +312,8 @@ name resolution for subsequent statements, including dynamic SQL. Setting `@@dat
 to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
 dataset. Both initially return `NULL` without a request default dataset. These settings belong
 to the current script. With a request default dataset, reading either variable before assigning
-it is unsupported until its initial value is verified against BigQuery.
+it is unsupported until its initial value is verified against BigQuery. Queries, including
+single statements, can read the read-only `@@project_id`, the project that runs the query.
 As in BigQuery, function and view definitions cannot reference system variables.
 Assignments to other system variables are unsupported. An `EXCEPTION` clause never handles an
 error that the emulator reports as unsupported.
@@ -338,8 +339,9 @@ project. Permanent tables must include their datasets: the caller's default data
 apply inside a procedure. The caller's `@@dataset_id` value can still be read from the body.
 Temporary tables and temporary UDFs are shared with the calling script. Local variables and
 `IN` argument assignments stay within the procedure, and caller variables are not visible in
-the body. Query parameters, function declarations, system-variable assignments, reads of system
-variables other than `@@dataset_id`, and dynamic SQL inside procedures are unsupported.
+the body, and `@@project_id` is the project that runs the script. Query parameters, function
+declarations, system-variable assignments, reads of system variables other than `@@dataset_id`
+and `@@project_id`, and dynamic SQL inside procedures are unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 

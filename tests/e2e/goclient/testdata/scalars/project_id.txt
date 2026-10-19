@@ -1,0 +1,27 @@
+# @@project_id is the read-only ID of the project that runs the query, test, in a single
+# statement as in a script; inside a procedure it is still the project that runs the script.
+# https://cloud.google.com/bigquery/docs/reference/system-variables
+
+SELECT @@project_id
+=> "test"
+
+SELECT 1;
+SELECT @@project_id
+=> "test"
+
+# Setting @@dataset_project_id changes name resolution, not the executing project.
+SET @@dataset_project_id = 'example-project';
+SELECT @@project_id
+=> "test"
+
+# INFORMATION_SCHEMA names the project by its ID.
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA WHERE catalog_name = @@project_id AND schema_name = "scalars"
+=> "1"
+
+SELECT LOGICAL_AND(table_catalog = @@project_id) FROM scalars.INFORMATION_SCHEMA.TABLES WHERE table_name = "t"
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.proc_project_id() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@project_id; END;
+CALL scalars.proc_project_id()
+=> "test"

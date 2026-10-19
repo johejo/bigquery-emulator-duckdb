@@ -22,7 +22,6 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "google/protobuf/any.pb.h"
 #include "googlesql/base/status_builder.h"
@@ -133,40 +132,9 @@ absl::Status CheckJavaScriptSignature(const googlesql::FunctionSignature& signat
   return absl::OkStatus();
 }
 
-// The first system variable that `node` refers to, if any.
-const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTNode& node) {
-  if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR) {
-    return node.GetAsOrDie<googlesql::ASTSystemVariableExpr>();
-  }
-  for (int i = 0; i < node.num_children(); ++i) {
-    if (const auto* variable = FindSystemVariable(*node.child(i))) {
-      return variable;
-    }
-  }
-  return nullptr;
-}
-
-// BigQuery's error for a view or function definition that refers to a system variable, which
-// names only a temporary function.
-absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
-  std::string function;
-  if (statement.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
-    const auto* create = statement.GetAsOrDie<googlesql::ASTCreateFunctionStatement>();
-    if (create->is_temp()) {
-      function = absl::StrCat(
-          "; in function ",
-          absl::StrJoin(create->function_declaration()->name()->ToIdentifierVector(), "."));
-    }
-  } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT) {
-    return absl::OkStatus();
-  }
-  const googlesql::ASTSystemVariableExpr* variable = FindSystemVariable(statement);
-  if (variable == nullptr) {
-    return absl::OkStatus();
-  }
-  return absl::InvalidArgumentError(
-      absl::StrCat("Invalid reference to system variable @@",
-                   absl::StrJoin(variable->path()->ToIdentifierVector(), "."), function));
+// Whether `path` names the read-only @@project_id, the project that runs the script.
+bool IsProjectId(const std::vector<std::string>& path) {
+  return path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "project_id");
 }
 
 // The statements of a script that the emulator does not run, with what to call them.
@@ -245,7 +213,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                     const googlesql::Value& value) override {
     const auto path = assignment->system_variable()->path()->ToIdentifierVector();
     const auto variable = system_variables_.find(path);
-    if (variable == system_variables_.end()) {
+    if (variable == system_variables_.end() || IsProjectId(path)) {
       return Unsupported(
           "assignment to system variables other than @@dataset_id and @@dataset_project_id");
     }
@@ -456,11 +424,14 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   }
 
   static absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
-    // Only reads of @@dataset_id have been checked against BigQuery in a procedure.
+    // Only reads of @@dataset_id have been checked against BigQuery in a procedure, and
+    // @@project_id is documented as the project that runs the script.
     if (const auto* variable = node.GetAsOrNull<googlesql::ASTSystemVariableExpr>()) {
       const auto path = variable->path()->ToIdentifierVector();
-      if (path.size() != 1 || !absl::EqualsIgnoreCase(path.front(), "dataset_id")) {
-        return Unsupported("system variables other than @@dataset_id inside procedures");
+      if (path.size() != 1 ||
+          (!absl::EqualsIgnoreCase(path.front(), "dataset_id") && !IsProjectId(path))) {
+        return Unsupported(
+            "system variables other than @@dataset_id and @@project_id inside procedures");
       }
     }
     if (node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
@@ -528,10 +499,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   googlesql::SystemVariableValuesMap SystemVariables(
       const googlesql::ScriptExecutor& executor) const {
     auto variables = executor.GetKnownSystemVariables();
-    // Initial reads with a request default dataset remain unsupported until checked against
-    // BigQuery. Without a request default, both variables are confirmed to start as NULL.
+    // Initial reads of the dataset variables with a request default dataset remain unsupported
+    // until checked against BigQuery. Without a request default, both are confirmed to start as
+    // NULL. @@project_id is read-only and known from the start.
     for (const auto& [path, value] : system_variables_) {
-      if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path)) {
+      if (settings_.default_dataset.empty() || assigned_system_variables_.contains(path) ||
+          IsProjectId(path)) {
         variables.emplace(path, value);
       }
     }
@@ -886,6 +859,7 @@ QueryResult RunScript(ScriptHost& host, const std::string& query,
           default_dataset.empty() ? googlesql::Value::NullString()
                                   : googlesql::Value::String(default_dataset),
       },
+      {{"project_id"}, googlesql::Value::String(query_project)},
   };
   AnalyzerSettings settings{
       .default_project = default_project,

@@ -22,6 +22,7 @@
 #include "googlesql/public/analyzer_options.h"
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
+#include "googlesql/public/value.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -288,10 +289,15 @@ QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& 
   return result;
 }
 
-TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
-                                        const std::string& default_project,
-                                        const std::string& default_dataset, JobLocation* location) {
-  AnalyzerSettings settings{.default_project = default_project, .default_dataset = default_dataset};
+TranslatedStatement Emulator::Translate(
+    const std::string& query, const QueryParameters& parameters, const std::string& default_project,
+    const std::string& default_dataset, JobLocation* location,
+    const googlesql::SystemVariableValuesMap* system_variables) {
+  AnalyzerSettings settings{
+      .default_project = default_project,
+      .default_dataset = default_dataset,
+      .system_variables = system_variables,
+  };
   googlesql::TypeFactory type_factory;
   for (const FieldSchema& field : parameters.named_types()) {
     settings.named_parameters.emplace_back(field.name, ParameterType(field, type_factory));
@@ -317,7 +323,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
                                    return ResultValue(Execute(sql, {}, true), type);
                                  },
                          },
-                         &unsupported);
+                         &unsupported, system_variables);
   if (!translated.has_value()) {
     throw ApiError::UnsupportedQuery(unsupported);
   }
@@ -494,9 +500,12 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
                     settings.default_dataset, setup, request.project_id, next_script_number_++);
       return;
     }
+    const googlesql::SystemVariableValuesMap variables{
+        {{"project_id"}, googlesql::Value::String(request.project_id)},
+    };
     const TranslatedStatement translation =
         Translate(request.query, request.parameters, settings.default_project,
-                  settings.default_dataset, &location);
+                  settings.default_dataset, &location, &variables);
     auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;

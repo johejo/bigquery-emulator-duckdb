@@ -304,6 +304,7 @@ cc_library(
         ":duckdb_sql",
         ":type_mapping",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/parser",
         "@googlesql//googlesql/parser:parse_tree",
@@ -324,6 +325,7 @@ cc_library(
     deps = [
         ":field_schema",
         ":system_variables",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer_options",
@@ -634,6 +636,7 @@ cc_library(
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
     ],
     deps = [
         ":api_error",
@@ -646,6 +649,7 @@ cc_library(
         ":query_parameters",
         ":references",
         ":routine",
+        ":system_variables",
         ":table_metadata",
         "//src/backend_functions:javascript_limits",
         "@nlohmann_json//:json",
