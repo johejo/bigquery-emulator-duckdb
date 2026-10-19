@@ -313,10 +313,8 @@ cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
-        "@googlesql//googlesql/public:options_cc_proto",
         "@googlesql//googlesql/public:simple_catalog",
         "@googlesql//googlesql/public:strings",
-        "@googlesql//googlesql/public:type",
     ],
     deps = [
         ":catalog_table",

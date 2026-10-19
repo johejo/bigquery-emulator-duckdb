@@ -10,8 +10,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
-#include "googlesql/public/options.pb.h"
-#include "googlesql/public/type.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/information_schema_options.h"
@@ -26,22 +24,13 @@ namespace bigquery_emulator_duckdb::information_schema {
 
 namespace {
 
-absl::StatusOr<std::string> TypeName(const FieldSchema& field,
-                                     googlesql::TypeFactory* type_factory) {
-  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, type_factory);
-  if (!type.ok()) {
-    return type.status();
-  }
-  return (*type)->TypeName(googlesql::PRODUCT_EXTERNAL);
-}
-
 absl::StatusOr<std::string> TableDdl(const std::string& project, const std::string& dataset,
                                      const std::string& table,
                                      const std::vector<FieldSchema>& schema,
                                      googlesql::TypeFactory* type_factory) {
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
-    absl::StatusOr<std::string> type = TypeName(field, type_factory);
+    absl::StatusOr<std::string> type = GoogleSqlTypeName(field, type_factory);
     if (!type.ok()) {
       return type.status();
     }
@@ -90,7 +79,7 @@ std::string PartitionId(const TableMetadata& metadata) {
 absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
                               const std::string& path, const FieldSchema& field,
                               googlesql::TypeFactory* type_factory, std::vector<Row>& rows) {
-  absl::StatusOr<std::string> type = TypeName(field, type_factory);
+  absl::StatusOr<std::string> type = GoogleSqlTypeName(field, type_factory);
   if (!type.ok()) {
     return type.status();
   }
@@ -385,7 +374,7 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
       }
       for (size_t i = 0; i < schema->size(); ++i) {
         const FieldSchema& field = schema->at(i);
-        absl::StatusOr<std::string> type = TypeName(field, context.type_factory);
+        absl::StatusOr<std::string> type = GoogleSqlTypeName(field, context.type_factory);
         if (!type.ok()) {
           return type.status();
         }

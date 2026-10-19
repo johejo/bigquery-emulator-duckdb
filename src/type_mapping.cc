@@ -229,6 +229,15 @@ absl::StatusOr<std::string> DuckDbFieldType(const FieldSchema& field, TypeUse us
 
 }  // namespace
 
+absl::StatusOr<std::string> GoogleSqlTypeName(const FieldSchema& field,
+                                              googlesql::TypeFactory* type_factory) {
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, type_factory);
+  if (!type.ok()) {
+    return type.status();
+  }
+  return (*type)->TypeName(googlesql::PRODUCT_EXTERNAL);
+}
+
 // The type parameters of a column that `field` describes: the precision and scale of NUMERIC and
 // BIGNUMERIC, at any depth, within the ranges DDL allows and failing with GoogleSQL's messages
 // outside them. Storage leaves lengths out; default validation includes them.
