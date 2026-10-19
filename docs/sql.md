@@ -22,7 +22,7 @@ rejected.
 | [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
-| [Multi-statement queries](#multi-statement-queries) | 9 | 4 | 0 |
+| [Multi-statement queries](#multi-statement-queries) | 10 | 3 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 7 | 0 | 0 |
 
 ## Queries
@@ -129,7 +129,7 @@ rejected.
 | `FOR ... IN` | Supported |  |
 | `RAISE`, `RETURN` | Supported |  |
 | System variables | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: assignment to system variables other than @@dataset_id and @@dataset_project_id. |
-| `EXECUTE IMMEDIATE` | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: scripting statements in EXECUTE IMMEDIATE. |
+| `EXECUTE IMMEDIATE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | Transactions | Partial | See [Scripts and transactions](compatibility.md#scripts-and-transactions). Unsupported: committing a transaction after a handled error; roll it back instead. |
 | `CALL` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: function declarations, system variable assignments, dynamic SQL and query parameters inside procedures. |
 

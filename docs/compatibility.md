@@ -357,8 +357,8 @@ destination tables or positional parameters.
 ## Scripts and transactions
 
 Multi-statement queries cannot be dry runs. Temporary tables belong to no dataset and are dropped
-when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement, but no scripting statements or
-transaction control. Scripts can set and read `@@dataset_id` and `@@dataset_project_id` to change
+when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement or a `BEGIN...END` block of them,
+but no other scripting statements, exception handlers or transaction control. Scripts can set and read `@@dataset_id` and `@@dataset_project_id` to change
 name resolution for subsequent statements, including dynamic SQL. Setting `@@dataset_project_id`
 to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
 dataset. Both initially return `NULL` without a request default dataset. These settings belong

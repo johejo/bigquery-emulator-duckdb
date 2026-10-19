@@ -1,4 +1,5 @@
-# EXECUTE IMMEDIATE rejects multiple INTO rows, outer variables and nested control statements.
+# EXECUTE IMMEDIATE rejects multiple INTO rows, outer variables and nested control statements,
+# also inside a BEGIN...END block.
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
 
 DECLARE x INT64; EXECUTE IMMEDIATE "SELECT * FROM UNNEST([1, 2])" INTO x
@@ -11,4 +12,7 @@ EXECUTE IMMEDIATE "EXECUTE IMMEDIATE 'SELECT 1'"
 => error:
 
 EXECUTE IMMEDIATE "IF TRUE THEN SELECT 1; END IF"
+=> error:
+
+EXECUTE IMMEDIATE "BEGIN IF TRUE THEN SELECT 1; END IF; END"
 => error:

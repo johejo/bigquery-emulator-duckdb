@@ -157,6 +157,48 @@ std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) 
   return std::nullopt;
 }
 
+// Whether BigQuery runs `statement` as dynamic SQL: no control statement, CALL or EXECUTE
+// IMMEDIATE may appear in it, even inside a BEGIN...END block. Sets `unsupported` to the first
+// part of it that the emulator does not run, unless it is already set.
+bool AllowedAsDynamicSql(const googlesql::ASTStatement& statement,
+                         std::optional<std::string>& unsupported) {
+  const auto unsupport = [&](std::optional<std::string> what) {
+    if (!unsupported) {
+      unsupported = std::move(what);
+    }
+  };
+  switch (statement.node_kind()) {
+    case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
+    case googlesql::AST_CALL_STATEMENT:
+    case googlesql::AST_IF_STATEMENT:
+    case googlesql::AST_CASE_STATEMENT:
+    case googlesql::AST_WHILE_STATEMENT:
+    case googlesql::AST_REPEAT_STATEMENT:
+    case googlesql::AST_FOR_IN_STATEMENT:
+      return false;
+    case googlesql::AST_BEGIN_STATEMENT:
+    case googlesql::AST_COMMIT_STATEMENT:
+    case googlesql::AST_ROLLBACK_STATEMENT:
+      unsupport("transactions in EXECUTE IMMEDIATE");
+      return true;
+    case googlesql::AST_BEGIN_END_BLOCK: {
+      const auto* block = statement.GetAsOrDie<googlesql::ASTBeginEndBlock>();
+      if (block->has_exception_handler()) {
+        unsupport("exception handlers in EXECUTE IMMEDIATE");
+      }
+      return std::ranges::all_of(block->statement_list(), [&](const auto* inner) {
+        return AllowedAsDynamicSql(*inner, unsupported);
+      });
+    }
+    default:
+      unsupport(UnsupportedStatement(statement));
+      if (!statement.IsSqlStatement()) {
+        unsupport("scripting statements other than BEGIN...END in EXECUTE IMMEDIATE");
+      }
+      return true;
+  }
+}
+
 // The database that holds the temporary tables of a script while it runs: an in-memory one of
 // its own, which no other job sees and which goes with the script.
 class TemporaryDatabase {
@@ -334,31 +376,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return googlesql::ApplyConstraints(type_params, googlesql::PRODUCT_EXTERNAL, *value);
   }
 
-  // BigQuery runs one SQL statement as dynamic SQL, but no control statement, CALL or another
-  // EXECUTE IMMEDIATE; the emulator runs neither the other scripting statements nor transactions
-  // there, which OnProcedureEntered then rejects before the statement runs.
+  // BigQuery runs one SQL statement as dynamic SQL, or a BEGIN...END block of them; what the
+  // emulator does not run of those, OnProcedureEntered rejects before the statement runs.
   bool IsAllowedAsDynamicSql(const googlesql::ASTStatement* statement) override {
     std::optional<std::string> unsupported;
-    switch (statement->node_kind()) {
-      case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
-      case googlesql::AST_CALL_STATEMENT:
-      case googlesql::AST_IF_STATEMENT:
-      case googlesql::AST_CASE_STATEMENT:
-      case googlesql::AST_WHILE_STATEMENT:
-      case googlesql::AST_REPEAT_STATEMENT:
-      case googlesql::AST_FOR_IN_STATEMENT:
-        return false;
-      case googlesql::AST_BEGIN_STATEMENT:
-      case googlesql::AST_COMMIT_STATEMENT:
-      case googlesql::AST_ROLLBACK_STATEMENT:
-        unsupported = "transactions in EXECUTE IMMEDIATE";
-        break;
-      default:
-        unsupported = UnsupportedStatement(*statement);
-        if (!unsupported && !statement->IsSqlStatement()) {
-          unsupported = "scripting statements in EXECUTE IMMEDIATE";
-        }
-        break;
+    if (!AllowedAsDynamicSql(*statement, unsupported)) {
+      return false;
     }
     pending_frame_ = PendingFrame{
         .frame = {.kind = ScriptFrame::Kind::kDynamicSql,
