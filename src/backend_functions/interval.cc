@@ -93,6 +93,16 @@ void AddIntervals(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
+// INTERVAL * INT64. GoogleSQL multiplies the months, days and time apart, and fails where one
+// leaves the range.
+void MultiplyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args));
+    GOOGLESQL_ASSIGN_OR_RETURN(const auto result, interval* args.Int(1));
+    return IntervalToDuckDb(result);
+  });
+}
+
 // DATE + INTERVAL, which is a DATETIME.
 template <bool kSubtract>
 void AddDateInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -277,6 +287,7 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
   Register(connection, "bq_add_intervals", {kInterval, kInterval}, kInterval, AddIntervals<false>);
   Register(connection, "bq_subtract_intervals", {kInterval, kInterval}, kInterval,
            AddIntervals<true>);
+  Register(connection, "bq_multiply_interval", {kInterval, kBigint}, kInterval, MultiplyInterval);
   Register(connection, "bq_add_date_interval", {kDate, kInterval}, kDatetime,
            AddDateInterval<false>);
   Register(connection, "bq_subtract_date_interval", {kDate, kInterval}, kDatetime,

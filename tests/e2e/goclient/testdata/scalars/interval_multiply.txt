@@ -1,0 +1,49 @@
+## INTERVAL * INT64
+# Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
+# compliance/functions_testlib_interval.cc (interval multiply).
+
+SELECT INTERVAL '1:2:3' HOUR TO SECOND * 10
+=> "0-0 0 10:20:30"
+
+SELECT INTERVAL 35 SECOND * 4
+=> "0-0 0 0:2:20"
+
+SELECT INTERVAL 1 YEAR * 0
+=> "0-0 0 0:0:0"
+
+SELECT INTERVAL 1 YEAR * -9999
+=> "-9999-0 0 0:0:0"
+
+SELECT INTERVAL 1 MONTH * 1007
+=> "83-11 0 0:0:0"
+
+SELECT INTERVAL 1 DAY * -11
+=> "0-0 -11 0:0:0"
+
+SELECT INTERVAL 1 HOUR * 9999
+=> "0-0 0 9999:0:0"
+
+SELECT INTERVAL 1 MICROSECOND * -3
+=> "0-0 0 -0:0:0.000003"
+
+# Months, days and time multiply apart, without carrying into each other.
+SELECT MAKE_INTERVAL(0, 1, 2, 3, 4, 5) * 11
+=> "0-11 22 33:44:55"
+
+SELECT MAKE_INTERVAL(0, -1, -2, -3, -4, -5) * -3
+=> "0-3 6 9:12:15"
+
+SELECT CAST(NULL AS INTERVAL) * 1
+=> null
+
+SELECT INTERVAL 1 YEAR * CAST(NULL AS INT64)
+=> null
+
+SELECT INTERVAL 2 YEAR * 10000
+=> error:
+
+SELECT INTERVAL 3660000 DAY * -2
+=> error:
+
+SELECT INTERVAL 999999 DAY * 99999999999
+=> error:

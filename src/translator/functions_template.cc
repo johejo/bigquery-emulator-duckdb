@@ -694,7 +694,18 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_multiply_numeric($1, $2)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
               },
-              {.arity = 2, .spelling = "($1 * $2)"},
+              // See src/backend_functions/interval.cc. INT64 * INTERVAL, which BigQuery does not
+              // document, stays unsupported.
+              {
+                  .arity = 2,
+                  .spelling = "bq_multiply_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_INTERVAL})},
+              },
+              {
+                  .arity = 2,
+                  .spelling = "($1 * $2)",
+                  .conditions = {Is(2, {TYPE_INT64, TYPE_DOUBLE})},
+              },
           },
       },
       {

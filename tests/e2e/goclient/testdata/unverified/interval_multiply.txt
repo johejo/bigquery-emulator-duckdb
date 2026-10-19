@@ -1,0 +1,16 @@
+# INTERVAL multiplication
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#interval_arithmetic_operators
+
+# Whether BigQuery takes INT64 * INTERVAL, which its operators reference does not list, as
+# GoogleSQL does.
+
+SELECT 3 * INTERVAL 2 DAY
+?>
+
+# BigQuery's messages where a component leaves its range, and where it overflows INT64.
+
+SELECT INTERVAL 2 YEAR * 10000
+?>
+
+SELECT INTERVAL 999999 DAY * 99999999999
+?>
