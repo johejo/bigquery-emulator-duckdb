@@ -47,7 +47,6 @@
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
-#include "googlesql/scripting/stack_frame.h"
 #include "googlesql/scripting/type_aliases.h"
 #include "nlohmann/json.hpp"
 #include "src/analyzer.h"
@@ -179,6 +178,18 @@ class TemporaryDatabase {
  private:
   Backend& backend_;
   std::string name_;
+};
+
+// A frame of the script's call stack: the script itself, a procedure that CALL entered, or the
+// statement that EXECUTE IMMEDIATE runs. The evaluator enters and leaves frames with the
+// executor, whose frames hold the variables. Temporary tables, temporary functions and system
+// variables belong to the whole script.
+struct ScriptFrame {
+  enum class Kind : uint8_t { kScript, kProcedure, kDynamicSql };
+  Kind kind = Kind::kScript;
+  // The project of the procedure that the frame runs in, which its names resolve against; empty
+  // outside procedures.
+  std::string procedure_project;
 };
 
 // Evaluates what the ScriptExecutor asks for: each statement, as a query job would run it, and
@@ -327,8 +338,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   // EXECUTE IMMEDIATE; the emulator runs neither the other scripting statements nor transactions
   // there, which OnProcedureEntered then rejects before the statement runs.
   bool IsAllowedAsDynamicSql(const googlesql::ASTStatement* statement) override {
-    unsupported_dynamic_sql_.reset();
-    loaded_procedure_status_ = absl::OkStatus();
+    std::optional<std::string> unsupported;
     switch (statement->node_kind()) {
       case googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT:
       case googlesql::AST_CALL_STATEMENT:
@@ -341,23 +351,27 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       case googlesql::AST_BEGIN_STATEMENT:
       case googlesql::AST_COMMIT_STATEMENT:
       case googlesql::AST_ROLLBACK_STATEMENT:
-        unsupported_dynamic_sql_ = "transactions in EXECUTE IMMEDIATE";
+        unsupported = "transactions in EXECUTE IMMEDIATE";
         break;
       default:
-        if (auto unsupported = UnsupportedStatement(*statement)) {
-          unsupported_dynamic_sql_ = *std::move(unsupported);
-        } else if (!statement->IsSqlStatement()) {
-          unsupported_dynamic_sql_ = "scripting statements in EXECUTE IMMEDIATE";
+        unsupported = UnsupportedStatement(*statement);
+        if (!unsupported && !statement->IsSqlStatement()) {
+          unsupported = "scripting statements in EXECUTE IMMEDIATE";
         }
         break;
     }
+    pending_frame_ = PendingFrame{
+        .frame = {.kind = ScriptFrame::Kind::kDynamicSql,
+                  .procedure_project = frames_.back().procedure_project},
+        .status = unsupported ? Unsupported(*unsupported) : absl::OkStatus(),
+    };
     return true;
   }
 
   absl::StatusOr<std::unique_ptr<googlesql::ProcedureDefinition>> LoadProcedure(
       const googlesql::ScriptExecutor& executor, const absl::Span<const std::string>& path,
       const int64_t /*num_arguments*/) override {
-    loaded_procedure_status_ = absl::OkStatus();
+    pending_frame_.reset();
     const auto settings = Settings(executor);
     const auto source = host_.NewTableSource(backend_.get(), false);
     const auto parts = NormalizeTablePath(SplitTablePath(path), settings.default_project,
@@ -373,15 +387,24 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     return LoadProcedureDefinition(*routine, *source);
   }
 
-  // These callbacks run before the new frame is pushed. Defer the body check from
-  // LoadProcedure until entry, where unsupported errors propagate without becoming catchable.
+  // Enters the frame that LoadProcedure or IsAllowedAsDynamicSql prepared, just before the
+  // executor pushes its own. What they found unsupported fails here, where the error propagates
+  // without becoming catchable.
   absl::Status OnProcedureEntered(const googlesql::ScriptExecutor& /*executor*/,
                                   const absl::Span<const std::string>& /*path*/) override {
-    const auto unsupported = std::exchange(unsupported_dynamic_sql_, std::nullopt);
-    if (unsupported) {
-      return Unsupported(*unsupported);
-    }
-    return std::exchange(loaded_procedure_status_, absl::OkStatus());
+    std::optional<PendingFrame> pending = std::exchange(pending_frame_, std::nullopt);
+    GOOGLESQL_RET_CHECK(pending.has_value());
+    GOOGLESQL_RETURN_IF_ERROR(pending->status);
+    frames_.push_back(std::move(pending->frame));
+    return absl::OkStatus();
+  }
+
+  // The executor leaves a frame on return and when an error unwinds it into a handler.
+  absl::Status OnProcedureExited(const googlesql::ScriptExecutor& /*executor*/,
+                                 const absl::Span<const std::string>& /*path*/) override {
+    GOOGLESQL_RET_CHECK_GT(frames_.size(), 1);
+    frames_.pop_back();
+    return absl::OkStatus();
   }
 
   absl::StatusOr<int64_t> GetIteratorMemoryUsage(
@@ -417,7 +440,14 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       GOOGLESQL_RETURN_IF_ERROR(googlesql::ParseScript(
           create.procedure_body(), googlesql::ParserOptions(GoogleSqlLanguageOptions()),
           {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &parsed));
-      loaded_procedure_status_ = CheckProcedureBody(*parsed->script());
+      pending_frame_ = PendingFrame{
+          .frame =
+              {
+                  .kind = ScriptFrame::Kind::kProcedure,
+                  .procedure_project = routine.reference.project_id,
+              },
+          .status = CheckProcedureBody(*parsed->script()),
+      };
       return std::make_unique<googlesql::ProcedureDefinition>(
           routine.reference.project_id + "." + routine.reference.dataset_id + "." +
               routine.reference.routine_id,
@@ -492,8 +522,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     const auto& dataset = system_variables_.at({"dataset_id"});
     settings.default_project = project.is_null() ? query_project_ : project.string_value();
     settings.default_dataset = dataset.is_null() ? "" : dataset.string_value();
-    if (const auto name = executor.GetCurrentProcedureName(); !name.empty()) {
-      settings.default_project = SplitTablePath({std::string(name)}).front();
+    if (const ScriptFrame& frame = frames_.back(); !frame.procedure_project.empty()) {
+      settings.default_project = frame.procedure_project;
       settings.default_dataset.clear();
       settings.named_parameters.clear();
     }
@@ -644,9 +674,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   absl::StatusOr<QueryParameters> Parameters(const googlesql::ScriptExecutor& executor,
                                              AnalyzerSettings& settings) {
     settings = Settings(executor);
-    const googlesql::StackFrame* frame = executor.GetCurrentStackFrame();
-    if (frame == nullptr || !frame->is_dynamic_sql()) {
-      return executor.GetCurrentProcedureName().empty() ? parameters_ : QueryParameters();
+    switch (frames_.back().kind) {
+      case ScriptFrame::Kind::kScript:
+        return parameters_;
+      case ScriptFrame::Kind::kProcedure:
+        return QueryParameters();
+      case ScriptFrame::Kind::kDynamicSql:
+        break;
     }
     settings.named_parameters.clear();
     const auto& values = executor.GetCurrentParameterValues();
@@ -836,10 +870,15 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
   bool transaction_failed_ = false;
   std::optional<QueryResult> last_result_;
   std::optional<ApiError> error_;
-  // What the emulator does not support in the statement that EXECUTE IMMEDIATE is about to run.
-  std::optional<std::string> unsupported_dynamic_sql_;
-  // Checked while loading, propagated on entry before any procedure statement executes.
-  absl::Status loaded_procedure_status_;
+  // The frames the script runs in, the innermost last.
+  std::vector<ScriptFrame> frames_{1};
+  // The frame that the procedure or dynamic SQL statement the executor is about to enter runs in,
+  // with what the emulator does not support in it.
+  struct PendingFrame {
+    ScriptFrame frame;
+    absl::Status status;
+  };
+  std::optional<PendingFrame> pending_frame_;
 };
 
 }  // namespace
