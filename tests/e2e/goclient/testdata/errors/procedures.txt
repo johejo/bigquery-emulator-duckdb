@@ -17,11 +17,3 @@ CREATE OR REPLACE PROCEDURE errors_procedures.proc_dynamic_system() OPTIONS(stri
 BEGIN EXECUTE IMMEDIATE "SET @@time_zone = 'Asia/Tokyo'"; END;
 BEGIN CALL errors_procedures.proc_dynamic_system(); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support
-
-# Unbound named parameters can be rejected before CALL is reached.
-# https://cloud.google.com/bigquery/docs/parameterized-queries
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_parameters() OPTIONS(strict_mode=FALSE)
-BEGIN SELECT @caller_parameter; END;
-BEGIN CALL errors_procedures.proc_parameters(); EXCEPTION WHEN ERROR THEN SELECT 1; END
-=> error:

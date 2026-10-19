@@ -274,8 +274,10 @@ cc_library(
     hdrs = ["src/routine_catalog.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/parser",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:parse_resume_location",
         "@googlesql//googlesql/public:simple_catalog",

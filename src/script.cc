@@ -379,7 +379,7 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         .frame = {.kind = ScriptFrame::Kind::kDynamicSql, .procedure_project = procedure_project},
         .status = unsupported                 ? Unsupported(*unsupported)
                   : procedure_project.empty() ? absl::OkStatus()
-                                              : CheckProcedureBody(*statement, /*dynamic=*/true),
+                                              : CheckProcedureBody(*statement),
     };
     return true;
   }
@@ -473,9 +473,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
   }
 
-  // Checks the body of a procedure, or with `dynamic` a statement that EXECUTE IMMEDIATE runs in
-  // one, whose query parameters are those of its USING clause.
-  static absl::Status CheckProcedureBody(const googlesql::ASTNode& node, bool dynamic = false) {
+  // Checks the body of a procedure, or a statement that EXECUTE IMMEDIATE runs in one.
+  static absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
     // The reads that have been checked against BigQuery in a procedure, where @@error is that of
     // a handler in the procedure.
     if (const auto* variable = node.GetAsOrNull<googlesql::ASTSystemVariableExpr>()) {
@@ -497,13 +496,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
         return Unsupported(*unsupported);
       }
       // The variable it assigns is not read.
-      return CheckProcedureBody(*assignment->expression(), dynamic);
-    }
-    if (!dynamic && node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
-      return Unsupported("query parameters inside procedures");
+      return CheckProcedureBody(*assignment->expression());
     }
     for (int i = 0; i < node.num_children(); ++i) {
-      GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i), dynamic));
+      GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i)));
     }
     return absl::OkStatus();
   }

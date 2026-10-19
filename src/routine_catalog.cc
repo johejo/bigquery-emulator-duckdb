@@ -12,9 +12,11 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "googlesql/base/status_macros.h"
+#include "googlesql/parser/parser.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/simple_catalog.h"
@@ -23,6 +25,7 @@
 #include "googlesql/public/templated_sql_function.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer.h"
+#include "src/api_error.h"
 #include "src/catalog.h"
 #include "src/references.h"
 #include "src/routine.h"
@@ -100,7 +103,31 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
 absl::Status RoutineCatalog::CheckRoutine(const Routine& routine) {
   if (routine.resource.at("routineType") == "PROCEDURE") {
     // CREATE PROCEDURE resolves the signature and checks the body's syntax. Strict mode,
-    // which would also resolve its statements, is rejected by the translator.
+    // which would also resolve its statements, is rejected by the translator. BigQuery rejects
+    // query parameters in the body even without strict mode.
+    std::unique_ptr<googlesql::ParserOutput> parsed;
+    GOOGLESQL_RETURN_IF_ERROR(
+        googlesql::ParseScript(routine.resource.at("definitionBody").get<std::string>(),
+                               googlesql::ParserOptions(GoogleSqlLanguageOptions()),
+                               {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &parsed));
+    std::vector<const googlesql::ASTNode*> nodes{parsed->script()};
+    while (!nodes.empty()) {
+      const googlesql::ASTNode* node = nodes.back();
+      nodes.pop_back();
+      if (const auto* parameter = node->GetAsOrNull<googlesql::ASTParameterExpr>()) {
+        if (parameter->name() == nullptr) {
+          return absl::UnimplementedError(
+              absl::StrCat(kUnsupported, "positional query parameters in procedure bodies"));
+        }
+        return absl::InvalidArgumentError(
+            absl::StrCat("Query parameter is not allowed in the body of procedure '",
+                         routine.reference.dataset_id, ".", routine.reference.routine_id, "': @",
+                         parameter->name()->GetAsStringView()));
+      }
+      for (int i = 0; i < node->num_children(); ++i) {
+        nodes.push_back(node->child(i));
+      }
+    }
     return absl::OkStatus();
   }
   if (routine.resource.at("routineType") == "TABLE_VALUED_FUNCTION") {

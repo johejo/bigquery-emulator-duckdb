@@ -268,3 +268,9 @@ BEGIN EXECUTE IMMEDIATE 'SELECT MAX(a) FROM t'; END;
 SET @@dataset_id = 'scalars';
 CALL scalars.proc_dynamic_tables()
 => error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
+# Answers collected from BigQuery with bqanswers: CREATE PROCEDURE rejects query parameters in the
+# body, even without strict mode.
+CREATE OR REPLACE PROCEDURE scalars.proc_parameter() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @p; END
+=> error contains: Query parameter is not allowed in the body of procedure 'scalars.proc_parameter': @p

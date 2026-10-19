@@ -397,11 +397,11 @@ argument assignments stay within the procedure, caller variables are not visible
 `@@project_id` is the project that runs the script. `OUT` arguments start as `NULL`, and when the
 procedure returns, the variables passed as `OUT` and `INOUT` arguments take the arguments' last
 values; a procedure that fails leaves them unchanged. Dynamic SQL inside a procedure resolves
-names as the procedure does and sees only the query parameters of its `USING` clause. Query
-parameters, assignments to system variables other than `@@dataset_id` and
-`@@dataset_project_id`, and reads of system variables other than those, `@@project_id`,
-`@@time_zone` and `@@error.message` inside procedures, including their dynamic SQL, are
-unsupported.
+names as the procedure does and sees only the query parameters of its `USING` clause. As in
+BigQuery, `CREATE PROCEDURE` rejects query parameters in the body. Assignments to system
+variables other than `@@dataset_id` and `@@dataset_project_id`, and reads of system variables
+other than those, `@@project_id`, `@@time_zone` and `@@error.message` inside procedures,
+including their dynamic SQL, are unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 
