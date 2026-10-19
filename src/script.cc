@@ -136,18 +136,6 @@ bool IsProjectId(const std::vector<std::string>& path) {
   return path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "project_id");
 }
 
-// Whether the system variable assignment `node` assigns @@dataset_id, which BigQuery lets
-// procedures and dynamic SQL set for the whole script, or the read-only @@project_id, which fails
-// there as it does elsewhere.
-bool AssignsDatasetId(const googlesql::ASTNode& node) {
-  const auto path = node.GetAsOrDie<googlesql::ASTSystemVariableAssignment>()
-                        ->system_variable()
-                        ->path()
-                        ->ToIdentifierVector();
-  return IsProjectId(path) ||
-         (path.size() == 1 && absl::EqualsIgnoreCase(path.front(), "dataset_id"));
-}
-
 // The statements of a script that the emulator does not run, with what to call them.
 std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) {
   if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT) {
@@ -170,8 +158,8 @@ std::optional<std::string> UnsupportedStatement(const googlesql::ASTNode& node) 
 }
 
 // Whether BigQuery runs `statement` as dynamic SQL, which it does not for a control statement,
-// CALL, EXECUTE IMMEDIATE or BEGIN...END block. Sets `unsupported` to what the emulator does not
-// run of the statements it does.
+// CALL, EXECUTE IMMEDIATE, BEGIN...END block or DECLARE. Sets `unsupported` to what the emulator
+// does not run of the statements it does.
 bool AllowedAsDynamicSql(const googlesql::ASTStatement& statement,
                          std::optional<std::string>& unsupported) {
   switch (statement.node_kind()) {
@@ -183,16 +171,14 @@ bool AllowedAsDynamicSql(const googlesql::ASTStatement& statement,
     case googlesql::AST_REPEAT_STATEMENT:
     case googlesql::AST_FOR_IN_STATEMENT:
     case googlesql::AST_BEGIN_END_BLOCK:
+    case googlesql::AST_VARIABLE_DECLARATION:
       return false;
     case googlesql::AST_BEGIN_STATEMENT:
     case googlesql::AST_COMMIT_STATEMENT:
     case googlesql::AST_ROLLBACK_STATEMENT:
-      unsupported = "transactions in EXECUTE IMMEDIATE";
       return true;
     case googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT:
-      if (!AssignsDatasetId(statement)) {
-        unsupported = "assignment to system variables other than @@dataset_id in EXECUTE IMMEDIATE";
-      }
+      unsupported = UnsupportedStatement(statement);
       return true;
     default:
       unsupported = UnsupportedStatement(statement);
@@ -499,9 +485,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
             "system variables other than @@dataset_id and @@project_id inside procedures");
       }
     }
-    if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT && !AssignsDatasetId(node)) {
-      return Unsupported(
-          "assignment to system variables other than @@dataset_id inside procedures");
+    if (const auto* assignment = node.GetAsOrNull<googlesql::ASTSystemVariableAssignment>()) {
+      if (auto unsupported = UnsupportedStatement(node)) {
+        return Unsupported(*unsupported);
+      }
+      // The variable it assigns is not read.
+      return CheckProcedureBody(*assignment->expression(), dynamic);
     }
     if (!dynamic && node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
       return Unsupported("query parameters inside procedures");

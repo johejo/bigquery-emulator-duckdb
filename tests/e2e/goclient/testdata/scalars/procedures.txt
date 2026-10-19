@@ -211,6 +211,13 @@ CALL scalars.proc_set_dataset_tables();
 SELECT MAX(a) FROM t
 => "3"
 
+# Answers collected from BigQuery with bqanswers: the procedure itself does not resolve table names
+# against the @@dataset_id it sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_own_tables() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_id = 'scalars'; SELECT MAX(a) FROM t; END;
+CALL scalars.proc_set_dataset_own_tables()
+=> error contains: Table "t" must be qualified with a dataset (e.g. dataset.table).
+
 # Answers collected from BigQuery with bqanswers: an OUT argument that the procedure never assigns
 # leaves the caller's variable NULL, and a procedure that fails leaves it unchanged.
 DECLARE v INT64 DEFAULT 5;
@@ -226,3 +233,11 @@ OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; SELECT ERROR('fail'); END;
 BEGIN CALL scalars.proc_out_failed(v); EXCEPTION WHEN ERROR THEN SELECT 0; END;
 SELECT v
 => "5"
+
+# Answers collected from BigQuery with bqanswers: so does the @@dataset_project_id that a
+# procedure sets.
+CREATE OR REPLACE PROCEDURE scalars.proc_set_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SET @@dataset_project_id = @@project_id; END;
+CALL scalars.proc_set_dataset_project();
+SELECT @@dataset_project_id = @@project_id
+=> "true"

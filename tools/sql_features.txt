@@ -338,6 +338,8 @@ query `EXECUTE IMMEDIATE` | EXECUTE IMMEDIATE "SET @@dataset_id = 'd'"; SELECT i
 note `EXECUTE IMMEDIATE` | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query Transactions | BEGIN TRANSACTION; INSERT u (id, v) VALUES (6, 60); COMMIT TRANSACTION
 query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; ROLLBACK TRANSACTION
+query Transactions | EXECUTE IMMEDIATE 'BEGIN TRANSACTION'; INSERT u (id, v) VALUES (6, 60); EXECUTE IMMEDIATE 'COMMIT TRANSACTION'
+query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; EXECUTE IMMEDIATE 'ROLLBACK TRANSACTION'
 query Transactions | BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
 note Transactions | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `CALL` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE) BEGIN SELECT x; END; CALL d.p(1)

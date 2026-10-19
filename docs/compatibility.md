@@ -357,9 +357,9 @@ destination tables or positional parameters.
 ## Scripts and transactions
 
 Multi-statement queries cannot be dry runs. Temporary tables belong to no dataset and are dropped
-when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement or an assignment to
-`@@dataset_id`, but no other scripting statements or transaction control; like BigQuery, it
-rejects `BEGIN...END` blocks. Scripts can set and read `@@dataset_id` and `@@dataset_project_id`
+when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement, transaction control or an
+assignment to `@@dataset_id` or `@@dataset_project_id`, but no other scripting statements; like
+BigQuery, it rejects `BEGIN...END` blocks and `DECLARE`. Scripts can set and read `@@dataset_id` and `@@dataset_project_id`
 to change name resolution for subsequent statements, including dynamic SQL. Setting
 `@@dataset_project_id` to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
 dataset. Both initially return `NULL` without a request default dataset. These settings belong
@@ -390,18 +390,17 @@ mode's default validation, `ANY TYPE` arguments, non-SQL procedures, and options
 The Routine API stores and returns the same definitions as DDL, including descriptions and
 argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
 project. Permanent tables must include their datasets: the caller's default dataset does not
-apply inside a procedure. The emulator does not apply an `@@dataset_id` that the procedure sets
-there either, which is not yet verified against BigQuery. Temporary tables, temporary UDFs and
-`@@dataset_id` belong to the whole script: a procedure sees the caller's, and the caller sees
-those the procedure creates or sets. Local variables and `IN` argument
-assignments stay within the procedure, caller variables are not visible in the body, and
+apply inside a procedure, nor does an `@@dataset_id` that the procedure sets. Temporary
+tables, temporary UDFs, `@@dataset_id` and `@@dataset_project_id` belong to the whole script: a
+procedure sees the caller's, and the caller sees those the procedure creates or sets. Local variables and `IN`
+argument assignments stay within the procedure, caller variables are not visible in the body, and
 `@@project_id` is the project that runs the script. `OUT` arguments start as `NULL`, and when the
 procedure returns, the variables passed as `OUT` and `INOUT` arguments take the arguments' last
 values; a procedure that fails leaves them unchanged. Dynamic SQL inside a procedure resolves
 names as the procedure does and sees only the query parameters of its `USING` clause. Query
-parameters, assignments to system variables other than `@@dataset_id`, and reads of system
-variables other than `@@dataset_id` and `@@project_id` inside procedures, including their dynamic
-SQL, are unsupported.
+parameters, assignments to system variables other than `@@dataset_id` and
+`@@dataset_project_id`, and reads of system variables other than `@@dataset_id` and
+`@@project_id` inside procedures, including their dynamic SQL, are unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 

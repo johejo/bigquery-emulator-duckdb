@@ -17,3 +17,7 @@ EXECUTE IMMEDIATE "IF TRUE THEN SELECT 1; END IF"
 # the reference says a query statement may contain one.
 EXECUTE IMMEDIATE "BEGIN SELECT 1; END"
 => error contains: SQL created by EXECUTE IMMEDIATE contains unsupported statement type: BeginEndBlock
+
+# Answers collected from BigQuery with bqanswers: BigQuery rejects DECLARE too.
+EXECUTE IMMEDIATE "DECLARE y INT64 DEFAULT 2"
+=> error contains: SQL created by EXECUTE IMMEDIATE contains unsupported statement type: VariableDeclaration
