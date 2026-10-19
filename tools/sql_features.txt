@@ -149,6 +149,8 @@ query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
 query `CREATE TABLE AS SELECT` | CREATE TABLE n AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (id INT64 NOT NULL) AS SELECT id FROM t
+query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (s STRUCT<x INT64 NOT NULL>) AS SELECT STRUCT(1 AS x) AS s
+note `CREATE TABLE AS SELECT` with `NOT NULL` | See [CREATE TABLE AS SELECT](compatibility.md#create-table-as-select).
 query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', friendly_name = 'z', labels = [('k', 'v')])
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
@@ -217,7 +219,6 @@ query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x NUMERIC(10, 2) OPTIONS (descrip
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN IF NOT EXISTS name STRING
 query `ALTER TABLE` | ALTER TABLE IF EXISTS missing ADD COLUMN x INT64
 query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64, ADD COLUMN y STRING
-query `ALTER TABLE` | ALTER TABLE t ADD COLUMN x INT64 DEFAULT 5
 query `ALTER TABLE` | ALTER TABLE t DROP COLUMN name, DROP COLUMN IF EXISTS missing
 query `ALTER TABLE` | ALTER TABLE t RENAME TO n
 query `ALTER TABLE` | ALTER TABLE t SET OPTIONS (description = 'x', friendly_name = 'T', labels = [('k', 'v')])

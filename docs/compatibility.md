@@ -137,12 +137,20 @@ write to a table with defaults.
 `ALTER TABLE` supports `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS` and `ALTER COLUMN`
 with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`, with `IF EXISTS` and `IF NOT EXISTS`. One
 statement may list several `ADD COLUMN`, `DROP COLUMN` or `ALTER COLUMN SET OPTIONS` actions. `ALTER
-COLUMN SET OPTIONS` sets the column's description and rounding mode only. `ADD COLUMN` with a default or with
-top-level `NOT NULL`, and other actions, are unsupported.
+COLUMN SET OPTIONS` sets the column's description and rounding mode only. Like BigQuery, `ADD
+COLUMN` rejects a default or top-level `NOT NULL`; add the column first, then use `SET DEFAULT`.
+Other actions are unsupported.
 
 `SET DEFAULT` and `DROP DEFAULT` change the default for future writes and the column's
 `defaultValueExpression`. `SET DEFAULT NULL` removes a nullable column's default, and a NULL default
 for a required column is rejected. `DROP DEFAULT` fails if the column has no default.
+
+### CREATE TABLE AS SELECT
+
+An explicit column schema's top-level `NOT NULL` creates a REQUIRED column and rejects NULL
+values, both in the query's rows and in later writes. Without an explicit column schema, the
+query does not inherit REQUIRED mode from its source. Nested `NOT NULL` in an explicit schema
+or one inherited by `LIKE AS SELECT` is unsupported.
 
 ### Copies and clones
 

@@ -27,8 +27,8 @@ CREATE TEMP TABLE t (a INT64); CREATE TEMP VIEW v AS SELECT a FROM t
 CREATE TEMP TABLE g (x INT64, y INT64 AS (x + 1)); SELECT 1
 => error contains: The emulator does not support generated columns
 
-CREATE TEMP TABLE c (x INT64 NOT NULL) AS SELECT 1 AS x; SELECT 1
-=> error contains: The emulator does not support NOT NULL in CREATE TABLE AS SELECT
+CREATE TEMP TABLE c (s STRUCT<x INT64 NOT NULL>) AS SELECT STRUCT(1 AS x) AS s; SELECT 1
+=> error contains: The emulator does not support CREATE TABLE AS SELECT with nested NOT NULL
 
 CREATE OR REPLACE SCHEMA errors_statements
 => error contains: The emulator does not support CREATE OR REPLACE SCHEMA
