@@ -184,15 +184,6 @@ struct ExtractRequest {
 
 // Emulator state: BigQuery projects map to DuckDB catalogs (attached databases), datasets to
 // schemas and tables to tables. Jobs are kept in memory.
-// The connections that EXTERNAL_QUERY reaches, by key, and those with table macros registered
-// in the DuckDB database of `backend`.
-struct ExternalConnections {
-  Backend& backend;
-  std::unordered_map<std::string, std::string> conninfo = {};
-  std::mutex mutex = {};
-  std::unordered_set<std::string> attached = {};
-};
-
 class Emulator {
  public:
   // Restores persisted registrations and replaces those explicitly supplied at startup.

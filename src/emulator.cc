@@ -16,10 +16,10 @@
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/backend_functions/javascript_limits.h"
-#include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/project.h"
+#include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

@@ -18,6 +18,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/location.h"
 
@@ -527,6 +528,10 @@ void ValidatePartitioning(const TableMetadata& metadata, const std::vector<Field
     ValidateRangePartitioning(*metadata.range_partitioning, schema);
   }
   ValidateClustering(metadata.clustering, schema);
+}
+
+std::string DatasetMetadataTable(const std::string& project) {
+  return QuoteIdentifier(project) + ".main.emulator_datasets";
 }
 
 }  // namespace bigquery_emulator_duckdb

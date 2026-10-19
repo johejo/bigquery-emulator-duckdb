@@ -163,4 +163,10 @@ void RejectEncryptionConfiguration(const nlohmann::json& body, const char* key,
 // that is empty or has more than 10,000 partitions.
 void ValidatePartitioning(const TableMetadata& metadata, const std::vector<FieldSchema>& schema);
 
+// DuckDB cannot comment on a schema, so the emulator records each dataset's DatasetMetadata as
+// JSON in this table of the project's `main` schema, which is not a dataset. A dataset the table
+// has no row for has no metadata. Writes to it share the transaction that creates or drops the
+// dataset's schema.
+std::string DatasetMetadataTable(const std::string& project);
+
 }  // namespace bigquery_emulator_duckdb

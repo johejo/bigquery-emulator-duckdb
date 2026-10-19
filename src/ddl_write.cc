@@ -95,10 +95,6 @@ DdlWrite CreateDatasetWrite(const DatasetDefinition& definition, const std::stri
   return write;
 }
 
-std::string DatasetMetadataTable(const std::string& project) {
-  return QuoteIdentifier(project) + ".main.emulator_datasets";
-}
-
 std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,
                                                    const DatasetMetadata& metadata) {
   ValidateLabels(metadata.labels);
