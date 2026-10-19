@@ -532,7 +532,8 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
     const LogicalType list(duckdb_create_list_type(varchar.get()));
     Register(connection, "bq_st_makeline_array", {list.get()}, varchar.get(),
              EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
-    Register(connection, "bq_st_makepolygon_holes", {varchar.get(), list.get()}, varchar.get(),
+    Register(connection, "bq_st_makepolygon_holes",
+             std::vector<duckdb_logical_type>{varchar.get(), list.get()}, varchar.get(),
              EachRow<[](const Arguments& args) {
                std::vector<std::string> rings = args.Strings(1);
                rings.insert(rings.begin(), args.String(0));
