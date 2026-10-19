@@ -14,6 +14,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "duckdb.h"
 #include "quickjs.h"
 #include "src/backend_error.h"
@@ -106,6 +107,9 @@ class Engine {
     return absl::OutOfRangeError(message);
   }
 
+  // Row `row` of `vector` as a JavaScript value. The caller owns the result.
+  absl::StatusOr<JSValue> Argument(duckdb_vector vector, idx_t row);
+
   // The text of `value`, as String(value) spells it, or nullopt when that throws.
   std::optional<std::string> String(JSValue value) {
     size_t length = 0;
@@ -171,25 +175,74 @@ void InitEngine(duckdb_init_info info) {
                                         [](void* engine) { delete static_cast<Engine*>(engine); });
 }
 
-// Argument `column` as a JavaScript value: NULL as null, and BOOL, FLOAT64 and STRING as a
-// boolean, number and string.
-absl::StatusOr<JSValue> Argument(JSContext* context, const Arguments& arguments, idx_t column) {
-  if (arguments.IsNull(column)) {
+// Row `row` of `vector` as a JavaScript value: NULL as null; BOOL, FLOAT64 and STRING as a
+// boolean, number and string; BYTES as its base64 string; ARRAY as an array; and STRUCT as an
+// object with a property per field, which the translator names as the UDF's signature does.
+absl::StatusOr<JSValue> Engine::Argument(duckdb_vector vector, idx_t row) {
+  uint64_t* validity = duckdb_vector_get_validity(vector);
+  if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
     return JS_NULL;
   }
-  LogicalType const type(duckdb_vector_get_column_type(arguments.Vector(column)));
+  LogicalType const type(duckdb_vector_get_column_type(vector));
+  JSValue value = JS_UNDEFINED;
   switch (duckdb_get_type_id(type.get())) {
     case DUCKDB_TYPE_BOOLEAN:
-      return JS_NewBool(context, arguments.Bool(column));
+      return JS_NewBool(context_, VectorElement<bool>(vector, row));
     case DUCKDB_TYPE_DOUBLE:
-      return JS_NewFloat64(context, arguments.Double(column));
+      return JS_NewFloat64(context_, VectorElement<double>(vector, row));
     case DUCKDB_TYPE_VARCHAR: {
-      const std::string text = arguments.String(column);
-      return JS_NewStringLen(context, text.data(), text.size());
+      const std::string text = VectorString(vector, row);
+      value = JS_NewStringLen(context_, text.data(), text.size());
+      break;
+    }
+    case DUCKDB_TYPE_BLOB: {
+      const std::string text = absl::Base64Escape(VectorString(vector, row));
+      value = JS_NewStringLen(context_, text.data(), text.size());
+      break;
+    }
+    case DUCKDB_TYPE_LIST: {
+      const auto entry = VectorElement<duckdb_list_entry>(vector, row);
+      duckdb_vector child = duckdb_list_vector_get_child(vector);
+      value = JS_NewArray(context_);
+      for (idx_t i = 0; i < entry.length && !JS_IsException(value); ++i) {
+        auto element = Argument(child, entry.offset + i);
+        if (!element.ok()) {
+          JS_FreeValue(context_, value);
+          return element.status();
+        }
+        if (JS_SetPropertyUint32(context_, value, static_cast<uint32_t>(i), *element) < 0) {
+          JS_FreeValue(context_, value);
+          value = JS_EXCEPTION;
+        }
+      }
+      break;
+    }
+    case DUCKDB_TYPE_STRUCT: {
+      value = JS_NewObject(context_);
+      const idx_t fields = duckdb_struct_type_child_count(type.get());
+      for (idx_t i = 0; i < fields && !JS_IsException(value); ++i) {
+        auto field = Argument(duckdb_struct_vector_get_child(vector, i), row);
+        if (!field.ok()) {
+          JS_FreeValue(context_, value);
+          return field.status();
+        }
+        DuckString const name(duckdb_struct_type_child_name(type.get(), i));
+        // Like BigQuery, set the property rather than define it, so that a field named __proto__
+        // sets the prototype.
+        if (JS_SetPropertyStr(context_, value, name.get(), *field) < 0) {
+          JS_FreeValue(context_, value);
+          value = JS_EXCEPTION;
+        }
+      }
+      break;
     }
     default:
       return absl::UnimplementedError("The emulator does not support this JavaScript UDF argument");
   }
+  if (JS_IsException(value)) {
+    return Exception();
+  }
+  return value;
 }
 
 template <Result R>
@@ -287,7 +340,7 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
         }
         std::vector<JSValue> values;
         for (idx_t column = 1; column < columns; ++column) {
-          auto value = Argument(engine.context(), arguments, column);
+          auto value = engine.Argument(arguments.Vector(column), arguments.Row());
           if (!value.ok()) {
             for (JSValue const converted : values) {
               JS_FreeValue(engine.context(), converted);

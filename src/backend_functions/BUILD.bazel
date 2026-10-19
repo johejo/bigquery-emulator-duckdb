@@ -393,6 +393,7 @@ cc_library(
         "//:duckdb_handle",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@quickjs-ng//:quickjs",
         "@quickjs-ng//:quickjs_hdrs",
     ],

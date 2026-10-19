@@ -24,6 +24,33 @@ AS "return x+1;";
 SELECT SUM(plusOne(x)) FROM UNNEST([1, 2, 3, 4, 5]) AS x
 => "20.0"
 
+# Argument encodings from BigQuery's documentation:
+# https://cloud.google.com/bigquery/docs/user-defined-functions#supported-javascript-udf-data-types
+
+CREATE TEMP FUNCTION f(b BYTES) RETURNS STRING LANGUAGE js AS "return typeof b + ':' + b;";
+SELECT f(b"abc")
+=> "string:YWJj"
+
+CREATE TEMP FUNCTION f(b BYTES) RETURNS STRING LANGUAGE js AS "return typeof b + ':' + b;";
+SELECT f(b"")
+=> "string:"
+
+CREATE TEMP FUNCTION f(a ARRAY<FLOAT64>) RETURNS FLOAT64 LANGUAGE js AS "return Array.isArray(a) ? a.length * 10 + a[1] : -1;";
+SELECT f([1.0, 2.0, 3.0])
+=> "32.0"
+
+CREATE TEMP FUNCTION f(a ARRAY<STRING>) RETURNS FLOAT64 LANGUAGE js AS "return Array.isArray(a) ? a.length : -1;";
+SELECT f(ARRAY<STRING>[])
+=> "0.0"
+
+CREATE TEMP FUNCTION f(s STRUCT<a FLOAT64, b STRING, c BOOL>) RETURNS STRING LANGUAGE js AS "return s.b + s.a + s.c;";
+SELECT f(STRUCT(1 AS a, 'x' AS b, true AS c))
+=> "x1true"
+
+CREATE TEMP FUNCTION f(a ARRAY<STRUCT<x FLOAT64, y ARRAY<BYTES>>>) RETURNS STRING LANGUAGE js AS "return a.map(s => s.x + s.y.join('/')).join(',');";
+SELECT f([STRUCT(1.0 AS x, [b"abc"] AS y), STRUCT(2.0 AS x, [b"abc", b""] AS y)])
+=> "1YWJj,2YWJj/"
+
 # BigQuery's answers to cases that its documentation does not settle.
 CREATE TEMP FUNCTION f(x STRING) RETURNS STRING LANGUAGE js AS "return x === null ? 'null' : typeof x;";
 SELECT f(NULL)
@@ -64,3 +91,39 @@ SELECT f()
 CREATE TEMP FUNCTION f() RETURNS FLOAT64 LANGUAGE js AS "return Promise.resolve(1);";
 SELECT f()
 => "1.0"
+
+# BYTES use the standard base64 alphabet with padding.
+
+CREATE TEMP FUNCTION f(b BYTES) RETURNS STRING LANGUAGE js AS "return b;";
+SELECT f(b"\xfb\xff")
+=> "+/8="
+
+# A NULL BYTES, ARRAY or STRUCT argument is null.
+
+CREATE TEMP FUNCTION f(b BYTES) RETURNS STRING LANGUAGE js AS "return b === null ? 'null' : typeof b;";
+SELECT f(NULL)
+=> "null"
+
+CREATE TEMP FUNCTION f(a ARRAY<FLOAT64>) RETURNS STRING LANGUAGE js AS "return a === null ? 'null' : JSON.stringify(a);";
+SELECT f(NULL)
+=> "null"
+
+CREATE TEMP FUNCTION f(s STRUCT<a FLOAT64>) RETURNS STRING LANGUAGE js AS "return s === null ? 'null' : JSON.stringify(s);";
+SELECT f(NULL)
+=> "null"
+
+# NULL array elements and STRUCT fields are null.
+
+CREATE TEMP FUNCTION f(a ARRAY<FLOAT64>) RETURNS STRING LANGUAGE js AS "return JSON.stringify(a);";
+SELECT f([1.0, NULL])
+=> "[1,null]"
+
+CREATE TEMP FUNCTION f(s STRUCT<a FLOAT64, b STRING>) RETURNS STRING LANGUAGE js AS "return JSON.stringify(s);";
+SELECT f(STRUCT(1 AS a, CAST(NULL AS STRING) AS b))
+=> "{\"a\":1,\"b\":null}"
+
+# A STRUCT field named __proto__ sets the prototype, which ignores a number, rather than a property.
+
+CREATE TEMP FUNCTION f(s STRUCT<__proto__ FLOAT64>) RETURNS STRING LANGUAGE js AS "return Object.keys(s).join(',');";
+SELECT f(STRUCT(1 AS __proto__))
+=> ""

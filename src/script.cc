@@ -97,6 +97,29 @@ class RowIterator : public googlesql::EvaluatorTableIterator {
   size_t next_ = 0;
 };
 
+// Whether the emulator passes values of `type` to a JavaScript UDF: BOOL, FLOAT64, STRING and
+// BYTES, and arrays and STRUCTs of them whose fields the backend can name as the UDF does, which
+// excludes positional names.
+bool IsJavaScriptArgumentType(const googlesql::Type* type) {
+  if (type->IsBool() || type->IsDouble() || type->IsString() || type->IsBytes()) {
+    return true;
+  }
+  if (type->IsArray()) {
+    return IsJavaScriptArgumentType(type->AsArray()->element_type());
+  }
+  if (!type->IsStruct() || type->AsStruct()->num_fields() == 0) {
+    return false;
+  }
+  const std::vector<std::string> names = DuckDbStructFieldNames(type->AsStruct());
+  for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
+    const googlesql::StructField& field = type->AsStruct()->field(i);
+    if (names.at(static_cast<size_t>(i)) != field.name || !IsJavaScriptArgumentType(field.type)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // The types a JavaScript UDF takes and returns in the emulator so far, and its argument names,
 // which must be JavaScript identifiers to name the parameters of the function the body becomes.
 // BigQuery rejects INT64 arguments, since JavaScript numbers cannot hold every INT64, but returns
@@ -119,7 +142,7 @@ absl::Status CheckJavaScriptSignature(const googlesql::FunctionSignature& signat
       return absl::InvalidArgumentError(
           "INT64 is not supported as an argument type of JavaScript UDFs; use FLOAT64 or STRING");
     }
-    if (type == nullptr || !(type->IsBool() || type->IsDouble() || type->IsString())) {
+    if (type == nullptr || !IsJavaScriptArgumentType(type)) {
       return absl::UnimplementedError(
           absl::StrCat(kUnsupported, "JavaScript UDF arguments of type ",
                        type == nullptr ? "ANY TYPE" : type->DebugString()));
