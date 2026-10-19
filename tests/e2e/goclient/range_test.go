@@ -10,6 +10,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"github.com/apache/arrow-go/v18/arrow"
+	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/memory"
 	"google.golang.org/api/iterator"
 )
 
@@ -348,5 +351,49 @@ func TestRangeLoadCSV(t *testing.T) {
 	}
 	if err := rows.Next(&[]bigquery.Value{}); err != iterator.Done {
 		t.Fatalf("next = %v, want iterator.Done", err)
+	}
+}
+
+// BigQuery fails to load a Parquet column into a RANGE, with the message below for a string column.
+// It loads a group of `start` and `end` as NULL, which the emulator rejects instead.
+func TestRangeLoadParquet(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_range_load_parquet")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	allocator := memory.NewGoAllocator()
+	text := array.NewStringBuilder(allocator)
+	text.Append("[2024-01-01, 2024-02-01)")
+	boundType := arrow.FixedWidthTypes.Date32
+	groupType := arrow.StructOf(arrow.Field{Name: "start", Type: boundType, Nullable: true},
+		arrow.Field{Name: "end", Type: boundType, Nullable: true})
+	group := array.NewStructBuilder(allocator, groupType)
+	group.Append(true)
+	group.FieldBuilder(0).(*array.Date32Builder).Append(arrow.Date32FromTime(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)))
+	group.FieldBuilder(1).(*array.Date32Builder).Append(arrow.Date32FromTime(time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)))
+	tableSchema := bigquery.Schema{{Name: "r", Type: bigquery.RangeFieldType,
+		RangeElementType: &bigquery.RangeElementType{Type: bigquery.DateFieldType}}}
+	for _, c := range []struct {
+		name    string
+		column  arrow.Field
+		values  arrow.Array
+		message string
+	}{
+		{"string", arrow.Field{Name: "r", Type: arrow.BinaryTypes.String, Nullable: true}, text.NewArray(),
+			"Error while reading data, error message: Attempted to read column 'r' as a BigQuery RANGE, which is not currently supported."},
+		{"group", arrow.Field{Name: "r", Type: groupType, Nullable: true}, group.NewArray(),
+			"The emulator does not support loading RANGE columns from PARQUET"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			source := writeParquet(t, []arrow.Field{c.column}, []arrow.Array{c.values})
+			err := loadParquet(ctx, dataset.Table(c.name), source, tableSchema)
+			if err == nil || !strings.Contains(err.Error(), c.message) {
+				t.Fatalf("load: %v, want an error containing %q", err, c.message)
+			}
+		})
 	}
 }

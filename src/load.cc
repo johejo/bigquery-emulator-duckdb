@@ -521,6 +521,20 @@ std::vector<std::string> StageJsonNumerics(const std::vector<std::string>& paths
 std::string LoadQuery(const std::string& format, const std::vector<std::string>& paths,
                       const json& config, const std::vector<FieldSchema>& schema,
                       const ParquetColumn& parquet) {
+  // BigQuery fails on a Parquet column that is not a group, but loads a group of `start` and
+  // `end` as NULL, which the emulator rejects as unsupported below.
+  if (format == "PARQUET") {
+    for (const FieldSchema& field : schema) {
+      const ParquetColumn* column = parquet.Child(field.name);
+      if (field.type == FieldType::kRange && column != nullptr &&
+          column->kind == ParquetColumn::Kind::kLeaf) {
+        throw ApiError::Invalid(
+            std::format("Error while reading data, error message: Attempted to read column '{}' "
+                        "as a BigQuery RANGE, which is not currently supported.",
+                        column->name));
+      }
+    }
+  }
   for (const FieldType type : {FieldType::kInterval, FieldType::kRange}) {
     if (format != "CSV" && HasType(schema, type)) {
       throw ApiError::Unsupported("loading " + std::string(FieldTypeName(type)) + " columns from " +
