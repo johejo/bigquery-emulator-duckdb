@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 29 | 4 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 15 | 10 | 6 |
+| [DDL](#ddl) | 16 | 10 | 5 |
 | [Multi-statement queries](#multi-statement-queries) | 9 | 4 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 4 | 0 | 0 |
 
@@ -87,7 +87,7 @@ rejected.
 | `BIGNUMERIC` columns | Supported |  |
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
-| `CREATE TABLE AS SELECT` with `NOT NULL` | Unsupported |  |
+| `CREATE TABLE AS SELECT` with `NOT NULL` | Partial | See [CREATE TABLE AS SELECT](compatibility.md#create-table-as-select). Unsupported: CREATE TABLE AS SELECT with nested NOT NULL. |
 | Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
 | Column rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields. |
 | Default rounding modes | Supported | See [Rounding modes](compatibility.md#rounding-modes). |
@@ -101,7 +101,7 @@ rejected.
 | `CREATE SNAPSHOT TABLE` | Unsupported |  |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
-| `ALTER TABLE` | Partial | See [ALTER TABLE](compatibility.md#alter-table). Unsupported: ADD COLUMN with generated columns, defaults or NOT NULL. |
+| `ALTER TABLE` | Supported | See [ALTER TABLE](compatibility.md#alter-table). |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |
 | `DROP SCHEMA` | Supported |  |
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |

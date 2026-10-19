@@ -29,7 +29,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 		"ALTER TABLE users ADD COLUMN IF NOT EXISTS name STRING",
 		"ALTER TABLE IF EXISTS missing ADD COLUMN x INT64",
 		"ALTER TABLE users ADD COLUMN tags ARRAY<STRING>",
-		"ALTER TABLE users ADD COLUMN details STRUCT<score INT64>",
+		"ALTER TABLE users ADD COLUMN details STRUCT<score INT64 NOT NULL>",
 		"ALTER TABLE users ADD COLUMN IF NOT EXISTS name STRING, ADD COLUMN score FLOAT64",
 	} {
 		if err := run(sql); err != nil {
@@ -46,7 +46,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 		{Name: "name", Type: bigquery.StringFieldType},
 		{Name: "tags", Type: bigquery.StringFieldType, Repeated: true},
 		{Name: "details", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{
-			{Name: "score", Type: bigquery.IntegerFieldType},
+			{Name: "score", Type: bigquery.IntegerFieldType, Required: true},
 		}},
 		{Name: "score", Type: bigquery.FloatFieldType},
 	}

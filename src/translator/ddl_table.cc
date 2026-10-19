@@ -603,10 +603,15 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
     if (action->Is<googlesql::ResolvedAddColumnAction>()) {
       const auto& add = *action->GetAs<googlesql::ResolvedAddColumnAction>();
       const auto& column = *add.column_definition();
-      if (column.is_hidden() || column.generated_column_info() != nullptr ||
-          column.default_value() != nullptr ||
-          (column.annotations() != nullptr && column.annotations()->not_null())) {
-        return Unsupported(scope, "ADD COLUMN with generated columns, defaults or NOT NULL");
+      if (column.is_hidden() || column.generated_column_info() != nullptr) {
+        return Unsupported(scope, "ADD COLUMN with generated columns");
+      }
+      if (column.default_value() != nullptr) {
+        throw std::invalid_argument(
+            "Cannot add a column with a default value to an existing table");
+      }
+      if (column.annotations() != nullptr && column.annotations()->not_null()) {
+        throw std::invalid_argument("Cannot add a REQUIRED column to an existing table schema");
       }
       auto field = ColumnField(column, scope);
       if (!ColumnDefinitionType(column, scope) || !field) {
@@ -750,6 +755,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
 }
 
 // The query's columns are cast to the declared types, which DuckDB would otherwise infer.
+// CreateTableWrite applies top-level NOT NULL constraints in the same transaction as the query.
 std::optional<std::string> CreateTableAsSelect(
     const googlesql::ResolvedCreateTableAsSelectStmt& create, const Scope& scope) {
   if (create.output_column_list_size() != create.column_definition_list_size()) {
@@ -803,10 +809,6 @@ std::optional<std::string> CreateTableAsSelect(
   std::vector<std::string> projections;
   for (int i = 0; i < create.output_column_list_size(); ++i) {
     const auto& definition = *create.column_definition_list(i);
-    // DuckDB cannot declare constraints on a table created from a query.
-    if (!like && definition.annotations() != nullptr && definition.annotations()->not_null()) {
-      return Unsupported(scope, "NOT NULL in CREATE TABLE AS SELECT");
-    }
     const auto column = relation->columns.find(create.output_column_list(i)->column().column_id());
     if (column == relation->columns.end()) {
       return std::nullopt;
@@ -825,6 +827,9 @@ std::optional<std::string> CreateTableAsSelect(
         return std::nullopt;
       }
       CheckFieldNames(*field, field->name);
+      if (HasNestedNotNull(*field)) {
+        return Unsupported(scope, "CREATE TABLE AS SELECT with nested NOT NULL");
+      }
       table.schema.push_back(*std::move(field));
     }
     // The query's values are rounded with the rounding mode a column takes from the table's
