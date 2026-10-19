@@ -1,0 +1,48 @@
+# STRUCT comparisons, casts to JSON and correlated aggregate subqueries
+
+# Whether IS DISTINCT FROM rejects a STRUCT, as the operators reference says, and with which
+# message; named, anonymous and duplicate fields, and IS NOT DISTINCT FROM.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/operators#is_distinct
+
+SELECT STRUCT(1 AS a, 2 AS b) IS DISTINCT FROM STRUCT(1 AS a, 2 AS b)
+?>
+
+SELECT STRUCT(1, 2) IS DISTINCT FROM STRUCT(1, 2)
+?>
+
+SELECT STRUCT(1 AS a, NULL AS a) IS NOT DISTINCT FROM STRUCT(1 AS a, NULL AS a)
+?>
+
+# Whether CAST to JSON rejects every type but JSON, and with which message.
+
+SELECT CAST(STRUCT(1 AS a, 2 AS b) AS JSON)
+?>
+
+SELECT CAST(STRUCT(1, 2) AS JSON)
+?>
+
+SELECT CAST(1 AS JSON)
+?>
+
+SELECT CAST('{"a": 1}' AS JSON)
+?>
+
+SELECT CAST(JSON '{"a": 1}' AS JSON)
+?>
+
+# Whether an aggregate that reads only enclosing columns aggregates them over the subquery's rows.
+
+SELECT (SELECT SUM(a) FROM UNNEST([1, 2, 3])) FROM UNNEST([10]) AS a
+?>
+
+SELECT (SELECT AS STRUCT x > 15 AS big, COUNT(a) AS n FROM UNNEST([10, 20, 30]) AS x
+  GROUP BY big ORDER BY big LIMIT 1) FROM UNNEST([1]) AS a
+?>
+
+# The same with anonymous and duplicate fields in the STRUCT the subquery returns.
+
+SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM UNNEST([2]) AS a
+?>
+
+SELECT TO_JSON_STRING((SELECT AS STRUCT SUM(a), COUNT(a) AS n, MAX(k) AS n FROM UNNEST([1, 2, 3]) AS k)) FROM UNNEST([1]) AS a
+?>
