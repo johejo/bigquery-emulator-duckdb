@@ -102,8 +102,10 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 // the regions it divides the sphere into, which a hole removes from the shell's. Rings must have
 // three or more distinct vertices and not cross, and holes must lie inside the shell and outside
 // each other; `failed` prefixes the error. Once each ring is valid, vertices within a micrometer
-// of each other snap to the one S2Builder keeps. BigQuery also snaps edges, and rings where they
-// cross or touch at an edge, which is unsupported.
+// of each other snap to the one S2Builder keeps: a hole that collapses is dropped, and a shell
+// without holes that collapses is the linestring or the point it leaves. BigQuery also snaps edges,
+// and rings where they cross or touch at an edge, which is unsupported, as is a shell with holes
+// that collapses.
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
                                        std::string_view failed);
 

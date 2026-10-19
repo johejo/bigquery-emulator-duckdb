@@ -402,8 +402,8 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
 
 // The rings with each vertex moved to the one S2Builder snaps it to with an identity snap function
 // of a micrometer, or nullopt where none moves: BigQuery keeps the vertex S2Builder does. Snapping
-// that collapses a ring, which BigQuery makes a line, or brings a vertex within a micrometer of an
-// edge, which BigQuery snaps too, is unsupported.
+// that collapses a shell with holes, or brings a vertex within a micrometer of an edge, which
+// BigQuery snaps too, is unsupported.
 absl::StatusOr<std::optional<std::vector<std::vector<S2Point>>>> SnapVertices(
     const std::vector<std::vector<S2Point>>& rings) {
   const S1Angle radius = S2Earth::MetersToAngle(1e-6);
@@ -438,17 +438,28 @@ absl::StatusOr<std::optional<std::vector<std::vector<S2Point>>>> SnapVertices(
   if (!moved) {
     return std::nullopt;
   }
-  MutableS2ShapeIndex edges;
   for (std::vector<S2Point>& ring : snapped) {
     const auto repeated = std::ranges::unique(ring);
     ring.erase(repeated.begin(), repeated.end());
     while (ring.size() > 1 && ring.back() == ring.front()) {
       ring.pop_back();
     }
-    if (ring.size() < 3) {
-      return absl::UnimplementedError(
-          "The emulator does not support a polygon ring that BigQuery snaps to a line");
+  }
+  // A hole that collapses is dropped, and a shell without holes that collapses is the line or the
+  // point it leaves.
+  std::erase_if(snapped, [&](const std::vector<S2Point>& ring) {
+    return &ring != snapped.data() && ring.size() < 3;
+  });
+  if (snapped.front().size() < 3) {
+    if (snapped.size() == 1) {
+      return snapped;
     }
+    return absl::UnimplementedError(
+        "The emulator does not support a polygon shell that BigQuery snaps to a line or a point "
+        "while it has holes");
+  }
+  MutableS2ShapeIndex edges;
+  for (const std::vector<S2Point>& ring : snapped) {
     edges.Add(std::make_unique<S2LaxClosedPolylineShape>(ring));
   }
   S2ClosestEdgeQuery edge_query(&edges);
@@ -474,10 +485,17 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
                                        std::string_view failed) {
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<std::vector<S2Point>> rings,
                              DistinctRings(input, failed));
-  // BigQuery checks each ring before snapping, and how the rings lie after.
-  GOOGLESQL_RETURN_IF_ERROR(Loops(rings, failed).status());
+  // BigQuery checks and normalizes each ring before snapping, and checks how the rings lie after.
+  GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<std::unique_ptr<S2Loop>> loops,
+                             Loops(rings, failed));
+  std::vector<std::vector<S2Point>> normalized;
+  for (const std::unique_ptr<S2Loop>& loop : loops) {
+    loop->Normalize();
+    const absl::Span<const S2Point> vertices = loop->vertices_span();
+    normalized.emplace_back(vertices.begin(), vertices.end());
+  }
   GOOGLESQL_ASSIGN_OR_RETURN(const std::optional<std::vector<std::vector<S2Point>>> snapped,
-                             SnapVertices(rings));
+                             SnapVertices(normalized));
   absl::StatusOr<Geography> polygon = Assemble(rings, failed);
   if (!snapped) {
     return polygon;
@@ -486,6 +504,12 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
   if (!polygon.ok()) {
     return absl::UnimplementedError(
         "The emulator does not support a polygon whose rings BigQuery snaps where they meet");
+  }
+  if (snapped->front().size() == 1) {
+    return PointGeography(snapped->front().front());
+  }
+  if (snapped->front().size() == 2) {
+    return BuildLine(snapped->front());
   }
   return Assemble(*snapped, failed);
 }

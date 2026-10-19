@@ -15,14 +15,11 @@ SELECT f()
 SELECT ST_GEOGFROMTEXT('LINESTRING(1 0, 10 0, 5 0, 5 4)')
 !> "MULTILINESTRING((1 0, 5 0, 10 0), (5 0, 5 4))"
 
-# BigQuery snaps a polygon's edges as well as its vertices, which may leave a line or a collection,
-# and snaps rings that cross or touch at an edge to where they meet, which may be a new vertex; the
+# BigQuery snaps a polygon's edges as well as its vertices, which may leave a collection, and snaps
+# rings that cross or touch at an edge to where they meet, which may be a new vertex; the
 # emulator rejects these.
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1.000000000006 0, 1.000000000012 0, 0 1, 0 0))')
 !> "GEOMETRYCOLLECTION(LINESTRING(1 0, 1.000000000012 0), POLYGON((0 0, 1 0, 0 1, 0 0)))"
-
-SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1.000000000001 0, 0 0))')
-!> "LINESTRING(0 0, 1.000000000001 0)"
 
 SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0), (0.000000000001 0, 0.5 0.1, 0.1 0.5, 0.000000000001 0))')
 !> "POLYGON((1e-12 0, 1 0, 0 1, 1e-12 0), (0.1 0.5, 0.5 0.1, 1e-12 0, 0.1 0.5))"

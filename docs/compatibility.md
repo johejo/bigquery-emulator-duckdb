@@ -250,12 +250,14 @@ sphere into, so a clockwise ring runs reversed, and a hole is written clockwise.
 `ST_GEOGFROMTEXT` and `ST_MAKEPOLYGON` drop a vertex that repeats the one before it, add the
 midpoint of an edge longer than 135 degrees, and reject rings that cross, including at a vertex on
 another edge, holes outside the shell, rings that repeat a vertex later, rings of fewer than three
-distinct vertices and `POLYGON` rings that do not end where they start. Once each ring is valid,
-vertices within a micrometer of each other, in one ring or several, snap to the one S2Builder
-keeps. BigQuery also snaps edges, which may leave a line or a collection, and rings that cross or
-touch at an edge to where they meet; such polygons are unsupported, as are `ST_MAKEPOLYGON` of an
-empty geography, which makes the full polygon, and `ST_GEOGFROMTEXT`'s `oriented`, `planar` and
-`make_valid` arguments.
+distinct vertices and `POLYGON` rings that do not end where they start. Once each ring is valid
+and normalized, vertices within a micrometer of each other, in one ring or several, snap to the one
+S2Builder keeps: a hole that collapses is dropped, and a polygon without holes that collapses is
+the `LINESTRING` or `POINT` it leaves. BigQuery also snaps edges, which may leave a collection, and
+rings that cross or touch at an edge to where they meet; such polygons, and a shell with holes that
+collapses, are unsupported, as are
+`ST_MAKEPOLYGON` of an empty geography, which makes the full polygon, and `ST_GEOGFROMTEXT`'s
+`oriented`, `planar` and `make_valid` arguments.
 `ST_AREA` and `ST_PERIMETER` measure polygons over the sphere.
 
 ### RANGE_SESSIONIZE
