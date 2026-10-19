@@ -263,3 +263,11 @@ SELECT AS STRUCT 1, STRUCT()
 # A STRUCT whose field names are those the emulator gives a RANGE's bounds stays a STRUCT.
 SELECT TO_JSON_STRING(STRUCT(DATE '2020-01-01' AS `$start`, DATE '2020-01-02' AS `$end`))
 => "{\"$start\":\"2020-01-01\",\"$end\":\"2020-01-02\"}"
+
+# Correlated aggregate subqueries return STRUCTs with anonymous and duplicate fields; aggregates of
+# enclosing columns follow the case in queries.txt.
+SELECT (SELECT AS STRUCT k, SUM(a) FROM (SELECT 1 AS k) GROUP BY k) FROM t WHERE a = 2
+=> {"f":[{"v":"1"},{"v":"2"}]}
+
+SELECT TO_JSON_STRING((SELECT AS STRUCT SUM(a), COUNT(a) AS n, MAX(k) AS n FROM UNNEST([1, 2, 3]) AS k)) FROM t WHERE a = 1
+=> "{\"\":3,\"n\":3,\"n\":3}"

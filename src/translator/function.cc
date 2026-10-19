@@ -284,6 +284,14 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     throw std::invalid_argument("Unsupported type in function " +
                                 (function == "NULLIF" ? "NULL_IF" : function));
   }
+  // BigQuery compares only the fields of a STRUCT with IS DISTINCT FROM, although GoogleSQL
+  // compares the STRUCT.
+  if ((function == "$IS_DISTINCT_FROM" || function == "$IS_NOT_DISTINCT_FROM") &&
+      call.argument_list(0)->type()->IsStruct()) {
+    throw std::invalid_argument(
+        "IS DISTINCT FROM is not supported for type " +
+        call.argument_list(0)->type()->TypeName(googlesql::PRODUCT_EXTERNAL));
+  }
   // BigQuery multiplies INTERVAL values only by INT64 values, although GoogleSQL takes FLOAT64.
   if (function == "$MULTIPLY" && interval &&
       std::ranges::any_of(call.argument_list(),
@@ -335,12 +343,6 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                                           })) &&
       !HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
     return Unsupported(scope, "function " + name + " with STRUCT<>");
-  }
-  // Call gives equality of STRUCTs to StructComparison, and BigQuery does not compare ARRAYs.
-  // DuckDB would compare the STRUCTs of IS DISTINCT FROM by their internal names, with NULL fields
-  // taken as values.
-  if (function == "$IS_DISTINCT_FROM" && HasInternalStructNames(call.argument_list(0)->type())) {
-    return Unsupported(scope, "comparison with anonymous or duplicate STRUCT fields");
   }
   const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;

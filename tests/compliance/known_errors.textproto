@@ -322,6 +322,15 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
+  reason: "BigQuery rejects IS DISTINCT FROM over STRUCTs, which GoogleSQL accepts"
+  label: "comparison_functions_test:is_distinct_empty_structs"
+  label: "comparison_functions_test:is_distinct_nan_struct"
+  label: "comparison_functions_test:is_distinct_null_second_arg_struct"
+  label: "comparison_functions_test:is_distinct_structs"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
   reason: "BigQuery rejects STRUCT columns in DISTINCT set operations, which GoogleSQL accepts"
   label: "except_intersect_queries_test:except_distinct_datatype_struct"
   label: "except_intersect_queries_test:except_distinct_struct_subquery"
@@ -1604,12 +1613,6 @@ known_errors {
   label: "analytic_avg_test:analytic_avg_range_current_and_following_double_desc"
   label: "analytic_avg_test:analytic_avg_trailing_rows_moving_avg_2"
   label: "analytic_avg_test:analytic_avg_trailing_rows_moving_avg_3"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "An aggregate in a scalar subquery in WHERE is bound to the outer query"
-  label: "array_aggregation_test:array_agg_with_correlated_column_and_limit"
 }
 
 known_errors {

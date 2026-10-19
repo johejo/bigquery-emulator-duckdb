@@ -189,9 +189,9 @@ reject it. As in BigQuery, a query result cannot contain one at any depth, and `
 and `SELECT AS VALUE` results cannot have anonymous fields. Casts between STRUCT types match fields by position,
 and JSON functions preserve the original field names, including in nested arrays and structs.
 Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
-NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts
-of these values to JSON and correlated aggregate subqueries returning them; use JSON functions for
-JSON conversion. As in BigQuery, ARRAYs, and STRUCTs that contain them, can be grouped but
+NULL semantics. As in BigQuery, `IS DISTINCT FROM` takes the fields of a STRUCT but not the STRUCT
+itself, and no value is cast to JSON other than a JSON value or `NULL`; use `TO_JSON` or
+`PARSE_JSON` instead. As in BigQuery, ARRAYs, and STRUCTs that contain them, can be grouped but
 cannot be compared, ordered or passed to aggregate functions with DISTINCT. ARRAYs with NULL
 elements, also inside STRUCTs, can be used in a query but fail in its result and in the tables a
 statement writes, as in BigQuery. BigQuery also rejects

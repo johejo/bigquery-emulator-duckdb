@@ -41,7 +41,6 @@ query Subqueries | SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t
 query Subqueries | SELECT ARRAY(SELECT v FROM u ORDER BY v) AS a
 query Subqueries | SELECT id FROM (SELECT id FROM t) AS sub
 query Correlated subqueries | SELECT (SELECT AS STRUCT k, SUM(id) FROM (SELECT 1 AS k) GROUP BY k) FROM t
-note Correlated subqueries | See [STRUCT values](compatibility.md#struct-values).
 query Correlated subqueries | SELECT id, (SELECT COUNT(*) FROM UNNEST(tags)) AS n FROM t
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*), SUM(id) FROM t GROUP BY name
 query Aggregates and `GROUP BY` | SELECT name, COUNT(*) FROM t GROUP BY 1 HAVING COUNT(*) > 0
@@ -79,7 +78,6 @@ query STRUCT constructors and casts | SELECT STRUCT(1, 'x'), STRUCT(1 AS a, 'x' 
 query STRUCT constructors and casts | SELECT CAST(STRUCT(1 AS x, 'y' AS y) AS STRUCT<INT64, STRING>)
 query STRUCT constructors and casts | SELECT TO_JSON_STRING(STRUCT())
 query STRUCT constructors and casts | SELECT STRUCT(NULL) = STRUCT(1)
-query STRUCT constructors and casts | SELECT CAST(STRUCT(1, 2) AS JSON)
 note STRUCT constructors and casts | See [STRUCT values](compatibility.md#struct-values).
 query Struct field and array element access | SELECT s.a, tags[SAFE_OFFSET(0)], tags[SAFE_ORDINAL(1)] FROM t
 query Struct field and array element access | SELECT [1, 2][OFFSET(0)], [1, 2][ORDINAL(1)], [1, 2][0]

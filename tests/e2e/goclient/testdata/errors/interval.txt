@@ -1,11 +1,5 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# IS DISTINCT FROM, is unsupported rather than left to DuckDB.
-
-SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVAL(hour => 168) AS i)
-=> error contains: The emulator does not support function $IS_DISTINCT_FROM with INTERVAL
-
-SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
-=> error contains: The emulator does not support CAST from STRUCT<i INTERVAL> to JSON
+# JSON_ARRAY, is unsupported rather than left to DuckDB.
 
 SELECT JSON_ARRAY(MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function JSON_ARRAY with INTERVAL

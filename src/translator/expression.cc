@@ -264,17 +264,6 @@ std::optional<std::string> Subquery(const googlesql::ResolvedSubqueryExpr& subqu
   if (!subquery.hint_list().empty()) {
     return std::nullopt;
   }
-  // The correlated aggregate projection path cannot yet carry these new STRUCT shapes: it
-  // exposes enclosing columns as local, ungrouped projections. Reject instead of binding a
-  // query that DuckDB will fail.
-  if (!subquery.parameter_list().empty() && HasInternalStructNames(subquery.type())) {
-    std::vector<const googlesql::ResolvedNode*> aggregates;
-    subquery.subquery()->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_SCAN}, &aggregates);
-    if (!aggregates.empty()) {
-      return Unsupported(scope,
-                         "correlated aggregate subquery with anonymous or duplicate STRUCT fields");
-    }
-  }
   const auto relation = Scan(*subquery.subquery(), Nested(scope, columns));
   if (!relation) {
     return std::nullopt;
@@ -343,22 +332,6 @@ std::optional<std::string> OrderItem(const googlesql::ResolvedOrderByItem& item,
 }
 
 }  // namespace
-
-bool HasInternalStructNames(const googlesql::Type* type) {
-  if (type->IsArray()) {
-    return HasInternalStructNames(type->AsArray()->element_type());
-  }
-  if (type->IsStruct()) {
-    const auto names = DuckDbStructFieldNames(type->AsStruct());
-    for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
-      const auto& field = type->AsStruct()->field(i);
-      if (names.at(i) != field.name || HasInternalStructNames(field.type)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 // Correlated references in a subquery name the enclosing columns without the q qualifier, which
 // the subquery's own scopes shadow. Column IDs are unique per statement, so nothing collides.
@@ -494,9 +467,6 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     }
     const googlesql::Type* from = cast->expr()->type();
     const bool safe = cast->return_null_on_error();
-    if (cast->type()->IsJson() && HasInternalStructNames(from)) {
-      return Unsupported(scope, "CAST to JSON with anonymous or duplicate STRUCT fields");
-    }
     if (cast->format() != nullptr) {
       return FormatCast(*cast, *argument, scope, columns);
     }

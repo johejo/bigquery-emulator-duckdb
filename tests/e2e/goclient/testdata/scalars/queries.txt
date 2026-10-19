@@ -264,6 +264,15 @@ SELECT TO_JSON_STRING(ARRAY(SELECT (SELECT SUM(s.x) FROM UNNEST([10, 20]) AS o,
   LATERAL (SELECT o + t.a AS x) AS s) FROM t ORDER BY t.a))
 => "[null,32,34,36]"
 
+# An aggregate that reads only enclosing columns aggregates them over the subquery's rows, as in
+# GoogleSQL compliance testdata/array_aggregation.test, array_agg_with_correlated_column_and_limit.
+SELECT TO_JSON_STRING(ARRAY(SELECT (SELECT SUM(t.a) FROM UNNEST([10, 20])) FROM t ORDER BY t.a))
+=> "[null,2,4,6]"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT (SELECT AS STRUCT x > 15 AS big, COUNT(t.a) AS n FROM UNNEST([10, 20, 30]) AS x
+  GROUP BY big ORDER BY big LIMIT 1) FROM t ORDER BY t.a))
+=> "[{\"big\":false,\"n\":0},{\"big\":false,\"n\":1},{\"big\":false,\"n\":1},{\"big\":false,\"n\":1}]"
+
 ## Analytic functions and QUALIFY
 
 SELECT TO_JSON_STRING(ARRAY(SELECT AS STRUCT ROW_NUMBER() OVER (ORDER BY a) AS r,
