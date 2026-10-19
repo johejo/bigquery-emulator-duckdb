@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "googlesql/public/function.h"
@@ -366,6 +369,87 @@ std::optional<std::string> GroupingSet(const googlesql::ResolvedGroupingSetBase&
   return std::nullopt;
 }
 
+// Lists the groupings one element of a grouping set list stands for, each as the column ids of
+// the keys it groups by.
+std::optional<std::vector<std::set<int>>> ExpandGroupingSet(
+    const googlesql::ResolvedGroupingSetBase& set) {
+  const auto ids =
+      [](const std::vector<std::unique_ptr<const googlesql::ResolvedColumnRef>>& refs) {
+        std::set<int> result;
+        std::ranges::transform(refs, std::inserter(result, result.end()),
+                               [](const auto& ref) { return ref->column().column_id(); });
+        return result;
+      };
+  const auto multi_columns =
+      [&](const std::vector<std::unique_ptr<const googlesql::ResolvedGroupingSetMultiColumn>>&
+              list) {
+        std::vector<std::set<int>> result;
+        std::ranges::transform(list, std::back_inserter(result),
+                               [&](const auto& columns) { return ids(columns->column_list()); });
+        return result;
+      };
+  if (set.Is<googlesql::ResolvedGroupingSet>()) {
+    return std::vector{ids(set.GetAs<googlesql::ResolvedGroupingSet>()->group_by_column_list())};
+  }
+  if (set.Is<googlesql::ResolvedRollup>()) {
+    const auto columns =
+        multi_columns(set.GetAs<googlesql::ResolvedRollup>()->rollup_column_list());
+    std::vector<std::set<int>> result;
+    for (std::size_t size = columns.size() + 1; size-- > 0;) {
+      std::set<int> keys;
+      for (std::size_t i = 0; i < size; ++i) {
+        keys.insert(columns.at(i).begin(), columns.at(i).end());
+      }
+      result.push_back(keys);
+    }
+    return result;
+  }
+  if (set.Is<googlesql::ResolvedCube>()) {
+    const auto columns = multi_columns(set.GetAs<googlesql::ResolvedCube>()->cube_column_list());
+    std::vector<std::set<int>> result = {{}};
+    for (const auto& column : columns) {
+      const std::size_t size = result.size();
+      for (std::size_t i = 0; i < size; ++i) {
+        std::set<int> keys = result.at(i);
+        keys.insert(column.begin(), column.end());
+        result.push_back(keys);
+      }
+    }
+    return result;
+  }
+  if (set.Is<googlesql::ResolvedGroupingSetList>()) {
+    std::vector<std::set<int>> result;
+    for (const auto& element : set.GetAs<googlesql::ResolvedGroupingSetList>()->elem_list()) {
+      const auto sets = ExpandGroupingSet(*element);
+      if (!sets) {
+        return std::nullopt;
+      }
+      result.insert(result.end(), sets->begin(), sets->end());
+    }
+    return result;
+  }
+  if (set.Is<googlesql::ResolvedGroupingSetProduct>()) {
+    std::vector<std::set<int>> result = {{}};
+    for (const auto& factor : set.GetAs<googlesql::ResolvedGroupingSetProduct>()->input_list()) {
+      const auto sets = ExpandGroupingSet(*factor);
+      if (!sets) {
+        return std::nullopt;
+      }
+      std::vector<std::set<int>> product;
+      for (const auto& left : result) {
+        for (const auto& right : *sets) {
+          std::set<int> keys = left;
+          keys.insert(right.begin(), right.end());
+          product.push_back(keys);
+        }
+      }
+      result = std::move(product);
+    }
+    return result;
+  }
+  return std::nullopt;
+}
+
 // Project finishes only after the aggregates have been computed, and expose only resolved
 // columns so intermediate lists cannot collide with later scans or escape into results.
 void ApplyFinishes(Relation& result, const std::map<int, std::string>& finishes) {
@@ -431,6 +515,11 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   std::vector<std::string> keys;
   // The rows each HAVING MAX/MIN modifier keeps, keyed by the aggregate call it modifies.
   std::map<const googlesql::ResolvedAggregateFunctionCall*, std::string> havings;
+  // With grouping sets, the keys with their types and the GROUPING() calls with their keys, which
+  // a grouping that leaves out a key spells as NULL and 1.
+  std::vector<std::pair<int, std::string>> key_projections;
+  std::vector<std::pair<int, int>> grouping_projections;
+  Columns key_columns;
   // GROUPING() without grouping sets still needs them: it is 0 over the one plain grouping.
   if (grouping_sets) {
     // Grouping sets name their keys, so compute the keys once below the aggregation and group
@@ -441,7 +530,6 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       inner.push_back(sql + " AS " + ColumnName(id));
       columns.emplace(id, "q." + ColumnName(id));
     }
-    Columns key_columns;
     // BigQuery returns the first of equal values in the whole input, also in the groups of later
     // rows, so a key with INTERVAL values becomes that value before the grouping. Values with
     // different lengths differ in DuckDB too, so DuckDB groups them as BigQuery does.
@@ -459,6 +547,11 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
                          IntervalKey(type, column) + " ORDER BY q._rn) AS " + ColumnName(id));
       }
       key_columns.emplace(id, "q." + ColumnName(id));
+      const auto type = DuckDbType(key->expr()->type());
+      if (!type) {
+        return std::nullopt;
+      }
+      key_projections.emplace_back(id, *type);
       projections.push_back("q." + ColumnName(id) + " AS " + ColumnName(id));
       result.columns.emplace(id, "q." + ColumnName(id));
     }
@@ -487,6 +580,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         return std::nullopt;
       }
       const int id = call->output_column().column_id();
+      grouping_projections.emplace_back(id, key->first);
       projections.push_back("CAST(GROUPING(" + key->second + ") AS BIGINT) AS " + ColumnName(id));
       result.columns.emplace(id, "q." + ColumnName(id));
     }
@@ -555,6 +649,31 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     }
   }
   const Scope aggregate_scope = WithCorrelatedColumns(aggregate, scope, *input);
+  // DuckDB cannot tell an aggregate's rows which grouping they belong to, so HAVING MAX/MIN with
+  // grouping sets computes each grouping on its own, with windows over its groups: each
+  // modifier's aggregate, with the column it is computed as.
+  std::vector<std::pair<std::string, std::string>> windows;
+  if (grouping_sets) {
+    for (const auto& computed : aggregate.aggregate_list()) {
+      const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
+      if (!computed->expr()->Is<googlesql::ResolvedAggregateFunctionCall>() ||
+          call->having_modifier() == nullptr) {
+        continue;
+      }
+      const auto& modifier = *call->having_modifier();
+      const auto sql = Expression(*modifier.having_expr(), aggregate_scope, input->columns);
+      if (!sql) {
+        return std::nullopt;
+      }
+      const std::string name = "_h" + std::to_string(havings.size());
+      windows.emplace_back(
+          std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "max("
+                                                                                         : "min(") +
+              *sql + ")",
+          name);
+      havings.emplace(call, *sql + " = q." + name);
+    }
+  }
   for (const auto& computed : aggregate.aggregate_list()) {
     const auto* call = computed->expr()->GetAs<googlesql::ResolvedAggregateFunctionCall>();
     const auto type = DuckDbType(computed->expr()->type());
@@ -581,8 +700,61 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
   if (projections.empty()) {
     return std::nullopt;
   }
-  result.sql = "SELECT " + Join(projections, ", ") + input->From() +
-               (keys.empty() ? "" : " GROUP BY " + Join(keys, ", "));
+  if (windows.empty()) {
+    result.sql = "SELECT " + Join(projections, ", ") + input->From() +
+                 (keys.empty() ? "" : " GROUP BY " + Join(keys, ", "));
+  } else {
+    std::vector<std::set<int>> groupings;
+    for (const auto& set : aggregate.grouping_set_list()) {
+      const auto sets = ExpandGroupingSet(*set);
+      if (!sets) {
+        return Unsupported(scope, "grouping set");
+      }
+      groupings.insert(groupings.end(), sets->begin(), sets->end());
+    }
+    if (aggregate.grouping_set_list().empty()) {
+      std::set<int> all;
+      for (const auto& [id, type] : key_projections) {
+        all.insert(id);
+      }
+      groupings.push_back(all);
+    }
+    // The keys and GROUPING() calls come first in `projections`, in the order recorded.
+    const std::vector<std::string> rest(
+        projections.begin() +
+            static_cast<std::ptrdiff_t>(key_projections.size() + grouping_projections.size()),
+        projections.end());
+    std::vector<std::string> branches;
+    for (const auto& grouping : groupings) {
+      std::vector<std::string> branch;
+      std::vector<std::string> partition;
+      for (const auto& [id, type] : key_projections) {
+        if (grouping.contains(id)) {
+          partition.push_back(key_columns.at(id));
+          branch.push_back(key_columns.at(id) + " AS " + ColumnName(id));
+        } else {
+          branch.push_back("CAST(NULL AS " + type + ") AS " + ColumnName(id));
+        }
+      }
+      for (const auto& [id, key] : grouping_projections) {
+        branch.push_back(
+            std::string(grouping.contains(key) ? "CAST(0 AS BIGINT)" : "CAST(1 AS BIGINT)") +
+            " AS " + ColumnName(id));
+      }
+      branch.insert(branch.end(), rest.begin(), rest.end());
+      const std::string window = partition.empty()
+                                     ? " OVER () AS "
+                                     : " OVER (PARTITION BY " + Join(partition, ", ") + ") AS ";
+      std::vector<std::string> over;
+      for (const auto& [sql, name] : windows) {
+        over.emplace_back(sql).append(window).append(name);
+      }
+      branches.push_back("SELECT " + Join(branch, ", ") + " FROM (SELECT q.*, " + Join(over, ", ") +
+                         input->From() + ") AS q" +
+                         (partition.empty() ? "" : " GROUP BY " + Join(partition, ", ")));
+    }
+    result.sql = Join(branches, " UNION ALL ");
+  }
   ApplyFinishes(result, finishes);
   return result;
 }

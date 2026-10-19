@@ -46,7 +46,7 @@ rejected.
 | Aggregate `ORDER BY` | Supported |  |
 | Aggregate `LIMIT` | Supported |  |
 | Aggregate `IGNORE NULLS` | Supported |  |
-| Aggregate `HAVING MAX` / `MIN` | Partial | Unsupported: aggregate ANY_VALUE with HAVING or GROUP BY. |
+| Aggregate `HAVING MAX` / `MIN` | Supported |  |
 | Window functions | Supported |  |
 | `QUALIFY` | Supported |  |
 | Set operations | Supported |  |
