@@ -23,9 +23,11 @@ valid parameters they cannot implement.
 [GoogleSQL](https://github.com/google/googlesql) parses and analyzes queries into a resolved AST
 with names bound and expressions typed. The frontend is independent of DuckDB execution details.
 
-- [catalog.cc](../src/catalog.cc) loads tables lazily through `TableSource` and completes table
-  paths from the default project and dataset. Functions and types come from GoogleSQL's built-ins
-  plus BigQuery functions it lacks.
+- [catalog.cc](../src/catalog.cc) loads tables lazily through `TableSource`, and
+  [table_path.cc](../src/table_path.cc) completes table paths from the default project and
+  dataset. Functions and types come from GoogleSQL's built-ins plus BigQuery functions it lacks.
+  [table_source.h](../src/table_source.h) gains a method with most metadata features, so it is a
+  Bazel target of its own: only what implements or calls it is rebuilt when it changes.
 - [type_mapping.cc](../src/type_mapping.cc) maps TableFieldSchema, GoogleSQL and DuckDB types.
   DuckDB column, parameter and expression types are derived from GoogleSQL types.
 - [information_schema.cc](../src/information_schema.cc) computes view rows during analysis;

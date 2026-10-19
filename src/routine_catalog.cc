@@ -27,8 +27,12 @@
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/catalog.h"
+#include "src/catalog_table.h"
+#include "src/language_options.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/table_path.h"
+#include "src/table_source.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {

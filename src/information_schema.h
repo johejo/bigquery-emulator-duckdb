@@ -5,13 +5,15 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
-#include "src/catalog.h"
+#include "src/catalog_table.h"
 
 namespace googlesql {
 class TypeFactory;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
+
+class TableSource;
 
 // Whether `parts`, a table path split by SplitTablePath, names a view in INFORMATION_SCHEMA:
 // [PROJECT.][DATASET or `region-REGION`.]INFORMATION_SCHEMA.VIEW.

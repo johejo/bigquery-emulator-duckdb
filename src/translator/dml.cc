@@ -11,7 +11,7 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "src/catalog.h"
+#include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/translator/context.h"

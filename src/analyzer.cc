@@ -35,9 +35,10 @@
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
-#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/language_options.h"
+#include "src/table_path.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {

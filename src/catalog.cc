@@ -1,9 +1,7 @@
 #include "src/catalog.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -15,7 +13,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "googlesql/public/builtin_function_options.h"
@@ -28,17 +25,17 @@
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "src/catalog_table.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
+#include "src/language_options.h"
+#include "src/table_path.h"
+#include "src/table_source.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
-
-// The group of the functions the catalog declares because GoogleSQL does not ship them, which
-// BigQuery names in errors such as "No matching signature for function BIGQUERYGOOGLESQL:...".
-constexpr char kBigQueryGroup[] = "BigQueryGoogleSQL";
 
 // BigQuery's RANGE_SESSIONIZE is not in GoogleSQL's built-in catalog. Its output
 // retains the input schema and appends a RANGE of the selected column's type.
@@ -258,119 +255,6 @@ googlesql::SimpleCatalog* BuiltinCatalog() {
 }
 
 }  // namespace
-
-bool IsBuiltinFunction(const googlesql::Function& function) {
-  return function.IsGoogleSQLBuiltin() || function.GetGroup() == kBigQueryGroup;
-}
-
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
-  static const googlesql::LanguageOptions* const kLanguageOptions = [] {
-    auto* options = new googlesql::LanguageOptions();
-    // Some syntax BigQuery accepts is gated behind a language feature that the default options
-    // leave off, QUALIFY among it, so every released feature is turned on and known differences
-    // from BigQuery are turned off below.
-    options->EnableMaximumLanguageFeatures();
-    // Some of those features add types and precision that BigQuery lacks rather than syntax, so
-    // they are turned off again: BigQuery has no MAP, UUID or FLOAT32, and its timestamps hold
-    // microseconds, not nanoseconds or picoseconds. BigQuery also rejects explicit casts between
-    // arrays with different element types, including SAFE_CAST and arrays inside structs, and
-    // comparing or ordering arrays, including arrays inside structs.
-    for (const googlesql::LanguageFeature feature : {
-             googlesql::FEATURE_MAP_TYPE,
-             googlesql::FEATURE_UUID_TYPE,
-             googlesql::FEATURE_TIMESTAMP_NANOS,
-             googlesql::FEATURE_TIMESTAMP_PICOS,
-             googlesql::FEATURE_CAST_DIFFERENT_ARRAY_TYPES,
-             googlesql::FEATURE_ARRAY_EQUALITY,
-             googlesql::FEATURE_ARRAY_ORDERING,
-         }) {
-      options->DisableLanguageFeature(feature);
-    }
-    // GoogleSQL released JSON_EXISTS functions before BigQuery documented them.
-    options->DisableLanguageFeature(googlesql::FEATURE_JSON_EXISTS_FUNCTIONS);
-    options->EnableLanguageFeature(googlesql::FEATURE_DISABLE_FLOAT32);
-    // BigQuery has EDIT_DISTANCE over BYTES and CREATE TABLE CLONE, which GoogleSQL still marks
-    // in development.
-    options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_EDIT_DISTANCE_BYTES);
-    options->EnableLanguageFeature(googlesql::FEATURE_CREATE_TABLE_CLONE);
-    // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.
-    options->set_product_mode(googlesql::PRODUCT_EXTERNAL);
-    // The analyzer accepts only queries by default, but the emulator also runs DDL and DML.
-    options->SetSupportsAllStatementKinds();
-    return options;
-  }();
-  return *kLanguageOptions;
-}
-
-std::vector<std::string> SplitTablePath(absl::Span<const std::string> path) {
-  std::vector<std::string> parts;
-  for (const std::string& element : path) {
-    for (const absl::string_view part : absl::StrSplit(element, '.')) {
-      // Each element expands into several owned strings, rather than a direct copy.
-      // cppcheck-suppress useStlAlgorithm
-      parts.emplace_back(part);
-    }
-  }
-  // Domain-scoped project IDs contain dots before the colon. Those dots belong to the
-  // project, even when GoogleSQL passes the entire backtick-quoted path as one element.
-  const auto project_part = std::ranges::find_if(
-      parts, [](const std::string& part) { return part.find(':') != std::string::npos; });
-  if (project_part != parts.end() && project_part != parts.begin()) {
-    const auto project_end = std::next(project_part);
-    const std::string project = absl::StrJoin(parts.begin(), project_end, ".");
-    parts.erase(parts.begin(), project_end);
-    parts.insert(parts.begin(), project);
-  }
-  return parts;
-}
-
-std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
-                                            const std::string& default_project,
-                                            const std::string& default_dataset,
-                                            const TableSource* source) {
-  std::vector<std::string> parts = SplitTablePath(path);
-  if (parts.size() == 1) {
-    parts.insert(parts.begin(), {default_project, default_dataset});
-  } else if (parts.size() == 2) {
-    parts.insert(parts.begin(), default_project);
-  }
-  if (parts.size() != 3) {
-    return {};
-  }
-  if (std::ranges::any_of(parts, [](const std::string& part) { return part.empty(); })) {
-    return {};
-  }
-  if (source != nullptr) {
-    parts.at(0) = source->ProjectId(parts.at(0));
-  }
-  return parts;
-}
-
-std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path) {
-  const std::vector<std::string> parts = SplitTablePath(path);
-  if (parts.size() == 1 && !parts.at(0).empty()) {
-    return parts.at(0);
-  }
-  if (parts.size() == 2 && parts.at(0) == kSessionDataset && !parts.at(1).empty()) {
-    return parts.at(1);
-  }
-  return std::nullopt;
-}
-
-std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
-                                          const std::string& default_project,
-                                          const std::string& default_dataset,
-                                          const TemporaryTables* temporary,
-                                          const TableSource* source) {
-  if (temporary != nullptr) {
-    const std::vector<std::string> parts = SplitTablePath(path);
-    const bool session = parts.size() == 2 && parts.at(0) == kSessionDataset;
-    if (session || (parts.size() == 1 && temporary->names.contains(parts.at(0)))) {
-      return {temporary->project, temporary->dataset, parts.back()};
-    }
-  }
-  return NormalizeTablePath(path, default_project, default_dataset, source);
-}
 
 BigQueryCatalog::BigQueryCatalog(TableSource& source, googlesql::TypeFactory* type_factory,
                                  std::string default_project, std::string default_dataset,

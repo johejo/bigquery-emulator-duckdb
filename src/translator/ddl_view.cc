@@ -6,9 +6,9 @@
 
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
+#include "src/table_path.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl.h"

@@ -40,9 +40,9 @@
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
-#include "src/catalog.h"
 #include "src/duckdb_handle.h"
 #include "src/interval.h"
+#include "src/language_options.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {

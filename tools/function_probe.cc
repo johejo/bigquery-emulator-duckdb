@@ -34,6 +34,8 @@
 #include "nlohmann/json.hpp"
 #include "src/catalog.h"
 #include "src/field_schema.h"
+#include "src/language_options.h"
+#include "src/table_source.h"
 #include "src/translator/functions.h"
 
 namespace bigquery_emulator_duckdb {
