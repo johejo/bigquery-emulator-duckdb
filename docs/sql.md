@@ -19,7 +19,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 31 | 2 | 1 |
+| [Queries](#queries) | 32 | 1 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
@@ -61,7 +61,7 @@ rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
-| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: aggregate or analytic function ARRAY_AGG with INTERVAL; function JSON_ARRAY with INTERVAL. |
+| INTERVAL values | Supported | See [INTERVAL values](compatibility.md#interval-values). |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML

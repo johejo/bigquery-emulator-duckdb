@@ -221,6 +221,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           {"ANY_VALUE", {{.function = "any_value"}}},
           // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
           // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
+          // STRUCT values with INTERVAL fields are collected as they are.
           {
               "ARRAY_AGG",
               {
@@ -238,7 +239,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                       .nulls = kFilter,
                       .limit = kSlice,
                   },
-                  {.function = "list", .nulls = kFilter, .limit = kSlice},
+                  {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
               },
           },
           // ARRAY_CONCAT_AGG skips NULL arrays.

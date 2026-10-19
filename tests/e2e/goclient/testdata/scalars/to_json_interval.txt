@@ -1,9 +1,10 @@
-## TO_JSON, TO_JSON_STRING and JSON_OBJECT with INTERVAL values
+## TO_JSON, TO_JSON_STRING, JSON_ARRAY, JSON_OBJECT and JSON_SET with INTERVAL values
 # Expected values: BigQuery's JSON encodings table, which encodes an INTERVAL as an ISO 8601
 # duration string; GoogleSQL compliance functions_testlib_tojson.cc
 # (AddIntervalValueTestCases), which agrees with it, for mixed signs and fractional seconds.
 # NULL values and containers follow the table's NULL, ARRAY and STRUCT rows, and JSON_OBJECT's
-# values the same encodings, as BigQuery's json_functions#json_object documents.
+# and JSON_ARRAY's and JSON_SET's values the same encodings, as BigQuery's
+# json_functions#json_object, json_functions#json_array and json_functions#json_set document.
 
 SELECT TO_JSON_STRING(INTERVAL '10:20:30.52' HOUR TO SECOND)
 => "\"PT10H20M30.52S\""
@@ -55,3 +56,15 @@ SELECT TO_JSON_STRING(JSON_OBJECT(['a', 'b'], [INTERVAL -25 MONTH, INTERVAL '10:
 
 SELECT TO_JSON_STRING(JSON_OBJECT('s', STRUCT(INTERVAL 1 SECOND AS i), 'a', [INTERVAL 1 SECOND]))
 => "{\"a\":[\"PT1S\"],\"s\":{\"i\":\"PT1S\"}}"
+
+SELECT TO_JSON_STRING(JSON_ARRAY(INTERVAL 2 DAY, CAST(NULL AS INTERVAL), INTERVAL -25 MONTH))
+=> "[\"P2D\",null,\"P-2Y-1M\"]"
+
+SELECT TO_JSON_STRING(JSON_ARRAY(STRUCT(INTERVAL 1 SECOND AS i), [INTERVAL '10:20:30.52' HOUR TO SECOND]))
+=> "[{\"i\":\"PT1S\"},[\"PT10H20M30.52S\"]]"
+
+SELECT TO_JSON_STRING(JSON_SET(JSON '{"a": 1}', '$.i', INTERVAL -25 MONTH, '$.s', STRUCT([INTERVAL 1 SECOND] AS a)))
+=> "{\"a\":1,\"i\":\"P-2Y-1M\",\"s\":{\"a\":[\"PT1S\"]}}"
+
+SELECT TO_JSON_STRING(JSON_SET(JSON '{"i": "x"}', '$.i', CAST(NULL AS INTERVAL)))
+=> "{\"i\":null}"
