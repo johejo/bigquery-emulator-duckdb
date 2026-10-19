@@ -739,6 +739,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_divide_numeric($1, $2)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
               },
+              // See src/backend_functions/interval.cc.
+              {
+                  .arity = 2,
+                  .spelling = "bq_divide_interval($1, $2)",
+                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
+              },
               {
                   .arity = 2,
                   .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
