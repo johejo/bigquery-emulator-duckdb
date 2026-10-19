@@ -7,8 +7,8 @@ SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVA
 SELECT CAST(STRUCT(MAKE_INTERVAL(day => 7) AS i) AS JSON)
 => error contains: The emulator does not support CAST from STRUCT<i INTERVAL> to JSON
 
-SELECT JSON_OBJECT('i', MAKE_INTERVAL(day => 7))
-=> error contains: The emulator does not support function JSON_OBJECT with INTERVAL
+SELECT JSON_ARRAY(MAKE_INTERVAL(day => 7))
+=> error contains: The emulator does not support function JSON_ARRAY with INTERVAL
 
 SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function $EXTRACT
@@ -16,7 +16,7 @@ SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 => error contains: The emulator does not support function $EXTRACT
 
-SELECT ARRAY_AGG(i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
+SELECT ARRAY_AGG(STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL
 
 SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i

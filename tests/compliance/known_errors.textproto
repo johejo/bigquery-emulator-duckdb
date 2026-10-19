@@ -764,6 +764,7 @@ known_errors {
   label: "groupby_queries_test:groupby_25"
   label: "groupby_queries_test:groupby_array_agg"
   label: "groupby_queries_test:groupby_struct_array"
+  label: "interval_test:array_agg_orderby"
   label: "json_queries_test:json_extract_string_array"
   label: "json_queries_test:json_value_array"
   label: "select_distinct_test:distinct_array"

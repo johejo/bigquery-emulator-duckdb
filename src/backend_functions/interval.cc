@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -223,6 +225,36 @@ void IntervalAggregate(duckdb_function_info info, duckdb_data_chunk input, duckd
           });
 }
 
+// ARRAY_AGG(DISTINCT ...) of the INTERVAL values the translator collects with list(): equal values,
+// and NULL values, occur once, as the first of them in input order, as BigQuery keeps them.
+void IntervalDistinct(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(
+      info, input, output,
+      [](const Arguments& args) -> absl::StatusOr<std::vector<std::optional<duckdb_interval>>> {
+        duckdb_vector vector = args.Vector(0);
+        const auto entry = VectorElement<duckdb_list_entry>(vector, args.Row());
+        duckdb_vector child = duckdb_list_vector_get_child(vector);
+        uint64_t* validity = duckdb_vector_get_validity(child);
+        std::vector<std::optional<duckdb_interval>> values;
+        std::unordered_set<int64_t> lengths;
+        bool null = false;
+        for (idx_t i = 0; i < entry.length; ++i) {
+          if (validity != nullptr && !duckdb_validity_row_is_valid(validity, entry.offset + i)) {
+            if (!std::exchange(null, true)) {
+              values.emplace_back();
+            }
+            continue;
+          }
+          const auto element = VectorElement<duckdb_interval>(child, entry.offset + i);
+          GOOGLESQL_ASSIGN_OR_RETURN(const auto value, IntervalFromDuckDb(element));
+          if (lengths.insert(value.GetAsMicros()).second) {
+            values.emplace_back(element);
+          }
+        }
+        return values;
+      });
+}
+
 // CAST from STRING, which takes the canonical form or ISO 8601, and which SAFE_CAST, when the
 // second argument is true, makes NULL on an error.
 void IntervalFromString(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -290,6 +322,7 @@ void RegisterIntervalFunctions(duckdb_connection connection) {
            IntervalAggregate<false, true>);
   Register(connection, "bq_interval_avg_distinct", {list.get()}, interval.get(),
            IntervalAggregate<true, true>);
+  Register(connection, "bq_interval_distinct", {list.get()}, list.get(), IntervalDistinct);
   Register(connection, "bq_interval_string", {kInterval}, kVarchar, IntervalString);
   Register(connection, "bq_interval_from_string", {kVarchar, kBoolean}, kInterval,
            IntervalFromString);
