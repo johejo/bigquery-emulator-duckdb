@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 #include "src/system_variables.h"
@@ -14,6 +15,7 @@
 namespace googlesql {
 class AnalyzerOptions;
 class AnalyzerOutput;
+class ASTNode;
 class Catalog;
 class ResolvedExpr;
 class ResolvedStatement;
@@ -76,6 +78,10 @@ std::optional<std::vector<FieldSchema>> ResultSchema(const googlesql::ResolvedSt
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
                                 const AnalyzerSettings& settings = {});
+
+// BigQuery's error for a view or function definition that refers to a system variable, which
+// names only a temporary function.
+absl::Status CheckDefinition(const googlesql::ASTNode& statement);
 
 // The options the statements of a script are analyzed with, from which its executor takes the
 // language, the query parameters and how errors are reported.

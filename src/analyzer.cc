@@ -15,6 +15,8 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/time/time.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/parser/parse_tree.h"
@@ -131,6 +133,19 @@ bool HasTypeParameters(const googlesql::ASTNode& node) {
     }
   }
   return false;
+}
+
+// The first system variable that `node` refers to, if any.
+const googlesql::ASTSystemVariableExpr* FindSystemVariable(const googlesql::ASTNode& node) {
+  if (node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_EXPR) {
+    return node.GetAsOrDie<googlesql::ASTSystemVariableExpr>();
+  }
+  for (int i = 0; i < node.num_children(); ++i) {
+    if (const auto* variable = FindSystemVariable(*node.child(i))) {
+      return variable;
+    }
+  }
+  return nullptr;
 }
 
 // BigQuery rejects type parameters in CAST, which GoogleSQL accepts. Literal CASTs disappear
@@ -333,6 +348,27 @@ absl::Status CheckResultColumns(const googlesql::ResolvedStatement& statement) {
 
 }  // namespace
 
+absl::Status CheckDefinition(const googlesql::ASTNode& statement) {
+  std::string function;
+  if (statement.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT) {
+    const auto* create = statement.GetAsOrDie<googlesql::ASTCreateFunctionStatement>();
+    if (create->is_temp()) {
+      function = absl::StrCat(
+          "; in function ",
+          absl::StrJoin(create->function_declaration()->name()->ToIdentifierVector(), "."));
+    }
+  } else if (statement.node_kind() != googlesql::AST_CREATE_VIEW_STATEMENT) {
+    return absl::OkStatus();
+  }
+  const googlesql::ASTSystemVariableExpr* variable = FindSystemVariable(statement);
+  if (variable == nullptr) {
+    return absl::OkStatus();
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Invalid reference to system variable @@",
+                   absl::StrJoin(variable->path()->ToIdentifierVector(), "."), function));
+}
+
 AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& catalog,
                                 googlesql::TypeFactory& type_factory,
                                 const AnalyzerSettings& settings) {
@@ -345,6 +381,17 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     throw std::invalid_argument(options.status().ToString());
   }
 
+  // A script checks each of its statements before analyzing it.
+  if (sql.find("@@") != std::string::npos) {
+    std::unique_ptr<googlesql::ParserOutput> parsed;
+    if (googlesql::ParseStatement(sql, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
+                                  &parsed)
+            .ok()) {
+      if (const absl::Status definition = CheckDefinition(*parsed->statement()); !definition.ok()) {
+        throw std::runtime_error(std::string(definition.message()));
+      }
+    }
+  }
   std::unique_ptr<const googlesql::AnalyzerOutput> analyzer_output;
   const absl::Status status =
       googlesql::AnalyzeStatement(sql, *options, &catalog, &type_factory, &analyzer_output);

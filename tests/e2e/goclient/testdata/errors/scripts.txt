@@ -59,3 +59,19 @@ SELECT errors_dataset_system_variables.f()
 CREATE TEMP FUNCTION f() AS (@@project_id);
 SELECT f() IS NOT NULL
 => error contains: Invalid reference to system variable @@project_id; in function f
+
+# @@project_id is read-only, also in dynamic SQL.
+EXECUTE IMMEDIATE "SET @@project_id = 'example-project'"
+=> error:
+
+# Answers collected from BigQuery with bqanswers: BigQuery's error for assigning @@project_id, and
+# a view or function that a single statement defines cannot reference it either.
+SET @@project_id = 'example-project';
+SELECT 1
+=> error contains: Assignment to read-only system variable @@project_id
+
+CREATE OR REPLACE VIEW errors_dataset_system_variables.project_id AS SELECT @@project_id AS project_id
+=> error contains: Invalid reference to system variable @@project_id
+
+CREATE OR REPLACE FUNCTION errors_dataset_system_variables.project_id() AS (@@project_id)
+=> error contains: Invalid reference to system variable @@project_id
