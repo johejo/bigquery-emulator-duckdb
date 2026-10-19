@@ -3,6 +3,7 @@ package gcsclient
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -239,4 +240,26 @@ func TestLoadAllListingPages(t *testing.T) {
 	defer server.Close()
 	t.Setenv("STORAGE_EMULATOR_HOST", server.URL)
 	load(t, start(t), "gs://bucket/nested/a*.json", []int64{1, 2})
+}
+
+func TestLoadsReuseConnections(t *testing.T) {
+	configure(t)
+	var connections atomic.Int32
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{"id":1}`)
+	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			connections.Add(1)
+		}
+	}
+	server.Start()
+	defer server.Close()
+	t.Setenv("STORAGE_EMULATOR_HOST", server.URL)
+	client := start(t)
+	load(t, client, "gs://bucket/nested/a.json", []int64{1})
+	load(t, client, "gs://bucket/nested/a.json", []int64{1, 1})
+	if got := connections.Load(); got != 1 {
+		t.Errorf("connections = %d, want 1", got)
+	}
 }
