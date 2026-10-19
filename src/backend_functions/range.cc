@@ -1,6 +1,5 @@
 #include "src/backend_functions/range.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -23,7 +22,6 @@
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
-#include "src/interval.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
@@ -53,10 +51,6 @@ auto Append(std::vector<Bound>& bounds) {
   };
 }
 
-absl::StatusOr<googlesql::IntervalValue> Step(const Arguments& args) {
-  return IntervalFromDuckDb(VectorElement<duckdb_interval>(args.Vector(2), args.Row()));
-}
-
 // GoogleSQL's error, which BigQuery names the function after.
 absl::Status InExpression(const absl::Status& status) {
   if (status.ok()) {
@@ -66,74 +60,79 @@ absl::Status InExpression(const absl::Status& status) {
           absl::StrCat(status.message(), "; error in GENERATE_RANGE_ARRAY expression")};
 }
 
-// GENERATE_RANGE_ARRAY over the bounds of a RANGE<DATE>, an infinite one being UNBOUNDED, as
-// the bounds of the subranges, which the rule pairs into RANGEs.
-void GenerateDateRanges(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::vector<int32_t>> {
-    const auto bound = [&](idx_t column) -> std::optional<int32_t> {
-      const int32_t days = args.Date(column);
-      return duckdb_is_finite_date(duckdb_date{.days = days}) ? std::optional(days) : std::nullopt;
-    };
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto step, Step(args));
-    const auto generator = fn::DateRangeArrayGenerator::Create(step, args.Bool(3));
-    GOOGLESQL_RETURN_IF_ERROR(InExpression(generator.status()));
-    std::vector<int32_t> bounds;
-    GOOGLESQL_RETURN_IF_ERROR(
-        InExpression(generator->Generate(bound(0), bound(1), Append(bounds))));
-    return bounds;
-  });
-}
+// The bounds of a RANGE<DATE> as days since the epoch.
+struct DateBounds {
+  using Bound = int32_t;
+  using Result = int32_t;
 
-// As GenerateDateRanges for a RANGE<DATETIME>, whose bounds are microseconds of civil time.
-void GenerateDatetimeRanges(duckdb_function_info info, duckdb_data_chunk input,
-                            duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::vector<int64_t>> {
-    const auto bound =
-        [&](idx_t column) -> absl::StatusOr<std::optional<googlesql::DatetimeValue>> {
-      const int64_t micros = args.Int(column);
-      if (!duckdb_is_finite_timestamp(duckdb_timestamp{.micros = micros})) {
-        return std::nullopt;
-      }
-      return DatetimeFromMicros(micros);
-    };
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto start, bound(0));
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto end, bound(1));
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto step, Step(args));
-    const auto generator =
-        fn::DatetimeRangeArrayGenerator::Create(step, args.Bool(3), fn::kMicroseconds);
-    GOOGLESQL_RETURN_IF_ERROR(InExpression(generator.status()));
-    std::vector<googlesql::DatetimeValue> bounds;
-    GOOGLESQL_RETURN_IF_ERROR(InExpression(generator->Generate(start, end, Append(bounds))));
-    std::vector<int64_t> micros;
-    micros.reserve(bounds.size());
-    for (const auto& datetime : bounds) {
-      GOOGLESQL_ASSIGN_OR_RETURN(micros.emplace_back(), MicrosFromDatetime(datetime));
+  static absl::StatusOr<std::optional<Bound>> Read(const Arguments& args, idx_t column) {
+    const int32_t days = args.Date(column);
+    return duckdb_is_finite_date(duckdb_date{.days = days}) ? std::optional(days) : std::nullopt;
+  }
+  static auto Generator(const googlesql::IntervalValue& step, bool last_partial_range) {
+    return fn::DateRangeArrayGenerator::Create(step, last_partial_range);
+  }
+  static absl::StatusOr<Result> Write(Bound days) { return days; }
+};
+
+// The bounds of a RANGE<DATETIME> as microseconds of civil time.
+struct DatetimeBounds {
+  using Bound = googlesql::DatetimeValue;
+  using Result = int64_t;
+
+  static absl::StatusOr<std::optional<Bound>> Read(const Arguments& args, idx_t column) {
+    const int64_t micros = args.Int(column);
+    if (!duckdb_is_finite_timestamp(duckdb_timestamp{.micros = micros})) {
+      return std::nullopt;
     }
-    return micros;
-  });
-}
+    return DatetimeFromMicros(micros);
+  }
+  static auto Generator(const googlesql::IntervalValue& step, bool last_partial_range) {
+    return fn::DatetimeRangeArrayGenerator::Create(step, last_partial_range, fn::kMicroseconds);
+  }
+  static absl::StatusOr<Result> Write(const Bound& datetime) {
+    return MicrosFromDatetime(datetime);
+  }
+};
 
-// As GenerateDateRanges for a RANGE<TIMESTAMP>.
-void GenerateTimestampRanges(duckdb_function_info info, duckdb_data_chunk input,
-                             duckdb_vector output) {
-  EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<std::vector<int64_t>> {
-    const auto bound = [&](idx_t column) -> std::optional<absl::Time> {
-      const int64_t micros = args.Int(column);
-      return duckdb_is_finite_timestamp(duckdb_timestamp{.micros = micros})
-                 ? std::optional(absl::FromUnixMicros(micros))
-                 : std::nullopt;
-    };
-    GOOGLESQL_ASSIGN_OR_RETURN(const auto step, Step(args));
-    const auto generator =
-        fn::TimestampRangeArrayGenerator::Create(step, args.Bool(3), fn::kMicroseconds);
-    GOOGLESQL_RETURN_IF_ERROR(InExpression(generator.status()));
-    std::vector<absl::Time> bounds;
-    GOOGLESQL_RETURN_IF_ERROR(
-        InExpression(generator->Generate(bound(0), bound(1), Append(bounds))));
-    std::vector<int64_t> micros(bounds.size());
-    std::ranges::transform(bounds, micros.begin(), absl::ToUnixMicros);
-    return micros;
-  });
+// The bounds of a RANGE<TIMESTAMP> as microseconds since the epoch.
+struct TimestampBounds {
+  using Bound = absl::Time;
+  using Result = int64_t;
+
+  static absl::StatusOr<std::optional<Bound>> Read(const Arguments& args, idx_t column) {
+    const int64_t micros = args.Int(column);
+    return duckdb_is_finite_timestamp(duckdb_timestamp{.micros = micros})
+               ? std::optional(absl::FromUnixMicros(micros))
+               : std::nullopt;
+  }
+  static auto Generator(const googlesql::IntervalValue& step, bool last_partial_range) {
+    return fn::TimestampRangeArrayGenerator::Create(step, last_partial_range, fn::kMicroseconds);
+  }
+  static absl::StatusOr<Result> Write(Bound time) { return absl::ToUnixMicros(time); }
+};
+
+// GENERATE_RANGE_ARRAY over the bounds of a RANGE, an infinite one being UNBOUNDED, as the bounds
+// of the subranges, which the rule pairs into RANGEs.
+template <typename Bounds>
+void GenerateRanges(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  EachRow(
+      info, input, output,
+      [](const Arguments& args) -> absl::StatusOr<std::vector<typename Bounds::Result>> {
+        GOOGLESQL_ASSIGN_OR_RETURN(const auto start, Bounds::Read(args, 0));
+        GOOGLESQL_ASSIGN_OR_RETURN(const auto end, Bounds::Read(args, 1));
+        GOOGLESQL_ASSIGN_OR_RETURN(const auto step, Codec<googlesql::IntervalValue>::Read(args, 2));
+        const auto generator = Bounds::Generator(step, args.Bool(3));
+        GOOGLESQL_RETURN_IF_ERROR(InExpression(generator.status()));
+        std::vector<typename Bounds::Bound> bounds;
+        GOOGLESQL_RETURN_IF_ERROR(InExpression(generator->Generate(start, end, Append(bounds))));
+        std::vector<typename Bounds::Result> results;
+        results.reserve(bounds.size());
+        for (const auto& bound : bounds) {
+          GOOGLESQL_ASSIGN_OR_RETURN(results.emplace_back(), Bounds::Write(bound));
+        }
+        return results;
+      });
 }
 
 }  // namespace
@@ -146,9 +145,9 @@ void RegisterRangeFunctions(duckdb_connection connection) {
   // One name for each element type, so that DuckDB picks the overload.
   constexpr duckdb_type kInterval = DUCKDB_TYPE_INTERVAL;
   for (const auto& [element, function] : {
-           std::pair{kDate, GenerateDateRanges},
-           std::pair{kDatetime, GenerateDatetimeRanges},
-           std::pair{kTimestamp, GenerateTimestampRanges},
+           std::pair{kDate, GenerateRanges<DateBounds>},
+           std::pair{kDatetime, GenerateRanges<DatetimeBounds>},
+           std::pair{kTimestamp, GenerateRanges<TimestampBounds>},
        }) {
     LogicalType const type(duckdb_create_logical_type(element));
     LogicalType const list(duckdb_create_list_type(type.get()));
