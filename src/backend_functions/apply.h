@@ -15,9 +15,12 @@
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "duckdb.h"
+#include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_handle.h"
+#include "src/interval.h"
 
 // Apply<kFunction> runs a GoogleSQL function as a DuckDB scalar function, row by row. It reads
 // the function's arguments from the columns in order, by the C++ type of each parameter, and
@@ -98,6 +101,18 @@ struct Codec<googlesql::BigNumericValue> {
   }
   static std::string Write(const googlesql::BigNumericValue& value) {
     return BigNumericUnits(value);
+  }
+};
+
+// An INTERVAL, which GoogleSQL validates as it reads it.
+template <>
+struct Codec<googlesql::IntervalValue> {
+  static absl::StatusOr<googlesql::IntervalValue> Read(const Arguments& arguments, idx_t column) {
+    return IntervalFromDuckDb(
+        VectorElement<duckdb_interval>(arguments.Vector(column), arguments.Row()));
+  }
+  static duckdb_interval Write(const googlesql::IntervalValue& value) {
+    return IntervalToDuckDb(value);
   }
 };
 
