@@ -342,8 +342,6 @@ query `SCHEMATA` | SELECT schema_name FROM `region-eu`.INFORMATION_SCHEMA.SCHEMA
 note `SCHEMATA` | See [Datasets](compatibility.md#datasets).
 query `TABLES` | SELECT table_name, table_type, ddl FROM d.INFORMATION_SCHEMA.TABLES
 query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
-note `TABLES` | Creation times are NULL.
 query `COLUMNS` | SELECT column_name, ordinal_position, data_type FROM d.INFORMATION_SCHEMA.COLUMNS
 query `COLUMNS` | SELECT * FROM `region-us`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = 't'
-note `COLUMNS` | Every column is nullable.
 query `COLUMN_FIELD_PATHS` | SELECT field_path, data_type FROM d.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
