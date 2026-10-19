@@ -143,9 +143,24 @@ just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 ## External queries
 
 With `--connection PROJECT.LOCATION.CONNECTION=CONNINFO`, `EXTERNAL_QUERY` reaches the PostgreSQL
-database that the libpq connection string or URI `CONNINFO` names, as the Cloud SQL connection
-`PROJECT.LOCATION.CONNECTION`. The option is repeatable and not persisted; credentials stay out of
-the data directory. See [EXTERNAL_QUERY](docs/compatibility.md#external_query) for limits.
+or Spanner database named by the connection. PostgreSQL takes a libpq connection string or URI;
+Spanner takes `spanner://projects/PROJECT/instances/INSTANCE/databases/DATABASE`. Set
+`SPANNER_EMULATOR_HOST=localhost:9010` to reach a locally running Spanner emulator; otherwise
+Spanner uses Application Default Credentials. For example:
+
+```sh
+SPANNER_EMULATOR_HOST=localhost:9010 bazel-bin/bigquery-emulator-duckdb \
+  --project='{"projectId":"test"}' \
+  --connection='test.us.spanner=spanner://projects/test/instances/test/databases/test'
+```
+
+The Spanner instance and database must already exist. Start a
+[Spanner emulator](https://cloud.google.com/spanner/docs/emulator) in a separate terminal with
+`${SPANNER_EMULATOR_GCLOUD:-gcloud} emulators spanner start`. On Linux x86_64, the Nix shell sets
+`SPANNER_EMULATOR_GCLOUD` to an SDK with the native emulator component.
+
+Connections are not persisted in the data directory. See
+[EXTERNAL_QUERY](docs/compatibility.md#external_query) for limits. For PostgreSQL:
 
 ```sh
 just run --project='{"projectId":"test"}' \
@@ -198,8 +213,8 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
-- `EXTERNAL_QUERY` reaches the PostgreSQL databases that `--connection` configures, rather than
-  connections that the Connection API creates.
+- `EXTERNAL_QUERY` reaches the PostgreSQL or Spanner databases that `--connection` configures,
+  rather than connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
@@ -219,6 +234,10 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 
 See [AGENTS.md](AGENTS.md) for building and testing, and
 [docs/architecture.md](docs/architecture.md) for how a request is processed.
+
+`just e2e` starts gcloud's native Spanner emulator on Linux x86_64. On other platforms, Spanner
+cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally
+started emulator and an empty GoogleSQL database.
 
 Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.md).
 

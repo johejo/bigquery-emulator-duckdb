@@ -1,0 +1,22 @@
+# Unsupported Spanner forms fail rather than silently dropping behavior.
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT [1, 2] AS x')
+=> error contains: The emulator does not support EXTERNAL_QUERY Spanner type
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT STRUCT(1 AS a) AS x')
+=> error:
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT 1 AS x', '{"query_execution_priority":"high"}')
+=> error contains: The emulator does not support EXTERNAL_QUERY Spanner options
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT 1 AS x', '{"default_type_for_decimal_columns":"string"}')
+=> error contains: The emulator does not support EXTERNAL_QUERY Spanner options
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT 1 AS x', '[]')
+=> error contains: options must be a JSON object
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'SELECT missing')
+=> error:
+
+SELECT * FROM EXTERNAL_QUERY('us.spanner', 'DELETE FROM missing WHERE TRUE')
+=> error:

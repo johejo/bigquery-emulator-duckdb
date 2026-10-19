@@ -109,7 +109,18 @@ ExternalConnection ParseConnectionArgument(std::string_view argument) {
         "--connection requires PROJECT.LOCATION.CONNECTION=CONNINFO, such as "
         "my-project.us.my-connection=postgresql://user@localhost/database");
   }
-  return ExternalConnection{.key = *key, .conninfo = std::string(argument.substr(equals + 1))};
+  const std::string conninfo(argument.substr(equals + 1));
+  if (conninfo.starts_with("spanner://")) {
+    const std::vector<std::string> path = absl::StrSplit(conninfo.substr(10), '/');
+    if (path.size() != 6 || path.at(0) != "projects" || path.at(1).empty() ||
+        path.at(2) != "instances" || path.at(3).empty() || path.at(4) != "databases" ||
+        path.at(5).empty()) {
+      throw std::invalid_argument(
+          "Spanner connection requires "
+          "spanner://projects/PROJECT/instances/INSTANCE/databases/DATABASE");
+    }
+  }
+  return ExternalConnection{.key = *key, .conninfo = conninfo};
 }
 
 std::optional<std::string> ConnectionKey(std::string_view connection_id,

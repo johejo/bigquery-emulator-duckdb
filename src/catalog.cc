@@ -321,13 +321,8 @@ absl::StatusOr<std::shared_ptr<googlesql::TVFSignature>> BigQueryCatalog::Extern
   if (!key.has_value()) {
     return absl::InvalidArgumentError("Invalid connection ID: " + literals.at(0));
   }
-  const absl::StatusOr<FieldType> decimal_type =
-      DecimalColumnType(literals.size() == 3 ? literals.at(2) : "{}");
-  if (!decimal_type.ok()) {
-    return decimal_type.status();
-  }
-  const absl::StatusOr<std::vector<FieldSchema>> columns =
-      source_.DescribeExternalQuery(*key, literals.at(1), *decimal_type);
+  const absl::StatusOr<std::vector<FieldSchema>> columns = source_.DescribeExternalQuery(
+      *key, literals.at(1), literals.size() == 3 ? literals.at(2) : "{}");
   if (!columns.ok()) {
     return columns.status();
   }

@@ -302,8 +302,8 @@ Value tables and INTERVAL or annotated partitioning columns are unsupported. An 
 ### EXTERNAL_QUERY
 
 `EXTERNAL_QUERY` reads from PostgreSQL databases that `--connection` names, standing in for Cloud
-SQL for PostgreSQL connections; the emulator has no Connection API, and connections to MySQL or
-Spanner are not supported. `--connection PROJECT.LOCATION.CONNECTION=CONNINFO` takes a libpq
+SQL for PostgreSQL connections; the emulator has no Connection API, and connections to MySQL
+are not supported. Spanner connections are described below. `--connection PROJECT.LOCATION.CONNECTION=CONNINFO` takes a libpq
 connection string or URI; a query names the connection by any form BigQuery accepts, the location
 in any case. The emulator prepares the query on the database when it analyzes the statement, so
 the connection ID, query and options must be literals, and it attaches the database to DuckDB,
@@ -317,6 +317,16 @@ unsupported, as are columns of the same name. Dates and times outside BigQuery's
 PostgreSQL's `infinity`, fail when read. Of the options, only `default_type_for_decimal_columns`
 is supported. Views that read `EXTERNAL_QUERY` are unsupported, since they would outlive the
 attachment.
+
+Spanner connections initially support GoogleSQL queries returning BOOL, BYTES, DATE, FLOAT64, INT64, JSON,
+NUMERIC, STRING and TIMESTAMP. These use BigQuery's
+[Spanner mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping),
+including truncating TIMESTAMP nanoseconds to microseconds. ARRAY, STRUCT, annotated PostgreSQL
+types and all nonempty options, including `query_execution_priority`, are unsupported. Queries
+run as single-use, strong, read-only transactions. Query partitioning and Data Boost are not
+implemented. The literal-argument and view restrictions above also apply.
+
+See the [README](../README.md#external-queries) for connection and emulator setup.
 
 ## User-defined functions
 

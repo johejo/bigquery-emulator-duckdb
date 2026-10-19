@@ -14,12 +14,14 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/spannerprocess"
 )
 
 func main() {
@@ -175,9 +177,31 @@ func run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, postgres.Stop()) }()
-	// EXTERNAL_QUERY cases name the connection us.postgres of the Go client's project.
-	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"), "jdoe@example.com",
-		"test.us.postgres="+postgres.Conninfo)
+	// The SDK provides a native Spanner emulator on Linux x86_64. Other platforms
+	// can run these cases against an externally started emulator and empty database.
+	connections := []string{"test.us.postgres=" + postgres.Conninfo}
+	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" && os.Getenv("E2E_SPANNER_DATABASE") == "" {
+		startup, cancel := context.WithTimeout(ctx, 45*time.Second)
+		spanner, startErr := spannerprocess.Start(startup)
+		cancel()
+		if startErr != nil {
+			return startErr
+		}
+		defer func() { err = errors.Join(err, spanner.Stop()) }()
+		if err := os.Setenv("SPANNER_EMULATOR_HOST", spanner.Host); err != nil {
+			return err
+		}
+		if err := os.Setenv("E2E_SPANNER_DATABASE", spanner.Database); err != nil {
+			return err
+		}
+	}
+	if database := os.Getenv("E2E_SPANNER_DATABASE"); database != "" {
+		if os.Getenv("SPANNER_EMULATOR_HOST") == "" {
+			return errors.New("E2E_SPANNER_DATABASE requires SPANNER_EMULATOR_HOST")
+		}
+		connections = append(connections, "test.us.spanner=spanner://"+database)
+	}
+	p, err := startEmulator(ctx, binary, dataDir, strings.Split(strings.TrimSpace(string(projectData)), "\n"), "jdoe@example.com", connections...)
 	if err != nil {
 		return err
 	}
