@@ -1,0 +1,22 @@
+# Scripting statements in EXECUTE IMMEDIATE
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
+#
+# BigQuery documents that the statement may be a BEGIN...END block, and that no control statement
+# may be nested in it, but not whether the block may declare variables or handle exceptions, or
+# whether the statement may assign a system variable or control a transaction. The emulator
+# rejects these as unsupported until they settle.
+
+EXECUTE IMMEDIATE "BEGIN DECLARE y INT64 DEFAULT 2; SELECT y; END"
+?>
+
+EXECUTE IMMEDIATE "BEGIN SELECT ERROR('fail'); EXCEPTION WHEN ERROR THEN SELECT 2; END"
+?>
+
+EXECUTE IMMEDIATE "SET @@dataset_id = 'unverified'";
+SELECT @@dataset_id
+?>
+
+CREATE TEMP TABLE dynamic_transaction (n INT64);
+EXECUTE IMMEDIATE "BEGIN BEGIN TRANSACTION; INSERT dynamic_transaction VALUES (1); COMMIT TRANSACTION; END";
+SELECT COUNT(*) FROM dynamic_transaction
+?>
