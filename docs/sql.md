@@ -61,7 +61,7 @@ rejected.
 | `UNPIVOT` | Supported |  |
 | `TABLESAMPLE` | Unsupported |  |
 | Pipe syntax | Supported |  |
-| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: ARRAY_AGG over INTERVAL values ordered by themselves first; function JSON_ARRAY with INTERVAL. |
+| INTERVAL values | Partial | See [INTERVAL values](compatibility.md#interval-values). Unsupported: aggregate or analytic function ARRAY_AGG with INTERVAL; function JSON_ARRAY with INTERVAL. |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
 
 ## DML

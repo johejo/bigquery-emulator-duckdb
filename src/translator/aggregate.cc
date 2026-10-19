@@ -71,20 +71,15 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     throw std::invalid_argument("Unsupported type INTERVAL for approx_top_sum_shard.");
   }
   // BigQuery rejects ARRAY_AGG over INTERVAL values ordered by themselves alone after analysis,
-  // as it must with DISTINCT, but orders them by other keys, also before themselves. Ordering them
-  // by themselves before other keys is unsupported until BigQuery settles it.
+  // as it must with DISTINCT, but orders them by other keys, also with themselves.
   if (name == "ARRAY_AGG" && type_of(0) == googlesql::TYPE_INTERVAL && aggregate != nullptr &&
       !aggregate->order_by_item_list().empty()) {
     const auto& items = aggregate->order_by_item_list();
-    const auto* value = call.argument_list(0)->Is<googlesql::ResolvedColumnRef>()
-                            ? call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>()
-                            : nullptr;
     if (call.distinct() ||
-        (value != nullptr && value->column() == items.at(0)->column_ref()->column())) {
-      if (call.distinct() || items.size() == 1) {
-        throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
-      }
-      return Unsupported(scope, "ARRAY_AGG over INTERVAL values ordered by themselves first");
+        (items.size() == 1 && call.argument_list(0)->Is<googlesql::ResolvedColumnRef>() &&
+         call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>()->column() ==
+             items.at(0)->column_ref()->column())) {
+      throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
     }
   }
   // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
