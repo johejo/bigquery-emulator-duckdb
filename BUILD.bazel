@@ -313,6 +313,7 @@ cc_library(
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:options_cc_proto",
+        "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
     ],

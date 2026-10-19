@@ -19,9 +19,10 @@ class TableSource;
 // [PROJECT.][DATASET or `region-REGION`.]INFORMATION_SCHEMA.VIEW.
 bool IsInformationSchemaPath(const std::vector<std::string>& parts);
 
-// Builds the INFORMATION_SCHEMA view `parts` names, with the rows it has now. SCHEMATA, TABLES,
-// VIEWS, COLUMNS, COLUMN_FIELD_PATHS, ROUTINES and PARAMETERS are supported. Dataset and region
-// qualifiers select the datasets to describe and require the query to run in their location.
+// Builds the INFORMATION_SCHEMA view `parts` names, with the rows it has now. SCHEMATA,
+// SCHEMATA_OPTIONS, TABLES, TABLE_OPTIONS, PARTITIONS, VIEWS, COLUMNS, COLUMN_FIELD_PATHS,
+// ROUTINES and PARAMETERS are supported. Dataset and region qualifiers select the datasets to
+// describe and require the query to run in their location.
 absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     const std::vector<std::string>& parts, TableSource& source,
     googlesql::TypeFactory* type_factory, const std::string& default_project,

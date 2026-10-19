@@ -357,8 +357,14 @@ query `SCHEMATA` | SELECT schema_name, ddl FROM INFORMATION_SCHEMA.SCHEMATA
 query `SCHEMATA` | SELECT schema_name FROM `test.region-us.INFORMATION_SCHEMA.SCHEMATA`
 query `SCHEMATA` | SELECT schema_name FROM `region-eu`.INFORMATION_SCHEMA.SCHEMATA
 note `SCHEMATA` | See [Datasets](compatibility.md#datasets).
+query `SCHEMATA_OPTIONS` | ALTER SCHEMA d SET OPTIONS (description = 'x'); SELECT schema_name, option_name, option_type, option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS
+query `SCHEMATA_OPTIONS` | SELECT option_name FROM `region-us`.INFORMATION_SCHEMA.SCHEMATA_OPTIONS
 query `TABLES` | SELECT table_name, table_type, ddl FROM d.INFORMATION_SCHEMA.TABLES
 query `TABLES` | SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
+query `TABLE_OPTIONS` | ALTER TABLE d.t SET OPTIONS (description = 'x'); SELECT table_name, option_name, option_type, option_value FROM d.INFORMATION_SCHEMA.TABLE_OPTIONS
+query `TABLE_OPTIONS` | SELECT table_schema, table_name, option_name FROM `region-us`.INFORMATION_SCHEMA.TABLE_OPTIONS
+query `PARTITIONS` | CREATE TABLE d.p (day DATE) PARTITION BY day; INSERT d.p VALUES (DATE '2021-07-12'); SELECT table_name, partition_id, total_rows FROM d.INFORMATION_SCHEMA.PARTITIONS
+note `PARTITIONS` | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query `COLUMNS` | SELECT column_name, ordinal_position, data_type FROM d.INFORMATION_SCHEMA.COLUMNS
 query `COLUMNS` | SELECT * FROM `region-us`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = 't'
 query `COLUMN_FIELD_PATHS` | SELECT field_path, data_type FROM d.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS

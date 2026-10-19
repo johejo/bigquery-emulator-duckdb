@@ -1,0 +1,45 @@
+# INFORMATION_SCHEMA.PARTITIONS partition IDs and row counts, as BigQuery documents them.
+# https://cloud.google.com/bigquery/docs/information-schema-partitions
+# https://cloud.google.com/bigquery/docs/partitioned-tables
+
+# Rows with NULL go into __NULL__, and dates before 1960-01-01 or after 2159-12-31 into
+# __UNPARTITIONED__.
+CREATE OR REPLACE TABLE scalars.partitions_daily (d DATE) PARTITION BY d;
+INSERT scalars.partitions_daily VALUES (DATE '2021-07-12'), (DATE '2021-07-12'), (DATE '2021-07-13'), (NULL), (DATE '1959-12-31'), (DATE '2160-01-01');
+SELECT STRING_AGG(FORMAT('%s:%d', partition_id, total_rows), ',' ORDER BY partition_id) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_daily'
+=> "20210712:2,20210713:1,__NULL__:1,__UNPARTITIONED__:2"
+
+# Partition boundaries are based on UTC time.
+CREATE OR REPLACE TABLE scalars.partitions_hourly (ts TIMESTAMP) PARTITION BY TIMESTAMP_TRUNC(ts, HOUR);
+INSERT scalars.partitions_hourly VALUES (TIMESTAMP '2021-07-12 05:30:00+00'), (TIMESTAMP '2021-07-12 23:30:00-05');
+SELECT STRING_AGG(partition_id, ',' ORDER BY partition_id) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_hourly'
+=> "2021071205,2021071304"
+
+CREATE OR REPLACE TABLE scalars.partitions_monthly (dt DATETIME) PARTITION BY DATETIME_TRUNC(dt, MONTH);
+INSERT scalars.partitions_monthly VALUES (DATETIME '2019-01-01 00:00:00'), (DATETIME '2019-01-15 00:00:00'), (DATETIME '2019-04-30 00:00:00');
+SELECT STRING_AGG(FORMAT('%s:%d', partition_id, total_rows), ',' ORDER BY partition_id) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_monthly'
+=> "201901:2,201904:1"
+
+CREATE OR REPLACE TABLE scalars.partitions_yearly (d DATE) PARTITION BY DATE_TRUNC(d, YEAR);
+INSERT scalars.partitions_yearly VALUES (DATE '2021-07-12');
+SELECT partition_id FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_yearly'
+=> "2021"
+
+# An integer-range partition is named by its start; values outside the range go into
+# __UNPARTITIONED__.
+CREATE OR REPLACE TABLE scalars.partitions_range (customer_id INT64) PARTITION BY RANGE_BUCKET(customer_id, GENERATE_ARRAY(0, 100, 10));
+INSERT scalars.partitions_range VALUES (0), (9), (40), (99), (-1), (100), (NULL);
+SELECT STRING_AGG(FORMAT('%s:%d', partition_id, total_rows), ',' ORDER BY partition_id) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_range'
+=> "0:2,40:1,90:1,__NULL__:1,__UNPARTITIONED__:2"
+
+# Unpartitioned tables have a NULL partition ID.
+CREATE OR REPLACE TABLE scalars.partitions_none (x INT64);
+INSERT scalars.partitions_none VALUES (1), (2);
+SELECT FORMAT('%t %s %t %d', table_catalog = @@project_id, table_schema, partition_id IS NULL, total_rows) FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_none'
+=> "true scalars true 2"
+
+CREATE OR REPLACE TABLE scalars.partitions_tier (d DATE) PARTITION BY d;
+INSERT scalars.partitions_tier VALUES (DATE '2021-07-12');
+SELECT storage_tier FROM scalars.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'partitions_tier'
+=> "ACTIVE"
+

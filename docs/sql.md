@@ -23,7 +23,7 @@ rejected.
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 17 | 11 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
-| [INFORMATION_SCHEMA](#information_schema) | 7 | 0 | 0 |
+| [INFORMATION_SCHEMA](#information_schema) | 10 | 0 | 0 |
 
 ## Queries
 
@@ -138,7 +138,10 @@ rejected.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | `SCHEMATA` | Supported | See [Datasets](compatibility.md#datasets). |
+| `SCHEMATA_OPTIONS` | Supported |  |
 | `TABLES` | Supported |  |
+| `TABLE_OPTIONS` | Supported |  |
+| `PARTITIONS` | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
 | `COLUMNS` | Supported |  |
 | `COLUMN_FIELD_PATHS` | Supported |  |
 | `VIEWS` | Supported |  |

@@ -1,0 +1,74 @@
+# INFORMATION_SCHEMA.SCHEMATA_OPTIONS, TABLE_OPTIONS and PARTITIONS
+# https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata-options
+# https://cloud.google.com/bigquery/docs/information-schema-table-options
+# https://cloud.google.com/bigquery/docs/information-schema-partitions
+#
+# Each script creates the datasets unverified_options_* and tables of their own, which stay in
+# the project after the scripts run.
+
+# Which options a dataset or a table that sets none lists, such as storage_billing_model or
+# location.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'unverified_options_plain'
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.t (x INT64);
+SELECT STRING_AGG(FORMAT('%s %s %s', option_name, option_type, option_value), '; ' ORDER BY option_name) FROM unverified_options_plain.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 't'
+?>
+
+# Whether default_rounding_mode is listed, and how.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_rounding OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+SELECT FORMAT('%s %s', option_type, option_value) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'unverified_options_rounding' AND option_name = 'default_rounding_mode'
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.rounding (x NUMERIC) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+SELECT FORMAT('%s %s', option_type, option_value) FROM unverified_options_plain.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'rounding' AND option_name = 'default_rounding_mode'
+?>
+
+# How several labels are ordered and separated.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.labels (x INT64) OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
+SELECT option_value FROM unverified_options_plain.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'labels' AND option_name = 'labels'
+?>
+
+# How a string value with quotes, backslashes and newlines is escaped.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.quoted (x INT64) OPTIONS (description = 'a "b" \'c\' \\ \n d');
+SELECT option_value FROM unverified_options_plain.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'quoted' AND option_name = 'description'
+?>
+
+# How a default table expiration of a fraction of a day is written.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_hours OPTIONS (default_table_expiration_days = 3.75);
+SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'unverified_options_hours' AND option_name = 'default_table_expiration_days'
+?>
+
+# Whether an unpartitioned table without rows has a partition, and a partitioned one none.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.empty (x INT64);
+SELECT FORMAT('%t', ARRAY(SELECT AS STRUCT partition_id, total_rows FROM unverified_options_plain.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'empty'))
+?>
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE TABLE unverified_options_plain.empty_daily (d DATE) PARTITION BY d;
+SELECT COUNT(*) FROM unverified_options_plain.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'empty_daily'
+?>
+
+# Whether views have rows in PARTITIONS.
+
+CREATE SCHEMA IF NOT EXISTS unverified_options_plain;
+CREATE OR REPLACE VIEW unverified_options_plain.v AS SELECT 1 AS x;
+SELECT COUNT(*) FROM unverified_options_plain.INFORMATION_SCHEMA.PARTITIONS WHERE table_name = 'v'
+?>
+
+# How BigQuery rejects PARTITIONS with a region qualifier, which it does not document.
+
+SELECT COUNT(*) FROM `region-us`.INFORMATION_SCHEMA.PARTITIONS
+?>
