@@ -1,6 +1,6 @@
 ## / between INTERVAL and INT64 values
 # Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
-# compliance/functions_testlib_interval.cc (interval divide).
+# compliance/functions_testlib_interval.cc (interval divide); BigQuery answers.
 
 SELECT INTERVAL 10 YEAR / 3
 => "3-4 0 0:0:0"
@@ -59,3 +59,22 @@ SELECT INTERVAL 1 YEAR / CAST(NULL AS INT64)
 
 SELECT CAST(NULL AS INTERVAL) / 0
 => null
+
+# The time truncates toward zero to microseconds. Source: BigQuery answers.
+SELECT INTERVAL 1 MICROSECOND / 2
+=> "0-0 0 0:0:0"
+
+SELECT INTERVAL -1 MICROSECOND / 2
+=> "0-0 0 0:0:0"
+
+SELECT INTERVAL 1 SECOND / 3
+=> "0-0 0 0:0:0.333333"
+
+SELECT INTERVAL -1 SECOND / 3
+=> "0-0 0 -0:0:0.333333"
+
+SELECT INTERVAL 1 YEAR / 0
+=> error: Interval division by zero
+
+SELECT 6 / INTERVAL 2 DAY
+=> error contains: No matching signature for operator /
