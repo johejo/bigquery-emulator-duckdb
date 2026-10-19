@@ -1,0 +1,26 @@
+# The @@project_id system variable
+# https://cloud.google.com/bigquery/docs/reference/system-variables
+#
+# The first script creates the dataset unverified_project_id, which the single statements after it
+# define a view and a function in. The dataset stays in the project after the queries run.
+
+# Whether system variable names are case-insensitive.
+
+CREATE SCHEMA IF NOT EXISTS unverified_project_id;
+SELECT @@PROJECT_ID = @@project_id
+?>
+
+# BigQuery's error for a view or function that a single statement, rather than a script, defines
+# with a system variable.
+
+CREATE OR REPLACE VIEW unverified_project_id.v AS SELECT @@project_id AS project_id
+?>
+
+CREATE OR REPLACE FUNCTION unverified_project_id.f() AS (@@project_id)
+?>
+
+# BigQuery's error for an assignment to the read-only @@project_id.
+
+SET @@project_id = 'example-project';
+SELECT 1
+?>

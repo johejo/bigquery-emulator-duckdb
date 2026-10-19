@@ -67,7 +67,3 @@ SELECT 1
 
 EXECUTE IMMEDIATE "SET @@project_id = 'example-project'"
 => error:
-
-# Nor can a function that a single statement defines.
-CREATE OR REPLACE FUNCTION errors_dataset_system_variables.project_id() AS (@@project_id)
-=> error contains: Invalid reference to system variable @@project_id
