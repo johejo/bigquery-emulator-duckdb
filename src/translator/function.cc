@@ -1,11 +1,8 @@
 #include "googlesql/public/function.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
-#include <iterator>
 #include <optional>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -47,11 +44,8 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
         .rounding_mode = RoundingMode(argument),
     });
   }
-  static constexpr std::array<std::string_view, 6> struct_comparisons = {
-      "$EQUAL", "$NOT_EQUAL", "$IN", "$IN_ARRAY", "$CASE_WITH_VALUE", "NULLIF",
-  };
   if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
-      std::ranges::find(struct_comparisons, name) != struct_comparisons.end()) {
+      HasTypeUse(name, TypeUse::kComparesStructs)) {
     return StructComparison(call);
   }
   if (entry->implementation == Implementation::kHandler) {
@@ -212,49 +206,6 @@ std::optional<std::string> RoundedToEven(const std::string& value, const googles
 
 namespace {
 
-// What a function does with values of a type that DuckDB holds in another type, such as a RANGE
-// in a STRUCT. A type takes the categories whose operations DuckDB performs on its stand-in as
-// BigQuery does on its values; other functions would see the stand-in.
-//
-// These pass, select or count their values without reading them.
-constexpr std::string_view kCarries[] = {
-    "$IS_NULL",
-    "$CASE_NO_VALUE",
-    "IF",
-    "IFNULL",
-    "COALESCE",
-    "$MAKE_ARRAY",
-    "$ARRAY_AT_OFFSET",
-    "$ARRAY_AT_ORDINAL",
-    "$SAFE_ARRAY_AT_OFFSET",
-    "$SAFE_ARRAY_AT_ORDINAL",
-    "ARRAY_LENGTH",
-    "ARRAY_REVERSE",
-    "ARRAY_CONCAT",
-};
-// These also compare or order their values.
-constexpr std::string_view kCompares[] = {
-    "$EQUAL",
-    "$NOT_EQUAL",
-    "$LESS",
-    "$LESS_OR_EQUAL",
-    "$GREATER",
-    "$GREATER_OR_EQUAL",
-    "$BETWEEN",
-    "$IS_DISTINCT_FROM",
-    "$IS_NOT_DISTINCT_FROM",
-    "$IN",
-    "$IN_ARRAY",
-    "$CASE_WITH_VALUE",
-    "NULLIF",
-    "GREATEST",
-    "LEAST",
-};
-
-bool In(std::span<const std::string_view> functions, std::string_view function) {
-  return std::ranges::find(functions, function) != functions.end();
-}
-
 // A call to a JavaScript UDF, which the backend function for its result type runs on `source`.
 std::optional<std::string> JavaScriptCall(const googlesql::ResolvedFunctionCall& call,
                                           const std::string& source, const Scope& scope,
@@ -300,8 +251,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     return Unsupported(scope, "function " + name);
   }
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
-  if ((name == "SESSION_USER" || name == "ERROR" || name == "TEXT_ANALYZE" ||
-       name == "ST_GEOHASH") &&
+  if (HasTypeUse(name, TypeUse::kRejectsSafe) &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
     throw std::invalid_argument("SAFE with function " + call.function()->Name() +
                                 " is not supported.");
@@ -327,29 +277,6 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         std::ranges::any_of(call.argument_list(), [](const auto& argument) {
                           return HasInterval(argument->type());
                         });
-  // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
-  // INTERVAL values are DuckDB intervals, which these build and read.
-  static constexpr std::string_view interval_functions[] = {
-      "$ADD",
-      "$SUBTRACT",
-      "$UNARY_MINUS",
-      "$MULTIPLY",
-      "$DIVIDE",
-      "$INTERVAL",
-      "$EXTRACT",
-      "MAKE_INTERVAL",
-      "JUSTIFY_HOURS",
-      "JUSTIFY_DAYS",
-      "JUSTIFY_INTERVAL",
-      "ERROR",
-      "FORMAT",
-      "JSON_ARRAY_APPEND",
-      "JSON_ARRAY_INSERT",
-      "TO_JSON",
-      "TO_JSON_STRING",
-      "JSON_OBJECT",
-      "GENERATE_RANGE_ARRAY",
-  };
   // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.
   if ((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
       std::ranges::any_of(call.argument_list(),
@@ -363,44 +290,22 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                           [](const auto& argument) { return argument->type()->IsDouble(); })) {
     throw std::invalid_argument("No matching signature for operator *");
   }
-  // These only compare their INTERVAL arguments or ARRAY elements, so they compare the
-  // values' keys instead.
-  static constexpr std::string_view interval_comparisons[] = {
-      "$EQUAL",
-      "$NOT_EQUAL",
-      "$LESS",
-      "$LESS_OR_EQUAL",
-      "$GREATER",
-      "$GREATER_OR_EQUAL",
-      "$BETWEEN",
-      "$IS_DISTINCT_FROM",
-      "$IS_NOT_DISTINCT_FROM",
-      "$IN",
-      "$IN_ARRAY",
-      "RANGE_BUCKET",
-  };
   const auto keyed = [&](const googlesql::Type* type) {
     return type->IsInterval() || ((function == "$IN_ARRAY" || function == "RANGE_BUCKET") &&
                                   type->IsArray() && type->AsArray()->element_type()->IsInterval());
   };
   const bool compares_intervals =
-      interval &&
-      std::ranges::find(interval_comparisons, function) != std::end(interval_comparisons) &&
+      interval && HasTypeUse(function, TypeUse::kComparesIntervalKeys) &&
       std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
         return !HasInterval(argument->type()) || keyed(argument->type());
       });
-  // StructComparison compares STRUCTs field by field, and their INTERVAL fields by their keys.
-  // BigQuery compares no ARRAYs, also in STRUCT fields.
-  static constexpr std::string_view struct_comparisons[] = {
-      "$EQUAL",
-      "$NOT_EQUAL",
-      "$IN",
-      "$IN_ARRAY",
-  };
-  const bool compares_structs =
-      interval && In(struct_comparisons, function) && call.argument_list(0)->type()->IsStruct();
+  const bool compares_structs = interval &&
+                                HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
+                                call.argument_list(0)->type()->IsStruct();
+  // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && entry->handler != Bucket &&
-      !In(kCarries, function) && !In(interval_functions, function)) {
+      !HasTypeUse(function, TypeUse::kCarries) &&
+      !HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
   // A GEOGRAPHY is text in DuckDB, which the S2 functions build and read, and which DuckDB
@@ -408,51 +313,27 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&
-      entry->implementation != Implementation::kS2 && !In(kCarries, function)) {
+      entry->implementation != Implementation::kS2 && !HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
   }
   // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.
   if (function == "RANGE_BUCKET" && call.argument_list(0)->type()->IsRange()) {
     throw std::invalid_argument("Unsupported type RANGE for function RANGE_BUCKET");
   }
-  // A RANGE is a STRUCT in DuckDB whose unbounded ends are infinite, so DuckDB carries, compares
-  // and orders it as BigQuery does a RANGE. These build or read it, and the JSON and FORMAT
-  // backends read it as a RANGE; others would see the STRUCT.
-  static constexpr std::string_view range_functions[] = {
-      "FORMAT",
-      "TO_JSON",
-      "TO_JSON_STRING",
-      "JSON_ARRAY",
-      "JSON_OBJECT",
-      "JSON_SET",
-      "JSON_ARRAY_APPEND",
-      "JSON_ARRAY_INSERT",
-      "RANGE",
-      "RANGE_START",
-      "RANGE_END",
-      "RANGE_CONTAINS",
-      "RANGE_OVERLAPS",
-      "RANGE_INTERSECT",
-      "GENERATE_RANGE_ARRAY",
-      "ERROR",
-  };
+  // A RANGE is a STRUCT in DuckDB, which only these read as a RANGE.
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasRange(argument->type()); })) &&
-      !In(kCarries, function) && !In(kCompares, function) && !In(range_functions, function)) {
+      !HasTypeUse(function, TypeUse::kCarries) && !HasTypeUse(function, TypeUse::kCompares) &&
+      !HasTypeUse(function, TypeUse::kBuildsOrReadsRange)) {
     return Unsupported(scope, "function " + name + " with RANGE");
   }
-  // A STRUCT<> is a STRUCT with a placeholder field in DuckDB, which the JSON and FORMAT backends
-  // read as an empty STRUCT; others would see the field.
-  static constexpr std::string_view empty_struct_functions[] = {
-      "TO_JSON", "TO_JSON_STRING",    "JSON_ARRAY",        "JSON_OBJECT", "JSON_SET",
-      "FORMAT",  "JSON_ARRAY_APPEND", "JSON_ARRAY_INSERT", "$MAKE_ARRAY",
-  };
+  // A STRUCT<> is a STRUCT with a placeholder field in DuckDB, which only these read as empty.
   if ((HasEmptyStruct(call.type()) || std::ranges::any_of(call.argument_list(),
                                                           [](const auto& argument) {
                                                             return HasEmptyStruct(argument->type());
                                                           })) &&
-      std::ranges::find(empty_struct_functions, function) == std::end(empty_struct_functions)) {
+      !HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
     return Unsupported(scope, "function " + name + " with STRUCT<>");
   }
   // Call gives equality of STRUCTs to StructComparison, and BigQuery does not compare ARRAYs.

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -95,11 +94,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                           [](const auto& argument) { return HasEmptyStruct(argument->type()); })) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with STRUCT<>");
   }
-  // These order, compare or carry a RANGE's STRUCT as BigQuery does its RANGE.
-  static constexpr std::string_view range_functions[] = {
-      "COUNT",      "MIN",       "MAX", "ANY_VALUE", "ARRAY_AGG", "FIRST_VALUE",
-      "LAST_VALUE", "NTH_VALUE", "LAG", "LEAD",      "MIN_BY",    "MAX_BY",
-  };
   // BigQuery rejects these over RANGE values although GoogleSQL accepts them, naming the
   // functions it implements them with.
   static const std::map<std::string_view, std::string_view> range_rejections = {
@@ -116,7 +110,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasRange(argument->type()); })) &&
-      std::ranges::find(range_functions, name) == std::end(range_functions)) {
+      !HasTypeUse(name, TypeUse::kAggregatesRange)) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with RANGE");
   }
   if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {

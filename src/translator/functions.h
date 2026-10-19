@@ -204,6 +204,41 @@ const FunctionEntry* FindFunction(std::string_view upper_name);
 // a BIGNUMERIC is unsupported.
 bool SupportsBigNumeric(std::string_view upper_name);
 
+// What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a
+// STRUCT, and other per-function differences from GoogleSQL. A type takes the uses whose
+// operations DuckDB performs on its stand-in as BigQuery does on its values; other functions
+// would see the stand-in.
+enum class TypeUse : std::uint8_t {
+  // Pass, select or count their values without reading them.
+  kCarries,
+  // Also compare or order their values.
+  kCompares,
+  // Build or read DuckDB intervals, which hold INTERVAL values.
+  kBuildsOrReadsInterval,
+  // Only compare their INTERVAL arguments or ARRAY elements, so they compare the values' keys.
+  kComparesIntervalKeys,
+  // Compare a STRUCT first argument field by field, as StructComparison does.
+  kComparesStructs,
+  // Of kComparesStructs, those that also compare INTERVAL fields, by their keys. BigQuery
+  // compares no ARRAYs, also in STRUCT fields.
+  kComparesStructsWithInterval,
+  // Build or read the STRUCT that holds a RANGE, whose unbounded ends are infinite, or read it as
+  // a RANGE in the JSON and FORMAT backends. DuckDB carries, compares and orders it as BigQuery
+  // does a RANGE.
+  kBuildsOrReadsRange,
+  // Aggregate or analytic functions that order, compare or carry a RANGE's STRUCT as BigQuery
+  // does its RANGE.
+  kAggregatesRange,
+  // Read the placeholder field of a STRUCT<> as an empty STRUCT, as the JSON and FORMAT backends
+  // do, or carry it.
+  kReadsEmptyStruct,
+  // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
+  kRejectsSafe,
+};
+
+// Whether `upper_name`, the function name in upper case, has `use`.
+bool HasTypeUse(std::string_view upper_name, TypeUse use);
+
 // The DuckDB spelling of a call to `upper_name`, a function implemented by kSame, kRenamed,
 // kRules, kBackend or kS2, or nullopt when no rule matches.
 std::optional<std::string> TranslateFunction(std::string_view upper_name,
