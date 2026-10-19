@@ -373,6 +373,27 @@ std::vector<Rule> WithInterval(const std::string& spelling,
   return rules;
 }
 
+// TIME arithmetic wraps within a day. Reduce the count before constructing an interval so
+// every INT64 count fits DuckDB's interval representation, including INT64_MIN for subtraction.
+std::vector<Rule> TimeArithmetic(std::string_view operation) {
+  std::vector<Rule> rules;
+  for (const auto& [part, per_day] : {
+           std::pair<std::string_view, int64_t>{"hour", 24},
+           {"minute", 1440},
+           {"second", 86400},
+           {"millisecond", 86400000},
+           {"microsecond", 86400000000},
+       }) {
+    rules.push_back({
+        .arity = 3,
+        .spelling = "($1 " + std::string(operation) + " to_microseconds(($2 % " +
+                    std::to_string(per_day) + ") * " + std::to_string(86400000000 / per_day) + "))",
+        .conditions = {Part(3, {part})},
+    });
+  }
+  return rules;
+}
+
 // EXTRACT, where a time zone argument moves a TIMESTAMP to the civil time there.
 std::vector<Rule> Extract() {
   std::vector<Rule> rules = {
@@ -841,8 +862,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"TIMESTAMP_ADD", WithInterval("($1 + $2)", kTimestampRange)},
       {"TIMESTAMP_SUB", WithInterval("($1 - $2)", kTimestampRange)},
       // TIME wraps around midnight.
-      {"TIME_ADD", WithInterval("($1 + $2)")},
-      {"TIME_SUB", WithInterval("($1 - $2)")},
+      {"TIME_ADD", TimeArithmetic("+")},
+      {"TIME_SUB", TimeArithmetic("-")},
       {"$EXTRACT", Extract()},
       {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
       // DATE and DATETIME differences count the boundaries crossed, which is DuckDB's date_diff,

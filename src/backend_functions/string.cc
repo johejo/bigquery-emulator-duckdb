@@ -292,6 +292,7 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_left_bytes", {kBlob, kBigint}, kBlob, Apply<fn::LeftBytes>},
            {"bq_right", {kVarchar, kBigint}, kVarchar, Apply<fn::RightUtf8>},
            {"bq_right_bytes", {kBlob, kBigint}, kBlob, Apply<fn::RightBytes>},
+           {"bq_substr", {kVarchar, kBigint, kBigint}, kVarchar, Apply<fn::SubstrWithLengthUtf8>},
            {"bq_substr_bytes", {kBlob, kBigint, kBigint}, kBlob, Apply<fn::SubstrWithLengthBytes>},
            {"bq_lpad", {kVarchar, kBigint, kVarchar}, kVarchar, Apply<fn::LeftPadUtf8>},
            {"bq_lpad_bytes", {kBlob, kBigint, kBlob}, kBlob, Apply<fn::LeftPadBytes>},
