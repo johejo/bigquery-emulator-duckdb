@@ -341,6 +341,7 @@ query Transactions | BEGIN TRANSACTION; DELETE u WHERE id = 1; ROLLBACK TRANSACT
 query Transactions | BEGIN BEGIN TRANSACTION; SELECT 1 / 0; EXCEPTION WHEN ERROR THEN COMMIT TRANSACTION; END
 note Transactions | See [Scripts and transactions](compatibility.md#scripts-and-transactions).
 query `CALL` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE) BEGIN SELECT x; END; CALL d.p(1)
+query `CALL` | DECLARE v INT64 DEFAULT 1; DECLARE w INT64; CREATE PROCEDURE d.p(INOUT x INT64, OUT y INT64) OPTIONS(strict_mode=FALSE) BEGIN SET y = x; SET x = x + 1; END; CALL d.p(v, w); SELECT v, w
 query `CALL` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT @@dataset_id; END; SET @@dataset_id = 'd'; CALL d.p()
 query `CALL` | CREATE TEMP FUNCTION f(x INT64) AS (x * 2); CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT f(3); END; CALL d.p()
 query `CALL` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SET @@dataset_id = 'd'; END; CALL d.p()

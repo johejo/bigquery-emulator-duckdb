@@ -125,3 +125,39 @@ CREATE OR REPLACE PROCEDURE scalars.proc_caller_function() OPTIONS(strict_mode=F
 BEGIN SELECT caller_function(1); END;
 CALL scalars.proc_caller_function()
 => "2"
+
+# OUT and INOUT arguments, from CREATE PROCEDURE's documentation:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+DECLARE accumulator INT64 DEFAULT 0;
+CREATE OR REPLACE PROCEDURE scalars.proc_add_delta(INOUT x INT64, delta INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = x + delta; END;
+CALL scalars.proc_add_delta(accumulator, 5);
+CALL scalars.proc_add_delta(accumulator, 3);
+SELECT accumulator
+=> "8"
+
+# An OUT argument starts as NULL, and the caller's variable takes the last value assigned to it.
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_null(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SELECT x IS NULL; END;
+CALL scalars.proc_out_null(v)
+=> "true"
+
+DECLARE v INT64 DEFAULT 5;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_last(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = 3; SET x = 4; END;
+CALL scalars.proc_out_last(v);
+SELECT v
+=> "4"
+
+# OUT and INOUT arguments take variables, each passed once.
+CREATE OR REPLACE PROCEDURE scalars.proc_out_value(OUT x INT64) OPTIONS(strict_mode=FALSE)
+BEGIN SET x = 1; END;
+CALL scalars.proc_out_value(1)
+=> error:
+
+DECLARE v INT64;
+CREATE OR REPLACE PROCEDURE scalars.proc_out_twice(OUT x INT64, INOUT y INT64)
+OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; END;
+CALL scalars.proc_out_twice(v, v)
+=> error:

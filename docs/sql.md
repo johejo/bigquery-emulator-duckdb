@@ -112,7 +112,7 @@ rejected.
 | `DROP FUNCTION` | Supported |  |
 | `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |
 | `DROP TABLE FUNCTION` | Supported |  |
-| `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedure arguments other than fixed-type IN arguments; procedures without OPTIONS(strict_mode = FALSE). |
+| `CREATE PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: procedures without OPTIONS(strict_mode = FALSE). |
 | `DROP PROCEDURE` | Partial | See [Stored procedures](compatibility.md#stored-procedures). Unsupported: persistent routine name missing without a dataset. |
 
 ## Multi-statement queries

@@ -8,14 +8,6 @@ CREATE OR REPLACE PROCEDURE errors_procedures.proc_strict_true() OPTIONS(strict_
 => error contains: The emulator does not support
 
 CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_out(OUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; END
-=> error contains: The emulator does not support
-
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_inout(INOUT x INT64) OPTIONS(strict_mode=FALSE) BEGIN SET x = x + 1; END
-=> error contains: The emulator does not support
-
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
 CREATE OR REPLACE PROCEDURE errors_procedures.proc_system() OPTIONS(strict_mode=FALSE) BEGIN SET @@dataset_id = 'other'; END;
 BEGIN CALL errors_procedures.proc_system(); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support

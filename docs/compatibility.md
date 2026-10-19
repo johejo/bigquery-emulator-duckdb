@@ -379,11 +379,11 @@ transaction.
 ## Stored procedures
 
 SQL procedures support `CREATE PROCEDURE`, `CREATE OR REPLACE PROCEDURE`, `CREATE PROCEDURE IF NOT
-EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN` arguments. Definitions must explicitly
+EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN`, `OUT` and `INOUT` arguments. Definitions must explicitly
 set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the Routine API): only syntax is
 checked at creation, and statements resolve when called. Strict mode's default validation,
-`OUT` and `INOUT` arguments, non-SQL procedures, and options other than `strict_mode` and
-`description` are unsupported. Procedure names in DDL must include their dataset.
+`ANY TYPE` arguments, non-SQL procedures, and options other than `strict_mode` and `description`
+are unsupported. Procedure names in DDL must include their dataset.
 
 The Routine API stores and returns the same definitions as DDL, including descriptions and
 argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
@@ -391,7 +391,9 @@ project. Permanent tables must include their datasets: the caller's default data
 apply inside a procedure. The caller's `@@dataset_id` value can still be read from the body.
 Temporary tables and temporary UDFs are shared with the calling script. Local variables and
 `IN` argument assignments stay within the procedure, and caller variables are not visible in
-the body, and `@@project_id` is the project that runs the script. Query parameters, function
+the body, and `@@project_id` is the project that runs the script. `OUT` arguments start as
+`NULL`, and when the procedure returns, the variables passed as `OUT` and `INOUT` arguments
+take the arguments' last values. Query parameters, function
 declarations, system-variable assignments, reads of system variables other than `@@dataset_id`
 and `@@project_id`, and dynamic SQL inside procedures are unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
