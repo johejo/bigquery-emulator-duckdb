@@ -1,0 +1,38 @@
+# ARRAY_AGG with ORDER BY over INTERVAL values
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#array_agg
+#
+# BigQuery rejects ARRAY_AGG(DISTINCT i ORDER BY i) over INTERVAL values with "Unsupported type
+# INTERVAL for array_agg.". These ask whether it also rejects ORDER BY without DISTINCT, and
+# whether the INTERVAL aggregated value or the INTERVAL key decides it.
+
+# An INTERVAL value ordered by itself.
+
+SELECT TO_JSON_STRING(ARRAY_AGG(i ORDER BY i))
+FROM UNNEST([INTERVAL 40 DAY, INTERVAL -1 SECOND, INTERVAL 1 MONTH, INTERVAL 2 HOUR]) AS i
+?>
+
+# An INT64 value ordered by an INTERVAL key.
+
+SELECT TO_JSON_STRING(ARRAY_AGG(n ORDER BY i))
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+?>
+
+# An INTERVAL value ordered by an INT64 key.
+
+SELECT TO_JSON_STRING(ARRAY_AGG(i ORDER BY n))
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+?>
+
+# An analytic ARRAY_AGG whose window orders by an INTERVAL key.
+
+SELECT STRING_AGG(TO_JSON_STRING(a), ' ' ORDER BY n) FROM (
+  SELECT n, ARRAY_AGG(i) OVER (ORDER BY i ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS a
+  FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+)
+?>
+
+# DISTINCT with LIMIT, which the emulator leaves unsupported.
+
+SELECT TO_JSON_STRING(ARRAY_AGG(DISTINCT i LIMIT 2))
+FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY, INTERVAL 1 DAY]) AS i
+?>
