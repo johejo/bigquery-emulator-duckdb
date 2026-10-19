@@ -93,8 +93,8 @@ void AddIntervals(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
   });
 }
 
-// INTERVAL * INT64. GoogleSQL multiplies the months, days and time apart, and fails where one
-// leaves the range.
+// INTERVAL * INT64, and INT64 * INTERVAL. GoogleSQL multiplies the months, days and time apart, and
+// fails where one leaves the range.
 void MultiplyInterval(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   EachRow(info, input, output, [](const Arguments& args) -> absl::StatusOr<duckdb_interval> {
     GOOGLESQL_ASSIGN_OR_RETURN(const auto interval, ReadInterval(args));

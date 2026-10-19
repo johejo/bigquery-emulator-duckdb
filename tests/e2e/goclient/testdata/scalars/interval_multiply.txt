@@ -1,6 +1,6 @@
-## INTERVAL * INT64
+## * between INTERVAL and INT64 values
 # Sources: BigQuery's operators reference (interval arithmetic operators); GoogleSQL's
-# compliance/functions_testlib_interval.cc (interval multiply).
+# compliance/functions_testlib_interval.cc (interval multiply); BigQuery answers.
 
 SELECT INTERVAL '1:2:3' HOUR TO SECOND * 10
 => "0-0 0 10:20:30"
@@ -39,11 +39,19 @@ SELECT CAST(NULL AS INTERVAL) * 1
 SELECT INTERVAL 1 YEAR * CAST(NULL AS INT64)
 => null
 
+# BigQuery also takes INT64 * INTERVAL, which its operators reference does not list. Source:
+# BigQuery answers.
+SELECT 3 * INTERVAL 2 DAY
+=> "0-0 6 0:0:0"
+
+SELECT CAST(NULL AS INT64) * INTERVAL 1 DAY
+=> null
+
 SELECT INTERVAL 2 YEAR * 10000
-=> error:
+=> error: Interval field months '240000' is out of range -120000 to 120000
 
 SELECT INTERVAL 3660000 DAY * -2
 => error:
 
 SELECT INTERVAL 999999 DAY * 99999999999
-=> error:
+=> error: Interval field days '99999899999000001' is out of range -3660000 to 3660000

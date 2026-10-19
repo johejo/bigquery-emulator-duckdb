@@ -4,10 +4,6 @@
 SELECT MAKE_INTERVAL(day => 14) / 2
 => error contains: The emulator does not support function $DIVIDE with INTERVAL
 
-# BigQuery documents only INTERVAL * INT64.
-SELECT 2 * MAKE_INTERVAL(day => 7)
-=> error contains: The emulator does not support function $MULTIPLY
-
 SELECT STRUCT(MAKE_INTERVAL(day => 7) AS i) IS DISTINCT FROM STRUCT(MAKE_INTERVAL(hour => 168) AS i)
 => error contains: The emulator does not support function $IS_DISTINCT_FROM with INTERVAL
 
