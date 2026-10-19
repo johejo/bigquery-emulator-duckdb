@@ -383,10 +383,12 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     if (!AllowedAsDynamicSql(*statement, unsupported)) {
       return false;
     }
+    const std::string& procedure_project = frames_.back().procedure_project;
     pending_frame_ = PendingFrame{
-        .frame = {.kind = ScriptFrame::Kind::kDynamicSql,
-                  .procedure_project = frames_.back().procedure_project},
-        .status = unsupported ? Unsupported(*unsupported) : absl::OkStatus(),
+        .frame = {.kind = ScriptFrame::Kind::kDynamicSql, .procedure_project = procedure_project},
+        .status = unsupported                 ? Unsupported(*unsupported)
+                  : procedure_project.empty() ? absl::OkStatus()
+                                              : CheckProcedureBody(*statement, /*dynamic=*/true),
     };
     return true;
   }
@@ -480,7 +482,9 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
   }
 
-  static absl::Status CheckProcedureBody(const googlesql::ASTNode& node) {
+  // Checks the body of a procedure, or with `dynamic` a statement that EXECUTE IMMEDIATE runs in
+  // one, whose query parameters are those of its USING clause.
+  static absl::Status CheckProcedureBody(const googlesql::ASTNode& node, bool dynamic = false) {
     // Only reads of @@dataset_id have been checked against BigQuery in a procedure, and
     // @@project_id is documented as the project that runs the script.
     if (const auto* variable = node.GetAsOrNull<googlesql::ASTSystemVariableExpr>()) {
@@ -493,14 +497,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
     }
     if (node.node_kind() == googlesql::AST_CREATE_FUNCTION_STATEMENT ||
         node.node_kind() == googlesql::AST_SYSTEM_VARIABLE_ASSIGNMENT ||
-        node.node_kind() == googlesql::AST_EXECUTE_IMMEDIATE_STATEMENT ||
-        node.node_kind() == googlesql::AST_PARAMETER_EXPR) {
+        (!dynamic && node.node_kind() == googlesql::AST_PARAMETER_EXPR)) {
       return Unsupported(
-          "function declarations, system variable assignments, dynamic SQL and query parameters "
-          "inside procedures");
+          "function declarations, system variable assignments and query parameters inside "
+          "procedures");
     }
     for (int i = 0; i < node.num_children(); ++i) {
-      GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i)));
+      GOOGLESQL_RETURN_IF_ERROR(CheckProcedureBody(*node.child(i), dynamic));
     }
     return absl::OkStatus();
   }

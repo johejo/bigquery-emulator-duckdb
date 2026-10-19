@@ -345,6 +345,7 @@ query `CALL` | DECLARE v INT64 DEFAULT 1; DECLARE w INT64; CREATE PROCEDURE d.p(
 query `CALL` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT @@dataset_id; END; SET @@dataset_id = 'd'; CALL d.p()
 query `CALL` | CREATE TEMP FUNCTION f(x INT64) AS (x * 2); CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SELECT f(3); END; CALL d.p()
 query `CALL` | CREATE PROCEDURE d.p() OPTIONS(strict_mode=FALSE) BEGIN SET @@dataset_id = 'd'; END; CALL d.p()
+query `CALL` | CREATE PROCEDURE d.p(x INT64) OPTIONS(strict_mode=FALSE) BEGIN EXECUTE IMMEDIATE 'SELECT id FROM d.t WHERE id = @x' USING x AS x; END; CALL d.p(1)
 note `CALL` | See [Stored procedures](compatibility.md#stored-procedures).
 
 section INFORMATION_SCHEMA

@@ -18,9 +18,9 @@ BEGIN CALL errors_procedures.proc_function(); EXCEPTION WHEN ERROR THEN SELECT 1
 => error contains: The emulator does not support
 
 CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_dynamic() OPTIONS(strict_mode=FALSE)
-BEGIN EXECUTE IMMEDIATE 'SELECT 1'; END;
-BEGIN CALL errors_procedures.proc_dynamic(); EXCEPTION WHEN ERROR THEN SELECT 1; END
+CREATE OR REPLACE PROCEDURE errors_procedures.proc_dynamic_function() OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'CREATE TEMP FUNCTION f() AS (1)'; END;
+BEGIN CALL errors_procedures.proc_dynamic_function(); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support
 
 # Unbound named parameters can be rejected before CALL is reached.

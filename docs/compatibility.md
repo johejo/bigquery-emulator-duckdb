@@ -379,9 +379,9 @@ transaction.
 ## Stored procedures
 
 SQL procedures support `CREATE PROCEDURE`, `CREATE OR REPLACE PROCEDURE`, `CREATE PROCEDURE IF NOT
-EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN`, `OUT` and `INOUT` arguments. Definitions must explicitly
-set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the Routine API): only syntax is
-checked at creation, and statements resolve when called. Strict mode's default validation,
+EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN`, `OUT` and `INOUT` arguments.
+Definitions must explicitly set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the
+Routine API): only syntax is checked at creation, and statements resolve when called. Strict mode's default validation,
 `ANY TYPE` arguments, non-SQL procedures, and options other than `strict_mode` and `description`
 are unsupported. Procedure names in DDL must include their dataset.
 
@@ -393,9 +393,11 @@ Temporary tables and temporary UDFs are shared with the calling script. Local va
 `IN` argument assignments stay within the procedure, and caller variables are not visible in
 the body, and `@@project_id` is the project that runs the script. `OUT` arguments start as
 `NULL`, and when the procedure returns, the variables passed as `OUT` and `INOUT` arguments
-take the arguments' last values. Query parameters, function
-declarations, system-variable assignments, reads of system variables other than `@@dataset_id`
-and `@@project_id`, and dynamic SQL inside procedures are unsupported.
+take the arguments' last values. Dynamic SQL inside a procedure resolves names as the procedure
+does and sees only the query parameters of its `USING` clause. Query parameters, function
+declarations, system-variable assignments and reads of system variables other than
+`@@dataset_id` and `@@project_id` inside procedures, including their dynamic SQL, are
+unsupported.
 `EXECUTE IMMEDIATE` cannot execute a `CALL`.
 CALL queries do not support dry runs, destination tables or positional query parameters.
 

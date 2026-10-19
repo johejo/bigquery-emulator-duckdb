@@ -161,3 +161,22 @@ CREATE OR REPLACE PROCEDURE scalars.proc_out_twice(OUT x INT64, INOUT y INT64)
 OPTIONS(strict_mode=FALSE) BEGIN SET x = 1; END;
 CALL scalars.proc_out_twice(v, v)
 => error:
+
+# Procedures run dynamic SQL, with the parameters of its USING clause, resolving names against
+# the procedure's project.
+DECLARE v INT64;
+CREATE OR REPLACE PROCEDURE scalars.proc_dynamic_into(OUT y INT64) OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT ? + 1' INTO y USING 1; END;
+CALL scalars.proc_dynamic_into(v);
+SELECT v
+=> "2"
+
+CREATE SCHEMA IF NOT EXISTS `example.com:proj`.proc_owner_dynamic;
+CREATE OR REPLACE TABLE `example.com:proj`.proc_owner_dynamic.t AS SELECT 12 AS n;
+CREATE OR REPLACE PROCEDURE `example.com:proj`.proc_owner_dynamic.read_table()
+OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'CREATE TEMP TABLE proc_owner_dynamic_rows AS SELECT n FROM proc_owner_dynamic.t'; END;
+CALL `example.com:proj`.proc_owner_dynamic.read_table();
+DROP SCHEMA `example.com:proj`.proc_owner_dynamic CASCADE;
+SELECT n FROM _SESSION.proc_owner_dynamic_rows
+=> "12"
