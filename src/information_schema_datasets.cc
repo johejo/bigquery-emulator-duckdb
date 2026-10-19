@@ -1,3 +1,7 @@
+#include "src/information_schema_datasets.h"
+
+#include <array>
+#include <charconv>
 #include <optional>
 #include <string>
 #include <utility>
@@ -7,12 +11,31 @@
 #include "absl/strings/str_cat.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/information_schema_internal.h"
+#include "src/information_schema_options.h"
+#include "src/information_schema_rows.h"
+#include "src/information_schema_view.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
 
-namespace bigquery_emulator_duckdb::information_schema_internal {
+namespace bigquery_emulator_duckdb::information_schema {
+
+namespace {
+
+// A FLOAT64 option value in its shortest round-trip form, with a fraction as BigQuery shows it,
+// such as 90.0.
+std::string Float64OptionValue(double value) {
+  std::array<char, 32> buffer{};
+  const std::to_chars_result result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+  std::string text(buffer.data(), result.ptr);
+  if (text.find_first_of(".e") == std::string::npos) {
+    text += ".0";
+  }
+  return text;
+}
+
+}  // namespace
 
 const std::vector<ViewColumn>& SchemataColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
@@ -96,4 +119,4 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
   return rows;
 }
 
-}  // namespace bigquery_emulator_duckdb::information_schema_internal
+}  // namespace bigquery_emulator_duckdb::information_schema

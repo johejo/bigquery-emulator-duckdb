@@ -1,3 +1,5 @@
+#include "src/information_schema_routines.h"
+
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -5,12 +7,13 @@
 
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
-#include "src/information_schema_internal.h"
+#include "src/information_schema_rows.h"
+#include "src/information_schema_view.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/table_source.h"
 
-namespace bigquery_emulator_duckdb::information_schema_internal {
+namespace bigquery_emulator_duckdb::information_schema {
 
 const std::vector<ViewColumn>& RoutinesColumns() {
   static const auto* const kColumns = new std::vector<ViewColumn>{
@@ -119,4 +122,4 @@ absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context) {
   return rows;
 }
 
-}  // namespace bigquery_emulator_duckdb::information_schema_internal
+}  // namespace bigquery_emulator_duckdb::information_schema

@@ -1,3 +1,5 @@
+#include "src/information_schema_tables.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -8,16 +10,30 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "googlesql/public/options.pb.h"
+#include "googlesql/public/type.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/information_schema_internal.h"
+#include "src/information_schema_options.h"
+#include "src/information_schema_rows.h"
+#include "src/information_schema_view.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
+#include "src/type_mapping.h"
 
-namespace bigquery_emulator_duckdb::information_schema_internal {
+namespace bigquery_emulator_duckdb::information_schema {
 
 namespace {
+
+absl::StatusOr<std::string> TypeName(const FieldSchema& field,
+                                     googlesql::TypeFactory* type_factory) {
+  absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(field, type_factory);
+  if (!type.ok()) {
+    return type.status();
+  }
+  return (*type)->TypeName(googlesql::PRODUCT_EXTERNAL);
+}
 
 absl::StatusOr<std::string> TableDdl(const std::string& project, const std::string& dataset,
                                      const std::string& table,
@@ -442,4 +458,4 @@ absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context
   return rows;
 }
 
-}  // namespace bigquery_emulator_duckdb::information_schema_internal
+}  // namespace bigquery_emulator_duckdb::information_schema

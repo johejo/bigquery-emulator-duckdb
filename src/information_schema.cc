@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,7 +18,12 @@
 #include "googlesql/public/simple_catalog.h"
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
-#include "src/information_schema_internal.h"
+#include "src/field_schema.h"
+#include "src/information_schema_datasets.h"
+#include "src/information_schema_routines.h"
+#include "src/information_schema_rows.h"
+#include "src/information_schema_tables.h"
+#include "src/information_schema_view.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/table_source.h"
@@ -26,10 +32,50 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
-namespace info = information_schema_internal;
+namespace info = information_schema;
+using info::Cell;
 using info::Row;
 using info::ViewColumn;
 using info::ViewContext;
+
+FieldSchema ColumnField(const ViewColumn& column) {
+  return {
+      .name = column.name,
+      .type = column.type,
+      .mode = column.repeated ? FieldMode::kRepeated : FieldMode::kNullable,
+  };
+}
+
+// Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
+// typed even when every row has NULL in it.
+absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
+                                    const std::vector<Row>& rows) {
+  std::vector<std::string> names;
+  std::vector<std::string> projections;
+  for (size_t i = 0; i < columns.size(); ++i) {
+    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(columns.at(i)));
+    if (!type.ok()) {
+      return type.status();
+    }
+    names.push_back("c" + std::to_string(i));
+    projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
+                          QuoteIdentifier(columns.at(i).name));
+  }
+  std::vector<std::string> values;
+  for (const Row& row : rows) {
+    std::vector<std::string> cells;
+    std::ranges::transform(row, std::back_inserter(cells),
+                           [](const Cell& cell) { return cell.value_or("NULL"); });
+    values.push_back("(" + absl::StrJoin(cells, ", ") + ")");
+  }
+  if (rows.empty()) {
+    values.push_back("(" + absl::StrJoin(std::vector<std::string>(columns.size(), "NULL"), ", ") +
+                     ")");
+  }
+  return "SELECT " + absl::StrJoin(projections, ", ") + " FROM (VALUES " +
+         absl::StrJoin(values, ", ") + ") AS v(" + absl::StrJoin(names, ", ") + ")" +
+         (rows.empty() ? " WHERE false" : "");
+}
 
 bool EqualsIgnoreCase(const std::string& a, const std::string& b) {
   return ToUpperAscii(a) == ToUpperAscii(b);
@@ -265,7 +311,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
   if (!rows.ok()) {
     return rows.status();
   }
-  absl::StatusOr<std::string> sql = info::ViewSql(columns, *rows);
+  absl::StatusOr<std::string> sql = ViewSql(columns, *rows);
   if (!sql.ok()) {
     return sql.status();
   }
@@ -274,8 +320,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     return status;
   }
   for (const ViewColumn& column : columns) {
-    absl::StatusOr<const googlesql::Type*> type =
-        GoogleSqlType(info::ColumnField(column), type_factory);
+    absl::StatusOr<const googlesql::Type*> type = GoogleSqlType(ColumnField(column), type_factory);
     if (!type.ok()) {
       return type.status();
     }
