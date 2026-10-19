@@ -40,10 +40,15 @@ go-vet:
 go-staticcheck:
     staticcheck ./...
 
-# Tool and subprocess tests; client-visible tests run through just e2e.
+# Tool and subprocess tests; client-visible tests run through just e2e. Set GO_TEST_JSON to a
+# path to also record go test's JSON events there, such as each test's duration; this needs jq.
 [positional-arguments]
 go-test *args:
-    go test "$@" ./internal/... ./tools/...
+    if [[ -n "${GO_TEST_JSON:-}" ]]; then \
+        go test -json "$@" ./internal/... ./tools/... | tee "$GO_TEST_JSON" | jq -j 'select(.Action == "output") | .Output'; \
+    else \
+        go test "$@" ./internal/... ./tools/...; \
+    fi
 
 go-tidy:
     go mod tidy
