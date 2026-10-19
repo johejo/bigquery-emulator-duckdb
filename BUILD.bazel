@@ -1016,7 +1016,8 @@ cc_test(
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@googlesql//googlesql/public/types",
-        "@nlohmann_json//:json",
+        # json_value brings nlohmann's single header, which nlohmann/json.hpp then names.
+        "@nlohmann_json//:singleheader-json",
     ],
 )
 
