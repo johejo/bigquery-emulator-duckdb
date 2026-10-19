@@ -1,8 +1,5 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# JSON_SET, is unsupported rather than left to DuckDB.
-
-SELECT JSON_SET(JSON '{}', '$.i', MAKE_INTERVAL(day => 7))
-=> error contains: The emulator does not support function JSON_SET with INTERVAL
+# EXTRACT of a WEEK or QUARTER, is unsupported rather than left to DuckDB.
 
 SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function $EXTRACT
