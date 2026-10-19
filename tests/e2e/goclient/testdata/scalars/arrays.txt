@@ -116,3 +116,7 @@ SELECT ARRAY_FIRST(CAST([] AS ARRAY<INT64>))
 # BigQuery groups by ARRAYs, though it neither compares nor orders them.
 SELECT COUNT(*) FROM UNNEST([STRUCT([1, 2] AS a), STRUCT([1, 2] AS a)]) GROUP BY a
 => "2"
+
+# A query can use ARRAYs with NULL elements that its result does not return.
+SELECT ARRAY_LENGTH([1, NULL])
+=> "2"

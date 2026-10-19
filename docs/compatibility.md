@@ -180,7 +180,9 @@ Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, 
 NULL semantics. `IS DISTINCT FROM` with anonymous or duplicate fields is unsupported, as are casts
 of these values to JSON and correlated aggregate subqueries returning them; use JSON functions for
 JSON conversion. As in BigQuery, ARRAYs, and STRUCTs that contain them, can be grouped but
-cannot be compared, ordered or passed to aggregate functions with DISTINCT. BigQuery also rejects
+cannot be compared, ordered or passed to aggregate functions with DISTINCT. ARRAYs with NULL
+elements, also inside STRUCTs, can be used in a query but fail in its result and in the tables a
+statement writes, as in BigQuery. BigQuery also rejects
 STRUCT partition keys and STRUCT columns in `UNION DISTINCT`, `INTERSECT DISTINCT` and
 `EXCEPT DISTINCT`; the emulator rejects them too. `INTERSECT ALL` and `EXCEPT ALL` are also rejected,
 as BigQuery only supports `DISTINCT` for those operations.

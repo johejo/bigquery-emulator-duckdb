@@ -18,6 +18,7 @@ class AnalyzerOutput;
 class ASTNode;
 class Catalog;
 class ResolvedExpr;
+class ResolvedQueryStmt;
 class ResolvedStatement;
 class ScriptExecutor;
 class ScriptSegment;
@@ -71,6 +72,9 @@ class AnalyzerResult {
 // column without a name is f0_, f1_, ... in the order of the unnamed columns. Empty for a
 // statement that is not a query and for a query with a column BigQuery cannot describe.
 std::optional<std::vector<FieldSchema>> ResultSchema(const googlesql::ResolvedStatement& statement);
+
+// The names of the columns `query` returns, as ResultSchema names them.
+std::vector<std::string> ResultColumnNames(const googlesql::ResolvedQueryStmt& query);
 
 // Parses `sql` as a single GoogleSQL statement and resolves its names and types against
 // `catalog`. Throws std::runtime_error with a caret-annotated message when the statement does

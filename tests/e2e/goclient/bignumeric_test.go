@@ -49,7 +49,7 @@ func TestBigNumericColumns(t *testing.T) {
 
 	read("CREATE TABLE t (id INT64, n BIGNUMERIC, a ARRAY<BIGNUMERIC>, s STRUCT<b BIGNUMERIC>)")
 	read("INSERT t VALUES (1, BIGNUMERIC '" + maxBigNumeric + "', [BIGNUMERIC '" + minBigNumeric +
-		"', NULL], STRUCT(BIGNUMERIC '" + tinyBigNumeric + "'))")
+		"'], STRUCT(BIGNUMERIC '" + tinyBigNumeric + "'))")
 	metadata, err := dataset.Table("t").Metadata(ctx)
 	if err != nil {
 		t.Fatal(err)

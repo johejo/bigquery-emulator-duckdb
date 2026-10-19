@@ -36,3 +36,32 @@ SELECT ARRAY_LENGTH(a) FROM UNNEST([STRUCT([1, 2] AS a), STRUCT([1] AS a)]) ORDE
 # BigQuery groups by ARRAYs but rejects them in aggregate functions with DISTINCT.
 SELECT COUNT(DISTINCT a) FROM UNNEST([STRUCT([1, 2] AS a), STRUCT([1, 2] AS a)])
 => error contains: Aggregate functions with DISTINCT cannot be used with arguments of type ARRAY
+
+# BigQuery rejects ARRAYs with NULL elements in query results and in the tables a statement
+# writes, of every element type and inside STRUCTs, though a query can use them.
+SELECT [1, NULL] AS a
+=> error contains: Array cannot have a null element; error in writing field a
+
+SELECT [INTERVAL 1 DAY, NULL]
+=> error contains: Array cannot have a null element
+
+SELECT STRUCT(['a', NULL] AS a) AS s
+=> error contains: Array cannot have a null element
+
+SELECT [STRUCT(1 AS x), NULL] AS a
+=> error contains: Array cannot have a null element
+
+SELECT AS STRUCT [1, NULL] AS a
+=> error contains: Array cannot have a null element
+
+SELECT ARRAY_AGG(x) FROM UNNEST([1, NULL]) AS x
+=> error contains: Array cannot have a null element
+
+CREATE TEMP TABLE t (a ARRAY<INT64>); INSERT t VALUES ([1, NULL])
+=> error contains: Array cannot have a null element; error in writing field a
+
+CREATE TEMP TABLE t AS SELECT [1, NULL] AS a; SELECT 1
+=> error contains: Array cannot have a null element; error in writing field a
+
+CREATE TEMP TABLE t (a ARRAY<INT64>); INSERT t VALUES ([1]); UPDATE t SET a = [1, NULL] WHERE TRUE
+=> error contains: Array cannot have a null element; error in writing field a

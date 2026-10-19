@@ -316,19 +316,23 @@ SELECT ARRAY(
 )
 => [{"v":"0-0 0 -4:5:6.789"},{"v":"0-0 0 -4:5:7.789"},{"v":"0-0 0 -4:5:7.789001"},{"v":"0-0 0 -4:5:7.789001"},{"v":"0-0 0 -4:5:7.789"},{"v":"0-0 0 -3:5:7.788999"},{"v":"0-0 0 -1:5:7.789"},{"v":"0-0 0 0:54:52.211"},{"v":"0-1 0 0:54:52.211"},{"v":"0-1 30 0:54:52.211"},{"v":"0-1 30 720:54:52.211"}]
 
+# The first row's average is NULL, which a result cannot hold in an ARRAY.
 SELECT ARRAY(
-  SELECT AVG(v) OVER (ORDER BY k ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)
-  FROM UNNEST([
-    STRUCT(1 AS k, CAST(NULL AS INTERVAL) AS v), (2, INTERVAL '-4:5:6.789' HOUR TO SECOND),
-    (3, INTERVAL -1 SECOND), (4, INTERVAL '-0.000001' SECOND), (5, INTERVAL 0 YEAR),
-    (6, INTERVAL '0.000001' SECOND), (7, INTERVAL '1:00:00.000001' HOUR TO SECOND),
-    (8, INTERVAL '1:59:59.999999' HOUR TO SECOND), (9, INTERVAL 2 HOUR), (10, INTERVAL 1 MONTH),
-    (11, INTERVAL 30 DAY), (12, INTERVAL 720 HOUR),
-    (13, INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND), (14, INTERVAL 10000 YEAR)
-  ])
+  SELECT a FROM (
+    SELECT k, AVG(v) OVER (ORDER BY k ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS a
+    FROM UNNEST([
+      STRUCT(1 AS k, CAST(NULL AS INTERVAL) AS v), (2, INTERVAL '-4:5:6.789' HOUR TO SECOND),
+      (3, INTERVAL -1 SECOND), (4, INTERVAL '-0.000001' SECOND), (5, INTERVAL 0 YEAR),
+      (6, INTERVAL '0.000001' SECOND), (7, INTERVAL '1:00:00.000001' HOUR TO SECOND),
+      (8, INTERVAL '1:59:59.999999' HOUR TO SECOND), (9, INTERVAL 2 HOUR), (10, INTERVAL 1 MONTH),
+      (11, INTERVAL 30 DAY), (12, INTERVAL 720 HOUR),
+      (13, INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND), (14, INTERVAL 10000 YEAR)
+    ])
+  )
+  WHERE k > 1
   ORDER BY k
 )
-=> [{"v":null},{"v":"0-0 0 -4:5:6.789"},{"v":"0-0 0 -2:2:33.894500"},{"v":"0-0 0 -1:21:42.596333"},{"v":"0-0 0 -1:1:16.947250"},{"v":"0-0 0 -0:0:0.250"},{"v":"0-0 0 0:15:0"},{"v":"0-0 0 0:45:0"},{"v":"0-0 0 1:15:0"},{"v":"0-0 7 13:15:0"},{"v":"0-0 15 0:59:59.999999"},{"v":"0-0 15 180:30:0"},{"v":"0-3 30 199:1:16.697250"},{"v":"2500-3 23 187:1:16.697250"}]
+=> [{"v":"0-0 0 -4:5:6.789"},{"v":"0-0 0 -2:2:33.894500"},{"v":"0-0 0 -1:21:42.596333"},{"v":"0-0 0 -1:1:16.947250"},{"v":"0-0 0 -0:0:0.250"},{"v":"0-0 0 0:15:0"},{"v":"0-0 0 0:45:0"},{"v":"0-0 0 1:15:0"},{"v":"0-0 7 13:15:0"},{"v":"0-0 15 0:59:59.999999"},{"v":"0-0 15 180:30:0"},{"v":"0-3 30 199:1:16.697250"},{"v":"2500-3 23 187:1:16.697250"}]
 
 # Comparisons and ordering compare lengths, with 30 days to a month and 24 hours to a day, so
 # INTERVAL 1 MONTH, 30 DAY and 720 HOUR are equal. Source: GoogleSQL's
