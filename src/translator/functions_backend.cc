@@ -37,21 +37,15 @@ std::vector<Rule> GenerateRangeArray() {
   };
 }
 
-// SUBSTR and SUBSTRING. BigQuery starts at the first character for a position of 0 or one
-// before the start, where DuckDB takes as many characters fewer. BYTES go to GoogleSQL, without
-// a length taking the rest.
+// STRING and BYTES use GoogleSQL's position, length and NULL semantics. An omitted length
+// takes the rest of the input.
 std::vector<Rule> Substr() {
-  const std::string start =
-      "CASE WHEN $2 > 0 THEN $2 WHEN $2 = 0 OR $2 < -length($1) THEN 1 ELSE length($1) + $2 + 1 "
-      "END";
   return {
-      {.arity = 2, .spelling = "substr($1, " + start + ")", .conditions = {Is(1, {TYPE_STRING})}},
       {
-          .arity = 3,
-          .spelling = "CASE WHEN $3 < 0 THEN !1 ELSE substr($1, " + start + ", $3) END",
+          .arity = {2, 3},
+          .spelling = "bq_substr($1, $2, $3)",
           .conditions = {Is(1, {TYPE_STRING})},
-          .defaults = {},
-          .errors = {"'Third argument in SUBSTR() cannot be negative'"},
+          .defaults = {"9223372036854775807"},
       },
       {
           .arity = {2, 3},

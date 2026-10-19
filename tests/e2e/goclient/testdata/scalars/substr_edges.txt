@@ -1,0 +1,34 @@
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr
+# BigQuery: positions beyond the end return an empty string;
+# lengths beyond the end take the rest; negative lengths fail unless an argument is NULL.
+# GoogleSQL's GetFunctionTestsSubstr also covers these INT64 and NULL boundaries.
+
+SELECT SUBSTR(s, p) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([9223372036854775807]) p
+=> ""
+
+SELECT SUBSTRING(s, p, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([9223372036854775807]) p CROSS JOIN UNNEST([9223372036854775807]) n
+=> ""
+
+SELECT SUBSTR(s, p, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([2]) p CROSS JOIN UNNEST([9223372036854775807]) n
+=> "あ😀"
+
+SELECT SUBSTRING(s, p, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([-9223372036854775808]) p CROSS JOIN UNNEST([2]) n
+=> "aあ"
+
+SELECT SUBSTR(s, p, n) FROM UNNEST([CAST(NULL AS STRING)]) s CROSS JOIN UNNEST([1]) p CROSS JOIN UNNEST([-1]) n
+=> null
+
+SELECT SUBSTRING(s, p, n) FROM UNNEST(['']) s CROSS JOIN UNNEST([CAST(NULL AS INT64)]) p CROSS JOIN UNNEST([-1]) n
+=> null
+
+SELECT SUBSTR(s, 1, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([CAST(NULL AS INT64)]) n
+=> null
+
+SELECT SUBSTRING(s, 1, n) FROM UNNEST(['']) s CROSS JOIN UNNEST([-1]) n
+=> error: Third argument in SUBSTR() cannot be negative
+
+SELECT SAFE.SUBSTR(s, 1, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([-1]) n
+=> null
+
+SELECT SAFE.SUBSTRING(s, 1, n) FROM UNNEST(['aあ😀']) s CROSS JOIN UNNEST([-1]) n
+=> null
