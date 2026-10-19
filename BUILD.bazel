@@ -288,10 +288,15 @@ cc_library(
     srcs = [
         "src/catalog.cc",
         "src/information_schema.cc",
+        "src/information_schema_common.cc",
+        "src/information_schema_datasets.cc",
+        "src/information_schema_routines.cc",
+        "src/information_schema_tables.cc",
     ],
     hdrs = [
         "src/catalog.h",
         "src/information_schema.h",
+        "src/information_schema_internal.h",
     ],
     copts = ["-std=c++20"],
     implementation_deps = [
