@@ -807,8 +807,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_ISCOLLECTION", call("bq_st_iscollection", 1)},
       {"ST_ISCLOSED", call("bq_st_isclosed", 1)},
       {"ST_LENGTH", spheroid("bq_st_length", {1, 2}, "ST_LENGTH")},
-      {"ST_AREA", spheroid("bq_st_zero_measure", {1, 2}, "ST_AREA")},
-      {"ST_PERIMETER", spheroid("bq_st_zero_measure", {1, 2}, "ST_PERIMETER")},
+      {"ST_AREA", spheroid("bq_st_measure", {1, 2}, "ST_AREA")},
+      {"ST_PERIMETER", spheroid("bq_st_measure", {1, 2}, "ST_PERIMETER")},
+      {"ST_EXTERIORRING", call("bq_st_exteriorring", 1)},
+      {"ST_INTERIORRINGS", call("bq_st_interiorrings", 1)},
       {"ST_GEOHASH", call("bq_st_geohash", {1, 2}, {"20"})},
       {"ST_STARTPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, 1)"}}},
       {"ST_ENDPOINT", {{.arity = 1, .spelling = "bq_st_pointn($1, -1)"}}},
@@ -822,6 +824,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
                   .arity = 1,
                   .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE "
                               "bq_st_makeline_array($1) END",
+              },
+          },
+      },
+      {
+          "ST_MAKEPOLYGON",
+          {
+              {.arity = 1, .spelling = "bq_st_makepolygon($1)"},
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN list_count($2) <> len($2) THEN NULL ELSE "
+                              "bq_st_makepolygon_holes($1, $2) END",
               },
           },
       },

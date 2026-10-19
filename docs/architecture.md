@@ -68,7 +68,7 @@ catalog and each dataset a schema. Results are encoded in BigQuery's `{"f": [{"v
 implementations. Most register a GoogleSQL function, or a small adapter of one, through `Apply` in
 [apply.h](../src/backend_functions/apply.h), which reads its arguments and writes its result by
 their C++ types. GEOGRAPHY functions, which GoogleSQL does not implement, use the
-[S2 Geometry](https://s2geometry.io/) library over the S2 points that a GEOGRAPHY holds in queries, written as text. GCS load jobs download objects with
+[S2 Geometry](https://s2geometry.io/) library over the S2 points and loops that a GEOGRAPHY holds in queries, written as text. GCS load jobs download objects with
 [google-cloud-cpp](https://github.com/googleapis/google-cloud-cpp) to temporary files for DuckDB.
 
 `EXTERNAL_QUERY` reads PostgreSQL through DuckDB's postgres_scanner extension, which is built
