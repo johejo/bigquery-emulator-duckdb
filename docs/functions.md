@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 10 | 18 | 43 | 0 |
+| [Geography functions](#geography-functions) | 26 | 5 | 40 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 0 | 0 | 4 | 0 |
@@ -230,10 +230,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | Supported | S2 function |  |
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | Unsupported |  |  |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | Unsupported |  |  |
-| [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | Supported | S2 function |  |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | Unsupported |  |  |
-| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a LINESTRING; ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
-| [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a LINESTRING; ST_ASGEOJSON of a POLYGON. |
+| [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | Supported | S2 function |  |
 | [`ST_AZIMUTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_azimuth) | Supported | S2 function |  |
 | [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | Unsupported |  |  |
 | [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | Unsupported |  |  |
@@ -248,45 +248,45 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | Unsupported |  |  |
 | [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | Unsupported |  |  |
 | [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | Unsupported |  |  |
-| [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | Supported | S2 function |  |
 | [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | Unsupported |  |  |
-| [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)); use_spheroid. |
+| [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | Partial | S2 function | Unsupported: use_spheroid. |
 | [`ST_DUMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dump) | Unsupported |  |  |
-| [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | Supported | S2 function |  |
 | [`ST_ENDPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_endpoint) | Supported | S2 function |  |
-| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_EQUALS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_equals) | Supported | S2 function |  |
 | [`ST_EXTENT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_extent) | Unsupported |  |  |
-| [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Unsupported |  |  |
+| [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Supported | S2 function |  |
 | [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Unsupported |  |  |
 | [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Unsupported |  |  |
-| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of MULTIPOLYGON(((0 0, 1 0, 0 1, 0 0))). |
 | [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Unsupported |  |  |
 | [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | Supported | S2 function |  |
 | [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | Supported | S2 function |  |
 | [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | Supported | S2 function |  |
-| [`ST_GEOMETRYTYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geometrytype) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_GEOMETRYTYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geometrytype) | Supported | S2 function |  |
 | [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | Unsupported |  |  |
 | [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | Unsupported |  |  |
-| [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Unsupported |  |  |
+| [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Supported | S2 function |  |
 | [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Unsupported |  |  |
 | [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Unsupported |  |  |
 | [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | Unsupported |  |  |
-| [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
-| [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
-| [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Supported | S2 function |  |
+| [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | Supported | S2 function |  |
+| [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | Supported | S2 function |  |
 | [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | Unsupported |  |  |
-| [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | Supported | S2 function |  |
 | [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | Unsupported |  |  |
 | [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | Unsupported |  |  |
 | [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Unsupported |  |  |
 | [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Partial | S2 function | Unsupported: a LINESTRING that BigQuery splits into a MULTILINESTRING. |
-| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Unsupported |  |  |
+| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Partial | S2 function | Unsupported: ST_MAKEPOLYGON of an empty GEOGRAPHY, which makes the full polygon. |
 | [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Unsupported |  |  |
-| [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
-| [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | Supported | S2 function |  |
+| [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | Supported | S2 function |  |
 | [`ST_NUMGEOMETRIES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numgeometries) | Unsupported |  |  |
-| [`ST_NUMPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numpoints) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
-| [`ST_PERIMETER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_perimeter) | Partial | S2 function | Unsupported: ST_GEOGFROMTEXT of POLYGON((0 0, 1 0, 0 1, 0 0)). |
+| [`ST_NUMPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numpoints) | Supported | S2 function |  |
+| [`ST_PERIMETER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_perimeter) | Supported | S2 function |  |
 | [`ST_POINTN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_pointn) | Supported | S2 function |  |
 | [`ST_REGIONSTATS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_regionstats) | Unsupported |  |  |
 | [`ST_SIMPLIFY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_simplify) | Unsupported |  |  |

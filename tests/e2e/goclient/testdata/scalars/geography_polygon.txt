@@ -1,0 +1,258 @@
+## GEOGRAPHY polygons and the functions over them
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions
+# The examples of ST_GEOGFROM, ST_CLUSTERDBSCAN, ST_SIMPLIFY, ST_EXTERIORRING and ST_INTERIORRINGS
+# show which region a polygon encloses and how it is written; the descriptions of ST_GEOGFROMTEXT,
+# ST_MAKEPOLYGON, ST_DIMENSION, ST_GEOMETRYTYPE, ST_NUMPOINTS, ST_ISCLOSED, ST_LENGTH and
+# ST_EQUALS give the rest.
+
+# A ring encloses the smaller region, so a clockwise one runs reversed.
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))')
+=> "POLYGON((2 0, 2 2, 0 2, 0 0, 2 0))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((40 2, 40 1, 41 2, 40 2))')
+=> "POLYGON((40 2, 40 1, 41 2, 40 2))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))')
+=> "POLYGON((0 0, 0.1 0, 0.1 0.1, 0 0))"
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))'))
+=> "POLYGON((2 0, 2 2, 0 2, 0 0, 2 0))"
+
+SELECT ST_GEOGFROMTEXT(wkt) FROM UNNEST([' polygon (( 40 2 , 40 1,41 2, 40 2 ) ) ']) AS wkt
+=> "POLYGON((40 2, 40 1, 41 2, 40 2))"
+
+# The ring that does not close and crosses itself.
+SELECT SAFE.ST_GEOGFROMTEXT(wkt) FROM UNNEST(['POLYGON((0 -1, 2 1, 2 -1, 0 1))']) AS wkt
+=> null
+
+SELECT ST_EXTERIORRING(ST_GEOGFROMTEXT('POLYGON((0 0, 1 4, 2 2, 0 0))'))
+=> "LINESTRING(2 2, 1 4, 0 0, 2 2)"
+
+SELECT ST_EXTERIORRING(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> "LINESTRING(5 1, 5 10, 1 10, 1 1, 5 1)"
+
+SELECT ST_EXTERIORRING(CAST(NULL AS GEOGRAPHY))
+=> null
+
+SELECT ST_EXTERIORRING(ST_GEOGPOINT(1, 2))
+=> error: Argument to STExteriorRing must have exactly 1 polygon; argument either had no polygons or more than one.
+
+SELECT SAFE.ST_EXTERIORRING(ST_GEOGPOINT(1, 2))
+=> null
+
+# A hole's ring encloses the region it removes.
+SELECT ST_INTERIORRINGS(ST_GEOGFROMTEXT('POLYGON((0 0, 1 1, 1 2, 0 0))'))
+=> []
+
+SELECT ST_INTERIORRINGS(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> [{"v":"LINESTRING(2 2, 3 4, 2 4, 2 2)"}]
+
+SELECT ST_INTERIORRINGS(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2.5, 3.5 3, 2.5 2, 2 2.5), (3.5 7, 4 6, 3 3, 3.5 7))'))
+=> [{"v":"LINESTRING(2.5 2, 3.5 3, 2 2.5, 2.5 2)"},{"v":"LINESTRING(3 3, 4 6, 3.5 7, 3 3)"}]
+
+SELECT ST_INTERIORRINGS(CAST(NULL AS GEOGRAPHY)) IS NULL
+=> "true"
+
+SELECT ST_INTERIORRINGS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'))
+=> error: Argument to STInteriorRings must have exactly 1 polygon; argument either had no polygons or more than one. Error in ST_INTERIORRINGS expression
+
+SELECT SAFE.ST_INTERIORRINGS(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)')) IS NULL
+=> "true"
+
+SELECT ST_DIMENSION(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "2"
+
+SELECT ST_GEOMETRYTYPE(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "ST_Polygon"
+
+# The first and last vertex of each ring count separately.
+SELECT ST_NUMPOINTS(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "4"
+
+SELECT ST_NPOINTS(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> "9"
+
+# Only the full polygon is closed.
+SELECT ST_ISCLOSED(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "false"
+
+SELECT ST_ISEMPTY(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "false"
+
+SELECT ST_ISCOLLECTION(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "false"
+
+SELECT ST_LENGTH(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "0.0"
+
+# A polygon covers its interior.
+SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(1, 1))
+=> "0.0"
+
+SELECT ST_DWITHIN(ST_GEOGPOINT(1, 1), ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), 0)
+=> "true"
+
+# Polygons are equal where they cover each other, whatever their vertices' order.
+SELECT ST_EQUALS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))'), ST_GEOGFROMTEXT('POLYGON((2 2, 0 2, 0 0, 2 0, 2 2))'))
+=> "true"
+
+SELECT ST_EQUALS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))'), ST_GEOGFROMTEXT('POLYGON((0 0, 0 3, 2 2, 2 0, 0 0))'))
+=> "false"
+
+SELECT ST_EQUALS(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'), ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0, 0 1, 0 0)'))
+=> "false"
+
+# ST_MAKEPOLYGON closes a ring that does not end where it starts.
+SELECT ST_EQUALS(ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 2, 2 2, 2 0)')), ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'))
+=> "true"
+
+SELECT ST_EQUALS(ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), [ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2)')]), ST_GEOGFROMTEXT('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (1 1, 2 1, 2 2, 1 1))'))
+=> "true"
+
+SELECT ST_MAKEPOLYGON(CAST(NULL AS GEOGRAPHY))
+=> null
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 2, 2 2, 2 0)'), NULL)
+=> null
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), [ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2)'), NULL])
+=> null
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'))
+=> error: ST_MakePolygon failed: A polygon loop must have at least 3 distinct vertices.
+
+SELECT SAFE.ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'))
+=> null
+
+# A hole is written reversed from the ring ST_INTERIORRINGS returns, clockwise.
+
+SELECT ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))')
+=> "POLYGON((5 1, 5 10, 1 10, 1 1, 5 1), (2 4, 3 4, 2 2, 2 4))"
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 10, 10 10, 10 0, 0 0)'), [ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2, 1 1)')])
+=> "POLYGON((10 0, 10 10, 0 10, 0 0, 10 0), (2 2, 2 1, 1 1, 2 2))"
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 2, 2 2, 2 0)'))
+=> "POLYGON((2 0, 2 2, 0 2, 0 0, 2 0))"
+
+# A hole may touch the shell at a vertex.
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0), (0 0, 0.5 0.1, 0.1 0.5, 0 0))')
+=> "POLYGON((0 0, 1 0, 0 1, 0 0), (0.1 0.5, 0.5 0.1, 0 0, 0.1 0.5))"
+
+# Areas and perimeters over the sphere.
+
+SELECT ST_AREA(ST_GEOGFROMTEXT('POLYGON((0 0, 90 0, 0 90, 0 0))'))
+=> "6.375825913974858E13"
+
+SELECT ST_PERIMETER(ST_GEOGFROMTEXT('POLYGON((0 0, 90 0, 0 90, 0 0))'))
+=> "3.0022677317920662E7"
+
+SELECT ST_AREA(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> "4.304500565581736E11"
+
+SELECT ST_PERIMETER(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> "3466128.5455267294"
+
+SELECT ST_AREA(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'), TRUE)
+=> error: ST_AREA does not yet implement use_spheroid=true
+
+# Distances to a polygon.
+
+SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(3, 1))
+=> "111178.16390555105"
+
+SELECT ST_MAXDISTANCE(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(3, 1))
+=> "351613.7138593989"
+
+SELECT ST_DISTANCE(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'), ST_GEOGPOINT(2.5, 3.5))
+=> "24783.083325701453"
+
+SELECT ST_DWITHIN(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGPOINT(2, 1), 0)
+=> "true"
+
+# A vertex on an edge leaves a polygon the same.
+
+SELECT ST_EQUALS(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 2 0, 2 2, 0 2, 0 0))'), ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))'))
+=> "true"
+
+# A ring needs four vertices and must end where it starts; a vertex that repeats the one before it,
+# or lies within a micrometer of it, is dropped, but one a ring repeats later is an error; a vertex on another edge is not snapped to
+# it; and an edge longer than 135 degrees gains its midpoint, as in a linestring.
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1))')
+=> error: ST_GeogFromText failed: Polygon loop should have at least four vertices, but only had 3
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 1, 0 1))')
+=> error: ST_GeogFromText failed: Polygon loop should be a closed ring (last point the same as first)
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0.5 0.5, 1 1, 0 1, 0.5 0.5, 0 0))')
+=> error: ST_GeogFromText failed: Invalid polygon loop: Edge 1 has duplicate vertex with edge 4
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 0, 0 1, 0 0))')
+=> "POLYGON((0 0, 1 0, 0 1, 0 0))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0.000000000001 0.000000000001, 0 0))')
+=> "POLYGON((0 0, 1 0, 0 1, 0 0))"
+
+# BigQuery checks each ring before it snaps the ring's vertices, keeping the one S2Builder keeps
+# whatever their order.
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1.000000000001 0, 0 1, 0 0))')
+=> "POLYGON((0 0, 1.000000000001 0, 0 1, 0 0))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1.000000000001 0, 1 0, 0 1, 0 0))')
+=> error: ST_GeogFromText failed: Invalid polygon loop: Edge 0 crosses edge 2
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 1 0.000000000001, 0 1, 0 0))')
+=> "POLYGON((0 0, 1 0, 0 1, 0 0))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0.000000000001, 1 0, 0 1, 0 0))')
+=> error: ST_GeogFromText failed: Invalid polygon loop: Edge 0 crosses edge 2
+
+# Vertices of different rings snap together in the same way.
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0), (0.000000000001 0.000000000001, 0.5 0.1, 0.1 0.5, 0.000000000001 0.000000000001))')
+=> "POLYGON((0 0, 1 0, 0 1, 0 0), (0.1 0.5, 0.5 0.1, 0 0, 0.1 0.5))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (1 1, 2 1, 2 2, 1 1), (2.000000000001 2, 3 2, 3 3, 2.000000000001 2))')
+=> "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (2.000000000001 2, 2 1, 1 1, 2.000000000001 2), (3 3, 3 2, 2.000000000001 2, 3 3))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0.0000000001 0, 0 0))')
+=> error: ST_GeogFromText failed: Invalid polygon loop: Edge 0 crosses edge 2
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 140 0, 0 1, 0 0))')
+=> "POLYGON((0 0, 70 0, 140 0, 70.011988740257 1.46162213865265, 0 1, 0 0))"
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 136 1, 0 2, 0 0))')
+=> "POLYGON((0 0, 67.9891998480968 1.33452605628295, 136 1, 68.0324070343043 3.99861075755523, 0 2, 0 0))"
+
+# Error messages.
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 0))')
+=> error: ST_GeogFromText failed: Polygon loop should have at least four vertices, but only had 3
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 -1, 2 1, 2 -1, 0 1, 0 -1))')
+=> error: ST_GeogFromText failed: Invalid polygon loop: Edge 0 crosses edge 2
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (20 20, 21 20, 21 21, 20 20))')
+=> error: ST_GeogFromText failed: Polygon should have only one shell, holes must be inside the shell. Polygon hole 1 is outside of the shell
+
+SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0)')
+=> error: ST_GeogFromText failed: Expected ',' or ')', but saw end of data at position 28.
+
+SELECT ST_GEOGFROMTEXT('POLYGON(0 0, 1 0, 0 1, 0 0)')
+=> error: ST_GeogFromText failed: Expected '(' or EMPTY, but saw '0' at position 8.
+
+SELECT ST_MAKEPOLYGON(ST_GEOGPOINT(1, 2))
+=> error: ST_MakePolygon failed: Input geographies for STMakePolygon must be empty or consist of exactly one linestring.
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), [ST_GEOGFROMTEXT('LINESTRING(20 20, 21 20, 21 21)')])
+=> error: ST_MakePolygon failed: Polygon should have only one shell, holes must be inside the shell. Polygon hole 1 is outside of the shell
+
+SELECT ST_X(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> error: Argument to ST_X must be a single point geography; an argument contained a polygon.
+
+SELECT ST_STARTPOINT(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> error: The input is not a single LINESTRING
+
+SELECT ST_MAKELINE(ST_GEOGPOINT(1, 2), ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> error: ST_MAKELINE arguments must be single points or lines

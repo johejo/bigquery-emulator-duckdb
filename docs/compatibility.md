@@ -225,10 +225,11 @@ columns are unsupported.
 ### GEOGRAPHY values
 
 Queries hold a GEOGRAPHY as the S2 points of its vertices, as BigQuery does, and return or store
-it as the WKT BigQuery does, in 15 significant digits. Points, linestrings and empty geographies are
-supported: from `ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH`, `ST_MAKELINE` and `ST_GEOGFROMTEXT` of a
-`POINT`, a `LINESTRING` or a geometry type followed by `EMPTY`. All empty geometries return as
-`GEOMETRYCOLLECTION EMPTY`. Polygons, multipart geometries and collections are unsupported.
+it as the WKT BigQuery does, in 15 significant digits. Points, linestrings, polygons and empty
+geographies are supported: from `ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH`, `ST_MAKELINE`,
+`ST_MAKEPOLYGON` and `ST_GEOGFROMTEXT` of a `POINT`, a `LINESTRING`, a `POLYGON` or a geometry type
+followed by `EMPTY`. All empty geometries return as `GEOMETRYCOLLECTION EMPTY`. Multipart
+geometries, collections and the full polygon are unsupported.
 Functions over them use the [S2 Geometry](https://s2geometry.io/) library; distances use S2's
 Earth radius of 6,371,010 meters, which BigQuery's distances match.
 `ST_DISTANCE` with `use_spheroid` `TRUE` is unsupported for nonempty inputs. Stored GEOGRAPHY columns read as the STRING they hold, and
@@ -241,8 +242,21 @@ itself, crossing edges gain the vertex where they cross, and a line that snaps t
 `POINT`. An edge longer than 135 degrees gains its midpoint, as BigQuery's do. A line that
 BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself, is unsupported.
 `ST_EQUALS` takes geographies as equal where each point of either is within a
-micrometer of the other. `ST_ASGEOJSON` of a linestring is unsupported. `ST_MAXDISTANCE` measures
+micrometer of the other. `ST_ASGEOJSON` of a linestring or a polygon is unsupported. `ST_MAXDISTANCE` measures
 over edges, as BigQuery does, though its documentation describes vertices.
+
+A polygon is held as S2 holds it: each ring encloses the smaller of the two regions it divides the
+sphere into, so a clockwise ring runs reversed, and a hole is written clockwise. As BigQuery does,
+`ST_GEOGFROMTEXT` and `ST_MAKEPOLYGON` drop a vertex that repeats the one before it, add the
+midpoint of an edge longer than 135 degrees, and reject rings that cross, including at a vertex on
+another edge, holes outside the shell, rings that repeat a vertex later, rings of fewer than three
+distinct vertices and `POLYGON` rings that do not end where they start. Once each ring is valid,
+vertices within a micrometer of each other, in one ring or several, snap to the one S2Builder
+keeps. BigQuery also snaps edges, which may leave a line or a collection, and rings that cross or
+touch at an edge to where they meet; such polygons are unsupported, as are `ST_MAKEPOLYGON` of an
+empty geography, which makes the full polygon, and `ST_GEOGFROMTEXT`'s `oriented`, `planar` and
+`make_valid` arguments.
+`ST_AREA` and `ST_PERIMETER` measure polygons over the sphere.
 
 ### RANGE_SESSIONIZE
 

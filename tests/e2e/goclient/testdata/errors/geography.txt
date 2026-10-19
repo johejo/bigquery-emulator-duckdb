@@ -8,10 +8,15 @@ SELECT ST_DISTANCE(ST_GEOGPOINT(0, 0), ST_GEOGPOINT(1, 0), TRUE)
 SELECT TO_JSON_STRING(ST_GEOGPOINT(1, 2))
 => error contains: The emulator does not support function TO_JSON_STRING with GEOGRAPHY
 
-# ST_GEOGFROMTEXT reads only points, linestrings and empty geometries.
+# ST_GEOGFROMTEXT reads only points, linestrings, polygons and empty geometries.
 
-SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')
-=> error contains: The emulator does not support ST_GEOGFROMTEXT of POLYGON
+SELECT ST_GEOGFROMTEXT('MULTIPOLYGON(((0 0, 1 0, 0 1, 0 0)))')
+=> error contains: The emulator does not support ST_GEOGFROMTEXT of MULTIPOLYGON
+
+# The emulator holds no full polygon, which ST_MAKEPOLYGON makes of an empty geography.
+
+SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING EMPTY'))
+=> error contains: The emulator does not support ST_MAKEPOLYGON of an empty GEOGRAPHY
 
 # BigQuery splits a line that overlaps itself into a MULTILINESTRING, which the emulator does not
 # hold.
@@ -19,7 +24,10 @@ SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))')
 SELECT ST_MAKELINE([ST_MAKELINE(ST_GEOGPOINT(1, 0), ST_GEOGPOINT(10, 0)), ST_MAKELINE(ST_GEOGPOINT(10, 0), ST_GEOGPOINT(5, 0)), ST_MAKELINE(ST_GEOGPOINT(5, 0), ST_GEOGPOINT(5, 4))])
 => error contains: The emulator does not support a LINESTRING that BigQuery splits into a MULTILINESTRING
 
-# BigQuery adds vertices to the GeoJSON of a line.
+# BigQuery adds vertices to the GeoJSON of a line or a polygon.
 
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'))
 => error contains: The emulator does not support ST_ASGEOJSON of a LINESTRING
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> error contains: The emulator does not support ST_ASGEOJSON of a POLYGON
