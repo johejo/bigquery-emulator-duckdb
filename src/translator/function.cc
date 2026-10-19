@@ -80,18 +80,38 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
                              [](const auto& argument) { return HasBigNumeric(argument->type()); });
 }
 
-std::string GeographyWkt(const std::string& value, const googlesql::Type* type, int depth) {
-  if (!HasGeography(type)) {
+namespace {
+
+// Whether ResultValue changes values of `type`.
+bool HasResultForm(const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return true;
+  }
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(), [](const googlesql::StructField& field) {
+      return HasResultForm(field.type);
+    });
+  }
+  return type->IsGeography();
+}
+
+std::string ResultValue(const std::string& value, const googlesql::Type* type,
+                        std::string_view column, int depth) {
+  if (!HasResultForm(type)) {
     return value;
   }
   if (type->IsGeography()) {
     return "bq_st_astext(" + value + ")";
   }
   // Each level binds its value once, under a name of its own.
-  const std::string name = "_geo" + std::to_string(depth);
+  const std::string name = "_result" + std::to_string(depth);
   if (type->IsArray()) {
-    return "list_transform(" + value + ", " + name + " -> " +
-           GeographyWkt(name, type->AsArray()->element_type(), depth + 1) + ")";
+    return "list_transform(" + value + ", " + name + " -> CASE WHEN " + name +
+           " IS NULL THEN error(" +
+           QuoteLiteral("Array cannot have a null element; error in writing field " +
+                        std::string(column)) +
+           ") ELSE " + ResultValue(name, type->AsArray()->element_type(), column, depth + 1) +
+           " END)";
   }
   const auto* structure = type->AsStruct();
   const std::vector<std::string> names = DuckDbStructFieldNames(structure);
@@ -99,11 +119,18 @@ std::string GeographyWkt(const std::string& value, const googlesql::Type* type, 
   fields.reserve(names.size());
   for (int i = 0; i < structure->num_fields(); ++i) {
     fields.push_back(QuoteIdentifier(names.at(i)) + " := " +
-                     GeographyWkt("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
-                                  structure->field(i).type, depth + 1));
+                     ResultValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
+                                 structure->field(i).type, column, depth + 1));
   }
   return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
+}
+
+}  // namespace
+
+std::string ResultValue(const std::string& value, const googlesql::Type* type,
+                        std::string_view column) {
+  return ResultValue(value, type, column, 0);
 }
 
 namespace {
@@ -175,7 +202,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
 
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
                                         const FieldSchema& field) {
-  return RoundedToEven(GeographyWkt(value, type), type, field);
+  return RoundedToEven(ResultValue(value, type, field.name), type, field);
 }
 
 std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,

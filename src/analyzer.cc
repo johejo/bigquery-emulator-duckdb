@@ -120,6 +120,14 @@ std::optional<std::vector<FieldSchema>> ResultSchema(
   return schema;
 }
 
+std::vector<std::string> ResultColumnNames(const googlesql::ResolvedQueryStmt& query) {
+  std::vector<std::string> names;
+  for (auto& [name, type] : ResultColumns(query)) {
+    names.push_back(std::move(name));
+  }
+  return names;
+}
+
 namespace {
 
 // Whether `node` has type parameters, such as STRING(3) or ARRAY<NUMERIC(5, 2)>.
