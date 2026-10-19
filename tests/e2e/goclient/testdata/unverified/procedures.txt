@@ -1,0 +1,43 @@
+# System variables inside procedures
+# https://cloud.google.com/bigquery/docs/reference/system-variables
+#
+# Each script creates the dataset unverified_procedures and procedures of its own. The dataset
+# stays in the project after the scripts run. The emulator reads @@dataset_id and @@project_id in
+# procedures, and rejects reads of other system variables there until these settle.
+
+# Whether a procedure reads the @@dataset_project_id that its caller sets.
+
+SET @@dataset_project_id = @@project_id;
+CREATE SCHEMA IF NOT EXISTS unverified_procedures;
+CREATE OR REPLACE PROCEDURE unverified_procedures.read_dataset_project() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@dataset_project_id = @@project_id; END;
+CALL unverified_procedures.read_dataset_project()
+?>
+
+# What a procedure reads of @@time_zone.
+
+CREATE SCHEMA IF NOT EXISTS unverified_procedures;
+CREATE OR REPLACE PROCEDURE unverified_procedures.read_time_zone() OPTIONS(strict_mode=FALSE)
+BEGIN SELECT @@time_zone; END;
+CALL unverified_procedures.read_time_zone()
+?>
+
+# What an exception handler in a procedure reads of @@error.
+
+CREATE SCHEMA IF NOT EXISTS unverified_procedures;
+CREATE OR REPLACE PROCEDURE unverified_procedures.read_error() OPTIONS(strict_mode=FALSE)
+BEGIN BEGIN SELECT ERROR('fail'); EXCEPTION WHEN ERROR THEN SELECT @@error.message; END; END;
+CALL unverified_procedures.read_error()
+?>
+
+# Whether dynamic SQL in a procedure resolves table names against the caller's @@dataset_id. The
+# emulator resolves them as the procedure's own statements, which BigQuery does not resolve
+# against it.
+
+CREATE SCHEMA IF NOT EXISTS unverified_procedures;
+CREATE OR REPLACE TABLE unverified_procedures.t AS SELECT 1 AS n;
+CREATE OR REPLACE PROCEDURE unverified_procedures.dynamic_tables() OPTIONS(strict_mode=FALSE)
+BEGIN EXECUTE IMMEDIATE 'SELECT n FROM t'; END;
+SET @@dataset_id = 'unverified_procedures';
+CALL unverified_procedures.dynamic_tables()
+?>
