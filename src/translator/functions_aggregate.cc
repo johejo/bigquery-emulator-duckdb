@@ -220,8 +220,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           },
           {"ANY_VALUE", {{.function = "any_value"}}},
           // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
-          // days, so the INTERVAL function keeps the first of them. LIMIT would slice the list
-          // before it does.
+          // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
           {
               "ARRAY_AGG",
               {
@@ -230,6 +229,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                       .type = googlesql::TYPE_INTERVAL,
                       .nulls = kFilter,
                       .distinct = AggregateRule::Distinct::kRequired,
+                      .limit = kSliceFinished,
                       .finish = IntervalDistinct,
                   },
                   {

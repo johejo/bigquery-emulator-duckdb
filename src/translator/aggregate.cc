@@ -70,10 +70,22 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (name == "APPROX_TOP_SUM" && type_of(0) == googlesql::TYPE_INTERVAL) {
     throw std::invalid_argument("Unsupported type INTERVAL for approx_top_sum_shard.");
   }
-  // BigQuery rejects ARRAY_AGG(DISTINCT ... ORDER BY ...) over INTERVAL values after analysis.
-  if (name == "ARRAY_AGG" && call.distinct() && type_of(0) == googlesql::TYPE_INTERVAL &&
-      aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
-    throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
+  // BigQuery rejects ARRAY_AGG over INTERVAL values ordered by themselves alone after analysis,
+  // as it must with DISTINCT, but orders them by other keys, also before themselves. Ordering them
+  // by themselves before other keys is unsupported until BigQuery settles it.
+  if (name == "ARRAY_AGG" && type_of(0) == googlesql::TYPE_INTERVAL && aggregate != nullptr &&
+      !aggregate->order_by_item_list().empty()) {
+    const auto& items = aggregate->order_by_item_list();
+    const auto* value = call.argument_list(0)->Is<googlesql::ResolvedColumnRef>()
+                            ? call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>()
+                            : nullptr;
+    if (call.distinct() ||
+        (value != nullptr && value->column() == items.at(0)->column_ref()->column())) {
+      if (call.distinct() || items.size() == 1) {
+        throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
+      }
+      return Unsupported(scope, "ARRAY_AGG over INTERVAL values ordered by themselves first");
+    }
   }
   // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
   // DuckDB does.
@@ -200,17 +212,21 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                         (args.size() > 1 ? args.at(1) : "','") + ")",
                     over);
     }
-    if (rule->limit != AggregateRule::Limit::kSlice) {
+    if (rule->limit != AggregateRule::Limit::kSlice &&
+        rule->limit != AggregateRule::Limit::kSliceFinished) {
       return Unsupported(scope, "aggregate " + name + " with LIMIT");
     }
   }
   const std::string tail =
       (conditions.empty() ? "" : " FILTER (WHERE " + Join(conditions, " AND ") + ")") + over;
-  std::string sql = std::string(rule->function) + "(" + inner + order + ")" + tail;
-  if (!limit.empty()) {
-    sql = "list_slice(" + sql + ", 1, " + limit + ")";
+  const std::string sql = std::string(rule->function) + "(" + inner + order + ")" + tail;
+  if (limit.empty()) {
+    return finish(sql, tail);
   }
-  return finish(sql, tail);
+  if (rule->limit == AggregateRule::Limit::kSliceFinished) {
+    return "list_slice(" + finish(sql, tail) + ", 1, " + limit + ")";
+  }
+  return finish("list_slice(" + sql + ", 1, " + limit + ")", tail);
 }
 
 std::optional<std::string> FrameBound(const googlesql::ResolvedWindowFrameExpr& bound,

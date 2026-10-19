@@ -206,9 +206,11 @@ Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `
 `DISTINCT` group STRUCT and ARRAY values by the lengths of their INTERVAL fields and elements. Among equal
 values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
 sets the first in the whole input, `SUM` and `AVG` with `DISTINCT` count the first, and `ARRAY_AGG`
-with `DISTINCT` keeps the first, which BigQuery rejects with `ORDER BY`. `GREATEST`, `LEAST`
+with `DISTINCT` keeps the first. As in BigQuery, `ARRAY_AGG` fails on INTERVAL values ordered by
+themselves alone, also with `DISTINCT`. `GREATEST`, `LEAST`
 and `NULLIF` fail as in BigQuery. `PARTITION BY` and distinct set operations over ARRAY values with
-INTERVAL elements, `ARRAY_AGG` with `DISTINCT` and `LIMIT` or over STRUCT values with INTERVAL fields, other
+INTERVAL elements, `ARRAY_AGG` over INTERVAL values ordered by themselves before other keys or over STRUCT values
+with INTERVAL fields, other
 arithmetic, other aggregates, other JSON conversions, loads of
 INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
 unsupported.

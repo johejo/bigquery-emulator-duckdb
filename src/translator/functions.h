@@ -151,6 +151,8 @@ struct AggregateRule {
     kUnsupported,
     // The first elements of the list it builds.
     kSlice,
+    // The first elements of the list its finish returns.
+    kSliceFinished,
     // The first non-NULL values of the list STRING_AGG joins.
     kJoin,
   };
