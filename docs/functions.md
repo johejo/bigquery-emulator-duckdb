@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 26 | 5 | 40 | 0 |
+| [Geography functions](#geography-functions) | 33 | 5 | 33 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 0 | 0 | 4 | 0 |
@@ -243,13 +243,13 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | Unsupported |  |  |
 | [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | Unsupported |  |  |
 | [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | Unsupported |  |  |
-| [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | Unsupported |  |  |
+| [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | Supported | S2 function |  |
 | [`ST_CONVEXHULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull) | Unsupported |  |  |
-| [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | Unsupported |  |  |
-| [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | Unsupported |  |  |
+| [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | Supported | S2 function |  |
+| [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | Supported | S2 function |  |
 | [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | Unsupported |  |  |
 | [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | Supported | S2 function |  |
-| [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | Unsupported |  |  |
+| [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | Supported | S2 function |  |
 | [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | Partial | S2 function | Unsupported: use_spheroid. |
 | [`ST_DUMP`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dump) | Unsupported |  |  |
 | [`ST_DWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dwithin) | Supported | S2 function |  |
@@ -269,7 +269,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | Unsupported |  |  |
 | [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Supported | S2 function |  |
 | [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Unsupported |  |  |
-| [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Unsupported |  |  |
+| [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Supported | S2 function |  |
 | [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | Unsupported |  |  |
 | [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Supported | S2 function |  |
 | [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | Supported | S2 function |  |
@@ -292,10 +292,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_SIMPLIFY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_simplify) | Unsupported |  |  |
 | [`ST_SNAPTOGRID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_snaptogrid) | Unsupported |  |  |
 | [`ST_STARTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_startpoint) | Supported | S2 function |  |
-| [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | Unsupported |  |  |
+| [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | Supported | S2 function |  |
 | [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | Unsupported |  |  |
 | [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | Unsupported |  |  |
-| [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | Unsupported |  |  |
+| [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | Supported | S2 function |  |
 | [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | Supported | S2 function |  |
 | [`ST_Y`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_y) | Supported | S2 function |  |
 

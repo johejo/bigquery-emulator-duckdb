@@ -283,6 +283,13 @@ collapses, are unsupported, as are
 `oriented`, `planar` and `make_valid` arguments.
 `ST_AREA` and `ST_PERIMETER` measure polygons over the sphere.
 
+`ST_INTERSECTS`, `ST_DISJOINT`, `ST_TOUCHES`, `ST_CONTAINS`, `ST_WITHIN`, `ST_COVERS` and
+`ST_COVEREDBY` take a geography's interior as OGC defines it: without a polygon's rings or a
+linestring's endpoints, unless it ends where it starts, while a point is its own interior. As
+BigQuery does, they first snap both geographies together with S2Builder, so that a vertex within a
+micrometer of a vertex or an edge of the other meets it there: a point between a linestring's
+vertices is on it, and one on a polygon's edge is on its boundary.
+
 ### RANGE_SESSIONIZE
 
 `RANGE_SESSIONIZE` retains every input row and appends `session_range` for DATE, DATETIME and
