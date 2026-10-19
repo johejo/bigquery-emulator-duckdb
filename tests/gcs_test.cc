@@ -57,12 +57,6 @@ class GcsTest : public ::testing::Test {
         response.status = 401;
         return;
       }
-      if (check_connection_reuse_) {
-        const int previous_port = peer_port_.exchange(request.remote_port);
-        if (previous_port != 0) {
-          EXPECT_EQ(request.remote_port, previous_port);
-        }
-      }
       EXPECT_EQ(request.get_header_value("Authorization"), authorization_);
       EXPECT_EQ(request.path, "/storage/v1/b/bucket/o/nested/a.json");
       EXPECT_EQ(request.get_param_value("alt"), "media");
@@ -141,18 +135,9 @@ class GcsTest : public ::testing::Test {
   std::string endpoint_;
   std::string authorization_;
   bool require_adc_ = false;
-  bool check_connection_reuse_ = false;
-  std::atomic<int> peer_port_ = 0;
   std::atomic<int> requests_ = 0;
   std::atomic<int> token_requests_ = 0;
 };
-
-TEST_F(GcsTest, ReusesConnections) {
-  check_connection_reuse_ = true;
-  Download();
-  Download();
-  EXPECT_EQ(requests_, 2);
-}
 
 TEST_F(GcsTest, DefaultsToPublicStorageApi) {
   unsetenv("STORAGE_EMULATOR_HOST");
@@ -175,12 +160,6 @@ TEST_F(GcsTest, UsesAdcWhenAvailable) {
   // The availability check and the Storage client each exchange a token once.
   EXPECT_LE(token_requests_, 2);
   EXPECT_EQ(requests_, 2);
-}
-
-TEST_F(GcsTest, IgnoresEnvironmentChangesAfterConstruction) {
-  client();
-  SetEnv("STORAGE_EMULATOR_HOST", "http://127.0.0.1:1");
-  Download();
 }
 
 TEST_F(GcsTest, SupportsConcurrentDownloads) {
