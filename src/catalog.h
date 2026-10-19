@@ -1,12 +1,8 @@
 #pragma once
 
-#include <cstddef>
 #include <map>
 #include <memory>
-#include <optional>
-#include <set>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -15,206 +11,18 @@
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/catalog_wrapper.h"
 #include "googlesql/public/simple_catalog.h"
-#include "src/field_schema.h"
-#include "src/references.h"
-#include "src/routine.h"
-#include "src/table_metadata.h"
 
 namespace googlesql {
-class Function;
-class LanguageOptions;
 class TableValuedFunction;
 class TVFInputArgumentType;
 class TVFSignature;
-class Type;
 class TypeFactory;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 
-// The language settings shared by the catalog's built-in functions and the analyzer, so that a
-// statement is not rejected for a feature one of them was not told about.
-const googlesql::LanguageOptions& GoogleSqlLanguageOptions();
-
-// Whether `function` is a GoogleSQL built-in or a BigQuery function that GoogleSQL does not ship
-// and the catalog declares in its place, as opposed to a user-defined one.
-bool IsBuiltinFunction(const googlesql::Function& function);
-
-// The schema and metadata of a table as tables.get reports them.
-struct TableDescription {
-  std::vector<FieldSchema> schema;
-  TableMetadata metadata;
-};
-
-// A view as INFORMATION_SCHEMA describes it: its GoogleSQL query, empty when it is unknown, and
-// its metadata.
-struct ViewDescription {
-  std::string query;
-  TableMetadata metadata;
-};
-
-// Resolves a BigQuery table reference to its schema. The emulator implements it on top of the
-// metadata it keeps in DuckDB.
-class TableSource {
- public:
-  virtual ~TableSource() = default;
-
-  // Returns the columns of `project`.`dataset`.`table`, or nothing if there is no such table.
-  virtual std::optional<std::vector<FieldSchema>> FindTable(const std::string& project,
-                                                            const std::string& dataset,
-                                                            const std::string& table) = 0;
-
-  // The schema and metadata of the table `project`.`dataset`.`table`, or nothing if there is no
-  // such table or it is a view. For CREATE TABLE LIKE, COPY and CLONE and INFORMATION_SCHEMA;
-  // none by default.
-  virtual std::optional<TableDescription> DescribeTable(const std::string& /*project*/,
-                                                        const std::string& /*dataset*/,
-                                                        const std::string& /*table*/) {
-    return std::nullopt;
-  }
-
-  // The metadata of the dataset `project`.`dataset`, or nothing if there is no such dataset. For
-  // the default rounding mode that CREATE TABLE AS SELECT rounds with and INFORMATION_SCHEMA;
-  // none by default.
-  virtual std::optional<DatasetMetadata> DescribeDataset(const std::string& /*project*/,
-                                                         const std::string& /*dataset*/) {
-    return std::nullopt;
-  }
-
-  // The datasets of `project`, sorted by name, for INFORMATION_SCHEMA. None by default.
-  virtual std::vector<std::string> ListDatasets(const std::string& /*project*/) { return {}; }
-
-  // Whether the emulator holds the project `project`, for INFORMATION_SCHEMA. Every project by
-  // default.
-  virtual bool HasProject(const std::string& /*project*/) { return true; }
-
-  // The ID of the project that `project` names, by its ID or by its number. `project` itself by
-  // default, and for a project the emulator does not hold.
-  [[nodiscard]] virtual std::string ProjectId(const std::string& project) const { return project; }
-
-  // The location of the dataset `project`.`dataset`, or nothing if there is no such dataset, for
-  // INFORMATION_SCHEMA. Unlike the lookups above, it does not count as the job using the dataset.
-  // Nothing by default.
-  virtual std::optional<std::string> DatasetLocation(const std::string& /*project*/,
-                                                     const std::string& /*dataset*/) {
-    return std::nullopt;
-  }
-
-  // Records that the job uses `name`, such as an INFORMATION_SCHEMA view of a region, which is in
-  // `location`, as JobLocation::Reference does. Does nothing by default.
-  virtual void ReferenceLocation(const std::string& /*name*/, const std::string& /*location*/) {}
-
-  // The tables of `project`.`dataset`, sorted by name, for INFORMATION_SCHEMA. None by default.
-  virtual std::vector<std::string> ListTables(const std::string& /*project*/,
-                                              const std::string& /*dataset*/) {
-    return {};
-  }
-
-  // The view `project`.`dataset`.`table`, or nothing for a table. For INFORMATION_SCHEMA; no
-  // views by default.
-  virtual std::optional<ViewDescription> FindView(const std::string& /*project*/,
-                                                  const std::string& /*dataset*/,
-                                                  const std::string& /*table*/) {
-    return std::nullopt;
-  }
-
-  // The persistent routines of a dataset, sorted by name. None by default.
-  virtual std::vector<Routine> ListRoutines(const DatasetReference& /*dataset*/) { return {}; }
-
-  // The persistent UDF `routine`, or nothing if there is no such routine. None by default.
-  virtual std::optional<Routine> FindRoutine(const RoutineReference& /*routine*/) {
-    return std::nullopt;
-  }
-
-  // The columns that EXTERNAL_QUERY returns for `query` on the connection `key`, as
-  // ConnectionKey gives it, with NUMERIC columns of `decimal_type`, once the connection is
-  // attached in DuckDB as ExternalDatabaseName(key). An error status for a connection that does
-  // not exist or a query that EXTERNAL_QUERY rejects. No connections by default.
-  virtual absl::StatusOr<std::vector<FieldSchema>> DescribeExternalQuery(
-      const std::string& key, const std::string& /*query*/, FieldType /*decimal_type*/) {
-    return absl::NotFoundError("Not found: Connection " + key);
-  }
-};
-
-// A table whose rows are not stored but computed by a DuckDB query, such as an
-// INFORMATION_SCHEMA view. The query's columns have the table's column names.
-class SqlTable : public googlesql::SimpleTable {
- public:
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a table is named before its query.
-  SqlTable(const std::string& name, std::string sql)
-      : googlesql::SimpleTable(name), sql_(std::move(sql)) {}
-
-  [[nodiscard]] const std::string& sql() const { return sql_; }
-
- private:
-  std::string sql_;
-};
-
-// A table the emulator keeps, which describes itself on demand: its columns are what queries
-// see, while CREATE TABLE LIKE, COPY and CLONE copy the schema and metadata tables.get reports.
-class BigQueryTable : public googlesql::SimpleTable {
- public:
-  // `source` must outlive the table, whose columns are those of `schema`, in order.
-  BigQueryTable(TableSource& source, std::vector<std::string> path, std::vector<FieldSchema> schema)
-      : googlesql::SimpleTable(path.back()),
-        source_(source),
-        path_(std::move(path)),
-        schema_(std::move(schema)) {}
-
-  [[nodiscard]] std::optional<TableDescription> Describe() const {
-    return source_.DescribeTable(path_.at(0), path_.at(1), path_.at(2));
-  }
-  [[nodiscard]] TableReference reference() const {
-    return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
-  }
-  // The field of column `index`, such as for its rounding mode.
-  [[nodiscard]] const FieldSchema& field(int index) const {
-    return schema_.at(static_cast<size_t>(index));
-  }
-
- private:
-  TableSource& source_;
-  std::vector<std::string> path_;
-  std::vector<FieldSchema> schema_;
-};
-
-// Splits a table path into its dot-separated parts. An element with dots in it, which is how
-// `project.dataset.table` in backquotes arrives, is split too; dots before the colon in a
-// domain-scoped project ID are kept in the project.
-std::vector<std::string> SplitTablePath(absl::Span<const std::string> path);
-
-// Normalizes a table path to {project, dataset, table}, splitting it with SplitTablePath first.
-// Missing parts come from the defaults, and a project number becomes the ID of the project
-// `source` holds by it, when `source` is not null. Returns an empty vector for a path it cannot
-// interpret.
-std::vector<std::string> NormalizeTablePath(absl::Span<const std::string> path,
-                                            const std::string& default_project,
-                                            const std::string& default_dataset,
-                                            const TableSource* source);
-
-// The dataset qualifier that names a temporary table explicitly, as `_SESSION.name`.
-inline constexpr char kSessionDataset[] = "_SESSION";
-
-// The temporary tables of a multi-statement query, which live in the DuckDB catalog `project`
-// and its schema `dataset`: those named `names` when a statement is analyzed and translated.
-struct TemporaryTables {
-  std::string project;
-  std::string dataset;
-  std::set<std::string> names = {};
-};
-
-// The name of the temporary table that CREATE TEMP TABLE `path` creates, which is either `name`
-// or `_SESSION.name`, or nothing for any other path.
-std::optional<std::string> TemporaryTableName(absl::Span<const std::string> path);
-
-// Normalizes a table path as NormalizeTablePath does, in a multi-statement query whose temporary
-// tables are `temporary` when it is not null: `_SESSION.name` names a temporary table, and so
-// does an unqualified name when a temporary table has it.
-std::vector<std::string> ResolveTablePath(absl::Span<const std::string> path,
-                                          const std::string& default_project,
-                                          const std::string& default_dataset,
-                                          const TemporaryTables* temporary,
-                                          const TableSource* source);
+class TableSource;
+struct TemporaryTables;
 
 // A catalog whose tables come from a TableSource and whose functions and types are the
 // GoogleSQL built-ins. Tables are looked up lazily, when the analyzer first refers to them,

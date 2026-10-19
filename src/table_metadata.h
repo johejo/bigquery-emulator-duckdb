@@ -69,6 +69,19 @@ struct TableMetadata {
   [[nodiscard]] nlohmann::json ToJson() const;
 };
 
+// The schema and metadata of a table as tables.get reports them.
+struct TableDescription {
+  std::vector<FieldSchema> schema;
+  TableMetadata metadata;
+};
+
+// A view as INFORMATION_SCHEMA describes it: its GoogleSQL query, empty when it is unknown, and
+// its metadata.
+struct ViewDescription {
+  std::string query;
+  TableMetadata metadata;
+};
+
 // What a dataset carries besides its reference: Dataset.description, friendlyName and labels,
 // defaultTableExpirationMs, which sets the expiration of tables and views created in it later, and
 // defaultRoundingMode, which tables created in it later take as their own.

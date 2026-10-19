@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "src/catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
+#include "src/table_path.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
 

@@ -18,7 +18,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
-#include "src/catalog.h"
+#include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/translator/aggregate.h"

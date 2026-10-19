@@ -10,8 +10,8 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "src/bignumeric.h"
-#include "src/catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/language_options.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {

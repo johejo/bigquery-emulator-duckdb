@@ -19,11 +19,13 @@
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/type.h"
 #include "src/catalog.h"
+#include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/routine.h"
 #include "src/table_metadata.h"
+#include "src/table_source.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {

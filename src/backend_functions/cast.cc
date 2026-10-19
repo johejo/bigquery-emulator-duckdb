@@ -19,8 +19,8 @@
 #include "src/backend_functions/datetime.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
-#include "src/catalog.h"
 #include "src/duckdb_handle.h"
+#include "src/language_options.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {

@@ -20,6 +20,9 @@ class TypeFactory;
 
 namespace bigquery_emulator_duckdb {
 
+class TableSource;
+struct TemporaryTables;
+
 // A BigQueryCatalog that resolves stored views and persistent SQL UDFs and table functions, by a
 // path that names their dataset. Each call resolves the routine's body anew, as BigQuery does:
 // against the routine's own project, with no default dataset, so that the body names its tables

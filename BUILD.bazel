@@ -229,6 +229,61 @@ cc_library(
 )
 
 cc_library(
+    name = "language_options",
+    srcs = ["src/language_options.cc"],
+    hdrs = ["src/language_options.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@googlesql//googlesql/public:function",
+        "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:options_cc_proto",
+    ],
+)
+
+# Kept apart from the catalog because it gains a method with most features that read metadata:
+# only what implements or calls it is rebuilt then.
+cc_library(
+    name = "table_source",
+    hdrs = ["src/table_source.h"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":field_schema",
+        ":references",
+        ":routine",
+        ":table_metadata",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "table_path",
+    srcs = ["src/table_path.cc"],
+    hdrs = ["src/table_path.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":table_source",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+    deps = ["@abseil-cpp//absl/types:span"],
+)
+
+cc_library(
+    name = "catalog_table",
+    srcs = ["src/catalog_table.cc"],
+    hdrs = ["src/catalog_table.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [":table_source"],
+    deps = [
+        ":field_schema",
+        ":references",
+        ":table_metadata",
+        "@googlesql//googlesql/public:simple_catalog",
+    ],
+)
+
+cc_library(
     name = "catalog",
     srcs = [
         "src/catalog.cc",
@@ -242,7 +297,14 @@ cc_library(
     implementation_deps = [
         ":duckdb_sql",
         ":external_query",
+        ":field_schema",
+        ":language_options",
         ":location",
+        ":references",
+        ":routine",
+        ":table_metadata",
+        ":table_path",
+        ":table_source",
         ":type_mapping",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
@@ -255,10 +317,7 @@ cc_library(
         "@googlesql//googlesql/public:value",
     ],
     deps = [
-        ":field_schema",
-        ":references",
-        ":routine",
-        ":table_metadata",
+        ":catalog_table",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/types:span",
@@ -275,6 +334,10 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":api_error",
+        ":catalog_table",
+        ":language_options",
+        ":table_path",
+        ":table_source",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/parser",
@@ -304,8 +367,9 @@ cc_library(
     hdrs = ["src/analyzer.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":catalog",
         ":duckdb_sql",
+        ":language_options",
+        ":table_path",
         ":type_mapping",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
@@ -623,12 +687,15 @@ cc_library(
         ":ddl_write",
         ":duckdb_sql",
         ":extract",
+        ":language_options",
         ":load",
         ":parquet_metadata",
         ":routine_catalog",
         ":schema_sql",
         ":script",
         ":table_comments",
+        ":table_path",
+        ":table_source",
         ":temporary_files",
         ":translated_statement",
         ":translator",
@@ -676,9 +743,12 @@ cc_library(
         ":duckdb_sql",
         ":field_schema",
         ":javascript_function",
+        ":language_options",
         ":routine",
         ":routine_catalog",
         ":system_variables",
+        ":table_path",
+        ":table_source",
         ":translated_statement",
         ":translator",
         ":type_mapping",
@@ -773,8 +843,8 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":api_error",
-        ":catalog",
         ":emulator",
+        ":language_options",
         ":references",
         "//src/server:requests",
         "//src/server:resources",
@@ -823,6 +893,8 @@ cc_binary(
     deps = [
         ":catalog",
         ":field_schema",
+        ":language_options",
+        ":table_source",
         "//src/translator:functions",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:function",
@@ -918,10 +990,10 @@ cc_test(
     tags = ["manual"],
     deps = [
         ":api_error",
-        ":catalog",
         ":cell_value",
         ":emulator",
         ":field_schema",
+        ":language_options",
         ":query_parameters",
         ":references",
         ":type_mapping",
@@ -944,7 +1016,8 @@ cc_test(
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@googlesql//googlesql/public/types",
-        "@nlohmann_json//:json",
+        # json_value brings nlohmann's single header, which nlohmann/json.hpp then names.
+        "@nlohmann_json//:singleheader-json",
     ],
 )
 
