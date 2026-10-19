@@ -16,8 +16,8 @@ SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 => error contains: The emulator does not support function $EXTRACT
 
-SELECT ARRAY_AGG(DISTINCT i) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support ARRAY_AGG(DISTINCT ...)
+SELECT ARRAY_AGG(DISTINCT i LIMIT 1) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
+=> error contains: The emulator does not support aggregate ARRAY_AGG with LIMIT
 
 SELECT ARRAY_AGG(STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL

@@ -70,6 +70,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if (name == "APPROX_TOP_SUM" && type_of(0) == googlesql::TYPE_INTERVAL) {
     throw std::invalid_argument("Unsupported type INTERVAL for approx_top_sum_shard.");
   }
+  // BigQuery rejects ARRAY_AGG(DISTINCT ... ORDER BY ...) over INTERVAL values after analysis.
+  if (name == "ARRAY_AGG" && call.distinct() && type_of(0) == googlesql::TYPE_INTERVAL &&
+      aggregate != nullptr && !aggregate->order_by_item_list().empty()) {
+    throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
+  }
   // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
   // DuckDB does.
   if ((rule == entry->aggregates.end() || rule->type != googlesql::TYPE_INTERVAL) &&

@@ -151,6 +151,11 @@ constexpr char kIntervalAvg[] = "bq_interval_avg";
 constexpr char kIntervalSumDistinct[] = "bq_interval_sum_distinct";
 constexpr char kIntervalAvgDistinct[] = "bq_interval_avg_distinct";
 
+std::string IntervalDistinct(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                             const std::string& /*tail*/) {
+  return "bq_interval_distinct(" + sql + ")";
+}
+
 // Aggregate functions, which also take a window.
 }  // namespace
 
@@ -215,7 +220,8 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           },
           {"ANY_VALUE", {{.function = "any_value"}}},
           // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
-          // days.
+          // days, so the INTERVAL function keeps the first of them. LIMIT would slice the list
+          // before it does.
           {
               "ARRAY_AGG",
               {
@@ -223,7 +229,13 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                       .function = "list",
                       .type = googlesql::TYPE_INTERVAL,
                       .nulls = kFilter,
-                      .distinct = AggregateRule::Distinct::kUnsupported,
+                      .distinct = AggregateRule::Distinct::kRequired,
+                      .finish = IntervalDistinct,
+                  },
+                  {
+                      .function = "list",
+                      .type = googlesql::TYPE_INTERVAL,
+                      .nulls = kFilter,
                       .limit = kSlice,
                   },
                   {.function = "list", .nulls = kFilter, .limit = kSlice},
