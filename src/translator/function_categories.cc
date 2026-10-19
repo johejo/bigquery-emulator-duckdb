@@ -42,25 +42,11 @@ constexpr std::string_view kCompares[] = {
 };
 
 constexpr std::string_view kBuildsOrReadsInterval[] = {
-    "$ADD",
-    "$SUBTRACT",
-    "$UNARY_MINUS",
-    "$MULTIPLY",
-    "$DIVIDE",
-    "$INTERVAL",
-    "$EXTRACT",
-    "MAKE_INTERVAL",
-    "JUSTIFY_HOURS",
-    "JUSTIFY_DAYS",
-    "JUSTIFY_INTERVAL",
-    "ERROR",
-    "FORMAT",
-    "JSON_ARRAY_APPEND",
-    "JSON_ARRAY_INSERT",
-    "TO_JSON",
-    "TO_JSON_STRING",
-    "JSON_OBJECT",
-    "GENERATE_RANGE_ARRAY",
+    "$ADD",           "$SUBTRACT",         "$UNARY_MINUS",      "$MULTIPLY",
+    "$DIVIDE",        "$INTERVAL",         "$EXTRACT",          "MAKE_INTERVAL",
+    "JUSTIFY_HOURS",  "JUSTIFY_DAYS",      "JUSTIFY_INTERVAL",  "ERROR",
+    "FORMAT",         "JSON_ARRAY_APPEND", "JSON_ARRAY_INSERT", "TO_JSON",
+    "TO_JSON_STRING", "JSON_ARRAY",        "JSON_OBJECT",       "GENERATE_RANGE_ARRAY",
 };
 
 constexpr std::string_view kComparesIntervalKeys[] = {

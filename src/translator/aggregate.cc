@@ -81,9 +81,10 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
     }
   }
-  // Only an INTERVAL overload takes INTERVAL values; the others would add or compare them as
-  // DuckDB does.
-  if ((rule == entry->aggregates.end() || rule->type != googlesql::TYPE_INTERVAL) &&
+  // Only an INTERVAL overload takes INTERVAL values, and one that carries them takes them in
+  // other values; the others would add or compare them as DuckDB does.
+  if ((rule == entry->aggregates.end() ||
+       (rule->type != googlesql::TYPE_INTERVAL && (!rule->carries || call.distinct()))) &&
       (HasInterval(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasInterval(argument->type()); }))) {

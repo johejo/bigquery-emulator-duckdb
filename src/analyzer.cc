@@ -315,21 +315,29 @@ bool ContainsArray(const googlesql::Type* type) {
 }
 
 // BigQuery groups by ARRAYs but rejects them in aggregate functions with DISTINCT, which GoogleSQL
-// allows under the same language feature as grouping.
-absl::Status CheckDistinctArrays(const googlesql::ResolvedNode& node) {
+// allows under the same language feature as grouping. It rejects STRUCTs with INTERVAL fields there
+// too.
+absl::Status CheckDistinctArguments(const googlesql::ResolvedNode& node) {
   std::vector<const googlesql::ResolvedNode*> calls;
   node.GetDescendantsSatisfying(
       &googlesql::ResolvedNode::Is<googlesql::ResolvedNonScalarFunctionCallBase>, &calls);
   for (const auto* descendant : calls) {
     const auto* call = descendant->GetAs<googlesql::ResolvedNonScalarFunctionCallBase>();
-    if (call->distinct() && std::ranges::any_of(call->argument_list(), [](const auto& argument) {
-          return ContainsArray(argument->type());
-        })) {
-      return absl::InvalidArgumentError(
-          std::string(descendant->Is<googlesql::ResolvedAnalyticFunctionCall>()
-                          ? "Analytic aggregate"
-                          : "Aggregate") +
-          " functions with DISTINCT cannot be used with arguments of type ARRAY");
+    if (!call->distinct()) {
+      continue;
+    }
+    const std::string prefix = descendant->Is<googlesql::ResolvedAnalyticFunctionCall>()
+                                   ? "Analytic aggregate"
+                                   : "Aggregate";
+    for (const auto& argument : call->argument_list()) {
+      if (ContainsArray(argument->type())) {
+        return absl::InvalidArgumentError(
+            prefix + " functions with DISTINCT cannot be used with arguments of type ARRAY");
+      }
+      if (argument->type()->IsStruct() && HasInterval(argument->type())) {
+        return absl::InvalidArgumentError(
+            prefix + " functions with DISTINCT cannot be used with arguments of type STRUCT");
+      }
     }
   }
   return absl::OkStatus();
@@ -521,7 +529,7 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
       !temporary.ok()) {
     throw std::runtime_error(std::string(temporary.message()));
   }
-  if (const absl::Status distinct = CheckDistinctArrays(*analyzer_output->resolved_statement());
+  if (const absl::Status distinct = CheckDistinctArguments(*analyzer_output->resolved_statement());
       !distinct.ok()) {
     throw std::runtime_error(std::string(distinct.message()));
   }
@@ -562,7 +570,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptStatement(const googlesql::ScriptSeg
       .With(googlesql::ConvertLocalErrorToScriptError(segment));
   GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(segment.GetSegmentText(), false));
   GOOGLESQL_RETURN_IF_ERROR(CheckTemporaryTable(*analyzer_output->resolved_statement(), true));
-  GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArrays(*analyzer_output->resolved_statement()));
+  GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_statement()));
   GOOGLESQL_RETURN_IF_ERROR(CheckResultColumns(*analyzer_output->resolved_statement()));
   return AnalyzerResult(std::move(analyzer_output));
 }
@@ -589,7 +597,7 @@ absl::StatusOr<AnalyzerResult> AnalyzeScriptExpression(std::string_view sql,
   }
   GOOGLESQL_RETURN_IF_ERROR(status);
   GOOGLESQL_RETURN_IF_ERROR(CheckCastTypeParameters(sql, true));
-  GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArrays(*analyzer_output->resolved_expr()));
+  GOOGLESQL_RETURN_IF_ERROR(CheckDistinctArguments(*analyzer_output->resolved_expr()));
   return AnalyzerResult(std::move(analyzer_output));
 }
 

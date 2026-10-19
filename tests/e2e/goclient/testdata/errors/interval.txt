@@ -1,17 +1,14 @@
 # INTERVAL values are supported only where the emulator implements them; anything else, such as
-# JSON_ARRAY, is unsupported rather than left to DuckDB.
+# JSON_SET, is unsupported rather than left to DuckDB.
 
-SELECT JSON_ARRAY(MAKE_INTERVAL(day => 7))
-=> error contains: The emulator does not support function JSON_ARRAY with INTERVAL
+SELECT JSON_SET(JSON '{}', '$.i', MAKE_INTERVAL(day => 7))
+=> error contains: The emulator does not support function JSON_SET with INTERVAL
 
 SELECT EXTRACT(WEEK FROM MAKE_INTERVAL(day => 7))
 => error contains: The emulator does not support function $EXTRACT
 
 SELECT EXTRACT(QUARTER FROM MAKE_INTERVAL(month => 3))
 => error contains: The emulator does not support function $EXTRACT
-
-SELECT ARRAY_AGG(STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
-=> error contains: The emulator does not support aggregate or analytic function ARRAY_AGG with INTERVAL
 
 SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day => 7)]) AS i
 => error contains: Partitioning by expressions of type STRUCT is unsupported
