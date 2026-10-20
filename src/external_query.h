@@ -1,8 +1,11 @@
 #pragma once
 
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -11,6 +14,17 @@
 // EXTERNAL_QUERY reads from PostgreSQL or Spanner databases that --connection names.
 
 namespace bigquery_emulator_duckdb {
+
+class Backend;
+
+// The connections that EXTERNAL_QUERY reaches, by key, and those with table macros registered
+// in the DuckDB database of `backend`.
+struct ExternalConnections {
+  Backend& backend;
+  std::unordered_map<std::string, std::string> conninfo = {};
+  std::mutex mutex = {};
+  std::unordered_set<std::string> attached = {};
+};
 
 // A connection that EXTERNAL_QUERY can name, and the external database it reaches.
 struct ExternalConnection {

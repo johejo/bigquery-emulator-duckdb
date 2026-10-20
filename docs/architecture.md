@@ -103,6 +103,19 @@ functions use the same macro-comment storage as persistent scalar functions and 
 View comments hold the original query and result schema as JSON. Creation and metadata writes
 share a transaction, preserving the previous definition on replacement failure.
 
+[duckdb_catalog.cc](../src/duckdb_catalog.cc) reads recorded metadata and sweeps expired
+relations through the supplied backend, including a script session's uncommitted changes.
+[duckdb_table_source.cc](../src/duckdb_table_source.cc) adapts those reads to `TableSource`,
+records job locations and registers external connection macros. Both are separate Bazel libraries with
+private implementation dependencies to limit the headers exposed to callers and the scope of
+clang-tidy cache invalidation. Neither depends on `Emulator` or GoogleSQL's parser.
+
+The emulator's resource operations live in `emulator_datasets.cc`, `emulator_tables.cc` and
+`emulator_routines.cc`; `emulator_tabledata.cc` handles row reads and writes, and
+`emulator_ddl.cc` handles catalog checks and metadata for query DDL. The shared expiration mutex
+still covers mutations through their response reads, and each expiration drop rechecks the
+relation's comment in its transaction.
+
 Column comments hold TableFieldSchema metadata; table comments hold descriptions, friendly names,
 labels, partitioning and clustering. View comments also hold this metadata alongside the query.
 Dataset metadata lives in the project's `main.emulator_datasets` table because DuckDB cannot

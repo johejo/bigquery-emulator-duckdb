@@ -29,7 +29,9 @@
 #include "src/backend_error.h"
 #include "src/cell_value.h"
 #include "src/ddl_write.h"
+#include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
+#include "src/duckdb_table_source.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
@@ -231,6 +233,15 @@ class Emulator::ScriptHostImpl : public ScriptHost {
   Emulator& emulator_;
   JobLocation& location_;
 };
+
+std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool expire,
+                                                      JobLocation* location) {
+  Backend& backend = session != nullptr ? *session : backend_;
+  if (expire) {
+    ExpireTables(backend, expiration_mutex_);
+  }
+  return NewDuckDbTableSource(backend, connections_, project_ids_, location);
+}
 
 QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
                               bool null_arrays) {
