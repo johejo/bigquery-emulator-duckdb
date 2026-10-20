@@ -58,7 +58,9 @@ Partition expiration is unsupported.
 DDL option values accept literals and constant expressions using query parameters and supported
 scalar functions. Other expressions, such as a parenthesized script variable, are unsupported.
 
-Expired tables and views are deleted when the catalog is read, including before query analysis.
+Expired tables and views are deleted when the catalog is read, including before query analysis,
+except by statements in a transaction, which can still read a table that expires while the
+transaction is open.
 Tables and views created before the emulator recorded creation times have no `creationTime` in
 `tables.get`, and NULL creation times in `INFORMATION_SCHEMA.TABLES`.
 

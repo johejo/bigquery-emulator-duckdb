@@ -608,7 +608,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                                         const AnalyzerSettings& settings,
                                         bool list_temporary = true) {
     ScriptCatalog catalog;
-    catalog.source = host_.NewTableSource(backend_.get(), /*expire=*/list_temporary);
+    // Dropping expired tables in an open transaction would make them part of it, so that its
+    // commit, and other requests' drops, could conflict. Other requests drop them meanwhile.
+    catalog.source =
+        host_.NewTableSource(backend_.get(), /*expire=*/list_temporary && !in_transaction_);
     catalog.temporary = std::make_unique<TemporaryTables>(temporary_);
     if (list_temporary) {
       for (std::string& name : catalog.source->ListTables(temporary_.project, temporary_.dataset)) {

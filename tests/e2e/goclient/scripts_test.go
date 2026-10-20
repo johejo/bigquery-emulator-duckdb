@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
@@ -273,6 +274,62 @@ func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 				t.Fatalf("got %d and %v, want %d", row.X, err, tc.want)
 			}
 		})
+	}
+}
+
+// A table that expires while a transaction is open is not part of the transaction: queries from
+// other clients run meanwhile, and the transaction commits.
+// https://cloud.google.com/bigquery/docs/transactions
+func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_transaction_expiration")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE t (x INT64)"); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if err := dataset.Table("expiring").Create(ctx, &bigquery.TableMetadata{
+		Schema:         bigquery.Schema{{Name: "x", Type: bigquery.IntegerFieldType}},
+		ExpirationTime: start.Add(2 * time.Second),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The second pause starts after the table expires and holds the transaction open while
+	// another query runs.
+	script := make(chan error, 1)
+	go func() {
+		_, _, err := runScript(t, client, dataset.DatasetID, `
+			CREATE TEMP FUNCTION pause(ms FLOAT64) RETURNS FLOAT64 LANGUAGE js AS r'''
+				const end = Date.now() + ms;
+				while (Date.now() < end) {}
+				return ms;
+			''';
+			BEGIN TRANSACTION;
+			SELECT pause(3000);
+			SELECT pause(3000);
+			INSERT t VALUES (1);
+			COMMIT TRANSACTION`)
+		script <- err
+	}()
+	time.Sleep(time.Until(start.Add(4500 * time.Millisecond)))
+	select {
+	case err := <-script:
+		t.Fatalf("the transaction ended before the query ran: %v", err)
+	default:
+	}
+	if _, _, err := runScript(t, client, "", "SELECT 1"); err != nil {
+		t.Errorf("query during the transaction: %v", err)
+	}
+	if err := <-script; err != nil {
+		t.Fatalf("transaction: %v", err)
+	}
+	if _, err := dataset.Table("expiring").Metadata(ctx); err == nil {
+		t.Error("the expired table still exists")
 	}
 }
 
