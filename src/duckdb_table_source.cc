@@ -244,6 +244,10 @@ class DuckDbTableSource : public TableSource {
     if (connection == connections_.conninfo.end()) {
       return absl::NotFoundError("Not found: Connection " + key);
     }
+    if (connection->second == kCloudResourceConnection) {
+      return absl::InvalidArgumentError("Connection " + key +
+                                        " is not a Cloud SQL or Spanner connection");
+    }
     if (const std::optional<std::string> location = ConnectionLocation(key); location.has_value()) {
       ReferenceLocation("Connection " + key, *location);
     }

@@ -34,6 +34,10 @@ struct ExternalConnection {
   std::string conninfo;
 };
 
+// What --connection gives a Cloud resource connection in place of a database, which OBJ functions
+// read Cloud Storage objects through and EXTERNAL_QUERY rejects.
+inline constexpr std::string_view kCloudResourceConnection = "cloud_resource";
+
 // Parses --connection's PROJECT.LOCATION.CONNECTION=CONNINFO. Throws std::invalid_argument.
 ExternalConnection ParseConnectionArgument(std::string_view argument);
 

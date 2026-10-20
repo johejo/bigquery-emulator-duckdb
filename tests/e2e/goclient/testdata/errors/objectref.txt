@@ -1,0 +1,23 @@
+# OBJ.MAKE_REF, which checks the authorizer and details it is given:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref
+
+SELECT OBJ.MAKE_REF('gs://cloud-samples-data/x.png', 'storage').authorizer
+=> error contains: Connection id storage is not in the expected format. Supported formats are projects/{project}/locations/{location}/connections/{connection} or {project}.{location}.{connection} or {location}.{connection}; error in OBJ.MAKE_REF expression
+
+SELECT TO_JSON_STRING(OBJ.MAKE_REF('gs://cloud-samples-data/x.png', 'us.storage', details => JSON '{"a": 1}').details)
+=> error contains: Invalid field in objectref details, only a JSON object named gcs_metadata or errors is allowed; error in OBJ.MAKE_REF expression
+
+SELECT TO_JSON_STRING(OBJ.MAKE_REF('gs://cloud-samples-data/x.png', details => JSON '1').details)
+=> error contains: Invalid field in objectref details, only a JSON object named gcs_metadata or errors is allowed; error in OBJ.MAKE_REF expression
+
+# The form that replaces an ObjectRef's authorizer takes it by position only, and one without a
+# project only when the connection exists.
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), authorizer => 'us.storage').authorizer
+=> error contains: No matching signature for function BIGQUERYGOOGLESQL:OBJ.MAKE_REF
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), 'us.missing').authorizer
+=> error contains: Connection 'us.missing' cannot be found.
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), 'storage').authorizer
+=> error contains: Connection id storage is not in the expected format. Supported formats are projects/{project}/locations/{location}/connections/{connection} or {project}.{location}.{connection} or {location}.{connection}

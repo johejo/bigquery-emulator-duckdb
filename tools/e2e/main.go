@@ -179,7 +179,7 @@ func run(ctx context.Context, args []string) (err error) {
 	defer func() { err = errors.Join(err, postgres.Stop()) }()
 	// The SDK provides a native Spanner emulator on Linux x86_64. Other platforms
 	// can run these cases against an externally started emulator and empty database.
-	connections := []string{"test.us.postgres=" + postgres.Conninfo}
+	connections := []string{"test.us.postgres=" + postgres.Conninfo, "test.us.storage=cloud_resource"}
 	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" && os.Getenv("E2E_SPANNER_DATABASE") == "" {
 		startup, cancel := context.WithTimeout(ctx, 45*time.Second)
 		spanner, startErr := spannerprocess.Start(startup)

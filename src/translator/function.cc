@@ -29,12 +29,12 @@ namespace {
 // The DuckDB spelling of a scalar call over already translated arguments.
 std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
                                 std::string_view name, const std::vector<std::string>& args,
-                                bool safe) {
+                                bool safe, std::string_view project) {
   const FunctionEntry* entry = FindFunction(name);
   if (entry == nullptr) {
     return std::nullopt;
   }
-  ScalarCall call{.resolved = resolved, .name = name, .safe = safe};
+  ScalarCall call{.resolved = resolved, .name = name, .safe = safe, .project = project};
   for (size_t i = 0; i < args.size(); ++i) {
     const googlesql::ResolvedExpr& argument = *resolved.argument_list(static_cast<int>(i));
     call.arguments.push_back({
@@ -395,7 +395,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
   }
   if (!safe) {
-    auto sql = Call(call, function, args, false);
+    auto sql = Call(call, function, args, false, scope.context.defaults.project);
     if (!sql) {
       return Unsupported(scope, "function " + name);
     }
@@ -422,7 +422,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql = Call(call, function, placeholders, true);
+  const auto sql = Call(call, function, placeholders, true, scope.context.defaults.project);
   if (!sql) {
     return Unsupported(scope, "SAFE." + name);
   }

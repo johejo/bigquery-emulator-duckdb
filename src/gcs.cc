@@ -166,6 +166,25 @@ std::vector<std::string> GcsClient::Expand(const std::string& uri) {
   return matches;
 }
 
+GcsObjectMetadata GcsClient::Metadata(const std::string& uri) {
+  const auto [bucket, object] = ParseUri(uri);
+  storage::Client client = impl_->client();
+  const auto metadata = client.GetObjectMetadata(bucket, object);
+  if (!metadata) {
+    const std::string message =
+        "Could not read GCS object: " + uri + " (" + metadata.status().message() + ")";
+    throw metadata.status().code() == cloud::StatusCode::kNotFound ? ApiError::NotFound(message)
+                                                                   : ApiError::Invalid(message);
+  }
+  return {
+      .content_type = metadata->content_type(),
+      .md5_hash = metadata->md5_hash(),
+      .size = metadata->size(),
+      .generation = metadata->generation(),
+      .updated = metadata->updated(),
+  };
+}
+
 void GcsClient::Download(const std::string& uri, const std::filesystem::path& output) {
   const auto [bucket, object] = ParseUri(uri);
   // SDK copies share the connection pool. Concurrent calls on the same Client instance

@@ -188,6 +188,17 @@ ARRAY, STRUCT, annotated PostgreSQL types and all nonempty options, including
 `query_execution_priority`, are unsupported. Queries run as single-use, strong, read-only
 transactions; query partitioning and Data Boost are not implemented.
 
+### ObjectRef functions
+
+`OBJ.FETCH_METADATA` reads objects from the Cloud Storage endpoint that loads read; see the
+[README](../README.md#google-cloud-storage). An authorizer must name a Cloud resource connection that
+`--connection PROJECT.LOCATION.CONNECTION=cloud_resource` declares; any other is recorded as a
+connection that cannot be used, as BigQuery records one that does not exist. Every declared
+connection can read every object, and its location is not checked against the bucket's.
+
+`OBJ.MAKE_REF`'s JSON form, `OBJ.GET_ACCESS_URL`, `OBJ.GET_READ_URL` and `OBJ.LIST` are
+unsupported.
+
 ## User-defined functions
 
 ### SQL UDFs

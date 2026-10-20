@@ -59,7 +59,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Navigation functions](#navigation-functions) | 7 | 0 | 0 | 0 |
 | [Net functions](#net-functions) | 10 | 0 | 0 | 0 |
 | [Numbering functions](#numbering-functions) | 6 | 0 | 0 | 0 |
-| [ObjectRef functions](#objectref-functions) | 0 | 0 | 4 | 0 |
+| [ObjectRef functions](#objectref-functions) | 1 | 1 | 2 | 0 |
 | [Range functions](#range-functions) | 7 | 1 | 0 | 0 |
 | [Search functions](#search-functions) | 0 | 0 | 2 | 0 |
 | [Security functions](#security-functions) | 1 | 0 | 0 | 0 |
@@ -490,10 +490,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | Unsupported |  |  |
+| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | Supported | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. |
 | [`OBJ.GET_ACCESS_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_access_url) | Unsupported |  |  |
 | [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | Unsupported |  |  |
-| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Unsupported |  |  |
+| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Partial | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function MAKE_REF. |
 
 ## Range functions
 

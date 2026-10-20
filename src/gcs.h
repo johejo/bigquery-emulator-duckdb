@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -14,6 +16,16 @@ namespace bigquery_emulator_duckdb {
 // https://cloud.google.com/bigquery/docs/batch-loading-data#load-wildcards
 // https://cloud.google.com/bigquery/docs/exporting-data#exporting_data_into_one_or_more_files
 size_t FindGcsWildcard(const std::string& uri);
+
+// The metadata of a GCS object version.
+struct GcsObjectMetadata {
+  std::string content_type;
+  // Base64, as GCS gives it; empty for objects without one, such as composite objects.
+  std::string md5_hash;
+  std::uint64_t size = 0;
+  std::int64_t generation = 0;
+  std::chrono::system_clock::time_point updated;
+};
 
 // Retains SDK connection pools and credentials for the lifetime of the emulator. Concurrent
 // downloads and uploads are supported.
@@ -34,6 +46,10 @@ class GcsClient {
   // Expands one object-name wildcard; exact URIs do not require listing permission.
   // Throws ApiError for malformed patterns, listing failures, or no matches.
   std::vector<std::string> Expand(const std::string& uri);
+
+  // The metadata of the current version of the object `uri`. Throws ApiError, a NotFound one when
+  // the object does not exist.
+  GcsObjectMetadata Metadata(const std::string& uri);
 
   // Throws ApiError.
   void Download(const std::string& uri, const std::filesystem::path& output);

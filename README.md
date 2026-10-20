@@ -192,6 +192,11 @@ GCS source URIs support one `*` in the object name, following the
 multiple asterisks are rejected. Wildcard expansion requires permission to list objects;
 exact URIs are read without listing. The emulator rejects patterns with no matches.
 
+`OBJ.FETCH_METADATA` reads object metadata from the same endpoint. Its authorizers are Cloud
+resource connections that `--connection PROJECT.LOCATION.CONNECTION=cloud_resource` declares,
+such as `--connection='test.us.storage=cloud_resource'`; see
+[ObjectRef functions](docs/compatibility.md#objectref-functions) for limits.
+
 CSV and newline-delimited JSON loads accept gzip data from GCS, local files, and uploads.
 Compression is detected from the file contents, so a `.gz` extension is not required, and
 compressed and uncompressed files can be loaded together.
@@ -214,7 +219,8 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
 - `EXTERNAL_QUERY` reaches the PostgreSQL or Spanner databases that `--connection` configures,
-  rather than connections that the Connection API creates.
+  and ObjectRef functions authorize with the Cloud resource connections it declares, rather than
+  connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
   every client, and is treated as having the BigQuery API enabled.
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy

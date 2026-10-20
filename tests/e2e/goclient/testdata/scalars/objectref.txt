@@ -1,0 +1,129 @@
+# ObjectRef functions, whose ObjectRef and fetched metadata BigQuery documents:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions
+#
+# tools/e2e serves tests/e2e/gcs/objectref/hello.txt, which holds "hello\n", from fake GCS, and
+# connects us.storage of the project test as a Cloud resource connection.
+
+SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg').uri
+=> "gs://mybucket/flowers/12345.jpg"
+
+SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg').authorizer
+=> null
+
+SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg', version => '12345').version
+=> "12345"
+
+SELECT JSON_VALUE(OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg', details => JSON '{"gcs_metadata": {"size": 23000}}').details.gcs_metadata.size)
+=> "23000"
+
+SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg', version => 'abc').version
+=> "abc"
+
+SELECT OBJ.MAKE_REF('not a uri').uri
+=> "not a uri"
+
+SELECT OBJ.MAKE_REF(CAST(NULL AS STRING)) IS NULL
+=> "true"
+
+# OBJ.MAKE_REF qualifies the authorizer with the project of the query.
+
+SELECT OBJ.MAKE_REF('gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/aquaclear-aquarium-background-poster.png', 'us.storage').authorizer
+=> "test.us.storage"
+
+SELECT OBJ.MAKE_REF('gs://cloud-samples-data/x.png', 'US.storage').authorizer
+=> "test.us.storage"
+
+SELECT OBJ.MAKE_REF('gs://cloud-samples-data/x.png', CONCAT('projects/', @@project_id, '/locations/us/connections/storage')).authorizer
+=> "test.us.storage"
+
+# Replacing an ObjectRef's authorizer takes one without a project only when the connection exists,
+# and does not look up one with a project.
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), 'us.storage').authorizer
+=> "test.us.storage"
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), CONCAT(@@project_id, '.us.storage')).authorizer
+=> "test.us.storage"
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), CONCAT(@@project_id, '.us.missing')).authorizer
+=> "test.us.missing"
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), CONCAT(@@project_id, '.US.storage')).authorizer
+=> "test.us.storage"
+
+SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://cloud-samples-data/x.png'), CONCAT('projects/', @@project_id, '/locations/us/connections/storage')).authorizer
+=> "test.us.storage"
+
+SELECT JSON_VALUE(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).details.gcs_metadata.md5_hash)
+=> "b1946ac92492d2347c6235b4d2611184"
+
+SELECT JSON_VALUE(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).details.gcs_metadata.size)
+=> "6"
+
+SELECT OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).authorizer
+=> "test.us.storage"
+
+SELECT OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).uri
+=> "gs://objectref/hello.txt"
+
+# The version is the object's generation, and the update time is in whole seconds.
+
+SELECT REGEXP_CONTAINS(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).version, r'^[0-9]+$')
+=> "true"
+
+SELECT MOD(INT64(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).details.gcs_metadata.updated), 1000000)
+=> "0"
+
+# Direct access, without an authorizer.
+
+SELECT JSON_VALUE(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt')).details.gcs_metadata.size)
+=> "6"
+
+SELECT ARRAY_LENGTH(OBJ.FETCH_METADATA([OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage'), OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')]))
+=> "2"
+
+SELECT OBJ.FETCH_METADATA(CAST(NULL AS STRUCT<uri STRING, version STRING, authorizer STRING, details JSON>)) IS NULL
+=> "true"
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF(CAST(NULL AS STRING), 'us.storage')))
+=> "null"
+
+# A failure is recorded in the details instead of failing the query, keeping the version and
+# making a NULL one empty.
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/aquaclear-aquarium-background-poster.png', 'us.missing')))
+=> "{\"uri\":\"gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/aquaclear-aquarium-background-poster.png\",\"version\":\"\",\"authorizer\":\"test.us.missing\",\"details\":{\"errors\":[{\"code\":400,\"message\":\"Connection credential for test.us.missing cannot be used. Either the connection does not exist, or the user does not have sufficient permissions (bigquery.objectRefs.read)\",\"source\":\"OBJ.FETCH_METADATA\"}]}}"
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/aquaclear-aquarium-background-poster.png', 'us.missing', version => 'abc')).version)
+=> "\"abc\""
+
+# The connection is checked before the URI, and a failure replaces the details.
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('not a uri', 'us.missing')))
+=> "{\"uri\":\"not a uri\",\"version\":\"\",\"authorizer\":\"test.us.missing\",\"details\":{\"errors\":[{\"code\":400,\"message\":\"Connection credential for test.us.missing cannot be used. Either the connection does not exist, or the user does not have sufficient permissions (bigquery.objectRefs.read)\",\"source\":\"OBJ.FETCH_METADATA\"}]}}"
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/aquaclear-aquarium-background-poster.png', 'us.missing', details => JSON '{"gcs_metadata": {"size": 1}}')).details)
+=> "{\"errors\":[{\"code\":400,\"message\":\"Connection credential for test.us.missing cannot be used. Either the connection does not exist, or the user does not have sufficient permissions (bigquery.objectRefs.read)\",\"source\":\"OBJ.FETCH_METADATA\"}]}"
+
+# The URI is checked after the connection, and the version is parsed but the current version is
+# read.
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/does-not-exist.txt', 'us.storage')))
+=> "{\"uri\":\"gs://objectref/does-not-exist.txt\",\"version\":\"\",\"authorizer\":\"test.us.storage\",\"details\":{\"errors\":[{\"code\":404,\"message\":\"No such object\",\"source\":\"OBJ.FETCH_METADATA\"}]}}"
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('not a uri', 'us.storage')))
+=> "{\"uri\":\"not a uri\",\"version\":\"\",\"authorizer\":\"test.us.storage\",\"details\":{\"errors\":[{\"code\":400,\"message\":\"URI not a uri is not in the expected format. Supported format is gs://bucket/path/to/object\",\"source\":\"OBJ.FETCH_METADATA\"}]}}"
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage', version => 'abc')))
+=> "{\"uri\":\"gs://objectref/hello.txt\",\"version\":\"abc\",\"authorizer\":\"test.us.storage\",\"details\":{\"errors\":[{\"code\":400,\"message\":\"Failed to parse object version number: abc\",\"source\":\"OBJ.FETCH_METADATA\"}]}}"
+
+SELECT OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage', version => '1')).version = OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage')).version
+=> "true"
+
+SELECT JSON_VALUE(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage', version => '1')).details.gcs_metadata.size)
+=> "6"
+
+# Fetched metadata replaces the details.
+
+SELECT TO_JSON_STRING(OBJ.FETCH_METADATA(OBJ.MAKE_REF('gs://objectref/hello.txt', 'us.storage', details => JSON '{"gcs_metadata": {"size": 1}}')).details.gcs_metadata.size)
+=> "6"

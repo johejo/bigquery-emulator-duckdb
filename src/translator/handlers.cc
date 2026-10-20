@@ -432,4 +432,46 @@ std::optional<std::string> TextAnalyze(const ScalarCall& call) {
   return "bq_text_analyze(" + Join(Sqls(call), ", ") + ")";
 }
 
+// OBJ.MAKE_REF from a URI, with the authorizer, version and details GoogleSQL passes as NULL when
+// omitted, or from an ObjectRef whose authorizer it replaces. The backend checks the authorizer,
+// qualifying one with the query's project from a URI, and the details. A NULL URI or ObjectRef
+// makes NULL. The JSON form is unsupported.
+std::optional<std::string> MakeRef(const ScalarCall& call) {
+  const auto type = DuckDbType(call.ResultType());
+  const std::vector<std::string> args = Sqls(call);
+  if (!type || (args.size() != 4 && args.size() != 2)) {
+    return std::nullopt;
+  }
+  const std::string project = QuoteLiteral(call.project);
+  if (args.size() == 2) {
+    return "list_transform([" + args.at(0) +
+           "], _objref -> CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := "
+           "_objref.uri, version := _objref.version, authorizer := bq_obj_replace_authorizer(" +
+           args.at(1) + ", " + project + "), details := _objref.details) AS " + *type + ") END)[1]";
+  }
+  return "list_transform([" + args.at(0) +
+         "], _objref -> CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := _objref, "
+         "version := " +
+         args.at(2) + ", authorizer := bq_obj_authorizer(" + args.at(1) + ", " + project +
+         "), details := bq_obj_details(" + args.at(3) + ")) AS " + *type + ") END)[1]";
+}
+
+// OBJ.FETCH_METADATA of an ObjectRef or of each in an array, which the backend reads as JSON in
+// the query's project.
+std::optional<std::string> FetchMetadata(const ScalarCall& call) {
+  const googlesql::Type* result = call.ResultType();
+  const auto type = DuckDbType(result->IsArray() ? result->AsArray()->element_type() : result);
+  if (!type || call.arguments.size() != 1) {
+    return std::nullopt;
+  }
+  const auto fetch = [&](const std::string& objectref) {
+    return "CAST(bq_obj_fetch_metadata(to_json(" + objectref + "), " + QuoteLiteral(call.project) +
+           ") AS " + *type + ")";
+  };
+  if (result->IsArray()) {
+    return "list_transform(" + call.arguments.at(0).sql + ", _objref -> " + fetch("_objref") + ")";
+  }
+  return fetch(call.arguments.at(0).sql);
+}
+
 }  // namespace bigquery_emulator_duckdb::translator
