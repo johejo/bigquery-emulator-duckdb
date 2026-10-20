@@ -30,6 +30,36 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
+  reason: "BigQuery has no MONTHS_BETWEEN function, which GoogleSQL implements for DATE and DATETIME"
+  label: "additional_date_time_functions_test:months_between_date_basic"
+  label: "additional_date_time_functions_test:months_between_date_null"
+  label: "additional_date_time_functions_test:months_between_datetime_basic"
+  label: "additional_date_time_functions_test:months_between_datetime_null"
+  label: "code:months_between_DATETIME_2008-02-29 00:00:00.123456_DATETIME_2008-02-28 00:00:00.789012"
+  label: "code:months_between_DATETIME_2008-02-29 00:00:00_DATETIME_2008-02-28 12:00:00"
+  label: "code:months_between_DATETIME_2008-04-15 06:15:45_DATETIME_2008-05-10 12:30:15"
+  label: "code:months_between_DATETIME_2025-01-01 01:33:12_DATETIME_NULL"
+  label: "code:months_between_DATETIME_2025-02-28 23:00:00_DATETIME_2025-03-31 00:00:00"
+  label: "code:months_between_DATETIME_2025-03-14 23:00:00_DATETIME_2025-02-14 00:00:00"
+  label: "code:months_between_DATETIME_2025-10-29 00:00:00_DATETIME_2025-11-30 00:00:00"
+  label: "code:months_between_DATETIME_2025-11-14 00:00:00_DATETIME_2025-10-14 00:00:00"
+  label: "code:months_between_DATETIME_2025-11-14 00:00:00_DATETIME_2025-10-16 00:00:00"
+  label: "code:months_between_DATETIME_2025-11-30 00:00:00_DATETIME_2024-10-31 00:00:00"
+  label: "code:months_between_DATETIME_2025-11-30 00:00:00_DATETIME_2025-10-29 00:00:00"
+  label: "code:months_between_DATETIME_NULL_DATETIME_2025-01-01 01:33:12"
+  label: "code:months_between_DATETIME_NULL_DATETIME_NULL"
+  label: "code:months_between_DATE_<2025-01-01>_DATE_NULL"
+  label: "code:months_between_DATE_<2025-10-29>_DATE_<2025-11-30>"
+  label: "code:months_between_DATE_<2025-11-14>_DATE_<2025-10-14>"
+  label: "code:months_between_DATE_<2025-11-14>_DATE_<2025-10-16>"
+  label: "code:months_between_DATE_<2025-11-30>_DATE_<2024-10-31>"
+  label: "code:months_between_DATE_<2025-11-30>_DATE_<2025-10-29>"
+  label: "code:months_between_DATE_NULL_DATE_<2025-01-01>"
+  label: "code:months_between_DATE_NULL_DATE_NULL"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
   reason: "BigQuery rejects INTERSECT ALL and EXCEPT ALL, which GoogleSQL accepts"
   label: "except_intersect_queries_test:except_all_datatype_struct"
   label: "except_intersect_queries_test:except_all_nan_different_bitwise_representation"

@@ -15,6 +15,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "googlesql/public/builtin_function.pb.h"
 #include "googlesql/public/builtin_function_options.h"
 #include "googlesql/public/catalog.h"
 #include "googlesql/public/function.h"
@@ -186,8 +187,13 @@ void AddObjectRefFunctions(googlesql::SimpleCatalog& catalog) {
 googlesql::SimpleCatalog* BuiltinCatalog() {
   static googlesql::SimpleCatalog* const kCatalog = [] {
     auto* catalog = new googlesql::SimpleCatalog("builtin", new googlesql::TypeFactory());
-    const absl::Status status = catalog->AddBuiltinFunctionsAndTypes(
-        googlesql::BuiltinFunctionOptions(GoogleSqlLanguageOptions()));
+    googlesql::BuiltinFunctionOptions options(GoogleSqlLanguageOptions());
+    // GoogleSQL implements MONTHS_BETWEEN, but BigQuery has no such built-in function.
+    options.exclude_function_ids = {
+        googlesql::FN_MONTHS_BETWEEN_DATE,
+        googlesql::FN_MONTHS_BETWEEN_DATETIME,
+    };
+    const absl::Status status = catalog->AddBuiltinFunctionsAndTypes(options);
     if (!status.ok()) {
       throw std::runtime_error(status.ToString());
     }

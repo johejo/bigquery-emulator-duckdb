@@ -1,5 +1,4 @@
 exports_files([
     "compliance.patch",
-    "months_between_datetime.patch",
     "throw_delegate.patch",
 ])

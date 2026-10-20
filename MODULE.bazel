@@ -57,8 +57,6 @@ archive_override(
         "//third_party/googlesql:throw_delegate.patch",
         # Lets //:compliance_test use GoogleSQL's compliance test cases.
         "//third_party/googlesql:compliance.patch",
-        # MONTHS_BETWEEN must also inline with BigQuery's microsecond precision.
-        "//third_party/googlesql:months_between_datetime.patch",
     ],
     strip_prefix = "googlesql-2026.10.1",
     urls = ["https://github.com/google/googlesql/archive/refs/tags/2026.10.1.tar.gz"],

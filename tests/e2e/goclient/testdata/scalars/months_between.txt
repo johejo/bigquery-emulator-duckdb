@@ -1,0 +1,9 @@
+# BigQuery has no MONTHS_BETWEEN built-in, even though GoogleSQL implements it.
+# The DATETIME error was verified on BigQuery; name lookup rejects DATE calls too.
+
+SELECT MONTHS_BETWEEN(x.a, x.b)
+FROM UNNEST([STRUCT(DATETIME '2008-02-29 00:00:00' AS a, DATETIME '2008-02-28 12:00:00' AS b)]) AS x
+=> error contains: Function not found: MONTHS_BETWEEN
+
+SELECT MONTHS_BETWEEN(DATE '2025-03-14', DATE '2025-02-14')
+=> error contains: Function not found: MONTHS_BETWEEN

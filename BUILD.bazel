@@ -340,6 +340,7 @@ cc_library(
         ":type_mapping",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
+        "@googlesql//googlesql/public:builtin_function_cc_proto",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
