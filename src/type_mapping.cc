@@ -176,9 +176,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                      : std::nullopt;
     }
     case googlesql::TYPE_GEOGRAPHY:
-      // See src/backend_functions/geography_value.h. A parameter's text would need parsing into
-      // that form.
-      return use == TypeUse::kParameter ? std::nullopt : std::optional<std::string>("VARCHAR");
+      // See src/backend_functions/geography_value.h.
+      return "VARCHAR";
     case googlesql::TYPE_ARRAY: {
       const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;

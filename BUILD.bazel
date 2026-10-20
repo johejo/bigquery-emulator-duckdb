@@ -68,6 +68,7 @@ cc_library(
         ":bignumeric",
         ":duckdb_sql",
         ":interval",
+        ":schema_sql",
         ":type_mapping",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/public:interval_value",

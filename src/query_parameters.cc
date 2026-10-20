@@ -18,6 +18,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
+#include "src/schema_sql.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -185,6 +186,10 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
   if (name == "BYTES") {
     // BYTES parameters are base64 encoded, which DuckDB decodes back into a BLOB.
     return "from_base64(" + QuoteLiteral(text) + ")";
+  }
+  if (name == "GEOGRAPHY") {
+    // Read from its WKT, as a load reads one.
+    return StoredValue(QuoteLiteral(text), ToFieldSchema("", type));
   }
   return "CAST(" + QuoteLiteral(text) + " AS " + ToDuckDbType(type) + ")";
 }
