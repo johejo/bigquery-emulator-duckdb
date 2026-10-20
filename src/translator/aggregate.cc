@@ -35,7 +35,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns, const std::string& having = "",
                                          std::vector<std::string>* intermediates = nullptr) {
-  const std::string name = ToUpperAscii(call.function()->Name());
+  const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
@@ -794,6 +794,19 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         if (call->error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
           throw std::invalid_argument("SAFE is unsupported with analytic function tf_idf");
         }
+      }
+      // GoogleSQL takes these with OVER, which BigQuery rejects after analysis.
+      static const std::set<std::string_view> kAggregateOnly = {
+          "APPROX_COUNT_DISTINCT",
+          "HLL_COUNT.INIT",
+          "HLL_COUNT.MERGE",
+          "HLL_COUNT.MERGE_PARTIAL",
+      };
+      if (IsBuiltinFunction(*call->function()) &&
+          kAggregateOnly.contains(
+              ToUpperAscii(call->function()->FullName(/*include_group=*/false)))) {
+        throw std::invalid_argument("Analytic function " + ToUpperAscii(call->function()->Name()) +
+                                    " is not supported.");
       }
       const auto type = DuckDbType(call->type());
       const auto over = Window(*group, call->window_frame(), scope, input_columns);

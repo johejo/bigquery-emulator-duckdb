@@ -240,7 +240,7 @@ std::optional<std::string> JavaScriptCall(const googlesql::ResolvedFunctionCall&
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns) {
-  const std::string name = ToUpperAscii(call.function()->Name());
+  const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty()) {
     return Unsupported(scope, "function " + name + " with generic arguments, hints or collation");

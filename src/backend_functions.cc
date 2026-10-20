@@ -11,6 +11,7 @@
 #include "src/backend_functions/cast.h"
 #include "src/backend_functions/datetime.h"
 #include "src/backend_functions/geography.h"
+#include "src/backend_functions/hll_count.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
 #include "src/backend_functions/javascript_limits.h"
@@ -134,6 +135,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterMathFunctions(connection.get());
   backend_functions::RegisterStringFunctions(connection.get());
   backend_functions::RegisterTextAnalysisFunctions(connection.get());
+  backend_functions::RegisterHllCountFunctions(connection.get());
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterCastFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());

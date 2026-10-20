@@ -51,7 +51,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Geography functions](#geography-functions) | 37 | 3 | 31 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
-| [HLL functions](#hll-functions) | 0 | 0 | 4 | 0 |
+| [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
 | [JSON functions](#json-functions) | 28 | 0 | 0 | 0 |
 | [KLL functions](#kll-functions) | 0 | 0 | 11 | 0 |
@@ -76,13 +76,13 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | Partial | GoogleSQL function | Unsupported: function KEYSET_CHAIN. |
-| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Partial | DuckDB SQL, in code | Unsupported: function ADD_KEY_FROM_RAW_BYTES. |
+| [`AEAD.DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`AEAD.DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeaddecrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`AEAD.ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#aeadencrypt) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
+| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Partial | DuckDB SQL, in code | Unsupported: function KEYS.ADD_KEY_FROM_RAW_BYTES. |
 | [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | Unsupported |  |  |
 | [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | Supported | GoogleSQL function |  |
 | [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | Supported | GoogleSQL function |  |
@@ -330,10 +330,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`HLL_COUNT.EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countextract) | Unsupported |  |  |
-| [`HLL_COUNT.INIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countinit) | Unsupported |  |  |
-| [`HLL_COUNT.MERGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge) | Unsupported |  |  |
-| [`HLL_COUNT.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge_partial) | Unsupported |  |  |
+| [`HLL_COUNT.EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countextract) | Supported | GoogleSQL function |  |
+| [`HLL_COUNT.INIT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countinit) | Supported | DuckDB aggregate |  |
+| [`HLL_COUNT.MERGE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge) | Supported | DuckDB aggregate |  |
+| [`HLL_COUNT.MERGE_PARTIAL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions#hll_countmerge_partial) | Supported | DuckDB aggregate |  |
 
 ## Interval functions
 
@@ -493,7 +493,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | Supported | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. |
 | [`OBJ.GET_ACCESS_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_access_url) | Unsupported |  |  |
 | [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | Unsupported |  |  |
-| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Partial | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function MAKE_REF. |
+| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Partial | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function OBJ.MAKE_REF. |
 
 ## Range functions
 
