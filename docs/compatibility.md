@@ -150,13 +150,10 @@ BigQuery loads as NULL.
 Loads and `tabledata.insertAll` take GEOGRAPHY values as WKT; GeoJSON and WKB are unsupported.
 Query parameters, loads and `tabledata.insertAll` take a polygon only where its shell runs
 counterclockwise and its holes clockwise, since BigQuery takes the region on the left of each
-ring. Multipart geometries, collections and the full polygon are unsupported. Additional limits
-are:
+ring. The full polygon is unsupported. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
-- Linestrings that BigQuery splits into a `MULTILINESTRING`, such as overlapping lines, are
-  unsupported.
-- `ST_ASGEOJSON` is unsupported for linestrings and polygons.
+- `ST_ASGEOJSON` is unsupported for anything but a single point and the empty geography.
 - Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
   holes that collapse are unsupported.
 - `ST_MAKEPOLYGON` of an empty geography and `ST_GEOGFROMTEXT`'s `oriented`, `planar` and

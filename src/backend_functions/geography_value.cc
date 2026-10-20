@@ -15,14 +15,17 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
 #include "s2/s1angle.h"
+#include "s2/s2boolean_operation.h"
 #include "s2/s2builder.h"
 #include "s2/s2builderutil_s2point_vector_layer.h"
+#include "s2/s2builderutil_s2polygon_layer.h"
 #include "s2/s2builderutil_s2polyline_vector_layer.h"
 #include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2closest_edge_query.h"
@@ -47,42 +50,78 @@ namespace {
 
 constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
 
+// `items` separated by commas.
+std::string Join(const std::vector<std::string>& items) {
+  std::string text;
+  for (const std::string& item : items) {
+    text += (&item == items.data() ? "" : ", ") + item;
+  }
+  return text;
+}
+
 // `vertices` as WKT with the vertices `vertex` writes, separated by commas.
 template <typename Vertex>
 std::string List(const std::vector<S2Point>& vertices, Vertex vertex) {
-  std::string text;
-  for (const S2Point& point : vertices) {
-    text += (&point == vertices.data() ? "" : ", ") + vertex(point);
+  std::vector<std::string> items(vertices.size());
+  std::ranges::transform(vertices, items.begin(), vertex);
+  return Join(items);
+}
+
+// A WKT type and the MULTI type of more than one of it.
+struct Types {
+  std::string_view one;
+  std::string_view many;
+};
+
+// `parts` as WKT of their type, each as `part` writes it.
+template <typename Item, typename Part>
+std::string Parts(const std::vector<Item>& parts, Types types, Part part) {
+  if (parts.size() == 1) {
+    return std::string(types.one) + part(parts.front());
   }
-  return text;
+  std::vector<std::string> items(parts.size());
+  std::ranges::transform(parts, items.begin(), part);
+  return std::string(types.many) + "(" + Join(items) + ")";
 }
 
 // `geography` as WKT with the vertices `vertex` writes. Unless `stored`, a polygon's rings are
 // those of OGC's WKT: closed, a hole running clockwise.
 template <typename Vertex>
 std::string Text(const Geography& geography, Vertex vertex, bool stored) {
-  switch (geography.kind) {
-    case Kind::kEmpty:
-      return std::string(kEmpty);
-    case Kind::kPoint:
-      return "POINT(" + List(geography.vertices, vertex) + ")";
-    case Kind::kLineString:
-      return "LINESTRING(" + List(geography.vertices, vertex) + ")";
-    case Kind::kPolygon:
-      break;
+  if (geography.Empty()) {
+    return std::string(kEmpty);
   }
-  std::string text = "POLYGON(";
-  for (const std::vector<S2Point>& loop : geography.loops) {
-    std::vector<S2Point> ring = loop;
-    if (!stored) {
-      if (&loop != geography.loops.data()) {
-        std::ranges::reverse(ring);
+  const auto vertices = [&](const std::vector<S2Point>& line) {
+    return "(" + List(line, vertex) + ")";
+  };
+  const auto rings = [&](const Polygon& polygon) {
+    std::vector<std::string> items;
+    for (const std::vector<S2Point>& loop : polygon) {
+      std::vector<S2Point> ring = loop;
+      if (!stored) {
+        if (&loop != polygon.data()) {
+          std::ranges::reverse(ring);
+        }
+        ring.push_back(ring.front());
       }
-      ring.push_back(ring.front());
+      items.push_back(vertices(ring));
     }
-    text += (&loop == geography.loops.data() ? "(" : ", (") + List(ring, vertex) + ")";
+    return "(" + Join(items) + ")";
+  };
+  std::vector<std::string> parts;
+  if (!geography.points.empty()) {
+    parts.push_back(geography.points.size() == 1
+                        ? "POINT(" + vertex(geography.points.front()) + ")"
+                        : "MULTIPOINT(" + List(geography.points, vertex) + ")");
   }
-  return text + ")";
+  if (!geography.lines.empty()) {
+    parts.push_back(
+        Parts(geography.lines, {.one = "LINESTRING", .many = "MULTILINESTRING"}, vertices));
+  }
+  if (!geography.polygons.empty()) {
+    parts.push_back(Parts(geography.polygons, {.one = "POLYGON", .many = "MULTIPOLYGON"}, rings));
+  }
+  return parts.size() == 1 ? parts.front() : "GEOMETRYCOLLECTION(" + Join(parts) + ")";
 }
 
 // Parses `x y z`, a vertex as GeographyText writes it.
@@ -109,21 +148,124 @@ std::optional<S2Point> ReadVertex(std::string_view text) {
   return S2Point(coordinates.at(0), coordinates.at(1), coordinates.at(2));
 }
 
-// Parses `x y z, ...`, vertices as GeographyText writes them.
+// The items of `text` that commas outside parentheses separate.
+std::vector<std::string_view> Items(std::string_view text) {
+  std::vector<std::string_view> items;
+  size_t depth = 0;
+  size_t start = 0;
+  for (size_t i = 0; i < text.size(); ++i) {
+    if (text.at(i) == '(') {
+      ++depth;
+    } else if (text.at(i) == ')') {
+      --depth;
+    } else if (text.at(i) == ',' && depth == 0) {
+      items.push_back(text.substr(start, i - start));
+      start = i + 2;
+    }
+  }
+  items.push_back(text.substr(start));
+  return items;
+}
+
+// What `text` holds in the parentheses after `name`.
+std::optional<std::string_view> Inside(std::string_view text, std::string_view name) {
+  if (!text.starts_with(name) || text.size() < name.size() + 2 || text.at(name.size()) != '(' ||
+      !text.ends_with(')')) {
+    return std::nullopt;
+  }
+  return text.substr(name.size() + 1, text.size() - name.size() - 2);
+}
+
+// Parses `(x y z, ...)`, vertices as GeographyText writes them.
 std::optional<std::vector<S2Point>> ReadVertices(std::string_view text) {
+  const std::optional<std::string_view> inside = Inside(text, "");
+  if (!inside) {
+    return std::nullopt;
+  }
   std::vector<S2Point> vertices;
-  while (true) {
-    const size_t comma = text.find(", ");
-    const std::optional<S2Point> vertex = ReadVertex(text.substr(0, comma));
+  for (const std::string_view item : Items(*inside)) {
+    const std::optional<S2Point> vertex = ReadVertex(item);
     if (!vertex) {
       return std::nullopt;
     }
     vertices.push_back(*vertex);
-    if (comma == std::string_view::npos) {
-      return vertices;
-    }
-    text.remove_prefix(comma + 2);
   }
+  return vertices;
+}
+
+// Parses `((x y z, ...), ...)`, the rings of a polygon as GeographyText writes them.
+std::optional<Polygon> ReadPolygon(std::string_view text) {
+  const std::optional<std::string_view> inside = Inside(text, "");
+  if (!inside) {
+    return std::nullopt;
+  }
+  Polygon polygon;
+  for (const std::string_view item : Items(*inside)) {
+    std::optional<std::vector<S2Point>> loop = ReadVertices(item);
+    if (!loop) {
+      return std::nullopt;
+    }
+    polygon.push_back(*std::move(loop));
+  }
+  return polygon;
+}
+
+// Adds the part of a geography `text` holds to `geography`, returning whether it was one.
+bool ReadPart(std::string_view text, Geography& geography) {
+  if (const auto point = Inside(text, "POINT")) {
+    const std::optional<S2Point> vertex = ReadVertex(*point);
+    if (vertex) {
+      geography.points.push_back(*vertex);
+    }
+    return vertex.has_value();
+  }
+  if (const auto points = Inside(text, "MULTIPOINT")) {
+    for (const std::string_view item : Items(*points)) {
+      const std::optional<S2Point> vertex = ReadVertex(item);
+      if (!vertex) {
+        return false;
+      }
+      geography.points.push_back(*vertex);
+    }
+    return true;
+  }
+  if (text.starts_with("LINESTRING(")) {
+    std::optional<std::vector<S2Point>> line = ReadVertices(text.substr(10));
+    if (!line) {
+      return false;
+    }
+    geography.lines.push_back(*std::move(line));
+    return true;
+  }
+  if (const auto lines = Inside(text, "MULTILINESTRING")) {
+    for (const std::string_view item : Items(*lines)) {
+      std::optional<std::vector<S2Point>> line = ReadVertices(item);
+      if (!line) {
+        return false;
+      }
+      geography.lines.push_back(*std::move(line));
+    }
+    return true;
+  }
+  if (text.starts_with("POLYGON(")) {
+    std::optional<Polygon> polygon = ReadPolygon(text.substr(7));
+    if (!polygon) {
+      return false;
+    }
+    geography.polygons.push_back(*std::move(polygon));
+    return true;
+  }
+  if (const auto polygons = Inside(text, "MULTIPOLYGON")) {
+    for (const std::string_view item : Items(*polygons)) {
+      std::optional<Polygon> polygon = ReadPolygon(item);
+      if (!polygon) {
+        return false;
+      }
+      geography.polygons.push_back(*std::move(polygon));
+    }
+    return true;
+  }
+  return false;
 }
 
 }  // namespace
@@ -149,7 +291,7 @@ Point ToPoint(const S2Point& point) {
 }
 
 Geography PointGeography(const S2Point& point) {
-  return {.kind = Kind::kPoint, .vertices = {point}, .loops = {}};
+  return {.points = {point}, .lines = {}, .polygons = {}};
 }
 
 std::string Wkt(const Geography& geography) {
@@ -173,63 +315,40 @@ std::string GeographyText(const Geography& geography) {
 }
 
 absl::StatusOr<Geography> ParseGeography(std::string_view text) {
+  Geography geography;
   if (text == kEmpty) {
-    return Geography{};
+    return geography;
   }
-  const auto unsupported = [&] {
-    return absl::UnimplementedError(
-        "The emulator does not support GEOGRAPHY values other than points, linestrings, polygons "
-        "or empty geometries: " +
-        std::string(text));
-  };
-  constexpr std::string_view kPolygon = "POLYGON((";
-  if (text.starts_with(kPolygon) && text.ends_with("))")) {
-    std::string_view rings = text.substr(kPolygon.size(), text.size() - kPolygon.size() - 2);
-    Geography polygon{.kind = Kind::kPolygon, .vertices = {}, .loops = {}};
-    while (true) {
-      const size_t end = rings.find("), (");
-      std::optional<std::vector<S2Point>> loop = ReadVertices(rings.substr(0, end));
-      if (!loop) {
-        return unsupported();
-      }
-      polygon.loops.push_back(*std::move(loop));
-      if (end == std::string_view::npos) {
-        return polygon;
-      }
-      rings.remove_prefix(end + 4);
-    }
+  const std::optional<std::string_view> collection = Inside(text, "GEOMETRYCOLLECTION");
+  const std::vector<std::string_view> parts =
+      collection ? Items(*collection) : std::vector<std::string_view>{text};
+  if (!std::ranges::all_of(parts,
+                           [&](std::string_view part) { return ReadPart(part, geography); })) {
+    return absl::InvalidArgumentError("Invalid GEOGRAPHY value: " + std::string(text));
   }
-  for (const auto& [prefix, kind] : {
-           std::pair<std::string_view, Kind>{"POINT(", Kind::kPoint},
-           {"LINESTRING(", Kind::kLineString},
-       }) {
-    if (!text.starts_with(prefix) || !text.ends_with(')')) {
-      continue;
-    }
-    std::optional<std::vector<S2Point>> vertices =
-        ReadVertices(text.substr(prefix.size(), text.size() - prefix.size() - 1));
-    if (vertices) {
-      return Geography{.kind = kind, .vertices = *std::move(vertices), .loops = {}};
-    }
-  }
-  return unsupported();
+  return geography;
 }
 
-std::unique_ptr<S2Shape> Shape(const Geography& geography) {
-  if (geography.kind == Kind::kPoint) {
-    return std::make_unique<S2PointVectorShape>(geography.vertices);
+void AddShapes(const Geography& geography, MutableS2ShapeIndex& index) {
+  if (!geography.points.empty()) {
+    index.Add(std::make_unique<S2PointVectorShape>(geography.points));
   }
-  if (geography.kind == Kind::kPolygon) {
-    return std::make_unique<S2Polygon::OwningShape>(ToS2Polygon(geography));
+  for (const std::vector<S2Point>& line : geography.lines) {
+    index.Add(std::make_unique<S2LaxPolylineShape>(line));
   }
-  return std::make_unique<S2LaxPolylineShape>(geography.vertices);
+  if (!geography.polygons.empty()) {
+    index.Add(std::make_unique<S2Polygon::OwningShape>(ToS2Polygon(geography)));
+  }
 }
 
-std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& polygon) {
-  std::vector<std::unique_ptr<S2Loop>> loops(polygon.loops.size());
-  std::ranges::transform(polygon.loops, loops.begin(), [](const std::vector<S2Point>& loop) {
-    return std::make_unique<S2Loop>(loop, S2Debug::DISABLE);
-  });
+std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& geography) {
+  std::vector<std::unique_ptr<S2Loop>> loops;
+  for (const Polygon& polygon : geography.polygons) {
+    std::ranges::transform(polygon, std::back_inserter(loops),
+                           [](const std::vector<S2Point>& loop) {
+                             return std::make_unique<S2Loop>(loop, S2Debug::DISABLE);
+                           });
+  }
   auto result = std::make_unique<S2Polygon>();
   result->set_s2debug_override(S2Debug::DISABLE);
   result->InitNested(std::move(loops));
@@ -304,13 +423,12 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices) {
   if (polylines.empty()) {
     return PointGeography(sites.front());
   }
-  if (polylines.size() > 1) {
-    return absl::UnimplementedError(
-        "The emulator does not support a LINESTRING that BigQuery splits into a "
-        "MULTILINESTRING");
+  Geography result;
+  for (const std::unique_ptr<S2Polyline>& polyline : polylines) {
+    const absl::Span<const S2Point> line = polyline->vertices_span();
+    result.lines.emplace_back(line.begin(), line.end());
   }
-  const absl::Span<const S2Point> line = polylines.front()->vertices_span();
-  return Geography{.kind = Kind::kLineString, .vertices = {line.begin(), line.end()}, .loops = {}};
+  return result;
 }
 
 namespace {
@@ -392,12 +510,12 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
                                  "Invalid polygon: the holes must lie inside the shell and "
                                  "outside each other");
   }
-  Geography result{.kind = Kind::kPolygon, .vertices = {}, .loops = {}};
+  Polygon result;
   for (const S2Loop* loop : order) {
     const absl::Span<const S2Point> vertices = loop->vertices_span();
-    result.loops.emplace_back(vertices.begin(), vertices.end());
+    result.emplace_back(vertices.begin(), vertices.end());
   }
-  return result;
+  return Geography{.points = {}, .lines = {}, .polygons = {std::move(result)}};
 }
 
 // The rings with each vertex moved to the one S2Builder snaps it to with an identity snap function
@@ -512,6 +630,107 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
     return BuildLine(snapped->front());
   }
   return Assemble(*snapped, failed);
+}
+
+namespace {
+
+// The output of a union, which the next one reads.
+struct Union {
+  std::vector<S2Point> points;
+  std::vector<std::unique_ptr<S2Polyline>> lines;
+  S2Polygon polygon;
+};
+
+// The geography of `output`, whose points on a linestring or a polygon's ring, which S2 keeps
+// unless they are its vertices, are dropped as BigQuery drops them.
+Geography Read(const Union& output) {
+  Geography geography;
+  absl::flat_hash_set<S2Point> vertices;
+  for (const std::unique_ptr<S2Polyline>& polyline : output.lines) {
+    const absl::Span<const S2Point> line = polyline->vertices_span();
+    geography.lines.emplace_back(line.begin(), line.end());
+    vertices.insert(line.begin(), line.end());
+  }
+  // S2Polygon holds its loops in preorder: each shell is followed by its holes and what lies in
+  // them.
+  std::vector<size_t> polygon_of(output.polygon.num_loops());
+  for (int i = 0; i < output.polygon.num_loops(); ++i) {
+    const S2Loop* loop = output.polygon.loop(i);
+    const absl::Span<const S2Point> ring = loop->vertices_span();
+    vertices.insert(ring.begin(), ring.end());
+    if (loop->is_hole()) {
+      polygon_of.at(i) = polygon_of.at(output.polygon.GetParent(i));
+    } else {
+      polygon_of.at(i) = geography.polygons.size();
+      geography.polygons.emplace_back();
+    }
+    geography.polygons.at(polygon_of.at(i)).emplace_back(ring.begin(), ring.end());
+  }
+  std::ranges::copy_if(output.points, std::back_inserter(geography.points),
+                       [&](const S2Point& point) { return !vertices.contains(point); });
+  return geography;
+}
+
+}  // namespace
+
+absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
+  if (parts.size() == 1) {
+    return parts.front();
+  }
+  // The points come first, all at once, and then each linestring and polygon.
+  std::vector<std::unique_ptr<MutableS2ShapeIndex>> inputs;
+  Geography points;
+  for (const Geography& part : parts) {
+    points.points.insert(points.points.end(), part.points.begin(), part.points.end());
+  }
+  if (!points.Empty()) {
+    AddShapes(points, *inputs.emplace_back(std::make_unique<MutableS2ShapeIndex>()));
+  }
+  for (const Geography& part : parts) {
+    for (const std::vector<S2Point>& line : part.lines) {
+      AddShapes({.points = {}, .lines = {line}, .polygons = {}},
+                *inputs.emplace_back(std::make_unique<MutableS2ShapeIndex>()));
+    }
+    for (const Polygon& polygon : part.polygons) {
+      AddShapes({.points = {}, .lines = {}, .polygons = {polygon}},
+                *inputs.emplace_back(std::make_unique<MutableS2ShapeIndex>()));
+    }
+  }
+  const S2BooleanOperation::Options options(
+      s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)));
+  using PolylineLayer = s2builderutil::S2PolylineVectorLayer;
+  PolylineLayer::Options line_options;
+  line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+  line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
+  line_options.set_duplicate_edges(PolylineLayer::Options::DuplicateEdges::MERGE);
+  auto output = std::make_unique<Union>();
+  auto index = std::make_unique<MutableS2ShapeIndex>();
+  for (const std::unique_ptr<MutableS2ShapeIndex>& input : inputs) {
+    auto next = std::make_unique<Union>();
+    std::vector<std::unique_ptr<S2Builder::Layer>> layers;
+    layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&next->points));
+    layers.push_back(std::make_unique<PolylineLayer>(&next->lines, line_options));
+    layers.push_back(std::make_unique<s2builderutil::S2PolygonLayer>(&next->polygon));
+    S2BooleanOperation operation(S2BooleanOperation::OpType::UNION, std::move(layers), options);
+    S2Error error;
+    if (!operation.Build(*index, *input, &error)) {
+      return absl::InternalError("S2BooleanOperation failed: " + std::string(error.message()));
+    }
+    // The next index reads the shapes of this output, which outlives it.
+    auto next_index = std::make_unique<MutableS2ShapeIndex>();
+    if (!next->points.empty()) {
+      next_index->Add(std::make_unique<S2PointVectorShape>(next->points));
+    }
+    for (const std::unique_ptr<S2Polyline>& line : next->lines) {
+      next_index->Add(std::make_unique<S2Polyline::Shape>(line.get()));
+    }
+    if (next->polygon.num_loops() > 0) {
+      next_index->Add(std::make_unique<S2Polygon::Shape>(&next->polygon));
+    }
+    index = std::move(next_index);
+    output = std::move(next);
+  }
+  return Read(*output);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

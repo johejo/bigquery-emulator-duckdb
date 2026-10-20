@@ -812,6 +812,19 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_NPOINTS", call("bq_st_numpoints", 1)},
       {"ST_ISEMPTY", call("bq_st_isempty", 1)},
       {"ST_ISCOLLECTION", call("bq_st_iscollection", 1)},
+      {"ST_NUMGEOMETRIES", call("bq_st_numgeometries", 1)},
+      // A NULL dimension matches no part.
+      {
+          "ST_DUMP",
+          {
+              {.arity = 1, .spelling = "bq_st_dump($1, -1)"},
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $2 IS NULL THEN CASE WHEN $1 IS NULL THEN NULL ELSE "
+                              "[]::VARCHAR[] END ELSE bq_st_dump($1, $2) END",
+              },
+          },
+      },
       {"ST_ISCLOSED", call("bq_st_isclosed", 1)},
       {"ST_LENGTH", spheroid("bq_st_length", {1, 2}, "ST_LENGTH")},
       {"ST_AREA", spheroid("bq_st_measure", {1, 2}, "ST_AREA")},
