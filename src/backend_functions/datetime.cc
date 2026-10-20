@@ -190,6 +190,48 @@ absl::Status StringToTimestampIn(std::string_view text, std::string_view time_zo
                                       /*allow_tz_in_str=*/false, out);
 }
 
+// The civil time of a TIMESTAMP in a time zone, which may be a UTC offset such as '-08:00' that
+// DuckDB does not accept.
+absl::Status TimestampToDatetimeIn(int64_t micros, std::string_view time_zone, int64_t* out) {
+  googlesql::DatetimeValue datetime;
+  GOOGLESQL_RETURN_IF_ERROR(
+      fn::ConvertTimestampToDatetime(absl::FromUnixMicros(micros), time_zone, &datetime));
+  GOOGLESQL_ASSIGN_OR_RETURN(*out, MicrosFromDatetime(datetime));
+  return absl::OkStatus();
+}
+
+// TIME(timestamp, time_zone), whose date may be out of the DATETIME range.
+absl::Status TimestampToTimeIn(int64_t micros, std::string_view time_zone, int64_t* out) {
+  googlesql::TimeValue time;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ConvertTimestampToTime(absl::FromUnixMicros(micros), time_zone,
+                                                       fn::kMicroseconds, &time));
+  *out = MicrosFromTime(time);
+  return absl::OkStatus();
+}
+
+// The civil time of a TIMESTAMP in a time zone for EXTRACT, which, like GoogleSQL's, reads any
+// part but DATE of a civil time out of the DATETIME range, such as in year 0.
+absl::Status TimestampCivilIn(int64_t micros, std::string_view time_zone, int64_t* out) {
+  absl::TimeZone zone;
+  GOOGLESQL_RETURN_IF_ERROR(fn::MakeTimeZone(time_zone, &zone));
+  constexpr int64_t kPerSecond = 1000000;
+  const absl::CivilSecond civil = zone.At(absl::FromUnixMicros(micros)).cs;
+  // Offsets are whole seconds, so the fraction of a second is the instant's.
+  *out = ((civil - absl::CivilSecond(1970)) * kPerSecond) +
+         (((micros % kPerSecond) + kPerSecond) % kPerSecond);
+  return absl::OkStatus();
+}
+
+// TIMESTAMP(datetime, time_zone), which takes the earlier of a repeated civil time, where
+// DuckDB's timezone() takes the later.
+absl::Status DatetimeToTimestampIn(int64_t micros, std::string_view time_zone, int64_t* out) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto datetime, DatetimeFromMicros(micros));
+  absl::Time time;
+  GOOGLESQL_RETURN_IF_ERROR(fn::ConvertDatetimeToTimestamp(datetime, time_zone, &time));
+  *out = absl::ToUnixMicros(time);
+  return absl::OkStatus();
+}
+
 // TIMESTAMP_TRUNC, DATE_TRUNC and DATETIME_TRUNC of a TIMESTAMP to a date part in a time zone,
 // such as 'day' or 'week_monday'.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): the date part and the time zone.
@@ -660,6 +702,14 @@ void RegisterDatetimeFunctions(duckdb_connection connection) {
            Apply<StringToTimestamp, Errors::kNullUnderSafeCast>);
   Register(connection, "bq_string_to_timestamp_in", {kVarchar, kVarchar}, kTimestamp,
            Apply<StringToTimestampIn>);
+  Register(connection, "bq_timestamp_to_datetime_in", {kTimestamp, kVarchar}, kDatetime,
+           Apply<TimestampToDatetimeIn>);
+  Register(connection, "bq_timestamp_to_time_in", {kTimestamp, kVarchar}, kTime,
+           Apply<TimestampToTimeIn>);
+  Register(connection, "bq_timestamp_civil_in", {kTimestamp, kVarchar}, kDatetime,
+           Apply<TimestampCivilIn>);
+  Register(connection, "bq_datetime_to_timestamp_in", {kDatetime, kVarchar}, kTimestamp,
+           Apply<DatetimeToTimestampIn>);
   Register(connection, "bq_timestamp_trunc", {kTimestamp, kVarchar, kVarchar}, kTimestamp,
            Apply<TimestampTrunc>);
   LogicalType const date(duckdb_create_logical_type(kDate));

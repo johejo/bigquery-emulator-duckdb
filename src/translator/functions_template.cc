@@ -165,7 +165,10 @@ std::vector<Rule> Civil(const std::string& target) {
       {.arity = 1, .spelling = "CAST($1 AS " + target + ")"},
       {
           .arity = 2,
-          .spelling = "CAST(timezone($2, $1) AS " + target + ")",
+          // A TIME does not need the date to be in range.
+          .spelling = target == "TIME"
+                          ? "bq_timestamp_to_time_in($1, $2)"
+                          : "CAST(bq_timestamp_to_datetime_in($1, $2) AS " + target + ")",
           .conditions = {Is(1, {TYPE_TIMESTAMP})},
       },
   };
@@ -418,7 +421,7 @@ std::vector<Rule> Extract() {
       },
   };
   for (const auto& [arity, value] :
-       {std::pair<std::size_t, std::string>{2, "$1"}, {3, "timezone($3, $1)"}}) {
+       {std::pair<std::size_t, std::string>{2, "$1"}, {3, "bq_timestamp_civil_in($1, $3)"}}) {
     rules.push_back({
         .arity = arity,
         .spelling = "(date_part('dayofweek', " + value + ") + 1)",
@@ -1080,7 +1083,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               // A civil time in the given zone.
               {
                   .arity = 2,
-                  .spelling = "timezone($2, CAST($1 AS TIMESTAMP))",
+                  .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
                   .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME})},
               },
           },
