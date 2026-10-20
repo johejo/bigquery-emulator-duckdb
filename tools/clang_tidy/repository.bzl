@@ -2,7 +2,7 @@
 
 _MISSING = """\
 #!/bin/sh
-echo "clang-tidy was not found; run \\`nix develop --command just tidy\\` or set --repo_env=CLANG_TIDY=/absolute/path/to/clang-tidy" >&2
+echo "clang-tidy was not found; run \\`nix run .#clang-tidy\\` or set --repo_env=CLANG_TIDY=/absolute/path/to/clang-tidy" >&2
 exit 1
 """
 

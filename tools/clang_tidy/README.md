@@ -1,6 +1,6 @@
 # clang-tidy aspect
 
-`nix develop --command just tidy` checks the repository with one cached action per source or
+`nix run .#clang-tidy` checks the repository with one cached action per source or
 header. To check one target and its dependencies:
 
 ```sh
@@ -9,8 +9,8 @@ nix develop --command bazelisk build --config=clang-tidy //:translator
 
 ## Tool resolution
 
-The tool is resolved by `repository.bzl` from `CLANG_TIDY` (set by the development shell), or
-from PATH. Outside the shell, `--repo_env=CLANG_TIDY=/absolute/path/to/clang-tidy` overrides it.
+The tool is resolved by `repository.bzl` from `CLANG_TIDY` (set by the app and development
+shell), or from PATH. Outside the shell, `--repo_env=CLANG_TIDY=/absolute/path/to/clang-tidy` overrides it.
 Without either, the tool is a stub that fails each lint action, so builds and tests that only
 analyze the aspect, such as `//:clang_tidy_test`, do not need clang-tidy.
 The executable is a declared action input, so changing it invalidates cached results. This uses

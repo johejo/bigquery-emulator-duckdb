@@ -87,28 +87,27 @@ jobs:
           echo "common --repo_env=TMP=$RUNNER_TEMP --repo_env=TEMP=$RUNNER_TEMP" >> .bazelrc.local
           mkdir -p "$RUNNER_TEMP/reports"
       - name: Format check
-        run: nix develop --command just fmt-check
+        run: nix run .#fmt-check
       - name: Cppcheck
-        run: nix develop --command just cppcheck
+        run: nix run .#cppcheck
       - name: Go vet
-        run: nix develop --command just go-vet
+        run: nix run .#go-vet
       - name: Go staticcheck
-        run: nix develop --command just go-staticcheck
+        run: nix run .#go-staticcheck
       - name: Unit tests
         env:
           GO_TEST_JSON: ${{ runner.temp }}/reports/go-test.json
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/unit-tests.bep.json --profile=$RUNNER_TEMP/reports/unit-tests.profile.json.gz" >> .bazelrc.local
-          # jq comes from the runner image.
-          nix develop --command just test
+          nix run .#test
       - name: Generated docs check
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/docs-check.bep.json --profile=$RUNNER_TEMP/reports/docs-check.profile.json.gz" >> .bazelrc.local
-          nix develop --command just docs-check
+          nix run .#docs-check
       - name: End-to-end tests
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/reports/e2e.bep.json --profile=$RUNNER_TEMP/reports/e2e.profile.json.gz" >> .bazelrc.local
-          nix develop --command just e2e --profile --profile-out "$RUNNER_TEMP/reports/e2e.runn.prof"
+          nix run .#e2e -- --profile --profile-out "$RUNNER_TEMP/reports/e2e.runn.prof"
 
       - name: Upload reports
         if: success() || failure()
@@ -139,7 +138,7 @@ jobs:
       - name: Stop Bazel
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          nix develop --command bazelisk --ignore_all_rc_files shutdown
+          nix run .#bazel -- --ignore_all_rc_files shutdown
           du -sh ~/.cache/bazel-disk
       - name: Save Bazel disk cache
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -7,7 +7,8 @@ accepting a query does not guarantee BigQuery-identical results.
 
 ## Quick start
 
-Enter the development shell, which provides Bazel, `just` and `bq`, then build the binary:
+Enter the development shell, which provides the build and development tools, including `just`
+and `bq`, then build the binary:
 
 ```bash
 nix develop
@@ -240,6 +241,13 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 
 See [AGENTS.md](AGENTS.md) for building and testing, and
 [docs/architecture.md](docs/architecture.md) for how a request is processed.
+
+`nix develop` provides the build tools, `just`, formatters, linters and test tools.
+CI uses apps such as `nix run .#clang-tidy`, `nix run .#test` and `nix run .#e2e`;
+`nix run .#check` runs all checks. Check apps call the same `just` recipes used locally,
+and share a fixed build-tool PATH for Bazel actions with the development shell.
+Test dependencies are available through `TEST_TOOLS_PATH`, which the test and probe recipes add to PATH only for their execution;
+`SPANNER_EMULATOR_GATEWAY` selects the standalone Spanner gateway on Linux.
 
 `just e2e` starts the standalone Spanner emulator on Linux x86_64 and arm64. On other platforms,
 Spanner cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally

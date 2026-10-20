@@ -1,5 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Nix apps supply test dependencies separately from the build tools. Outside Nix, use PATH.
+_test_env := 'env PATH="${TEST_TOOLS_PATH:+$TEST_TOOLS_PATH:}$PATH"'
+
 # Formatters and the files they cover are in treefmt.toml.
 fmt:
     treefmt
@@ -41,13 +44,13 @@ go-staticcheck:
     staticcheck ./...
 
 # Tool and subprocess tests; client-visible tests run through just e2e. Set GO_TEST_JSON to a
-# path to also record go test's JSON events there, such as each test's duration; this needs jq.
+# path to also record go test's JSON events there, such as each test's duration.
 [positional-arguments]
 go-test *args:
     if [[ -n "${GO_TEST_JSON:-}" ]]; then \
-        go test -json "$@" ./internal/... ./tools/... | tee "$GO_TEST_JSON" | jq -j 'select(.Action == "output") | .Output'; \
+        {{ _test_env }} go test -json "$@" ./internal/... ./tools/... | tee "$GO_TEST_JSON" | {{ _test_env }} jq -j 'select(.Action == "output") | .Output'; \
     else \
-        go test "$@" ./internal/... ./tools/...; \
+        {{ _test_env }} go test "$@" ./internal/... ./tools/...; \
     fi
 
 go-tidy:
@@ -63,7 +66,7 @@ test: go-test
 [positional-arguments]
 e2e *args:
     bazelisk build //:bigquery-emulator-duckdb
-    go run ./tools/e2e "$@"
+    {{ _test_env }} go run ./tools/e2e "$@"
 
 # GoogleSQL's compliance tests against the emulator; not part of `check`, since they take long.
 # Extra arguments go to `bazelisk test`, such as --test_arg=--gtest_filter=...
@@ -94,11 +97,11 @@ check: lint test e2e docs-check
 
 # Generates docs/sql.md, docs/api.md and docs/functions.md: tools/restprobe probes emulators started
 # from the binary, running the calls //:function_probe builds for functions.
-_restprobe := "go run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_restprobe := _test_env + " go run ./tools/restprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 _sql_probe := _restprobe + " sql " + justfile_directory() + "/tools/sql_features.txt"
 _api_probe := _restprobe + " api " + justfile_directory() + "/third_party/bigquery/discovery.json " + justfile_directory() + "/tools/api_methods.txt"
 _function_probe := _restprobe + " functions " + justfile_directory() + "/bazel-bin/function_probe " + justfile_directory() + "/tools/bigquery_functions.txt " + justfile_directory() + "/tools/function_probe_hints.txt"
-_storage_probe := "go run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
+_storage_probe := _test_env + " go run ./tools/storageprobe -emulator " + justfile_directory() + "/bazel-bin/bigquery-emulator-duckdb"
 
 # Regenerates the compatibility tables for functions, SQL, REST and Storage RPCs.
 docs:
