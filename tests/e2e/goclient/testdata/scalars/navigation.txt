@@ -1,0 +1,21 @@
+# BigQuery requires LAG/LEAD default expressions to be constant:
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/navigation_functions
+# Error text is also covered by GoogleSQL's analytic_lag/lead tests.
+
+SELECT LAG(x, 2, x) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The third argument (the default expression) to LAG must be constant
+
+SELECT LEAD(x, 2, x + 1) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The third argument (the default expression) to LEAD must be constant
+
+SELECT LAG(x, 2, CAST(3 AS INT64) + 4) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> "7"
+
+SELECT LEAD(x, 2, CAST(NULL AS INT64)) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> null
+
+SELECT LEAD(x, 2, 7) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> "7"
+
+SELECT LAG(CAST(x AS FLOAT64), 2, RAND()) OVER (ORDER BY x) FROM UNNEST([1]) AS x
+=> error: The third argument (the default expression) to LAG must be constant

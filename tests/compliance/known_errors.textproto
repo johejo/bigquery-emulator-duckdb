@@ -1451,20 +1451,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ARRAY_AGG and STRING_AGG with LIMIT 0 return an empty value instead of NULL"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_bignumeric"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_limit_desc"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_limit_only_same_values"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_limit_same_values"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_limit_without_group_by"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_numeric"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_range_date"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_range_datetime"
-  label: "aggregation_order_by_queries_test:aggregation_order_by_range_timestamp"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "ARRAY_AVG overflows to an infinity on large FLOAT64 values and fails on large NUMERIC values where BigQuery averages them"
   label: "code:ArrayAvg_ARRAY<NUMERIC>_<-9999999_4qS1lLNqJ_o_99999999>"
@@ -1544,15 +1530,17 @@ known_errors {
   label: "code:bXor_BYTES_NULL_BYTES_<foo>"
 }
 
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "CHR(0) returns an empty string instead of a NUL character"
+  reason: "CHR(0) returns an empty string as BigQuery documents; GoogleSQL returns NUL"
   label: "code:chr_INT64_0"
+  label: "strings_test:strings_function_chr"
 }
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "CHR(0), SPLIT of NULL and other string functions differ"
+  reason: "TO_JSON_STRING with escaped field names differs"
   label: "strings_test:to_json_string_with_escaped_field_names"
 }
 
@@ -1569,9 +1557,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "CHR(0), SPLIT of NULL and other string functions differ"
+  reason: "SPLIT of NULL differs"
   label: "strings_test:split_nulls"
-  label: "strings_test:strings_function_chr"
 }
 
 known_errors {
@@ -1710,24 +1697,6 @@ known_errors {
   label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@x@@'a@'@>"
   label: "code:json_extract_JSON_<@@@x@@:@_AW4lsnlokuI_baz@@@@@>_STRING_<@@y@0@@@'a@'@>"
   label: "json_queries_test:json_extract"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "JSON_KEYS accepts an invalid mode on a NULL value instead of failing"
-  label: "code:json_keys_JSON_NULL_INT64_1_STRING_<invalid>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "LAG with a default expression that is not constant returns other values"
-  label: "analytic_lag_test:lag_non_constant_default_expr"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "LEAD with a default expression that is not constant returns other values"
-  label: "analytic_lead_test:lead_non_constant_default_expr"
 }
 
 known_errors {
@@ -1904,9 +1873,10 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SELECT * returns pseudo-columns, which BigQuery leaves out"
+  mode: ALLOW_ERROR
+  reason: "The public API cannot describe the compliance fixture with pseudo-columns"
   label: "code:TestPseudoColumnSelectAll"
+  label: "code:TestPseudoColumnSelectPseudo"
 }
 
 known_errors {
@@ -2015,4 +1985,31 @@ known_errors {
   reason: "Variance, standard deviation, covariance and correlation over windows fail as out of range or lose precision where BigQuery returns a result"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_cumulative_numeric"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_moving_window_numeric"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
+  reason: "The result contains NULL array elements, which BigQuery rejects but GoogleSQL returns"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_limit_without_group_by"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "The fixture contains NULL array elements, which table insertion rejects, leaving the table empty"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_bignumeric"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_numeric"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_range_date"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_range_datetime"
+  label: "aggregation_order_by_queries_test:aggregation_order_by_range_timestamp"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
+  reason: "BigQuery rejects SAFE.JSON_KEYS; GoogleSQL returns NULL for its errors"
+  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_0_STRING_NULL"
+  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_1_STRING_<invalid>"
+  label: "code:safe_error_mode__safe_json_keys_JSON_<@@@a@@:1@>_INT64_NULL_STRING_<invalid>"
+  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_-1"
+  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_0"
+  label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_1_STRING_<invalid>"
 }

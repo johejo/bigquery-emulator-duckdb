@@ -549,3 +549,7 @@ SELECT CAST(raw AS STRING) FROM t WHERE a = 3
 
 SELECT SAFE_CAST(raw AS STRING) FROM t WHERE a = 3
 => null
+
+# BigQuery documents CHR(0) as empty; use a column to exercise the backend as well.
+SELECT LENGTH(CHR(x)) FROM UNNEST([0]) AS x
+=> "0"

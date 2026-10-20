@@ -710,22 +710,28 @@ void JsonKeys(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector 
   EachRow(
       info, input, output,
       [](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
+        // BigQuery validates mode before depth, even when the JSON input is SQL NULL.
+        JsonPathOptions options = JsonPathOptions::kStrict;
+        if (!arguments.IsNull(2)) {
+          const std::string mode = arguments.String(2);
+          if (absl::EqualsIgnoreCase(mode, "lax")) {
+            options = JsonPathOptions::kLax;
+          } else if (absl::EqualsIgnoreCase(mode, "lax recursive")) {
+            options = JsonPathOptions::kLaxRecursive;
+          } else if (!absl::EqualsIgnoreCase(mode, "strict")) {
+            return absl::OutOfRangeError("Invalid JSON mode specified: " + mode +
+                                         "; error in JSON_KEYS expression");
+          }
+        }
         const int64_t max_depth =
             arguments.IsNull(1) ? std::numeric_limits<int64_t>::max() : arguments.Int(1);
         if (max_depth <= 0) {
-          return absl::OutOfRangeError("max_depth must be positive.");
+          return absl::OutOfRangeError(
+              "max_depth must be positive. provided value: " + std::to_string(max_depth) +
+              "; error in JSON_KEYS expression");
         }
         if (arguments.IsNull(0) || arguments.IsNull(2)) {
           return std::nullopt;
-        }
-        const std::string mode = arguments.String(2);
-        JsonPathOptions options = JsonPathOptions::kStrict;
-        if (absl::EqualsIgnoreCase(mode, "lax")) {
-          options = JsonPathOptions::kLax;
-        } else if (absl::EqualsIgnoreCase(mode, "lax recursive")) {
-          options = JsonPathOptions::kLaxRecursive;
-        } else if (!absl::EqualsIgnoreCase(mode, "strict")) {
-          return absl::OutOfRangeError("Invalid JSON mode specified");
         }
         const auto document = ParseJson(arguments.String(0));
         if (!document.ok()) {
