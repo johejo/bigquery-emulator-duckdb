@@ -1,0 +1,89 @@
+## ANY_VALUE, ARRAY_CONCAT_AGG, MAX_BY, MIN_BY, HAVING MAX/MIN and navigation functions with INTERVAL values
+# Sources: BigQuery's aggregate_functions#any_value, which takes any type and keeps the rows that
+# reach the HAVING MAX or MIN value, and aggregate_functions#max_by and #min_by, synonyms for
+# ANY_VALUE(x HAVING MAX y) and ANY_VALUE(x HAVING MIN y); navigation_functions, whose value
+# expressions take any type. INTERVAL values compare by their lengths, with 30 days to a month,
+# as GoogleSQL's compliance/testdata/interval.test (orderby) does, also with parts of mixed signs,
+# as BigQuery's answers in interval.txt show.
+
+SELECT ANY_VALUE(i) FROM UNNEST([INTERVAL '1-2 3 4:5:6.789' YEAR TO SECOND]) AS i
+=> "1-2 3 4:5:6.789"
+
+SELECT ANY_VALUE(i) FROM UNNEST([CAST(NULL AS INTERVAL)]) AS i
+=> null
+
+SELECT TO_JSON_STRING(ANY_VALUE(STRUCT(i, [i] AS a))) FROM UNNEST([INTERVAL 2 HOUR]) AS i
+=> "{\"i\":\"PT2H\",\"a\":[\"PT2H\"]}"
+
+SELECT ANY_VALUE(n HAVING MAX i)
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+=> "1"
+
+SELECT ANY_VALUE(n HAVING MIN i)
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+=> "3"
+
+SELECT SUM(n HAVING MAX i)
+FROM UNNEST([STRUCT(1 AS n, MAKE_INTERVAL(month => 1, day => -1) AS i), (2, INTERVAL 29 DAY),
+  (4, INTERVAL 28 DAY)])
+=> "3"
+
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT k, SUM(n HAVING MIN i) AS s
+  FROM UNNEST([STRUCT(1 AS k, 1 AS n, MAKE_INTERVAL(month => 1, day => -1) AS i),
+    (1, 2, INTERVAL 29 DAY), (2, 4, INTERVAL 30 DAY)])
+  GROUP BY ROLLUP(k) ORDER BY k NULLS LAST
+))
+=> "[{\"k\":1,\"s\":3},{\"k\":2,\"s\":4},{\"k\":null,\"s\":3}]"
+
+SELECT MAX_BY(n, i)
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+=> "1"
+
+SELECT MIN_BY(n, i)
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+=> "3"
+
+SELECT MAX_BY(n, i)
+FROM UNNEST([STRUCT(1 AS n, MAKE_INTERVAL(month => 1, day => -1) AS i), (2, INTERVAL '29 1' DAY TO HOUR)])
+=> "2"
+
+SELECT MAX_BY(i, n) FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH)])
+=> "0-1 0 0:0:0"
+
+SELECT MIN_BY(i, n) OVER () FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH)])
+LIMIT 1
+=> "0-0 40 0:0:0"
+
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT LAG(i) OVER w AS lag, LEAD(i, 1, INTERVAL 5 HOUR) OVER w AS lead
+  FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH)])
+  WINDOW w AS (ORDER BY n) ORDER BY n
+))
+=> "[{\"lag\":null,\"lead\":\"P1M\"},{\"lag\":\"P40D\",\"lead\":\"PT5H\"}]"
+
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT FIRST_VALUE(i) OVER w AS first, LAST_VALUE(i) OVER w AS last,
+    NTH_VALUE(i, 2) OVER w AS second
+  FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+  WINDOW w AS (ORDER BY n ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY n
+  LIMIT 1
+))
+=> "[{\"first\":\"P40D\",\"last\":\"PT2H\",\"second\":\"P1M\"}]"
+
+SELECT TO_JSON_STRING(ARRAY(
+  SELECT AS STRUCT LAST_VALUE(i IGNORE NULLS) OVER w AS last
+  FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, NULL)])
+  WINDOW w AS (ORDER BY n ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) ORDER BY n
+))
+=> "[{\"last\":\"P40D\"},{\"last\":\"P40D\"}]"
+
+SELECT FIRST_VALUE(n) OVER (ORDER BY i)
+FROM UNNEST([STRUCT(1 AS n, INTERVAL 40 DAY AS i), (2, INTERVAL 1 MONTH), (3, INTERVAL 2 HOUR)])
+LIMIT 1
+=> "3"
+
+# Source: BigQuery's aggregate_functions#array_concat_agg, which takes ARRAYs of any type.
+SELECT TO_JSON_STRING(ARRAY_CONCAT_AGG(a ORDER BY n))
+FROM UNNEST([STRUCT(2 AS n, [INTERVAL 1 MONTH] AS a), (1, [INTERVAL 40 DAY, INTERVAL 2 HOUR])])
+=> "[\"P40D\",\"PT2H\",\"P1M\"]"

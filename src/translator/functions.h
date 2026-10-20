@@ -173,8 +173,8 @@ struct AggregateRule {
   Limit limit = Limit::kUnsupported;
   // Leaves out the rows whose first argument is NULL.
   bool skip_nulls = false;
-  // Collects the values as they are, so they may hold INTERVAL values, except with DISTINCT,
-  // which would compare them as DuckDB does; the analyzer rejects DISTINCT over them.
+  // Passes or collects the values as they are, so they may hold INTERVAL values, except with
+  // DISTINCT, which would compare them as DuckDB does; the analyzer rejects DISTINCT over them.
   bool carries = false;
   // Turns the DuckDB call `sql` into the BigQuery result, given the BigQuery arguments and the
   // FILTER and OVER clauses of the call; null keeps it as it is.

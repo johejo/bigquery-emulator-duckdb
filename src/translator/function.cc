@@ -278,12 +278,16 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         std::ranges::any_of(call.argument_list(), [](const auto& argument) {
                           return HasInterval(argument->type());
                         });
-  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them.
-  if ((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
-      std::ranges::any_of(call.argument_list(),
-                          [](const auto& argument) { return argument->type()->IsInterval(); })) {
+  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. CASE compares
+  // its first argument with its WHEN values.
+  if (((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return argument->type()->IsInterval(); })) ||
+      (function == "$CASE_WITH_VALUE" && call.argument_list(0)->type()->IsInterval())) {
     throw std::invalid_argument("Unsupported type in function " +
-                                (function == "NULLIF" ? "NULL_IF" : function));
+                                (function == "NULLIF"             ? std::string("NULL_IF")
+                                 : function == "$CASE_WITH_VALUE" ? std::string("CASE_WITH_VALUE")
+                                                                  : function));
   }
   // BigQuery compares only the fields of a STRUCT with IS DISTINCT FROM, although GoogleSQL
   // compares the STRUCT.
@@ -311,9 +315,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   const bool compares_structs = interval &&
                                 HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
                                 call.argument_list(0)->type()->IsStruct();
+  // CASE with a value carries its results when it compares no INTERVAL values.
+  const bool carries_results =
+      function == "$CASE_WITH_VALUE" && !HasInterval(call.argument_list(0)->type());
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
-  if (interval && !compares_intervals && !compares_structs && entry->handler != Bucket &&
-      !HasTypeUse(function, TypeUse::kCarries) &&
+  if (interval && !compares_intervals && !compares_structs && !carries_results &&
+      entry->handler != Bucket && !HasTypeUse(function, TypeUse::kCarries) &&
       !HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }

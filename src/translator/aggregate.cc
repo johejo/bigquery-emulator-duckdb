@@ -68,9 +68,16 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                     condition.types.end();
            });
   });
-  // GoogleSQL accepts INTERVAL keys, but BigQuery rejects them after analysis.
-  if (name == "APPROX_TOP_SUM" && type_of(0) == googlesql::TYPE_INTERVAL) {
-    throw std::invalid_argument("Unsupported type INTERVAL for approx_top_sum_shard.");
+  // GoogleSQL accepts INTERVAL values in these, but BigQuery rejects them after analysis.
+  static const std::map<std::string_view, std::string_view> interval_rejections = {
+      {"APPROX_COUNT_DISTINCT", "Unsupported type INTERVAL for hll_count.init."},
+      {"APPROX_QUANTILES", "Unsupported type INTERVAL for aggregate function approx_quantiles"},
+      {"APPROX_TOP_COUNT", "Unsupported type INTERVAL for approx_top_count_shard."},
+      {"APPROX_TOP_SUM", "Unsupported type INTERVAL for approx_top_sum_shard."},
+  };
+  if (const auto rejection = interval_rejections.find(name);
+      rejection != interval_rejections.end() && type_of(0) == googlesql::TYPE_INTERVAL) {
+    throw std::invalid_argument(std::string(rejection->second));
   }
   // BigQuery rejects ARRAY_AGG over INTERVAL values ordered by themselves alone after analysis,
   // as it must with DISTINCT, but orders them by other keys, also with themselves.
@@ -594,7 +601,8 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     input = Relation{.sql = sql, .columns = columns};
   } else {
     // HAVING MAX/MIN keeps the rows whose expression reaches the group's maximum or minimum,
-    // which a window over the group computes alongside the input.
+    // which a window over the group computes alongside the input; INTERVAL values compare by
+    // their keys.
     std::vector<std::string> partition;
     for (const auto& key : aggregate.group_by_list()) {
       const auto sql = Expression(*key->expr(), scope, input->columns);
@@ -616,6 +624,7 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         continue;
       }
       const auto& modifier = *call->having_modifier();
+      const googlesql::Type* type = modifier.having_expr()->type();
       const auto window = Expression(*modifier.having_expr(), scope, input->columns);
       const auto row = Expression(*modifier.having_expr(), scope, columns);
       if (!window || !row) {
@@ -625,9 +634,9 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       inner.push_back(
           std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "max("
                                                                                          : "min(") +
-          *window + ") OVER (" +
+          IntervalKey(type, *window) + ") OVER (" +
           (partition.empty() ? "" : "PARTITION BY " + Join(partition, ", ")) + ") AS " + name);
-      havings.emplace(call, *row + " = q." + name);
+      havings.emplace(call, IntervalKey(type, *row) + " = q." + name);
     }
     if (!havings.empty()) {
       input = Relation{.sql = "SELECT " + Join(inner, ", ") + input->From(), .columns = columns};
@@ -661,10 +670,11 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
         continue;
       }
       const auto& modifier = *call->having_modifier();
-      const auto sql = Expression(*modifier.having_expr(), aggregate_scope, input->columns);
+      auto sql = Expression(*modifier.having_expr(), aggregate_scope, input->columns);
       if (!sql) {
         return std::nullopt;
       }
+      sql = IntervalKey(modifier.having_expr()->type(), *sql);
       const std::string name = "_h" + std::to_string(havings.size());
       windows.emplace_back(
           std::string(modifier.kind() == googlesql::ResolvedAggregateHavingModifier::MAX ? "max("

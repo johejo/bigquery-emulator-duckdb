@@ -218,7 +218,7 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                   {.function = "max"},
               },
           },
-          {"ANY_VALUE", {{.function = "any_value"}}},
+          {"ANY_VALUE", {{.function = "any_value", .carries = true}}},
           // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
           // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
           // STRUCT values with INTERVAL fields are collected as they are.
@@ -245,7 +245,15 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
           // ARRAY_CONCAT_AGG skips NULL arrays.
           {
               "ARRAY_CONCAT_AGG",
-              {{.function = "list", .limit = kSlice, .skip_nulls = true, .finish = Flatten}},
+              {
+                  {
+                      .function = "list",
+                      .limit = kSlice,
+                      .skip_nulls = true,
+                      .carries = true,
+                      .finish = Flatten,
+                  },
+              },
           },
           // Exact, which is within any approximation error.
           {
@@ -285,9 +293,32 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                   TopSumRule<googlesql::TYPE_DOUBLE>(),
               },
           },
-          // The _null variants return a NULL x instead of skipping its row.
-          {"MAX_BY", {{.function = "arg_max_null"}}},
-          {"MIN_BY", {{.function = "arg_min_null"}}},
+          // The _null variants return a NULL x instead of skipping its row. INTERVAL values of y
+          // compare by their keys.
+          {
+              "MAX_BY",
+              {
+                  {
+                      .function = "arg_max_null",
+                      .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
+                      .arguments = {"$1", "bq_interval_key($2)"},
+                      .carries = true,
+                  },
+                  {.function = "arg_max_null", .carries = true},
+              },
+          },
+          {
+              "MIN_BY",
+              {
+                  {
+                      .function = "arg_min_null",
+                      .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
+                      .arguments = {"$1", "bq_interval_key($2)"},
+                      .carries = true,
+                  },
+                  {.function = "arg_min_null", .carries = true},
+              },
+          },
           // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
           // hexadecimal digits; the default delimiter is b','.
           {
@@ -406,11 +437,11 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytic
           {"PERCENT_RANK", {{.function = "percent_rank"}}},
           {"CUME_DIST", {{.function = "cume_dist"}}},
           {"NTILE", {{.function = "ntile"}}},
-          {"LAG", {{.function = "lag"}}},
-          {"LEAD", {{.function = "lead"}}},
-          {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier}}},
-          {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier}}},
-          {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier}}},
+          {"LAG", {{.function = "lag", .carries = true}}},
+          {"LEAD", {{.function = "lead", .carries = true}}},
+          {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier, .carries = true}}},
+          {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier, .carries = true}}},
+          {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier, .carries = true}}},
           {
               "PERCENTILE_CONT",
               {

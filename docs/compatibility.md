@@ -130,7 +130,8 @@ INTERVAL arithmetic is limited to `+`, `-`, unary `-`, multiplication by INT64 a
 INT64, and subtraction between DATE, DATETIME, TIMESTAMP or TIME values. Other limits are:
 
 - `PARTITION BY` and distinct set operations over ARRAYs with INTERVAL elements are unsupported.
-- Aggregates are limited to `SUM`, `AVG`, `ARRAY_AGG`, `COUNT`, `MIN` and `MAX`, subject to
+- Aggregate and analytic functions are limited to `SUM`, `AVG`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`,
+  `ANY_VALUE`, `COUNT`, `MIN`, `MAX`, `MIN_BY`, `MAX_BY` and navigation functions, subject to
   BigQuery's own restrictions on INTERVAL inputs.
 - JSON conversions are limited to `TO_JSON`, `TO_JSON_STRING`, `JSON_ARRAY`, `JSON_OBJECT` and
   `JSON_SET`.
