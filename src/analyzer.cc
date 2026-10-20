@@ -58,6 +58,13 @@ const googlesql::ResolvedExpr& AnalyzerResult::expression() const {
   return *analyzer_output_->resolved_expr();
 }
 
+const googlesql::Value* AnalyzerResult::literal_value() const {
+  const auto* expr = analyzer_output_->resolved_expr();
+  return expr != nullptr && expr->Is<googlesql::ResolvedLiteral>()
+             ? &expr->GetAs<googlesql::ResolvedLiteral>()->value()
+             : nullptr;
+}
+
 std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
   return ResultSchema(statement());
 }

@@ -791,7 +791,6 @@ cc_library(
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
     ],
     deps = [
         ":api_error",
