@@ -26,6 +26,12 @@ class TableSource {
                                                             const std::string& dataset,
                                                             const std::string& table) = 0;
 
+  // A query that converts a table's external numeric storage to query values, or nullopt for
+  // the emulator's native storage. A table that needs this conversion is read-only.
+  virtual std::optional<std::string> NumericReadQuery(const TableReference& /*table*/) {
+    return std::nullopt;
+  }
+
   // The schema and metadata of the table `project`.`dataset`.`table`, or nothing if there is no
   // such table or it is a view. For CREATE TABLE LIKE, COPY and CLONE and INFORMATION_SCHEMA;
   // none by default.

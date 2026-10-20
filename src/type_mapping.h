@@ -97,6 +97,10 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
 // queries hold it as. Stored structs still require distinct nonempty field names.
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
+// The same storage mapping for a resolved SQL column definition.
+std::optional<std::string> DuckDbColumnType(const googlesql::Type* type,
+                                            const googlesql::TypeParameters* parameters = nullptr);
+
 // The DuckDB type of a query parameter described by a BigQuery TableFieldSchema: as
 // DuckDbColumnType, except that INTERVAL, a query value, is supported and GEOGRAPHY is not.
 absl::StatusOr<std::string> DuckDbParameterType(const FieldSchema& field);

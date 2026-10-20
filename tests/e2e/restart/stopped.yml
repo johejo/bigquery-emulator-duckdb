@@ -1,4 +1,4 @@
-desc: edits the stopped emulator's database as another DuckDB client or an earlier emulator would
+desc: edits the stopped emulator's database as another DuckDB client would
 steps:
   edit:
     exec:
@@ -10,10 +10,9 @@ steps:
         COMMENT ON COLUMN persist.column_comments.d IS '{"name": "d", "type": "NOPE"}';
         COMMENT ON COLUMN persist.column_comments.e IS NULL;
         ALTER TABLE persist.column_comments ADD COLUMN f DOUBLE;
-        -- An earlier emulator stored BIGNUMERIC as DECIMAL(38, 19), which reads back as NUMERIC and
-        -- cannot hold every BIGNUMERIC.
-        ALTER TABLE persist.decimal_bignumeric ALTER n TYPE DECIMAL(38, 19);
-        ALTER TABLE persist.nested_decimal_bignumeric ALTER s TYPE STRUCT(n DECIMAL(38, 19));
+        -- External edits can leave numeric metadata inconsistent with the actual type.
+        ALTER TABLE persist.decimal_bignumeric ALTER n TYPE DECIMAL(18, 9);
+        ALTER TABLE persist.nested_decimal_bignumeric ALTER s TYPE STRUCT(n DECIMAL(18, 9));
     test: current.exit_code == 0 && current.stderr == ""
   # A view written by another DuckDB client has no GoogleSQL definition or schema.
   unmanaged_view:
@@ -37,13 +36,16 @@ steps:
           -1234567890.123456::DECIMAL(18, 6) AS d64,
           [{'x': 1}, {'x': NULL}]::STRUCT(x INTEGER)[2] AS fixed, NULL::STRUCT(x INTEGER) AS s,
           NULL::INTEGER[2] AS n;
-        -- Types the emulator does not support.
-        CREATE TABLE duckdb_types.ubigint AS SELECT '18446744073709551615'::UBIGINT AS x;
-        CREATE TABLE duckdb_types.hugeint AS SELECT 1::HUGEINT AS x;
-        CREATE TABLE duckdb_types.uhugeint AS SELECT 1::UHUGEINT AS x;
-        CREATE TABLE duckdb_types.nested AS SELECT 1 AS id, [{'x': 1::HUGEINT}] AS s;
-        CREATE TABLE duckdb_types.wide_decimal AS SELECT 1::DECIMAL(38, 0) AS x;
-        CREATE TABLE duckdb_types.fine_decimal AS SELECT 1::DECIMAL(18, 12) AS x;
+        CREATE TABLE duckdb_types.numeric AS SELECT
+          '18446744073709551615'::UBIGINT AS u,
+          '-170141183460469231731687303715884105728'::HUGEINT AS h,
+          '340282366920938463463374607431768211455'::UHUGEINT AS uh,
+          '-99999999999999999999999999999999999999'::DECIMAL(38, 0) AS w,
+          '0.00000000000000000000000000000000000001'::DECIMAL(38, 38) AS f,
+          [{'x': -1::HUGEINT}, {'x': NULL::HUGEINT}] AS a,
+          NULL::STRUCT(x HUGEINT) AS s, NULL::DECIMAL(38, 0) AS n;
+        CREATE TABLE duckdb_types.bignum AS SELECT 1::BIGNUM AS x;
+        CREATE TABLE duckdb_types.nested_bignum AS SELECT [{'x': 1::BIGNUM}] AS a;
     test: current.exit_code == 0 && current.stderr == ""
   # Each project is stored in a file of its own, its id encoded into a single file name.
   project_files:
@@ -52,3 +54,10 @@ steps:
     test: |
       current.exit_code == 0 && current.stdout contains 'test.duckdb' &&
       current.stdout contains 'example%2Ecom%3Aproj.duckdb'
+  numeric_storage_type:
+    exec:
+      command: duckdb -noheader -csv "$E2E_DATA_DIR/test.duckdb"
+      stdin: SELECT typeof(n), typeof(p), typeof(s), typeof(a) FROM persist.numeric_storage;
+    test: |
+      current.exit_code == 0 && current.stderr == "" &&
+      current.stdout contains 'bq_bignumeric_units' && current.stdout contains 'bq_bignumeric_5_2'

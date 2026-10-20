@@ -574,9 +574,13 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
     }
     // A view such as INFORMATION_SCHEMA.TABLES is read from the query that computes it.
     const auto* sql_table = dynamic_cast<const SqlTable*>(table->table());
+    const auto* stored_table = dynamic_cast<const BigQueryTable*>(table->table());
+    const auto converted =
+        stored_table == nullptr ? std::nullopt : stored_table->NumericReadQuery();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
                  (sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
+                  : converted          ? "(" + *converted + ") AS v"
                                        : QuoteIdentifierPath(table->table()->FullName()));
     return result;
   }

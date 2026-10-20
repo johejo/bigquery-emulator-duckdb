@@ -137,7 +137,7 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
   if (!parameters) {
     return std::nullopt;
   }
-  auto type = DuckDbType(column.type(), &*parameters);
+  auto type = DuckDbColumnType(column.type(), &*parameters);
   if (!type) {
     return Unsupported(scope, "column type " + column.type()->DebugString());
   }
@@ -578,6 +578,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .rows_from = source,
+      .rows_query = dynamic_cast<const BigQueryTable*>(scan.table())->NumericReadQuery(),
       .temporary = temporary,
       .copies_table = true,
       .keeps_rounding_modes = true,
@@ -616,10 +617,13 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
         throw std::invalid_argument("Cannot add a REQUIRED column to an existing table schema");
       }
       auto field = ColumnField(column, scope);
-      if (!ColumnDefinitionType(column, scope) || !field) {
+      if (!field) {
         return std::nullopt;
       }
       CheckFieldNames(*field, "");
+      if (!ColumnDefinitionType(column, scope)) {
+        return std::nullopt;
+      }
       alteration.actions.emplace_back(
           AddColumnAction{.field = *std::move(field), .if_not_exists = add.is_if_not_exists()});
     } else if (action->Is<googlesql::ResolvedDropColumnAction>()) {
@@ -729,12 +733,15 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
     if (column->is_hidden() || column->generated_column_info() != nullptr) {
       return Unsupported(scope, "generated columns");
     }
-    const auto type = ColumnDefinitionType(*column, scope);
     auto field = ColumnField(*column, scope);
-    if (!type || !field) {
+    if (!field) {
       return std::nullopt;
     }
     CheckFieldNames(*field, field->name);
+    const auto type = ColumnDefinitionType(*column, scope);
+    if (!type) {
+      return std::nullopt;
+    }
     table.schema.push_back(*std::move(field));
     std::string sql = QuoteIdentifier(column->name()) + " " + *type;
     if (column->annotations() != nullptr && column->annotations()->not_null()) {
@@ -823,12 +830,15 @@ std::optional<std::string> CreateTableAsSelect(
       }
       type = *inherited_type;
     } else {
-      type = ColumnDefinitionType(definition, scope);
       auto field = ColumnField(definition, scope);
-      if (!type || !field) {
+      if (!field) {
         return std::nullopt;
       }
       CheckFieldNames(*field, field->name);
+      type = ColumnDefinitionType(definition, scope);
+      if (!type) {
+        return std::nullopt;
+      }
       if (HasNestedNotNull(*field)) {
         return Unsupported(scope, "CREATE TABLE AS SELECT with nested NOT NULL");
       }

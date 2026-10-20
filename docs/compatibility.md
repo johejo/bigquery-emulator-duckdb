@@ -266,8 +266,14 @@ Tables written by another DuckDB client may contain types BigQuery does not have
 - A DECIMAL that fits NUMERIC reads as NUMERIC; TIMESTAMP_NS reads as DATETIME truncated to
   microseconds; fixed-size arrays read as REPEATED.
 - ENUM, UUID, BIT, MAP and UNION read as STRING in DuckDB's text form.
-- Columns or nested fields of UBIGINT, HUGEINT, UHUGEINT or wider DECIMAL types cannot be read
-  or queried.
+- UBIGINT, HUGEINT, UHUGEINT and DECIMAL types that do not fit NUMERIC read as BIGNUMERIC,
+  including inside arrays and structs. Tables containing these types are read-only through the
+  emulator: DML, streaming writes and jobs that retain the destination's schema are unsupported.
+  Copy the table with `CREATE TABLE COPY` or a copy job to obtain writable emulator storage;
+  `WRITE_TRUNCATE` can also replace it.
+- Unmarked BIGNUM columns and nested fields are unsupported. The emulator reserves type aliases
+  beginning with `bq_bignumeric_` for its scaled BIGNUMERIC storage.
+- Numeric column metadata that disagrees with the actual DuckDB type is rejected.
 
 Duplicate result column names are compared without case. Without a destination table, a second
 occurrence gains `_1`, as in BigQuery. Names repeated more than twice, or collisions with renamed

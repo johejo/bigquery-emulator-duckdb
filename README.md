@@ -179,6 +179,11 @@ On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project
 project file can be open in only one process at a time, and a file written by a newer DuckDB
 cannot be opened by an older one.
 
+BIGNUMERIC columns store integers in units of 10^-38 under `bq_bignumeric_` type aliases. The
+DuckDB CLI displays those integers; its ordinary numeric operations do not implement BIGNUMERIC
+semantics. Use the emulator to read or update those values. For tables created by other DuckDB
+clients, see [external type mappings and write limits](docs/compatibility.md#result-schemas-and-values).
+
 ## Google Cloud Storage
 
 Load jobs read `gs://` objects from [fake-gcs-server](https://github.com/fsouza/fake-gcs-server)

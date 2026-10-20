@@ -64,6 +64,8 @@ struct TableDefinition {
   TableMetadata metadata;
   bool if_not_exists = false;
   std::optional<TableReference> rows_from = {};
+  // Conversion of rows_from's external numeric storage, when it needs one.
+  std::optional<std::string> rows_query = {};
   // DuckDB's CREATE TABLE AS SELECT cannot declare NOT NULL; apply it after creating the table.
   bool as_select = false;
   // A temporary table belongs to its script rather than to a dataset, whose default expiration

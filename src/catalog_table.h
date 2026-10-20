@@ -41,6 +41,7 @@ class BigQueryTable : public googlesql::SimpleTable {
         schema_(std::move(schema)) {}
 
   [[nodiscard]] std::optional<TableDescription> Describe() const;
+  [[nodiscard]] std::optional<std::string> NumericReadQuery() const;
   [[nodiscard]] TableReference reference() const {
     return {.project_id = path_.at(0), .dataset_id = path_.at(1), .table_id = path_.at(2)};
   }

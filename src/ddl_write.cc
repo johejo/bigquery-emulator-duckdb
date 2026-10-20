@@ -182,8 +182,9 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
     write.metadata_statements.push_back(TableCommentStatement(definition.table, metadata, schema));
   }
   if (definition.rows_from.has_value()) {
-    write.metadata_statements.push_back("INSERT INTO " + QualifiedName(definition.table) +
-                                        " SELECT * FROM " + QualifiedName(*definition.rows_from));
+    write.metadata_statements.push_back(
+        "INSERT INTO " + QualifiedName(definition.table) + " " +
+        definition.rows_query.value_or("SELECT * FROM " + QualifiedName(*definition.rows_from)));
   }
   if (definition.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(definition.table);

@@ -43,14 +43,29 @@ const FieldSchema* ColumnField(const googlesql::Table* table, int index) {
   return kept == nullptr ? nullptr : &kept->field(index);
 }
 
+// INSERT builds its columns separately from UPDATE/MERGE, but all DML must reject storage
+// whose ordinary numbers would be mistaken for scaled BIGNUMERIC query values.
+bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
+  if (dynamic_cast<const SqlTable*>(table) != nullptr) {
+    Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
+    return false;
+  }
+  const auto* stored = dynamic_cast<const BigQueryTable*>(table);
+  if (stored != nullptr && stored->NumericReadQuery().has_value()) {
+    Unsupported(scope, "DML on external numeric storage; copy the table first");
+    return false;
+  }
+  return true;
+}
+
 std::optional<Target> DmlTarget(const googlesql::ResolvedTableScan& table, const Scope& scope) {
   if (!table.hint_list().empty() || table.for_system_time_expr() != nullptr ||
       table.lock_mode() != nullptr || table.table()->IsValueTable() ||
       table.column_list_size() != table.column_index_list_size()) {
     return Unsupported(scope, "DML target with hints, FOR SYSTEM_TIME or a value table");
   }
-  if (dynamic_cast<const SqlTable*>(table.table()) != nullptr) {
-    return Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
+  if (!WritableDmlTable(table.table(), scope)) {
+    return std::nullopt;
   }
   Target target{
       .table = QuoteIdentifierPath(table.table()->FullName()),
@@ -233,8 +248,8 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
                        "INSERT with OR IGNORE/REPLACE/UPDATE, ASSERT_ROWS_MODIFIED, THEN RETURN, "
                        "ON CONFLICT or generated columns");
   }
-  if (dynamic_cast<const SqlTable*>(table->table()) != nullptr) {
-    return Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
+  if (!WritableDmlTable(table->table(), scope)) {
+    return std::nullopt;
   }
   // The inserted columns are the table scan's columns; name them by the table's own columns.
   std::map<int, std::string> table_columns;

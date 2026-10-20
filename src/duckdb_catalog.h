@@ -38,6 +38,11 @@ std::optional<nlohmann::json> ViewComment(Backend& backend, const TableReference
 
 // Restores view and column metadata without requiring a view's execution identity.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table);
+// The table as a FROM relation, converting external numeric columns when needed.
+std::string ReadTableRelation(Backend& backend, const TableReference& table);
+// Rejects writes whose query values would be interpreted as a different physical number.
+void CheckWritableTable(Backend& backend, const TableReference& table);
+
 std::optional<std::string> LocationOf(Backend& backend, const DatasetReference& dataset);
 
 }  // namespace bigquery_emulator_duckdb

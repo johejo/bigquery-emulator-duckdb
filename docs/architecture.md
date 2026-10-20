@@ -45,6 +45,11 @@ schema. Results are encoded in BigQuery's REST row format.
 [src/backend_functions/](../src/backend_functions/) exposes GoogleSQL implementations through
 DuckDB functions and uses [S2 Geometry](https://s2geometry.io/) for GEOGRAPHY.
 
+BIGNUMERIC query values are BIGNUM integers in units of 10^-38; stored columns use the
+`bq_bignumeric_units` alias or a precision-and-scale alias. `Backend::NumericReadQuery` converts
+external integer and decimal columns to those units at the table boundary. Catalog scans, REST
+row reads, copies and extracts share it; writes that retain external numeric storage are rejected.
+
 `EXTERNAL_QUERY` exposes each connection through a DuckDB table macro:
 
 - [PostgreSQL](../src/external_query.cc): libpq prepares the query during analysis; the linked

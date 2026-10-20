@@ -610,6 +610,7 @@ cc_library(
         ":backend_functions",
         ":bignumeric",
         ":duckdb_handle",
+        ":duckdb_sql",
         ":interval",
         ":postgres_scanner",
         ":type_mapping",
