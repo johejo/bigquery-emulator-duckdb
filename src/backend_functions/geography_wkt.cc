@@ -15,6 +15,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/base/status_macros.h"
+#include "s2/s2loop_measures.h"
 #include "s2/s2point.h"
 #include "src/backend_functions/geography_value.h"
 
@@ -63,6 +64,32 @@ class WktReader {
     }
     position_ += token.size();
     return value;
+  }
+
+  // Fails saying the next token, a number or else one character, was unexpected.
+  [[nodiscard]] absl::Status Unexpected() {
+    Spaces();
+    size_t end = position_;
+    while (end < text_.size() &&
+           (std::isdigit(static_cast<unsigned char>(text_.at(end))) != 0 || text_.at(end) == '.' ||
+            text_.at(end) == '-' || text_.at(end) == '+')) {
+      ++end;
+    }
+    if (end == position_ && end < text_.size()) {
+      ++end;
+    }
+    return absl::InvalidArgumentError(
+        "ST_GeogFromText failed: Unexpected " +
+        (end == position_ ? std::string("end of data")
+                          : "'" + std::string(text_.substr(position_, end - position_)) + "'") +
+        " at position " + std::to_string(position_) + ".");
+  }
+
+  // Whether the next character starts a word.
+  bool Letter() {
+    Spaces();
+    return position_ < text_.size() &&
+           std::isalpha(static_cast<unsigned char>(text_.at(position_))) != 0;
   }
 
   absl::Status End() {
@@ -128,7 +155,7 @@ absl::StatusOr<std::vector<Point>> ReadVertices(WktReader& reader, std::string_v
 
 }  // namespace
 
-absl::StatusOr<Geography> ReadWkt(std::string_view text) {
+absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented) {
   WktReader reader(text);
   const bool point = reader.Word("POINT");
   const bool line = !point && reader.Word("LINESTRING");
@@ -139,6 +166,9 @@ absl::StatusOr<Geography> ReadWkt(std::string_view text) {
   if (geometry && reader.Word("EMPTY")) {
     GOOGLESQL_RETURN_IF_ERROR(reader.End());
     return Geography{};
+  }
+  if (!geometry && !reader.Letter()) {
+    return reader.Unexpected();
   }
   if (!point && !line && !polygon) {
     return absl::UnimplementedError("The emulator does not support ST_GEOGFROMTEXT of " +
@@ -193,6 +223,13 @@ absl::StatusOr<Geography> ReadWkt(std::string_view text) {
             "first)");
       }
       loop.pop_back();
+    }
+    if (oriented && std::ranges::any_of(loops, [&](const std::vector<S2Point>& loop) {
+          return S2::IsNormalized(loop) != (&loop == &loops.front());
+        })) {
+      return absl::UnimplementedError(
+          "The emulator does not support GEOGRAPHY values of polygons whose shell runs clockwise "
+          "or whose holes run counterclockwise");
     }
     return BuildPolygon(loops, "ST_GeogFromText failed: ");
   }

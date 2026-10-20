@@ -120,35 +120,76 @@ func TestQueryRejectsUndeclaredParameters(t *testing.T) {
 	}
 }
 
-// A GEOGRAPHY parameter is a GEOGRAPHY in the query, given as WKT; the coordinates are those of
-// scalars/geography.txt. A value that is not WKT fails the query, and GeoJSON, which BigQuery
-// takes, is unsupported.
+// A GEOGRAPHY parameter is a GEOGRAPHY in the query, given as WKT whose polygons are oriented,
+// at any depth; the coordinates are those of scalars/geography.txt. BigQuery answered the other
+// cases, including the errors, which name the parameter even for an element or a field. The
+// emulator does not support a clockwise shell, which encloses more than a hemisphere.
 func TestGeographyQueryParameters(t *testing.T) {
 	client := newClient(t)
-	read := func(value string) ([]bigquery.Value, error) {
-		query := client.Query("SELECT ST_X(@p), ST_Y(@p)")
-		query.Parameters = []bigquery.QueryParameter{
-			{Name: "p", Value: bigquery.NullGeography{GeographyVal: value, Valid: true}},
-		}
-		rows, err := query.Read(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		var got []bigquery.Value
-		return got, rows.Next(&got)
+	geography := func(value string) bigquery.NullGeography {
+		return bigquery.NullGeography{GeographyVal: value, Valid: true}
 	}
-	got, err := read("POINT(-122.35 47.62)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := []bigquery.Value{-122.35, 47.62}; !reflect.DeepEqual(got, want) {
-		t.Errorf("values = %#v, want %#v", got, want)
-	}
-	if _, err := read("POINT(1"); err == nil {
-		t.Error("query succeeded with invalid WKT")
-	}
-	if _, err := read(`{"type": "Point", "coordinates": [1, 2]}`); err == nil ||
-		!strings.Contains(err.Error(), "does not support GeoJSON") {
-		t.Errorf("GeoJSON parameter: %v, want an error that GeoJSON is unsupported", err)
+	clockwise := "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))"
+	for _, c := range []struct {
+		name  string
+		sql   string
+		value any
+		want  []bigquery.Value
+		err   string
+	}{
+		{"point", "SELECT ST_X(@p), ST_Y(@p)", geography("POINT(-122.35 47.62)"),
+			[]bigquery.Value{-122.35, 47.62}, ""},
+		{"case_and_spaces", "SELECT ST_ASTEXT(@p)", geography(" point ( 1  2 ) "),
+			[]bigquery.Value{"POINT(1 2)"}, ""},
+		{"counterclockwise", "SELECT ST_AREA(@p) < 1e11", geography("POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"),
+			[]bigquery.Value{true}, ""},
+		{"clockwise", "SELECT ST_AREA(@p) < 1e11", geography(clockwise), nil,
+			"does not support GEOGRAPHY values of polygons whose shell runs clockwise"},
+		{"clockwise_element", "SELECT ST_AREA(@p[OFFSET(0)]) < 1e11",
+			[]bigquery.NullGeography{geography(clockwise)}, nil,
+			"does not support GEOGRAPHY values of polygons whose shell runs clockwise"},
+		{"invalid", "SELECT ST_X(@p)", geography("POINT(1"), nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Expected latitude, but saw " +
+				"end of data at position 7. value: 'POINT(1'"},
+		{"empty", "SELECT ST_X(@p)", geography(""), nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Unexpected end of data at " +
+				"position 0. value: ''"},
+		{"geojson", "SELECT ST_ASTEXT(@p)", geography(`{"type": "Point", "coordinates": [1, 2]}`), nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Unexpected '{' at position 0. " +
+				`value: '{"type": "Point", "coordinates": [1, 2]}'`},
+		{"wkb", "SELECT ST_ASTEXT(@p)", geography("0101000000000000000000F03F0000000000000040"), nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Unexpected " +
+				"'0101000000000000000000' at position 0. value: '0101000000000000000000F03F0000000000000040'"},
+		{"invalid_element", "SELECT ARRAY_LENGTH(@p)",
+			[]bigquery.NullGeography{geography("POINT(1 2)"), geography("POINT(1")}, nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Expected latitude, but saw " +
+				"end of data at position 7. value: 'POINT(1'"},
+		{"invalid_field", "SELECT ST_X(@p.g)", struct {
+			G bigquery.NullGeography `bigquery:"g"`
+		}{geography("POINT(1")}, nil,
+			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Expected latitude, but saw " +
+				"end of data at position 7. value: 'POINT(1'"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			query := client.Query(c.sql)
+			query.Parameters = []bigquery.QueryParameter{{Name: "p", Value: c.value}}
+			rows, err := query.Read(context.Background())
+			var got []bigquery.Value
+			if err == nil {
+				err = rows.Next(&got)
+			}
+			if c.err != "" {
+				if err == nil || !strings.Contains(err.Error(), c.err) {
+					t.Fatalf("error = %v, want one containing %q", err, c.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("values = %#v, want %#v", got, c.want)
+			}
+		})
 	}
 }

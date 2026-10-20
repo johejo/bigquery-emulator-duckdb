@@ -100,9 +100,9 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
   return GeographyText(geography);
 }
 
-// A GEOGRAPHY that a load or tabledata.insertAll writes, given as WKT. BigQuery also takes GeoJSON
-// and WKB, hex-encoded or, from Parquet, binary, which DuckDB casts to text that starts with the
-// escape of its first byte; these are unsupported.
+// A GEOGRAPHY that a load or tabledata.insertAll writes, given as WKT whose polygons are oriented.
+// BigQuery also takes GeoJSON and WKB, hex-encoded or, from Parquet, binary, which DuckDB casts to
+// text that starts with the escape of its first byte; these are unsupported.
 absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
   const std::string text = args.String(0);
   const size_t start = text.find_first_not_of(" \t\r\n");
@@ -114,7 +114,8 @@ absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
       }))) {
     return absl::UnimplementedError("The emulator does not support WKB GEOGRAPHY values");
   }
-  return GeogFromText(args);
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ReadWkt(text, /*oriented=*/true));
+  return GeographyText(geography);
 }
 
 // NULL for the same and antipodal points. Otherwise the initial bearing over the sphere, from the

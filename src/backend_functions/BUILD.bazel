@@ -190,6 +190,7 @@ cc_library(
         "@googlesql//googlesql/base:status",
     ],
     linkstatic = True,
+    visibility = ["//:__pkg__"],
     deps = [
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -208,6 +209,7 @@ cc_library(
         "@s2geometry//:s2",
     ],
     linkstatic = True,
+    visibility = ["//:__pkg__"],
     deps = [
         ":geography_value",
         "@abseil-cpp//absl/status:statusor",
