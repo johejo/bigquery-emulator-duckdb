@@ -284,3 +284,7 @@ including `RANGE<TIMESTAMP>` bounds. Seconds use Java's FLOAT64 notation, such a
 [README](../README.md#compatibility) for the ignored `timestampOutputFormat` option.
 
 The `SAFE.` prefix is unsupported on volatile functions.
+
+Transcendental functions, such as SIN and EXP, and GEOGRAPHY measurements, such as ST_AREA, use
+the platform's math library, so their FLOAT64 results can differ from BigQuery's in the last bits,
+such as on macOS.
