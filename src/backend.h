@@ -10,6 +10,7 @@
 
 #include "nlohmann/json.hpp"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/backend_functions/object_metadata.h"
 #include "src/field_schema.h"
 
 namespace bigquery_emulator_duckdb {
@@ -37,8 +38,10 @@ nlohmann::json TimestampsAsSeconds(const std::vector<FieldSchema>& schema,
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {
  public:
-  explicit Backend(const std::optional<std::string>& session_user = std::nullopt,
-                   const backend_functions::JavaScriptLimits& javascript = {});
+  explicit Backend(
+      const std::optional<std::string>& session_user = std::nullopt,
+      const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
+      const backend_functions::ObjectStorage& storage = {});
   ~Backend();
 
   Backend(const Backend&) = delete;

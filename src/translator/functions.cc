@@ -65,6 +65,8 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"LEAST", Extremum},
       {"ADD_KEY_FROM_RAW_BYTES", AddKeyFromRawBytes},
       {"TEXT_ANALYZE", TextAnalyze},
+      {"MAKE_REF", MakeRef},
+      {"FETCH_METADATA", FetchMetadata},
   };
   return *kHandlers;
 }

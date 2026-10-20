@@ -306,3 +306,11 @@ note SESSION_USER Requires --session-user; returns the configured identity for e
 
 note RANGE_SESSIONIZE See [RANGE_SESSIONIZE](compatibility.md#range_sessionize) for limits.
 note EXTERNAL_QUERY For external database support and limits, see [EXTERNAL_QUERY](compatibility.md#external_query).
+
+# ObjectRef functions, over BigQuery's documented URI. OBJ.MAKE_REF's JSON form is unsupported.
+query OBJ.MAKE_REF SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg')
+query OBJ.MAKE_REF SELECT OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg', 'us.conn', version => '1', details => JSON '{"gcs_metadata": {"size": 23000}}')
+query OBJ.MAKE_REF SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://mybucket/flowers/12345.jpg'), 'myproject.us.conn')
+query OBJ.MAKE_REF SELECT OBJ.MAKE_REF(JSON '{"uri": "gs://mybucket/flowers/12345.jpg"}')
+note OBJ.FETCH_METADATA See [ObjectRef functions](compatibility.md#objectref-functions) for limits.
+note OBJ.MAKE_REF See [ObjectRef functions](compatibility.md#objectref-functions) for limits.

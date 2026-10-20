@@ -535,6 +535,7 @@ cc_library(
         "//src/backend_functions:javascript",
         "//src/backend_functions:json",
         "//src/backend_functions:math",
+        "//src/backend_functions:objectref",
         "//src/backend_functions:percentile",
         "//src/backend_functions:range",
         "//src/backend_functions:string",
@@ -543,6 +544,7 @@ cc_library(
     linkstatic = True,
     deps = [
         "//src/backend_functions:javascript_limits",
+        "//src/backend_functions:object_metadata",
         "//third_party/duckdb",
     ],
 )
@@ -561,6 +563,20 @@ cc_library(
     deps = [
         ":field_schema",
         "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "object_ref",
+    srcs = ["src/object_ref.cc"],
+    hdrs = ["src/object_ref.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":external_query",
+        ":gcs",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -603,6 +619,7 @@ cc_library(
     deps = [
         ":field_schema",
         "//src/backend_functions:javascript_limits",
+        "//src/backend_functions:object_metadata",
         "@nlohmann_json//:json",
     ],
 )
@@ -727,6 +744,7 @@ cc_library(
         ":extract",
         ":language_options",
         ":load",
+        ":object_ref",
         ":parquet_metadata",
         ":routine_catalog",
         ":schema_sql",

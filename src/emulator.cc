@@ -18,6 +18,7 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/object_ref.h"
 #include "src/project.h"
 #include "src/table_metadata.h"
 
@@ -51,7 +52,17 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
                    const backend_functions::JavaScriptLimits& javascript,
                    const std::vector<ExternalConnection>& connections)
-    : backend_(session_user, javascript),
+    : backend_(
+          session_user, javascript,
+          {
+              .fetch =
+                  [this](const std::string& objectref, const std::string& project) {
+                    return FetchObjectMetadata(gcs_client_, connections_.conninfo, objectref,
+                                               project);
+                  },
+              .has_connection =
+                  [this](const std::string& key) { return connections_.conninfo.contains(key); },
+          }),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   for (const ExternalConnection& connection : connections) {

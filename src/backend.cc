@@ -23,6 +23,7 @@
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/backend_functions/object_metadata.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
@@ -698,7 +699,8 @@ json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
   Database(const std::optional<std::string>& session_user,
-           const backend_functions::JavaScriptLimits& javascript) {
+           const backend_functions::JavaScriptLimits& javascript,
+           const backend_functions::ObjectStorage& storage) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -708,7 +710,7 @@ struct Backend::Database {
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
-    RegisterBackendFunctions(handle.get(), session_user, javascript);
+    RegisterBackendFunctions(handle.get(), session_user, javascript, storage);
     RegisterPostgresScanner(handle.get());
   }
 
@@ -728,8 +730,9 @@ struct Backend::Session {
 };
 
 Backend::Backend(const std::optional<std::string>& session_user,
-                 const backend_functions::JavaScriptLimits& javascript)
-    : db_(std::make_shared<Database>(session_user, javascript)) {}
+                 const backend_functions::JavaScriptLimits& javascript,
+                 const backend_functions::ObjectStorage& storage)
+    : db_(std::make_shared<Database>(session_user, javascript, storage)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)
     : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}

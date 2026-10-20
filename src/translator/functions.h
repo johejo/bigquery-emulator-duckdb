@@ -44,6 +44,8 @@ struct ScalarCall {
   std::string_view name;
   std::vector<FunctionArgument> arguments = {};
   bool safe = false;
+  // The project the query runs in, which connection IDs without one belong to.
+  std::string_view project = {};
 
   // Access resolved arguments and types without including the AST definitions in handlers.
   [[nodiscard]] const googlesql::ResolvedExpr& Argument(std::size_t i) const;
