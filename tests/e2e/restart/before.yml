@@ -67,7 +67,7 @@ steps:
               useLegacySql: false
     test: current.res.status == 200
   # restart/stopped.yml rewrites these tables' column comments and types as another DuckDB client
-  # or an earlier emulator would leave them.
+  # would leave them.
   column_comments:
     req:
       /projects/test/queries:
@@ -96,5 +96,27 @@ steps:
           body:
             application/json:
               query: CREATE TABLE persist.nested_decimal_bignumeric (s STRUCT<n BIGNUMERIC>)
+              useLegacySql: false
+    test: current.res.status == 200
+  numeric_storage:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE TABLE persist.numeric_storage
+                  (n BIGNUMERIC, p BIGNUMERIC(5, 2), s STRUCT<n BIGNUMERIC>, a ARRAY<BIGNUMERIC>);
+                INSERT INTO persist.numeric_storage VALUES
+                  (1.25, 2.25, STRUCT(BIGNUMERIC '-1.25'), [BIGNUMERIC '0.00000000000000000000000000000000000001', BIGNUMERIC '-1'])
+              useLegacySql: false
+    test: current.res.status == 200
+  numeric_anonymous:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: CREATE TABLE persist.numeric_anonymous AS SELECT STRUCT(BIGNUMERIC '1.25') AS s
               useLegacySql: false
     test: current.res.status == 200

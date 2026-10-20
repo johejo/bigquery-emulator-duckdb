@@ -79,8 +79,7 @@ steps:
           body: null
     test: |
       current.res.status == 400 &&
-      current.res.body.error.message contains 'Column n was created by an earlier' &&
-      current.res.body.error.message contains 'recreate the table'
+      current.res.body.error.message contains 'Column n metadata does not match its DuckDB numeric storage type'
   nested_decimal_bignumeric:
     req:
       /projects/test/datasets/persist/tables/nested_decimal_bignumeric:
@@ -88,8 +87,7 @@ steps:
           body: null
     test: |
       current.res.status == 400 &&
-      current.res.body.error.message contains 'Column s was created by an earlier' &&
-      current.res.body.error.message contains 'recreate the table'
+      current.res.body.error.message contains 'Column s metadata does not match its DuckDB numeric storage type'
   # restart/stopped.yml writes duckdb_types.t with types BigQuery does not have; queries and
   # tabledata.list read them alike, as docs/compatibility.md describes.
   duckdb_types_query:
@@ -113,72 +111,131 @@ steps:
     test: |
       current.res.status == 200 &&
       current.res.body.rows == steps.duckdb_types_query.res.body.rows
-  # A table with a column of a type the emulator does not support cannot be read.
-  duckdb_types_ubigint:
-    req:
-      /projects/test/datasets/duckdb_types/tables/ubigint:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type UBIGINT, which the emulator does not support'
-  duckdb_types_hugeint:
-    req:
-      /projects/test/datasets/duckdb_types/tables/hugeint:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT, which the emulator does not support'
-  duckdb_types_uhugeint:
-    req:
-      /projects/test/datasets/duckdb_types/tables/uhugeint:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type UHUGEINT, which the emulator does not support'
-  duckdb_types_nested:
-    req:
-      /projects/test/datasets/duckdb_types/tables/nested:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column s has the DuckDB type HUGEINT, which the emulator does not support'
-  duckdb_types_wide_decimal:
-    req:
-      /projects/test/datasets/duckdb_types/tables/wide_decimal:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type DECIMAL(38, 0), which the emulator does not support'
-  duckdb_types_fine_decimal:
-    req:
-      /projects/test/datasets/duckdb_types/tables/fine_decimal:
-        get:
-          body: null
-    test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type DECIMAL(18, 12), which the emulator does not support'
-  duckdb_types_hugeint_query:
+  # These explicit values originate in the DuckDB CLI setup, rather than an emulator answer.
+  duckdb_numeric_query:
     req:
       /projects/test/queries:
         post:
           body:
-            application/json: {query: 'SELECT x FROM duckdb_types.hugeint', useLegacySql: false}
+            application/json: {query: 'SELECT * FROM duckdb_types.numeric', useLegacySql: false}
     test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT'
-  duckdb_types_hugeint_rows:
+      current.res.status == 200 &&
+      current.res.body.schema.fields[0].type == 'BIGNUMERIC' &&
+      current.res.body.schema.fields[4].type == 'BIGNUMERIC' &&
+      current.res.body.rows == [{"f": [
+        {"v": "18446744073709551615"}, {"v": "-170141183460469231731687303715884105728"},
+        {"v": "340282366920938463463374607431768211455"},
+        {"v": "-99999999999999999999999999999999999999"},
+        {"v": "0.00000000000000000000000000000000000001"},
+        {"v": [{"v": {"f": [{"v": "-1"}]}}, {"v": {"f": [{"v": null}]}}]},
+        {"v": null}, {"v": null}]}]
+  duckdb_numeric_rows:
     req:
-      /projects/test/datasets/duckdb_types/tables/hugeint/data:
+      /projects/test/datasets/duckdb_types/tables/numeric/data:
         get:
           body: null
     test: |
-      current.res.status == 400 &&
-      current.res.body.error.message contains 'Column x has the DuckDB type HUGEINT'
+      current.res.status == 200 && current.res.body.rows == steps.duckdb_numeric_query.res.body.rows
+  duckdb_numeric_arithmetic:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT h + 1 AS h, f * 2 AS f, a[OFFSET(0)].x AS x FROM duckdb_types.numeric
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [
+        {"v": "-170141183460469231731687303715884105727"},
+        {"v": "0.00000000000000000000000000000000000002"}, {"v": "-1"}]}]
+  duckdb_numeric_insert:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: INSERT INTO duckdb_types.numeric (h) VALUES (BIGNUMERIC '0.00000000000000000000000000000000000001')
+              useLegacySql: false
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains 'DML on external numeric storage'
+  duckdb_numeric_update:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: UPDATE duckdb_types.numeric SET h = 1 WHERE TRUE
+              useLegacySql: false
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains 'DML on external numeric storage'
+  duckdb_numeric_stream:
+    req:
+      /projects/test/datasets/duckdb_types/tables/numeric/insertAll:
+        post:
+          body:
+            application/json: {rows: [{json: {h: '1'}}]}
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains 'writing to external numeric storage'
+  duckdb_numeric_copy:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: CREATE TABLE duckdb_types.copied COPY duckdb_types.numeric
+              useLegacySql: false
+    test: current.res.status == 200
+  duckdb_numeric_copied_rows:
+    req:
+      /projects/test/datasets/duckdb_types/tables/copied/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == steps.duckdb_numeric_query.res.body.rows
+  duckdb_numeric_copied_update:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: UPDATE duckdb_types.copied SET h = 1 WHERE TRUE; SELECT h FROM duckdb_types.copied
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "1"}]}]
+  duckdb_bignum:
+    req:
+      /projects/test/datasets/duckdb_types/tables/bignum/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains 'Column x has the DuckDB type BIGNUM'
+  duckdb_nested_bignum:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT * FROM duckdb_types.nested_bignum', useLegacySql: false}
+    test: |
+      current.res.status == 400 && current.res.body.error.message contains 'Column a has the DuckDB type BIGNUM'
+  numeric_storage:
+    req:
+      /projects/test/datasets/persist/tables/numeric_storage/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [
+        {"v": "1.25"}, {"v": "2.25"}, {"v": {"f": [{"v": "-1.25"}]}},
+        {"v": [{"v": "0.00000000000000000000000000000000000001"}, {"v": "-1"}]}]}]
+  numeric_storage_update:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: UPDATE persist.numeric_storage SET n = n + 1 WHERE TRUE; SELECT n FROM persist.numeric_storage
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "2.25"}]}]
   # restart/stopped.yml creates unmanaged.v without the emulator; it is listed, queried in
   # INFORMATION_SCHEMA and deleted, but has no metadata to show.
   unmanaged_view_list:
@@ -222,3 +279,18 @@ steps:
           body: null
     test: |
       current.res.status == 200 && current.res.body.totalItems == 0 && !("tables" in current.res.body)
+  numeric_anonymous_rows:
+    req:
+      /projects/test/datasets/persist/tables/numeric_anonymous/data:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": {"f": [{"v": "1.25"}]}}]}]
+  numeric_anonymous_query:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json: {query: 'SELECT s FROM persist.numeric_anonymous', useLegacySql: false}
+    test: |
+      current.res.status == 200 && current.res.body.rows == steps.numeric_anonymous_rows.res.body.rows

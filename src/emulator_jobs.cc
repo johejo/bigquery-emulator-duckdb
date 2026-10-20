@@ -21,6 +21,7 @@
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/ddl_write.h"
+#include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/extract.h"
@@ -339,7 +340,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         throw ApiError::Invalid("Source tables have different schemas");
       }
       sql += (sql.empty() ? "" : " UNION ALL ") + std::string("SELECT * FROM ") +
-             QualifiedName(source);
+             ReadTableRelation(backend_, source);
     }
     // BigQuery cannot append a copy to a table whose additional columns have defaults
     // (https://cloud.google.com/bigquery/docs/default-values#limitations).
@@ -433,12 +434,13 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     }
     if (parquet) {
       Execute(std::format("COPY (SELECT {} FROM {}) TO {} (FORMAT parquet, COMPRESSION {})",
-                          ParquetExtractColumns(table.schema), QualifiedName(source),
+                          ParquetExtractColumns(table.schema), ReadTableRelation(backend_, source),
                           QuoteLiteral(path),
                           compression == "NONE" ? "uncompressed" : ToLowerAscii(compression)));
       AnnotateParquetBigNumerics(path, table.schema);
     } else {
-      WriteTextExtract(table.schema, Execute("SELECT * FROM " + QualifiedName(source)).rows,
+      WriteTextExtract(table.schema,
+                       Execute("SELECT * FROM " + ReadTableRelation(backend_, source)).rows,
                        {
                            .json = format == "NEWLINE_DELIMITED_JSON",
                            .gzip = compression == "GZIP",
@@ -497,6 +499,9 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
   if (existing.has_value() && write == WriteDisposition::kWriteEmpty && existing->num_rows > 0) {
     throw ApiError::Duplicate("Already Exists: Table " + TableName(destination));
+  }
+  if (existing.has_value() && write != WriteDisposition::kWriteTruncate) {
+    CheckWritableTable(backend_, destination);
   }
   // Appended rows are written with DuckDB's casts, which round halfway values away from zero, so
   // the values of ROUND_HALF_EVEN fields are rounded to even first, as BigQuery rounds those a

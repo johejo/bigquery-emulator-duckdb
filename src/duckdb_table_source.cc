@@ -79,6 +79,10 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  std::optional<std::string> NumericReadQuery(const TableReference& table) override {
+    return backend_.NumericReadQuery(QualifiedName(table));
+  }
+
   std::optional<TableDescription> DescribeTable(const std::string& project,
                                                 const std::string& dataset,
                                                 const std::string& table) override {

@@ -51,14 +51,17 @@ std::string ColumnCommentsQuery(const TableReference& table) {
 
 namespace {
 
-// Whether `recorded` is a BIGNUMERIC, at any depth, where `stored`, read back from DuckDB's types,
-// is not: a column of an earlier emulator, which kept BIGNUMERIC as DECIMAL(38, 19).
-bool StoresBigNumericAsDecimal(const FieldSchema& recorded, const FieldSchema& stored) {
-  if (recorded.type == FieldType::kBigNumeric) {
-    return stored.type != FieldType::kBigNumeric;
+// Numeric metadata must agree with the actual type: otherwise queries and REST readers
+// could interpret the same stored number differently after an external schema change.
+bool NumericStorageMismatch(const FieldSchema& recorded, const FieldSchema& stored) {
+  const auto numeric = [](FieldType type) {
+    return type == FieldType::kNumeric || type == FieldType::kBigNumeric;
+  };
+  if ((numeric(recorded.type) || numeric(stored.type)) && recorded.type != stored.type) {
+    return true;
   }
   for (size_t i = 0; i < recorded.fields.size() && i < stored.fields.size(); ++i) {
-    if (StoresBigNumericAsDecimal(recorded.fields.at(i), stored.fields.at(i))) {
+    if (NumericStorageMismatch(recorded.fields.at(i), stored.fields.at(i))) {
       return true;
     }
   }
@@ -86,10 +89,9 @@ std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
       continue;
     }
     if (ToLowerAscii(field.name) == ToLowerAscii(derived.at(i).name)) {
-      if (StoresBigNumericAsDecimal(field, derived.at(i))) {
+      if (NumericStorageMismatch(field, derived.at(i))) {
         throw ApiError::Invalid("Column " + field.name +
-                                " was created by an earlier version of the emulator, which "
-                                "stored BIGNUMERIC as DECIMAL(38, 19); recreate the table");
+                                " metadata does not match its DuckDB numeric storage type");
       }
       derived.at(i) = std::move(field);
     }

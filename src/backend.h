@@ -78,6 +78,11 @@ class Backend {
   // DuckDB type the emulator does not support, or nullopt.
   std::optional<std::string> UnreadableColumnError(const std::string& relation);
 
+  // A SELECT that converts external numeric columns to the emulator's query representation,
+  // or nullopt when the stored values already have that representation. Such external tables
+  // can be read but cannot yet be written through the emulator.
+  std::optional<std::string> NumericReadQuery(const std::string& relation);
+
   // Inserts each row on one connection. Unless skip_invalid_rows is set, a failed row rolls
   // back the entire request. Returns the failed row indexes and their DuckDB errors.
   std::vector<std::pair<size_t, std::string>> InsertRows(const std::vector<std::string>& statements,

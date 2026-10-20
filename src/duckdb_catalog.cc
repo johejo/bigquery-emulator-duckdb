@@ -173,6 +173,19 @@ std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& tab
   return schema;
 }
 
+std::string ReadTableRelation(Backend& backend, const TableReference& table) {
+  const std::string relation = QualifiedName(table);
+  const auto converted = backend.NumericReadQuery(relation);
+  return converted ? "(" + *converted + ") AS _bq_storage" : relation;
+}
+
+void CheckWritableTable(Backend& backend, const TableReference& table) {
+  if (backend.NumericReadQuery(QualifiedName(table)).has_value()) {
+    throw ApiError::Unsupported("writing to external numeric storage in " + TableName(table) +
+                                "; copy the table first");
+  }
+}
+
 // The location of `dataset`, as `backend` sees it, or nothing when it does not exist.
 std::optional<std::string> LocationOf(Backend& backend, const DatasetReference& dataset) {
   if (IsDuckDbSchema(dataset.dataset_id)) {

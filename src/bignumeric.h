@@ -13,6 +13,9 @@
 
 namespace bigquery_emulator_duckdb {
 
+// Marks stored, unparameterized BIGNUMERIC columns; an unmarked BIGNUM is an integer.
+inline constexpr char kBigNumericStorageType[] = "bq_bignumeric_units";
+
 // The decimal text of the units of `value`, such as "-150000000000000000000000000000000000000"
 // for -1.5.
 std::string BigNumericUnits(const googlesql::BigNumericValue& value);

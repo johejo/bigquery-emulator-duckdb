@@ -25,6 +25,7 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
+#include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
 #include "src/postgres_scanner.h"
@@ -66,8 +67,8 @@ FieldType ToBigQueryType(duckdb_logical_type type) {
     case DUCKDB_TYPE_UTINYINT:
     case DUCKDB_TYPE_USMALLINT:
     case DUCKDB_TYPE_UINTEGER:
-    case DUCKDB_TYPE_UBIGINT:
       return FieldType::kInteger;
+    case DUCKDB_TYPE_UBIGINT:
     case DUCKDB_TYPE_HUGEINT:
     case DUCKDB_TYPE_UHUGEINT:
     case DUCKDB_TYPE_BIGNUM:
@@ -76,7 +77,10 @@ FieldType ToBigQueryType(duckdb_logical_type type) {
     case DUCKDB_TYPE_DOUBLE:
       return FieldType::kFloat;
     case DUCKDB_TYPE_DECIMAL:
-      return FieldType::kNumeric;
+      return duckdb_decimal_width(type) - duckdb_decimal_scale(type) <= 29 &&
+                     duckdb_decimal_scale(type) <= 9
+                 ? FieldType::kNumeric
+                 : FieldType::kBigNumeric;
     case DUCKDB_TYPE_VARCHAR:
     case DUCKDB_TYPE_UUID:
       return FieldType::kString;
@@ -113,22 +117,15 @@ bool IsListLike(duckdb_logical_type type) {
          duckdb_get_type_id(type) == DUCKDB_TYPE_ARRAY;
 }
 
-// The DuckDB type, at any depth, that the emulator does not read, or empty. A table another DuckDB
-// client wrote can have these: a UBIGINT can exceed INT64 and a DECIMAL can exceed NUMERIC, and
-// BIGNUMERIC, which holds both, is stored as units of 10^-38, which a HUGEINT, a UHUGEINT or such a
-// value would have to be converted to. MAP and UNION values are read as text, whatever they hold.
+// Only marked BIGNUM columns contain units of 10^-38. A plain BIGNUM is an integer,
+// with a range larger than BIGNUMERIC's, and is not a supported storage type.
 std::string UnsupportedType(duckdb_logical_type type) {
   switch (duckdb_get_type_id(type)) {
-    case DUCKDB_TYPE_UBIGINT:
-      return "UBIGINT";
-    case DUCKDB_TYPE_HUGEINT:
-      return "HUGEINT";
-    case DUCKDB_TYPE_UHUGEINT:
-      return "UHUGEINT";
-    case DUCKDB_TYPE_DECIMAL: {
-      const int width = duckdb_decimal_width(type);
-      const int scale = duckdb_decimal_scale(type);
-      return width - scale > 29 || scale > 9 ? std::format("DECIMAL({}, {})", width, scale) : "";
+    case DUCKDB_TYPE_BIGNUM: {
+      DuckString const alias(duckdb_logical_type_get_alias(type));
+      return alias.get() != nullptr && std::string_view(alias.get()).starts_with("bq_bignumeric_")
+                 ? ""
+                 : "BIGNUM";
     }
     case DUCKDB_TYPE_LIST:
     case DUCKDB_TYPE_ARRAY:
@@ -143,6 +140,52 @@ std::string UnsupportedType(duckdb_logical_type type) {
       return "";
     default:
       return "";
+  }
+}
+
+// Converts external numeric storage to the units used by all query expressions. Arrays and
+// structs preserve NULLs, including a NULL struct rather than a struct of NULL fields.
+std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_logical_type type,
+                                              int depth) {
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_UBIGINT:
+    case DUCKDB_TYPE_HUGEINT:
+    case DUCKDB_TYPE_UHUGEINT:
+      return "CAST(bq_bignumeric_from_string(CAST(" + sql + " AS VARCHAR), false) AS BIGNUM)";
+    case DUCKDB_TYPE_DECIMAL:
+      if (ToBigQueryType(type) == FieldType::kBigNumeric) {
+        return "CAST(bq_bignumeric_from_string(CAST(" + sql + " AS VARCHAR), false) AS BIGNUM)";
+      }
+      return std::nullopt;
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY: {
+      const std::string element = "_bq_numeric_" + std::to_string(depth);
+      const auto converted = ReadNumericStorage(element, ElementType(type).get(), depth + 1);
+      if (!converted) {
+        return std::nullopt;
+      }
+      return "list_transform(" + sql + ", " + element + " -> " + *converted + ")";
+    }
+    case DUCKDB_TYPE_STRUCT: {
+      std::vector<std::string> fields;
+      bool changed = false;
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        DuckString const name(duckdb_struct_type_child_name(type, i));
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
+        const std::string field = QuoteIdentifier(name.get());
+        const std::string access = std::format("({}).{}", sql, field);
+        const auto converted = ReadNumericStorage(access, child.get(), depth + 1);
+        changed |= converted.has_value();
+        fields.push_back(field + " := " + converted.value_or(access));
+      }
+      if (!changed) {
+        return std::nullopt;
+      }
+      return "CASE WHEN " + sql + " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") +
+             ") END";
+    }
+    default:
+      return std::nullopt;
   }
 }
 
@@ -879,6 +922,29 @@ std::optional<std::string> Backend::UnreadableColumnError(const std::string& rel
     }
   }
   return std::nullopt;
+}
+
+std::optional<std::string> Backend::NumericReadQuery(const std::string& relation) {
+  Connection const owned = session_ ? Connection{} : db_->Connect();
+  auto* const connection = session_ ? session_->connection.get() : owned.get();
+  Prepared prepared;
+  const std::string sql = "SELECT * FROM " + relation;
+  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
+    throw BackendError(
+        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
+  }
+  std::vector<std::string> columns;
+  bool changed = false;
+  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
+    DuckString const name(duckdb_prepared_statement_column_name(prepared.get(), i));
+    LogicalType const type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
+    const std::string column = QuoteIdentifier(name.get());
+    const auto converted = ReadNumericStorage(column, type.get(), 0);
+    changed |= converted.has_value();
+    columns.push_back(converted.value_or(column) + " AS " + column);
+  }
+  return changed ? std::make_optional("SELECT " + Join(columns, ", ") + " FROM " + relation)
+                 : std::nullopt;
 }
 
 std::vector<std::pair<size_t, std::string>> Backend::InsertRows(

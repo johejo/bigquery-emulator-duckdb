@@ -237,13 +237,13 @@ struct PrecisionScale {
   }
 };
 
-// The cast to a BIGNUMERIC(P, S) column's type from a BIGNUM or, with `kUnits`, from the VARCHAR
-// of its units, which loads write.
+// The cast to a stored BIGNUMERIC type from a BIGNUM or, with `kUnits`, from the VARCHAR
+// of its units, which loads write. Extra parameters enforce a declared precision and scale.
 template <bool kUnits>
-bool CastToPrecisionScale(duckdb_function_info info, idx_t count, duckdb_vector input,
-                          duckdb_vector output) {
-  const auto& parameters =
-      *static_cast<const PrecisionScale*>(duckdb_cast_function_get_extra_info(info));
+bool CastToStorage(duckdb_function_info info, idx_t count, duckdb_vector input,
+                   duckdb_vector output) {
+  const auto* parameters =
+      static_cast<const PrecisionScale*>(duckdb_cast_function_get_extra_info(info));
   const bool try_cast = duckdb_cast_function_get_cast_mode(info) == DUCKDB_CAST_TRY;
   uint64_t* validity = duckdb_vector_get_validity(input);
   duckdb_vector_ensure_validity_writable(output);
@@ -254,8 +254,8 @@ bool CastToPrecisionScale(duckdb_function_info info, idx_t count, duckdb_vector 
     }
     const std::string stored = VectorString(input, row);
     auto value = kUnits ? BigNumericFromUnits(stored) : BigNumericFromBignum(stored);
-    if (value.ok()) {
-      value = parameters.Apply(*value);
+    if (value.ok() && parameters != nullptr) {
+      value = parameters->Apply(*value);
     }
     if (!value.ok()) {
       const std::string message(value.status().message());
@@ -272,8 +272,8 @@ bool CastToPrecisionScale(duckdb_function_info info, idx_t count, duckdb_vector 
 }
 
 // The cast from a BIGNUMERIC(P, S) column's type to BIGNUM, whose values it keeps.
-bool CastFromPrecisionScale(duckdb_function_info /*info*/, idx_t count, duckdb_vector input,
-                            duckdb_vector output) {
+bool CastFromStorage(duckdb_function_info /*info*/, idx_t count, duckdb_vector input,
+                     duckdb_vector output) {
   uint64_t* validity = duckdb_vector_get_validity(input);
   duckdb_vector_ensure_validity_writable(output);
   for (idx_t row = 0; row < count; ++row) {
@@ -304,7 +304,7 @@ void RegisterCast(duckdb_connection connection, duckdb_logical_type source,
     duckdb_cast_function_set_implicit_cast_cost(cast.get(), implicit_cost);
   }
   if (duckdb_register_cast_function(connection, cast.get()) == DuckDBError) {
-    throw BackendError("DuckDB failed to register a cast to BIGNUMERIC(P, S)");
+    throw BackendError("DuckDB failed to register a cast for stored BIGNUMERIC");
   }
 }
 
@@ -315,6 +315,14 @@ void RegisterCast(duckdb_connection connection, duckdb_logical_type source,
 void RegisterBigNumericTypes(duckdb_connection connection) {
   LogicalType const bignum(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
   LogicalType const varchar(duckdb_create_logical_type(kVarchar));
+  LogicalType const stored(duckdb_create_logical_type(DUCKDB_TYPE_BIGNUM));
+  duckdb_logical_type_set_alias(stored.get(), kBigNumericStorageType);
+  if (duckdb_register_logical_type(connection, stored.get(), nullptr) == DuckDBError) {
+    throw BackendError("DuckDB failed to register BIGNUMERIC storage type");
+  }
+  RegisterCast(connection, bignum.get(), stored.get(), CastToStorage<false>, std::nullopt, -1);
+  RegisterCast(connection, varchar.get(), stored.get(), CastToStorage<true>, std::nullopt, -1);
+  RegisterCast(connection, stored.get(), bignum.get(), CastFromStorage, std::nullopt, 0);
   for (int64_t scale = 0; scale <= BigNumericValue::kMaxFractionalDigits; ++scale) {
     // DDL allows from 1, or the scale if greater, to 38 more digits than the scale.
     for (int64_t precision = std::max<int64_t>(1, scale); precision <= 38 + scale; ++precision) {
@@ -324,11 +332,9 @@ void RegisterBigNumericTypes(duckdb_connection connection) {
         throw BackendError("DuckDB failed to register BIGNUMERIC(P, S)");
       }
       const PrecisionScale parameters{.precision = precision, .scale = scale};
-      RegisterCast(connection, bignum.get(), type.get(), CastToPrecisionScale<false>, parameters,
-                   -1);
-      RegisterCast(connection, varchar.get(), type.get(), CastToPrecisionScale<true>, parameters,
-                   -1);
-      RegisterCast(connection, type.get(), bignum.get(), CastFromPrecisionScale, std::nullopt, 0);
+      RegisterCast(connection, bignum.get(), type.get(), CastToStorage<false>, parameters, -1);
+      RegisterCast(connection, varchar.get(), type.get(), CastToStorage<true>, parameters, -1);
+      RegisterCast(connection, type.get(), bignum.get(), CastFromStorage, std::nullopt, 0);
     }
   }
 }
