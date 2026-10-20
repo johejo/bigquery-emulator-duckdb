@@ -21,3 +21,11 @@ and of `protobuf~` and `googleapis~`; the patch points those at the canonical na
 for the `http_archive` of file-based-test-driver to fix `Match` and `GetContents`, which pass the
 data of a `string_view` that is not NUL-terminated to `stat()` and so fail to find a `.test` file
 at random. It stays as long as that test does.
+
+`months_between_datetime.patch` makes the DATETIME overload of `MONTHS_BETWEEN` inline
+when `FEATURE_TIMESTAMP_NANOS` is disabled, as it is for BigQuery. Its SQL definition
+otherwise calls `TIME_DIFF` with `NANOSECOND`, which the analyzer rejects in that mode.
+The patch uses a microsecond difference scaled to nanoseconds; a time-of-day difference
+fits in INT64 even after scaling, so it preserves the existing calculation exactly.
+Nanosecond mode keeps the original definition. Remove it once upstream supports
+inlining this overload without nanosecond precision.

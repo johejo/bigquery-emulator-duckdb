@@ -1727,26 +1727,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "MONTHS_BETWEEN on DATETIME fails to analyze: the SQL it is rewritten to calls TIME_DIFF with NANOSECOND"
-  label: "additional_date_time_functions_test:months_between_datetime_basic"
-  label: "additional_date_time_functions_test:months_between_datetime_null"
-  label: "code:months_between_DATETIME_2008-02-29 00:00:00.123456_DATETIME_2008-02-28 00:00:00.789012"
-  label: "code:months_between_DATETIME_2008-02-29 00:00:00_DATETIME_2008-02-28 12:00:00"
-  label: "code:months_between_DATETIME_2008-04-15 06:15:45_DATETIME_2008-05-10 12:30:15"
-  label: "code:months_between_DATETIME_2025-01-01 01:33:12_DATETIME_NULL"
-  label: "code:months_between_DATETIME_2025-02-28 23:00:00_DATETIME_2025-03-31 00:00:00"
-  label: "code:months_between_DATETIME_2025-03-14 23:00:00_DATETIME_2025-02-14 00:00:00"
-  label: "code:months_between_DATETIME_2025-10-29 00:00:00_DATETIME_2025-11-30 00:00:00"
-  label: "code:months_between_DATETIME_2025-11-14 00:00:00_DATETIME_2025-10-14 00:00:00"
-  label: "code:months_between_DATETIME_2025-11-14 00:00:00_DATETIME_2025-10-16 00:00:00"
-  label: "code:months_between_DATETIME_2025-11-30 00:00:00_DATETIME_2024-10-31 00:00:00"
-  label: "code:months_between_DATETIME_2025-11-30 00:00:00_DATETIME_2025-10-29 00:00:00"
-  label: "code:months_between_DATETIME_NULL_DATETIME_2025-01-01 01:33:12"
-  label: "code:months_between_DATETIME_NULL_DATETIME_NULL"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "ORDER BY of FLOAT64 does not order NaN and infinities as BigQuery does"
   label: "orderby_queries_test:orderby_duplicates_single_base_column_double_asc"
