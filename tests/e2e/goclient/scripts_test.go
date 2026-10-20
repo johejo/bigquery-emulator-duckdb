@@ -12,6 +12,7 @@ import (
 )
 
 func TestMultiStatementQueryReturnsItsLastResult(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_scripts")
@@ -56,6 +57,7 @@ SELECT COUNT(*) AS c, SUM(id) AS s FROM t;`)
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/procedural-language#execute_immediate
 // describes; testdata/scalars/scripts.txt covers the rest of its rules.
 func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	query := client.Query(`SELECT @p; EXECUTE IMMEDIATE "SELECT @p"`)
@@ -73,6 +75,7 @@ func TestExecuteImmediateSeesNoQueryParameters(t *testing.T) {
 }
 
 func TestMultiStatementQueryRejectsJobOptionsOfASingleStatement(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 
@@ -101,6 +104,7 @@ func TestMultiStatementQueryRejectsJobOptionsOfASingleStatement(t *testing.T) {
 }
 
 func TestChildJobsOfAMultiStatementQueryAreUnsupported(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	job, _, err := runScript(t, client, "", "SELECT 1; SELECT 2")
@@ -116,6 +120,7 @@ func TestChildJobsOfAMultiStatementQueryAreUnsupported(t *testing.T) {
 // Temporary tables follow
 // https://cloud.google.com/bigquery/docs/multi-statement-queries#temporary_tables.
 func TestTemporaryTablesLastForTheirMultiStatementQuery(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_temporary_tables")
@@ -181,6 +186,7 @@ SELECT a FROM t;`)
 // https://cloud.google.com/bigquery/docs/multi-statement-queries#write_a_multi-statement_query
 // excludes TEMP function declarations followed by one SELECT from multi-statement queries.
 func TestTemporaryFunctionQueryReportsSelectAndResolvedTypes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	job, status, err := runScript(t, client, "", `
@@ -207,6 +213,7 @@ SELECT AddFourAndDivide(3, 2) AS answer;`)
 }
 
 func TestTemporaryFunctionsAcceptNamedQueryParameters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	query := client.Query(`CREATE TEMP FUNCTION StringIdentity(value STRING) AS (value);
@@ -229,6 +236,7 @@ SELECT StringIdentity(@value) AS answer`)
 // Transaction changes persist only on commit, including when a script exits or fails.
 // https://cloud.google.com/bigquery/docs/transactions
 func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_transactions")
@@ -281,6 +289,7 @@ func TestTransactionsPersistOnlyCommittedChanges(t *testing.T) {
 // other clients run meanwhile, and the transaction commits.
 // https://cloud.google.com/bigquery/docs/transactions
 func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_transaction_expiration")
@@ -337,6 +346,7 @@ func TestTransactionsLeaveExpirationToOtherQueries(t *testing.T) {
 // STRUCT names and order, including duplicate names, follow the data types reference:
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#struct_type
 func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	rows, err := client.Query(`SELECT STRUCT(1 AS duplicate, 'x' AS duplicate,
       STRUCT(2 AS _field_2, 'y' AS _field_2) AS nested) AS s`).Read(context.Background())
@@ -361,6 +371,7 @@ func TestStructResultSchemaPreservesLogicalNames(t *testing.T) {
 // DML, scalar subqueries and dynamic SQL. Explicit table paths keep their meaning.
 // https://cloud.google.com/bigquery/docs/reference/system-variables
 func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	const otherProject = "go-script-defaults-other"
@@ -466,6 +477,7 @@ func TestDatasetSystemVariablesResolveSubsequentStatements(t *testing.T) {
 // bqanswers confirmed that both variables initially return NULL without a request default.
 // This query deliberately has no DefaultDatasetID, unlike the scalar fixtures.
 func TestDatasetSystemVariablesInitiallyNull(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	rows, err := newClient(t).Query("SELECT 1; SELECT @@dataset_project_id, @@dataset_id").Read(ctx)
 	if err != nil {

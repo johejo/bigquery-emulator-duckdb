@@ -8,6 +8,7 @@ import (
 )
 
 func TestJobStatisticsDescribeTheStatement(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_statement_type")

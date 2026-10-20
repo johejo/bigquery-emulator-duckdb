@@ -133,6 +133,7 @@ func duration(value any, unit schema.TimeUnitType) time.Duration {
 // Extract jobs write CSV, newline-delimited JSON and Parquet in BigQuery's formats, with the
 // options a job sets, and count the files they write.
 func TestExtract(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	bucket := newExtractBucket(t, "go-extract")
@@ -266,6 +267,7 @@ func TestExtract(t *testing.T) {
 // An extract fails for what BigQuery cannot export: a nested table to CSV, Avro, a view, or a URI
 // with a wildcard in its bucket name or more than one wildcard.
 func TestExtractErrors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	newExtractBucket(t, "go-extract-errors")

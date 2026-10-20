@@ -13,6 +13,7 @@ import (
 // Tables and views keep the description, friendly name and labels that tables.insert, DDL OPTIONS
 // and tables.patch give them.
 func TestTableMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_metadata")
@@ -96,6 +97,7 @@ func TestTableMetadata(t *testing.T) {
 // Tables keep the partitioning and clustering that tables.insert and DDL give them. Partitioning
 // cannot change, and what the emulator does not emulate is rejected.
 func TestTablePartitioning(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_partitioning")

@@ -8,6 +8,7 @@ import (
 )
 
 func TestApproxTopSumParametersAndSchema(t *testing.T) {
+	t.Parallel()
 	query := newClient(t).Query(`SELECT APPROX_TOP_SUM(x, w, @n) AS top
 		FROM UNNEST([STRUCT('x' AS x, 5 AS w), ('x', 1), ('y', 2)])`)
 	query.Parameters = []bigquery.QueryParameter{{Name: "n", Value: int64(2)}}
@@ -41,6 +42,7 @@ func TestApproxTopSumParametersAndSchema(t *testing.T) {
 }
 
 func TestApproxTopSumInvalidCountParameter(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	for _, count := range []bigquery.NullInt64{
 		{Int64: 0, Valid: true},

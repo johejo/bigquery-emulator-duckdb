@@ -12,6 +12,7 @@ import (
 // A NEWLINE_DELIMITED_JSON load writes NULL to a NULLABLE field that rows omit or give as null,
 // even when no row of the files has a value for it, including BIGNUMERIC fields.
 func TestJSONLoadNullColumns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_json_load_nulls")

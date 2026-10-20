@@ -10,6 +10,7 @@ import (
 // SQL-only rejections use the Go client's Run/Wait path; request options and API lifecycle
 // checks stay in their own Go tests. Each query is independent and has no default dataset.
 func TestQueryErrors(t *testing.T) {
+	t.Parallel()
 	paths, err := filepath.Glob("testdata/errors/*.txt")
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("no cases in testdata/errors: %v", err)

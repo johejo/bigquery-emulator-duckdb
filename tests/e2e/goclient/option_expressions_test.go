@@ -17,6 +17,7 @@ import (
 // expression does not, a bare script variable is ambiguous, CURRENT_TIMESTAMP() is not after the
 // creation time, and the messages.
 func TestOptionExpressions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_option_expressions")

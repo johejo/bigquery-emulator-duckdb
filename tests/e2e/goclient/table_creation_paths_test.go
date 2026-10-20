@@ -167,6 +167,7 @@ func informationSchemaOf(schema bigquery.Schema) (columns, paths [][]bigquery.Va
 // Tables created by tables.insert, DDL, and query, load and copy jobs each take the schema,
 // defaults and metadata that path gives them, and tables.get and INFORMATION_SCHEMA agree on it.
 func TestTableCreationPaths(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_creation_paths")
@@ -285,6 +286,7 @@ func TestTableCreationPaths(t *testing.T) {
 // Writes into an existing table keep or replace its schema, defaults and metadata as their
 // disposition says, and omitted columns take their defaults.
 func TestWritesToExistingTables(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_writes_to_existing_tables")
@@ -372,6 +374,7 @@ func TestWritesToExistingTables(t *testing.T) {
 // A replacement that fails, by any path, leaves the table it would have replaced as it was:
 // its rows, schema, defaults, metadata and creation time.
 func TestFailedReplacementsKeepTheTable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_failed_replacements")

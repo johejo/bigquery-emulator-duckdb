@@ -17,6 +17,7 @@ import (
 // NULL parameters are documented by the bq --parameter flag:
 // https://cloud.google.com/bigquery/docs/reference/bq-cli-reference#bq_query
 func TestQueryParameterValuesAndSchema(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	for _, c := range []struct {
 		name   string
@@ -84,6 +85,7 @@ func TestQueryParameterValuesAndSchema(t *testing.T) {
 }
 
 func TestQueryParameterNamesAreCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	query := newClient(t).Query("SELECT @id AS lower, @ID AS upper")
 	query.Parameters = []bigquery.QueryParameter{{Name: "Id", Value: int64(1)}}
 	rows, err := query.Read(context.Background())
@@ -100,6 +102,7 @@ func TestQueryParameterNamesAreCaseInsensitive(t *testing.T) {
 }
 
 func TestQueryRejectsUndeclaredParameters(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	for _, c := range []struct {
 		name       string
@@ -125,6 +128,7 @@ func TestQueryRejectsUndeclaredParameters(t *testing.T) {
 // cases, including the errors, which name the parameter even for an element or a field. The
 // emulator does not support a clockwise shell, which encloses more than a hemisphere.
 func TestGeographyQueryParameters(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	geography := func(value string) bigquery.NullGeography {
 		return bigquery.NullGeography{GeographyVal: value, Valid: true}

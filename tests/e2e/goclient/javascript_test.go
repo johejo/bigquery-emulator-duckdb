@@ -6,6 +6,7 @@ import "testing"
 // https://cloud.google.com/bigquery/docs/user-defined-functions describes.
 // Run separate jobs in order so that a JavaScript global leaking between them changes the result.
 func TestJavaScriptUdfKeepsNoStateAcrossQueries(t *testing.T) {
+	t.Parallel()
 	client := newClient(t)
 	const sql = `CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS """
 		globalThis.n = (globalThis.n || 0) + 1;

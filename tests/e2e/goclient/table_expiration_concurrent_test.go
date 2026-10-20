@@ -18,6 +18,7 @@ import (
 // Other runbooks query separate datasets, but their expiration sweeps are global.
 // Successful mutations must still return their resource when those sweeps run concurrently.
 func TestTableExpirationConcurrentMutations(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_expiration_mutations")
@@ -122,6 +123,7 @@ func TestTableExpirationConcurrentMutations(t *testing.T) {
 // Readers arriving together at an expired table must all see absence, rather than one of them
 // failing while another deletes it.
 func TestTableExpirationConcurrentReads(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
 	dataset := client.Dataset("go_expiration_reads")

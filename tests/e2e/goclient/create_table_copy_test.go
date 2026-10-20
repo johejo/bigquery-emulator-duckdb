@@ -15,6 +15,7 @@ import (
 // partitioning, clustering and options, which OPTIONS replace. A clone also records the table it
 // was cloned from and when.
 func TestCreateTableCopyAndClone(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_create_table_copy")

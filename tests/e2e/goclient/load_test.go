@@ -33,6 +33,7 @@ func loadGCS(ctx context.Context, table *bigquery.Table, schema bigquery.Schema,
 // matches across subfolders, and an object name is matched literally, escaped or not. A load
 // without a schema appends to the table's own.
 func TestGCSLoadWildcards(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_gcs_load")
@@ -77,6 +78,7 @@ func TestGCSLoadWildcards(t *testing.T) {
 
 // A load that names no object, or an object it cannot read, fails and leaves the table's rows.
 func TestGCSLoadErrors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_gcs_load_errors")
@@ -115,6 +117,7 @@ func TestGCSLoadErrors(t *testing.T) {
 
 // A gzip-compressed file loads whether it is uploaded or read from GCS.
 func TestGzipLoad(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_gzip_load")
@@ -153,6 +156,7 @@ func TestGzipLoad(t *testing.T) {
 // CSV and JSON loads keep every digit of a BIGNUMERIC or NUMERIC, which reading the text as a
 // DuckDB number or FLOAT64 would lose, at any depth. The values are the bounds BigQuery documents.
 func TestBigNumericTextLoads(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_bignumeric_text_load")

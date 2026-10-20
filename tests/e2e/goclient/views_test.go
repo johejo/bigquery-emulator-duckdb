@@ -14,6 +14,7 @@ import (
 )
 
 func TestViewLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_views")
@@ -116,6 +117,7 @@ func TestViewLifecycle(t *testing.T) {
 // reject them as destinations or sources.
 // https://cloud.google.com/bigquery/docs/views
 func TestViewStatements(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_view_statements")

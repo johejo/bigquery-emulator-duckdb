@@ -12,6 +12,7 @@ import (
 // Column schemas declare REQUIRED mode, but queries do not propagate it:
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
 func TestCreateTableAsSelectColumnModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_ctas_column_modes")
@@ -66,6 +67,7 @@ func TestCreateTableAsSelectColumnModes(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/default-values#limitations
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_table_add_column_statement
 func TestAlterTableAddColumnModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_add_column_modes")

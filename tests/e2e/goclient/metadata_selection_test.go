@@ -12,6 +12,7 @@ import (
 )
 
 func TestDatasetLabelFilter(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClientForProject(t, "go-dataset-filter")
 	for id, labels := range map[string]map[string]string{
@@ -73,6 +74,7 @@ func TestDatasetLabelFilter(t *testing.T) {
 }
 
 func TestTableMetadataView(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_metadata_view")

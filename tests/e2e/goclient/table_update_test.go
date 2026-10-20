@@ -12,6 +12,7 @@ import (
 // Table.Update sends tables.patch, which may add NULLABLE and REPEATED fields after the existing
 // ones, records included, relax REQUIRED to NULLABLE and change descriptions, but nothing else.
 func TestTableUpdateSchema(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_update")
@@ -139,6 +140,7 @@ func TestTableUpdateSchema(t *testing.T) {
 
 // A view's query can be replaced; its schema follows the new query.
 func TestTableUpdateViewQuery(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_view_update")

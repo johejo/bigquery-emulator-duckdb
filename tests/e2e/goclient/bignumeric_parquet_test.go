@@ -101,6 +101,7 @@ func loadParquet(ctx context.Context, table *bigquery.Table, path string, s bigq
 // BigQuery's export writes or narrower; and a table's BIGNUMERIC columns export as DECIMAL(76,
 // 38), which loads back into the same values.
 func TestBigNumericParquet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_bignumeric_parquet")
@@ -273,6 +274,7 @@ func TestBigNumericParquet(t *testing.T) {
 
 // A load that would change a value or BigQuery would treat differently fails.
 func TestBigNumericParquetErrors(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_bignumeric_parquet_errors")

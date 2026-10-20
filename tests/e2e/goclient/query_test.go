@@ -12,6 +12,7 @@ import (
 )
 
 func TestQueryWithNamedParameters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	created := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
 
@@ -58,6 +59,7 @@ func TestQueryWithNamedParameters(t *testing.T) {
 }
 
 func TestQueryWithPositionalParameters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	query := newClient(t).Query("SELECT ? AS a, ? AS b")
 	query.Parameters = []bigquery.QueryParameter{{Value: int64(1)}, {Value: "b"}}
@@ -82,6 +84,7 @@ func TestQueryWithPositionalParameters(t *testing.T) {
 }
 
 func TestDryRunReportsTheSchemaWithoutRunning(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	query := newClient(t).Query("SELECT 1 AS n, 'x' AS s")
 	query.DryRun = true
@@ -102,6 +105,7 @@ func TestDryRunReportsTheSchemaWithoutRunning(t *testing.T) {
 // TIMESTAMP and TIME hold microseconds, so a literal with more than six fractional digits is
 // invalid, as in BigQuery, rather than truncated.
 func TestSubmicrosecondLiterals(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	for sql, want := range map[string]string{
@@ -117,6 +121,7 @@ func TestSubmicrosecondLiterals(t *testing.T) {
 // A query that fails while it runs is an error from Read, whether the client gets its results
 // from jobs.query or from jobs.getQueryResults, rather than an empty result.
 func TestQueryRuntimeError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	query := client.Query("SELECT ERROR('boom')")
@@ -138,6 +143,7 @@ func TestQueryRuntimeError(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#implicit_aliases
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
 func TestResultSchema(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	describe := func(schema bigquery.Schema) string {
@@ -258,6 +264,7 @@ func TestResultSchema(t *testing.T) {
 // A parameter keeps the type it is declared with: BigQuery does not coerce a STRING to a number,
 // and a cast of one that is not a number fails.
 func TestQueryParameterTypes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	for sql, value := range map[string]string{"SELECT @s * 2": "2", "SELECT CAST(@s AS INT64)": "あ"} {
@@ -271,6 +278,7 @@ func TestQueryParameterTypes(t *testing.T) {
 
 // A result larger than DuckDB reads at once comes back whole and in order, arrays included.
 func TestLargeResult(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	it, err := newClient(t).Query("SELECT x, [x, -x] AS a FROM UNNEST(GENERATE_ARRAY(0, 4999)) AS x ORDER BY x").Read(ctx)
 	if err != nil {
@@ -302,6 +310,7 @@ func TestLargeResult(t *testing.T) {
 // A DML statement reports the rows it changed, none where it matches none.
 // https://cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2
 func TestDMLAffectedRows(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_dml_affected_rows")

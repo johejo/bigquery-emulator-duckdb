@@ -13,6 +13,7 @@ import (
 // Check the Go client's typed decoding and result schema, including nested INTERVALs.
 // The values follow BigQuery's data-types#interval_type construction examples.
 func TestIntervalResults(t *testing.T) {
+	t.Parallel()
 	rows, err := newClient(t).Query(`SELECT
 		INTERVAL '8 -20 17' MONTH TO HOUR AS i,
 		EXTRACT(HOUR FROM INTERVAL 1500 MINUTE) AS h,
@@ -53,6 +54,7 @@ func TestIntervalResults(t *testing.T) {
 // INTERVAL query parameters retain their independent month, day and microsecond parts.
 // EXTRACT follows https://cloud.google.com/bigquery/docs/reference/standard-sql/interval_functions#extract.
 func TestIntervalParameters(t *testing.T) {
+	t.Parallel()
 	query := newClient(t).Query(`SELECT @i AS i, EXTRACT(MONTH FROM @i) AS m,
 		EXTRACT(MICROSECOND FROM @i) AS us, EXTRACT(DAY FROM @i) AS d, @a AS a`)
 	value := &bigquery.IntervalValue{Years: 1, Months: 2, Days: -3, Hours: 4, Minutes: 5, Seconds: 6,
@@ -80,6 +82,7 @@ func TestIntervalParameters(t *testing.T) {
 // tabledata.insertAll rows in the canonical form, and reads back each value's month, day and time
 // parts.
 func TestIntervalColumns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_interval_columns")
@@ -150,6 +153,7 @@ func TestIntervalColumns(t *testing.T) {
 // https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
 // Loads from other formats, whose forms BigQuery does not document, are unsupported.
 func TestIntervalLoad(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_interval_load")

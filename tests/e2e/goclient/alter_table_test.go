@@ -11,6 +11,7 @@ import (
 )
 
 func TestAlterTableAddColumn(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_alter")
@@ -108,6 +109,7 @@ func TestAlterTableAddColumn(t *testing.T) {
 }
 
 func TestAlterTableDropColumnAndRename(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_alter_drop")
@@ -185,6 +187,7 @@ func TestAlterTableDropColumnAndRename(t *testing.T) {
 }
 
 func TestAlterTableSetOptions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_alter_options")
@@ -244,6 +247,7 @@ func TestAlterTableSetOptions(t *testing.T) {
 }
 
 func TestAlterTableAlterColumnSetOptions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_alter_column_options")
@@ -312,6 +316,7 @@ func TestAlterTableAlterColumnSetOptions(t *testing.T) {
 // Expected behavior follows BigQuery's ALTER COLUMN SET/DROP DEFAULT documentation:
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#alter_column_set_default_statement
 func TestAlterTableColumnDefault(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_alter_default")

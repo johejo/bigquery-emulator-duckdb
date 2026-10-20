@@ -18,6 +18,7 @@ import (
 // returns each as WKT, and queries read the columns as GEOGRAPHY. The WKT and coordinates are
 // those of scalars/geography.txt and scalars/geography_linestring.txt.
 func TestGeographyColumns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_geography_columns")
