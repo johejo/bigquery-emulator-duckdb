@@ -1,429 +1,243 @@
-# Query and API behavior
+# Query and API limits
 
-This page describes behavior that the generated [SQL](sql.md), [function](functions.md) and
-[REST](api.md) tables cannot show, since they check only that a form runs. Deliberate differences
-from BigQuery are listed in the [README](../README.md#compatibility), and Storage API behavior in
-its [guide](storage-api.md).
+This page records emulator-specific limits and behavior that the generated [SQL](sql.md),
+[function](functions.md) and [REST](api.md) support tables cannot show. For supported features,
+use BigQuery's documentation for their normal semantics. The tables check execution, not
+agreement with BigQuery's results or metadata.
+
+Deliberate compatibility exceptions are listed in the [README](../README.md#compatibility).
+Storage API usage and limits are in its [guide](storage-api.md).
 
 ## Jobs
 
-Jobs finish before `jobs.insert` or `jobs.query` returns, so `jobs.cancel` returns the finished job,
-and `jobs.list` returns no jobs for a `stateFilter` of `pending` or `running`. Only GoogleSQL is
-supported. Statements are analyzed against the existing tables and parameter types; unsupported SQL
-constructs fail as `invalidQuery`, naming the construct.
+Jobs finish before `jobs.insert` or `jobs.query` returns. Consequently, `jobs.cancel` returns the
+finished job, and `jobs.list` returns no jobs for a `stateFilter` of `pending` or `running`.
+Unsupported SQL constructs fail as `invalidQuery`, naming the construct.
 
-Multi-statement queries create no child jobs: `jobs.list` leaves out the ones BigQuery lists and
-rejects the `parentJobId` of a multi-statement query.
+Multi-statement queries create no child jobs: `jobs.list` omits them and rejects `parentJobId`.
 
 ### Locations
 
-A job runs in the location its request names, `location` for `jobs.query` and
-`jobReference.location` for `jobs.insert`. Otherwise it runs where the datasets and
-`INFORMATION_SCHEMA` regions its query names are, as BigQuery infers it before running the query,
-and in the `US` when they are in several locations or it names none; `INFORMATION_SCHEMA.SCHEMATA`
-without a region qualifier is the `US` region's. A query that names none, such as one built by
-`EXECUTE IMMEDIATE`, runs where the first dataset or connection it uses is. Every dataset a job
-reads or writes must be in that location: a job that uses one elsewhere fails with `notFound`, and
-the location that `CREATE SCHEMA` names must be the job's too. Copies to a dataset in another
-location, which BigQuery supports, are unsupported. `jobs.get`, `jobs.getQueryResults`,
-`jobs.cancel` and `jobs.delete` find a job outside the `US` and `EU` multi-regions only when the
-request names its location. A view created with `tables.insert` reads only tables in its dataset's
-location.
+Copies across dataset locations are unsupported. To retrieve, cancel or delete a job outside the
+`US` and `EU` multi-regions, supply its location to `jobs.get`, `jobs.getQueryResults`,
+`jobs.cancel` or `jobs.delete`.
 
 ### Loads, extracts and copies
 
-Loads and extracts also accept local paths. Loads read CSV, newline-delimited JSON and Parquet. A
-Parquet DECIMAL wider than 38 digits loads only into BIGNUMERIC, which schema detection picks only
-when `decimalTargetTypes` includes it. Parquet files whose schemas differ do not load
-when one has a nullable LIST, or a group of one field that DuckDB reads as the field, as a LIST
-is without `parquetOptions.enableListInference`. Query and load jobs cannot partition or cluster their
-destination table, and loads reject `destinationTableProperties`.
+Loads and extracts also accept local paths. Their limits are:
 
-Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns. They write a
-BIGNUMERIC to Parquet as a `DECIMAL(76, 38)` of `BYTE_ARRAY` rather than `FIXED_LEN_BYTE_ARRAY`.
+- Parquet DECIMAL values wider than 38 digits require BIGNUMERIC; schema detection selects it
+  only when `decimalTargetTypes` includes it.
+- Parquet files with differing schemas cannot load if one contains a nullable LIST or a
+  single-field group that DuckDB reads as its field, including a LIST without
+  `parquetOptions.enableListInference`.
+- Query and load jobs cannot partition or cluster their destination table. Loads reject
+  `destinationTableProperties`.
+- Extracts write the whole table to one file and reject INTERVAL, RANGE and GEOGRAPHY columns.
+  BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
+  `FIXED_LEN_BYTE_ARRAY`.
+- A copy job's `destinationExpirationTime` is accepted only when creating its destination.
 
 ## Datasets
 
-A dataset is in the location that `datasets.insert` or `CREATE SCHEMA` names, the `US` unless
-`datasets.insert` names one, and the [job's location](#locations) unless `CREATE SCHEMA` does. The
-locations are those BigQuery lists for datasets, compared without case; BigQuery Omni locations are
-unsupported. A dataset cannot move: `ALTER SCHEMA SET OPTIONS` rejects a location as BigQuery does,
-and `datasets.patch` and `datasets.update` reject another location as unsupported. A table is in its dataset's location, and the
-`INFORMATION_SCHEMA` region qualifier `` `region-REGION` ``, whose `region-` is in lower case,
-covers the datasets of the project in that location.
+BigQuery Omni locations, default partition expiration and access controls are unsupported.
+`datasets.patch` and `datasets.update` reject changes to the dataset's location.
 
-Datasets keep a description, friendly name, labels, default table expiration and [default rounding
-mode](#rounding-modes), which `CREATE SCHEMA`, `ALTER SCHEMA SET OPTIONS` and the `datasets` methods set; other options and fields, such
-as default partition expiration and access controls, are unsupported. A table or view created in a
-dataset with a default table expiration, by DDL, `tables.insert` or a job that creates its
-destination, expires that long after its creation time unless it sets an expiration of its own.
-Changing the default leaves existing tables as they are, and a job that replaces an existing table
-with `WRITE_TRUNCATE` does not apply it. Temporary tables of scripts do not take it either.
-`default_table_expiration_days` is rounded to milliseconds. `INFORMATION_SCHEMA.SCHEMATA` returns NULL last modified times
-and NULL for options other than the location; `SCHEMATA_OPTIONS` lists the options a dataset
-keeps and sets. Datasets created before the emulator recorded
-creation times have none: `datasets.get` omits `creationTime`, and `SCHEMATA` returns NULL.
+`INFORMATION_SCHEMA.SCHEMATA` returns NULL last modified times and NULL options other than the
+location. Datasets created before the emulator recorded creation times have no `creationTime`
+in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ## Tables
 
 ### Options and expiration
 
-Tables keep a description, friendly name, labels, expiration and [default rounding
-mode](#rounding-modes), and columns a description and a rounding mode, which DDL `OPTIONS` and the
-`tables` methods set; other options, such as partition expiration, are unsupported. Expiration comes from
-REST `expirationTime`, DDL `expiration_timestamp`, or the `destinationExpirationTime` of a copy job
-that creates its destination; a copy job with one to an existing table is rejected. Tables and
-views created before the emulator recorded creation times have none: `tables.get` omits
-`creationTime`, and `INFORMATION_SCHEMA.TABLES` returns NULL. `INFORMATION_SCHEMA.TABLE_OPTIONS`
-lists the options a table or view keeps and sets.
+Table options are limited to description, friendly name, labels, expiration and
+[default rounding mode](#rounding-modes); column options to description and rounding mode.
+Partition expiration is unsupported.
 
-A DDL option's value is a literal or a constant expression of query parameters and the supported
-scalar functions, which the backend evaluates when the statement runs; the functions BigQuery
-excludes, such as `REPEAT` and `RAND`, fail, and other expressions, such as a parenthesized script
-variable, are unsupported. As in BigQuery, a STRING literal converts to the TIMESTAMP of
-`expiration_timestamp`, and a bare identifier that names a script variable is an error. Expired tables and views are deleted lazily when the catalog is read,
-including before query analysis, and are treated as missing.
+DDL option values accept literals and constant expressions using query parameters and supported
+scalar functions. Other expressions, such as a parenthesized script variable, are unsupported.
+
+Expired tables and views are deleted when the catalog is read, including before query analysis.
+Tables and views created before the emulator recorded creation times have no `creationTime` in
+`tables.get`, and NULL creation times in `INFORMATION_SCHEMA.TABLES`.
 
 ### Partitioning and clustering
 
-Tables keep partitioning on a column or an integer range, and clustering. Ingestion-time
-partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) is unsupported, and partitions do not expire.
-`INFORMATION_SCHEMA.PARTITIONS` counts the rows of each partition when it is queried. The emulator
-keeps no storage statistics, so its byte counts are 0, as `tables.get` reports `numBytes`, its
-`last_modified_time` is NULL, and every partition is in `ACTIVE` storage.
+Ingestion-time partitioning (`_PARTITIONTIME`, `_PARTITIONDATE`) and partition expiration are
+unsupported. `INFORMATION_SCHEMA.PARTITIONS` counts rows when queried. Storage byte counts are 0,
+including `tables.get`'s `numBytes`; partition `last_modified_time` is NULL and storage tier is
+always `ACTIVE`.
 
 ### Rounding modes
 
-NUMERIC and BIGNUMERIC columns and STRUCT fields keep the rounding mode that DDL `rounding_mode` or
-a schema's `roundingMode` sets, which `tables.get` and the `rounding_mode` of
-`INFORMATION_SCHEMA.COLUMNS` and `COLUMN_FIELD_PATHS` return; `ROUNDING_MODE_UNSPECIFIED` leaves it
-unset. A rounding mode on another type is unsupported.
+`ROUND_HALF_EVEN` writes are supported for DML, `CREATE TABLE AS SELECT`, query and load jobs
+that append to an existing table, and `tabledata.insertAll`, including parameterized fields
+inside STRUCTs and ARRAYs. The following forms are rejected:
 
-Tables and datasets keep a default rounding mode, from DDL `default_rounding_mode` or a resource's
-`defaultRoundingMode`. A table created in a dataset, by DDL, `tables.insert` or a query or load job
-that creates its destination, takes the dataset's default unless it sets its own; temporary tables
-do not. The NUMERIC and BIGNUMERIC fields that creation, `ALTER TABLE ADD COLUMN` or a schema update
-adds without a rounding mode take the table's default, which `tables.get` and `INFORMATION_SCHEMA`
-then report as theirs; changing a default later keeps the modes of existing fields and tables.
-Views cannot have a default.
-
-Copies keep the rounding modes of the source's fields. `CREATE TABLE LIKE`, `COPY` and `CLONE` keep
-the source's default unless their `OPTIONS` set another; in a dataset with a default, `LIKE` takes
-it when the source has none, while `COPY` and `CLONE` keep the source's unset default. A table a
-copy job creates takes no default, neither the source's nor the dataset's. A job that replaces a
-table with `WRITE_TRUNCATE` keeps its default, which the new fields do not take, and appending
-keeps it too.
-
-A `tables.patch` or `tables.update` that changes the default and adds NUMERIC or BIGNUMERIC fields
-is rejected, since which default the fields take is not known.
-
-DML, `CREATE TABLE AS SELECT`, query and load jobs that append to an existing table, and
-`tabledata.insertAll` round the values they write to a parameterized column's scale with its rounding mode,
-`ROUND_HALF_AWAY_FROM_ZERO` when unset, and fail on a value out of its range. They round
-parameterized `ROUND_HALF_EVEN` fields within STRUCTs and ARRAYs too, keeping NULL STRUCTs and
-converting NULL arrays containing those fields to empty arrays. NULL elements in those arrays are
-rejected. Other writes round halfway values away from zero, so they reject `ROUND_HALF_EVEN`
-columns: loads that create a table or replace one with `WRITE_TRUNCATE`, since BigQuery rounds
-2.25 to 2.3 in a field that takes `ROUND_HALF_EVEN` from the dataset's default, copy jobs that
-append to a table of another schema, which BigQuery rejects, and the Storage Write API. Defaults on parameterized `ROUND_HALF_EVEN` columns are also unsupported.
+- Loads that create a table or replace one with `WRITE_TRUNCATE` using `ROUND_HALF_EVEN` columns.
+- Copy jobs that append to `ROUND_HALF_EVEN` columns with a different schema.
+- Storage Write API writes to `ROUND_HALF_EVEN` columns.
+- Defaults on parameterized `ROUND_HALF_EVEN` columns.
+- A `tables.patch` or `tables.update` that both changes the default rounding mode and adds
+  NUMERIC or BIGNUMERIC fields: which default those fields should take is unverified.
 
 ### Column defaults
 
-Column defaults from DDL `DEFAULT` or a schema's `defaultValueExpression` apply alike to tables
-created by DDL, `tables.insert`, and load and copy jobs, and `INFORMATION_SCHEMA.COLUMNS` reports
-them as `column_default`. Defaults accept literals, ARRAY and STRUCT constructors and the supported
-forms of BigQuery's documented default functions; NULL arrays and NULL array elements are rejected.
-Parameterized columns accept literal defaults only, checked against their constraints.
-`tables.update` and `tables.patch` cannot add or change a default, and the Storage Write API cannot
-write to a table with defaults.
+Parameterized columns accept literal defaults only. `tables.update` and `tables.patch` cannot
+add or change defaults, and the Storage Write API cannot write to a table with defaults.
 
 ### ALTER TABLE
 
-`ALTER TABLE` supports `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS` and `ALTER COLUMN`
-with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`, with `IF EXISTS` and `IF NOT EXISTS`. One
-statement may list several `ADD COLUMN`, `DROP COLUMN` or `ALTER COLUMN SET OPTIONS` actions. `ALTER
-COLUMN SET OPTIONS` sets the column's description and rounding mode only. Like BigQuery, `ADD
-COLUMN` rejects a default or top-level `NOT NULL`; add the column first, then use `SET DEFAULT`.
-Other actions are unsupported.
-
-`SET DEFAULT` and `DROP DEFAULT` change the default for future writes and the column's
-`defaultValueExpression`. `SET DEFAULT NULL` removes a nullable column's default, and a NULL default
-for a required column is rejected. `DROP DEFAULT` fails if the column has no default.
+Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, and `ALTER COLUMN`
+with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
+have the limits described under [Options and expiration](#options-and-expiration).
 
 ### CREATE TABLE AS SELECT
 
-An explicit column schema's top-level `NOT NULL` creates a REQUIRED column and rejects NULL
-values, both in the query's rows and in later writes. Without an explicit column schema, the
-query does not inherit REQUIRED mode from its source. Nested `NOT NULL` in an explicit schema
-or one inherited by `LIKE AS SELECT` is unsupported.
+Nested `NOT NULL` in an explicit column schema or one inherited by `LIKE AS SELECT` is unsupported.
 
 ### Copies and clones
 
-`CREATE TABLE LIKE` copies a table's schema, partitioning, clustering, description, friendly name
-and labels; with `AS SELECT`, it fills the new table with the query's rows. `CREATE TABLE COPY` also
-copies the rows, and `CREATE TABLE CLONE` also records the table it was cloned from and when, which
-`tables.get` and `INFORMATION_SCHEMA.TABLES` return. All three keep the source's column defaults,
-and reject a view as BigQuery does. A temporary table can be made only from a temporary table, as
-BigQuery requires.
+For `CREATE TABLE LIKE`, `COPY` and `CLONE`, see the [SQL support table](sql.md) for rejected
+forms and [Rounding modes](#rounding-modes) for write restrictions.
 
 ### Schema changes
 
-`tables.patch` and `tables.update` change the schema, view definition, description, friendly name,
-labels, clustering and expiration, and ignore other fields. Neither partitioning nor a view's schema
-can change. `tables.update` keeps a schema or view definition that the request leaves out rather
-than clearing it.
+`tables.patch` and `tables.update` change schema, view definition, description, friendly name,
+labels, clustering and expiration, and ignore other fields. Partitioning and a view's schema
+cannot change. `tables.update` keeps a schema or view definition omitted from the request.
 
 ### Views
 
-Logical views keep their GoogleSQL definition, schema, description, friendly name, labels and
-expiration; other view options are unsupported. `INFORMATION_SCHEMA.VIEWS` returns their original
-GoogleSQL definitions at dataset or region scope. Each query resolves a view
-against its own project and dataset, including the current definitions of persistent SQL UDFs
-and table functions. A changed UDF return type is reflected in query results; the stored view
-schema is unchanged. Temporary, recursive and value-table views, and
-views that read temporary tables, are unsupported.
+Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
+View options are limited to description, friendly name, labels and expiration.
+
+Queries resolve views using the current definitions of persistent SQL UDFs and table functions.
+A changed UDF return type is reflected in query results, while the stored view schema stays
+unchanged.
 
 ## Types
 
 ### STRUCT values
 
-Query values may have anonymous or duplicate STRUCT field names; stored table columns require
-distinct nonempty names. A STRUCT without fields, `STRUCT<>`, can only be passed to JSON functions,
-such as `TO_JSON` and `JSON_ARRAY_APPEND`, and to ARRAY constructors; aggregates and other functions
-reject it. As in BigQuery, a query result cannot contain one at any depth, and `SELECT AS STRUCT`
-and `SELECT AS VALUE` results cannot have anonymous fields. Casts between STRUCT types match fields by position,
-and JSON functions preserve the original field names, including in nested arrays and structs.
-Equality, `IN`, `CASE` and `NULLIF` compare STRUCTs field by field by position, with BigQuery's
-NULL semantics. As in BigQuery, `IS DISTINCT FROM` takes the fields of a STRUCT but not the STRUCT
-itself, and no value is cast to JSON other than a JSON value or `NULL`; use `TO_JSON` or
-`PARSE_JSON` instead. As in BigQuery, ARRAYs, and STRUCTs that contain them, can be grouped but
-cannot be compared, ordered or passed to aggregate functions with DISTINCT. ARRAYs with NULL
-elements, also inside STRUCTs, can be used in a query but fail in its result and in the tables a
-statement writes, as in BigQuery. BigQuery also rejects
-STRUCT partition keys and STRUCT columns in `UNION DISTINCT`, `INTERSECT DISTINCT` and
-`EXCEPT DISTINCT`; the emulator rejects them too. `INTERSECT ALL` and `EXCEPT ALL` are also rejected,
-as BigQuery only supports `DISTINCT` for those operations.
+An empty `STRUCT<>` can be passed only to JSON functions and ARRAY constructors; aggregates and
+other functions reject it. BigQuery's restrictions on empty STRUCTs in query results also apply.
 
 ### INTERVAL values
 
-INTERVAL values keep separate month, day and microsecond components. Literals, constructors, query
-parameters, `JUSTIFY` functions, `EXTRACT`, casts to and from STRING, `TO_JSON`, `TO_JSON_STRING`,
-`JSON_ARRAY`, `JSON_OBJECT` and `JSON_SET`, which encode them as ISO 8601 durations, `SUM` and `AVG`, `ARRAY_AGG`, also over STRUCT values with INTERVAL fields, `+`, `-` and unary `-` with INTERVAL
-operands, `*` between INTERVAL and INT64 values, `/` of an INTERVAL by an INT64, and `-` between DATE, DATETIME, TIMESTAMP or TIME values are supported. `+` adds an INTERVAL's months, days
-and time in turn, as GoogleSQL does, and fails where a step leaves the range, also when the result
-is within it; `-` adds the negated INTERVAL, and TIMESTAMP values take no months or years. `*` multiplies the months, days and time apart, and
-fails where one leaves the range. `/` divides the months, carries their remainder into the days and
-theirs into the time, and truncates the time to microseconds. Tables store INTERVAL columns, also in ARRAYs and STRUCTs.
-`tabledata.insertAll` rows give them as text in the canonical form, in full or in part, as query
-parameters do, and CSV loads read only the full `Y-M D H:M:S[.F]` form BigQuery documents.
-Comparisons, `IN`, `BETWEEN`, `ORDER BY`, `GROUP BY`, also with grouping sets, `DISTINCT`, `PARTITION BY`,
-`UNION`, `INTERSECT` and `EXCEPT` with `DISTINCT`, `COUNT`, `MIN` and `MAX`, and `SUM` and `AVG` with
-`DISTINCT` compare lengths with 30 days to a month and 24 hours to a day, as GoogleSQL does, so `INTERVAL 1 MONTH` equals
-`INTERVAL 30 DAY`. STRUCT comparisons compare their INTERVAL fields the same way, and `GROUP BY` and
-`DISTINCT` group STRUCT and ARRAY values by the lengths of their INTERVAL fields and elements. Among equal
-values, as in BigQuery, a group, a distinct row, `MIN` and `MAX` return the first in input order, grouping
-sets the first in the whole input, `SUM` and `AVG` with `DISTINCT` count the first, and `ARRAY_AGG`
-with `DISTINCT` keeps the first. As in BigQuery, `ARRAY_AGG` fails on INTERVAL values ordered by
-themselves alone, also with `DISTINCT`, and aggregates with `DISTINCT` fail on STRUCT values with
-INTERVAL fields. `GREATEST`, `LEAST`
-and `NULLIF` fail as in BigQuery. `PARTITION BY` and distinct set operations over ARRAY values with
-INTERVAL elements, other
-arithmetic, other aggregates, other JSON conversions, loads of
-INTERVAL columns from other formats, extracts of them, and reading them through the Storage API are
-unsupported.
+INTERVAL arithmetic is limited to `+`, `-`, unary `-`, multiplication by INT64 and division by
+INT64, and subtraction between DATE, DATETIME, TIMESTAMP or TIME values. Other limits are:
+
+- `PARTITION BY` and distinct set operations over ARRAYs with INTERVAL elements are unsupported.
+- Aggregates are limited to `SUM`, `AVG`, `ARRAY_AGG`, `COUNT`, `MIN` and `MAX`, subject to
+  BigQuery's own restrictions on INTERVAL inputs.
+- JSON conversions are limited to `TO_JSON`, `TO_JSON_STRING`, `JSON_ARRAY`, `JSON_OBJECT` and
+  `JSON_SET`.
+- Loads accept only CSV, with the full `Y-M D H:M:S[.F]` form. Extracts and Storage API reads
+  are unsupported.
 
 ### RANGE values
 
-`RANGE<DATE>`, `RANGE<DATETIME>` and `RANGE<TIMESTAMP>` values are supported in queries, stored
-columns, query parameters, `tabledata.insertAll` rows, CSV loads and
-[Storage Read sessions](storage-api.md#reading-rows). Functions other than the range functions,
-casts, comparisons, the JSON functions, `FORMAT`, and `COUNT`, `MIN`, `MAX`, `ANY_VALUE`,
-`ARRAY_AGG` and navigation functions are unsupported over them, as are extracts of RANGE columns.
-Loads of RANGE columns from JSON and Parquet fail, as in BigQuery, except that BigQuery loads a
-Parquet group of `start` and `end` as NULL, which the emulator rejects.
+Functions over RANGE values are limited to range functions, casts, comparisons, JSON functions,
+`FORMAT`, `COUNT`, `MIN`, `MAX`, `ANY_VALUE`, `ARRAY_AGG` and navigation functions. Extracts are
+unsupported. JSON and Parquet loads fail, including a Parquet group of `start` and `end` that
+BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-Queries hold a GEOGRAPHY as the S2 points of its vertices, as BigQuery does, and return or store
-it as the WKT BigQuery does, in 15 significant digits. Points, linestrings, polygons and empty
-geographies are supported: from `ST_GEOGPOINT`, `ST_GEOGPOINTFROMGEOHASH`, `ST_MAKELINE`,
-`ST_MAKEPOLYGON` and `ST_GEOGFROMTEXT` of a `POINT`, a `LINESTRING`, a `POLYGON` or a geometry type
-followed by `EMPTY`. All empty geometries return as `GEOMETRYCOLLECTION EMPTY`. Multipart
-geometries, collections and the full polygon are unsupported.
-Functions over them use the [S2 Geometry](https://s2geometry.io/) library; distances use S2's
-Earth radius of 6,371,010 meters, which BigQuery's distances match.
-`ST_DISTANCE` with `use_spheroid` `TRUE` is unsupported for nonempty inputs. Stored GEOGRAPHY columns read as the STRING they hold, and
-GEOGRAPHY query parameters are unsupported.
+Stored GEOGRAPHY columns read as STRING, and GEOGRAPHY query parameters are unsupported.
+Multipart geometries, collections and the full polygon are unsupported. Additional limits are:
 
-`ST_X` and `ST_Y` give a vertex's coordinates as S2 converts them back from its point.
-`ST_GEOGFROMTEXT` and `ST_MAKELINE` build a linestring as BigQuery does
-with S2Builder: vertices within a micrometer snap together, a line that folds back merges with
-itself, crossing edges gain the vertex where they cross, and a line that snaps to one point is a
-`POINT`. An edge longer than 135 degrees gains its midpoint, as BigQuery's do. A line that
-BigQuery splits into a `MULTILINESTRING`, such as one that overlaps itself, is unsupported.
-`ST_EQUALS` takes geographies as equal where each point of either is within a
-micrometer of the other. `ST_ASGEOJSON` of a linestring or a polygon is unsupported. `ST_MAXDISTANCE` measures
-over edges, as BigQuery does, though its documentation describes vertices.
+- `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
+- Linestrings that BigQuery splits into a `MULTILINESTRING`, such as overlapping lines, are
+  unsupported.
+- `ST_ASGEOJSON` is unsupported for linestrings and polygons.
+- Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
+  holes that collapse are unsupported.
+- `ST_MAKEPOLYGON` of an empty geography and `ST_GEOGFROMTEXT`'s `oriented`, `planar` and
+  `make_valid` arguments are unsupported.
 
-A polygon is held as S2 holds it: each ring encloses the smaller of the two regions it divides the
-sphere into, so a clockwise ring runs reversed, and a hole is written clockwise. As BigQuery does,
-`ST_GEOGFROMTEXT` and `ST_MAKEPOLYGON` drop a vertex that repeats the one before it, add the
-midpoint of an edge longer than 135 degrees, and reject rings that cross, including at a vertex on
-another edge, holes outside the shell, rings that repeat a vertex later, rings of fewer than three
-distinct vertices and `POLYGON` rings that do not end where they start. Once each ring is valid
-and normalized, vertices within a micrometer of each other, in one ring or several, snap to the one
-S2Builder keeps: a hole that collapses is dropped, and a polygon without holes that collapses is
-the `LINESTRING` or `POINT` it leaves. BigQuery also snaps edges, which may leave a collection, and
-rings that cross or touch at an edge to where they meet; such polygons, and a shell with holes that
-collapses, are unsupported, as are
-`ST_MAKEPOLYGON` of an empty geography, which makes the full polygon, and `ST_GEOGFROMTEXT`'s
-`oriented`, `planar` and `make_valid` arguments.
-`ST_AREA` and `ST_PERIMETER` measure polygons over the sphere.
-
-`ST_INTERSECTS`, `ST_DISJOINT`, `ST_TOUCHES`, `ST_CONTAINS`, `ST_WITHIN`, `ST_COVERS` and
-`ST_COVEREDBY` take a geography's interior as OGC defines it: without a polygon's rings or a
-linestring's endpoints, unless it ends where it starts, while a point is its own interior. As
-BigQuery does, they first snap both geographies together with S2Builder, so that a vertex within a
-micrometer of a vertex or an edge of the other meets it there: a point between a linestring's
-vertices is on it, and one on a polygon's edge is on its boundary.
+`ST_MAXDISTANCE` measures over edges, as BigQuery does, although its documentation describes
+vertices.
 
 ### RANGE_SESSIONIZE
 
-`RANGE_SESSIONIZE` retains every input row and appends `session_range` for DATE, DATETIME and
-TIMESTAMP ranges. The default `MEETS` mode merges touching or overlapping ranges; `OVERLAPS`
-merges only overlapping ranges. Partitioning columns separate sessions, and an empty list
-sessionizes the whole input. Unbounded ends are supported. A NULL range retains its input row
-and receives a NULL `session_range`. Mode names are case sensitive.
-
 The range column, partitioning columns and sessionize option must be non-NULL literals.
-Value tables and INTERVAL or annotated partitioning columns are unsupported. An existing
-`session_range` column is replaced with the computed session range.
+Value tables and INTERVAL or annotated partitioning columns are unsupported.
 
 ### EXTERNAL_QUERY
 
-`EXTERNAL_QUERY` reads from PostgreSQL databases that `--connection` names, standing in for Cloud
-SQL for PostgreSQL connections; the emulator has no Connection API, and connections to MySQL
-are not supported. Spanner connections are described below. `--connection PROJECT.LOCATION.CONNECTION=CONNINFO` takes a libpq
-connection string or URI; a query names the connection by any form BigQuery accepts, the location
-in any case. The emulator prepares the query on the database when it analyzes the statement, so
-the connection ID, query and options must be literals, and it attaches the database to DuckDB,
-read-only, the first time a query reaches it. DuckDB's
-[postgres_scanner](https://github.com/duckdb/duckdb-postgres) extension reads the results.
+Connections to PostgreSQL and Spanner are configured with `--connection`; see the
+[README](../README.md#external-queries) for setup. MySQL is unsupported. The connection ID,
+query and options must be literals, and views that read `EXTERNAL_QUERY` are unsupported.
 
-Columns take the BigQuery types of BigQuery's PostgreSQL mapping, and the types it lists as
-unsupported fail with BigQuery's error. `name`, which `information_schema` uses, is read as
-STRING. Other types, including `bit` and `bit varying`, which BigQuery reads as BYTES, are
-unsupported, as are columns of the same name. Dates and times outside BigQuery's ranges, such as
-PostgreSQL's `infinity`, fail when read. Of the options, only `default_type_for_decimal_columns`
-is supported. Views that read `EXTERNAL_QUERY` are unsupported, since they would outlive the
-attachment.
+PostgreSQL queries are prepared during analysis and read through a read-only attachment.
+Their limits are:
 
-Spanner connections initially support GoogleSQL queries returning BOOL, BYTES, DATE, FLOAT64, INT64, JSON,
-NUMERIC, STRING and TIMESTAMP. These use BigQuery's
-[Spanner mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping),
-including truncating TIMESTAMP nanoseconds to microseconds. ARRAY, STRUCT, annotated PostgreSQL
-types and all nonempty options, including `query_execution_priority`, are unsupported. Queries
-run as single-use, strong, read-only transactions. Query partitioning and Data Boost are not
-implemented. The literal-argument and view restrictions above also apply.
+- Types outside BigQuery's PostgreSQL mapping are unsupported, except `name`, which reads as
+  STRING. `bit` and `bit varying`, which BigQuery reads as BYTES, are also unsupported.
+- Duplicate column names are unsupported.
+- Only the `default_type_for_decimal_columns` option is supported.
 
-See the [README](../README.md#external-queries) for connection and emulator setup.
+Spanner queries are limited to GoogleSQL returning BOOL, BYTES, DATE, FLOAT64, INT64, JSON,
+NUMERIC, STRING and TIMESTAMP, using BigQuery's
+[Spanner mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#spanner-mapping).
+ARRAY, STRUCT, annotated PostgreSQL types and all nonempty options, including
+`query_execution_priority`, are unsupported. Queries run as single-use, strong, read-only
+transactions; query partitioning and Data Boost are not implemented.
 
 ## User-defined functions
 
 ### SQL UDFs
 
-`CREATE TEMP FUNCTION` defines a query-local SQL UDF. Persistent SQL UDFs use `CREATE [OR REPLACE]
-FUNCTION [IF NOT EXISTS] dataset.name` or `routines.insert`/`routines.update`, and remain available
-until `DROP FUNCTION` or `routines.delete`. Each query that calls a SQL UDF inlines its body.
-
-Persistent UDF definitions and descriptions are returned by `routines.get` and `routines.list`.
-`INFORMATION_SCHEMA.ROUTINES` and `PARAMETERS` describe persistent SQL UDFs, table functions and
-procedures, at dataset or region scope. A UDF without an explicit return type has NULL `data_type`
-and no result row in `PARAMETERS`; ANY TYPE arguments are reported as `ANY TYPE`.
-An explicit TVF return schema appears as `TABLE<...>` in `ROUTINES.data_type`; TVFs have no
-result row in `PARAMETERS`.
-Bodies resolve on each call against the UDF's project: table and UDF names need datasets, and
-temporary UDFs cannot be called. `ANY TYPE` bodies resolve for each call's argument types; temporary
-UDF bodies resolve against previously declared UDFs.
+Persistent SQL UDF bodies require dataset-qualified table and routine references and cannot call
+temporary UDFs.
 
 ### Table functions
 
-`CREATE [OR REPLACE] TABLE FUNCTION [IF NOT EXISTS] dataset.name` defines a SQL table function
-with fixed scalar argument types, optionally with `RETURNS TABLE<...>` and a description.
-The API also accepts an explicit `returnTableType`.
-`DROP TABLE FUNCTION` removes it. `routines.insert`, `routines.update`, `routines.get`,
-`routines.list` and `routines.delete` use the same definitions. The body resolves on each call
-against the routine's project, with dataset-qualified dependencies and no job-local objects.
-Views may call table functions, and their bodies may call persistent SQL UDFs and other table
-functions. Temporary, non-SQL, templated, table-argument and value-table functions, and security
-clauses are unsupported.
+Only persistent SQL table functions with fixed scalar argument types are supported. Temporary,
+non-SQL, templated, table-argument and value-table functions, and security clauses are unsupported.
 
 ### JavaScript UDFs
 
-Temporary JavaScript UDFs run in embedded QuickJS. They take BOOL, FLOAT64, STRING and BYTES
-arguments, and arrays and STRUCTs of them with named fields, named by JavaScript identifiers, and
-return BOOL, FLOAT64, STRING or INT64. State is query-local, with a 5-minute
-call timeout and a 256 MiB allocation limit per query per thread; see
-[JavaScript UDF limits](../README.md#javascript-udf-limits) to change them.
+Temporary JavaScript UDF arguments are limited to BOOL, FLOAT64, STRING, BYTES, and arrays and
+STRUCTs of those types. STRUCT fields must be named by JavaScript identifiers. Return types are
+limited to BOOL, FLOAT64, STRING and INT64. The default call timeout is 5 minutes, and the
+allocation limit is 256 MiB per query per thread; see
+[JavaScript UDF limits](../README.md#javascript-udf-limits) for configuration and the
+[compatibility exceptions](../README.md#compatibility) for runtime differences.
 
 ### Unsupported forms
 
-Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `OR REPLACE` and `IF NOT
-EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent UDF's
-description, the `library` option, and views that call temporary SQL UDFs are unsupported. Subquery bodies do
-not support volatile arguments. Queries with TEMP function declarations do not support dry runs,
-destination tables or positional parameters.
+Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `OR REPLACE` and
+`IF NOT EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent UDF's
+description, the `library` option, and views that call temporary SQL UDFs are unsupported.
+Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do
+not support dry runs, destination tables or positional parameters.
 
 ## Scripts and transactions
 
-Multi-statement queries cannot be dry runs. Temporary tables belong to no dataset and are dropped
-when the script ends. `EXECUTE IMMEDIATE` runs one SQL statement, transaction control or an
-assignment to `@@dataset_id` or `@@dataset_project_id`, but no other scripting statements; like
-BigQuery, it rejects `BEGIN...END` blocks and `DECLARE`. Scripts can set and read `@@dataset_id` and `@@dataset_project_id`
-to change name resolution for subsequent statements, including dynamic SQL. Setting
-`@@dataset_project_id` to `NULL` uses the query-executing project; setting `@@dataset_id` to `NULL` clears the default
-dataset. Both initially return `NULL` without a request default dataset. These settings belong
-to the current script. With a request default dataset, reading either variable before assigning
-it is unsupported until its initial value is verified against BigQuery. Queries, including
-single statements, can read `@@project_id`, the project that runs the query, which, as in
-BigQuery, cannot be assigned.
-As in BigQuery, function and view definitions cannot reference system variables.
-Assignments to other system variables are unsupported. An `EXCEPTION` clause never handles an
-error that the emulator reports as unsupported.
+Multi-statement queries cannot be dry runs. With a request default dataset, reading
+`@@dataset_id` or `@@dataset_project_id` before assigning it is unsupported until its initial
+value is verified against BigQuery. Assignments to other system variables are unsupported.
+An `EXCEPTION` clause never handles an error that the emulator reports as unsupported.
 
-Transactions support `BEGIN TRANSACTION`, `COMMIT TRANSACTION` and `ROLLBACK TRANSACTION` within a
-multi-statement query. Unfinished transactions roll back when the script ends. Transaction modes,
-SQL UDF declarations inside transactions, writes to multiple projects (or both permanent and
-temporary tables), and committing after a handled error are unsupported; roll back a failed
-transaction. DuckDB aborts a transaction on an error and has no savepoints, so the emulator cannot
-keep the statements before the error as BigQuery's commit does.
+Transaction modes, SQL UDF declarations inside transactions, writes to multiple projects (or
+both permanent and temporary tables), and committing after a handled error are unsupported.
+Roll back a failed transaction: it cannot preserve statements before the error for a later commit.
 
 ## Stored procedures
 
-SQL procedures support `CREATE PROCEDURE`, `CREATE OR REPLACE PROCEDURE`, `CREATE PROCEDURE IF NOT
-EXISTS`, `DROP PROCEDURE`, and `CALL`, with fixed-type `IN`, `OUT` and `INOUT` arguments.
-Definitions must explicitly set `OPTIONS(strict_mode = FALSE)` (or `strictMode: false` in the
-Routine API): only syntax is checked at creation, and statements resolve when called. Strict
-mode's default validation, `ANY TYPE` arguments, non-SQL procedures, and options other than
-`strict_mode` and `description` are unsupported. Procedure names in DDL must include their dataset.
+Definitions must explicitly set `OPTIONS(strict_mode = FALSE)` or `strictMode: false` in the
+Routine API. Strict mode's creation-time validation, `ANY TYPE` arguments, non-SQL procedures,
+and options other than `strict_mode` and `description` are unsupported.
 
-The Routine API stores and returns the same definitions as DDL, including descriptions and
-argument modes. Procedure bodies resolve dataset-qualified references against the procedure's
-project. Permanent tables must include their datasets: the caller's default dataset does not
-apply inside a procedure, nor does an `@@dataset_id` that the procedure sets. Temporary
-tables, temporary UDFs, `@@dataset_id` and `@@dataset_project_id` belong to the whole script: a
-procedure sees the caller's, and the caller sees those the procedure creates or sets. Local variables and `IN`
-argument assignments stay within the procedure, caller variables are not visible in the body, and
-`@@project_id` is the project that runs the script. `OUT` arguments start as `NULL`, and when the
-procedure returns, the variables passed as `OUT` and `INOUT` arguments take the arguments' last
-values; a procedure that fails leaves them unchanged. Dynamic SQL inside a procedure resolves
-names as the procedure does and sees only the query parameters of its `USING` clause. As in
-BigQuery, `CREATE PROCEDURE` rejects query parameters in the body. Assignments to system
-variables other than `@@dataset_id` and `@@dataset_project_id`, and reads of system variables
-other than those, `@@project_id`, `@@time_zone` and `@@error.message` inside procedures,
-including their dynamic SQL, are unsupported.
-`EXECUTE IMMEDIATE` cannot execute a `CALL`.
-CALL queries do not support dry runs, destination tables or positional query parameters.
+Inside procedures, including their dynamic SQL, system variable reads are limited to
+`@@dataset_id`, `@@dataset_project_id`, `@@project_id`, `@@time_zone` and `@@error.message`;
+assignments are limited to `@@dataset_id` and `@@dataset_project_id`.
+`EXECUTE IMMEDIATE` cannot execute a `CALL`. CALL queries do not support dry runs, destination
+tables or positional query parameters.
 
 ## Approximate aggregates
 
@@ -432,29 +246,23 @@ use grows with the input size rather than with the requested number of results.
 
 ## Result schemas and values
 
-Query result schemas come from the GoogleSQL analyzer, so anonymous columns are named `f0_`, `f1_`,
-… and `SUM` over integers reports `INTEGER`. Other statements derive the schema from DuckDB types:
-`TIMESTAMPTZ` → `TIMESTAMP`, `TIMESTAMP` → `DATETIME`, lists → `REPEATED`, structs → `RECORD`,
-except the structs that keep `RANGE` values → `RANGE`. A table another DuckDB client wrote may hold
-types BigQuery does not have: a `DECIMAL` that fits `NUMERIC` reads as `NUMERIC`, `TIMESTAMP_NS` as
-a `DATETIME` truncated to microseconds, fixed-size arrays as `REPEATED`, and types such as `ENUM`,
-`UUID`, `BIT`, `MAP` and `UNION` as a `STRING` in DuckDB's text form. A table with a column, or a
-field at any depth, of `UBIGINT`, `HUGEINT`, `UHUGEINT` or a wider `DECIMAL` cannot be read or
-queried: `BIGNUMERIC` would hold their values, but the emulator does not convert them to how it
-stores one.
+Tables written by another DuckDB client may contain types BigQuery does not have:
 
-Without a destination table, a second column with the same name as another is renamed with `_1`,
-as `SELECT 1 AS a, 2 AS a` returns `a` and `a_1`; names that differ only in case are duplicates, as
-`SELECT 1 AS a, 2 AS A` returns `a` and `A_1`. BigQuery does not document how it renames a name
-repeated more than twice or a column that would collide with a renamed one, so the emulator rejects
-those results. In a `SELECT AS STRUCT` or `SELECT AS VALUE`
-result, a field whose name repeats an earlier one's, ignoring case, is named by its position, such
-as `_field_2`; a name repeated more than twice, or a positional name another field already has, is
-rejected.
+- A DECIMAL that fits NUMERIC reads as NUMERIC; TIMESTAMP_NS reads as DATETIME truncated to
+  microseconds; fixed-size arrays read as REPEATED.
+- ENUM, UUID, BIT, MAP and UNION read as STRING in DuckDB's text form.
+- Columns or nested fields of UBIGINT, HUGEINT, UHUGEINT or wider DECIMAL types cannot be read
+  or queried.
 
-Timestamps are encoded as epoch seconds, or epoch microseconds with
-`formatOptions.useInt64Timestamp`, and so are the bounds of a `RANGE<TIMESTAMP>`. As in BigQuery,
-seconds are a `FLOAT64` in Java's notation, such as `1.57793424525E9`, while the bounds of a range
-have six fractional digits.
+Duplicate result column names are compared without case. Without a destination table, a second
+occurrence gains `_1`, as in BigQuery. Names repeated more than twice, or collisions with renamed
+columns, are rejected because BigQuery's naming is unverified. In `SELECT AS STRUCT` and
+`SELECT AS VALUE` results, the second occurrence uses its position, such as `_field_2`; further
+repetitions and collisions with positional names are rejected.
+
+REST timestamps use epoch seconds, or epoch microseconds with `formatOptions.useInt64Timestamp`,
+including `RANGE<TIMESTAMP>` bounds. Seconds use Java's FLOAT64 notation, such as
+`1.57793424525E9`; range bounds have six fractional digits. See the
+[README](../README.md#compatibility) for the ignored `timestampOutputFormat` option.
 
 The `SAFE.` prefix is unsupported on volatile functions.

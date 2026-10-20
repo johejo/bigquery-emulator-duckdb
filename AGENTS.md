@@ -153,13 +153,14 @@ alone does not require removing existing support.
 ## Documentation
 
 Keep setup and deliberate compatibility exceptions in [README.md](README.md). Put detailed
-query and API behavior in [docs/compatibility.md](docs/compatibility.md), Storage client usage
+query and API limits in [docs/compatibility.md](docs/compatibility.md), Storage client usage
 and limits in [docs/storage-api.md](docs/storage-api.md), and implementation details in
 [docs/architecture.md](docs/architecture.md). The support tables listed above are generated;
 the preambles under `tools/restprobe/` and `tools/storageprobe/` are their handwritten inputs. A
 probe's note is a sentence or a link to a section of `docs/compatibility.md` or
 `docs/storage-api.md`; describe a behavior in one place and link to it, and leave the forms a
-probe rejects to the probe.
+probe rejects to the probe. Describe emulator-specific limits and differences; do not restate
+BigQuery's normal semantics for supported features or narrate their implementation.
 
 ## Before committing
 
