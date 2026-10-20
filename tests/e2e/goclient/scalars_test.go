@@ -68,6 +68,7 @@ func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
 // TestScalars runs each query of testdata/scalars/*.txt and compares its one cell. These are the
 // many small cases where a BigQuery function or operator must answer as BigQuery does.
 func TestScalars(t *testing.T) {
+	t.Parallel()
 	endpoint := os.Getenv("BQ_EMULATOR_API")
 	if endpoint == "" {
 		t.Skip("BQ_EMULATOR_API is not set; run just e2e")

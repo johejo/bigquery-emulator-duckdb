@@ -26,6 +26,7 @@ import (
 // These fixtures are ordinary DuckDB numbers. Their decimal text, rather than the emulator's
 // output, defines the expected values through each client path.
 func TestDuckDBNumericStorage(t *testing.T) {
+	t.Parallel()
 	binary := os.Getenv("BQ_EMULATOR_BINARY")
 	if binary == "" {
 		t.Skip("BQ_EMULATOR_BINARY is not set; run just e2e")

@@ -12,6 +12,7 @@ import (
 // table it would create, and does not read the data, so it validates a DML statement whose rows
 // would make it fail.
 func TestTruncateTableAndDryRuns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_truncate")

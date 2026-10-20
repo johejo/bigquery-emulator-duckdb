@@ -13,6 +13,7 @@ import (
 )
 
 func TestTableExpirationPersistence(t *testing.T) {
+	t.Parallel()
 	binary := os.Getenv("BQ_EMULATOR_BINARY")
 	if binary == "" {
 		t.Skip("BQ_EMULATOR_BINARY is not set; run just e2e")

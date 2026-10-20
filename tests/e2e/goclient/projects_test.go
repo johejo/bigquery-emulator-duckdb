@@ -9,6 +9,7 @@ import (
 )
 
 func TestProjectNumberReferences(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	byNumber := newClientForProject(t, "123456789012")
 	byID := newClientForProject(t, "test")

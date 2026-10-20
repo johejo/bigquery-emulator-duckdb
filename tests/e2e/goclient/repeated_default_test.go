@@ -11,6 +11,7 @@ import (
 // BigQuery stores a missing ARRAY as an empty one, so a row that leaves out a REPEATED column
 // reads it back as [], however the table was created.
 func TestOmittedRepeatedColumnsAreEmpty(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_repeated_default")

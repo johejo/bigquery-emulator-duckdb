@@ -17,6 +17,7 @@ import (
 // https://cloud.google.com/bigquery/docs/managing-views,
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language).
 func TestDatasetDefaultTableExpiration(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	run := func(dataset, sql string) error {

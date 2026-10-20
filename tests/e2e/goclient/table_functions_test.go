@@ -12,6 +12,7 @@ import (
 // Table functions share their persistent definitions between SQL DDL, the Routine API and
 // INFORMATION_SCHEMA. The API's Routine resource documents TABLE_VALUED_FUNCTION.
 func TestTableFunctionLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_functions")

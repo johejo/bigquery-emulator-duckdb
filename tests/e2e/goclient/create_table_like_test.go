@@ -18,6 +18,7 @@ import (
 // With AS SELECT, the data comes from the query, as documented at:
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like
 func TestCreateTableLike(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_create_table_like")

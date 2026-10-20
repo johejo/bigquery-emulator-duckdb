@@ -14,6 +14,7 @@ import (
 // OPTIONS and datasets.patch give them, and forget them when they are dropped. Each has the
 // creation time it was created with, which INFORMATION_SCHEMA.SCHEMATA reports too.
 func TestDatasetMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	run := func(sql string) error {

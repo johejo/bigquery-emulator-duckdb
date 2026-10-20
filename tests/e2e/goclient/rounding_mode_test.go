@@ -40,6 +40,7 @@ func wait(ctx context.Context, runner interface {
 // it writes to a parameterized column with it. The expected values are the examples of BigQuery's
 // DDL reference (2.25 and -2.25 to one digit) and of its RoundingMode enum (1.5 and 2.5 to none).
 func TestColumnRoundingModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_rounding_mode")
@@ -184,6 +185,7 @@ func TestColumnRoundingModes(t *testing.T) {
 // with their rounding modes, as DML does, and fail on a value out of a field's range, as BigQuery
 // answers.
 func TestAppendedRoundingModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_appended_rounding_mode")
@@ -314,6 +316,7 @@ func TestAppendedRoundingModes(t *testing.T) {
 // https://cloud.google.com/bigquery/docs/updating-datasets). The rounded values are the examples
 // of BigQuery's DDL reference, 2.25 to 2.2 and 2.3.
 func TestDefaultRoundingModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_default_rounding_mode")
@@ -451,6 +454,7 @@ func TestDefaultRoundingModes(t *testing.T) {
 // columns. In a dataset with a default, LIKE takes it when the source has none, and COPY and CLONE
 // do not; BigQuery's answers to cases that were unverified.
 func TestCopiedDefaultRoundingModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	plain := client.Dataset("go_default_rounding_plain")
@@ -569,6 +573,7 @@ func tableRoundingModes(t *testing.T, client *bigquery.Client, dataset, table st
 // table keep its default, which the new fields do not take, and appending keeps it too. BigQuery's
 // answers, which bq show reported for the same jobs.
 func TestJobDefaultRoundingModes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	plain := client.Dataset("go_job_rounding_plain")

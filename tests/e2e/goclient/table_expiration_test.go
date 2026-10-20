@@ -15,6 +15,7 @@ import (
 // omitted, and deletion after expiration. DDL expiration_timestamp sets the same property.
 // https://cloud.google.com/bigquery/docs/reference/rest/v2/tables
 func TestTableExpiration(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_expiration")

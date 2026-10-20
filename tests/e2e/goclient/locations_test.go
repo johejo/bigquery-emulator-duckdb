@@ -15,6 +15,7 @@ import (
 // names are, or where its request says, and every dataset it uses must be there. The project is
 // one of its own, so that the datasets of other tests do not show up in INFORMATION_SCHEMA.
 func TestLocations(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClientForProject(t, "go-locations")
 	create := func(id, location string) *bigquery.Dataset {

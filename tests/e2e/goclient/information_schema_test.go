@@ -13,6 +13,7 @@ import (
 // INFORMATION_SCHEMA views describe the datasets, tables and columns of a project. The project is
 // one of its own, so that the datasets of other tests do not show up in the views.
 func TestInformationSchema(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClientForProject(t, "infoschema")
 	for _, id := range []string{"a", "b"} {

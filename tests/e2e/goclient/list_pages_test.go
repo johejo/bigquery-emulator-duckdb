@@ -14,6 +14,7 @@ import (
 // returned does not skip the next one. Datasets whose names start with an underscore are listed
 // only with ListHidden.
 func TestListPages(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	// A project of its own, so that other tests' datasets do not show up.
 	client := newClientForProject(t, "go-list-pages")

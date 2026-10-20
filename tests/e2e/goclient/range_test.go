@@ -20,6 +20,7 @@ import (
 // unbounded ends and an array of RANGEs; the client decodes no RANGE in a STRUCT. The values
 // follow BigQuery's range-functions RANGE examples.
 func TestRangeResults(t *testing.T) {
+	t.Parallel()
 	rows, err := newClient(t).Query(`SELECT
 		RANGE(DATE '2022-12-01', DATE '2022-12-31') AS d,
 		RANGE(DATETIME '2022-10-01 14:53:27', DATETIME '2022-10-01 16:00:00') AS dt,
@@ -74,6 +75,7 @@ func TestRangeResults(t *testing.T) {
 
 // RANGE query parameters, which the client sends as a rangeValue whose missing bound is unbounded.
 func TestRangeParameters(t *testing.T) {
+	t.Parallel()
 	query := newClient(t).Query(`SELECT RANGE_START(@d) AS s, RANGE_END(@d) AS e,
 		RANGE_CONTAINS(@ts, TIMESTAMP '2024-04-11 00:00:00+00') AS c`)
 	query.Parameters = []bigquery.QueryParameter{
@@ -99,6 +101,7 @@ func TestRangeParameters(t *testing.T) {
 // A table with RANGE columns keeps its schema, takes rows from tabledata.insertAll as objects of
 // start and end, and reads them back.
 func TestRangeColumns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_range_columns")
@@ -168,6 +171,7 @@ func TestRangeColumns(t *testing.T) {
 // The rows and both session sets are from BigQuery's RANGE_SESSIONIZE examples:
 // https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/range-functions#range_sessionize
 func TestRangeSessionize(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_range_sessionize")
@@ -252,6 +256,7 @@ func TestRangeSessionize(t *testing.T) {
 
 // Session ranges preserve the element type that the input RANGE resolves to.
 func TestRangeSessionizeElementTypes(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		element bigquery.FieldType
 		sql     string
@@ -292,6 +297,7 @@ func TestRangeSessionizeElementTypes(t *testing.T) {
 // unbounded ends; the values are those of BigQuery's CSV loading documentation:
 // https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv#data_types
 func TestRangeLoadCSV(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_range_load_csv")
@@ -357,6 +363,7 @@ func TestRangeLoadCSV(t *testing.T) {
 // BigQuery fails to load a Parquet column into a RANGE, with the message below for a string column.
 // It loads a group of `start` and `end` as NULL, which the emulator rejects instead.
 func TestRangeLoadParquet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_range_load_parquet")

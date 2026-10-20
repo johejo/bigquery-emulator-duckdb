@@ -112,8 +112,9 @@ expected result from one layer to another.
 - **End-to-end tests** (`tests/e2e`, `just e2e`) check what a client sees against BigQuery, and
   come first. [runn](https://github.com/k1LoW/runn) drives the emulator with `bq` and the Go
   client. A query that returns one value goes in `tests/e2e/goclient/testdata/scalars/`. Use `bq`
-  only for what depends on it, such as its flags and output formats. Runbooks run concurrently, so
-  each uses datasets of its own, and a project of its own where it lists a whole project. REST
+  only for what depends on it, such as its flags and output formats. Runbooks run concurrently, and
+  so do Go client tests, which each call `t.Parallel()`; each uses datasets of its own, and a
+  project of its own where it lists a whole project. REST
   details no client surfaces are checked with runn's HTTP runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
   `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by

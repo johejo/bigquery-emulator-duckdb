@@ -9,6 +9,7 @@ import (
 )
 
 func TestDomainScopedProject(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClientForProject(t, "example.com:proj")
 

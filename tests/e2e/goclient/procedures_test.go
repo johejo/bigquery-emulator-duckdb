@@ -11,6 +11,7 @@ import (
 // Metadata follows CREATE PROCEDURE and the REST Routine resource documentation.
 // Scalar results are covered in testdata/scalars/procedures.txt.
 func TestSqlProcedureMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_procedures")
@@ -77,6 +78,7 @@ func TestSqlProcedureMetadata(t *testing.T) {
 // testdata/scalars/procedures.txt covers bodies that name parameters, which CREATE PROCEDURE
 // rejects.
 func TestCallWithQueryParameters(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_procedure_parameters")

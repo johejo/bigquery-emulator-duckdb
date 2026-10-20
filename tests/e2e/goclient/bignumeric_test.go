@@ -27,6 +27,7 @@ func rat(t *testing.T, s string) *big.Rat {
 // BIGNUMERIC keeps its whole range and 38 fractional digits in columns, nested ones included,
 // whether written by DML, a streaming insert or a query parameter.
 func TestBigNumericColumns(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_bignumeric")
@@ -115,6 +116,7 @@ func mustInt(t *testing.T, s string) int64 {
 
 // Array functions keep the BIGNUMERIC schema and values exposed by the Go client.
 func TestBigNumericArrayFunctions(t *testing.T) {
+	t.Parallel()
 	rows, err := newClient(t).Query("SELECT ARRAY_LENGTH(a) AS n, ARRAY_REVERSE(a) AS r, " +
 		"ARRAY_CONCAT(a, a) AS c FROM (SELECT [BIGNUMERIC '" + maxBigNumeric +
 		"', BIGNUMERIC '" + minBigNumeric + "', BIGNUMERIC '" + tinyBigNumeric + "'] AS a)").Read(context.Background())
@@ -156,6 +158,7 @@ func TestBigNumericArrayFunctions(t *testing.T) {
 
 // AVG of BIGNUMERIC is BIGNUMERIC, and the statistical aggregates are FLOAT64, as in BigQuery.
 func TestBigNumericAggregates(t *testing.T) {
+	t.Parallel()
 	rows, err := newClient(t).Query("SELECT AVG(x) AS a, STDDEV_POP(x) AS s, CORR(x, x) AS c " +
 		"FROM UNNEST([BIGNUMERIC '" + tinyBigNumeric + "', BIGNUMERIC '" + maxBigNumeric + "']) x").Read(context.Background())
 	if err != nil {
@@ -183,6 +186,7 @@ func TestBigNumericAggregates(t *testing.T) {
 
 // A parsed value reaches the client as BIGNUMERIC, with its full precision.
 func TestParseBigNumeric(t *testing.T) {
+	t.Parallel()
 	query := newClient(t).Query("SELECT PARSE_BIGNUMERIC(@s) AS n")
 	query.Parameters = []bigquery.QueryParameter{{Name: "s", Value: maxBigNumeric}}
 	rows, err := query.Read(context.Background())

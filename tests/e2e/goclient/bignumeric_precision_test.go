@@ -15,6 +15,7 @@ import (
 // fields included, whatever writes it. The values follow BigQuery's documented examples for
 // NUMERIC(5, 2); BIGNUMERIC(76, 38) and BIGNUMERIC(40, 2) allow 38 integer digits.
 func TestBigNumericPrecisionAndScale(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_bignumeric_precision")

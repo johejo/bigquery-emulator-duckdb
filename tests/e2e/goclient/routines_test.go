@@ -34,6 +34,7 @@ func queryValue(t *testing.T, client *bigquery.Client, dataset, sql string) (big
 // dataset, as https://cloud.google.com/bigquery/docs/user-defined-functions describes, and
 // routines.get and routines.list describe them.
 func TestPersistentSqlUdfs(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_routines")
@@ -201,6 +202,7 @@ func TestPersistentSqlUdfs(t *testing.T) {
 
 // The emulator rejects the forms of persistent UDFs it does not run.
 func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_routines_unsupported")
@@ -244,6 +246,7 @@ func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 // API fields and replacement semantics follow the Routine resource and routines.update
 // documentation: https://cloud.google.com/bigquery/docs/reference/rest/v2/routines.
 func TestRoutineInsertUpdate(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_routine_api")

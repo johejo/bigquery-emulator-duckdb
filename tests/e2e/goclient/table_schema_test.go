@@ -14,6 +14,7 @@ import (
 // tell: JSON and GEOGRAPHY are stored as text, REQUIRED as NOT NULL and NUMERIC(10, 2) as a
 // DECIMAL, and descriptions have no column type at all.
 func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_schema")
@@ -162,6 +163,7 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 // beyond its precision, as one created by DDL does, nested fields included. The values are
 // BigQuery's documented examples for NUMERIC(5, 2).
 func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_precision")
@@ -237,6 +239,7 @@ func TestTablesInsertAppliesPrecisionAndScale(t *testing.T) {
 // BigQuery does; its error names the field by its path from the top of the schema.
 // https://cloud.google.com/bigquery/docs/schemas#column_names
 func TestTableSchemasRejectFieldNamesDifferingInCase(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_table_schema_case")

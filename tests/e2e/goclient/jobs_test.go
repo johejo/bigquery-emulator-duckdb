@@ -14,6 +14,7 @@ import (
 // Tables expose their creation time regardless of how they are created (tables resource's
 // creationTime), and omitted repeated columns read as empty arrays.
 func TestJobTableCreation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_job_table_creation")
@@ -98,6 +99,7 @@ func TestJobTableCreation(t *testing.T) {
 }
 
 func TestQueryToADestinationTable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 
@@ -152,6 +154,7 @@ func TestQueryToADestinationTable(t *testing.T) {
 // view be defined with duplicate column names:
 // https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#duplicate_aliases
 func TestQueryDestinationTableEdges(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_destination_edges")
@@ -211,6 +214,7 @@ func TestQueryDestinationTableEdges(t *testing.T) {
 }
 
 func TestJobLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	query := client.Query("SELECT 1 AS n")
@@ -254,6 +258,7 @@ func TestJobLifecycle(t *testing.T) {
 }
 
 func TestJobListAndResultPagination(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	query := client.Query("SELECT x FROM UNNEST([1, 2, 3]) AS x ORDER BY x")

@@ -9,6 +9,7 @@ import (
 )
 
 func TestInserterPut(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_streaming")
@@ -63,6 +64,7 @@ func TestInserterPut(t *testing.T) {
 }
 
 func TestStreamingInsertOptions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_streaming_options")

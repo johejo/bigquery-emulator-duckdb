@@ -11,6 +11,7 @@ import (
 )
 
 func TestDatasetTableAndRows(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	created := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)

@@ -80,6 +80,7 @@ func describeSchema(s bigquery.Schema) string {
 // A Parquet load reads each shape of list the format allows as BigQuery does, with and without
 // list inference.
 func TestParquetLists(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
 	dataset := client.Dataset("go_parquet_lists")

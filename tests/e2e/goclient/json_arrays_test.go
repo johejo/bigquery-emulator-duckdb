@@ -12,6 +12,7 @@ import (
 // Check typed client decoding and schema across rows. Values follow the JSON
 // functions' documented flattening and SQL-to-JSON encoding rules.
 func TestJsonArrayFunctionResults(t *testing.T) {
+	t.Parallel()
 	rows, err := newClient(t).Query(`SELECT
 		JSON_FLATTEN(JSON_ARRAY([n], JSON 'null')) AS flattened,
 		JSON_ARRAY_APPEND(JSON '[]', '$', STRUCT(n AS n)) AS appended,
