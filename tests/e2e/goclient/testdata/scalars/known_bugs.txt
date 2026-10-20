@@ -11,10 +11,6 @@ CREATE TEMP FUNCTION f() RETURNS STRING LANGUAGE js AS "throw new Error('boom');
 SELECT f()
 !> error: Error: boom at f() line 1, column 1
 
-# GEOGRAPHY holds no MULTILINESTRING, which ST_GEOGFROMTEXT makes of a line that overlaps itself.
-SELECT ST_GEOGFROMTEXT('LINESTRING(1 0, 10 0, 5 0, 5 4)')
-!> "MULTILINESTRING((1 0, 5 0, 10 0), (5 0, 5 4))"
-
 # BigQuery snaps a polygon's edges as well as its vertices, which may leave a collection, and snaps
 # rings that cross or touch at an edge to where they meet, which may be a new vertex; the
 # emulator rejects these.

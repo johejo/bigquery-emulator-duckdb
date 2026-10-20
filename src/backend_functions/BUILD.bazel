@@ -186,6 +186,7 @@ cc_library(
     hdrs = ["geography_value.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",
     ],

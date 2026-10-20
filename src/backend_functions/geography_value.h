@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,39 +9,38 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "s2/mutable_s2shape_index.h"
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
-#include "s2/s2shape.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 
-// A GEOGRAPHY holds S2Points, as BigQuery's do: POINT(x y z), LINESTRING(x y z, ...) or
-// POLYGON((x y z, ...), ...) with the shortest digits that round-trip, or GEOMETRYCOLLECTION
-// EMPTY. Coordinates are those of
-// S2LatLng, which gives ST_X(ST_GEOGPOINT(0.1 + 0.2, 1)) 0.3000000000000001 as BigQuery does. The
-// translator turns a GEOGRAPHY into WKT with bq_st_astext wherever a query returns or stores one.
+// A GEOGRAPHY holds S2Points, as BigQuery's do, written as WKT with each vertex as `x y z` with
+// the shortest digits that round-trip, a polygon's rings as S2Polygon holds them, or
+// GEOMETRYCOLLECTION EMPTY. Coordinates are those of S2LatLng, which gives
+// ST_X(ST_GEOGPOINT(0.1 + 0.2, 1)) 0.3000000000000001 as BigQuery does. The translator turns a
+// GEOGRAPHY into WKT with bq_st_astext wherever a query returns or stores one.
 struct Point {
   double longitude;
   double latitude;
 };
 
-enum class Kind : uint8_t {
-  // The empty geography, which has no geometry type.
-  kEmpty,
-  kPoint,
-  kLineString,
-  kPolygon,
-};
+// A polygon's loops, its shell and then its holes, each as S2Polygon holds it: counterclockwise
+// without repeating its first vertex, so that the shell encloses at most half the sphere and a
+// hole is the region it removes.
+using Polygon = std::vector<std::vector<S2Point>>;
 
-// A geography and its vertices: none for the empty geography, one for a point and two or more for
-// a linestring. A polygon has no vertices but loops, its shell and then its holes, each as
-// S2Polygon holds it: counterclockwise without repeating its first vertex, so that the shell
-// encloses at most half the sphere and a hole is the region it removes. EachRow handles SQL
-// NULLs.
+// A geography as BigQuery holds it, the union of its points, linestrings of two or more vertices
+// and polygons, which Combine makes of any parts; none of them makes the empty geography. EachRow
+// handles SQL NULLs.
 struct Geography {
-  Kind kind = Kind::kEmpty;
-  std::vector<S2Point> vertices;
-  std::vector<std::vector<S2Point>> loops;
+  std::vector<S2Point> points;
+  std::vector<std::vector<S2Point>> lines;
+  std::vector<Polygon> polygons;
+
+  [[nodiscard]] bool Empty() const { return points.empty() && lines.empty() && polygons.empty(); }
+  // The number of points, linestrings and polygons.
+  [[nodiscard]] size_t Count() const { return points.size() + lines.size() + polygons.size(); }
 };
 
 Geography PointGeography(const S2Point& point);
@@ -55,9 +53,10 @@ std::string Coordinate(double value, std::optional<int> precision = 15);
 S2Point ToS2Point(const Point& point);
 Point ToPoint(const S2Point& point);
 
-// The WKT BigQuery returns for `geography`, whose coordinates have 15 significant digits. A
-// polygon's rings repeat their first vertex, and a hole's run clockwise, as S2Polygon's shape
-// walks it.
+// The WKT BigQuery returns for `geography`, whose coordinates have 15 significant digits: one
+// point, linestring or polygon, a MULTIPOINT, MULTILINESTRING or MULTIPOLYGON of more than one,
+// and a GEOMETRYCOLLECTION of these where it has parts of more than one dimension. A polygon's
+// rings repeat their first vertex, and a hole's run clockwise, as S2Polygon's shape walks it.
 std::string Wkt(const Geography& geography);
 
 // The GEOGRAPHY of `geography`.
@@ -66,11 +65,11 @@ std::string GeographyText(const Geography& geography);
 // Parses a GEOGRAPHY as GeographyText writes it.
 absl::StatusOr<Geography> ParseGeography(std::string_view text);
 
-// The shape of a nonempty geography.
-std::unique_ptr<S2Shape> Shape(const Geography& geography);
+// Adds the shapes of `geography` to `index`: its points, each linestring and its polygons.
+void AddShapes(const Geography& geography, MutableS2ShapeIndex& index);
 
-// The S2Polygon of a polygon.
-std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& polygon);
+// The S2Polygon of the polygons of `geography`.
+std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& geography);
 
 // The same point as BigQuery's ST_EQUALS and ST_AZIMUTH take it, within a micrometer in every
 // direction: POINT(0.30000000000000004 0) is POINT(0.3 0), though their distance is not 0, and a
@@ -91,9 +90,9 @@ absl::Status CheckAntipodal(const std::vector<Point>& vertices, std::string_view
 
 // The linestring of `vertices`, two or more without antipodal neighbors, as BigQuery builds it
 // with S2Builder: vertices within a micrometer are snapped together, a line folding back on itself
-// merges with itself, and crossing edges are split where they cross. A long edge gains its
-// midpoint, and a line that snaps to one point is the point S2Builder snaps it to. The emulator
-// does not hold the MULTILINESTRING a line that overlaps itself becomes.
+// merges with itself, and crossing edges are split where they cross, which may leave more than
+// one linestring. A long edge gains its midpoint, and a line that snaps to one point is the point
+// S2Builder snaps it to.
 absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 
 // The polygon of `rings`, a shell and then its holes, as BigQuery builds one where its
@@ -108,5 +107,12 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 // that collapses.
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
                                        std::string_view failed);
+
+// The geography of `parts`, each as BuildLine or BuildPolygon builds it, as BigQuery makes a
+// collection: the union of the parts in order, snapped together within a micrometer, where a
+// polygon absorbs what it covers, a linestring the points on it, and lines and polygon edges
+// that cross gain the vertex where they do. Points follow S2CellId order, and linestrings and
+// polygons the order of the parts they came from.
+absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts);
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <numbers>
 #include <numeric>
@@ -36,6 +37,7 @@
 #include "s2/s2furthest_edge_query.h"
 #include "s2/s2hausdorff_distance_query.h"
 #include "s2/s2lax_polygon_shape.h"
+#include "s2/s2lax_polyline_shape.h"
 #include "s2/s2point.h"
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
@@ -55,15 +57,17 @@ namespace {
 absl::StatusOr<S2Point> ParsePoint(const Arguments& args, idx_t index, std::string_view context,
                                    bool say = true) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(index)));
-  if (geography.kind != Kind::kPoint) {
+  if (geography.Count() != 1 || geography.points.size() != 1) {
     return absl::OutOfRangeError(
         std::string(context) + " must be a single point geography" +
-        (!say                               ? "."
-         : geography.kind == Kind::kEmpty   ? "; an argument was the empty geography."
-         : geography.kind == Kind::kPolygon ? "; an argument contained a polygon."
-                                            : "; an argument contained a line."));
+        (!say                          ? "."
+         : geography.Empty()           ? "; an argument was the empty geography."
+         : !geography.polygons.empty() ? "; an argument contained a polygon."
+         : !geography.lines.empty()
+             ? "; an argument contained a line."
+             : "; an argument had " + Points(geography.points.size()) + "."));
   }
-  return geography.vertices.front();
+  return geography.points.front();
 }
 
 absl::Status CheckFinite(double value, std::string_view name) {
@@ -148,9 +152,9 @@ double Meters(S1ChordAngle distance) { return S2Earth::ToMeters(distance.ToAngle
 // The shortest distance between nonempty geographies, which is 0 where they meet.
 S1ChordAngle MinDistance(const Geography& a, const Geography& b) {
   MutableS2ShapeIndex index;
-  index.Add(Shape(a));
+  AddShapes(a, index);
   MutableS2ShapeIndex target_index;
-  target_index.Add(Shape(b));
+  AddShapes(b, target_index);
   S2ClosestEdgeQuery query(&index);
   S2ClosestEdgeQuery::ShapeIndexTarget target(&target_index);
   return query.GetDistance(&target);
@@ -160,9 +164,9 @@ S1ChordAngle MinDistance(const Geography& a, const Geography& b) {
 // though ST_MAXDISTANCE describes vertices.
 S1ChordAngle MaxDistance(const Geography& a, const Geography& b) {
   MutableS2ShapeIndex index;
-  index.Add(Shape(a));
+  AddShapes(a, index);
   MutableS2ShapeIndex target_index;
-  target_index.Add(Shape(b));
+  AddShapes(b, target_index);
   S2FurthestEdgeQuery query(&index);
   S2FurthestEdgeQuery::ShapeIndexTarget target(&target_index);
   return query.GetDistance(&target);
@@ -186,102 +190,109 @@ absl::StatusOr<std::optional<double>> Distance(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
   // Unlike ST_DWITHIN, both distance functions return NULL before checking use_spheroid.
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return std::nullopt;
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 2));
   return Meters(args.String(3) == "ST_MAXDISTANCE" ? MaxDistance(a, b) : MinDistance(a, b));
 }
 
-// Between points, the distance itself. A linestring is within the distance where it may be,
+// Between single points, the distance itself. Anything else is within the distance where it may be,
 // allowing for the error in measuring it: BigQuery takes a point on an edge, a few nanometers
 // away as S2 measures it, as within 0 meters, and points that far apart as not.
 absl::StatusOr<bool> DWithin(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 3));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return false;
   }
   const double limit = args.Double(2);
-  if (a.kind == Kind::kPoint && b.kind == Kind::kPoint) {
+  const auto point = [](const Geography& geography) {
+    return geography.Count() == 1 && geography.points.size() == 1;
+  };
+  if (point(a) && point(b)) {
     return Meters(MinDistance(a, b)) <= limit;
   }
   if (!(limit >= 0)) {
     return false;
   }
   MutableS2ShapeIndex index;
-  index.Add(Shape(a));
+  AddShapes(a, index);
   MutableS2ShapeIndex target_index;
-  target_index.Add(Shape(b));
+  AddShapes(b, target_index);
   S2ClosestEdgeQuery query(&index);
   S2ClosestEdgeQuery::ShapeIndexTarget target(&target_index);
   return query.IsConservativeDistanceLessOrEqual(&target,
                                                  S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
 
-// Geographies are equal where each point of either is within a micrometer of the other, as Same
-// takes points, and polygons where they cover the same region but for a micrometer. Geographies
-// of different kinds differ: a point is not a linestring, which has more than one point, and a
-// linestring is not a polygon, which has an interior.
-absl::StatusOr<bool> Equals(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
-  if (a.kind != b.kind) {
-    return false;
-  }
-  switch (a.kind) {
-    case Kind::kEmpty:
-      return true;
-    case Kind::kPoint:
-      return Same(a.vertices.front(), b.vertices.front());
-    case Kind::kPolygon:
-      return ToS2Polygon(a)->ApproxEquals(*ToS2Polygon(b), S2Earth::MetersToAngle(1e-6));
-    case Kind::kLineString:
-      break;
-  }
+// Whether each point of either of `a` and `b`, nonempty, is within a micrometer of the other, as
+// Same takes points.
+bool Near(const Geography& a, const Geography& b) {
   MutableS2ShapeIndex index;
-  index.Add(Shape(a));
+  AddShapes(a, index);
   MutableS2ShapeIndex other;
-  other.Add(Shape(b));
+  AddShapes(b, other);
   return S2HausdorffDistanceQuery().GetDistance(&index, &other) <=
          S1ChordAngle(S2Earth::MetersToAngle(1e-6));
 }
 
-// A geography as S2Builder outputs it, in the layer for its kind.
+// Geographies are equal where their points, their linestrings and their polygons are: points
+// and linestrings where each point of either is within a micrometer of the other, and polygons
+// where they cover the same region but for a micrometer. A point is not a linestring, which has
+// more than one point, and a linestring is not a polygon, which has an interior.
+absl::StatusOr<bool> Equals(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  if (a.points.empty() != b.points.empty() || a.lines.empty() != b.lines.empty() ||
+      a.polygons.empty() != b.polygons.empty()) {
+    return false;
+  }
+  if (!a.points.empty() && !Near({.points = a.points, .lines = {}, .polygons = {}},
+                                 {.points = b.points, .lines = {}, .polygons = {}})) {
+    return false;
+  }
+  if (!a.lines.empty() && !Near({.points = {}, .lines = a.lines, .polygons = {}},
+                                {.points = {}, .lines = b.lines, .polygons = {}})) {
+    return false;
+  }
+  return a.polygons.empty() ||
+         ToS2Polygon(a)->ApproxEquals(*ToS2Polygon(b), S2Earth::MetersToAngle(1e-6));
+}
+
+// A geography as S2Builder outputs it, in a layer for its points, each linestring and its
+// polygons.
 struct Snapped {
   std::vector<S2Point> points;
   std::vector<std::unique_ptr<S2Polyline>> polylines;
   std::unique_ptr<S2LaxPolygonShape> polygon = std::make_unique<S2LaxPolygonShape>();
 };
 
-// Adds nonempty `geography` to `builder` in a layer of its own that outputs to `output`.
-void AddLayer(S2Builder& builder, const Geography& geography, Snapped& output) {
-  switch (geography.kind) {
-    case Kind::kEmpty:
-      break;
-    case Kind::kPoint:
-      builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
-      builder.AddPoint(geography.vertices.front());
-      break;
-    case Kind::kLineString: {
-      // One walk, which gains no endpoints where a vertex is added.
-      s2builderutil::S2PolylineVectorLayer::Options options;
-      options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
-      builder.StartLayer(
-          std::make_unique<s2builderutil::S2PolylineVectorLayer>(&output.polylines, options));
-      builder.AddPolyline(geography.vertices);
-      break;
+// Adds `geography` to `builder` in layers of its own that output to `output`.
+void AddLayers(S2Builder& builder, const Geography& geography, Snapped& output) {
+  if (!geography.points.empty()) {
+    builder.StartLayer(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
+    for (const S2Point& point : geography.points) {
+      builder.AddPoint(point);
     }
-    case Kind::kPolygon:
-      builder.StartLayer(std::make_unique<s2builderutil::LaxPolygonLayer>(output.polygon.get()));
-      builder.AddPolygon(*ToS2Polygon(geography));
-      break;
+  }
+  for (const std::vector<S2Point>& line : geography.lines) {
+    // One walk, which gains no endpoints where a vertex is added.
+    s2builderutil::S2PolylineVectorLayer::Options options;
+    options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+    builder.StartLayer(
+        std::make_unique<s2builderutil::S2PolylineVectorLayer>(&output.polylines, options));
+    builder.AddPolyline(line);
+  }
+  if (!geography.polygons.empty()) {
+    builder.StartLayer(std::make_unique<s2builderutil::LaxPolygonLayer>(output.polygon.get()));
+    builder.AddPolygon(*ToS2Polygon(geography));
   }
 }
 
 // Adds the shapes of `snapped` to `index`.
-void AddShapes(Snapped snapped, MutableS2ShapeIndex& index) {
+void AddSnapped(Snapped snapped, MutableS2ShapeIndex& index) {
   if (!snapped.points.empty()) {
     index.Add(std::make_unique<S2PointVectorShape>(std::move(snapped.points)));
   }
@@ -302,16 +313,16 @@ absl::StatusOr<bool> Relate(const Geography& a, const Geography& b, Predicate pr
       S2Builder::Options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)))};
   Snapped snapped_a;
   Snapped snapped_b;
-  AddLayer(builder, a, snapped_a);
-  AddLayer(builder, b, snapped_b);
+  AddLayers(builder, a, snapped_a);
+  AddLayers(builder, b, snapped_b);
   S2Error error;
   if (!builder.Build(&error)) {
     return absl::InternalError("S2Builder failed: " + std::string(error.message()));
   }
   MutableS2ShapeIndex index_a;
-  AddShapes(std::move(snapped_a), index_a);
+  AddSnapped(std::move(snapped_a), index_a);
   MutableS2ShapeIndex index_b;
-  AddShapes(std::move(snapped_b), index_b);
+  AddSnapped(std::move(snapped_b), index_b);
   return predicate(index_a, index_b);
 }
 
@@ -339,7 +350,7 @@ bool Cover(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
 }
 
 absl::StatusOr<bool> Intersects(const Geography& a, const Geography& b) {
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return false;
   }
   return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
@@ -349,7 +360,7 @@ absl::StatusOr<bool> Intersects(const Geography& a, const Geography& b) {
 
 // The geographies meet only where the boundary of one is.
 absl::StatusOr<bool> Touches(const Geography& a, const Geography& b) {
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return false;
   }
   return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
@@ -358,7 +369,7 @@ absl::StatusOr<bool> Touches(const Geography& a, const Geography& b) {
 }
 
 absl::StatusOr<bool> Covers(const Geography& a, const Geography& b) {
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return false;
   }
   return Relate(a, b, Cover);
@@ -366,7 +377,7 @@ absl::StatusOr<bool> Covers(const Geography& a, const Geography& b) {
 
 // `a` covers `b`, and their interiors meet, so a geography does not contain its boundary.
 absl::StatusOr<bool> Contains(const Geography& a, const Geography& b) {
-  if (a.kind == Kind::kEmpty || b.kind == Kind::kEmpty) {
+  if (a.Empty() || b.Empty()) {
     return false;
   }
   return Relate(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
@@ -399,59 +410,75 @@ absl::StatusOr<decltype(kFunction(Geography{}))> OfGeography(const Arguments& ar
   return kFunction(geography);
 }
 
-// The dimension of the empty geography, a point, a linestring and a polygon.
+// The highest dimension of the parts of a geography, -1 for the empty geography.
 int64_t Dimension(const Geography& geography) {
-  switch (geography.kind) {
-    case Kind::kEmpty:
-      return -1;
-    case Kind::kPoint:
-      return 0;
-    case Kind::kLineString:
-      return 1;
-    case Kind::kPolygon:
-      return 2;
-  }
-  return -1;
+  return !geography.polygons.empty() ? 2
+         : !geography.lines.empty()  ? 1
+         : !geography.points.empty() ? 0
+                                     : -1;
 }
 
+// The geometry type of the WKT that Wkt writes, which BigQuery spells as ST_GEOMETRYTYPE returns
+// it.
 std::string GeometryType(const Geography& geography) {
-  constexpr std::array<std::string_view, 4> kTypes = {
-      "ST_GeometryCollection",
-      "ST_Point",
-      "ST_LineString",
-      "ST_Polygon",
+  const size_t dimensions = (geography.points.empty() ? 0 : 1) + (geography.lines.empty() ? 0 : 1) +
+                            (geography.polygons.empty() ? 0 : 1);
+  if (dimensions != 1) {
+    return "ST_GeometryCollection";
+  }
+  const auto type = [&](size_t count, std::string_view name) {
+    return std::string(count == 1 ? "ST_" : "ST_Multi") + std::string(name);
   };
-  return std::string(kTypes.at(Dimension(geography) + 1));
+  if (!geography.points.empty()) {
+    return type(geography.points.size(), "Point");
+  }
+  if (!geography.lines.empty()) {
+    return type(geography.lines.size(), "LineString");
+  }
+  return type(geography.polygons.size(), "Polygon");
 }
 
 // A polygon's rings count their first vertex twice, as WKT writes them.
 int64_t NumPoints(const Geography& geography) {
+  const auto lines = std::accumulate(
+      geography.lines.begin(), geography.lines.end(), geography.points.size(),
+      [](size_t count, const std::vector<S2Point>& line) { return count + line.size(); });
   return static_cast<int64_t>(std::accumulate(
-      geography.loops.begin(), geography.loops.end(), geography.vertices.size(),
-      [](size_t count, const std::vector<S2Point>& loop) { return count + loop.size() + 1; }));
+      geography.polygons.begin(), geography.polygons.end(), lines,
+      [](size_t count, const Polygon& polygon) {
+        return std::accumulate(
+            polygon.begin(), polygon.end(), count,
+            [](size_t sum, const std::vector<S2Point>& loop) { return sum + loop.size() + 1; });
+      }));
 }
 
-// A point is closed, and a linestring where it ends where it starts. Only the full polygon, which
-// the emulator does not hold, is closed.
+// A nonempty geography whose parts are all closed: a point is closed, and a linestring where it
+// ends where it starts. Only the full polygon, which the emulator does not hold, is closed.
 bool IsClosed(const Geography& geography) {
-  return (geography.kind == Kind::kPoint || geography.kind == Kind::kLineString) &&
-         Same(geography.vertices.front(), geography.vertices.back());
+  return !geography.Empty() && geography.polygons.empty() &&
+         std::ranges::all_of(geography.lines, [](const std::vector<S2Point>& line) {
+           return Same(line.front(), line.back());
+         });
 }
 
-// ST_LENGTH, the length of a linestring's edges, which is 0 for a point or an empty geography.
+// ST_LENGTH, the length of the edges of the linestrings, which is 0 for points, polygons and the
+// empty geography.
 absl::StatusOr<double> Length(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 1));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
-  return geography.kind != Kind::kLineString ? 0.0
-                                             : S2Earth::ToMeters(S2::GetLength(*Shape(geography)));
+  return std::accumulate(geography.lines.begin(), geography.lines.end(), 0.0,
+                         [](double length, const std::vector<S2Point>& line) {
+                           return length +
+                                  S2Earth::ToMeters(S2::GetLength(S2LaxPolylineShape(line)));
+                         });
 }
 
-// ST_AREA and ST_PERIMETER, which the last argument names, of a polygon over the sphere, and 0
-// for anything else.
+// ST_AREA and ST_PERIMETER, which the last argument names, of the polygons over the sphere, and 0
+// where there are none.
 absl::StatusOr<double> Measure(const Arguments& args) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 1));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
-  if (geography.kind != Kind::kPolygon) {
+  if (geography.polygons.empty()) {
     return 0.0;
   }
   const std::unique_ptr<S2Polygon> polygon = ToS2Polygon(geography);
@@ -465,16 +492,16 @@ absl::StatusOr<double> Measure(const Arguments& args) {
 // near the geodesic ones, which the emulator does not.
 absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
-  if (geography.kind == Kind::kEmpty) {
+  if (geography.Empty()) {
     return std::string(R"({ "type": "GeometryCollection", "geometries": [ ] } )");
   }
-  if (geography.kind == Kind::kLineString) {
-    return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a LINESTRING");
+  if (geography.Count() != 1 || geography.points.empty()) {
+    std::string type = GeometryType(geography).substr(3);
+    std::ranges::transform(type, type.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a " + type);
   }
-  if (geography.kind == Kind::kPolygon) {
-    return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a POLYGON");
-  }
-  const Point point = ToPoint(geography.vertices.front());
+  const Point point = ToPoint(geography.points.front());
   return R"({ "type": "Point", "coordinates": [)" + Coordinate(point.longitude) + ", " +
          Coordinate(point.latitude) + "] } ";
 }
@@ -482,30 +509,33 @@ absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
 // ST_STARTPOINT, ST_ENDPOINT and ST_POINTN: the vertex of a linestring at a 1-based index, a
 // negative one counting from the end.
 absl::StatusOr<std::string> PointN(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography line, ParseGeography(args.String(0)));
-  const int64_t index = args.Int(1);
-  const auto size = static_cast<int64_t>(line.vertices.size());
-  if (line.kind != Kind::kLineString) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Count() != 1 || geography.lines.empty()) {
     return absl::OutOfRangeError("The input is not a single LINESTRING");
   }
+  const std::vector<S2Point>& line = geography.lines.front();
+  const int64_t index = args.Int(1);
+  const auto size = static_cast<int64_t>(line.size());
   if (index == 0 || index > size || index < -size) {
     return absl::OutOfRangeError("The vertex index " + std::to_string(index) +
-                                 " is out of bounds; input LINESTRING has " +
-                                 Points(line.vertices.size()) + ".");
+                                 " is out of bounds; input LINESTRING has " + Points(line.size()) +
+                                 ".");
   }
-  return GeographyText(PointGeography(line.vertices.at(index > 0 ? index - 1 : size + index)));
+  return GeographyText(PointGeography(line.at(index > 0 ? index - 1 : size + index)));
 }
 
-// The line through the vertices of the points and linestrings of `geographies`, built as
+// The line through the vertices of `geographies`, each a single point or linestring, built as
 // ST_GEOGFROMTEXT builds one; a single point is that point.
 absl::StatusOr<std::string> MakeLine(const std::vector<std::string>& geographies) {
   std::vector<S2Point> vertices;
   for (const std::string& text : geographies) {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(text));
-    if (geography.kind == Kind::kEmpty || geography.kind == Kind::kPolygon) {
+    if (geography.Count() != 1 || !geography.polygons.empty()) {
       return absl::OutOfRangeError("ST_MAKELINE arguments must be single points or lines");
     }
-    vertices.insert(vertices.end(), geography.vertices.begin(), geography.vertices.end());
+    const std::vector<S2Point>& part =
+        geography.points.empty() ? geography.lines.front() : geography.points;
+    vertices.insert(vertices.end(), part.begin(), part.end());
   }
   if (vertices.empty()) {
     return absl::OutOfRangeError(
@@ -528,17 +558,17 @@ absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& geograph
   std::vector<std::vector<S2Point>> rings;
   for (const std::string& text : geographies) {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(text));
-    if (geography.kind == Kind::kEmpty) {
+    if (geography.Empty()) {
       return absl::UnimplementedError(
           "The emulator does not support ST_MAKEPOLYGON of an empty GEOGRAPHY, which makes the "
           "full polygon");
     }
-    if (geography.kind != Kind::kLineString) {
+    if (geography.Count() != 1 || geography.lines.empty()) {
       return absl::OutOfRangeError(
           "ST_MakePolygon failed: Input geographies for STMakePolygon must be empty or consist of "
           "exactly one linestring.");
     }
-    std::vector<S2Point>& ring = rings.emplace_back(geography.vertices);
+    std::vector<S2Point>& ring = rings.emplace_back(geography.lines.front());
     if (ring.front() == ring.back()) {
       ring.pop_back();
     }
@@ -550,23 +580,56 @@ absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& geograph
 
 // A loop of a polygon as a linestring that ends where it starts.
 std::string Ring(const std::vector<S2Point>& loop) {
-  Geography line{.kind = Kind::kLineString, .vertices = loop, .loops = {}};
-  line.vertices.push_back(loop.front());
-  return GeographyText(line);
+  std::vector<S2Point> line = loop;
+  line.push_back(loop.front());
+  return GeographyText({.points = {}, .lines = {std::move(line)}, .polygons = {}});
 }
 
 // ST_EXTERIORRING and ST_INTERIORRINGS, which `function` names as BigQuery's errors do: the loops
-// of a polygon as S2Polygon holds them, a hole enclosing the region it removes.
+// of a polygon as S2Polygon holds them, a hole enclosing the region it removes. A collection is
+// not a polygon, even of one polygon with points or linestrings.
 absl::StatusOr<std::vector<std::string>> Rings(const Arguments& args, std::string_view function) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography polygon, ParseGeography(args.String(0)));
-  if (polygon.kind != Kind::kPolygon) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.polygons.size() != 1 || geography.Count() != 1) {
     return absl::OutOfRangeError(
         "Argument to " + std::string(function) +
         " must have exactly 1 polygon; argument either had no polygons or more than one.");
   }
-  std::vector<std::string> rings(polygon.loops.size());
-  std::ranges::transform(polygon.loops, rings.begin(), Ring);
+  const Polygon& polygon = geography.polygons.front();
+  std::vector<std::string> rings(polygon.size());
+  std::ranges::transform(polygon, rings.begin(), Ring);
   return rings;
+}
+
+// ST_DUMP: each point, linestring and polygon of a geography, in the order Wkt writes them, of
+// the dimension of the second argument, or of any for -1.
+absl::StatusOr<std::vector<std::string>> Dump(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  const int64_t dimension = args.Int(1);
+  if (dimension < -1 || dimension > 2) {
+    return absl::OutOfRangeError("Dimension must be -1, 0, 1, or 2, but was " +
+                                 std::to_string(dimension) + ". Error in ST_DUMP expression");
+  }
+  const auto wanted = [&](int64_t of) { return dimension == -1 || dimension == of; };
+  std::vector<std::string> parts;
+  if (wanted(0)) {
+    std::ranges::transform(geography.points, std::back_inserter(parts), [](const S2Point& point) {
+      return GeographyText(PointGeography(point));
+    });
+  }
+  if (wanted(1)) {
+    std::ranges::transform(geography.lines, std::back_inserter(parts),
+                           [](const std::vector<S2Point>& line) {
+                             return GeographyText({.points = {}, .lines = {line}, .polygons = {}});
+                           });
+  }
+  if (wanted(2)) {
+    std::ranges::transform(
+        geography.polygons, std::back_inserter(parts), [](const Polygon& polygon) {
+          return GeographyText({.points = {}, .lines = {}, .polygons = {polygon}});
+        });
+  }
+  return parts;
 }
 
 constexpr std::string_view kGeohashDigits = "0123456789bcdefghjkmnpqrstuvwxyz";
@@ -574,7 +637,7 @@ constexpr std::string_view kGeohashDigits = "0123456789bcdefghjkmnpqrstuvwxyz";
 // A maxchars outside [1, 20] is taken as 20.
 absl::StatusOr<std::optional<std::string>> Geohash(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
-  if (geography.kind == Kind::kEmpty) {
+  if (geography.Empty()) {
     return std::nullopt;
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const S2Point vertex,
@@ -676,13 +739,14 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
            EachRow<OfGeography<GeometryType>>);
   Register(connection, "bq_st_dimension", {kVarchar}, kBigint, EachRow<OfGeography<Dimension>>);
   Register(connection, "bq_st_numpoints", {kVarchar}, kBigint, EachRow<OfGeography<NumPoints>>);
-  Register(
-      connection, "bq_st_isempty", {kVarchar}, kBoolean,
-      EachRow<
-          OfGeography<[](const Geography& geography) { return geography.kind == Kind::kEmpty; }>>);
-  // A point, a linestring or a polygon is never a collection.
+  Register(connection, "bq_st_isempty", {kVarchar}, kBoolean,
+           EachRow<OfGeography<[](const Geography& geography) { return geography.Empty(); }>>);
   Register(connection, "bq_st_iscollection", {kVarchar}, kBoolean,
-           EachRow<OfGeography<[](const Geography&) { return false; }>>);
+           EachRow<OfGeography<[](const Geography& geography) { return geography.Count() > 1; }>>);
+  Register(connection, "bq_st_numgeometries", {kVarchar}, kBigint,
+           EachRow<OfGeography<[](const Geography& geography) {
+             return static_cast<int64_t>(geography.Count());
+           }>>);
   Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean, EachRow<OfGeography<IsClosed>>);
   Register(connection, "bq_st_length", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Length>);
   Register(connection, "bq_st_measure", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Measure>);
@@ -710,6 +774,10 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
                rings.insert(rings.begin(), args.String(0));
                return MakePolygon(rings);
              }>);
+    const LogicalType bigint(duckdb_create_logical_type(kBigint));
+    Register(connection, "bq_st_dump",
+             std::vector<duckdb_logical_type>{varchar.get(), bigint.get()}, list.get(),
+             EachRow<Dump>);
     Register(connection, "bq_st_interiorrings", {varchar.get()}, list.get(),
              EachRow<[](const Arguments& args) -> absl::StatusOr<std::vector<std::string>> {
                // BigQuery's error ends as no other function's does.
