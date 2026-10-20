@@ -23,3 +23,8 @@ SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
 
 SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('MULTIPOINT(1 2, 3 4)'))
 => error contains: The emulator does not support ST_ASGEOJSON of a MULTIPOINT
+
+# Eight octants cover the sphere; the emulator cannot represent the full polygon.
+
+SELECT ST_UNION([ST_GEOGFROMTEXT('POLYGON((0 0, 90 0, 0 90, 0 0))'), ST_GEOGFROMTEXT('POLYGON((90 0, 180 0, 0 90, 90 0))'), ST_GEOGFROMTEXT('POLYGON((180 0, -90 0, 0 90, 180 0))'), ST_GEOGFROMTEXT('POLYGON((-90 0, 0 0, 0 90, -90 0))'), ST_GEOGFROMTEXT('POLYGON((0 0, 90 0, 0 -90, 0 0))'), ST_GEOGFROMTEXT('POLYGON((90 0, 180 0, 0 -90, 90 0))'), ST_GEOGFROMTEXT('POLYGON((180 0, -90 0, 0 -90, 180 0))'), ST_GEOGFROMTEXT('POLYGON((-90 0, 0 0, 0 -90, -90 0))')])
+=> error contains: The emulator does not support ST_UNION producing the full polygon

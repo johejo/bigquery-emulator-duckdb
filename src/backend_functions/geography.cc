@@ -524,6 +524,26 @@ absl::StatusOr<std::string> PointN(const Arguments& args) {
   return GeographyText(PointGeography(line.at(index > 0 ? index - 1 : size + index)));
 }
 
+// ST_UNION, with NULL array elements already removed by the translator.
+absl::StatusOr<std::optional<std::string>> UnionGeographies(
+    const std::vector<std::string>& geographies) {
+  if (geographies.empty()) {
+    return std::nullopt;
+  }
+  std::vector<Geography> parts;
+  parts.reserve(geographies.size());
+  for (const std::string& text : geographies) {
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, ParseGeography(text));
+    parts.push_back(std::move(geography));
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, Combine(parts));
+  if (ToS2Polygon(geography)->is_full()) {
+    return absl::UnimplementedError(
+        "The emulator does not support ST_UNION producing the full polygon");
+  }
+  return GeographyText(geography);
+}
+
 // The line through the vertices of `geographies`, each a single point or linestring, built as
 // ST_GEOGFROMTEXT builds one; a single point is that point.
 absl::StatusOr<std::string> MakeLine(const std::vector<std::string>& geographies) {
@@ -762,9 +782,15 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(
       connection, "bq_st_makeline", {kVarchar, kVarchar}, kVarchar,
       EachRow<[](const Arguments& args) { return MakeLine({args.String(0), args.String(1)}); }>);
+  Register(connection, "bq_st_union", {kVarchar, kVarchar}, kVarchar,
+           EachRow<[](const Arguments& args) {
+             return UnionGeographies({args.String(0), args.String(1)});
+           }>);
   {
     const LogicalType varchar(duckdb_create_logical_type(kVarchar));
     const LogicalType list(duckdb_create_list_type(varchar.get()));
+    Register(connection, "bq_st_union_array", {list.get()}, varchar.get(),
+             EachRow<[](const Arguments& args) { return UnionGeographies(args.Strings(0)); }>);
     Register(connection, "bq_st_makeline_array", {list.get()}, varchar.get(),
              EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
     Register(connection, "bq_st_makepolygon_holes",

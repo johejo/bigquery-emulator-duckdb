@@ -158,6 +158,7 @@ ring. The full polygon is unsupported. Additional limits are:
 - `ST_ASGEOJSON` is unsupported for anything but a single point and the empty geography.
 - Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
   holes that collapse are unsupported.
+- `ST_UNION` producing the full polygon is unsupported.
 - `ST_MAKEPOLYGON` of an empty geography and `ST_GEOGFROMTEXT`'s `oriented`, `planar` and
   `make_valid` arguments are unsupported.
 
