@@ -1,8 +1,8 @@
 # AGENTS.md
 
 C++20 built with Bazel; prefer the standard library. `nix develop` provides the toolchain,
-including `bq`. Use `just` recipes (see the [Justfile](Justfile)) for building, testing, formatting and
-generating docs.
+including `just` and `bq`. Use `just` recipes (see the [Justfile](Justfile)) for building, testing,
+formatting and generating docs. CI runs the same recipes through `nix run` apps.
 
 Bazel rejects cyclic dependencies; do not break a cycle with a target that holds only headers.
 Move what causes it, such as a type or an error class, to a lower target, or build sources that
