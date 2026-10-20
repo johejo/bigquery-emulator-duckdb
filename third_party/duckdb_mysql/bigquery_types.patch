@@ -1,0 +1,38 @@
+diff --git a/src/mysql_types.cpp b/src/mysql_types.cpp
+--- a/src/mysql_types.cpp
++++ b/src/mysql_types.cpp
+@@ -78,10 +78,8 @@
+ 	} else if (type_info.type_name == "datetime") {
+ 		return LogicalType::TIMESTAMP;
+ 	} else if (type_info.type_name == "decimal") {
+-		if (type_info.precision > 0 && type_info.precision <= 38) {
+-			return LogicalType::DECIMAL(type_info.precision, type_info.scale);
+-		}
+-		return LogicalType::DOUBLE;
++		// Preserve every decimal digit until EXTERNAL_QUERY applies BigQuery's mapping.
++		return LogicalType::VARCHAR;
+ 	} else if (type_info.type_name == "json") {
+ 		// FIXME
+ 		return LogicalType::VARCHAR;
+@@ -179,7 +177,7 @@
+ 	case MYSQL_TYPE_BLOB:
+ 	case MYSQL_TYPE_STRING:
+ 	case MYSQL_TYPE_VAR_STRING:
+-		if (field->flags & BINARY_FLAG) {
++		if (field->charsetnr == 63) {
+ 			type_data.type_name = "blob";
+ 		} else {
+ 			type_data.type_name = "varchar";
+diff --git a/src/mysql_result.cpp b/src/mysql_result.cpp
+--- a/src/mysql_result.cpp
++++ b/src/mysql_result.cpp
+@@ -355,8 +355,7 @@
+ 	                          type_config.incomplete_dates_as_nulls && (mt->month == 0 || mt->day == 0);
+ 
+ 	if (is_zero_datetime || is_zero_date || is_incomplete_date) {
+-		FlatVector::SetNull(vec, row, true);
+-		return;
++		throw InvalidInputException("The emulator does not support EXTERNAL_QUERY MySQL zero dates");
+ 	}
+ 
+ 	switch (vec.GetType().id()) {

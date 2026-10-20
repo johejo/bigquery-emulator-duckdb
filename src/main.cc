@@ -42,7 +42,7 @@ void PrintUsage() {
          "                              300000)\n"
          "  --javascript-memory-mib MIB  How much memory JavaScript UDF calls may allocate per\n"
          "                               query on each thread (default: 256)\n"
-         "  --connection ID=CONNINFO  Let EXTERNAL_QUERY reach PostgreSQL or Spanner\n"
+         "  --connection ID=CONNINFO  Let EXTERNAL_QUERY reach PostgreSQL, MySQL or Spanner\n"
          "                  (libpq connection string/URI or "
          "spanner://projects/P/instances/I/databases/D),\n"
          "                  or OBJ functions read Cloud Storage (cloud_resource),\n"

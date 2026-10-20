@@ -1,0 +1,5 @@
+exports_files([
+    "BUILD.duckdb_mysql.bazel",
+    "bigquery_types.patch",
+    "static_symbols.patch",
+])

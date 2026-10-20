@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
+	"github.com/johejo/bigquery-emulator-duckdb/internal/mysqlprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/postgresprocess"
 	"github.com/johejo/bigquery-emulator-duckdb/internal/spannerprocess"
 )
@@ -177,9 +178,23 @@ func run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, postgres.Stop()) }()
+	startup, cancelMySQL := context.WithTimeout(ctx, 60*time.Second)
+	mysql, err := mysqlprocess.Start(startup, filepath.Join(tmp, "mysql"))
+	cancelMySQL()
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, mysql.Stop()) }()
+	fixture, err := os.ReadFile("tests/e2e/mysql.sql")
+	if err != nil {
+		return err
+	}
+	if err := mysql.Execute(ctx, string(fixture)); err != nil {
+		return err
+	}
+	connections := []string{"test.us.postgres=" + postgres.Conninfo, "test.us.mysql=" + mysql.Conninfo, "test.us.storage=cloud_resource"}
 	// Standalone Spanner binaries are available for Linux amd64 and arm64. Other platforms
 	// can run these cases against an externally started emulator and empty database.
-	connections := []string{"test.us.postgres=" + postgres.Conninfo, "test.us.storage=cloud_resource"}
 	if runtime.GOOS == "linux" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") && os.Getenv("E2E_SPANNER_DATABASE") == "" {
 		startup, cancel := context.WithTimeout(ctx, 45*time.Second)
 		spanner, startErr := spannerprocess.Start(startup)

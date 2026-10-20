@@ -11,8 +11,8 @@ bazel_dep(name = "googleapis", version = "0.0.0-20260825-d10ac924")
 bazel_dep(name = "grpc", version = "1.84.0")
 bazel_dep(name = "googlesql", version = "2026.10.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
 
-bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 
 bazel_dep(name = "linenoise", version = "2.0.0.bcr.1")
@@ -183,4 +183,28 @@ http_archive(
     sha256 = "75183a89b801ce7a172594580665ce321684e6831dbb632d8770be94b166e07b",
     strip_prefix = "database-connector-0a8505f775dae7bb30edd37f848d5975bf72884e",
     urls = ["https://github.com/duckdb/database-connector/archive/0a8505f775dae7bb30edd37f848d5975bf72884e.tar.gz"],
+)
+
+# MySQL extension pinned by DuckDB v1.5.6. Keep decimals lossless until BigQuery conversion.
+http_archive(
+    name = "duckdb_mysql",
+    build_file = "//third_party/duckdb_mysql:BUILD.duckdb_mysql.bazel",
+    patch_args = ["-p1"],
+    patches = [
+        "//third_party/duckdb_mysql:bigquery_types.patch",
+        "//third_party/duckdb_mysql:static_symbols.patch",
+    ],
+    sha256 = "32ec9a3b97ddee39f93d2460a57ed6f2d69a960d1e5041a608913c5425343230",
+    strip_prefix = "duckdb-mysql-99c2e091b153b7f1cbd449988332232e75684b41",
+    urls = ["https://github.com/duckdb/duckdb-mysql/archive/99c2e091b153b7f1cbd449988332232e75684b41.tar.gz"],
+)
+
+http_archive(
+    name = "mariadb_connector_c",
+    build_file = "//third_party/mariadb_connector_c:BUILD.mariadb.bazel",
+    patch_args = ["-p1"],
+    patches = ["//third_party/mariadb_connector_c:boringssl.patch"],
+    sha256 = "ced7e5063c91fe2bfafd9d63a759490fe53e81df80599a9abad01c570c202f0c",
+    strip_prefix = "mariadb-connector-c-3.4.8",
+    urls = ["https://github.com/mariadb-corporation/mariadb-connector-c/archive/refs/tags/v3.4.8.tar.gz"],
 )

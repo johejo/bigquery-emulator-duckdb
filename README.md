@@ -143,8 +143,9 @@ just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 
 ## External queries
 
-With `--connection PROJECT.LOCATION.CONNECTION=CONNINFO`, `EXTERNAL_QUERY` reaches the PostgreSQL
-or Spanner database named by the connection. PostgreSQL takes a libpq connection string or URI;
+With `--connection PROJECT.LOCATION.CONNECTION=CONNINFO`, `EXTERNAL_QUERY` reaches the PostgreSQL,
+MySQL or Spanner database named by the connection. PostgreSQL takes a libpq connection string or URI;
+MySQL takes `mysql:` followed by the DuckDB MySQL extension's `key=value` connection string;
 Spanner takes `spanner://projects/PROJECT/instances/INSTANCE/databases/DATABASE`. Set
 `SPANNER_EMULATOR_HOST=localhost:9010` to reach a locally running Spanner emulator; otherwise
 Spanner uses Application Default Credentials. For example:
@@ -166,6 +167,13 @@ Connections are not persisted in the data directory. See
 ```sh
 just run --project='{"projectId":"test"}' \
   --connection='test.us.orders=postgresql://postgres@localhost:5432/orders'
+```
+
+For MySQL:
+
+```sh
+just run --project='{"projectId":"test"}' \
+  --connection='test.us.orders=mysql:host=localhost port=3306 user=root database=orders'
 ```
 
 ## Persistence
@@ -224,7 +232,7 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
-- `EXTERNAL_QUERY` reaches the PostgreSQL or Spanner databases that `--connection` configures,
+- `EXTERNAL_QUERY` reaches the PostgreSQL, MySQL or Spanner databases that `--connection` configures,
   and ObjectRef functions authorize with the Cloud resource connections it declares, rather than
   connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to

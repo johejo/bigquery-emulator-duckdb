@@ -29,6 +29,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
+#include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
 #include "src/type_mapping.h"
 
@@ -755,6 +756,7 @@ struct Backend::Database {
     }
     RegisterBackendFunctions(handle.get(), session_user, javascript, storage);
     RegisterPostgresScanner(handle.get());
+    RegisterMySqlScanner(handle.get());
   }
 
   [[nodiscard]] Connection Connect() const {

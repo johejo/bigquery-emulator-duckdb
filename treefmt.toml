@@ -3,7 +3,7 @@
 
 [formatter.buildifier]
 command = "buildifier"
-includes = ["BUILD", "BUILD.bazel", "*/BUILD", "*/BUILD.bazel", "*.bzl", "MODULE.bazel"]
+includes = ["BUILD", "BUILD.bazel", "*/BUILD", "*/BUILD.bazel", "*/BUILD.*.bazel", "*.bzl", "MODULE.bazel"]
 
 [formatter.clang-format]
 command = "clang-format"

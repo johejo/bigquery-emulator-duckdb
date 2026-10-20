@@ -1,0 +1,18 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "mysql_scanner",
+    srcs = glob([
+        "src/*.cpp",
+        "src/storage/**/*.cpp",
+    ]),
+    hdrs = glob(["src/include/**/*.hpp"]),
+    includes = ["src/include"],
+    deps = [
+        "@duckdb_database_connector//:database_connector",
+        "@duckdb_source//:headers",
+        "@mariadb_connector_c//:mariadb",
+    ],
+)

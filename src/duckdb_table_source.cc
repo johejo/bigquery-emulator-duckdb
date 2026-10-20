@@ -23,6 +23,7 @@
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/location.h"
+#include "src/mysql_query.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/spanner_query.h"
@@ -256,6 +257,7 @@ class DuckDbTableSource : public TableSource {
       ReferenceLocation("Connection " + key, *location);
     }
     const bool spanner = connection->second.starts_with("spanner://");
+    const bool mysql = connection->second.starts_with("mysql:");
     absl::StatusOr<std::vector<FieldSchema>> columns =
         [&]() -> absl::StatusOr<std::vector<FieldSchema>> {
       if (spanner) {
@@ -264,6 +266,9 @@ class DuckDbTableSource : public TableSource {
       const auto decimal_type = DecimalColumnType(options);
       if (!decimal_type.ok()) {
         return decimal_type.status();
+      }
+      if (mysql) {
+        return DescribeMySqlQuery(connection->second.substr(6), query, *decimal_type);
       }
       return DescribePostgresQuery(connection->second, query, *decimal_type);
     }();
@@ -279,6 +284,10 @@ class DuckDbTableSource : public TableSource {
         std::string read;
         if (spanner) {
           read = "bq_spanner_query(" + QuoteLiteral(connection->second.substr(10)) + ", sql)";
+        } else if (mysql) {
+          connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second.substr(6)) +
+                                       " AS " + name + " (TYPE mysql, READ_ONLY)");
+          read = "mysql_query(" + QuoteLiteral(ExternalDatabaseName(key)) + ", sql)";
         } else {
           connections_.backend.Execute("ATTACH " + QuoteLiteral(connection->second) + " AS " +
                                        name + " (TYPE postgres, READ_ONLY)");

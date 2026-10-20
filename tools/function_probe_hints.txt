@@ -293,6 +293,9 @@ query TEXT_ANALYZE SELECT TEXT_ANALYZE('abc', analyzer_options => '{"delimiters"
 # tools/restprobe connects us.postgres to an empty PostgreSQL server. BigQuery reads bit strings
 # as BYTES, which the emulator rejects.
 query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1 AS x')
+# tools/restprobe also connects us.mysql to an empty MySQL server.
+query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT 1 AS x')
+query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(1 AS DECIMAL(65, 0)) AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
 query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', 'SELECT 1.5::numeric AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
 query EXTERNAL_QUERY SELECT * FROM EXTERNAL_QUERY('us.postgres', '''SELECT B'101' AS x''')
 

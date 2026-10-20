@@ -11,7 +11,7 @@
 #include "absl/status/statusor.h"
 #include "src/field_schema.h"
 
-// EXTERNAL_QUERY reads from PostgreSQL or Spanner databases that --connection names.
+// EXTERNAL_QUERY reads from PostgreSQL, MySQL or Spanner databases that --connection names.
 
 namespace bigquery_emulator_duckdb {
 
@@ -30,7 +30,8 @@ struct ExternalConnections {
 struct ExternalConnection {
   // The connection's PROJECT.LOCATION.CONNECTION, as ConnectionKey gives it.
   std::string key;
-  // A libpq connection string or URI, or spanner://projects/P/instances/I/databases/D.
+  // A libpq connection string or URI, mysql:key=value DSN, or
+  // spanner://projects/P/instances/I/databases/D.
   std::string conninfo;
 };
 
@@ -51,8 +52,8 @@ std::optional<std::string> ConnectionKey(std::string_view connection_id,
 // The internal DuckDB attachment and table macro name, which a project ID cannot name.
 std::string ExternalDatabaseName(const std::string& key);
 
-// The type that EXTERNAL_QUERY's options give PostgreSQL's NUMERIC: NUMERIC unless
-// default_type_for_decimal_columns names another. An error status for options it rejects.
+// The type that EXTERNAL_QUERY's options give PostgreSQL's NUMERIC and MySQL's DECIMAL: NUMERIC
+// unless default_type_for_decimal_columns names another. An error status for options it rejects.
 absl::StatusOr<FieldType> DecimalColumnType(const std::string& options);
 
 // The columns that `query` returns on the PostgreSQL database `conninfo`, with the BigQuery types
