@@ -1,0 +1,183 @@
+## HLL_COUNT functions and APPROX_COUNT_DISTINCT
+# Sources: the examples of BigQuery's hll_functions, and BigQuery's answers to unverified cases.
+
+SELECT TO_HEX(HLL_COUNT.INIT(customer_id, 10))
+FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+  ('UA', 'customer_id_1'), ('CZ', 'customer_id_2'), ('CZ', 'customer_id_2'),
+  ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+WHERE country = 'UA'
+=> "087010021802200b82070d1002180a200f3205f9e401cd08"
+
+SELECT TO_HEX(HLL_COUNT.INIT(customer_id, 10))
+FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+  ('UA', 'customer_id_1'), ('CZ', 'customer_id_2'), ('CZ', 'customer_id_2'),
+  ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+WHERE country = 'CZ'
+=> "087010021802200b82070b1001180a200f3203f9e401"
+
+SELECT TO_HEX(HLL_COUNT.INIT(customer_id, 10))
+FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+  ('UA', 'customer_id_1'), ('CZ', 'customer_id_2'), ('CZ', 'customer_id_2'),
+  ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+WHERE country = 'BR'
+=> "087010011802200b82070b1001180a200f320382e101"
+
+SELECT HLL_COUNT.EXTRACT(hll_sketch) FROM (
+  SELECT country, HLL_COUNT.INIT(customer_id) AS hll_sketch
+  FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+    ('UA', 'customer_id_1'), ('BR', 'customer_id_3'), ('CZ', 'customer_id_2'),
+    ('CZ', 'customer_id_2'), ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+  GROUP BY country)
+WHERE country = 'UA'
+=> "2"
+
+SELECT HLL_COUNT.MERGE(hll_sketch) FROM (
+  SELECT country, HLL_COUNT.INIT(customer_id) AS hll_sketch
+  FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+    ('UA', 'customer_id_1'), ('BR', 'customer_id_3'), ('CZ', 'customer_id_2'),
+    ('CZ', 'customer_id_2'), ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+  GROUP BY country)
+=> "3"
+
+SELECT TO_HEX(HLL_COUNT.MERGE_PARTIAL(hll_sketch)) FROM (
+  SELECT country, HLL_COUNT.INIT(customer_id) AS hll_sketch
+  FROM UNNEST(ARRAY<STRUCT<country STRING, customer_id STRING>>[
+    ('UA', 'customer_id_1'), ('BR', 'customer_id_3'), ('CZ', 'customer_id_2'),
+    ('CZ', 'customer_id_2'), ('BR', 'customer_id_3'), ('UA', 'customer_id_2')])
+  GROUP BY country)
+=> "087010061802200b8207101003180f20143208d0a038ea7da49302"
+
+SELECT HLL_COUNT.EXTRACT(NULL)
+=> "0"
+
+SELECT HLL_COUNT.MERGE(s) FROM UNNEST([CAST(NULL AS BYTES)]) AS s
+=> "0"
+
+SELECT HLL_COUNT.MERGE_PARTIAL(s) FROM UNNEST([CAST(NULL AS BYTES)]) AS s
+=> null
+
+SELECT HLL_COUNT.INIT(x) FROM UNNEST([CAST(NULL AS INT64)]) AS x
+=> null
+
+# BigQuery's answers to unverified cases. INT64 sketches carry the value type of UINT64, and
+# NUMERIC and BIGNUMERIC ones custom types; num_values leaves out NULL inputs.
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([1, 2, 3]) AS x
+=> "08701003180220088207121003180f2014320aacfc20eaa60debfea101"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([-1]) AS x
+=> "087010011802200882070b1001180f20143203bdc236"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([0]) AS x
+=> "087010011802200882070b1001180f20143203a2a721"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([1, NULL, 1]) AS x
+=> "087010021802200882070b1001180f2014320396a32e"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([b'customer_id_1', b'customer_id_2']) AS x
+=> "087010021802200b82070e1002180f20143206ba9e39a49302"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST(['']) AS x
+=> "087010011802200b82070b1001180f20143203d7f508"
+
+SELECT HLL_COUNT.MERGE(s) FROM (
+  SELECT HLL_COUNT.INIT(x) AS s FROM UNNEST(['a', 'b']) AS x
+  UNION ALL SELECT HLL_COUNT.INIT(x) FROM UNNEST([b'b', b'c']) AS x)
+=> "3"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '0']) AS x
+=> "08701001180220cdb0f45982070b1001180f20143203a19b07"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '1']) AS x
+=> "08701001180220cdb0f45982070b1001180f2014320388cb27"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '-1']) AS x
+=> "08701001180220cdb0f45982070b1001180f2014320398dd39"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '1.5']) AS x
+=> "08701001180220cdb0f45982070b1001180f20143203bdf404"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '0.000000001']) AS x
+=> "08701001180220cdb0f45982070b1001180f20143203818413"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([NUMERIC '99999999999999999999999999999.999999999']) AS x
+=> "08701001180220cdb0f45982070b1001180f20143203ced837"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([BIGNUMERIC '1']) AS x
+=> "08701001180220ceb0f45982070b1001180f20143203bf9910"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([BIGNUMERIC '1e-38']) AS x
+=> "08701001180220ceb0f45982070b1001180f20143203a48413"
+
+SELECT TO_HEX(HLL_COUNT.INIT(x)) FROM UNNEST([BIGNUMERIC '-578960446186580977117854925043439539266.34992332820282019728792003956564819968']) AS x
+=> "08701001180220ceb0f45982070b1001180f201432039dce19"
+
+SELECT HLL_COUNT.MERGE(s) FROM (
+  SELECT HLL_COUNT.INIT(x) AS s FROM UNNEST([NUMERIC '1', NUMERIC '2']) AS x
+  UNION ALL SELECT HLL_COUNT.INIT(x) FROM UNNEST([BIGNUMERIC '2', BIGNUMERIC '3']) AS x)
+=> error: HLL_COUNT.MERGE_PARTIAL failed to compute.
+
+SELECT HLL_COUNT.MERGE(s) FROM (
+  SELECT HLL_COUNT.INIT(x) AS s FROM UNNEST([NUMERIC '1', NUMERIC '2']) AS x
+  UNION ALL SELECT HLL_COUNT.INIT(x) FROM UNNEST([2, 3]) AS x)
+=> error: HLL_COUNT.MERGE_PARTIAL failed to compute.
+
+# A sketch turns from sparse to normal once its sparse data would take three quarters of the
+# 2^precision bytes of the normal one.
+
+SELECT LENGTH(HLL_COUNT.INIT(x, 10)) FROM UNNEST(GENERATE_ARRAY(1, 701)) AS x
+=> "790"
+
+SELECT LENGTH(HLL_COUNT.INIT(x, 10)) FROM UNNEST(GENERATE_ARRAY(1, 702)) AS x
+=> "1044"
+
+SELECT TO_HEX(HLL_COUNT.MERGE_PARTIAL(s)) FROM (
+  SELECT HLL_COUNT.INIT(x, 15) AS s FROM UNNEST([1, 2, 3]) AS x
+  UNION ALL SELECT HLL_COUNT.INIT(x, 16) FROM UNNEST([4]) AS x)
+=> "08701004180220088207141004180f2014320cacfc20e2af0c8877ebfea101"
+
+# Estimates with and without bias correction, past the bias tables, and at a precision they do
+# not cover.
+
+SELECT HLL_COUNT.EXTRACT(HLL_COUNT.INIT(x, 10)) FROM UNNEST(GENERATE_ARRAY(1, 3000)) AS x
+=> "2937"
+
+SELECT HLL_COUNT.EXTRACT(HLL_COUNT.INIT(x)) FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS x
+=> "99651"
+
+SELECT HLL_COUNT.EXTRACT(HLL_COUNT.INIT(a + b * 1000))
+FROM UNNEST(GENERATE_ARRAY(1, 1000)) AS a, UNNEST(GENERATE_ARRAY(0, 999)) AS b
+=> "994892"
+
+SELECT HLL_COUNT.EXTRACT(HLL_COUNT.INIT(a + b * 1000, 20))
+FROM UNNEST(GENERATE_ARRAY(1, 1000)) AS a, UNNEST(GENERATE_ARRAY(0, 999)) AS b
+=> "1000473"
+
+SELECT HLL_COUNT.EXTRACT(HLL_COUNT.INIT(CAST(x AS STRING))) FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS x
+=> "102094"
+
+SELECT APPROX_COUNT_DISTINCT(x) FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS x
+=> "99651"
+
+SELECT APPROX_COUNT_DISTINCT(CAST(x AS STRING)) FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS x
+=> "102094"
+
+# BigQuery takes no sparse precision, and precisions from 10 to 24.
+
+SELECT HLL_COUNT.INIT(x, 9) FROM UNNEST([1]) AS x
+=> error contains: Argument 2 to HLL_COUNT.INIT must be between 10 and 24
+
+SELECT HLL_COUNT.INIT(x, 25) FROM UNNEST([1]) AS x
+=> error contains: Argument 2 to HLL_COUNT.INIT must be between 10 and 24
+
+SELECT HLL_COUNT.INIT(x, 15, 14) FROM UNNEST([1]) AS x
+=> error contains: No matching signature for aggregate function HLL_COUNT.INIT
+
+SELECT HLL_COUNT.EXTRACT(b'')
+=> error: Invalid input bytes to HLL_COUNT.EXTRACT
+
+SELECT HLL_COUNT.EXTRACT(b'abc')
+=> error: Invalid input bytes to HLL_COUNT.EXTRACT
+
+SELECT HLL_COUNT.MERGE(s) FROM UNNEST([b'']) AS s
+=> error: Invalid or incompatible sketch in HLL_COUNT.MERGE_PARTIAL

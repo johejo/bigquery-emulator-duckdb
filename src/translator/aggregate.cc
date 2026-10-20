@@ -35,7 +35,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns, const std::string& having = "",
                                          std::vector<std::string>* intermediates = nullptr) {
-  const std::string name = ToUpperAscii(call.function()->Name());
+  const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||

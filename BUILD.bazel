@@ -531,6 +531,7 @@ cc_library(
         "//src/backend_functions:cast",
         "//src/backend_functions:datetime",
         "//src/backend_functions:geography",
+        "//src/backend_functions:hll_count",
         "//src/backend_functions:interval",
         "//src/backend_functions:javascript",
         "//src/backend_functions:json",

@@ -435,21 +435,21 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
       },
       // NET functions. HOST, REG_DOMAIN and PUBLIC_SUFFIX follow GoogleSQL's copy of the public
       // suffix list.
-      {"IPV4_FROM_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_from_int64($1)"}}},
-      {"IPV4_TO_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_to_int64($1)"}}},
-      {"IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_ip_from_string($1)"}}},
-      {"SAFE_IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_safe_ip_from_string($1)"}}},
-      {"IP_TO_STRING", {{.arity = 1, .spelling = "bq_net_ip_to_string($1)"}}},
-      {"IP_NET_MASK", {{.arity = 2, .spelling = "bq_net_ip_net_mask($1, $2)"}}},
-      {"IP_TRUNC", {{.arity = 2, .spelling = "bq_net_ip_trunc($1, $2)"}}},
-      {"HOST", {{.arity = 1, .spelling = "bq_net_host($1)"}}},
-      {"REG_DOMAIN", {{.arity = 1, .spelling = "bq_net_reg_domain($1)"}}},
-      {"PUBLIC_SUFFIX", {{.arity = 1, .spelling = "bq_net_public_suffix($1)"}}},
+      {"NET.IPV4_FROM_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_from_int64($1)"}}},
+      {"NET.IPV4_TO_INT64", {{.arity = 1, .spelling = "bq_net_ipv4_to_int64($1)"}}},
+      {"NET.IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_ip_from_string($1)"}}},
+      {"NET.SAFE_IP_FROM_STRING", {{.arity = 1, .spelling = "bq_net_safe_ip_from_string($1)"}}},
+      {"NET.IP_TO_STRING", {{.arity = 1, .spelling = "bq_net_ip_to_string($1)"}}},
+      {"NET.IP_NET_MASK", {{.arity = 2, .spelling = "bq_net_ip_net_mask($1, $2)"}}},
+      {"NET.IP_TRUNC", {{.arity = 2, .spelling = "bq_net_ip_trunc($1, $2)"}}},
+      {"NET.HOST", {{.arity = 1, .spelling = "bq_net_host($1)"}}},
+      {"NET.REG_DOMAIN", {{.arity = 1, .spelling = "bq_net_reg_domain($1)"}}},
+      {"NET.PUBLIC_SUFFIX", {{.arity = 1, .spelling = "bq_net_public_suffix($1)"}}},
       // AEAD with Tink keysets of AES-GCM keys, and deterministic AEAD with AES-SIV keys, where a
       // STRING is its UTF-8 bytes. The keyset chain of KEYS.KEYSET_CHAIN needs Cloud KMS, as do
       // the KEYS functions of wrapped keysets.
       {
-          "ENCRYPT",
+          "AEAD.ENCRYPT",
           {
               {
                   .arity = 3,
@@ -464,7 +464,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
           },
       },
       {
-          "DECRYPT_BYTES",
+          "AEAD.DECRYPT_BYTES",
           {
               {
                   .arity = 3,
@@ -474,7 +474,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
           },
       },
       {
-          "DECRYPT_STRING",
+          "AEAD.DECRYPT_STRING",
           {
               {
                   .arity = 3,
@@ -518,11 +518,12 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               },
           },
       },
-      {"NEW_KEYSET", {{.arity = 1, .spelling = "bq_keys_new_keyset($1)"}}},
-      {"ROTATE_KEYSET", {{.arity = 2, .spelling = "bq_keys_rotate_keyset($1, $2)"}}},
-      {"KEYSET_LENGTH", {{.arity = 1, .spelling = "bq_keys_keyset_length($1)"}}},
-      {"KEYSET_TO_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_to_json($1)"}}},
-      {"KEYSET_FROM_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_from_json($1)"}}},
+      {"KEYS.NEW_KEYSET", {{.arity = 1, .spelling = "bq_keys_new_keyset($1)"}}},
+      {"KEYS.ROTATE_KEYSET", {{.arity = 2, .spelling = "bq_keys_rotate_keyset($1, $2)"}}},
+      {"KEYS.KEYSET_LENGTH", {{.arity = 1, .spelling = "bq_keys_keyset_length($1)"}}},
+      {"KEYS.KEYSET_TO_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_to_json($1)"}}},
+      {"KEYS.KEYSET_FROM_JSON", {{.arity = 1, .spelling = "bq_keys_keyset_from_json($1)"}}},
+      {"HLL_COUNT.EXTRACT", {{.arity = 1, .spelling = "bq_hll_count_extract($1)"}}},
       // Without max_distance, the distance is not capped.
       {
           "EDIT_DISTANCE",

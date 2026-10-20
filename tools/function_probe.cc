@@ -407,8 +407,8 @@ int Main(int argc, char** argv) {
     const std::vector<std::string> path = absl::StrSplit(name, '.');
     const bool known = catalog.FindFunction(path, &function).ok();
     // Functions spelled as syntax, such as EXTRACT, are operators such as $EXTRACT.
-    const translator::FunctionEntry* entry =
-        translator::FindFunction(known ? absl::AsciiStrToUpper(function->Name()) : "$" + name);
+    const translator::FunctionEntry* entry = translator::FindFunction(
+        known ? absl::AsciiStrToUpper(function->FullName(/*include_group=*/false)) : "$" + name);
     const googlesql::TableValuedFunction* table_function = nullptr;
     // RANGE_SESSIONIZE and EXTERNAL_QUERY have scan translators rather than scalar registry
     // entries.

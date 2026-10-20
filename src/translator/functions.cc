@@ -63,10 +63,10 @@ const std::unordered_map<std::string_view, Handler>& Handlers() {
       {"CONCAT", ConcatStrings},
       {"GREATEST", Extremum},
       {"LEAST", Extremum},
-      {"ADD_KEY_FROM_RAW_BYTES", AddKeyFromRawBytes},
+      {"KEYS.ADD_KEY_FROM_RAW_BYTES", AddKeyFromRawBytes},
       {"TEXT_ANALYZE", TextAnalyze},
-      {"MAKE_REF", MakeRef},
-      {"FETCH_METADATA", FetchMetadata},
+      {"OBJ.MAKE_REF", MakeRef},
+      {"OBJ.FETCH_METADATA", FetchMetadata},
   };
   return *kHandlers;
 }
@@ -165,6 +165,7 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
       "MAX_BY",
       "MIN_BY",
       "APPROX_COUNT_DISTINCT",
+      "HLL_COUNT.INIT",
       "APPROX_QUANTILES",
       "APPROX_TOP_COUNT",
       "APPROX_TOP_SUM",

@@ -156,6 +156,36 @@ std::string IntervalDistinct(const std::string& sql, const std::vector<std::stri
   return "bq_interval_distinct(" + sql + ")";
 }
 
+// The estimate of the sketch that bq_hll_count_init or bq_hll_count_merge_partial builds, 0 for
+// none, as BigQuery's MERGE and APPROX_COUNT_DISTINCT estimate a merged sketch.
+std::string ExtractSketch(const std::string& sql, const std::vector<std::string>& /*arguments*/,
+                          const std::string& /*tail*/) {
+  return "bq_hll_count_extract(" + sql + ")";
+}
+
+// HLL_COUNT.INIT over values of `type`, or of any type but BIGNUMERIC for TYPE_UNKNOWN. It takes a
+// BIGNUMERIC as the VARCHAR of its units.
+AggregateRule HllCountInit(googlesql::TypeKind type) {
+  const bool bignumeric = type == googlesql::TYPE_BIGNUMERIC;
+  return {
+      .function = bignumeric ? "bq_hll_count_init_bignumeric" : "bq_hll_count_init",
+      .type = type,
+      .arguments = {bignumeric ? "CAST($1 AS VARCHAR)" : "$1", "$2"},
+      .defaults = {"", "15"},
+      .distinct = AggregateRule::Distinct::kUnsupported,
+  };
+}
+
+// APPROX_COUNT_DISTINCT over values of `type`, which BigQuery estimates as HLL_COUNT.INIT's
+// sketch at its default precision.
+AggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
+  AggregateRule rule = HllCountInit(type);
+  rule.arguments.at(1) = "15";
+  rule.distinct = AggregateRule::Distinct::kAllowed;
+  rule.finish = ExtractSketch;
+  return rule;
+}
+
 // Aggregate functions, which also take a window.
 }  // namespace
 
@@ -255,10 +285,26 @@ const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregat
                   },
               },
           },
-          // Exact, which is within any approximation error.
+          {
+              "HLL_COUNT.INIT",
+              {HllCountInit(googlesql::TYPE_BIGNUMERIC), HllCountInit(googlesql::TYPE_UNKNOWN)},
+          },
+          {"HLL_COUNT.MERGE_PARTIAL", {{.function = "bq_hll_count_merge_partial"}}},
+          {
+              "HLL_COUNT.MERGE",
+              {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}},
+          },
+          // Other types count exactly, which is within any approximation error.
           {
               "APPROX_COUNT_DISTINCT",
-              {{.function = "count", .distinct = AggregateRule::Distinct::kAlways}},
+              {
+                  ApproxCountDistinct(googlesql::TYPE_INT64),
+                  ApproxCountDistinct(googlesql::TYPE_STRING),
+                  ApproxCountDistinct(googlesql::TYPE_BYTES),
+                  ApproxCountDistinct(googlesql::TYPE_NUMERIC),
+                  ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
+                  {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
+              },
           },
           // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
           // skips NULLs, as APPROX_QUANTILES does by default.
