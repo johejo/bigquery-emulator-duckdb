@@ -47,16 +47,20 @@ func TestGeographyColumns(t *testing.T) {
 		[]bigquery.Value{"LINESTRING(0 0, 132 0)"}, []bigquery.Value{"POINT(10 10)"})}); err != nil {
 		t.Fatal(err)
 	}
-	// Each row with a value that is not WKT fails; GeoJSON, which BigQuery takes, is unsupported.
+	// Each row with a value that is not WKT fails; GeoJSON, which BigQuery takes, is unsupported,
+	// as is a polygon whose shell runs clockwise, which BigQuery takes as the region on its left:
+	// https://cloud.google.com/bigquery/docs/geospatial-data#polygon_orientation
 	var rowErrors bigquery.PutMultiError
 	inserter.SkipInvalidRows = true
 	err := inserter.Put(ctx, []*bigquery.ValuesSaver{
 		row(int64(2), "POINT(1", nil, nil),
 		row(int64(3), `{"type": "Point", "coordinates": [1, 2]}`, nil, nil),
+		row(int64(8), "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))", nil, nil),
 	})
-	if !errors.As(err, &rowErrors) || len(rowErrors) != 2 ||
-		!strings.Contains(rowErrors[1].Error(), "does not support GeoJSON") {
-		t.Fatalf("invalid rows: %v, want an error for each, the second for GeoJSON", err)
+	if !errors.As(err, &rowErrors) || len(rowErrors) != 3 ||
+		!strings.Contains(rowErrors[1].Error(), "does not support GeoJSON") ||
+		!strings.Contains(rowErrors[2].Error(), "whose shell runs clockwise") {
+		t.Fatalf("invalid rows: %v, want an error for each, for GeoJSON and a clockwise shell", err)
 	}
 
 	if err := p.load("places", `{"id": 4, "g": "POINT(5 6)", "r": {"g": null}}`+"\n", schema,
@@ -99,5 +103,17 @@ func TestGeographyColumns(t *testing.T) {
 		{-122.35, 47.62, "LINESTRING(0 0, 132 0)", "POINT(10 10)"},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("query = %v, want %v", got, want)
+	}
+
+	// A counterclockwise shell encloses the square degree on its left.
+	inserter.SkipInvalidRows = false
+	if err := inserter.Put(ctx, []*bigquery.ValuesSaver{
+		row(int64(7), "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))", nil, nil),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := p.read("SELECT ST_AREA(g) < 1e11 FROM places WHERE id = 7"),
+		[][]bigquery.Value{{true}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("polygon query = %v, want %v", got, want)
 	}
 }

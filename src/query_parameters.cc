@@ -5,20 +5,23 @@
 #include <iterator>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/backend_functions/geography_value.h"
+#include "src/backend_functions/geography_wkt.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/interval.h"
-#include "src/schema_sql.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -44,10 +47,11 @@ std::string CanonicalTypeName(const json& type) {
 }
 
 // A value together with the type that describes it: BigQuery keeps the two apart, in
-// parameterType and parameterValue, at every level of a nested parameter.
+// parameterType and parameterValue, at every level of a nested parameter, which `parameter` names.
 struct TypedValue {
   const json& type;
   const json& value;
+  const std::string& parameter;
 };
 
 // The value of a parameter that carries none, which is how BigQuery spells a NULL.
@@ -105,12 +109,34 @@ std::string ValueText(const json& value) {
 
 std::string ToDuckDbLiteral(const TypedValue& parameter);
 
+// The GEOGRAPHY of the WKT `text`, whose polygons are oriented, in the form queries hold it in.
+std::string GeographyLiteral(const std::string& text, const std::string& parameter) {
+  const absl::StatusOr<backend_functions::Geography> geography =
+      backend_functions::ReadWkt(text, /*oriented=*/true);
+  if (geography.ok()) {
+    return QuoteLiteral(backend_functions::GeographyText(*geography));
+  }
+  const std::string_view message = geography.status().message();
+  if (geography.status().code() == absl::StatusCode::kUnimplemented) {
+    throw ApiError::Invalid(std::string(message));
+  }
+  constexpr std::string_view kFailed = "ST_GeogFromText failed: ";
+  throw ApiError::Invalid(
+      "Unparseable query parameter `" + parameter + "` in type `TYPE_GEOGRAPHY`, " +
+      std::string(message.starts_with(kFailed) ? message.substr(kFailed.size()) : message) +
+      " value: '" + text + "'");
+}
+
 std::string ArrayLiteral(const TypedValue& parameter) {
   std::vector<std::string> elements;
-  std::ranges::transform(
-      parameter.value["arrayValues"], std::back_inserter(elements), [&](const json& element) {
-        return ToDuckDbLiteral({.type = parameter.type["arrayType"], .value = element});
-      });
+  std::ranges::transform(parameter.value["arrayValues"], std::back_inserter(elements),
+                         [&](const json& element) {
+                           return ToDuckDbLiteral({
+                               .type = parameter.type["arrayType"],
+                               .value = element,
+                               .parameter = parameter.parameter,
+                           });
+                         });
   // The cast pins down the element type, which an empty list literal does not carry.
   return "CAST([" + Join(elements, ", ") + "] AS " + ToDuckDbType(parameter.type) + ")";
 }
@@ -128,6 +154,7 @@ std::string StructLiteral(const TypedValue& parameter) {
                      ToDuckDbLiteral({
                          .type = field.at("type"),
                          .value = value == values.end() ? NoValue() : *value,
+                         .parameter = parameter.parameter,
                      }));
   }
   return "struct_pack(" + Join(fields, ", ") + ")";
@@ -143,6 +170,7 @@ std::string RangeLiteral(const TypedValue& parameter) {
     bounds.push_back(ToDuckDbLiteral({
         .type = parameter.type["rangeElementType"],
         .value = value == values.end() ? NoValue() : *value,
+        .parameter = parameter.parameter,
     }));
   }
   return "CAST(" + DuckDbRange(bounds.at(0), bounds.at(1)) + " AS " + type + ")";
@@ -188,8 +216,7 @@ std::string ToDuckDbLiteral(const TypedValue& parameter) {
     return "from_base64(" + QuoteLiteral(text) + ")";
   }
   if (name == "GEOGRAPHY") {
-    // Read from its WKT, as a load reads one.
-    return StoredValue(QuoteLiteral(text), ToFieldSchema("", type));
+    return GeographyLiteral(text, parameter.parameter);
   }
   return "CAST(" + QuoteLiteral(text) + " AS " + ToDuckDbType(type) + ")";
 }
@@ -214,11 +241,12 @@ QueryParameters QueryParameters::Parse(const json& parameters) {
       throw ApiError::Invalid("Query parameter is missing parameterType");
     }
     const auto value = parameter.find("parameterValue");
+    const std::string name = parameter.value("name", "");
     std::string literal = ToDuckDbLiteral({
         .type = parameter["parameterType"],
         .value = value == parameter.end() ? NoValue() : *value,
+        .parameter = name,
     });
-    const std::string name = parameter.value("name", "");
     FieldSchema type = ToFieldSchema(name, parameter["parameterType"]);
     if (name.empty()) {
       result.by_position_.push_back(std::move(literal));
