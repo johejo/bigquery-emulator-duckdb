@@ -146,8 +146,8 @@ BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-GEOGRAPHY query parameters are unsupported. Loads and `tabledata.insertAll` take GEOGRAPHY
-values as WKT; GeoJSON and WKB are unsupported. Multipart geometries, collections and the full
+Query parameters, loads and `tabledata.insertAll` take GEOGRAPHY values as WKT; GeoJSON and
+WKB are unsupported. Multipart geometries, collections and the full
 polygon are unsupported. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.

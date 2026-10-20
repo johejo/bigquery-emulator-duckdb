@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -36,6 +37,13 @@ func TestQueryParameterValuesAndSchema(t *testing.T) {
 		{"null_interval", &bigquery.QueryParameterValue{
 			Type: bigquery.StandardSQLDataType{TypeKind: "INTERVAL"}, Value: bigquery.NullString{},
 		}, nil, &bigquery.FieldSchema{Type: bigquery.IntervalFieldType}},
+		{"geography", bigquery.NullGeography{GeographyVal: "POINT(-122.35 47.62)", Valid: true},
+			"POINT(-122.35 47.62)", &bigquery.FieldSchema{Type: bigquery.GeographyFieldType}},
+		{"null_geography", bigquery.NullGeography{}, nil,
+			&bigquery.FieldSchema{Type: bigquery.GeographyFieldType}},
+		{"geography_array", []bigquery.NullGeography{{GeographyVal: "LINESTRING(0 0, 132 0)", Valid: true}},
+			[]bigquery.Value{"LINESTRING(0 0, 132 0)"},
+			&bigquery.FieldSchema{Type: bigquery.GeographyFieldType, Repeated: true}},
 		{"integer_array", []int64{1, 2}, []bigquery.Value{int64(1), int64(2)},
 			&bigquery.FieldSchema{Type: bigquery.IntegerFieldType, Repeated: true}},
 		// The Go client's convertRepeatedRecord returns a nil slice for an empty array.
@@ -109,5 +117,38 @@ func TestQueryRejectsUndeclaredParameters(t *testing.T) {
 				t.Fatal("query succeeded with an undeclared parameter")
 			}
 		})
+	}
+}
+
+// A GEOGRAPHY parameter is a GEOGRAPHY in the query, given as WKT; the coordinates are those of
+// scalars/geography.txt. A value that is not WKT fails the query, and GeoJSON, which BigQuery
+// takes, is unsupported.
+func TestGeographyQueryParameters(t *testing.T) {
+	client := newClient(t)
+	read := func(value string) ([]bigquery.Value, error) {
+		query := client.Query("SELECT ST_X(@p), ST_Y(@p)")
+		query.Parameters = []bigquery.QueryParameter{
+			{Name: "p", Value: bigquery.NullGeography{GeographyVal: value, Valid: true}},
+		}
+		rows, err := query.Read(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		var got []bigquery.Value
+		return got, rows.Next(&got)
+	}
+	got, err := read("POINT(-122.35 47.62)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []bigquery.Value{-122.35, 47.62}; !reflect.DeepEqual(got, want) {
+		t.Errorf("values = %#v, want %#v", got, want)
+	}
+	if _, err := read("POINT(1"); err == nil {
+		t.Error("query succeeded with invalid WKT")
+	}
+	if _, err := read(`{"type": "Point", "coordinates": [1, 2]}`); err == nil ||
+		!strings.Contains(err.Error(), "does not support GeoJSON") {
+		t.Errorf("GeoJSON parameter: %v, want an error that GeoJSON is unsupported", err)
 	}
 }
