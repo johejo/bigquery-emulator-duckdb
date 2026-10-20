@@ -33,7 +33,12 @@ stdenvNoCC.mkDerivation {
     # The gateway locates emulator_main and third-party notices next to itself.
     install -Dm755 gateway_main $out/bin/gateway_main
     install -Dm755 emulator_main $out/bin/emulator_main
-    install -Dm644 THIRD_PARTY_NOTICES.txt $out/bin/THIRD_PARTY_NOTICES.txt
+    if [[ -f THIRD_PARTY_NOTICES.txt ]]; then
+      install -Dm644 THIRD_PARTY_NOTICES.txt $out/bin/THIRD_PARTY_NOTICES.txt
+    else
+      # The arm64 archive supplies compressed notices under a different name.
+      gzip -dc licenses.txt.gz > $out/bin/THIRD_PARTY_NOTICES.txt
+    fi
     runHook postInstall
   '';
 
