@@ -100,6 +100,23 @@ absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
   return GeographyText(geography);
 }
 
+// A GEOGRAPHY that a load or tabledata.insertAll writes, given as WKT. BigQuery also takes GeoJSON
+// and WKB, hex-encoded or, from Parquet, binary, which DuckDB casts to text that starts with the
+// escape of its first byte; these are unsupported.
+absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
+  const std::string text = args.String(0);
+  const size_t start = text.find_first_not_of(" \t\r\n");
+  if (start != std::string::npos && text.at(start) == '{') {
+    return absl::UnimplementedError("The emulator does not support GeoJSON GEOGRAPHY values");
+  }
+  if (text.starts_with("\\x") || (!text.empty() && std::ranges::all_of(text, [](unsigned char c) {
+        return std::isxdigit(c) != 0;
+      }))) {
+    return absl::UnimplementedError("The emulator does not support WKB GEOGRAPHY values");
+  }
+  return GeogFromText(args);
+}
+
 // NULL for the same and antipodal points. Otherwise the initial bearing over the sphere, from the
 // difference of the longitudes in degrees, which gives nearly antipodal points and those at a pole
 // the azimuth BigQuery does, unlike S2Earth::GetInitialBearing.
@@ -632,6 +649,7 @@ absl::StatusOr<int64_t> CellIdFromPoint(const Arguments& args) {
 void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_geogpoint", {kDouble, kDouble}, kVarchar, EachRow<GeogPoint>);
   Register(connection, "bq_st_geogfromtext", {kVarchar}, kVarchar, EachRow<GeogFromText>);
+  Register(connection, "bq_geography_input", {kVarchar}, kVarchar, EachRow<GeographyInput>);
   Register(connection, "bq_st_geogpointfromgeohash", {kVarchar}, kVarchar,
            EachRow<PointFromGeohash>);
   Register(connection, "bq_st_astext", {kVarchar}, kVarchar,

@@ -580,7 +580,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                          result_table);
   }
   statements.emplace_back("COMMIT");
-  statements.push_back("SELECT " + std::string(count_only ? "count(*)" : "*") + " FROM " +
+  statements.push_back("SELECT " + (count_only ? "count(*)" : ReadColumns(schema)) + " FROM " +
                        result_table);
   try {
     return backend_.ExecuteAll(statements, setup);

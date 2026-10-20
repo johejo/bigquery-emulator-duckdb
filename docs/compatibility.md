@@ -146,8 +146,9 @@ BigQuery loads as NULL.
 
 ### GEOGRAPHY values
 
-Stored GEOGRAPHY columns read as STRING, and GEOGRAPHY query parameters are unsupported.
-Multipart geometries, collections and the full polygon are unsupported. Additional limits are:
+GEOGRAPHY query parameters are unsupported. Loads and `tabledata.insertAll` take GEOGRAPHY
+values as WKT; GeoJSON and WKB are unsupported. Multipart geometries, collections and the full
+polygon are unsupported. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
 - Linestrings that BigQuery splits into a `MULTILINESTRING`, such as overlapping lines, are

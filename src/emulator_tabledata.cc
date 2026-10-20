@@ -45,11 +45,13 @@ std::string RoundedInsertValue(const json& value, const FieldSchema& field,
 QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
                                     int64_t max_results) {
   table.project_id = ResolveProject(table.project_id);
-  if (GetTable(table).view_query) {
+  const TableInfo info = GetTable(table);
+  if (info.view_query) {
     throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
   }
-  return Execute("SELECT * FROM " + QualifiedName(table) + " LIMIT " + std::to_string(max_results) +
-                 " OFFSET " + std::to_string(start_index));
+  return Execute("SELECT " + ReadColumns(info.schema) + " FROM " + QualifiedName(table) +
+                 " LIMIT " + std::to_string(max_results) + " OFFSET " +
+                 std::to_string(start_index));
 }
 
 std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,

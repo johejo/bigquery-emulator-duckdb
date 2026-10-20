@@ -77,21 +77,22 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call) {
 namespace {
 
 // Whether ResultValue changes values of `type`.
-bool HasResultForm(const googlesql::Type* type) {
+bool HasResultForm(const googlesql::Type* type, bool stored) {
   if (type->IsArray()) {
     return true;
   }
   if (type->IsStruct()) {
-    return std::ranges::any_of(type->AsStruct()->fields(), [](const googlesql::StructField& field) {
-      return HasResultForm(field.type);
-    });
+    return std::ranges::any_of(type->AsStruct()->fields(),
+                               [stored](const googlesql::StructField& field) {
+                                 return HasResultForm(field.type, stored);
+                               });
   }
-  return type->IsGeography();
+  return !stored && type->IsGeography();
 }
 
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column, int depth) {
-  if (!HasResultForm(type)) {
+                        std::string_view column, bool stored, int depth) {
+  if (!HasResultForm(type, stored)) {
     return value;
   }
   if (type->IsGeography()) {
@@ -104,8 +105,8 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
            " IS NULL THEN error(" +
            QuoteLiteral("Array cannot have a null element; error in writing field " +
                         std::string(column)) +
-           ") ELSE " + ResultValue(name, type->AsArray()->element_type(), column, depth + 1) +
-           " END)";
+           ") ELSE " +
+           ResultValue(name, type->AsArray()->element_type(), column, stored, depth + 1) + " END)";
   }
   const auto* structure = type->AsStruct();
   const std::vector<std::string> names = DuckDbStructFieldNames(structure);
@@ -114,7 +115,7 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
   for (int i = 0; i < structure->num_fields(); ++i) {
     fields.push_back(QuoteIdentifier(names.at(i)) + " := " +
                      ResultValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
-                                 structure->field(i).type, column, depth + 1));
+                                 structure->field(i).type, column, stored, depth + 1));
   }
   return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
@@ -123,8 +124,8 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 }  // namespace
 
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
-                        std::string_view column) {
-  return ResultValue(value, type, column, 0);
+                        std::string_view column, bool stored) {
+  return ResultValue(value, type, column, stored, 0);
 }
 
 namespace {
@@ -196,7 +197,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
 
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
                                         const FieldSchema& field) {
-  return RoundedToEven(ResultValue(value, type, field.name), type, field);
+  return RoundedToEven(ResultValue(value, type, field.name, true), type, field);
 }
 
 std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,

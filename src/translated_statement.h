@@ -35,6 +35,9 @@ struct DefaultDataset {
   TableSource* source = nullptr;
   // Whether SESSION_USER is available from the execution backend.
   bool has_session_user = false;
+  // Whether a query's rows are written to a destination table, which stores them as
+  // ResultValue's `stored` gives them.
+  bool stores_result = false;
   // Runs a DuckDB query that returns one value of `type`, the value of a DDL option that is not
   // a literal. Without it, such options are unsupported.
   std::function<googlesql::Value(const std::string& query, const googlesql::Type* type)> evaluate =
