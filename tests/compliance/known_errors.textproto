@@ -1918,15 +1918,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "TIME_DIFF counts the unit boundaries crossed rather than the whole units elapsed"
-  label: "code:time_diff_TIME_02:56:13.456789_TIME_12:34:56.987654_STRING_<HOUR>"
-  label: "code:time_diff_TIME_02:56:13.456789_TIME_12:34:56.987654_STRING_<MILLISECOND>"
-  label: "code:time_diff_TIME_12:34:56.987654_TIME_02:56:13.456789_STRING_<HOUR>"
-  label: "code:time_diff_TIME_12:34:56.987654_TIME_02:56:13.456789_STRING_<MILLISECOND>"
-}
-
-known_errors {
   mode: ALLOW_ERROR
   reason: "TRUNC fails on a precision beyond INT32 and does not truncate extreme values to 0"
   label: "code:trunc_FLOAT64_3@1415925_INT64_-9223372036854775808"

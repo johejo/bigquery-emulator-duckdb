@@ -993,7 +993,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
           }),
       },
       {"DATETIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
-      // Every TIMESTAMP and TIME difference counts whole units.
+      // TIMESTAMP differences count whole units.
       {
           "TIMESTAMP_DIFF",
           Concat({
@@ -1008,7 +1008,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               },
           }),
       },
-      {"TIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_sub(#3, $2, $1)"}}})},
+      {"TIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
       // date_trunc() widens a DATE to a TIMESTAMP, which DATE_TRUNC does not. DATE_TRUNC also
       // takes a DATETIME or a TIMESTAMP, and returns its type.
       {
