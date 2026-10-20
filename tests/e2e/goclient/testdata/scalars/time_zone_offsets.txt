@@ -29,3 +29,22 @@ SELECT CAST(TIMESTAMP(DATE '2008-12-25', '+07:30') AS STRING)
 # The time zone is not a literal, so it is read at run time.
 SELECT CAST(DATETIME(TIMESTAMP '2008-12-25 15:30:00+00', z) AS STRING) FROM UNNEST(['-08:30']) z
 => "2008-12-25 07:00:00"
+
+# Expected values: BigQuery's answers.
+
+# A civil time repeated at a daylight saving change converts to its earlier instant;
+# America/Los_Angeles falls back at 02:00 PDT to 01:00 PST on 2024-11-03.
+SELECT CAST(TIMESTAMP(DATETIME '2024-11-03 01:30:00', 'America/Los_Angeles') AS STRING)
+=> "2024-11-03 08:30:00+00"
+
+# An unknown time zone that is not a literal.
+SELECT CAST(DATETIME(TIMESTAMP '2024-01-01 12:00:00+00', z) AS STRING) FROM UNNEST(['Invalid/Zone']) z
+=> error: Invalid time zone: Invalid/Zone
+
+# A civil time outside the DATETIME range is an error, which SAFE. turns into NULL, but its time
+# of day is not.
+SELECT CAST(SAFE.DATETIME(TIMESTAMP '0001-01-01 00:00:00+00', '-08:00') AS STRING)
+=> null
+
+SELECT CAST(TIME(TIMESTAMP '0001-01-01 00:00:00+00', '-08:00') AS STRING)
+=> "16:00:00"
