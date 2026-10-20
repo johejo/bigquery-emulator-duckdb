@@ -29,6 +29,14 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
 std::string InsertValue(const nlohmann::json& value, const FieldSchema& field,
                         bool ignore_unknown_values);
 
+// The DuckDB value `sql` of `field`, as a load reads it, with each GEOGRAPHY in it, at any depth,
+// read from its WKT into the form a table stores it in, which is the one queries hold.
+std::string StoredValue(const std::string& sql, const FieldSchema& field);
+
+// The select list of a table of `schema`, with each GEOGRAPHY, at any depth, as the WKT that
+// tabledata.list and query results return; `*` when it has none.
+std::string ReadColumns(const std::vector<FieldSchema>& schema);
+
 // The DuckDB value of the RANGE `field` that `text`, a VARCHAR in the form "[start, end)", holds,
 // where NULL and UNBOUNDED are unbounded ends and each other bound is cast to the element type.
 std::string RangeFromText(const std::string& text, const FieldSchema& field);

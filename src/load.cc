@@ -554,6 +554,7 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
       std::vector<std::string> columns;
       // read_csv() would truncate a BIGNUM, so a BIGNUMERIC is read as text and converted, as
       // are a RANGE, which has no text form in DuckDB, and an INTERVAL, whose text form differs.
+      // A GEOGRAPHY is read from its WKT, as in the other formats.
       std::vector<std::string> conversions;
       for (const FieldSchema& field : schema) {
         const bool big = field.type == FieldType::kBigNumeric;
@@ -567,7 +568,7 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
                                   ToDuckDbType(field))
             : range ? RangeFromText(name, field) + " AS " + name
             : interval ? std::format("bq_interval_from_csv({0}) AS {0}", name)
-                       : name);
+                       : StoredValue(name, field) + " AS " + name);
       }
       sql += ", columns={" + Join(columns, ", ") + "})";
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);
@@ -600,11 +601,12 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
     std::vector<std::string> columns;
     for (const FieldSchema& field : schema) {
       const std::string name = QuoteIdentifier(field.name);
-      columns.push_back(std::format("{} AS {}",
-                                    format == "PARQUET"
-                                        ? ParquetValue(name, field, parquet.Child(field.name), 0)
-                                        : JsonValue(name, field),
-                                    name));
+      columns.push_back(std::format(
+          "{} AS {}",
+          StoredValue(format == "PARQUET" ? ParquetValue(name, field, parquet.Child(field.name), 0)
+                                          : JsonValue(name, field),
+                      field),
+          name));
     }
     sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);
   }

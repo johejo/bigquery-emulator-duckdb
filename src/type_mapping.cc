@@ -176,8 +176,8 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                      : std::nullopt;
     }
     case googlesql::TYPE_GEOGRAPHY:
-      // The WKT BigQuery returns for it; see src/backend_functions/geography.cc. A parameter's
-      // text would need parsing into that form.
+      // See src/backend_functions/geography_value.h. A parameter's text would need parsing into
+      // that form.
       return use == TypeUse::kParameter ? std::nullopt : std::optional<std::string>("VARCHAR");
     case googlesql::TYPE_ARRAY: {
       const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);

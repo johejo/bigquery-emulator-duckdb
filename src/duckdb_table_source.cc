@@ -36,18 +36,6 @@ using nlohmann::json;
 
 namespace {
 
-// Queries see a GEOGRAPHY column as the STRING it is stored as, since the stored text is what the
-// client wrote rather than the WKT that GEOGRAPHY values in queries hold; tables.get still
-// reports the column as GEOGRAPHY.
-void GeographyAsString(std::vector<FieldSchema>& schema) {
-  for (FieldSchema& field : schema) {
-    if (field.type == FieldType::kGeography) {
-      field.type = FieldType::kString;
-    }
-    GeographyAsString(field.fields);
-  }
-}
-
 // The location of the connection `key`, as ConnectionKey gives it: PROJECT.LOCATION.CONNECTION,
 // where only the project may have dots.
 std::optional<std::string> ConnectionLocation(const std::string& key) {
@@ -84,7 +72,6 @@ class DuckDbTableSource : public TableSource {
       std::vector<FieldSchema> schema = TableSchema(
           backend_,
           TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
-      GeographyAsString(schema);
       Use(project, dataset);
       return schema;
     } catch (const BackendError&) {

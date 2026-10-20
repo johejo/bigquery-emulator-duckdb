@@ -306,10 +306,11 @@ QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& 
   return result;
 }
 
-TranslatedStatement Emulator::Translate(
-    const std::string& query, const QueryParameters& parameters, const std::string& default_project,
-    const std::string& default_dataset, JobLocation* location,
-    const googlesql::SystemVariableValuesMap* system_variables) {
+TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
+                                        const std::string& default_project,
+                                        const std::string& default_dataset, JobLocation* location,
+                                        const googlesql::SystemVariableValuesMap* system_variables,
+                                        bool stores_result) {
   AnalyzerSettings settings{
       .default_project = default_project,
       .default_dataset = default_dataset,
@@ -335,6 +336,7 @@ TranslatedStatement Emulator::Translate(
                              .temporary = nullptr,
                              .source = source.get(),
                              .has_session_user = has_session_user_,
+                             .stores_result = stores_result,
                              .evaluate =
                                  [this](const std::string& sql, const googlesql::Type* type) {
                                    return ResultValue(Execute(sql, {}, true), type);
@@ -520,9 +522,9 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
     const googlesql::SystemVariableValuesMap variables{
         {{"project_id"}, googlesql::Value::String(request.project_id)},
     };
-    const TranslatedStatement translation =
-        Translate(request.query, request.parameters, settings.default_project,
-                  settings.default_dataset, &location, &variables);
+    const TranslatedStatement translation = Translate(
+        request.query, request.parameters, settings.default_project, settings.default_dataset,
+        &location, &variables, request.destination_table.has_value());
     auto& query = std::get<QueryJob>(job.configuration);
     query.statement_type = translation.statement_type;
     query.ddl_target_table = translation.ddl_target_table;

@@ -66,16 +66,16 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 		t.Errorf("tables.insert: got schema\n%v\nwant\n%v", fields(got), fields(created))
 	}
 
-	// The emulator does not translate GEOGRAPHY in SQL, so the DDL leaves it out.
 	run(`CREATE TABLE ddl (
 		id INT64 NOT NULL OPTIONS (description = 'the key'),
 		doc JSON,
+		place GEOGRAPHY,
 		price NUMERIC(10, 2),
 		big BIGNUMERIC,
 		code STRING(8) DEFAULT 'none',
 		tags ARRAY<JSON>,
 		detail STRUCT<note JSON>)`)
-	want := bigquery.Schema{created[0], created[1], created[3], created[4],
+	want := bigquery.Schema{created[0], created[1], created[2], created[3], created[4],
 		{Name: "code", Type: bigquery.StringFieldType, MaxLength: 8, DefaultValueExpression: "'none'"},
 		created[6], created[7]}
 	if got := schemaOf("ddl"); !reflect.DeepEqual(got, want) {
@@ -90,7 +90,7 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 	}
 
 	run("ALTER TABLE ddl ADD COLUMN added JSON")
-	if got := schemaOf("ddl"); len(got) != 8 || got[7].Type != bigquery.JSONFieldType {
+	if got := schemaOf("ddl"); len(got) != 9 || got[8].Type != bigquery.JSONFieldType {
 		t.Errorf("ALTER TABLE ADD COLUMN: got schema\n%v\nwant a JSON column last", fields(got))
 	}
 
@@ -120,13 +120,16 @@ func TestTablesKeepTheirBigQuerySchema(t *testing.T) {
 		t.Errorf("got another row %v, want one", row)
 	}
 
-	// Queries read GEOGRAPHY as the text it is stored as.
+	// A GEOGRAPHY column is GEOGRAPHY in queries too.
 	rows, err = client.Query("SELECT place FROM go_table_schema.api").Read(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := rows.Next(&row); err != iterator.Done {
 		t.Errorf("got row %v, want none", row)
+	}
+	if len(rows.Schema) != 1 || rows.Schema[0].Type != bigquery.GeographyFieldType {
+		t.Errorf("got schema %v, want a GEOGRAPHY column", fields(rows.Schema))
 	}
 
 	// Copies and query results written to a table keep the schema too.

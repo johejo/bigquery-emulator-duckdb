@@ -88,6 +88,7 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   std::vector<std::string> projections;
   const std::vector<std::string> names = ResultColumnNames(*query);
+  const bool stored = scope.context.defaults.stores_result;
   // A value table of structs is returned as the structs' fields, like BigQuery does.
   if (query->is_value_table() && query->output_column_list_size() == 1 &&
       query->output_column_list(0)->column().type()->IsStruct()) {
@@ -100,7 +101,7 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     for (size_t i = 0; i < fields.size(); ++i) {
       projections.push_back(
           ResultValue("struct_extract_at(" + column->second + ", " + std::to_string(i + 1) + ")",
-                      fields.at(i).type, names.at(i)) +
+                      fields.at(i).type, names.at(i), stored) +
           " AS " + QuoteIdentifier(fields.at(i).name));
     }
     return "SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
@@ -111,8 +112,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     if (column == relation->columns.end()) {
       return std::nullopt;
     }
-    projections.push_back(ResultValue(column->second, output->column().type(), names.at(i)) +
-                          " AS " + QuoteIdentifier(output->name()));
+    projections.push_back(
+        ResultValue(column->second, output->column().type(), names.at(i), stored) + " AS " +
+        QuoteIdentifier(output->name()));
   }
   if (projections.empty()) {
     return std::nullopt;

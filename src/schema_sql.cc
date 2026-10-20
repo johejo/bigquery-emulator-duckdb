@@ -48,6 +48,33 @@ std::string InsertRecord(const json& value, const FieldSchema& field, bool ignor
   return "struct_pack(" + Join(fields, ", ") + ")";
 }
 
+bool HasGeography(const std::vector<FieldSchema>& fields) {
+  return std::ranges::any_of(fields, [](const FieldSchema& field) {
+    return field.type == FieldType::kGeography || HasGeography(field.fields);
+  });
+}
+
+// The DuckDB value `sql` of `field` with each GEOGRAPHY in it, at any depth, replaced by
+// `geography(value)`.
+std::string MapGeographies(const std::string& sql, const FieldSchema& field, int depth,
+                           const std::function<std::string(const std::string&)>& geography) {
+  if (!HasGeography({field})) {
+    return sql;
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    return MapElements(sql, field, depth,
+                       [&](const std::string& name, const FieldSchema& element, int element_depth) {
+                         return MapGeographies(name, element, element_depth, geography);
+                       });
+  }
+  if (field.type == FieldType::kRecord) {
+    return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
+      return MapGeographies(value, child, depth, geography);
+    });
+  }
+  return geography(sql);
+}
+
 // Appends to `statements` the statements of SchemaUpdateStatements for the fields `current` of
 // a record of `table`. `path` is the DuckDB column path of the record, with a trailing dot, or
 // empty for the table's columns, and `prefix` its BigQuery field path for errors.
@@ -183,6 +210,9 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   if (field.type == FieldType::kBytes) {
     return "from_base64(" + QuoteLiteral(scalar) + ")";
   }
+  if (field.type == FieldType::kGeography) {
+    return StoredValue(QuoteLiteral(scalar), field);
+  }
   if (field.type == FieldType::kBigNumeric) {
     const auto number = googlesql::BigNumericValue::FromString(scalar);
     if (!number.ok()) {
@@ -202,6 +232,27 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
     return "to_timestamp(CAST(" + QuoteLiteral(scalar) + " AS DOUBLE))";
   }
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
+}
+
+std::string StoredValue(const std::string& sql, const FieldSchema& field) {
+  return MapGeographies(
+      sql, field, 0, [](const std::string& value) { return "bq_geography_input(" + value + ")"; });
+}
+
+std::string ReadColumns(const std::vector<FieldSchema>& schema) {
+  if (!HasGeography(schema)) {
+    return "*";
+  }
+  std::vector<std::string> columns;
+  for (const FieldSchema& field : schema) {
+    const std::string name = QuoteIdentifier(field.name);
+    columns.push_back(std::format(
+        "{} AS {}",
+        MapGeographies(name, field, 0,
+                       [](const std::string& value) { return "bq_st_astext(" + value + ")"; }),
+        name));
+  }
+  return Join(columns, ", ");
 }
 
 std::string ColumnDefinition(const FieldSchema& field) {
