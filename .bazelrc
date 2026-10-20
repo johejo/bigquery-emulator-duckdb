@@ -34,6 +34,12 @@ build --host_copt=--system-header-prefix=google/
 build --host_copt=--system-header-prefix=googlesql/
 build --host_copt=--system-header-prefix=s2/
 
+# Optimize dependencies, such as GoogleSQL, while this repository's sources keep the fastbuild
+# defaults so that they recompile quickly. The emulator starts in about half the CPU time, which
+# speeds up the probes and end-to-end tests that start many emulators. Exec tools are already
+# optimized.
+build --per_file_copt=external/.*@-O2
+
 # Build libpq against the BoringSSL that gRPC already links, rather than a second TLS library
 # whose symbols would collide with it.
 common --@postgres//:with_ssl=boringssl
