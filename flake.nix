@@ -78,12 +78,10 @@
               CC = "/usr/bin/clang";
               CXX = "/usr/bin/clang++";
             }
-            # Keep the SDK with the native emulator off PATH: adding a test service should
+            # Keep the standalone emulator off PATH: adding a test service should
             # not change Bazel's toolchain PATH and invalidate unrelated C++ actions.
-            // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-              SPANNER_EMULATOR_GCLOUD = "${pkgs.google-cloud-sdk.withExtraComponents [ pkgs.google-cloud-sdk.components.cloud-spanner-emulator ]}/bin/gcloud";
-            }
             // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+              SPANNER_EMULATOR_GATEWAY = "${pkgs.callPackage ./cloud-spanner-emulator-bin.nix { }}/bin/gateway_main";
               # Bazel runs genrules with /bin/bash, which NixOS does not have.
               BAZEL_SH = "${pkgs.bash}/bin/bash";
             }

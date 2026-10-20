@@ -1,4 +1,4 @@
-// Package spannerprocess runs the gcloud Spanner emulator for federated-query E2E tests.
+// Package spannerprocess runs the standalone Spanner emulator for federated-query E2E tests.
 package spannerprocess
 
 import (
@@ -24,9 +24,8 @@ type Process struct {
 	err      error
 }
 
-// Start runs gcloud's native Spanner emulator on free loopback ports.
-// gcloud must include the cloud-spanner-emulator component. SPANNER_EMULATOR_GCLOUD can
-// select a separate SDK installation, as the Nix development shell does.
+// Start runs the standalone Spanner emulator on free loopback ports.
+// SPANNER_EMULATOR_GATEWAY selects gateway_main, as the Nix development shell does.
 func Start(ctx context.Context) (*Process, error) {
 	grpc, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -40,13 +39,14 @@ func Start(ctx context.Context) (*Process, error) {
 	defer rest.Close()
 	host := grpc.Addr().String()
 	restHost := rest.Addr().String()
-	port := rest.Addr().(*net.TCPAddr).Port
+	grpcPort := grpc.Addr().(*net.TCPAddr).Port
+	restPort := rest.Addr().(*net.TCPAddr).Port
 	p := &Process{Host: host, Database: "projects/test/instances/test/databases/test", done: make(chan struct{})}
-	gcloud := os.Getenv("SPANNER_EMULATOR_GCLOUD")
-	if gcloud == "" {
-		gcloud = "gcloud"
+	gateway := os.Getenv("SPANNER_EMULATOR_GATEWAY")
+	if gateway == "" {
+		gateway = "gateway_main"
 	}
-	p.cmd = exec.Command(gcloud, "emulators", "spanner", "start", "--host-port="+host, fmt.Sprintf("--rest-port=%d", port), "--use-docker=false", "--quiet")
+	p.cmd = exec.Command(gateway, "--hostname=127.0.0.1", fmt.Sprintf("--grpc_port=%d", grpcPort), fmt.Sprintf("--http_port=%d", restPort))
 	p.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	p.cmd.Stderr = os.Stderr
 	if err := grpc.Close(); err != nil {
@@ -103,7 +103,7 @@ func Start(ctx context.Context) (*Process, error) {
 	return p, nil
 }
 
-// Stop shuts down gcloud and its emulator child processes.
+// Stop shuts down the gateway and its emulator child processes.
 func (p *Process) Stop() error {
 	select {
 	case <-p.done:

@@ -156,8 +156,8 @@ SPANNER_EMULATOR_HOST=localhost:9010 bazel-bin/bigquery-emulator-duckdb \
 
 The Spanner instance and database must already exist. Start a
 [Spanner emulator](https://cloud.google.com/spanner/docs/emulator) in a separate terminal with
-`${SPANNER_EMULATOR_GCLOUD:-gcloud} emulators spanner start`. On Linux x86_64, the Nix shell sets
-`SPANNER_EMULATOR_GCLOUD` to an SDK with the native emulator component.
+`${SPANNER_EMULATOR_GATEWAY:-gateway_main}`. On Linux x86_64 and arm64, the Nix shell sets
+`SPANNER_EMULATOR_GATEWAY` to the standalone emulator gateway.
 
 Connections are not persisted in the data directory. See
 [EXTERNAL_QUERY](docs/compatibility.md#external_query) for limits. For PostgreSQL:
@@ -241,8 +241,8 @@ Unsupported behavior is rejected, with these deliberate exceptions:
 See [AGENTS.md](AGENTS.md) for building and testing, and
 [docs/architecture.md](docs/architecture.md) for how a request is processed.
 
-`just e2e` starts gcloud's native Spanner emulator on Linux x86_64. On other platforms, Spanner
-cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally
+`just e2e` starts the standalone Spanner emulator on Linux x86_64 and arm64. On other platforms,
+Spanner cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally
 started emulator and an empty GoogleSQL database.
 
 Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.md).
