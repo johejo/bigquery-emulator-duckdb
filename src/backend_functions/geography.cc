@@ -288,6 +288,7 @@ void AddLayers(S2Builder& builder, const Geography& geography, Snapped& output) 
   if (!geography.polygons.empty()) {
     builder.StartLayer(std::make_unique<s2builderutil::LaxPolygonLayer>(output.polygon.get()));
     builder.AddPolygon(*ToS2Polygon(geography));
+    builder.AddIsFullPolygonPredicate(S2Builder::IsFullPolygon(geography.Full()));
   }
 }
 
@@ -440,6 +441,9 @@ std::string GeometryType(const Geography& geography) {
 
 // A polygon's rings count their first vertex twice, as WKT writes them.
 int64_t NumPoints(const Geography& geography) {
+  if (geography.Full()) {
+    return 0;
+  }
   const auto lines = std::accumulate(
       geography.lines.begin(), geography.lines.end(), geography.points.size(),
       [](size_t count, const std::vector<S2Point>& line) { return count + line.size(); });
@@ -453,8 +457,11 @@ int64_t NumPoints(const Geography& geography) {
 }
 
 // A nonempty geography whose parts are all closed: a point is closed, and a linestring where it
-// ends where it starts. Only the full polygon, which the emulator does not hold, is closed.
+// ends where it starts. Only the full polygon is closed.
 bool IsClosed(const Geography& geography) {
+  if (geography.Full()) {
+    return true;
+  }
   return !geography.Empty() && geography.polygons.empty() &&
          std::ranges::all_of(geography.lines, [](const std::vector<S2Point>& line) {
            return Same(line.front(), line.back());
@@ -492,6 +499,10 @@ absl::StatusOr<double> Measure(const Arguments& args) {
 // near the geodesic ones, which the emulator does not.
 absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Full()) {
+    return "{ \"type\": \"Polygon\", \"coordinates\": [ [ [180, 90], [-180, 90], [-180, -90], "
+           "[180, -90], [180, 90] ] ] } ";
+  }
   if (geography.Empty()) {
     return std::string(R"({ "type": "GeometryCollection", "geometries": [ ] } )");
   }
@@ -537,10 +548,6 @@ absl::StatusOr<std::optional<std::string>> UnionGeographies(
     parts.push_back(std::move(geography));
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, Combine(parts));
-  if (ToS2Polygon(geography)->is_full()) {
-    return absl::UnimplementedError(
-        "The emulator does not support ST_UNION producing the full polygon");
-  }
   return GeographyText(geography);
 }
 
@@ -579,9 +586,8 @@ absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& geograph
   for (const std::string& text : geographies) {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(text));
     if (geography.Empty()) {
-      return absl::UnimplementedError(
-          "The emulator does not support ST_MAKEPOLYGON of an empty GEOGRAPHY, which makes the "
-          "full polygon");
+      rings.emplace_back();
+      continue;
     }
     if (geography.Count() != 1 || geography.lines.empty()) {
       return absl::OutOfRangeError(
@@ -616,6 +622,9 @@ absl::StatusOr<std::vector<std::string>> Rings(const Arguments& args, std::strin
         " must have exactly 1 polygon; argument either had no polygons or more than one.");
   }
   const Polygon& polygon = geography.polygons.front();
+  if (geography.Full()) {
+    return std::vector<std::string>{GeographyText(Geography{})};
+  }
   std::vector<std::string> rings(polygon.size());
   std::ranges::transform(polygon, rings.begin(), Ring);
   return rings;

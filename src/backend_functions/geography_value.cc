@@ -91,6 +91,11 @@ std::string Text(const Geography& geography, Vertex vertex, bool stored) {
   if (geography.Empty()) {
     return std::string(kEmpty);
   }
+  if (geography.Full()) {
+    return stored ? "fullglobe"
+                  : "GEOMETRYCOLLECTION(POLYGON((0 0, 120 0, -120 0, 0 0)), "
+                    "POLYGON((0 0, -120 0, 120 0, 0 0)))";
+  }
   const auto vertices = [&](const std::vector<S2Point>& line) {
     return "(" + List(line, vertex) + ")";
   };
@@ -294,6 +299,11 @@ Geography PointGeography(const S2Point& point) {
   return {.points = {point}, .lines = {}, .polygons = {}};
 }
 
+Geography FullGeography() {
+  const auto vertices = S2Loop::kFull();
+  return {.points = {}, .lines = {}, .polygons = {{{vertices.begin(), vertices.end()}}}};
+}
+
 std::string Wkt(const Geography& geography) {
   return Text(
       geography,
@@ -316,6 +326,9 @@ std::string GeographyText(const Geography& geography) {
 
 absl::StatusOr<Geography> ParseGeography(std::string_view text) {
   Geography geography;
+  if (text == "fullglobe") {
+    return FullGeography();
+  }
   if (text == kEmpty) {
     return geography;
   }
@@ -439,6 +452,14 @@ absl::StatusOr<std::vector<std::vector<S2Point>>> DistinctRings(
     const std::vector<std::vector<S2Point>>& input, std::string_view failed) {
   std::vector<std::vector<S2Point>> rings;
   for (const std::vector<S2Point>& vertices : input) {
+    if (vertices.empty()) {
+      if (&vertices == input.data()) {
+        rings.emplace_back();
+        continue;
+      }
+      return absl::OutOfRangeError(std::string(failed) +
+                                   "Polygon holes cannot be empty/full loops.");
+    }
     std::vector<S2Point> distinct;
     std::ranges::unique_copy(vertices, std::back_inserter(distinct));
     while (distinct.size() > 1 && distinct.back() == distinct.front()) {
@@ -466,6 +487,9 @@ absl::StatusOr<std::vector<std::unique_ptr<S2Loop>>> Loops(
     const std::vector<std::vector<S2Point>>& rings, std::string_view failed) {
   std::vector<std::unique_ptr<S2Loop>> loops;
   for (const std::vector<S2Point>& ring : rings) {
+    if (ring.empty()) {
+      continue;
+    }
     auto loop = std::make_unique<S2Loop>(ring, S2Debug::DISABLE);
     S2Error error;
     if (loop->FindValidationError(&error)) {
@@ -477,8 +501,27 @@ absl::StatusOr<std::vector<std::unique_ptr<S2Loop>>> Loops(
   return loops;
 }
 
+// The polygons of `polygon`, whose loops run in preorder: each shell is followed by its holes
+// and what lies in them. S2 represents the full polygon with its sentinel vertex.
+Geography FromPolygon(const S2Polygon& polygon) {
+  Geography geography;
+  std::vector<size_t> polygon_of(polygon.num_loops());
+  for (int i = 0; i < polygon.num_loops(); ++i) {
+    const S2Loop* loop = polygon.loop(i);
+    if (loop->is_hole()) {
+      polygon_of.at(i) = polygon_of.at(polygon.GetParent(i));
+    } else {
+      polygon_of.at(i) = geography.polygons.size();
+      geography.polygons.emplace_back();
+    }
+    const auto vertices = loop->vertices_span();
+    geography.polygons.at(polygon_of.at(i)).emplace_back(vertices.begin(), vertices.end());
+  }
+  return geography;
+}
+
 // The polygon of distinct rings, which must be valid: each encloses the smaller region, which a
-// hole removes from the shell's.
+// hole removes from the shell's. An empty first ring is a full shell.
 absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& rings,
                                    std::string_view failed) {
   GOOGLESQL_ASSIGN_OR_RETURN(std::vector<std::unique_ptr<S2Loop>> loops, Loops(rings, failed));
@@ -494,6 +537,18 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
   if (polygon.FindValidationError(&error)) {
     return absl::OutOfRangeError(std::string(failed) +
                                  "Invalid polygon: " + std::string(error.message()));
+  }
+  if (rings.front().empty()) {
+    for (size_t i = 0; i < order.size(); ++i) {
+      if (order.at(i)->depth() != 0) {
+        return absl::OutOfRangeError(std::string(failed) +
+                                     "Polygon should have only one shell, holes must be inside "
+                                     "the shell. Polygon hole " +
+                                     std::to_string(i + 1) + " is outside of the shell");
+      }
+    }
+    polygon.Invert();
+    return FromPolygon(polygon);
   }
   for (size_t i = 1; i < order.size(); ++i) {
     if (order.at(i)->depth() == 0) {
@@ -568,7 +623,7 @@ absl::StatusOr<std::optional<std::vector<std::vector<S2Point>>>> SnapVertices(
   std::erase_if(snapped, [&](const std::vector<S2Point>& ring) {
     return &ring != snapped.data() && ring.size() < 3;
   });
-  if (snapped.front().size() < 3) {
+  if (!rings.front().empty() && snapped.front().size() < 3) {
     if (snapped.size() == 1) {
       return snapped;
     }
@@ -607,6 +662,9 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
   GOOGLESQL_ASSIGN_OR_RETURN(const std::vector<std::unique_ptr<S2Loop>> loops,
                              Loops(rings, failed));
   std::vector<std::vector<S2Point>> normalized;
+  if (rings.front().empty()) {
+    normalized.emplace_back();
+  }
   for (const std::unique_ptr<S2Loop>& loop : loops) {
     loop->Normalize();
     const absl::Span<const S2Point> vertices = loop->vertices_span();
@@ -623,10 +681,10 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
     return absl::UnimplementedError(
         "The emulator does not support a polygon whose rings BigQuery snaps where they meet");
   }
-  if (snapped->front().size() == 1) {
+  if (!rings.front().empty() && snapped->front().size() == 1) {
     return PointGeography(snapped->front().front());
   }
-  if (snapped->front().size() == 2) {
+  if (!rings.front().empty() && snapped->front().size() == 2) {
     return BuildLine(snapped->front());
   }
   return Assemble(*snapped, failed);
@@ -644,27 +702,17 @@ struct Union {
 // The geography of `output`, whose points on a linestring or a polygon's ring, which S2 keeps
 // unless they are its vertices, are dropped as BigQuery drops them.
 Geography Read(const Union& output) {
-  Geography geography;
+  Geography geography = FromPolygon(output.polygon);
   absl::flat_hash_set<S2Point> vertices;
   for (const std::unique_ptr<S2Polyline>& polyline : output.lines) {
     const absl::Span<const S2Point> line = polyline->vertices_span();
     geography.lines.emplace_back(line.begin(), line.end());
     vertices.insert(line.begin(), line.end());
   }
-  // S2Polygon holds its loops in preorder: each shell is followed by its holes and what lies in
-  // them.
-  std::vector<size_t> polygon_of(output.polygon.num_loops());
   for (int i = 0; i < output.polygon.num_loops(); ++i) {
     const S2Loop* loop = output.polygon.loop(i);
     const absl::Span<const S2Point> ring = loop->vertices_span();
     vertices.insert(ring.begin(), ring.end());
-    if (loop->is_hole()) {
-      polygon_of.at(i) = polygon_of.at(output.polygon.GetParent(i));
-    } else {
-      polygon_of.at(i) = geography.polygons.size();
-      geography.polygons.emplace_back();
-    }
-    geography.polygons.at(polygon_of.at(i)).emplace_back(ring.begin(), ring.end());
   }
   std::ranges::copy_if(output.points, std::back_inserter(geography.points),
                        [&](const S2Point& point) { return !vertices.contains(point); });
