@@ -190,7 +190,6 @@ func TestCreateTableLike(t *testing.T) {
 	}
 
 	for sql, want := range map[string]string{
-		"CREATE TABLE n LIKE text_source AS SELECT 'abc' AS s":           "CREATE TABLE LIKE AS SELECT with length parameters",
 		"CREATE TABLE n LIKE go_create_table_like.v":                     "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
 		"CREATE TABLE n LIKE go_create_table_like.v AS SELECT id FROM v": "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
 		// BigQuery's message for a temporary table like a table that is not temporary.

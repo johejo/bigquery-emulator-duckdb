@@ -705,6 +705,7 @@ cc_library(
         ":table_comments",
         ":table_metadata",
         ":translated_statement",
+        "@googlesql//googlesql/public:value",
         "@nlohmann_json//:json",
     ],
 )
@@ -790,6 +791,7 @@ cc_library(
         "@googlesql//googlesql/public:strings",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/resolved_ast",
     ],
     deps = [
         ":api_error",

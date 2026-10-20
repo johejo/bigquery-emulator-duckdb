@@ -402,25 +402,41 @@ void DetectDecimals(FieldSchema& field, const ParquetColumn* column, const json&
   field.type = FieldType::kBigNumeric;
 }
 
-// `field` with each BIGNUMERIC in it, at any depth, a STRING. DuckDB's JSON reader cannot read a
-// BIGNUM, which it would for a cast of a column it detects as JSON, as it does when every value is
-// null, so a load reads those values as text, which StageJsonNumerics writes them as.
-FieldSchema BigNumericsAsStrings(FieldSchema field) {
+// `field` with each BIGNUMERIC or Base64-encoded BYTES in it, at any depth, a STRING.
+// DuckDB's JSON reader cannot read a BIGNUM, which it would for a cast of a column it detects
+// as JSON when every value is null. A load reads those values as text, as StageJsonNumerics
+// writes them.
+FieldSchema JsonTextFields(FieldSchema field) {
   if (field.type == FieldType::kBigNumeric) {
     field.type = FieldType::kString;
     field.precision.reset();
     field.scale.reset();
     field.rounding_mode.clear();
   }
+  if (field.type == FieldType::kBytes) {
+    field.type = FieldType::kString;
+  }
   for (FieldSchema& child : field.fields) {
-    child = BigNumericsAsStrings(std::move(child));
+    child = JsonTextFields(std::move(child));
   }
   return field;
 }
 
 // The value of `field` that the column `name` of a NEWLINE_DELIMITED_JSON file holds.
-std::string JsonValue(const std::string& name, const FieldSchema& field) {
-  const FieldSchema read = BigNumericsAsStrings(field);
+std::string JsonValue(const std::string& name, const FieldSchema& field, int depth = 0) {
+  if (HasType({field}, FieldType::kBytes)) {
+    const std::string text = "CAST(" + name + " AS " + ToDuckDbType(JsonTextFields(field)) + ")";
+    if (field.mode == FieldMode::kRepeated) {
+      return MapElements(text, field, depth, JsonValue);
+    }
+    if (field.type == FieldType::kRecord) {
+      return MapFields(text, field, [depth](const std::string& value, const FieldSchema& child) {
+        return JsonValue(value, child, depth);
+      });
+    }
+    return "from_base64(CAST(" + name + " AS VARCHAR))";
+  }
+  const FieldSchema read = JsonTextFields(field);
   const std::string type = ToDuckDbType(field);
   if (read.type == field.type && !HasType(field.fields, FieldType::kBigNumeric)) {
     return std::format("CAST({} AS {})", name, type);
@@ -560,15 +576,21 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
         const bool big = field.type == FieldType::kBigNumeric;
         const bool range = field.type == FieldType::kRange;
         const bool interval = field.type == FieldType::kInterval;
+        const bool bytes = field.type == FieldType::kBytes;
         const std::string name = QuoteIdentifier(field.name);
-        columns.push_back(QuoteLiteral(field.name) + ": " +
-                          QuoteLiteral(big || range || interval ? "VARCHAR" : ToDuckDbType(field)));
+        columns.push_back(
+            QuoteLiteral(field.name) + ": " +
+            QuoteLiteral(big || range || interval || bytes ? "VARCHAR" : ToDuckDbType(field)));
         conversions.push_back(
             big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
                                   ToDuckDbType(field))
             : range ? RangeFromText(name, field) + " AS " + name
-            : interval ? std::format("bq_interval_from_csv({0}) AS {0}", name)
-                       : StoredValue(name, field) + " AS " + name);
+            : interval
+                ? std::format("bq_interval_from_csv({0}) AS {0}", name)
+                : std::format(
+                      "{} AS {}",
+                      StoredValue(bytes ? std::format("from_base64({})", name) : name, field),
+                      name));
       }
       sql += ", columns={" + Join(columns, ", ") + "})";
       return std::format("SELECT {} FROM ({}) AS source", Join(conversions, ", "), sql);

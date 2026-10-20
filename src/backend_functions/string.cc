@@ -22,6 +22,11 @@
 #include "googlesql/public/functions/normalize_mode.pb.h"
 #include "googlesql/public/functions/regexp.h"
 #include "googlesql/public/numeric_value.h"
+#include "googlesql/public/type.pb.h"
+#include "googlesql/public/type_parameters.pb.h"
+#include "googlesql/public/types/type_parameters.h"
+#include "googlesql/public/value.h"
+#include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "src/backend_functions/apply.h"
 #include "src/backend_functions/register.h"
 #include "src/backend_functions/scalar.h"
@@ -30,6 +35,25 @@
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {
+
+// Keep the character count, range validation and error text of parameterized STRING/BYTES
+// columns in GoogleSQL. BigQuery reports the top-level column even for a nested length error.
+template <bool kBytes>
+absl::StatusOr<bool> CheckLength(std::string_view text, int64_t maximum, std::string_view column) {
+  googlesql::StringTypeParametersProto proto;
+  proto.set_max_length(maximum);
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto parameters,
+                             googlesql::TypeParameters::MakeStringTypeParameters(proto));
+  auto value = kBytes ? googlesql::Value::Bytes(text) : googlesql::Value::String(text);
+  const auto status = googlesql::ApplyConstraints(parameters, googlesql::PRODUCT_EXTERNAL, value);
+  if (!status.ok()) {
+    return absl::OutOfRangeError((column.empty() ? "" : "Field " + std::string(column) + ": ") +
+                                 std::string(status.message()));
+  }
+  return true;
+  // Value releases its StringRef in its out-of-line destructor.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
+}
 
 // NORMALIZE and NORMALIZE_AND_CASEFOLD, with the mode by its name, such as NFKC.
 template <bool kCasefold>
@@ -258,6 +282,18 @@ void RegisterStringFunctions(duckdb_connection connection) {
   for (const auto& [name, parameters, result, function] :
        std::initializer_list<std::tuple<const char*, std::vector<duckdb_type>, duckdb_type,
                                         duckdb_scalar_function_t>>{
+           {
+               "bq_check_string_length",
+               {kVarchar, kBigint, kVarchar},
+               kBoolean,
+               Apply<CheckLength<false>>,
+           },
+           {
+               "bq_check_bytes_length",
+               {kBlob, kBigint, kVarchar},
+               kBoolean,
+               Apply<CheckLength<true>>,
+           },
            {"bq_repeat", {kVarchar, kBigint}, kVarchar, Apply<fn::Repeat>},
            {"bq_repeat_bytes", {kBlob, kBigint}, kBlob, Apply<fn::Repeat>},
            {"bq_lower", {kVarchar}, kVarchar, Apply<fn::LowerUtf8>},

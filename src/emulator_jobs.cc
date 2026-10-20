@@ -503,20 +503,23 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   if (existing.has_value() && write != WriteDisposition::kWriteTruncate) {
     CheckWritableTable(backend_, destination);
   }
-  // Appended rows are written with DuckDB's casts, which round halfway values away from zero, so
+  // Existing destinations retain their write constraints. Appended rows are written with
+  // DuckDB's casts, which round halfway values away from zero, so
   // the values of ROUND_HALF_EVEN fields are rounded to even first, as BigQuery rounds those a
   // query or a load appends. A copy from a table of the same schema has nothing to round, and
   // BigQuery rejects a copy from another.
   std::string appended = "*";
-  if (existing.has_value() && write != WriteDisposition::kWriteTruncate &&
-      HasRoundHalfEven(existing->schema) && !SameSchema(existing->schema, schema)) {
+  if (existing.has_value() && write != WriteDisposition::kWriteTruncate) {
+    if (copy && HasRoundHalfEven(existing->schema) && !SameSchema(existing->schema, schema)) {
+      throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
+    }
     std::vector<std::string> columns;
     for (const FieldSchema& field : schema) {
       const std::string name = QuoteIdentifier(field.name);
       const auto column = FindField(existing->schema, field.name);
       const std::optional<std::string> value =
           column == existing->schema.end() ? name : TranslateAppendedValue(name, field, *column);
-      if (copy || !value.has_value()) {
+      if (!value.has_value()) {
         throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
       }
       columns.push_back(*value + " AS " + name);

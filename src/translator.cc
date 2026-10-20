@@ -144,7 +144,7 @@ std::optional<std::string> TranslateAppendedValue(const std::string& value,
                                                   const FieldSchema& source,
                                                   const FieldSchema& destination) {
   if (!RoundsToEven(destination)) {
-    return RequiredValue(value, destination);
+    return CheckedWriteValue(value, destination);
   }
   if (!RoundsAs(source, destination)) {
     return std::nullopt;
@@ -155,7 +155,8 @@ std::optional<std::string> TranslateAppendedValue(const std::string& value,
     return std::nullopt;
   }
   const auto rounded = translator::RoundedToEven(value, *type, destination);
-  return rounded ? std::optional<std::string>(RequiredValue(*rounded, destination)) : std::nullopt;
+  return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, destination))
+                 : std::nullopt;
 }
 
 }  // namespace bigquery_emulator_duckdb

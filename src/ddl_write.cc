@@ -80,6 +80,29 @@ bool HasDefaultTypeConstraints(const FieldSchema& field) {
 
 }  // namespace
 
+void ValidateColumnDefault(const FieldSchema& field,
+                           const std::optional<googlesql::Value>& literal_value) {
+  const auto parameters = FieldTypeParameters(field, /*include_lengths=*/true);
+  if (!parameters.ok()) {
+    throw ApiError::Invalid(std::string(parameters.status().message()));
+  }
+  if (HasDefaultTypeConstraints(field) && !literal_value.has_value()) {
+    throw ApiError::Unsupported("non-literal defaults on parameterized columns");
+  }
+  if (literal_value.has_value()) {
+    auto literal = *literal_value;
+    if (literal.is_null() && field.mode == FieldMode::kRequired) {
+      throw ApiError::Invalid("NULL default for required column " + field.name);
+    }
+    const auto status =
+        googlesql::ApplyConstraints(*parameters, googlesql::PRODUCT_EXTERNAL, literal);
+    if (!status.ok()) {
+      throw ApiError::Invalid(
+          std::format("Invalid value: Field {}: {}", field.name, status.message()));
+    }
+  }
+}
+
 DdlWrite CreateDatasetWrite(const DatasetDefinition& definition, const std::string& location) {
   DatasetMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
@@ -265,25 +288,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
         throw ApiError::Invalid("Column not found: " + value->name);
       }
       if (!value->drop) {
-        const auto parameters = FieldTypeParameters(*column, /*include_lengths=*/true);
-        if (!parameters.ok()) {
-          throw ApiError::Invalid(std::string(parameters.status().message()));
-        }
-        if (HasDefaultTypeConstraints(*column) && !value->literal.has_value()) {
-          throw ApiError::Unsupported("non-literal defaults on parameterized columns");
-        }
-        if (value->literal.has_value()) {
-          auto literal = *value->literal;
-          if (literal.is_null() && column->mode == FieldMode::kRequired) {
-            throw ApiError::Invalid("NULL default for required column " + column->name);
-          }
-          const auto status =
-              googlesql::ApplyConstraints(*parameters, googlesql::PRODUCT_EXTERNAL, literal);
-          if (!status.ok()) {
-            throw ApiError::Invalid(
-                std::format("Invalid value: Field {}: {}", column->name, status.message()));
-          }
-        }
+        ValidateColumnDefault(*column, value->literal);
       }
       if (value->drop && column->default_value_expression.empty()) {
         throw ApiError::Invalid("Column has no default value: " + column->name);

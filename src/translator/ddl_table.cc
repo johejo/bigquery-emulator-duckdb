@@ -11,13 +11,16 @@
 #include "absl/status/statusor.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "googlesql/public/cast.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/function_signature.h"
+#include "googlesql/public/language_options.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/types/type_parameters.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
+#include "src/ddl_write.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
@@ -246,6 +249,28 @@ void CheckFieldNames(const FieldSchema& field, const std::string& path) {
   }
 }
 
+// A literal default may have an implicit cast carrying its column's type parameters.
+std::optional<googlesql::Value> DefaultLiteral(const googlesql::ResolvedExpr& expression) {
+  if (expression.Is<googlesql::ResolvedLiteral>()) {
+    return expression.GetAs<googlesql::ResolvedLiteral>()->value();
+  }
+  if (expression.Is<googlesql::ResolvedCast>()) {
+    const auto& cast = *expression.GetAs<googlesql::ResolvedCast>();
+    if (cast.format() == nullptr && cast.time_zone() == nullptr &&
+        cast.extended_cast() == nullptr && !cast.return_null_on_error()) {
+      if (const auto literal = DefaultLiteral(*cast.expr())) {
+        const auto value = googlesql::CastValue(*literal, absl::UTCTimeZone(),
+                                                googlesql::LanguageOptions(), cast.type());
+        if (!value.ok()) {
+          throw std::invalid_argument(std::string(value.status().message()));
+        }
+        return *value;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 // The TableFieldSchema BigQuery reports for a column a DDL statement defines.
 std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition& column,
                                        const Scope& scope) {
@@ -264,6 +289,8 @@ std::optional<FieldSchema> ColumnField(const googlesql::ResolvedColumnDefinition
     ApplyTypeParameters(column.type(), *parameters, *field);
   }
   if (column.default_value() != nullptr) {
+    const auto& expression = *column.default_value()->expression();
+    ValidateColumnDefault(*field, DefaultLiteral(expression));
     field->default_value_expression = column.default_value()->sql();
   }
   return *std::move(field);
@@ -459,10 +486,6 @@ std::optional<std::string> ColumnsSql(const std::vector<FieldSchema>& schema, co
                       (field.mode == FieldMode::kRequired ? " NOT NULL" : ""));
   }
   return Join(columns, ", ");
-}
-
-bool HasLengthParameters(const FieldSchema& field) {
-  return field.max_length.has_value() || std::ranges::any_of(field.fields, HasLengthParameters);
 }
 
 // CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name,
@@ -778,10 +801,6 @@ std::optional<std::string> CreateTableAsSelect(
   }
   if (!head || !target || !description) {
     return std::nullopt;
-  }
-  // DuckDB does not enforce STRING/BYTES lengths, including in nested fields.
-  if (like && std::ranges::any_of(description->schema, HasLengthParameters)) {
-    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT with length parameters");
   }
   const auto relation = Scan(*create.query(), scope);
   if (!relation) {

@@ -23,6 +23,7 @@
 #include "googlesql/public/strings.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
+#include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -438,6 +439,11 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
       throw ApiError::Invalid("Invalid default value for field " + field.name + ": " +
                               std::string(analyzed.status().message()));
     }
+    ValidateColumnDefault(
+        field,
+        analyzed->expression().Is<googlesql::ResolvedLiteral>()
+            ? std::optional(analyzed->expression().GetAs<googlesql::ResolvedLiteral>()->value())
+            : std::nullopt);
     std::string unsupported;
     const std::optional<std::string> query =
         TranslateExpression(analyzed->expression(), {},

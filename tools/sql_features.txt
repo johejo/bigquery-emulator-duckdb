@@ -145,7 +145,7 @@ query `CREATE TABLE` | CREATE TABLE IF NOT EXISTS t (a INT64)
 query `CREATE TABLE` | CREATE OR REPLACE TABLE t (a INT64)
 query `CREATE TABLE` | CREATE TABLE `test.d.n` (a INT64)
 query Column types with parameters | CREATE TABLE n (a STRING(10), b BYTES(5), c NUMERIC(10, 2))
-note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length.
+query Column types with parameters | CREATE TABLE n (items ARRAY<STRUCT<label STRING(2), data BYTES(3)>>) AS SELECT [STRUCT('日本' AS label, b'abc' AS data)]; INSERT n VALUES ([STRUCT('', b'')])
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC)
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC(40, 10))
 query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)

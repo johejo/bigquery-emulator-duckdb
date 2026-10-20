@@ -54,35 +54,44 @@ bool HasGeography(const std::vector<FieldSchema>& fields) {
   });
 }
 
-bool HasRequired(const FieldSchema& field) {
-  return field.mode == FieldMode::kRequired || std::ranges::any_of(field.fields, HasRequired);
+bool HasWriteConstraints(const FieldSchema& field) {
+  return field.mode == FieldMode::kRequired || field.max_length.has_value() ||
+         std::ranges::any_of(field.fields, HasWriteConstraints);
 }
 
-// A predicate that reports REQUIRED errors. CASE skips descendants of a
+// A predicate that checks REQUIRED and length constraints. CASE skips descendants of a
 // NULL record. Positions also handle CTAS expressions whose field names differ from the schema.
-std::string RequiredCondition(const std::string& sql, const FieldSchema& field,
-                              const std::string& path, const std::string& column, int depth) {
-  if (!HasRequired(field)) {
+std::string WriteCondition(const std::string& sql, const FieldSchema& field,
+                           const std::string& path, const std::string& column, int depth,
+                           bool assignment) {
+  if (!HasWriteConstraints(field)) {
     return "true";
   }
   std::string condition = "true";
   if (field.mode == FieldMode::kRepeated) {
-    const std::string name = "_required_element" + std::to_string(depth);
+    const std::string name = "_write_element" + std::to_string(depth);
     condition = "coalesce(list_bool_and(list_transform(" + sql + ", " + name + " -> " +
-                RequiredCondition(name, AsNullable(field), path, column, depth + 1) + ")), true)";
+                WriteCondition(name, AsNullable(field), path, column, depth + 1, assignment) +
+                ")), true)";
   } else if (field.type == FieldType::kRecord) {
     std::vector<std::string> children;
     for (size_t i = 0; i < field.fields.size(); ++i) {
       const FieldSchema& child = field.fields.at(i);
-      if (HasRequired(child)) {
+      if (HasWriteConstraints(child)) {
         children.push_back(
-            RequiredCondition("struct_extract_at(" + sql + ", " + std::to_string(i + 1) + ")",
-                              child, path + "." + child.name, column, depth));
+            WriteCondition("struct_extract_at(" + sql + ", " + std::to_string(i + 1) + ")", child,
+                           path + "." + child.name, column, depth, assignment));
       }
     }
     if (!children.empty()) {
       condition = "(" + Join(children, " AND ") + ")";
     }
+  }
+  if (field.mode != FieldMode::kRepeated && field.max_length.has_value()) {
+    const std::string function =
+        field.type == FieldType::kBytes ? "bq_check_bytes_length" : "bq_check_string_length";
+    condition = function + "(" + sql + ", " + std::to_string(*field.max_length) + ", " +
+                QuoteLiteral(assignment ? "" : column) + ")";
   }
   const std::string missing =
       field.mode == FieldMode::kRequired
@@ -277,17 +286,18 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
-std::string RequiredValue(const std::string& sql, const FieldSchema& field) {
-  if (!HasRequired(field)) {
+std::string CheckedWriteValue(const std::string& sql, const FieldSchema& field, bool assignment) {
+  if (!HasWriteConstraints(field)) {
     return sql;
   }
-  const std::string name = "_required_value";
+  const std::string name = "_write_value";
   return "list_transform([" + sql + "], " + name + " -> CASE WHEN " +
-         RequiredCondition(name, field, field.name, field.name, 0) + " THEN " + name + " END)[1]";
+         WriteCondition(name, field, field.name, field.name, 0, assignment) + " THEN " + name +
+         " END)[1]";
 }
 
 std::string StoredValue(const std::string& sql, const FieldSchema& field) {
-  return MapGeographies(RequiredValue(sql, field), field, 0, [](const std::string& value) {
+  return MapGeographies(CheckedWriteValue(sql, field), field, 0, [](const std::string& value) {
     return "bq_geography_input(" + value + ")";
   });
 }
