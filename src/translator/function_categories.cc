@@ -71,10 +71,7 @@ constexpr std::string_view kComparesStructs[] = {
 };
 
 constexpr std::string_view kComparesStructsWithInterval[] = {
-    "$EQUAL",
-    "$NOT_EQUAL",
-    "$IN",
-    "$IN_ARRAY",
+    "$EQUAL", "$NOT_EQUAL", "$IN", "$IN_ARRAY", "$CASE_WITH_VALUE",
 };
 
 constexpr std::string_view kBuildsOrReadsRange[] = {

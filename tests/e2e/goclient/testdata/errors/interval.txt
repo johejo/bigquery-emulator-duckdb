@@ -12,3 +12,36 @@ SELECT ROW_NUMBER() OVER (PARTITION BY STRUCT(i)) FROM UNNEST([MAKE_INTERVAL(day
 
 SELECT MAKE_INTERVAL(day => 7) INTERSECT ALL SELECT MAKE_INTERVAL(day => 8)
 => error contains: INTERSECT ALL is not supported. Only INTERSECT DISTINCT is supported.
+
+# BigQuery rejects these over INTERVAL values after analysis, although GoogleSQL accepts them,
+# also where the values are NULL or equal by length. Source: BigQuery's answers.
+SELECT CASE INTERVAL 30 DAY WHEN INTERVAL 1 MONTH THEN 'equal' ELSE 'different' END
+=> error contains: Unsupported type in function CASE_WITH_VALUE
+
+SELECT CASE MAKE_INTERVAL(month => 1, day => -1) WHEN INTERVAL 29 DAY THEN 'equal' ELSE 'different' END
+=> error contains: Unsupported type in function CASE_WITH_VALUE
+
+SELECT CASE INTERVAL 1 DAY WHEN INTERVAL 23 HOUR THEN 'a' WHEN INTERVAL 24 HOUR THEN 'b' END
+=> error contains: Unsupported type in function CASE_WITH_VALUE
+
+SELECT CASE CAST(NULL AS INTERVAL) WHEN CAST(NULL AS INTERVAL) THEN 'equal' ELSE 'different' END
+=> error contains: Unsupported type in function CASE_WITH_VALUE
+
+SELECT APPROX_COUNT_DISTINCT(i) FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY, INTERVAL 1 DAY]) AS i
+=> error contains: Unsupported type INTERVAL for hll_count.init.
+
+SELECT TO_JSON_STRING(APPROX_TOP_COUNT(i, 2))
+FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY, INTERVAL 1 DAY]) AS i
+=> error contains: Unsupported type INTERVAL for approx_top_count_shard.
+
+SELECT TO_JSON_STRING(APPROX_TOP_COUNT(i, 2))
+FROM UNNEST([INTERVAL 30 DAY, INTERVAL 1 MONTH, INTERVAL 1 DAY]) AS i
+=> error contains: Unsupported type INTERVAL for approx_top_count_shard.
+
+SELECT TO_JSON_STRING(APPROX_QUANTILES(i, 2))
+FROM UNNEST([INTERVAL 40 DAY, INTERVAL 1 MONTH, INTERVAL 2 HOUR]) AS i
+=> error contains: Unsupported type INTERVAL for aggregate function approx_quantiles
+
+SELECT TO_JSON_STRING(APPROX_QUANTILES(i, 1))
+FROM UNNEST([INTERVAL 1 MONTH, INTERVAL 30 DAY]) AS i
+=> error contains: Unsupported type INTERVAL for aggregate function approx_quantiles
