@@ -855,18 +855,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "An invalid time zone fails with DuckDB's internal error instead of BigQuery's"
-  label: "civil_time_test:extract_date_from_timestamp_with_invalid_time_zone"
-  label: "civil_time_test:extract_datetime_from_timestamp_with_invalid_time_zone"
-  label: "civil_time_test:extract_time_from_timestamp_with_invalid_time_zone"
-  label: "code:extract_TIMESTAMP_0_STRING_<DATE>_STRING_<invalid _KRb-lKq4iQs_ime zone>"
-  label: "code:extract_TIMESTAMP_0_STRING_<DATETIME>_STRING_<invalid _KRb-lKq4iQs_ime zone>"
-  label: "code:extract_TIMESTAMP_0_STRING_<MONTH>_STRING_<invalid _KRb-lKq4iQs_ime zone>"
-  label: "code:extract_TIMESTAMP_0_STRING_<TIME>_STRING_<invalid _KRb-lKq4iQs_ime zone>"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "NaN does not compare as BigQuery orders it, such as in MIN, MAX and IN"
   label: "code:ArrayMin_ARRAY<FLOAT64>_<1@2, 1@2, nan>"
@@ -918,123 +906,6 @@ known_errors {
   label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_yyS0estFsOE_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
   label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<1970-01-_z1rzwUP7Pu4_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
   label: "code:ArrayOffsets_ARRAY<TIMESTAMP>_<NULL, 19_PF5zcTdyopg_48562@00>_TIMESTAMP_<1970-01-_aNYbm6XahcU_48562@00>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "DuckDB does not accept a time zone given as a UTC offset, such as '-08:00', or an empty one"
-  label: "civil_time_test:convert_datetime_to_timestamp"
-  label: "civil_time_test:convert_timestamp_to_datetime"
-  label: "civil_time_test:convert_timestamp_to_time"
-  label: "civil_time_test:extract_date_from_timestamp_with_invalid_empty_time_zone"
-  label: "civil_time_test:extract_datetime_from_timestamp_with_invalid_empty_time_zone"
-  label: "civil_time_test:extract_time_from_timestamp_with_invalid_empty_time_zone"
-  label: "code:date_TIMESTAMP_1391191954000000_STRING_<@0>"
-  label: "code:date_TIMESTAMP_1391191954000000_STRING_<@12>"
-  label: "code:datetime_TIMESTAMP_-62135596800000000_STRING_<-08:00>"
-  label: "code:datetime_TIMESTAMP_-62135596800000000_STRING_<@08:00>"
-  label: "code:datetime_TIMESTAMP_0_STRING_<-08:00>"
-  label: "code:datetime_TIMESTAMP_0_STRING_<@08:00>"
-  label: "code:datetime_TIMESTAMP_253402300799999999_STRING_<-08:00>"
-  label: "code:datetime_TIMESTAMP_253402300799999999_STRING_<@08:00>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<DATE>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<DATE>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<DATETIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<DATETIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<TIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_-62135596800000000_STRING_<TIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_0_STRING_<DATE>_STRING_<>"
-  label: "code:extract_TIMESTAMP_0_STRING_<DATETIME>_STRING_<>"
-  label: "code:extract_TIMESTAMP_0_STRING_<MONTH>_STRING_<>"
-  label: "code:extract_TIMESTAMP_0_STRING_<TIME>_STRING_<>"
-  label: "code:extract_TIMESTAMP_1262303999000000_STRING_<DATE>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_1262303999000000_STRING_<DATETIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_1262303999000000_STRING_<TIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<DATE>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<DATE>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<DATETIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<DATETIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<TIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_253402300799000000_STRING_<TIME>_STRING_<@01>"
-  label: "code:extract_TIMESTAMP_946684801000000_STRING_<DATE>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_946684801000000_STRING_<DATETIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_946684801000000_STRING_<TIME>_STRING_<-01>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-10>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-11>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-12>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-1>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-2>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-3>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-4>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-5>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-6>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-7>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-8>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<-9>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@0>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@10>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@11>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@12>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@1>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@2>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@3>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@4>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@5>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@6>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@7>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@8>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<HOUR>_STRING_<@9>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-10>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-11>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-12>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-1>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-2>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-3>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-4>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-5>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-6>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-7>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-8>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<-9>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@0>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@10>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@11>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@12>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@1>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@2>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@3>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@4>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@5>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@6>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@7>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@8>"
-  label: "code:extract_TIMESTAMP_946685482345678_STRING_<TIME>_STRING_<@9>"
-  label: "code:safe_error_mode__safe_datetime_TIMESTAMP_-62135596800000000_STRING_<-08:00>"
-  label: "code:safe_error_mode__safe_datetime_TIMESTAMP_253402300799999999_STRING_<@08:00>"
-  label: "code:safe_error_mode__safe_timestamp_DATETIME_0001-01-01 00:00:00_STRING_<@08:00>"
-  label: "code:safe_error_mode__safe_timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<-08:00>"
-  label: "code:safe_error_mode__safe_timestamp_DATE_<0001-01-01>_STRING_<@1>"
-  label: "code:time_TIMESTAMP_-62135596800000000_STRING_<-08:00>"
-  label: "code:time_TIMESTAMP_-62135596800000000_STRING_<@08:00>"
-  label: "code:time_TIMESTAMP_0_STRING_<-08:00>"
-  label: "code:time_TIMESTAMP_0_STRING_<@08:00>"
-  label: "code:time_TIMESTAMP_253402300799999999_STRING_<-08:00>"
-  label: "code:time_TIMESTAMP_253402300799999999_STRING_<@08:00>"
-  label: "code:timestamp_DATETIME_0001-01-01 00:00:00_STRING_<-08:00>"
-  label: "code:timestamp_DATETIME_0001-01-01 00:00:00_STRING_<@08:00>"
-  label: "code:timestamp_DATETIME_1970-01-01 00:00:00_STRING_<-08:00>"
-  label: "code:timestamp_DATETIME_1970-01-01 00:00:00_STRING_<@08:00>"
-  label: "code:timestamp_DATETIME_2006-01-02 03:04:05_STRING_<-08:00>"
-  label: "code:timestamp_DATETIME_2006-01-02 03:04:05_STRING_<@08:00>"
-  label: "code:timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<-08:00>"
-  label: "code:timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<@08:00>"
-  label: "code:timestamp_DATE_<0001-01-01>_STRING_<-08:30>"
-  label: "code:timestamp_DATE_<0001-01-01>_STRING_<@0>"
-  label: "code:timestamp_DATE_<0001-01-01>_STRING_<@1>"
-  label: "code:timestamp_DATE_<1969-12-31>_STRING_<@0>"
-  label: "code:timestamp_DATE_<1970-01-02>_STRING_<@0>"
-  label: "code:timestamp_DATE_<9999-12-31>_STRING_<@08:30>"
-  label: "code:timestamp_DATE_<9999-12-31>_STRING_<@0>"
 }
 
 known_errors {
@@ -1322,13 +1193,6 @@ known_errors {
   label: "value_table_queries_test:value_table_source_struct_filter"
   label: "value_table_queries_test:value_table_source_struct_self"
   label: "value_table_queries_test:value_table_source_struct_star"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "A TIMESTAMP result outside BigQuery's range fails to decode instead of failing as out of range"
-  label: "code:safe_error_mode__safe_timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<America/_gHqr2K5IEYY__Angeles>"
-  label: "code:timestamp_DATETIME_9999-12-31 23:59:59.999999_STRING_<America/_gHqr2K5IEYY__Angeles>"
 }
 
 known_errors {
@@ -2019,19 +1883,6 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE.DATE fails on a date outside BigQuery's range instead of returning NULL"
-  label: "code:safe_error_mode__safe_date_TIMESTAMP_-62135596046000000_STRING_<PST8PDT>"
-  label: "code:safe_error_mode__safe_date_TIMESTAMP_253402279954000000_STRING_<Asia/Shanghai>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "SAFE.DATETIME fails on a result outside BigQuery's range instead of returning NULL"
-  label: "code:safe_error_mode__safe_datetime_TIMESTAMP_-62135596800000000_STRING_<America/_gHqr2K5IEYY__Angeles>"
-}
-
-known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "SAFE_CAST differs: FLOAT64 to INT64 rounds halves to even, large FLOAT64 values become NULL as NUMERIC, and STRING to BOOL accepts '0' and '1'"
   label: "code:SafeCastTo_BOOL_STRING_<0>"
@@ -2088,12 +1939,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "TIMESTAMP converts a civil time repeated at a daylight saving change to its later instant rather than its earlier one"
-  label: "code:timestamp_DATETIME_2015-11-01 01:30:00_STRING_<America/_gHqr2K5IEYY__Angeles>"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "TIME_DIFF counts the unit boundaries crossed rather than the whole units elapsed"
   label: "code:time_diff_TIME_02:56:13.456789_TIME_12:34:56.987654_STRING_<HOUR>"
   label: "code:time_diff_TIME_02:56:13.456789_TIME_12:34:56.987654_STRING_<MILLISECOND>"
@@ -2115,13 +1960,6 @@ known_errors {
   label: "code:trunc_FLOAT64_1_INT64_-40000"
   label: "code:trunc_FLOAT64_4@94065645841247e-324_INT64_323"
   label: "code:trunc_FLOAT64_75@736617999999993_INT64_6"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Time zones written as UTC offsets, such as UTC+1234, are not converted as BigQuery does"
-  label: "timezones_test:extract_datetime_from_timestamp"
-  label: "timezones_test:extract_time_from_timestamp"
 }
 
 known_errors {
