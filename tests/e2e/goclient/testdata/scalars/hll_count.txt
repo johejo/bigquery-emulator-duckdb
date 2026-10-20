@@ -181,3 +181,21 @@ SELECT HLL_COUNT.EXTRACT(b'abc')
 
 SELECT HLL_COUNT.MERGE(s) FROM UNNEST([b'']) AS s
 => error: Invalid or incompatible sketch in HLL_COUNT.MERGE_PARTIAL
+
+# BigQuery takes none of these over a window.
+
+SELECT TO_HEX(HLL_COUNT.INIT(x) OVER ()) FROM UNNEST([1, 2, 3]) AS x LIMIT 1
+=> error: Analytic function INIT is not supported.
+
+SELECT TO_HEX(HLL_COUNT.MERGE_PARTIAL(s) OVER ())
+FROM (SELECT HLL_COUNT.INIT(x) AS s FROM UNNEST([1, 2, 3]) AS x) LIMIT 1
+=> error: Analytic function MERGE_PARTIAL is not supported.
+
+SELECT HLL_COUNT.MERGE(s) OVER ()
+FROM (SELECT HLL_COUNT.INIT(x) AS s FROM UNNEST([1, 2, 3]) AS x)
+=> error: Analytic function MERGE is not supported.
+
+SELECT ARRAY_AGG(n ORDER BY x) FROM (
+  SELECT x, APPROX_COUNT_DISTINCT(x) OVER (ORDER BY x ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS n
+  FROM UNNEST([1, 2, 3]) AS x)
+=> error: Analytic function APPROX_COUNT_DISTINCT is not supported.
