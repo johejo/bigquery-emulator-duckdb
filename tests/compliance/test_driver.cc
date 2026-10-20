@@ -246,7 +246,12 @@ class EmulatorTestDriver : public googlesql::TestDriver {
       // Value tables, which BigQuery lacks, are left out, and so are the columns of types it
       // lacks; the tests that read them fail to resolve, or are skipped for using a type the
       // engine does not support.
-      if (table.options.is_value_table()) continue;
+      // The public API cannot describe pseudo-columns. Loading them as ordinary columns
+      // would silently change SELECT *; leave such tables unsupported, like value tables.
+      if (table.options.is_value_table() ||
+          std::ranges::any_of(table.options.pseudo_columns(), [](bool pseudo) { return pseudo; })) {
+        continue;
+      }
       const googlesql::StructType& row_type =
           *table.table_as_value.type()->AsArray()->element_type()->AsStruct();
       std::vector<FieldSchema> schema;

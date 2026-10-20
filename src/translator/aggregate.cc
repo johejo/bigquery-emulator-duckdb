@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -54,6 +55,16 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        entry->implementation != Implementation::kAnalytic) ||
       (entry->implementation == Implementation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
+  }
+  if ((name == "LAG" || name == "LEAD") && call.argument_list_size() == 3) {
+    const auto constant = googlesql::IsConstantExpression(call.argument_list(2));
+    if (!constant.ok()) {
+      return Unsupported(scope, name + " default expression");
+    }
+    if (!*constant) {
+      throw std::invalid_argument("The third argument (the default expression) to " + name +
+                                  " must be constant");
+    }
   }
   const auto type_of = [&](std::size_t argument) {
     return argument < call.argument_list().size()
@@ -202,7 +213,8 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
     if (!sql) {
       return std::nullopt;
     }
-    limit = *sql;
+    // A zero-row aggregate is NULL, not the empty list/string a zero-length slice yields.
+    limit = "nullif(" + *sql + ", 0)";
     if (rule->limit == AggregateRule::Limit::kJoin) {
       conditions.push_back(args.at(0) + " IS NOT NULL");
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +

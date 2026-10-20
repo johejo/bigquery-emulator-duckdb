@@ -104,10 +104,7 @@ constexpr std::string_view kReadsEmptyStruct[] = {
 };
 
 constexpr std::string_view kRejectsSafe[] = {
-    "SESSION_USER",
-    "ERROR",
-    "TEXT_ANALYZE",
-    "ST_GEOHASH",
+    "JSON_KEYS", "SESSION_USER", "ERROR", "TEXT_ANALYZE", "ST_GEOHASH",
 };
 
 std::span<const std::string_view> Functions(TypeUse use) {

@@ -404,3 +404,18 @@ SELECT BOOL(JSON '1')
 
 SELECT STRING(JSON '1')
 => error:
+
+# Validation order when SQL NULL and invalid JSON_KEYS arguments occur together.
+# Expected errors were verified on BigQuery.
+
+SELECT JSON_KEYS(j, 1, mode => 'invalid') FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> error: Invalid JSON mode specified: invalid; error in JSON_KEYS expression
+
+SELECT JSON_KEYS(j, 0, mode => CAST(NULL AS STRING)) FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> error: max_depth must be positive. provided value: 0; error in JSON_KEYS expression
+
+SELECT JSON_KEYS(j, 0, mode => 'invalid') FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> error: Invalid JSON mode specified: invalid; error in JSON_KEYS expression
+
+SELECT SAFE.JSON_KEYS(j, 1, mode => 'invalid') IS NULL FROM UNNEST([CAST(NULL AS JSON)]) AS j
+=> error: SAFE with function json_keys is not supported.
