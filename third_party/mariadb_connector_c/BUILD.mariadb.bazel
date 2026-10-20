@@ -1,0 +1,95 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+copy_file(
+    name = "config",
+    src = "@bigquery_emulator_duckdb//third_party/mariadb_connector_c:ma_config.h",
+    out = "include/ma_config.h",
+)
+
+copy_file(
+    name = "version",
+    src = "@bigquery_emulator_duckdb//third_party/mariadb_connector_c:mariadb_version.h",
+    out = "include/mariadb_version.h",
+)
+
+expand_template(
+    name = "plugins",
+    out = "libmariadb/ma_client_plugin.c",
+    substitutions = {
+        "@PLUGINS_DISABLED@": "",
+        "@EXTERNAL_PLUGINS@": "extern struct st_mysql_client_plugin zlib_client_plugin;\nextern struct st_mysql_client_plugin mysql_native_password_client_plugin;\nextern struct st_mysql_client_plugin pvio_socket_client_plugin;\nextern struct st_mysql_client_plugin caching_sha2_password_client_plugin;\nextern struct st_mysql_client_plugin sha256_password_client_plugin;",
+        "@BUILTIN_PLUGINS@": "(struct st_mysql_client_plugin *)&zlib_client_plugin,\n(struct st_mysql_client_plugin *)&mysql_native_password_client_plugin,\n(struct st_mysql_client_plugin *)&pvio_socket_client_plugin,\n(struct st_mysql_client_plugin *)&caching_sha2_password_client_plugin,\n(struct st_mysql_client_plugin *)&sha256_password_client_plugin,",
+    },
+    template = "libmariadb/ma_client_plugin.c.in",
+)
+
+cc_library(
+    name = "mariadb",
+    srcs = [
+        "libmariadb/ma_alloc.c",
+        "libmariadb/ma_array.c",
+        "libmariadb/ma_charset.c",
+        "libmariadb/ma_compress.c",
+        "libmariadb/ma_context.c",
+        "libmariadb/ma_decimal.c",
+        "libmariadb/ma_default.c",
+        "libmariadb/ma_dtoa.c",
+        "libmariadb/ma_errmsg.c",
+        "libmariadb/ma_hashtbl.c",
+        "libmariadb/ma_init.c",
+        "libmariadb/ma_io.c",
+        "libmariadb/ma_list.c",
+        "libmariadb/ma_ll2str.c",
+        "libmariadb/ma_loaddata.c",
+        "libmariadb/ma_net.c",
+        "libmariadb/ma_password.c",
+        "libmariadb/ma_pvio.c",
+        "libmariadb/ma_stmt_codec.c",
+        "libmariadb/ma_string.c",
+        "libmariadb/ma_time.c",
+        "libmariadb/ma_tls.c",
+        "libmariadb/mariadb_async.c",
+        "libmariadb/mariadb_charset.c",
+        "libmariadb/mariadb_lib.c",
+        "libmariadb/mariadb_rpl.c",
+        "libmariadb/mariadb_stmt.c",
+        "libmariadb/secure/openssl.c",
+        "libmariadb/secure/openssl_crypt.c",
+        "plugins/auth/caching_sha2_pw.c",
+        "plugins/auth/my_auth.c",
+        "plugins/auth/sha256_pw.c",
+        "plugins/compress/c_zlib.c",
+        "plugins/pvio/pvio_socket.c",
+        ":plugins",
+    ],
+    hdrs = glob(["include/**/*.h"]) + [
+        ":config",
+        ":version",
+    ],
+    includes = ["include"],
+    linkopts = select({
+        "@platforms//os:macos": ["-liconv"],
+        "//conditions:default": [
+            "-ldl",
+            "-lpthread",
+        ],
+    }),
+    local_defines = [
+        "HAVE_COMPRESS",
+        "LIBMARIADB",
+        "THREAD",
+        "HAVE_TLS",
+        "HAVE_OPENSSL",
+        "_GNU_SOURCE",
+        "_DARWIN_C_SOURCE",
+        "_XOPEN_SOURCE=700",
+    ],
+    deps = [
+        "@boringssl//:ssl",
+        "@zlib",
+    ],
+)

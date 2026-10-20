@@ -54,6 +54,8 @@ row reads, copies and extracts share it; writes that retain external numeric sto
 
 `EXTERNAL_QUERY` exposes each connection through a DuckDB table macro:
 
+- [MySQL](../src/mysql_query.cc): MariaDB Connector/C prepares the query during analysis; the
+  linked [mysql_scanner extension](../third_party/duckdb_mysql/README.md) reads the rows.
 - [PostgreSQL](../src/external_query.cc): libpq prepares the query during analysis; the linked
   [postgres_scanner extension](../third_party/duckdb_postgres/README.md) reads the rows.
 - [Spanner](../src/spanner_query.cc): a `PLAN` RPC supplies result metadata; google-cloud-cpp

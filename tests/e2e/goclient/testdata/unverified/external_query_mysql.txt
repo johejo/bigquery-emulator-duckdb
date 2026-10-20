@@ -1,0 +1,27 @@
+# A Cloud SQL MySQL connection named us.mysql, with tests/e2e/mysql.sql loaded.
+# The mapping documents neither the errors/rounding below nor the JSON result type.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('-01:00:00' AS TIME) AS x")
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('24:00:00' AS TIME) AS x")
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('0000-00-00' AS DATE) AS x")
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(1.0000000005 AS DECIMAL(65,10)) AS x')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(1e30 AS DECIMAL(65,0)) AS x')
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('{\"a\":1}' AS JSON) AS x")
+?>
+
+SELECT TO_JSON_STRING(t) FROM EXTERNAL_QUERY('us.mysql', 'SELECT 1 AS x, 2 AS x') AS t
+?>
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT NULL AS x')
+?>

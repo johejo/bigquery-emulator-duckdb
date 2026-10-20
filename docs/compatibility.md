@@ -169,8 +169,8 @@ Value tables and INTERVAL or annotated partitioning columns are unsupported.
 
 ### EXTERNAL_QUERY
 
-Connections to PostgreSQL and Spanner are configured with `--connection`; see the
-[README](../README.md#external-queries) for setup. MySQL is unsupported. The connection ID,
+Connections to PostgreSQL, MySQL and Spanner are configured with `--connection`; see the
+[README](../README.md#external-queries) for setup. The connection ID,
 query and options must be literals, and views that read `EXTERNAL_QUERY` are unsupported.
 
 PostgreSQL queries are prepared during analysis and read through a read-only attachment.
@@ -180,6 +180,10 @@ Their limits are:
   STRING. `bit` and `bit varying`, which BigQuery reads as BYTES, are also unsupported.
 - Duplicate column names are unsupported.
 - Only the `default_type_for_decimal_columns` option is supported.
+
+MySQL queries use a read-only attachment. Duplicate column names, zero dates, JSON results and
+types outside BigQuery's [MySQL mapping](https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping)
+are unsupported. Only the `default_type_for_decimal_columns` option is supported.
 
 Spanner queries are limited to GoogleSQL returning BOOL, BYTES, DATE, FLOAT64, INT64, JSON,
 NUMERIC, STRING and TIMESTAMP, using BigQuery's

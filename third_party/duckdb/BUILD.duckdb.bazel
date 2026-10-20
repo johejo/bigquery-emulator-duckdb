@@ -26,9 +26,9 @@ _VENDORED = glob(
 [
     cc_import(
         name = lib.removesuffix(".a"),
-        alwayslink = True,
         static_library = lib,
         visibility = ["//visibility:private"],
+        alwayslink = True,
     )
     for lib in _WHOLE
 ]

@@ -1,0 +1,97 @@
+# MySQL mapping: https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#mysql_mapping
+# tools/e2e loads tests/e2e/mysql.sql into us.mysql. The server defaults to +09:00.
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(-9223372036854775808 AS SIGNED) AS x')
+=> "-9223372036854775808"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(NULL AS SIGNED) AS x')
+=> null
+
+SELECT tiny FROM EXTERNAL_QUERY('us.mysql', 'SELECT tiny FROM types')
+=> "2"
+
+SELECT float_value FROM EXTERNAL_QUERY('us.mysql', 'SELECT float_value FROM types')
+=> "1.5"
+
+SELECT double_value FROM EXTERNAL_QUERY('us.mysql', 'SELECT double_value FROM types')
+=> "1.5"
+
+SELECT unsigned_big FROM EXTERNAL_QUERY('us.mysql', 'SELECT unsigned_big FROM types')
+=> "18446744073709551615"
+
+# Decimal options do not change the UNSIGNED BIGINT mapping.
+SELECT TYPEOF(unsigned_big) FROM EXTERNAL_QUERY('us.mysql', 'SELECT unsigned_big FROM types', '{"default_type_for_decimal_columns":"string"}')
+=> "NUMERIC"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(12.34 AS DECIMAL(10,2)) AS x')
+=> "12.34"
+
+SELECT TYPEOF(x) FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(1 AS DECIMAL(65,0)) AS x')
+=> "NUMERIC"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(NULL AS DECIMAL(65,0)) AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
+=> null
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(12345678901234567890123456789012345678.12345 AS DECIMAL(65,5)) AS x', '{"default_type_for_decimal_columns":"bignumeric"}')
+=> "12345678901234567890123456789012345678.12345"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', 'SELECT CAST(1.5 AS DECIMAL(65,1)) AS x', '{"default_type_for_decimal_columns":"float64"}')
+=> "1.5"
+
+SELECT decimal65 FROM EXTERNAL_QUERY('us.mysql', 'SELECT decimal65 FROM types', '{"default_type_for_decimal_columns":"string"}')
+=> "12345678901234567890123456789012345678901234567890123456789012345"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('abc' AS CHAR) AS x")
+=> "abc"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('' AS CHAR) AS x")
+=> ""
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST(NULL AS CHAR) AS x")
+=> null
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT _utf8mb4'日本語' COLLATE utf8mb4_bin AS x")
+=> "日本語"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST(X'0001FF' AS BINARY) AS x")
+=> "AAH/"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('' AS BINARY) AS x")
+=> ""
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('2026-01-02' AS DATE) AS x")
+=> "2026-01-02"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('03:04:05.123456' AS TIME(6)) AS x")
+=> "03:04:05.123456"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST(NULL AS TIME) AS x")
+=> null
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST('2026-01-02 03:04:05.123456' AS DATETIME(6)) AS x")
+=> "2026-01-02T03:04:05.123456"
+
+# MySQL TIMESTAMP is retrieved in UTC, independent of the server's default time zone.
+SELECT CAST(ts AS STRING) FROM EXTERNAL_QUERY('us.mysql', 'SELECT ts FROM types')
+=> "2026-01-02 03:04:05.123456+00"
+
+SELECT year_value FROM EXTERNAL_QUERY('us.mysql', 'SELECT year_value FROM types')
+=> "2026"
+
+SELECT enum_value FROM EXTERNAL_QUERY('us.mysql', 'SELECT enum_value FROM types')
+=> "second"
+
+SELECT set_value FROM EXTERNAL_QUERY('us.mysql', 'SELECT set_value FROM types')
+=> "a,b"
+
+SELECT x FROM EXTERNAL_QUERY('test.us.mysql', 'SELECT 1 AS x')
+=> "1"
+
+SELECT x FROM EXTERNAL_QUERY('projects/test/locations/us/connections/mysql', 'SELECT 1 AS x')
+=> "1"
+
+SELECT SUM(x) FROM UNNEST([1, 2]) AS x JOIN EXTERNAL_QUERY('us.mysql', 'SELECT 2 AS y') ON x = y
+=> "2"
+
+SELECT x FROM EXTERNAL_QUERY('us.mysql', "SELECT CAST(NULL AS BINARY) AS x")
+=> null

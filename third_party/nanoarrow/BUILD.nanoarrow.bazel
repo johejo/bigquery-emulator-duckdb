@@ -10,14 +10,22 @@ genrule(
 # IPC uses nanoarrow's vendored flatcc runtime and generated Arrow flatbuffers.
 cc_library(
     name = "flatcc",
-    srcs = ["thirdparty/flatcc/src/runtime/" + f + ".c" for f in ["builder", "emitter", "refmap", "verifier"]],
+    srcs = ["thirdparty/flatcc/src/runtime/" + f + ".c" for f in [
+        "builder",
+        "emitter",
+        "refmap",
+        "verifier",
+    ]],
     hdrs = glob(["thirdparty/flatcc/include/**/*.h"]),
     includes = ["thirdparty/flatcc/include"],
 )
 
 cc_library(
     name = "nanoarrow",
-    srcs = glob(["src/nanoarrow/common/*.c", "src/nanoarrow/ipc/*.c"]),
+    srcs = glob([
+        "src/nanoarrow/common/*.c",
+        "src/nanoarrow/ipc/*.c",
+    ]),
     hdrs = glob([
         "src/nanoarrow/common/*.h",
         "src/nanoarrow/hpp/*.hpp",

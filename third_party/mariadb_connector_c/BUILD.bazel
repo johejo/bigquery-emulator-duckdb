@@ -1,0 +1,6 @@
+exports_files([
+    "BUILD.mariadb.bazel",
+    "boringssl.patch",
+    "ma_config.h",
+    "mariadb_version.h",
+])

@@ -1,0 +1,18 @@
+# BigQuery's unsupported types: https://cloud.google.com/bigquery/docs/reference/standard-sql/federated_query_functions#unsupported_data_types
+# Fixtures: tests/e2e/mysql.sql.
+
+SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT bit_value FROM types')
+=> error contains: Found unsupported MySQL type in BigQuery.
+
+SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT geometry_value FROM types')
+=> error contains: Found unsupported MySQL type in BigQuery.
+
+SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT nosuch')
+=> error:
+
+# Emulator limits, as for PostgreSQL.
+SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT 1 AS x, 2 AS x')
+=> error contains: The emulator does not support EXTERNAL_QUERY columns of the same name
+
+SELECT * FROM EXTERNAL_QUERY('us.mysql', 'SELECT 1 AS x', '{"query_execution_priority":"low"}')
+=> error contains: The emulator does not support EXTERNAL_QUERY option query_execution_priority

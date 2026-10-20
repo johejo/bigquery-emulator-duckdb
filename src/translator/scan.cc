@@ -30,18 +30,18 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-// A column of EXTERNAL_QUERY's result, `sql`, as postgres_scanner reads it, converted to the
-// BigQuery type `type` that the catalog gave it. A NUMERIC that postgres_scanner cannot read as a
-// DECIMAL is read as text. Dates and times outside BigQuery's ranges, such as PostgreSQL's
-// infinity or 24:00:00, fail.
-std::string ExternalValue(const googlesql::Type* type, const std::string& sql) {
+// Converts an external result column to the BigQuery type the catalog gave it. MySQL decimals
+// and PostgreSQL numerics beyond DuckDB's precision arrive as text. MySQL TIMESTAMP arrives as
+// a UTC timestamp without a time zone. Dates and times outside BigQuery's ranges fail.
+std::string ExternalValue(const googlesql::Type* type, const std::string& value) {
+  std::string sql = "CAST(" + value + " AS " + DuckDbType(type).value_or("VARCHAR") + ")";
   const auto in_range = [&](const std::string& condition, std::string_view name) {
     return "CASE WHEN " + sql + " IS NULL OR " + condition + " THEN " + sql + " ELSE error('" +
            std::string(name) + " value out of range: ' || CAST(" + sql + " AS VARCHAR)) END";
   };
   switch (type->kind()) {
     case googlesql::TYPE_BIGNUMERIC:
-      return "CAST(bq_bignumeric_from_string(CAST(" + sql + " AS VARCHAR), false) AS BIGNUM)";
+      return "CAST(bq_bignumeric_from_string(CAST(" + value + " AS VARCHAR), false) AS BIGNUM)";
     case googlesql::TYPE_DATE:
       return in_range(sql + " BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'", "DATE");
     case googlesql::TYPE_DATETIME:
@@ -57,7 +57,7 @@ std::string ExternalValue(const googlesql::Type* type, const std::string& sql) {
     case googlesql::TYPE_TIME:
       return in_range(sql + " < TIME '24:00:00'", "TIME");
     default:
-      return "CAST(" + sql + " AS " + DuckDbType(type).value_or("VARCHAR") + ")";
+      return sql;
   }
 }
 

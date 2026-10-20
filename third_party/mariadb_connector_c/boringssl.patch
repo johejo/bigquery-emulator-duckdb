@@ -1,0 +1,28 @@
+--- a/libmariadb/secure/openssl.c
++++ b/libmariadb/secure/openssl.c
+@@ -334,7 +334,7 @@
+         mysql->options.ssl_cipher[0] != 0))
+   {
+     if(
+-#ifdef TLS1_3_VERSION
++#if defined(TLS1_3_VERSION) && !defined(OPENSSL_IS_BORINGSSL)
+        SSL_CTX_set_ciphersuites(ctx, mysql->options.ssl_cipher) == 0 &&
+ #endif
+        SSL_CTX_set_cipher_list(ctx, mysql->options.ssl_cipher) == 0)
+@@ -502,8 +502,16 @@
+   #if OPENSSL_VERSION_NUMBER >= 0x10101000L
+       const ASN1_TIME *not_before= X509_get0_notBefore(cert),
+                       *not_after= X509_get0_notAfter(cert);
++  #ifdef OPENSSL_IS_BORINGSSL
++      time_t from, to;
++      if (!ASN1_TIME_to_time_t(not_before, &from) || !ASN1_TIME_to_time_t(not_after, &to))
++        return 1;
++      gmtime_r(&from, &ctls->cert_info.not_before);
++      gmtime_r(&to, &ctls->cert_info.not_after);
++  #else
+       ASN1_TIME_to_tm(not_before, (struct tm *)&ctls->cert_info.not_before);
+       ASN1_TIME_to_tm(not_after, (struct tm *)&ctls->cert_info.not_after);
++  #endif
+   #else
+       const ASN1_TIME *not_before= X509_get_notBefore(cert),
+                       *not_after= X509_get_notAfter(cert);

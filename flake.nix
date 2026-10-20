@@ -34,6 +34,7 @@
             google-cloud-sdk
             jq
             postgresql
+            mysql84
             runn
           ];
           formatPackages = with pkgs; [
