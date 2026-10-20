@@ -465,12 +465,6 @@ bool HasLengthParameters(const FieldSchema& field) {
   return field.max_length.has_value() || std::ranges::any_of(field.fields, HasLengthParameters);
 }
 
-bool HasNestedNotNull(const FieldSchema& field) {
-  return std::ranges::any_of(field.fields, [](const FieldSchema& child) {
-    return child.mode == FieldMode::kRequired || HasNestedNotNull(child);
-  });
-}
-
 // CREATE TABLE LIKE copies the schema, partitioning, clustering, description, friendly name,
 // default rounding mode and labels of the source table, which PARTITION BY, CLUSTER BY and OPTIONS
 // replace, as ALTER TABLE SET OPTIONS does.
@@ -789,9 +783,6 @@ std::optional<std::string> CreateTableAsSelect(
   if (like && std::ranges::any_of(description->schema, HasLengthParameters)) {
     return Unsupported(scope, "CREATE TABLE LIKE AS SELECT with length parameters");
   }
-  if (like && std::ranges::any_of(description->schema, HasNestedNotNull)) {
-    return Unsupported(scope, "CREATE TABLE LIKE AS SELECT with nested NOT NULL");
-  }
   const auto relation = Scan(*create.query(), scope);
   if (!relation) {
     return std::nullopt;
@@ -838,9 +829,6 @@ std::optional<std::string> CreateTableAsSelect(
       type = ColumnDefinitionType(definition, scope);
       if (!type) {
         return std::nullopt;
-      }
-      if (HasNestedNotNull(*field)) {
-        return Unsupported(scope, "CREATE TABLE AS SELECT with nested NOT NULL");
       }
       table.schema.push_back(*std::move(field));
     }

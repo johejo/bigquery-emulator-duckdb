@@ -29,6 +29,10 @@ std::optional<std::string> ColumnDefinitions(const std::vector<FieldSchema>& sch
 std::string InsertValue(const nlohmann::json& value, const FieldSchema& field,
                         bool ignore_unknown_values);
 
+// The value `sql` with REQUIRED fields checked at every depth, by position within records.
+// Evaluates `sql` once and permits a nullable parent record to be NULL.
+std::string RequiredValue(const std::string& sql, const FieldSchema& field);
+
 // The DuckDB value `sql` of `field`, as a load reads it, with each GEOGRAPHY in it, at any depth,
 // read from its WKT into the form a table stores it in, which is the one queries hold.
 std::string StoredValue(const std::string& sql, const FieldSchema& field);

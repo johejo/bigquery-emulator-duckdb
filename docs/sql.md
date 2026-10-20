@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 33 | 0 | 1 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 17 | 11 | 4 |
+| [DDL](#ddl) | 18 | 10 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 10 | 0 | 0 |
 
@@ -87,7 +87,7 @@ rejected.
 | `BIGNUMERIC` columns | Supported |  |
 | Column defaults | Supported |  |
 | `CREATE TABLE AS SELECT` | Supported |  |
-| `CREATE TABLE AS SELECT` with `NOT NULL` | Partial | See [CREATE TABLE AS SELECT](compatibility.md#create-table-as-select). Unsupported: CREATE TABLE AS SELECT with nested NOT NULL. |
+| `CREATE TABLE AS SELECT` with `NOT NULL` | Supported |  |
 | Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
 | Column rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields. |
 | Default rounding modes | Supported | See [Rounding modes](compatibility.md#rounding-modes). |
@@ -95,7 +95,7 @@ rejected.
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
-| `CREATE TABLE LIKE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE LIKE AS SELECT with length parameters; CREATE TABLE LIKE AS SELECT with nested NOT NULL. |
+| `CREATE TABLE LIKE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE LIKE AS SELECT with length parameters. |
 | `CREATE TABLE COPY` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE COPY with FOR SYSTEM_TIME AS OF. |
 | `CREATE TABLE CLONE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF. |
 | `CREATE SNAPSHOT TABLE` | Unsupported |  |

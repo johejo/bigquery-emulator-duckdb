@@ -54,6 +54,46 @@ bool HasGeography(const std::vector<FieldSchema>& fields) {
   });
 }
 
+bool HasRequired(const FieldSchema& field) {
+  return field.mode == FieldMode::kRequired || std::ranges::any_of(field.fields, HasRequired);
+}
+
+// A predicate that reports REQUIRED errors. CASE skips descendants of a
+// NULL record. Positions also handle CTAS expressions whose field names differ from the schema.
+std::string RequiredCondition(const std::string& sql, const FieldSchema& field,
+                              const std::string& path, const std::string& column, int depth) {
+  if (!HasRequired(field)) {
+    return "true";
+  }
+  std::string condition = "true";
+  if (field.mode == FieldMode::kRepeated) {
+    const std::string name = "_required_element" + std::to_string(depth);
+    condition = "coalesce(list_bool_and(list_transform(" + sql + ", " + name + " -> " +
+                RequiredCondition(name, AsNullable(field), path, column, depth + 1) + ")), true)";
+  } else if (field.type == FieldType::kRecord) {
+    std::vector<std::string> children;
+    for (size_t i = 0; i < field.fields.size(); ++i) {
+      const FieldSchema& child = field.fields.at(i);
+      if (HasRequired(child)) {
+        children.push_back(
+            RequiredCondition("struct_extract_at(" + sql + ", " + std::to_string(i + 1) + ")",
+                              child, path + "." + child.name, column, depth));
+      }
+    }
+    if (!children.empty()) {
+      condition = "(" + Join(children, " AND ") + ")";
+    }
+  }
+  const std::string missing =
+      field.mode == FieldMode::kRequired
+          ? "error(" +
+                QuoteLiteral("Required field " + path + " cannot be null; error in writing field " +
+                             column) +
+                ")"
+          : "true";
+  return "CASE WHEN " + sql + " IS NULL THEN " + missing + " ELSE " + condition + " END";
+}
+
 // The DuckDB value `sql` of `field` with each GEOGRAPHY in it, at any depth, replaced by
 // `geography(value)`.
 std::string MapGeographies(const std::string& sql, const FieldSchema& field, int depth,
@@ -174,6 +214,9 @@ std::string RangeFromText(const std::string& text, const FieldSchema& field) {
 std::string InsertValue(const json& value, const FieldSchema& field, bool ignore_unknown_values) {
   const std::string type = ToDuckDbType(field);
   if (value.is_null()) {
+    if (field.mode == FieldMode::kRequired) {
+      throw ApiError::Invalid("Required field " + field.name + " cannot be null");
+    }
     return "CAST(NULL AS " + type + ")";
   }
   if (field.mode == FieldMode::kRepeated) {
@@ -234,9 +277,19 @@ std::string InsertValue(const json& value, const FieldSchema& field, bool ignore
   return "CAST(" + QuoteLiteral(scalar) + " AS " + type + ")";
 }
 
+std::string RequiredValue(const std::string& sql, const FieldSchema& field) {
+  if (!HasRequired(field)) {
+    return sql;
+  }
+  const std::string name = "_required_value";
+  return "list_transform([" + sql + "], " + name + " -> CASE WHEN " +
+         RequiredCondition(name, field, field.name, field.name, 0) + " THEN " + name + " END)[1]";
+}
+
 std::string StoredValue(const std::string& sql, const FieldSchema& field) {
-  return MapGeographies(
-      sql, field, 0, [](const std::string& value) { return "bq_geography_input(" + value + ")"; });
+  return MapGeographies(RequiredValue(sql, field), field, 0, [](const std::string& value) {
+    return "bq_geography_input(" + value + ")";
+  });
 }
 
 std::string ReadColumns(const std::vector<FieldSchema>& schema) {

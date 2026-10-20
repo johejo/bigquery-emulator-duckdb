@@ -52,7 +52,8 @@ std::optional<QueryParameters> TranslateParameters(
 
 // `value`, the SQL of a column of `source` that a job appends to the existing column
 // `destination`, with the values of its ROUND_HALF_EVEN fields rounded to their scale as DML
-// rounds them; DuckDB's casts round halfway values away from zero. nullopt when the emulator
+// rounds them, and its REQUIRED fields checked. DuckDB's casts round halfway values away from
+// zero. nullopt when the emulator
 // cannot round them, such as values that are not NUMERIC or BIGNUMERIC or STRUCT fields in
 // another order.
 std::optional<std::string> TranslateAppendedValue(const std::string& value,

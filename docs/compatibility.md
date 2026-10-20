@@ -95,10 +95,6 @@ Supported actions are `ADD COLUMN`, `DROP COLUMN`, `RENAME TO`, `SET OPTIONS`, a
 with `SET OPTIONS`, `SET DEFAULT` or `DROP DEFAULT`. Other actions are unsupported. Column options
 have the limits described under [Options and expiration](#options-and-expiration).
 
-### CREATE TABLE AS SELECT
-
-Nested `NOT NULL` in an explicit column schema or one inherited by `LIKE AS SELECT` is unsupported.
-
 ### Copies and clones
 
 For `CREATE TABLE LIKE`, `COPY` and `CLONE`, see the [SQL support table](sql.md) for rejected

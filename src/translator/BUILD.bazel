@@ -42,6 +42,7 @@ cc_library(
         "//:field_schema",
         "//:javascript_function",
         "//:language_options",
+        "//:schema_sql",
         "//:type_mapping",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
