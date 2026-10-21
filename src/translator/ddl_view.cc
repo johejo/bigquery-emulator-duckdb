@@ -56,6 +56,7 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   }
   const auto path = TargetTable(create.name_path(), scope, true);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
+  scope.context.defines_view = true;
   const auto relation = Scan(*create.query(), scope);
   auto metadata = OptionsMetadata(create.option_list(), "CREATE VIEW", scope);
   if (!path || !target || !relation || !metadata) {

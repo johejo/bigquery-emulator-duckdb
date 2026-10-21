@@ -262,9 +262,4 @@ func TestCreateSnapshotTable(t *testing.T) {
 		t.Errorf("deleting a table snapshot: %v", err)
 	}
 
-	// The emulator keeps no table history.
-	if _, err := run("CREATE SNAPSHOT TABLE n CLONE base FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()"); err == nil ||
-		!strings.Contains(err.Error(), "CREATE SNAPSHOT TABLE with FOR SYSTEM_TIME AS OF") {
-		t.Errorf("CREATE SNAPSHOT TABLE with FOR SYSTEM_TIME AS OF: error = %v", err)
-	}
 }

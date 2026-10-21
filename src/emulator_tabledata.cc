@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <format>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <utility>
@@ -64,6 +65,8 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
   }
   RejectSnapshotWrite(info);
+  // Held until the transaction that keeps the table's rows and appends to it commits.
+  std::unique_lock<std::mutex> kept;
   try {
     const auto session = backend_.NewSession();
     session->Transaction("BEGIN TRANSACTION");
@@ -78,6 +81,10 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
     CheckWritableTable(*session, table);
     if (SchemaToJson(TableSchema(*session, table)) != SchemaToJson(schema)) {
       throw ApiError::Invalid("Storage Write does not support destination schema changes");
+    }
+    if (!validate_only) {
+      kept = std::unique_lock(HistoryMutex(table));
+      (void)KeepVersion(*session, table);
     }
     std::vector<std::string> statements;
     for (size_t index = 0; index < rows.size(); ++index) {
@@ -168,6 +175,8 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
     return errors;
   }
   try {
+    const std::unique_lock<std::mutex> kept =
+        statements.empty() ? std::unique_lock<std::mutex>() : KeepVersion(backend_, table);
     for (const auto& [index, message] : backend_.InsertRows(statements, skip_invalid_rows)) {
       errors.push_back({.index = indexes.at(index), .message = message});
     }

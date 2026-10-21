@@ -28,6 +28,7 @@
 #include "src/routine.h"
 #include "src/spanner_query.h"
 #include "src/table_comments.h"
+#include "src/table_history.h"
 #include "src/table_metadata.h"
 #include "src/table_source.h"
 
@@ -82,6 +83,16 @@ class DuckDbTableSource : public TableSource {
 
   std::optional<std::string> NumericReadQuery(const TableReference& table) override {
     return backend_.NumericReadQuery(QualifiedName(table));
+  }
+
+  absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {
+    const std::optional<json> comment =
+        RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    if (!comment.has_value() || !project_ids_.contains(table.project_id)) {
+      return absl::UnimplementedError("FOR SYSTEM_TIME AS OF a temporary table");
+    }
+    return bigquery_emulator_duckdb::TimeTravelQuery(backend_, table,
+                                                     CommentMetadata(*comment).creation_time, time);
   }
 
   std::optional<TableDescription> DescribeTable(const std::string& project,

@@ -238,11 +238,9 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 	// BigQuery's messages for a view.
 	view := dataset.ProjectID + ":" + dataset.DatasetID + ".v"
 	for sql, want := range map[string]string{
-		"CREATE TABLE n COPY v":  "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE]",
-		"CREATE TABLE n CLONE v": "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE, SNAPSHOT]",
-		"CREATE TABLE n COPY source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()":  "CREATE TABLE COPY with FOR SYSTEM_TIME AS OF",
-		"CREATE TABLE n CLONE source FOR SYSTEM_TIME AS OF CURRENT_TIMESTAMP()": "CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF",
-		"CREATE OR REPLACE TABLE copied COPY copied":                            "CREATE OR REPLACE TABLE COPY of itself",
+		"CREATE TABLE n COPY v":                      "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE]",
+		"CREATE TABLE n CLONE v":                     "Invalid value: Cannot clone " + view + " which has type VIEW. Allowed types: [TABLE, SNAPSHOT]",
+		"CREATE OR REPLACE TABLE copied COPY copied": "CREATE OR REPLACE TABLE COPY of itself",
 		// BigQuery's messages for a temporary copy or clone of a table that is not temporary.
 		"CREATE TEMP TABLE n COPY source; SELECT 1":  "CREATE TEMPORARY TABLE ... COPY is only allowed if the source table is a temporary table.",
 		"CREATE TEMP TABLE n CLONE source; SELECT 1": "CREATE TEMPORARY TABLE ... CLONE is only allowed if the source table is a temporary table.",

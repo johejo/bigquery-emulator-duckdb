@@ -32,6 +32,14 @@ class TableSource {
     return std::nullopt;
   }
 
+  // A query of the rows `table` had at `time`, in microseconds since the Unix epoch, for FOR
+  // SYSTEM_TIME AS OF: InvalidArgument for a time BigQuery cannot read the table at, and
+  // Unimplemented for one whose rows the emulator did not keep, as for every table by default.
+  virtual absl::StatusOr<std::string> TimeTravelQuery(const TableReference& /*table*/,
+                                                      int64_t /*time*/) {
+    return absl::UnimplementedError("FOR SYSTEM_TIME AS OF");
+  }
+
   // The schema and metadata of the table `project`.`dataset`.`table`, or nothing if there is no
   // such table or it is a view. For CREATE TABLE LIKE, COPY and CLONE and INFORMATION_SCHEMA;
   // none by default.

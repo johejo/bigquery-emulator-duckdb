@@ -447,6 +447,24 @@ std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableS
 // cloneDefinition is its own, which no copy inherits. BigQuery rejects a view, a table snapshot
 // as the source of LIKE or COPY, and a temporary table of a table that is not temporary, with
 // these messages.
+// The query of the rows that CREATE TABLE COPY, CLONE or CREATE SNAPSHOT TABLE copies from `scan`,
+// a scan of a table SourceDescription accepted, or none for the rows it has now that need no
+// conversion. Sets `time` to the time FOR SYSTEM_TIME AS OF reads it at, as tables.get reports it.
+std::optional<std::optional<std::string>> SourceRows(const googlesql::ResolvedTableScan& scan,
+                                                     const Scope& scope, std::string& time) {
+  if (scan.for_system_time_expr() == nullptr) {
+    return dynamic_cast<const BigQueryTable*>(scan.table())->NumericReadQuery();
+  }
+  int64_t micros = 0;
+  std::optional<std::string> rows = TimeTravelRows(scan, scope, micros);
+  if (!rows) {
+    return std::nullopt;
+  }
+  time =
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::FromUnixMicros(micros), absl::UTCTimeZone());
+  return rows;
+}
+
 std::optional<TableDescription> SourceDescription(const googlesql::Table* table,
                                                   std::string_view statement, bool temporary,
                                                   const Scope& scope) {
@@ -563,7 +581,8 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
 // clone also records the table it was cloned from and when, which tables.get reports as its
 // cloneDefinition. A clone of a table snapshot restores it as a standard table, which records no
 // clone and, as BigQuery documents, takes its dataset's default expiration rather than the
-// snapshot's. The emulator keeps no table's history, so FOR SYSTEM_TIME AS OF is unsupported.
+// snapshot's. FOR SYSTEM_TIME AS OF copies the rows the table had then, which a clone records as
+// its cloneTime.
 std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableStmt& create,
                                            const Scope& scope) {
   const bool clone = create.clone_from() != nullptr;
@@ -574,13 +593,15 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
     return Unsupported(scope, statement + " with WHERE");
   }
   const auto& scan = *from.GetAs<googlesql::ResolvedTableScan>();
-  if (scan.for_system_time_expr() != nullptr) {
-    return Unsupported(scope, statement + " with FOR SYSTEM_TIME AS OF");
-  }
   const bool temporary = create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP;
   std::optional<TableDescription> description =
       SourceDescription(scan.table(), statement, temporary, scope);
   if (!description) {
+    return std::nullopt;
+  }
+  std::string time;
+  auto rows = SourceRows(scan, scope, time);
+  if (!rows) {
     return std::nullopt;
   }
   const bool replace =
@@ -594,7 +615,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
     description->metadata.expiration_time.reset();
   }
   if (clone && !restore) {
-    description->metadata.clone = BaseTableDefinition{.base_table = source};
+    description->metadata.clone = BaseTableDefinition{.base_table = source, .time = time};
   }
   auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope,
                                   std::move(description->metadata));
@@ -613,7 +634,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
       .rows_from = source,
-      .rows_query = dynamic_cast<const BigQueryTable*>(scan.table())->NumericReadQuery(),
+      .rows_query = *std::move(rows),
       .temporary = temporary,
       .copies_table = true,
       .keeps_rounding_modes = true,
@@ -802,8 +823,9 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
 // CREATE SNAPSHOT TABLE copies a table as CLONE does, into a table snapshot, which records the
 // table it was made of and when as its snapshotDefinition and takes only the options BigQuery
 // documents for it, but not the base table's expiration, as BigQuery answers. A snapshot of a
-// snapshot names that snapshot as its base table. BigQuery takes neither OR REPLACE nor TEMP. The
-// emulator keeps no table's history, so FOR SYSTEM_TIME AS OF is unsupported.
+// snapshot names that snapshot as its base table. BigQuery takes neither OR REPLACE nor TEMP. FOR
+// SYSTEM_TIME AS OF copies the rows the table had then, which the snapshot records as its
+// snapshotTime.
 std::optional<std::string> CreateSnapshotTable(
     const googlesql::ResolvedCreateSnapshotTableStmt& create, const Scope& scope) {
   const std::string statement = "CREATE SNAPSHOT TABLE";
@@ -815,12 +837,14 @@ std::optional<std::string> CreateSnapshotTable(
     return Unsupported(scope, statement + " with WHERE");
   }
   const auto& scan = *create.clone_from()->GetAs<googlesql::ResolvedTableScan>();
-  if (scan.for_system_time_expr() != nullptr) {
-    return Unsupported(scope, statement + " with FOR SYSTEM_TIME AS OF");
-  }
   std::optional<TableDescription> description =
       SourceDescription(scan.table(), statement, /*temporary=*/false, scope);
   if (!description) {
+    return std::nullopt;
+  }
+  std::string time;
+  auto rows = SourceRows(scan, scope, time);
+  if (!rows) {
     return std::nullopt;
   }
   const auto* stored = dynamic_cast<const BigQueryTable*>(scan.table());
@@ -839,7 +863,7 @@ std::optional<std::string> CreateSnapshotTable(
   }
   const auto path = TargetTable(create.name_path(), scope, true);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
-  description->metadata.snapshot = BaseTableDefinition{.base_table = base};
+  description->metadata.snapshot = BaseTableDefinition{.base_table = base, .time = time};
   description->metadata.expiration_time.reset();
   auto metadata =
       OptionsMetadata(create.option_list(), statement, scope, std::move(description->metadata));
@@ -855,7 +879,7 @@ std::optional<std::string> CreateSnapshotTable(
       .metadata = *std::move(metadata),
       .if_not_exists = if_not_exists,
       .rows_from = source,
-      .rows_query = stored->NumericReadQuery(),
+      .rows_query = *std::move(rows),
       .copies_table = true,
       .keeps_rounding_modes = true,
   };
