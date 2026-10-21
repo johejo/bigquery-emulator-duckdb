@@ -113,7 +113,7 @@ std::string DecimalBytes(const FieldSchema& field, const json& value) {
   return result;
 }
 
-void ArrowField(ArrowSchema* out, const FieldSchema& field) {
+void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
   if (field.precision || field.scale) {
     throw ApiError::Invalid("Storage Read does not support parameterized decimals");
   }
@@ -124,7 +124,7 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field) {
     FieldSchema item = field;
     item.name = "item";
     item.mode = FieldMode::kRequired;
-    ArrowField(out->children[0], item);
+    ArrowField(out->children[0], item, arrow);
     out->flags =
         static_cast<int64_t>(static_cast<uint64_t>(out->flags) & ~uint64_t{ARROW_FLAG_NULLABLE});
     return;
@@ -169,16 +169,23 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field) {
     case FieldType::kRecord:
       ArrowCheck(ArrowSchemaSetTypeStruct(out, static_cast<int64_t>(field.fields.size())));
       for (size_t i = 0; i < field.fields.size(); ++i) {
-        ArrowField(out->children[i], field.fields.at(i));
+        ArrowField(out->children[i], field.fields.at(i), arrow);
       }
       break;
+    case FieldType::kGeography:
+    case FieldType::kJson:
+      if (arrow) {
+        throw ApiError::Invalid("Storage Read does not support " +
+                                std::string(FieldTypeName(field.type)));
+      }
+      [[fallthrough]];
     case FieldType::kString:
       ArrowCheck(ArrowSchemaSetType(out, NANOARROW_TYPE_STRING));
       break;
     case FieldType::kRange:
       ArrowCheck(ArrowSchemaSetTypeStruct(out, 2));
-      ArrowField(out->children[0], RangeBoundField(field, "start"));
-      ArrowField(out->children[1], RangeBoundField(field, "end"));
+      ArrowField(out->children[0], RangeBoundField(field, "start"), arrow);
+      ArrowField(out->children[1], RangeBoundField(field, "end"), arrow);
       break;
     default:
       throw ApiError::Invalid("Storage Read does not support " +
@@ -471,7 +478,7 @@ std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow
     return result.dump();
   }
   nanoarrow::UniqueSchema root;
-  StorageArrowSchema(root.get(), schema);
+  StorageReadArraySchema(root.get(), schema, true);
   nanoarrow::ipc::UniqueEncoder encoder;
   nanoarrow::UniqueBuffer output;
   ArrowError error{};
@@ -481,13 +488,13 @@ std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow
   return {reinterpret_cast<const char*>(output->data), static_cast<size_t>(output->size_bytes)};
 }
 
-void StorageArrowSchema(ArrowSchema* out, const std::vector<FieldSchema>& schema) {
+void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& schema, bool arrow) {
   ArrowSchemaInit(out);
   ArrowCheck(ArrowSchemaSetTypeStruct(out, static_cast<int64_t>(schema.size())));
   out->flags =
       static_cast<int64_t>(static_cast<uint64_t>(out->flags) & ~uint64_t{ARROW_FLAG_NULLABLE});
   for (size_t i = 0; i < schema.size(); ++i) {
-    ArrowField(out->children[i], schema.at(i));
+    ArrowField(out->children[i], schema.at(i), arrow);
   }
 }
 

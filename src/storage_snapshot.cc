@@ -325,7 +325,7 @@ StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema>
   state.session = std::move(session);
   state.fields = std::move(schema);
   *state.options.out() = duckdb_result_get_arrow_options(&result);
-  StorageArrowSchema(state.wire.get(), state.fields);
+  StorageReadArraySchema(state.wire.get(), state.fields, false);
   for (idx_t i = 0; i < state.fields.size(); ++i) {
     state.types.emplace_back(duckdb_column_logical_type(&result, i));
     duckdb_logical_type type = state.types.back().get();

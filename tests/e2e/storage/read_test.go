@@ -364,6 +364,97 @@ func TestReadAvroTypes(t *testing.T) {
 	}
 }
 
+// Avro represents JSON as JSON text and GEOGRAPHY as WKT, both string/sqlType:
+// https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
+func TestReadAvroJSONAndGeography(t *testing.T) {
+	for _, tc := range []struct {
+		name, kind, value, want string
+	}{
+		{"json", "JSON", `JSON '{"text":"日本語"}'`, `{"text":"日本語"}`},
+		{"geography", "GEOGRAPHY", "ST_GEOGPOINT(1, 2)", "POINT(1 2)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rest, read, _ := clients(t)
+			dataset := "storage_read_avro_" + tc.name
+			path := table(t, rest, dataset, fmt.Sprintf("id INT64, value %s, items ARRAY<%s>, rec STRUCT<value %s>, records ARRAY<STRUCT<value %s>>", tc.kind, tc.kind, tc.kind, tc.kind))
+			query(t, rest, fmt.Sprintf("INSERT INTO %s.rows VALUES (1, %s, [%s], STRUCT(%s), [STRUCT(%s)]), (2, NULL, [], NULL, [])", dataset, tc.value, tc.value, tc.value, tc.value))
+			s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
+			var schema struct {
+				Fields []struct {
+					Name string
+					Type json.RawMessage
+				}
+			}
+			if err := json.Unmarshal([]byte(s.GetAvroSchema().Schema), &schema); err != nil {
+				t.Fatal(err)
+			}
+			var branches []json.RawMessage
+			if err := json.Unmarshal(schema.Fields[1].Type, &branches); err != nil {
+				t.Fatal(err)
+			}
+			var kind struct{ Type, SQLType string }
+			if err := json.Unmarshal(branches[1], &kind); err != nil {
+				t.Fatal(err)
+			}
+			if kind.Type != "string" || kind.SQLType != tc.kind {
+				t.Fatalf("schema = %s", branches[1])
+			}
+			codec, err := goavro.NewCodec(s.GetAvroSchema().Schema)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows := make(map[int64]map[string]any)
+			for _, block := range responses(t, read, s.Streams[0].Name, 0) {
+				data := block.GetAvroRows().SerializedBinaryRows
+				for range block.RowCount {
+					value, remaining, err := codec.NativeFromBinary(data)
+					if err != nil {
+						t.Fatal(err)
+					}
+					row := value.(map[string]any)
+					rows[union(row["id"]).(int64)] = row
+					data = remaining
+				}
+				if len(data) != 0 {
+					t.Fatal("unexpected trailing Avro bytes")
+				}
+			}
+			if len(rows) != 2 {
+				t.Fatalf("rows = %v", rows)
+			}
+			row := rows[1]
+			for _, value := range []any{
+				union(row["value"]), row["items"].([]any)[0],
+				union(union(row["rec"]).(map[string]any)["value"]),
+				union(row["records"].([]any)[0].(map[string]any)["value"]),
+			} {
+				got := value.(string)
+				if tc.kind == "JSON" {
+					var compact bytes.Buffer
+					if err := json.Compact(&compact, []byte(got)); err != nil {
+						t.Fatal(err)
+					}
+					got = compact.String()
+				}
+				if got != tc.want {
+					t.Fatalf("value = %q, want %q", got, tc.want)
+				}
+			}
+			if rows[2]["value"] != nil || rows[2]["rec"] != nil || len(rows[2]["items"].([]any)) != 0 || len(rows[2]["records"].([]any)) != 0 {
+				t.Fatalf("NULL/empty: %v", rows[2])
+			}
+			_, err = read.CreateReadSession(t.Context(), &storagepb.CreateReadSessionRequest{
+				Parent:      "projects/test",
+				ReadSession: &storagepb.ReadSession{Table: path, DataFormat: storagepb.DataFormat_ARROW},
+			})
+			if status.Code(err) != codes.Unimplemented {
+				t.Fatalf("Arrow session error = %v", err)
+			}
+		})
+	}
+}
+
 func TestGoClientStorageRead(t *testing.T) {
 	rest, _, _ := clients(t)
 	table(t, rest, "storage_read_goclient", "id INT64, n NUMERIC, bn BIGNUMERIC, ts TIMESTAMP, d DATE, tm TIME, dt DATETIME, rec STRUCT<a INT64, b STRING>, tags ARRAY<STRING>")

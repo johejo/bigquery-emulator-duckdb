@@ -17,10 +17,11 @@ namespace bigquery_emulator_duckdb {
 std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow);
 
 // Initializes `out` as the record batch type of `schema`: a non-nullable struct of its fields,
-// each of the Arrow type Storage Read gives it.
-void StorageArrowSchema(ArrowSchema* out, const std::vector<FieldSchema>& schema);
+// each of the Arrow type Storage Read gives it. For Avro, JSON and GEOGRAPHY use strings;
+// Arrow output rejects them.
+void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& schema, bool arrow);
 
-// Appends a cell's value to an array building the type StorageArrowSchema gives `field`.
+// Appends a cell's value to an array building the type StorageReadArraySchema gives `field`.
 void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const nlohmann::json& value);
 // Avro binary rows from the same arrays used for Arrow output.
 std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
