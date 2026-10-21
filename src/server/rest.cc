@@ -367,7 +367,9 @@ class RestServer::Impl {
         const TableUpdateRequest update = ParseTableUpdate(body);
         TableMetadata metadata = emulator_.GetTable(table, /*include_row_count=*/false).metadata;
         UpdateTableMetadata(metadata, body, patch);
-        return TableResource(emulator_.UpdateTable(table, update.schema, update.view, metadata));
+        return TableResource(emulator_.UpdateTable(
+            table, update.schema, update.view, metadata,
+            body.value("defaultRoundingMode", json()) == "ROUNDING_MODE_UNSPECIFIED"));
       });
     };
     // Both ignore autodetect_schema.

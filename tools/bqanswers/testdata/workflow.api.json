@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "description": "Tool workflow test; answers from this fixture are temporary and never compatibility expectations.",
+  "vars": {
+    "dataset": "bqa_${run}_${case}"
+  },
+  "cases": [
+    {
+      "name": "upload_and_stream",
+      "steps": [
+        {
+          "name": "create_dataset",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/datasets",
+            "body": {
+              "datasetReference": {
+                "datasetId": "${dataset}"
+              },
+              "location": "US"
+            }
+          }
+        },
+        {
+          "name": "load",
+          "rest": {
+            "method": "POST",
+            "path": "/upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart",
+            "body": {
+              "jobReference": {
+                "location": "US"
+              },
+              "configuration": {
+                "load": {
+                  "destinationTable": {
+                    "projectId": "${project}",
+                    "datasetId": "${dataset}",
+                    "tableId": "t"
+                  },
+                  "sourceFormat": "NEWLINE_DELIMITED_JSON",
+                  "schema": {
+                    "fields": [
+                      {
+                        "name": "id",
+                        "type": "INTEGER"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "upload": "{\"id\":1}\n"
+          },
+          "observe": {
+            "status": "/status"
+          },
+          "bind": {
+            "job": "/body/jobReference/jobId"
+          }
+        },
+        {
+          "name": "wait",
+          "rest": {
+            "method": "GET",
+            "path": "/bigquery/v2/projects/${project}/jobs/${job}?location=US"
+          },
+          "observe": {
+            "status": "/body/status"
+          },
+          "until": {
+            "/body/status/state": "DONE"
+          }
+        },
+        {
+          "name": "create_stream",
+          "grpc": {
+            "method": "google.cloud.bigquery.storage.v1.BigQueryWrite/CreateWriteStream",
+            "requests": [
+              {
+                "parent": "projects/${project}/datasets/${dataset}/tables/t",
+                "writeStream": {
+                  "type": "COMMITTED"
+                }
+              }
+            ]
+          },
+          "bind": {
+            "stream": "/messages/0/name"
+          }
+        },
+        {
+          "name": "append",
+          "grpc": {
+            "method": "google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows",
+            "requests": [
+              {
+                "writeStream": "${stream}",
+                "protoRows": {
+                  "writerSchema": {
+                    "protoDescriptor": {
+                      "name": "Row",
+                      "field": [
+                        {
+                          "name": "id",
+                          "number": 1,
+                          "label": "LABEL_OPTIONAL",
+                          "type": "TYPE_INT64"
+                        }
+                      ]
+                    }
+                  },
+                  "rows": {
+                    "serializedRows": [
+                      "CAI="
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "observe": {
+            "messages": "/messages"
+          }
+        },
+        {
+          "name": "read",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT TO_JSON_STRING(ARRAY_AGG(id ORDER BY id)) FROM `${project}.${dataset}.t`",
+              "useLegacySql": false,
+              "timeoutMs": 60000
+            }
+          },
+          "observe": {
+            "rows": "/body/rows"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "name": "delete_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejection",
+      "steps": [
+        {
+          "name": "create_dataset",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/datasets",
+            "body": {
+              "datasetReference": {
+                "datasetId": "${dataset}"
+              },
+              "location": "US"
+            }
+          }
+        },
+        {
+          "name": "missing",
+          "rest": {
+            "method": "GET",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          },
+          "observe": {
+            "status": "/status"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "name": "delete_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
+          }
+        }
+      ]
+    }
+  ]
+}

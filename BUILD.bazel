@@ -716,6 +716,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":type_mapping",
+        "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/reference_impl:type_parameter_constraints",
     ],
@@ -808,6 +809,7 @@ cc_library(
         ":translated_statement",
         ":translator",
         ":type_mapping",
+        "//src/translator:literal",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

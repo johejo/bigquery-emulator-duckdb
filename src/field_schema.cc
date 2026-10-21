@@ -335,10 +335,6 @@ void CheckRoundingModes(const std::vector<FieldSchema>& schema) {
       throw ApiError::Unsupported("rounding modes on " + std::string(FieldTypeName(field.type)) +
                                   " fields");
     }
-    // DuckDB writes a default with its own cast.
-    if (!field.default_value_expression.empty() && RoundsToEven(field)) {
-      throw ApiError::Unsupported("defaults on parameterized ROUND_HALF_EVEN fields");
-    }
     CheckRoundingModes(field.fields);
   }
 }

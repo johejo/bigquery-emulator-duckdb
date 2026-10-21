@@ -119,7 +119,11 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
   std::ranges::transform(schema, std::back_inserter(columns), ColumnDefinition);
   DdlWrite write = CreateTableWrite(
       TableDefinition{.table = table, .schema = schema, .metadata = metadata}, dataset);
-  std::ranges::move(ColumnDefaultStatements(table, schema),
+  auto defaults = schema;
+  ApplyDefaultRoundingMode(defaults, metadata.default_rounding_mode.empty()
+                                         ? dataset.default_rounding_mode
+                                         : metadata.default_rounding_mode);
+  std::ranges::move(ColumnDefaultStatements(table, defaults),
                     std::back_inserter(write.metadata_statements));
   try {
     backend_.ExecuteDdl("CREATE TABLE " + QualifiedName(table) + " (" + Join(columns, ", ") + ")",
@@ -145,7 +149,8 @@ TableInfo Emulator::CreateView(TableReference table, const json& definition,
 TableInfo Emulator::UpdateTable(TableReference table,
                                 const std::optional<std::vector<FieldSchema>>& schema,
                                 const std::optional<json>& view,
-                                const std::optional<TableMetadata>& metadata) {
+                                const std::optional<TableMetadata>& metadata,
+                                bool rounding_mode_unspecified) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, /*include_row_count=*/false);
@@ -174,19 +179,7 @@ TableInfo Emulator::UpdateTable(TableReference table,
   std::vector<std::string> statements;
   std::optional<std::vector<FieldSchema>> updated_schema = schema;
   if (updated_schema.has_value()) {
-    // Added NUMERIC and BIGNUMERIC fields take the table's default rounding mode. Whether they
-    // take the one the same request sets, or the one it replaces, is not known.
     const std::string& mode = metadata.value_or(info.metadata).default_rounding_mode;
-    if (mode != info.metadata.default_rounding_mode) {
-      std::vector<FieldSchema> before = *updated_schema;
-      std::vector<FieldSchema> after = *updated_schema;
-      ApplyDefaultRoundingMode(info.schema, before, info.metadata.default_rounding_mode);
-      ApplyDefaultRoundingMode(info.schema, after, mode);
-      if (SchemaToJson(before) != SchemaToJson(after)) {
-        throw ApiError::Unsupported(
-            "changing defaultRoundingMode while adding NUMERIC or BIGNUMERIC fields");
-      }
-    }
     ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);
     statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
     std::ranges::move(ColumnCommentStatements(table, *updated_schema),
@@ -195,6 +188,10 @@ TableInfo Emulator::UpdateTable(TableReference table,
   if (metadata.has_value()) {
     TableMetadata updated = *metadata;
     updated.creation_time = info.metadata.creation_time;
+    // UNSPECIFIED leaves the stored default intact, but newly added fields above take no mode.
+    if (rounding_mode_unspecified) {
+      updated.default_rounding_mode = info.metadata.default_rounding_mode;
+    }
     statements.push_back(
         TableCommentStatement(table, updated, updated_schema.value_or(info.schema)));
   }

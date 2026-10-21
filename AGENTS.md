@@ -149,7 +149,10 @@ where the reference implementation agrees with BigQuery, or from BigQuery itself
 emulator's output. Agents do not run queries on BigQuery: a case no source settles goes in
 `tests/e2e/goclient/testdata/unverified/*.txt`, split by feature, whose answers maintainers fill in with
 `just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
-lead for what to check, never as an expected value.
+lead for what to check, never as an expected value. REST and BigQuery Storage gRPC cases go in
+`tests/e2e/goclient/testdata/unverified/*.api.json`, using the
+[bqanswers scenario format](tools/bqanswers/README.md); the same `just bigquery-answers` command
+records their selected responses. Validate these files locally with `just bigquery-answers-validate`.
 
 Until an independent source settles a case, do not rely on a guessed answer to support the
 behavior that case covers; the rest of the function can still be supported. An unverified case

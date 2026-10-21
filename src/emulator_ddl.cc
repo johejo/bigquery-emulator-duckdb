@@ -1,5 +1,8 @@
+#include <algorithm>
+#include <iterator>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -50,8 +53,16 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
       }
       throw ApiError::NotFound("Not found: Table " + TableName(table));
     }
-    return AlterTableStatements(*alteration, TableSchema(backend_, table),
-                                CommentMetadata(*comment));
+    auto schema = TableSchema(backend_, table);
+    auto statements = AlterTableStatements(*alteration, schema, CommentMetadata(*comment));
+    TableReference destination = table;
+    for (const auto& action : alteration->actions) {
+      if (const auto* rename = std::get_if<RenameTableAction>(&action)) {
+        destination.table_id = rename->table_id;
+      }
+    }
+    std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
+    return statements;
   }
   if (const auto& alteration = translation.altered_dataset) {
     const DatasetReference& dataset = alteration->dataset;

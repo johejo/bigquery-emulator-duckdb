@@ -7,22 +7,30 @@
 // Lines starting with "param> " between a query and its "?>" line each give a named query
 // parameter, as JSON of an entry of the request's queryParameters.
 //
-// A directory processes each of its *.txt files.
+// A directory processes each *.txt and *.api.json file. API scenarios can use REST, multipart
+// uploads and BigQuery Storage gRPC; see README.md in this directory. -validate checks scenarios
+// without authenticating or sending requests.
 //
-//	bqanswers PROJECT FILE_OR_DIRECTORY
+//	bqanswers [-validate] [-timeout 2m] PROJECT FILE_OR_DIRECTORY
 package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 )
 
 type queryResponse struct {
@@ -39,7 +47,7 @@ type queryResponse struct {
 
 // answer runs sql on BigQuery and returns what follows "?> ", or an error when BigQuery does not
 // return exactly one cell.
-func answer(token, project, sql string, parameters []json.RawMessage) (string, error) {
+func answer(ctx context.Context, token, project, sql string, parameters []json.RawMessage) (string, error) {
 	request := map[string]any{"query": sql, "useLegacySql": false, "timeoutMs": 60000}
 	if len(parameters) > 0 {
 		request["parameterMode"] = "NAMED"
@@ -50,7 +58,7 @@ func answer(token, project, sql string, parameters []json.RawMessage) (string, e
 		return "", err
 	}
 	url := fmt.Sprintf("https://bigquery.googleapis.com/bigquery/v2/projects/%s/queries", project)
-	post, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	post, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -86,39 +94,97 @@ func parseAnswer(body io.Reader) (string, error) {
 }
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: bqanswers PROJECT FILE_OR_DIRECTORY")
+	validate := flag.Bool("validate", false, "validate API scenarios without authentication or requests")
+	timeout := flag.Duration("timeout", 2*time.Minute, "deadline for each scenario step, including polling")
+	flag.Parse()
+	if flag.NArg() != 2 || *timeout <= 0 {
+		fmt.Fprintln(os.Stderr, "usage: bqanswers [-validate] [-timeout 2m] PROJECT FILE_OR_DIRECTORY")
 		os.Exit(2)
 	}
-	project, path := os.Args[1], os.Args[2]
-	token, err := exec.Command("gcloud", "auth", "print-access-token").Output()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "gcloud auth print-access-token: %v\n", err)
-		os.Exit(1)
-	}
-	if err := fillAnswers(path, func(sql string, parameters []json.RawMessage) (string, error) {
-		return answer(strings.TrimSpace(string(token)), project, sql, parameters)
-	}); err != nil {
+	if err := run(flag.Arg(0), flag.Arg(1), *validate, *timeout); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func fillAnswers(path string, query func(string, []json.RawMessage) (string, error)) error {
+func caseFiles(path string) ([]string, error) {
 	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		if !strings.HasSuffix(path, ".txt") && !strings.HasSuffix(path, ".api.json") {
+			return nil, fmt.Errorf("unsupported case file %q", path)
+		}
+		return []string{path}, nil
+	}
+	var paths []string
+	for _, pattern := range []string{"*.txt", "*.api.json"} {
+		matches, err := filepath.Glob(filepath.Join(path, pattern))
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, matches...)
+	}
+	slices.Sort(paths)
+	return paths, nil
+}
+
+func run(project, path string, validate bool, timeout time.Duration) error {
+	paths, err := caseFiles(path)
 	if err != nil {
 		return err
 	}
-	paths := []string{path}
-	if info.IsDir() {
-		paths, err = filepath.Glob(filepath.Join(path, "*.txt"))
-		if err != nil {
-			return err
+	// Validate every scenario before any mutations, including files that already have answers.
+	for _, file := range paths {
+		if strings.HasSuffix(file, ".api.json") {
+			if _, err := readScenarios(file); err != nil {
+				return err
+			}
 		}
+	}
+	if validate {
+		return nil
+	}
+	token, err := exec.Command("gcloud", "auth", "print-access-token").Output()
+	if err != nil {
+		return fmt.Errorf("gcloud auth print-access-token: %w", err)
+	}
+	accessToken := strings.TrimSpace(string(token))
+	transport := newScenarioTransport(accessToken)
+	defer transport.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	return fillAnswers(ctx, path, func(sql string, parameters []json.RawMessage) (string, error) {
+		queryCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		return answer(queryCtx, accessToken, project, sql, parameters)
+	}, func(file string) error {
+		return fillScenarios(ctx, file, project, strings.ToLower(rand.Text()), timeout, transport.call)
+	})
+}
+
+func fillAnswers(ctx context.Context, path string, query func(string, []json.RawMessage) (string, error), scenarios func(string) error) error {
+	paths, err := caseFiles(path)
+	if err != nil {
+		return err
 	}
 	var failures []error
 	for _, file := range paths {
-		if err := fillFile(file, query); err != nil {
+		if ctx.Err() != nil {
+			failures = append(failures, ctx.Err())
+			break
+		}
+		if strings.HasSuffix(file, ".api.json") {
+			if scenarios == nil {
+				err = fmt.Errorf("API scenario runner is not configured for %s", file)
+			} else {
+				err = scenarios(file)
+			}
+		} else {
+			err = fillFile(file, query)
+		}
+		if err != nil {
 			failures = append(failures, err)
 		}
 	}
