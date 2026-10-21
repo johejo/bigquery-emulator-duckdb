@@ -1,0 +1,4 @@
+# Parameter percentages are deliberately unsupported.
+CREATE TEMP TABLE sample_input (id INT64);
+EXECUTE IMMEDIATE 'SELECT id FROM sample_input TABLESAMPLE SYSTEM (@percent PERCENT)' USING 25 AS percent
+=> error contains: TABLESAMPLE with a non-literal percentage

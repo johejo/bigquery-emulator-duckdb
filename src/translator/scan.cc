@@ -546,6 +546,32 @@ std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, con
                     result->columns, {"u.e"}, scope);
 }
 
+std::optional<Relation> SampleScan(const googlesql::ResolvedSampleScan& sample,
+                                   const Scope& scope) {
+  if (sample.method() != "system" || sample.unit() != googlesql::ResolvedSampleScan::PERCENT ||
+      sample.repeatable_argument() != nullptr || sample.weight_column() != nullptr ||
+      !sample.partition_by_list().empty()) {
+    return Unsupported(scope, "TABLESAMPLE other than SYSTEM (PERCENT) without a suffix");
+  }
+  if (!sample.input_scan()->Is<googlesql::ResolvedTableScan>()) {
+    return Unsupported(scope, "TABLESAMPLE on a subquery or array");
+  }
+  if (!sample.size()->Is<googlesql::ResolvedLiteral>()) {
+    return Unsupported(scope, "TABLESAMPLE with a non-literal percentage");
+  }
+  // The analyzer validates literal percentages, including NULL and the [0, 100] bounds.
+  const auto& size = sample.size()->GetAs<googlesql::ResolvedLiteral>()->value();
+  const std::string percent = size.type()->IsInt64() ? std::to_string(size.int64_value())
+                                                     : std::format("{}", size.double_value());
+  auto result = Scan(*sample.input_scan(), scope);
+  if (!result) {
+    return std::nullopt;
+  }
+  // SYSTEM samples DuckDB vectors instead of BigQuery storage blocks; see README's exceptions.
+  result->sql = "SELECT q.*" + result->From() + " TABLESAMPLE SYSTEM (" + percent + " PERCENT)";
+  return result;
+}
+
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
@@ -610,6 +636,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedArrayScan>()) {
     return ArrayScan(*scan.GetAs<googlesql::ResolvedArrayScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedSampleScan>()) {
+    return SampleScan(*scan.GetAs<googlesql::ResolvedSampleScan>(), scope);
   }
   const googlesql::ResolvedScan* input = nullptr;
   if (scan.Is<googlesql::ResolvedProjectScan>()) {

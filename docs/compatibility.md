@@ -49,6 +49,10 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ## Tables
 
+### Sampling
+
+`TABLESAMPLE SYSTEM` supports literal percentages only; query parameters are unsupported.
+
 ### Options and expiration
 
 Table options are limited to description, friendly name, labels, expiration and

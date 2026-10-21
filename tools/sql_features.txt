@@ -84,6 +84,9 @@ query Struct field and array element access | SELECT [1, 2][OFFSET(0)], [1, 2][O
 query `PIVOT` | SELECT * FROM (SELECT id, name FROM t) PIVOT (COUNT(*) FOR name IN ('a', 'b'))
 query `UNPIVOT` | SELECT * FROM u UNPIVOT (x FOR col IN (id, v))
 query `TABLESAMPLE` | SELECT id FROM t TABLESAMPLE SYSTEM (50 PERCENT)
+query `TABLESAMPLE` | SELECT name FROM t TABLESAMPLE SYSTEM (12.5 PERCENT)
+query `TABLESAMPLE` | EXECUTE IMMEDIATE 'SELECT id FROM t TABLESAMPLE SYSTEM (@percent PERCENT)' USING 25 AS percent
+note `TABLESAMPLE` | See [Sampling](compatibility.md#sampling).
 query Pipe syntax | FROM t |> WHERE id > 0 |> SELECT id, name |> ORDER BY id
 query Pipe syntax | FROM t |> AGGREGATE COUNT(*) GROUP BY name
 

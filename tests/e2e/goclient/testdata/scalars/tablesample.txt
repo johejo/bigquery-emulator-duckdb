@@ -1,0 +1,31 @@
+# Boundary percentages select no rows or the whole table, respectively.
+# https://cloud.google.com/bigquery/docs/table-sampling
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (0 PERCENT)
+=> "0"
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (100 PERCENT)
+=> "4"
+
+SELECT TO_JSON_STRING(ARRAY(SELECT a FROM t TABLESAMPLE SYSTEM (100.0 PERCENT) ORDER BY a))
+=> "[null,1,2,3]"
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (0.0 PERCENT)
+=> "0"
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (-1 PERCENT)
+=> error:
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (101 PERCENT)
+=> error:
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (-0.1 PERCENT)
+=> error:
+
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (100.1 PERCENT)
+=> error:
+
+# BigQuery's TABLESAMPLE syntax does not include REPEATABLE.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
+SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (50 PERCENT) REPEATABLE (42)
+=> error:
