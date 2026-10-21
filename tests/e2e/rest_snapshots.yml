@@ -1,4 +1,4 @@
-desc: tables.list reports a table snapshot's type without its snapshotDefinition, which tables.get reports
+desc: tables.list reports a table snapshot's type without its snapshotDefinition, which tables.get reports, and a SNAPSHOT copy job takes destinationExpirationTime
 # Fields follow https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list.
 # The Go client does not expose the type of a listed table, so check it through the HTTP runner.
 runners:
@@ -43,3 +43,26 @@ steps:
       current.res.body.type == "SNAPSHOT" &&
       current.res.body.snapshotDefinition.baseTableReference ==
         {"projectId": "rest-snapshots", "datasetId": "ds", "tableId": "base"}
+  # A SNAPSHOT copy job gives its snapshot the destinationExpirationTime, as BigQuery answers.
+  copy_snapshot:
+    req:
+      /projects/rest-snapshots/jobs:
+        post:
+          body:
+            application/json:
+              configuration:
+                copy:
+                  sourceTable: {projectId: rest-snapshots, datasetId: ds, tableId: base}
+                  destinationTable: {projectId: rest-snapshots, datasetId: ds, tableId: expiring}
+                  operationType: SNAPSHOT
+                  destinationExpirationTime: '2100-01-01T00:00:00Z'
+    test: current.res.status == 200 && current.res.body.status.state == "DONE" && !("errorResult" in current.res.body.status)
+  get_expiring_snapshot:
+    req:
+      /projects/rest-snapshots/datasets/ds/tables/expiring:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.type == "SNAPSHOT" &&
+      current.res.body.expirationTime == "4102444800000"

@@ -23,6 +23,7 @@ setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tab
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "hp"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x INT64) AS (x + 1)", "useLegacySql": false}
+setup POST /bigquery/v2/projects/test/queries {"query": "CREATE SNAPSHOT TABLE d.ts CLONE d.t", "useLegacySql": false}
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
@@ -66,6 +67,9 @@ request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configurat
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "h"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}, "operationType": "CLONE"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}, "operationType": "SNAPSHOT", "destinationExpirationTime": "2100-01-01T00:00:00Z"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "ts"}, "destinationTable": {"datasetId": "d", "tableId": "c"}, "operationType": "RESTORE"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "ts"}, "destinationTable": {"datasetId": "d", "tableId": "t"}, "operationType": "RESTORE", "writeDisposition": "WRITE_TRUNCATE"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"jobReference": {"location": "US"}, "configuration": {"query": {"query": "SELECT 1", "useLegacySql": false}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.csv"]}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"extract": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationUris": ["$DIR/t.avro"], "destinationFormat": "AVRO"}}}

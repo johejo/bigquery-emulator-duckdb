@@ -109,7 +109,12 @@ struct LoadJob {
   nlohmann::json configuration;
 };
 
+// What a copy job makes of its source: a table of the same type, a table snapshot of a table, a
+// standard table of a snapshot, or a clone. The enumerators take BigQuery's names.
+enum class CopyOperation : std::uint8_t { kCopy, kSnapshot, kRestore, kClone };
+
 struct CopyJob {
+  CopyOperation operation = CopyOperation::kCopy;
   std::vector<TableReference> source_tables;
   TableReference destination_table;
   CreateDisposition create_disposition = CreateDisposition::kCreateIfNeeded;
@@ -336,12 +341,14 @@ class Emulator {
   // Runs the query `sql`, whose columns are `schema`, and writes its result to `destination`
   // with the given dispositions. A table the write creates takes `metadata`; a write to an
   // existing table rejects metadata. A `copy` job's new table keeps the rounding modes of
-  // `schema` and takes no default rounding mode. Returns the query's result.
+  // `schema` and takes no default rounding mode, and a `restore` keeps the metadata of the table
+  // it replaces. Returns the query's result.
   QueryResult WriteDestination(const std::string& project_id, TableReference destination,
                                CreateDisposition create, WriteDisposition write,
                                const std::string& sql, const std::vector<FieldSchema>& schema,
                                const std::vector<std::string>& setup, bool count_only = false,
-                               const TableMetadata& metadata = TableMetadata(), bool copy = false);
+                               const TableMetadata& metadata = TableMetadata(), bool copy = false,
+                               bool restore = false);
 
   // Mutations also hold this while reading their response. Recursive because their catalog
   // lookups may expire other relations on the same thread.

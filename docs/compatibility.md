@@ -37,6 +37,9 @@ Loads and extracts also accept local paths. Their limits are:
   BIGNUMERIC Parquet output uses `DECIMAL(76, 38)` with `BYTE_ARRAY` rather than
   `FIXED_LEN_BYTE_ARRAY`.
 - A copy job's `destinationExpirationTime` is accepted only when creating its destination.
+- Copy jobs with `operationType` `SNAPSHOT`, `RESTORE` or `CLONE` take one source table without a
+  default rounding mode and create their destination with `WRITE_EMPTY`; a `RESTORE` can also
+  replace a table with `WRITE_TRUNCATE`, and a `CLONE` cannot copy a table snapshot.
 
 ## Datasets
 
