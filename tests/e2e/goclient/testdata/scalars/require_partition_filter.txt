@@ -1,0 +1,212 @@
+# BigQuery answers collected with bqanswers for required partition filter predicates.
+# Each case owns its table, since scalar cases run concurrently.
+
+# no_filter
+CREATE OR REPLACE TABLE scalars.partition_filter_no_filter (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_no_filter VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_no_filter
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# literal_equality
+CREATE OR REPLACE TABLE scalars.partition_filter_literal_equality (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_literal_equality VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_literal_equality WHERE day = DATE '2025-01-01'
+=> "1"
+
+# other_column_only
+CREATE OR REPLACE TABLE scalars.partition_filter_other_column_only (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_other_column_only VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_other_column_only WHERE id = 1
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# and_other_column
+CREATE OR REPLACE TABLE scalars.partition_filter_and_other_column (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_and_other_column VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_and_other_column WHERE day = DATE '2025-01-01' AND id = 1
+=> "1"
+
+# or_partition_dates
+CREATE OR REPLACE TABLE scalars.partition_filter_or_partition_dates (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_or_partition_dates VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_or_partition_dates WHERE day = DATE '2025-01-01' OR day = DATE '2025-01-02'
+=> "2"
+
+# or_other_column
+CREATE OR REPLACE TABLE scalars.partition_filter_or_other_column (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_or_other_column VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_or_other_column WHERE day = DATE '2025-01-01' OR id = 1
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# or_each_conjunct_filtered
+CREATE OR REPLACE TABLE scalars.partition_filter_or_each_conjunct_filtered (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_or_each_conjunct_filtered VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_or_each_conjunct_filtered WHERE (day = DATE '2025-01-01' AND id = 1) OR (day = DATE '2025-01-02' AND id = 2)
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# or_true
+CREATE OR REPLACE TABLE scalars.partition_filter_or_true (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_or_true VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_or_true WHERE day = DATE '2025-01-01' OR TRUE
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# or_false
+CREATE OR REPLACE TABLE scalars.partition_filter_or_false (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_or_false VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_or_false WHERE day = DATE '2025-01-01' OR FALSE
+=> "1"
+
+# constant_false
+CREATE OR REPLACE TABLE scalars.partition_filter_constant_false (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_constant_false VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_constant_false WHERE FALSE
+=> "0"
+
+# not_equality
+CREATE OR REPLACE TABLE scalars.partition_filter_not_equality (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_not_equality VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_not_equality WHERE NOT (day = DATE '2025-01-01')
+=> "1"
+
+# is_null
+CREATE OR REPLACE TABLE scalars.partition_filter_is_null (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_is_null VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_is_null WHERE day IS NULL
+=> "1"
+
+# is_not_null
+CREATE OR REPLACE TABLE scalars.partition_filter_is_not_null (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_is_not_null VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_is_not_null WHERE day IS NOT NULL
+=> "2"
+
+# in_literals
+CREATE OR REPLACE TABLE scalars.partition_filter_in_literals (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_in_literals VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_in_literals WHERE day IN (DATE '2025-01-01', DATE '2025-01-02')
+=> "2"
+
+# scalar_subquery_literal
+CREATE OR REPLACE TABLE scalars.partition_filter_scalar_subquery_literal (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_scalar_subquery_literal VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_scalar_subquery_literal WHERE day = (SELECT DATE '2025-01-01')
+=> "1"
+
+# scalar_subquery_rows
+CREATE OR REPLACE TABLE scalars.partition_filter_scalar_subquery_rows (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_scalar_subquery_rows VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_scalar_subquery_rows WHERE day = (SELECT MAX(d) FROM UNNEST([DATE '2025-01-01', DATE '2025-01-02']) AS d)
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# in_subquery
+CREATE OR REPLACE TABLE scalars.partition_filter_in_subquery (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_in_subquery VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_in_subquery WHERE day IN (SELECT d FROM UNNEST([DATE '2025-01-01', DATE '2025-01-02']) AS d)
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# correlated_exists
+CREATE OR REPLACE TABLE scalars.partition_filter_correlated_exists (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_correlated_exists VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_correlated_exists WHERE EXISTS (SELECT 1 FROM UNNEST([DATE '2025-01-01']) AS d WHERE day = d)
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# same_row_column
+CREATE OR REPLACE TABLE scalars.partition_filter_same_row_column (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_same_row_column VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_same_row_column WHERE day = other_day
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# date_add_column
+CREATE OR REPLACE TABLE scalars.partition_filter_date_add_column (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_date_add_column VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_date_add_column WHERE DATE_ADD(day, INTERVAL 1 DAY) = DATE '2025-01-02'
+=> "1"
+
+# date_add_constant
+CREATE OR REPLACE TABLE scalars.partition_filter_date_add_constant (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_date_add_constant VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_date_add_constant WHERE day = DATE_SUB(DATE '2025-01-02', INTERVAL 1 DAY)
+=> "1"
+
+# extract_year
+CREATE OR REPLACE TABLE scalars.partition_filter_extract_year (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_extract_year VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_extract_year WHERE EXTRACT(YEAR FROM day) = 2025
+=> "2"
+
+# date_trunc_month
+CREATE OR REPLACE TABLE scalars.partition_filter_date_trunc_month (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_date_trunc_month VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_date_trunc_month WHERE DATE_TRUNC(day, MONTH) = DATE '2025-01-01'
+=> "2"
+
+# cast_string
+CREATE OR REPLACE TABLE scalars.partition_filter_cast_string (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_cast_string VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_cast_string WHERE CAST(day AS STRING) = '2025-01-01'
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# coalesce
+CREATE OR REPLACE TABLE scalars.partition_filter_coalesce (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_coalesce VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_coalesce WHERE COALESCE(day, DATE '2025-01-01') = DATE '2025-01-01'
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# current_date
+CREATE OR REPLACE TABLE scalars.partition_filter_current_date (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_current_date VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_current_date WHERE day = CURRENT_DATE()
+=> "0"
+
+# timestamp_date
+CREATE OR REPLACE TABLE scalars.partition_filter_timestamp_date (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY DATE(ts) OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_timestamp_date VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_timestamp_date WHERE DATE(ts) = DATE '2025-01-01'
+=> "1"
+
+# timestamp_trunc
+CREATE OR REPLACE TABLE scalars.partition_filter_timestamp_trunc (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY DATE(ts) OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_timestamp_trunc VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_timestamp_trunc WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP '2025-01-01 00:00:00+00'
+=> "1"
+
+# derived_table_outer_filter
+CREATE OR REPLACE TABLE scalars.partition_filter_derived_table_outer_filter (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_derived_table_outer_filter VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM (SELECT day AS d FROM scalars.partition_filter_derived_table_outer_filter) WHERE d = DATE '2025-01-01'
+=> "1"
+
+# cte_outer_filter
+CREATE OR REPLACE TABLE scalars.partition_filter_cte_outer_filter (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_cte_outer_filter VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+WITH c AS (SELECT day, id FROM scalars.partition_filter_cte_outer_filter) SELECT COUNT(*) AS n FROM c WHERE day = DATE '2025-01-01'
+=> "1"
+
+# inner_join_constant
+CREATE OR REPLACE TABLE scalars.partition_filter_inner_join_constant (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_inner_join_constant VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_inner_join_constant AS t JOIN UNNEST([DATE '2025-01-01']) AS d ON t.day = d
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# left_join_on_filter
+CREATE OR REPLACE TABLE scalars.partition_filter_left_join_on_filter (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_left_join_on_filter VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_left_join_on_filter AS t LEFT JOIN UNNEST([1]) AS i ON t.id = i AND t.day = DATE '2025-01-01'
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# self_join_one_filtered
+CREATE OR REPLACE TABLE scalars.partition_filter_self_join_one_filtered (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_self_join_one_filtered VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_self_join_one_filtered AS a JOIN scalars.partition_filter_self_join_one_filtered AS b ON a.id = b.id WHERE a.day = DATE '2025-01-01'
+=> error contains: ' without a filter over column(s) 'day' that can be used for partition elimination
+
+# self_join_partition_equality
+CREATE OR REPLACE TABLE scalars.partition_filter_self_join_partition_equality (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_self_join_partition_equality VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+SELECT COUNT(*) AS n FROM scalars.partition_filter_self_join_partition_equality AS a JOIN scalars.partition_filter_self_join_partition_equality AS b ON a.day = b.day WHERE a.day = DATE '2025-01-01'
+=> "1"
+
+# view_outer_filter
+CREATE OR REPLACE TABLE scalars.partition_filter_view_outer_filter (day DATE, other_day DATE, id INT64, ts TIMESTAMP) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+INSERT scalars.partition_filter_view_outer_filter VALUES (DATE '2025-01-01', DATE '2025-01-02', 1, TIMESTAMP '2025-01-01 12:00:00+00'), (DATE '2025-01-02', DATE '2025-01-01', 2, TIMESTAMP '2025-01-02 12:00:00+00'), (NULL, NULL, 3, NULL);
+CREATE OR REPLACE VIEW scalars.partition_filter_view AS SELECT day, id FROM scalars.partition_filter_view_outer_filter; SELECT COUNT(*) AS n FROM scalars.partition_filter_view WHERE day = DATE '2025-01-01'
+=> "1"

@@ -74,6 +74,12 @@ unsupported. `INFORMATION_SCHEMA.PARTITIONS` counts rows when queried. Storage b
 including `tables.get`'s `numBytes`; partition `last_modified_time` is NULL and storage tier is
 always `ACTIVE`.
 
+For `require_partition_filter`, transforms of temporal partition keys are limited to `DATE_ADD`,
+`DATE_SUB`, `EXTRACT(YEAR FROM ...)`, `DATE_TRUNC`, `DATE` and `TIMESTAMP_TRUNC`, with constant
+arguments besides the key. Projections propagate filters through direct column renames only. Outer
+predicates do not propagate through aggregation, LIMIT or other scan boundaries.
+The DDL option cannot be NULL, or be enabled on an unpartitioned table or view.
+
 ### Column defaults
 
 Parameterized columns accept literal defaults only. `tables.update` and `tables.patch` cannot

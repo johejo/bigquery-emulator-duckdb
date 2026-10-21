@@ -68,6 +68,7 @@ struct DatasetDefinition {
 // What SET OPTIONS sets on a table or dataset: each option it names replaces the value there,
 // and NULL clears it.
 struct OptionUpdates {
+  std::optional<bool> require_partition_filter = {};
   std::optional<std::string> description = {};
   std::optional<std::string> friendly_name = {};
   std::optional<std::map<std::string, std::string>> labels = {};

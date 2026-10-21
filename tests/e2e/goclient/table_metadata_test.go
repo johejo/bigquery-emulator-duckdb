@@ -173,9 +173,6 @@ func TestTablePartitioning(t *testing.T) {
 				Schema: schema, Clustering: &bigquery.Clustering{Fields: []string{"missing"}},
 			})
 		},
-		"require_partition_filter": func() error {
-			return run("CREATE TABLE filtered (day DATE) PARTITION BY day OPTIONS (require_partition_filter = TRUE)")
-		},
 		"clustering for a destination table": func() error {
 			query := client.Query("SELECT 1 AS id")
 			query.Dst = dataset.Table("clustered")

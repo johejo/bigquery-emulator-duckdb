@@ -13,11 +13,13 @@
 #include "src/translator/ddl.h"
 #include "src/translator/dml.h"
 #include "src/translator/function.h"
+#include "src/translator/partition_filter.h"
 #include "src/translator/scan.h"
 
 namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
                                      const Scope& scope) {
+  CheckPartitionFilters(statement);
   if (!statement.hint_list().empty()) {
     return Unsupported(scope, "statement hints");
   }

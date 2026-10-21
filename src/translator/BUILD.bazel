@@ -245,8 +245,14 @@ cc_library(
 # Statement dispatch depends on query and DDL translation; the public entry points only pass ASTs.
 cc_library(
     name = "statement",
-    srcs = ["statement.cc"],
-    hdrs = ["statement.h"],
+    srcs = [
+        "partition_filter.cc",
+        "statement.cc",
+    ],
+    hdrs = [
+        "partition_filter.h",
+        "statement.h",
+    ],
     copts = ["-std=c++20"],
     implementation_deps = [
         ":context",
@@ -254,9 +260,15 @@ cc_library(
         ":dml",
         ":query",
         "//:analyzer",
+        "//:api_error",
+        "//:catalog_table",
         "//:duckdb_sql",
+        "//:language_options",
+        "//:table_metadata",
         "//:type_mapping",
+        "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/resolved_ast",
     ],
     linkstatic = True,

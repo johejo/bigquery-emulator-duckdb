@@ -351,6 +351,9 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
     } else {
       const auto& updates = std::get<OptionUpdates>(action);
       ApplyOptionUpdates(updates, metadata);
+      if (updates.require_partition_filter.has_value()) {
+        metadata.require_partition_filter = *updates.require_partition_filter;
+      }
       if (updates.expiration_time.has_value()) {
         metadata.expiration_time = *updates.expiration_time;
       }
