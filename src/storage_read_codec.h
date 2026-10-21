@@ -22,8 +22,9 @@ void StorageArrowSchema(ArrowSchema* out, const std::vector<FieldSchema>& schema
 
 // Appends a cell's value to an array building the type StorageArrowSchema gives `field`.
 void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const nlohmann::json& value);
-// Appends the Avro binary encoding of a cell's value.
-void AppendAvroCell(std::string& out, const FieldSchema& field, const nlohmann::json& value);
+// Avro binary rows from the same arrays used for Arrow output.
+std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
+                           const std::vector<FieldSchema>& schema);
 
 // One encapsulated IPC record batch message of `array`, a struct array of the type `root`.
 std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array);

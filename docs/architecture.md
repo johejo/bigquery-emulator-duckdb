@@ -7,10 +7,10 @@ A Storage Read session keeps its rows as the DuckDB vectors of one query, which 
 requested fields in GoogleSQL, on a backend session the snapshot owns so that Arrow's connection
 properties remain valid. Each response copies its rows of the columns whose DuckDB Arrow layout
 matches the BigQuery wire type into a private chunk, exports them through the Arrow C Data
-interface and serializes the batch with Apache nanoarrow. The export is adjusted in place: a NULL
-array becomes an empty one and a BIGNUMERIC's stored bytes become a decimal256. Other columns,
-such as RANGE, and Avro rows are encoded from each value's cell. Both formats use the table
-metadata to encode the public schema.
+interface. A NULL array becomes an empty one, a BIGNUMERIC's stored bytes become a decimal256,
+and infinite RANGE bounds become NULL. Columns with other physical layouts are appended to Arrow
+arrays from their cells. The resulting arrays are serialized as Arrow IPC with Apache nanoarrow
+or encoded as Avro binary rows. Both formats use the table metadata to encode the public schema.
 
 ## Server
 

@@ -144,6 +144,33 @@ func arrowIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.Read
 	return ids
 }
 
+func readIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.ReadSession, name string, offset int64) []int64 {
+	t.Helper()
+	if s.DataFormat == storagepb.DataFormat_ARROW {
+		return arrowIDs(t, read, s, name, offset)
+	}
+	codec, err := goavro.NewCodec(s.GetAvroSchema().Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, block := range responses(t, read, name, offset) {
+		data := block.GetAvroRows().SerializedBinaryRows
+		for range block.RowCount {
+			value, remaining, err := codec.NativeFromBinary(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, union(value.(map[string]any)["id"]).(int64))
+			data = remaining
+		}
+		if len(data) != 0 {
+			t.Fatal("unexpected trailing Avro bytes")
+		}
+	}
+	return ids
+}
+
 // The Storage API documents snapshot isolation, disjoint read streams, schema order and
 // offset resumption. Expectations here follow those guarantees and the rows we insert.
 func TestReadSnapshotProjectionSplitAndOffset(t *testing.T) {
@@ -267,8 +294,8 @@ func union(value any) any {
 
 func TestReadAvroTypes(t *testing.T) {
 	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_avro", "id INT64, name STRING, payload BYTES, n NUMERIC, bn BIGNUMERIC, tags ARRAY<STRING>, rec STRUCT<a INT64, b STRING>, ts TIMESTAMP, d DATE, tm TIME, dt DATETIME")
-	query(t, rest, `INSERT INTO storage_read_avro.rows VALUES (-1, '日本語', b'\x00\xff', NUMERIC '-123456789.123456789', BIGNUMERIC '-12345678901234567890123456789012345678.12345678901234567890123456789012345678', ['a','b'], STRUCT(1,'nested'), TIMESTAMP '1969-12-31 23:59:59.999999+00', DATE '1969-12-31', TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999'), (2, NULL, b'', 0, 0, [], NULL, NULL, NULL, NULL, NULL)`)
+	path := table(t, rest, "storage_read_avro", "id INT64, name STRING, payload BYTES, n NUMERIC, bn BIGNUMERIC, tags ARRAY<STRING>, rec STRUCT<a INT64, b STRING>, ts TIMESTAMP, d DATE, tm TIME, dt DATETIME, flag BOOL, f FLOAT64")
+	query(t, rest, `INSERT INTO storage_read_avro.rows VALUES (-1, '日本語', b'\x00\xff', NUMERIC '-123456789.123456789', BIGNUMERIC '-12345678901234567890123456789012345678.12345678901234567890123456789012345678', ['a','b'], STRUCT(1,'nested'), TIMESTAMP '1969-12-31 23:59:59.999999+00', DATE '1969-12-31', TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999', TRUE, -1.25), (2, NULL, b'', 0, 0, [], NULL, NULL, NULL, NULL, NULL, FALSE, CAST('inf' AS FLOAT64))`)
 	s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
 	// The official Storage schema mapping annotates DATETIME as string/datetime.
 	var schema struct {
@@ -316,6 +343,10 @@ func TestReadAvroTypes(t *testing.T) {
 		}
 	}
 	row := values[-1]
+	if union(row["flag"]) != true || union(row["f"]) != float64(-1.25) ||
+		union(values[2]["flag"]) != false || !math.IsInf(union(values[2]["f"]).(float64), 1) {
+		t.Fatalf("boolean/float: %v, %v", row, values[2])
+	}
 	if union(row["name"]) != "日本語" || !bytes.Equal(union(row["payload"]).([]byte), []byte{0, 255}) {
 		t.Fatalf("text/bytes: %v", row)
 	}
@@ -359,31 +390,37 @@ func TestGoClientStorageRead(t *testing.T) {
 }
 
 func TestReadEmptyAndMultipleBatches(t *testing.T) {
-	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_batches", "id INT64")
-	empty := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
-	if ids := arrowIDs(t, read, empty, empty.Streams[0].Name, 0); len(ids) != 0 {
-		t.Fatal(ids)
-	}
-	query(t, rest, "INSERT INTO storage_read_batches.rows SELECT i FROM UNNEST(GENERATE_ARRAY(1, 2050)) AS i")
-	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
-	ids := arrowIDs(t, read, s, s.Streams[0].Name, 0)
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	if len(ids) != 2050 {
-		t.Fatalf("row count: %d", len(ids))
-	}
-	for i, id := range ids {
-		if id != int64(i+1) {
-			t.Fatalf("row %d: %d", i, id)
-		}
-	}
-	// Resume across both IPC response boundaries and DuckDB vector boundaries.
-	original := arrowIDs(t, read, s, s.Streams[0].Name, 0)
-	for _, offset := range []int64{1, 1023, 2047, 2050} {
-		got := arrowIDs(t, read, s, s.Streams[0].Name, offset)
-		if !slices.Equal(got, original[offset:]) {
-			t.Fatalf("offset %d: got %v, want %v", offset, got, original[offset:])
-		}
+	for _, format := range []storagepb.DataFormat{storagepb.DataFormat_ARROW, storagepb.DataFormat_AVRO} {
+		t.Run(format.String(), func(t *testing.T) {
+			t.Parallel()
+			rest, read, _ := clients(t)
+			dataset := "storage_read_batches_" + format.String()
+			path := table(t, rest, dataset, "id INT64")
+			empty := session(t, read, path, format, nil, 1)
+			if ids := readIDs(t, read, empty, empty.Streams[0].Name, 0); len(ids) != 0 {
+				t.Fatal(ids)
+			}
+			query(t, rest, "INSERT INTO "+dataset+".rows SELECT i FROM UNNEST(GENERATE_ARRAY(1, 2050)) AS i")
+			s := session(t, read, path, format, nil, 1)
+			ids := readIDs(t, read, s, s.Streams[0].Name, 0)
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+			if len(ids) != 2050 {
+				t.Fatalf("row count: %d", len(ids))
+			}
+			for i, id := range ids {
+				if id != int64(i+1) {
+					t.Fatalf("row %d: %d", i, id)
+				}
+			}
+			// Resume across response boundaries and DuckDB vector boundaries.
+			original := readIDs(t, read, s, s.Streams[0].Name, 0)
+			for _, offset := range []int64{1, 1023, 2047, 2050} {
+				got := readIDs(t, read, s, s.Streams[0].Name, offset)
+				if !slices.Equal(got, original[offset:]) {
+					t.Fatalf("offset %d: got %v, want %v", offset, got, original[offset:])
+				}
+			}
+		})
 	}
 }
 
@@ -611,9 +648,12 @@ func TestGoClientStorageReadRange(t *testing.T) {
 // https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
 func TestReadAvroRange(t *testing.T) {
 	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>")
+	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>, nested STRUCT<rs ARRAY<RANGE<DATE>>>")
 	query(t, rest, `INSERT INTO storage_read_avro_range.rows VALUES
-		(1, RANGE<DATE> '[1969-12-31, UNBOUNDED)', RANGE<DATE> '[UNBOUNDED, 1970-01-02)')`)
+		(1, RANGE<DATE> '[1969-12-31, UNBOUNDED)', RANGE<DATE> '[UNBOUNDED, 1970-01-02)',
+		 RANGE<DATETIME> '[1969-12-31 23:59:59.999999, UNBOUNDED)',
+		 RANGE<TIMESTAMP> '[UNBOUNDED, 1970-01-01 00:00:00.000001+00)',
+		 STRUCT([RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']))`)
 	s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
 	var schema struct {
 		Fields []struct {
@@ -662,5 +702,15 @@ func TestReadAvroRange(t *testing.T) {
 	d2 := union(row["d2"]).(map[string]any)
 	if day(d1["start"]) != "1969-12-31" || d1["end"] != nil || d2["start"] != nil || day(d2["end"]) != "1970-01-02" {
 		t.Fatalf("RANGE values: %v", row)
+	}
+	dt := union(row["dt"]).(map[string]any)
+	ts := union(row["ts"]).(map[string]any)
+	if union(dt["start"]) != "1969-12-31 23:59:59.999999" || dt["end"] != nil ||
+		ts["start"] != nil || !union(ts["end"]).(time.Time).Equal(time.UnixMicro(1)) {
+		t.Fatalf("temporal RANGE values: %v", row)
+	}
+	nested := union(row["nested"]).(map[string]any)["rs"].([]any)[0].(map[string]any)
+	if nested["start"] != nil || nested["end"] != nil {
+		t.Fatalf("nested unbounded RANGE: %v", nested)
 	}
 }

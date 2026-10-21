@@ -15,7 +15,8 @@ class Backend;
 
 // The rows of a Storage Read session, kept as the DuckDB vectors of a query result. Each read
 // encodes its rows: columns whose DuckDB Arrow layout is the one Storage Read gives are exported
-// through the Arrow C Data interface, and other columns and Avro rows go through their cells.
+// through the Arrow C Data interface, and other columns go through their cells. Both Arrow and
+// Avro encode the resulting arrays.
 class StorageSnapshot {
  public:
   // Fetches every row of `result`, whose columns are the fields of `schema`. The session keeps

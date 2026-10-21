@@ -70,6 +70,7 @@ std::string_view Format(FieldType type) {
       // DuckDB exports the stored bytes of a BIGNUM, which Normalize decodes.
       return "z";
     case FieldType::kRecord:
+    case FieldType::kRange:
       return "+s";
     default:
       return {};
@@ -126,6 +127,11 @@ bool Matches(const ArrowSchema& arrow, const FieldSchema& field) {
     return std::string_view(arrow.format) == "+l" && arrow.n_children == 1 &&
            Matches(*arrow.children[0], Item(field));
   }
+  if (field.type == FieldType::kRange) {
+    return std::string_view(arrow.format) == "+s" && arrow.n_children == 2 &&
+           Matches(*arrow.children[0], RangeBoundField(field, "start")) &&
+           Matches(*arrow.children[1], RangeBoundField(field, "end"));
+  }
   if (std::string_view(arrow.format) != Format(field.type) ||
       std::cmp_not_equal(arrow.n_children, field.fields.size())) {
     return false;
@@ -140,7 +146,8 @@ bool Matches(const ArrowSchema& arrow, const FieldSchema& field) {
 
 // Rewrites a DuckDB Arrow export, whose layout Matches `field`, into the type `wire` that
 // Storage Read gives it. A NULL array, whose DuckDB offsets have zero length, becomes an empty
-// one, and a BIGNUM's stored bytes become its units of 10^-38, a decimal256 integer.
+// one, a BIGNUM's stored bytes become its units of 10^-38, a decimal256 integer, and infinite
+// RANGE bounds become NULL.
 void Normalize(ArrowArray* array, const ArrowSchema& wire, const FieldSchema& field) {
   if (field.mode == FieldMode::kRepeated) {
     array->buffers[0] = nullptr;
@@ -151,6 +158,39 @@ void Normalize(ArrowArray* array, const ArrowSchema& wire, const FieldSchema& fi
   if (field.type == FieldType::kRecord) {
     for (size_t i = 0; i < field.fields.size(); ++i) {
       Normalize(array->children[i], *wire.children[i], field.fields.at(i));
+    }
+    return;
+  }
+  if (field.type == FieldType::kRange) {
+    // DuckDB stores unbounded ends as temporal infinities; Storage Read uses NULL.
+    for (int64_t i = 0; i < 2; ++i) {
+      ArrowArray* bound = array->children[i];
+      ArrowError error{};
+      nanoarrow::UniqueArrayView stored;
+      Check(ArrowArrayViewInitFromSchema(stored.get(), wire.children[i], &error), error);
+      Check(ArrowArrayViewSetArray(stored.get(), bound, &error), error);
+      nanoarrow::UniqueArray normalized;
+      Check(ArrowArrayInitFromSchema(normalized.get(), wire.children[i], &error), error);
+      Check(ArrowArrayStartAppending(normalized.get()), error);
+      Check(ArrowArrayReserve(normalized.get(), bound->length), error);
+      for (int64_t row = 0; row < bound->length; ++row) {
+        if (ArrowArrayViewIsNull(stored.get(), row) != 0) {
+          Check(ArrowArrayAppendNull(normalized.get(), 1), error);
+          continue;
+        }
+        const int64_t value = ArrowArrayViewGetIntUnsafe(stored.get(), row);
+        const bool finite = field.range_element_type == FieldType::kDate
+                                ? duckdb_is_finite_date({static_cast<int32_t>(value)})
+                                : duckdb_is_finite_timestamp({value});
+        if (!finite) {
+          Check(ArrowArrayAppendNull(normalized.get(), 1), error);
+        } else {
+          Check(ArrowArrayAppendInt(normalized.get(), value), error);
+        }
+      }
+      Check(ArrowArrayFinishBuildingDefault(normalized.get(), &error), error);
+      ArrowArrayRelease(bound);
+      ArrowArrayMove(normalized.get(), bound);
     }
     return;
   }
@@ -210,6 +250,12 @@ void ValidateCivilTime(const ArrowArrayView& view, const FieldSchema& field, int
   if (field.type == FieldType::kRecord) {
     for (size_t i = 0; i < field.fields.size(); ++i) {
       ValidateCivilTime(*view.children[i], field.fields.at(i), row);
+    }
+    return;
+  }
+  if (field.type == FieldType::kRange) {
+    for (int64_t i = 0; i < 2; ++i) {
+      ValidateCivilTime(*view.children[i], RangeBoundField(field, ""), row);
     }
     return;
   }
@@ -326,17 +372,6 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
                   false)
         .at("v");
   };
-  if (!arrow) {
-    std::string output;
-    state.Runs(offset, count, [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
-      for (size_t row = begin; row < begin + take; ++row) {
-        for (size_t column = 0; column < state.fields.size(); ++column) {
-          AppendAvroCell(output, state.fields.at(column), cell(chunk, column, row));
-        }
-      }
-    });
-    return output;
-  }
   nanoarrow::UniqueArray root;
   ArrowError error{};
   Check(ArrowArrayInitFromSchema(root.get(), state.wire.get(), &error), error);
@@ -395,7 +430,8 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
   }
   root->length = static_cast<int64_t>(count);
   root->null_count = 0;
-  return EncodeArrowRecordBatch(*state.wire.get(), *root.get());
+  return arrow ? EncodeArrowRecordBatch(*state.wire.get(), *root.get())
+               : EncodeAvroRows(*state.wire.get(), *root.get(), state.fields);
 }
 
 }  // namespace bigquery_emulator_duckdb

@@ -370,69 +370,87 @@ void AvroLong(std::string& out, int64_t value) {
   out.push_back(static_cast<char>(encoded));
 }
 
-void AvroCell(std::string& out, const FieldSchema& field, const json& value) {
+void AvroValue(std::string& out, const FieldSchema& field, const ArrowArrayView& view,
+               int64_t row) {
   if (field.mode == FieldMode::kRepeated) {
-    if (!value.empty()) {
-      AvroLong(out, static_cast<int64_t>(value.size()));
+    const int64_t begin = ArrowArrayViewListChildOffset(&view, row);
+    const int64_t end = ArrowArrayViewListChildOffset(&view, row + 1);
+    if (end != begin) {
+      AvroLong(out, end - begin);
       FieldSchema item = field;
       item.mode = FieldMode::kRequired;
-      for (const auto& cell : value) {
-        AvroCell(out, item, cell.at("v"));
+      for (int64_t i = begin; i < end; ++i) {
+        AvroValue(out, item, *view.children[0], i);
       }
     }
     AvroLong(out, 0);
     return;
   }
   if (field.mode == FieldMode::kNullable) {
-    AvroLong(out, value.is_null() ? 0 : 1);
-    if (value.is_null()) {
+    const bool null = ArrowArrayViewIsNull(&view, row) != 0;
+    AvroLong(out, null ? 0 : 1);
+    if (null) {
       return;
     }
   }
   switch (field.type) {
     case FieldType::kRecord:
       for (size_t i = 0; i < field.fields.size(); ++i) {
-        AvroCell(out, field.fields.at(i), value.at("f").at(i).at("v"));
+        AvroValue(out, field.fields.at(i), *view.children[i], row);
       }
       return;
     case FieldType::kRange:
-      for (const json& bound : RangeBounds(value)) {
-        AvroCell(out, RangeBoundField(field, ""), bound);
+      for (int64_t i = 0; i < 2; ++i) {
+        AvroValue(out, RangeBoundField(field, ""), *view.children[i], row);
       }
       return;
     case FieldType::kInteger:
-      AvroLong(out, std::stoll(Text(value)));
+    case FieldType::kDate:
+    case FieldType::kTime:
+    case FieldType::kTimestamp:
+      AvroLong(out, ArrowArrayViewGetIntUnsafe(&view, row));
       return;
     case FieldType::kBoolean:
-      out.push_back(Text(value) == "true" ? '\1' : '\0');
+      out.push_back(ArrowArrayViewGetIntUnsafe(&view, row) != 0 ? '\1' : '\0');
       return;
     case FieldType::kFloat: {
-      const auto bits = std::bit_cast<uint64_t>(std::stod(Text(value)));
+      const auto bits = std::bit_cast<uint64_t>(ArrowArrayViewGetDoubleUnsafe(&view, row));
       for (unsigned i = 0; i < 8; ++i) {
         out.push_back(static_cast<char>(bits >> (8U * i)));
       }
       return;
     }
-    case FieldType::kDate:
-    case FieldType::kTime:
-    case FieldType::kTimestamp:
-      AvroLong(out, Temporal(field, value));
-      return;
-    default: {
+    case FieldType::kDatetime: {
+      googlesql::DatetimeValue datetime;
+      Check(googlesql::functions::ConvertTimestampToDatetime(
+          absl::FromUnixMicros(ArrowArrayViewGetIntUnsafe(&view, row)), absl::UTCTimeZone(),
+          &datetime));
       std::string text;
-      if (field.type == FieldType::kBytes) {
-        text = Bytes(value);
-      } else if (field.type == FieldType::kNumeric || field.type == FieldType::kBigNumeric) {
-        text = DecimalBytes(field, value);
-        std::ranges::reverse(text);
-      } else {
-        text = Text(value);
-        if (field.type == FieldType::kDatetime && text.size() > 10) {
-          text.at(10) = ' ';
-        }
-      }
+      Check(googlesql::functions::FormatDatetimeToString("%Y-%m-%d %H:%M:%E*S", datetime, &text));
       AvroLong(out, static_cast<int64_t>(text.size()));
       out += text;
+      return;
+    }
+    case FieldType::kNumeric:
+    case FieldType::kBigNumeric: {
+      ArrowDecimal decimal{};
+      const int bits = field.type == FieldType::kNumeric ? 128 : 256;
+      ArrowDecimalInit(&decimal, bits, field.type == FieldType::kNumeric ? 38 : 76,
+                       field.type == FieldType::kNumeric ? 9 : 38);
+      ArrowArrayViewGetDecimalUnsafe(&view, row, &decimal);
+      std::array<uint8_t, 32> bytes{};
+      ArrowDecimalGetBytes(&decimal, bytes.data());
+      AvroLong(out, bits / 8);
+      for (int i = (bits / 8) - 1; i >= 0; --i) {
+        out.push_back(static_cast<char>(bytes.at(static_cast<size_t>(i))));
+      }
+      return;
+    }
+    default: {
+      const ArrowBufferView bytes = ArrowArrayViewGetBytesUnsafe(&view, row);
+      AvroLong(out, bytes.size_bytes);
+      out.append(bytes.data.as_char,  // NOLINT(cppcoreguidelines-pro-type-union-access)
+                 static_cast<size_t>(bytes.size_bytes));
     }
   }
 }
@@ -477,8 +495,19 @@ void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const json& va
   ArrowCell(array, field, value);
 }
 
-void AppendAvroCell(std::string& out, const FieldSchema& field, const json& value) {
-  AvroCell(out, field, value);
+std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
+                           const std::vector<FieldSchema>& schema) {
+  nanoarrow::UniqueArrayView view;
+  ArrowError error{};
+  ArrowCheck(ArrowArrayViewInitFromSchema(view.get(), &root, &error));
+  ArrowCheck(ArrowArrayViewSetArray(view.get(), &array, &error));
+  std::string out;
+  for (int64_t row = 0; row < array.length; ++row) {
+    for (size_t column = 0; column < schema.size(); ++column) {
+      AvroValue(out, schema.at(column), *view->children[column], row);
+    }
+  }
+  return out;
 }
 
 std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array) {
