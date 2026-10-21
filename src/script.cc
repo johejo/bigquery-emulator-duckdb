@@ -665,7 +665,8 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return absl::InvalidArgumentError("Temporary function names must not be qualified");
     }
     if (create.create_mode() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT) {
-      return Unsupported("OR REPLACE and IF NOT EXISTS for temporary SQL UDFs");
+      return absl::InvalidArgumentError(
+          "Clauses such as IF NOT EXISTS are not yet supported with CREATE TEMP FUNCTION");
     }
     const std::string& name = create.name_path().front();
     const googlesql::Function* existing = nullptr;
