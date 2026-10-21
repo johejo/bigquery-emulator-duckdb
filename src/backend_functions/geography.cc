@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -125,17 +126,9 @@ absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
   return GeographyText(geography);
 }
 
-// NULL for the same and antipodal points. Otherwise the initial bearing over the sphere, from the
-// difference of the longitudes in degrees, which gives nearly antipodal points and those at a pole
-// the azimuth BigQuery does, unlike S2Earth::GetInitialBearing.
-absl::StatusOr<std::optional<double>> Azimuth(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point p,
-                             ParsePoint(args, 0, "ST_Azimuth: Argument to STAzimuth"));
-  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point q,
-                             ParsePoint(args, 1, "ST_Azimuth: Argument to STAzimuth"));
-  if (Same(p, q) || Antipodal(p, q)) {
-    return std::nullopt;
-  }
+// The initial bearing over the sphere. Working with longitude differences in degrees
+// preserves BigQuery's behavior near antipodes and at poles.
+double Bearing(const S2Point& p, const S2Point& q) {
   const Point a = ToPoint(p);
   const Point b = ToPoint(q);
   const double lat1 = S1Angle::Degrees(a.latitude).radians();
@@ -146,6 +139,31 @@ absl::StatusOr<std::optional<double>> Azimuth(const Arguments& args) {
       (std::cos(lat1) * std::sin(lat2)) - (std::sin(lat1) * std::cos(lat2) * std::cos(lng)));
   // atan2 is in (-pi, pi]; BigQuery's azimuth is in [0, 2 pi).
   return azimuth < 0 ? azimuth + (2 * std::numbers::pi) : azimuth + 0.0;
+}
+
+// NULL for coincident or antipodal points, where the bearing is undefined.
+absl::StatusOr<std::optional<double>> Azimuth(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point p,
+                             ParsePoint(args, 0, "ST_Azimuth: Argument to STAzimuth"));
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point q,
+                             ParsePoint(args, 1, "ST_Azimuth: Argument to STAzimuth"));
+  if (Same(p, q) || Antipodal(p, q)) {
+    return std::nullopt;
+  }
+  return Bearing(p, q);
+}
+
+// The clockwise turn at the second point, in [0, 2 pi). Validate all three
+// geographies before testing whether either of the two bearings is undefined.
+absl::StatusOr<std::optional<double>> Angle(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point p, ParsePoint(args, 0, "ST_Angle: Argument to STAngle"));
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point q, ParsePoint(args, 1, "ST_Angle: Argument to STAngle"));
+  GOOGLESQL_ASSIGN_OR_RETURN(const S2Point r, ParsePoint(args, 2, "ST_Angle: Argument to STAngle"));
+  if (Same(q, p) || Same(q, r) || Antipodal(q, p) || Antipodal(q, r)) {
+    return std::nullopt;
+  }
+  const double angle = Bearing(q, r) - Bearing(q, p);
+  return angle < 0 ? angle + (2 * std::numbers::pi) : angle + 0.0;
 }
 
 // A distance over the sphere of S2Earth's radius, measured through the chord, which BigQuery's
@@ -575,6 +593,30 @@ bool IsClosed(const Geography& geography) {
          });
 }
 
+// Only the highest dimension contributes. S2's centroids already include the
+// measure of each component, so their sum gives the weighted centroid.
+absl::StatusOr<std::string> Centroid(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Empty()) {
+    return GeographyText(geography);
+  }
+  S2Point centroid(0, 0, 0);
+  if (!geography.polygons.empty()) {
+    centroid = ToS2Polygon(geography)->GetCentroid();
+  } else if (!geography.lines.empty()) {
+    centroid = std::accumulate(geography.lines.begin(), geography.lines.end(), S2Point(0, 0, 0),
+                               [](const S2Point& sum, const std::vector<S2Point>& line) {
+                                 return sum + S2::GetCentroid(S2LaxPolylineShape(line));
+                               });
+  } else {
+    centroid = std::accumulate(geography.points.begin(), geography.points.end(), S2Point(0, 0, 0));
+  }
+  if (centroid.Norm2() == 0) {
+    return GeographyText(PointGeography(S2Point(1, 0, 0)));
+  }
+  return GeographyText(PointGeography(centroid.Normalize()));
+}
+
 // ST_LENGTH, the length of the edges of the linestrings, which is 0 for points, polygons and the
 // empty geography.
 absl::StatusOr<double> Length(const Arguments& args) {
@@ -640,6 +682,79 @@ absl::StatusOr<std::string> PointN(const Arguments& args) {
                                  ".");
   }
   return GeographyText(PointGeography(line.at(index > 0 ? index - 1 : size + index)));
+}
+
+// BigQuery names the operation and the kind of invalid component in its errors.
+absl::Status CheckLine(const Geography& geography, std::string_view function,
+                       std::string_view context, bool allow_empty) {
+  if ((allow_empty && geography.Empty()) ||
+      (geography.Count() == 1 && geography.lines.size() == 1)) {
+    return absl::OkStatus();
+  }
+  const std::string reason = geography.Empty()             ? "was the empty geography"
+                             : !geography.polygons.empty() ? "contained a polygon"
+                             : !geography.points.empty()
+                                 ? "contained a point"
+                                 : "had " + std::to_string(geography.lines.size()) + " lines";
+  return absl::OutOfRangeError(std::string(function) + ": Argument to " + std::string(context) +
+                               " must be a single line geography; an argument " + reason +
+                               ". Error in " + std::string(function) + " expression");
+}
+
+absl::StatusOr<std::string> LineInterpolatePoint(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  const double fraction = args.Double(1);
+  if (!std::isfinite(fraction) || fraction < 0 || fraction > 1) {
+    return absl::OutOfRangeError(std::format(
+        "ST_LINEINTERPOLATEPOINT: ST_LineInterpolatePoint: fraction should be between 0 and 1. "
+        "Actual value was {:.6f}; error in ST_LINEINTERPOLATEPOINT expression",
+        fraction));
+  }
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckLine(geography, "ST_LINEINTERPOLATEPOINT", "ST_LineInterpolatePoint", true));
+  if (geography.Empty()) {
+    return GeographyText(geography);
+  }
+  return GeographyText(PointGeography(S2Polyline(geography.lines.front()).Interpolate(fraction)));
+}
+
+absl::StatusOr<std::string> LineSubstring(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  const double start = args.Double(1);
+  const double end = args.Double(2);
+  GOOGLESQL_RETURN_IF_ERROR(CheckLine(geography, "ST_LINESUBSTRING", "STLineSubString", false));
+  if (!std::isfinite(start) || start < 0 || start > 1) {
+    return absl::OutOfRangeError(
+        "ST_LINESUBSTRING: Second argument to STLineSubString must be a float between 0.0 and 1.0. "
+        "Error in ST_LINESUBSTRING expression");
+  }
+  if (!std::isfinite(end) || end < 0 || end > 1) {
+    return absl::OutOfRangeError(
+        "ST_LINESUBSTRING: Third argument to STLineSubString must be a float between 0.0 and 1.0. "
+        "Error in ST_LINESUBSTRING expression");
+  }
+  if (start > end) {
+    return absl::OutOfRangeError(
+        "ST_LINESUBSTRING: Second argument to STLineSubString must be <= Third argument. Error in "
+        "ST_LINESUBSTRING expression");
+  }
+  const S2Polyline line(geography.lines.front());
+  int next_start = 0;
+  int next_end = 0;
+  const S2Point first = line.GetSuffix(start, &next_start);
+  if (start == end) {
+    return GeographyText(PointGeography(first));
+  }
+  const S2Point last = line.GetSuffix(end, &next_end);
+  std::vector<S2Point> vertices{first};
+  for (int i = next_start; i < next_end; ++i) {
+    vertices.push_back(line.vertex(i));
+  }
+  if (vertices.back() != last) {
+    vertices.push_back(last);
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography result, BuildLine(vertices));
+  return GeographyText(result);
 }
 
 // ST_UNION, with NULL array elements already removed by the translator.
@@ -855,6 +970,12 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_astext", {kVarchar}, kVarchar,
            EachRow<OfGeography<[](const Geography& geography) { return Wkt(geography); }>>);
   Register(connection, "bq_st_asgeojson", {kVarchar}, kVarchar, EachRow<AsGeoJson>);
+  Register(connection, "bq_st_angle", {kVarchar, kVarchar, kVarchar}, kDouble, EachRow<Angle>);
+  Register(connection, "bq_st_centroid", {kVarchar}, kVarchar, EachRow<Centroid>);
+  Register(connection, "bq_st_lineinterpolatepoint", {kVarchar, kDouble}, kVarchar,
+           EachRow<LineInterpolatePoint>);
+  Register(connection, "bq_st_linesubstring", {kVarchar, kDouble, kDouble}, kVarchar,
+           EachRow<LineSubstring>);
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);
   Register(connection, "bq_st_distance", {kVarchar, kVarchar, kBoolean, kVarchar}, kDouble,
            EachRow<Distance>);

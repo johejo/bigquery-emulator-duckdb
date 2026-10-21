@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 43 | 2 | 26 | 0 |
+| [Geography functions](#geography-functions) | 47 | 2 | 22 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -229,7 +229,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | --- | --- | --- | --- |
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | Supported | S2 function |  |
 | [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | Unsupported |  |  |
-| [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | Unsupported |  |  |
+| [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | Supported | S2 function |  |
 | [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | Supported | S2 function |  |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | Unsupported |  |  |
 | [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a GEOMETRYCOLLECTION; ST_ASGEOJSON of a LINESTRING; ST_ASGEOJSON of a POLYGON. |
@@ -239,7 +239,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | Supported | S2 function |  |
 | [`ST_BUFFER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_buffer) | Unsupported |  |  |
 | [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | Unsupported |  |  |
-| [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | Unsupported |  |  |
+| [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | Supported | S2 function |  |
 | [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | Unsupported |  |  |
 | [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | Unsupported |  |  |
 | [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | Unsupported |  |  |
@@ -276,9 +276,9 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | Supported | S2 function |  |
 | [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | Unsupported |  |  |
 | [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | Supported | S2 function |  |
-| [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | Unsupported |  |  |
+| [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | Supported | S2 function |  |
 | [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | Unsupported |  |  |
-| [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Unsupported |  |  |
+| [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Supported | S2 function |  |
 | [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Supported | S2 function |  |
 | [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Supported | S2 function |  |
 | [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Unsupported |  |  |
