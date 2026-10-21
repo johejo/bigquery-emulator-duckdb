@@ -98,6 +98,78 @@ bool InLocation(const Job& job, const std::optional<std::string>& location) {
   return CanonicalLocation(*location) == job.location;
 }
 
+// BigQuery's name for `operation`.
+std::string_view OperationName(CopyOperation operation) {
+  switch (operation) {
+    case CopyOperation::kCopy:
+      return "COPY";
+    case CopyOperation::kSnapshot:
+      return "SNAPSHOT";
+    case CopyOperation::kRestore:
+      return "RESTORE";
+    case CopyOperation::kClone:
+      return "CLONE";
+  }
+  return "";
+}
+
+// Rejects a source table of `copy` whose metadata is `metadata` that its operation does not take,
+// with BigQuery's messages. What a CLONE of a snapshot makes, and which default rounding mode a
+// SNAPSHOT, RESTORE or CLONE gives its table, are not known.
+void CheckCopySource(const CopyJob& copy, const TableReference& source,
+                     const TableMetadata& metadata) {
+  const bool snapshot = metadata.snapshot.has_value();
+  if (copy.operation == CopyOperation::kCopy && snapshot) {
+    throw ApiError::Invalid("Copy operation on SNAPSHOT types is not allowed.");
+  }
+  if (copy.operation == CopyOperation::kRestore && !snapshot) {
+    throw ApiError::Invalid(TableName(source) +
+                            " is not allowed for this operation because it is currently a TABLE.");
+  }
+  const std::string what = "copy operationType " + std::string(OperationName(copy.operation));
+  if (copy.operation == CopyOperation::kClone && snapshot) {
+    throw ApiError::Unsupported(what + " of a table snapshot");
+  }
+  if (copy.operation != CopyOperation::kCopy && !metadata.default_rounding_mode.empty()) {
+    throw ApiError::Unsupported(what + " of a table with a default rounding mode");
+  }
+}
+
+// The metadata of the table that a SNAPSHOT, RESTORE or CLONE `copy` of `source`, whose metadata
+// is `metadata`, creates: the source's without its expiration, with the source as the base table
+// of a snapshot or a clone, as BigQuery answers. A RESTORE that replaces a table, which `exists`,
+// keeps that table's metadata instead. Rejects WRITE_TRUNCATE for a SNAPSHOT with BigQuery's
+// message, and the dispositions whose outcome is not known.
+TableMetadata CopiedMetadata(const CopyJob& copy, const TableReference& source,
+                             TableMetadata metadata, bool exists) {
+  const std::string what = "copy operationType " + std::string(OperationName(copy.operation));
+  const WriteDisposition write = copy.write_disposition;
+  if (copy.operation == CopyOperation::kSnapshot && write == WriteDisposition::kWriteTruncate) {
+    throw ApiError::Invalid(
+        "Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try "
+        "again with WRITE_EMPTY.");
+  }
+  const bool replaces =
+      copy.operation == CopyOperation::kRestore && write == WriteDisposition::kWriteTruncate;
+  if ((write != WriteDisposition::kWriteEmpty && !replaces) || (exists && !replaces)) {
+    throw ApiError::Unsupported(what + " with " + std::string(DispositionName(write)) +
+                                (exists ? " to an existing table" : ""));
+  }
+  if (exists) {
+    return {};
+  }
+  metadata.expiration_time.reset();
+  metadata.creation_time = 0;
+  metadata.clone.reset();
+  metadata.snapshot.reset();
+  if (copy.operation == CopyOperation::kSnapshot) {
+    metadata.snapshot = BaseTableDefinition{.base_table = source};
+  } else if (copy.operation == CopyOperation::kClone) {
+    metadata.clone = BaseTableDefinition{.base_table = source};
+  }
+  return metadata;
+}
+
 }  // namespace
 
 void Emulator::UseDataset(JobLocation& location, const TableReference& table) {
@@ -355,7 +427,14 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         destination.has_value() && *destination != location.Resolve()) {
       throw ApiError::Unsupported("copying tables to a dataset in another location");
     }
+    if (copy.operation != CopyOperation::kCopy && copy.source_tables.size() > 1) {
+      throw ApiError::Unsupported("copy operationType " +
+                                  std::string(OperationName(copy.operation)) +
+                                  " of several source tables");
+    }
     std::vector<FieldSchema> schema;
+    TableReference first_source;
+    TableMetadata source_metadata;
     std::string sql;
     for (TableReference source : copy.source_tables) {
       if (source.project_id.empty()) {
@@ -366,11 +445,11 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
-      if (table.metadata.snapshot.has_value()) {
-        throw ApiError::Invalid("Copy operation on SNAPSHOT types is not allowed.");
-      }
+      CheckCopySource(copy, source, table.metadata);
       if (sql.empty()) {
         schema = table.schema;
+        first_source = source;
+        source_metadata = table.metadata;
       } else if (!SameSchema(table.schema, schema)) {
         throw ApiError::Invalid("Source tables have different schemas");
       }
@@ -400,10 +479,23 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       }
     }
     TableMetadata metadata;
+    if (copy.operation != CopyOperation::kCopy) {
+      bool exists = true;
+      try {
+        GetTable(copy.destination_table, /*include_row_count=*/false);
+      } catch (const ApiError& error) {
+        if (error.http_status() != 404) {
+          throw;
+        }
+        exists = false;
+      }
+      metadata = CopiedMetadata(copy, first_source, std::move(source_metadata), exists);
+    }
     metadata.expiration_time = copy.destination_expiration_time;
     const QueryResult result =
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
-                         copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true);
+                         copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true,
+                         /*restore=*/copy.operation == CopyOperation::kRestore);
     job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
     job.result = QueryResult{};
   });
@@ -496,7 +588,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                                        const std::string& sql,
                                        const std::vector<FieldSchema>& schema,
                                        const std::vector<std::string>& setup, bool count_only,
-                                       const TableMetadata& metadata, bool copy) {
+                                       const TableMetadata& metadata, bool copy, bool restore) {
   std::set<std::string> names;
   std::vector<std::string> duplicates;
   for (const FieldSchema& field : schema) {
@@ -609,7 +701,10 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
         .keeps_rounding_modes = existing.has_value() || copy,
     };
     DatasetMetadata defaults = existing.has_value() ? DatasetMetadata{} : dataset;
-    if (existing.has_value()) {
+    if (existing.has_value() && restore) {
+      definition.metadata = existing->metadata;
+      definition.metadata.clone.reset();
+    } else if (existing.has_value()) {
       definition.metadata.default_rounding_mode = existing->metadata.default_rounding_mode;
     } else if (copy) {
       defaults.default_rounding_mode.clear();

@@ -219,14 +219,19 @@ CopyRequest ParseCopyJob(const std::string& project_id, const json& body) {
   if (!copy.is_object() || !copy.contains("destinationTable")) {
     throw ApiError::Invalid("Invalid destination table");
   }
-  // A snapshot, a restore and a clone record where they came from, which a copy does not.
+  CopyRequest request;
   if (const json operation = copy.value("operationType", json());
       !operation.is_null() && operation != "COPY" && operation != "OPERATION_TYPE_UNSPECIFIED") {
-    throw ApiError::Unsupported("copy operationType " + (operation.is_string()
-                                                             ? operation.get<std::string>()
-                                                             : operation.dump()));
+    if (operation == "SNAPSHOT") {
+      request.copy.operation = CopyOperation::kSnapshot;
+    } else if (operation == "RESTORE") {
+      request.copy.operation = CopyOperation::kRestore;
+    } else if (operation == "CLONE") {
+      request.copy.operation = CopyOperation::kClone;
+    } else {
+      throw ApiError::Invalid("Invalid copy operationType: " + operation.dump());
+    }
   }
-  CopyRequest request;
   request.project_id = project_id;
   request.job_id = JobId(body);
   request.location = JobLocationField(body);

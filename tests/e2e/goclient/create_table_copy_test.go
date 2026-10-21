@@ -269,17 +269,4 @@ func TestCreateTableCopyAndClone(t *testing.T) {
 		t.Errorf("replaced_clone: ids = %v, want [1 2 5]", got)
 	}
 
-	// A copy job records no clone, so it cannot make one.
-	copier := dataset.Table("job_clone").CopierFrom(dataset.Table("source"))
-	copier.OperationType = bigquery.CloneOperation
-	job, err := copier.Run(ctx)
-	if err == nil {
-		var status *bigquery.JobStatus
-		if status, err = job.Wait(ctx); err == nil {
-			err = status.Err()
-		}
-	}
-	if err == nil || !strings.Contains(err.Error(), "operationType CLONE") {
-		t.Errorf("copy job with operation type CLONE: error = %v", err)
-	}
 }
