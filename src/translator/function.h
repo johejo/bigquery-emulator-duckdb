@@ -37,9 +37,10 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 // `value`, the SQL of a value of `type` that a statement writes to the column `field`. DuckDB's
 // cast to a parameterized NUMERIC or BIGNUMERIC rounds halfway values away from zero, so the value
 // of a ROUND_HALF_EVEN field, at any depth in a STRUCT or ARRAY, is rounded to even first, as
-// ROUND does. Container expressions are evaluated once and NULL STRUCTs remain NULL.
+// ROUND does. REQUIRED and length constraints are checked at every depth. Container expressions are
+// evaluated once and NULL STRUCTs remain NULL.
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
-                                        const FieldSchema& field);
+                                        const FieldSchema& field, bool assignment = false);
 
 // `value`, the SQL of a value of `type` already in the form a query returns, rounded for the
 // column `field` as WrittenValue rounds it.

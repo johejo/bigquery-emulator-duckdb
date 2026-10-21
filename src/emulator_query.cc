@@ -438,6 +438,8 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
       throw ApiError::Invalid("Invalid default value for field " + field.name + ": " +
                               std::string(analyzed.status().message()));
     }
+    const auto* literal = analyzed->literal_value();
+    ValidateColumnDefault(field, literal != nullptr ? std::optional(*literal) : std::nullopt);
     std::string unsupported;
     const std::optional<std::string> query =
         TranslateExpression(analyzed->expression(), {},

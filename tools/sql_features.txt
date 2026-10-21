@@ -145,7 +145,7 @@ query `CREATE TABLE` | CREATE TABLE IF NOT EXISTS t (a INT64)
 query `CREATE TABLE` | CREATE OR REPLACE TABLE t (a INT64)
 query `CREATE TABLE` | CREATE TABLE `test.d.n` (a INT64)
 query Column types with parameters | CREATE TABLE n (a STRING(10), b BYTES(5), c NUMERIC(10, 2))
-note Column types with parameters | `STRING(L)` and `BYTES(L)` lose their length.
+query Column types with parameters | CREATE TABLE n (items ARRAY<STRUCT<label STRING(2), data BYTES(3)>>) AS SELECT [STRUCT('日本' AS label, b'abc' AS data)]; INSERT n VALUES ([STRUCT('', b'')])
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC)
 query `BIGNUMERIC` columns | CREATE TABLE n (a BIGNUMERIC(40, 10))
 query Column defaults | CREATE TABLE n (a INT64 DEFAULT 5, b STRING)
@@ -153,7 +153,7 @@ query `CREATE TABLE AS SELECT` | CREATE TABLE n AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` | CREATE TABLE n (id INT64, name STRING) AS SELECT id, name FROM t
 query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (id INT64 NOT NULL) AS SELECT id FROM t
 query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (s STRUCT<x INT64 NOT NULL>) AS SELECT STRUCT(1 AS x) AS s
-note `CREATE TABLE AS SELECT` with `NOT NULL` | See [CREATE TABLE AS SELECT](compatibility.md#create-table-as-select).
+query `CREATE TABLE AS SELECT` with `NOT NULL` | CREATE TABLE n (items ARRAY<STRUCT<detail STRUCT<id INT64 NOT NULL> NOT NULL>>) AS SELECT [STRUCT(STRUCT(7 AS id) AS detail)] AS items
 query Table and column options | CREATE TABLE n (a INT64 OPTIONS (description = 'x')) OPTIONS (description = 'y', friendly_name = 'z', labels = [('k', 'v')])
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP '2030-01-01 00:00:00 UTC')
 query Table and column options | CREATE TABLE n (a INT64) OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))

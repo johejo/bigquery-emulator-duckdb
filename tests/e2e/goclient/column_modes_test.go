@@ -102,3 +102,107 @@ func TestAlterTableAddColumnModes(t *testing.T) {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
 }
+
+// NOT NULL applies to fields inside records, including records in arrays. A nullable parent
+// record may itself be NULL. LIKE AS SELECT inherits these modes from the source schema.
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_name_and_column_schema
+func TestCreateTableAsSelectNestedColumnModes(t *testing.T) {
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_ctas_nested_modes")
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	p := creationPaths{t: t, client: client, dataset: dataset}
+	columns := `(r STRUCT<x INT64 NOT NULL, s STRUCT<y STRING NOT NULL>>, a ARRAY<STRUCT<x INT64 NOT NULL>>)`
+	values := `SELECT STRUCT(1 AS renamed, STRUCT('ok' AS renamed) AS renamed_s), [STRUCT(2 AS renamed)] FROM UNNEST([0])`
+	p.mustRun("CREATE TABLE source " + columns)
+	p.mustRun("CREATE TABLE declared " + columns + " AS " + values)
+	p.mustRun("CREATE TABLE inherited LIKE source AS " + values)
+	p.mustRun("CREATE TABLE empty " + columns + " AS " + values + " WHERE FALSE")
+	p.mustRun("CREATE TABLE empty_like LIKE source AS " + values + " WHERE FALSE")
+	if got, want := p.read("SELECT r.x, r.s.y, a[OFFSET(0)].x FROM declared"), [][]bigquery.Value{{int64(1), "ok", int64(2)}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("CTAS values = %v, want %v", got, want)
+	}
+	for _, table := range []string{"declared", "inherited", "empty", "empty_like"} {
+		t.Run(table, func(t *testing.T) {
+			if got, want := p.view(table), p.view("source"); !reflect.DeepEqual(got.Schema, want.Schema) ||
+				!reflect.DeepEqual(got.Columns, want.Columns) || !reflect.DeepEqual(got.FieldPaths, want.FieldPaths) {
+				t.Fatalf("schema or information schema differs from source: %+v, want %+v", got, want)
+			}
+			// Both nullable records and empty arrays remain writable after creation.
+			p.mustRun("INSERT " + table + " VALUES (NULL, []), (STRUCT(3, NULL), [])")
+			p.mustRun("INSERT " + table + " " + values)
+			before := p.read("SELECT TO_JSON_STRING(t) FROM " + table + " AS t ORDER BY 1")
+			for _, sql := range []string{
+				"INSERT " + table + " VALUES (STRUCT(NULL, NULL), [])",
+				"INSERT " + table + " VALUES (STRUCT(1, STRUCT(CAST(NULL AS STRING))), [])",
+				"INSERT " + table + " VALUES (NULL, [STRUCT(CAST(NULL AS INT64))])",
+				"INSERT " + table + " SELECT STRUCT(CAST(NULL AS INT64), NULL), ARRAY<STRUCT<x INT64>>[]",
+				"INSERT " + table + " SELECT NULL, [STRUCT(CAST(NULL AS INT64) AS renamed)]",
+				"UPDATE " + table + " SET r.x = NULL WHERE r IS NOT NULL",
+				"UPDATE " + table + " SET a = [STRUCT(CAST(NULL AS INT64) AS x)] WHERE TRUE",
+			} {
+				if err := p.run(sql); err == nil {
+					t.Fatalf("%s unexpectedly succeeded", sql)
+				}
+			}
+			if got := p.read("SELECT TO_JSON_STRING(t) FROM " + table + " AS t ORDER BY 1"); !reflect.DeepEqual(got, before) {
+				t.Fatalf("failed writes changed rows: %v, want %v", got, before)
+			}
+		})
+	}
+	// Client streaming and load jobs must enforce the same schema as SQL writes.
+	metadata, err := dataset.Table("inherited").Metadata(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range [][]bigquery.Value{
+		{[]bigquery.Value{nil, nil}, []bigquery.Value{}},
+		{nil, []bigquery.Value{[]bigquery.Value{nil}}},
+	} {
+		if err := dataset.Table("inherited").Inserter().Put(ctx, &bigquery.ValuesSaver{Schema: metadata.Schema, Row: row}); err == nil {
+			t.Fatal("streaming a NULL required field succeeded")
+		}
+	}
+	for _, data := range []string{`{"r":{"x":null},"a":[]}`, `{"r":null,"a":[{"x":null}]}`} {
+		source := bigquery.NewReaderSource(strings.NewReader(data))
+		source.SourceFormat = bigquery.JSON
+		job, err := dataset.Table("inherited").LoaderFrom(source).Run(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		status, err := job.Wait(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status.Err() == nil {
+			t.Fatalf("loading %s succeeded", data)
+		}
+	}
+	for _, clause := range []string{columns, "LIKE source"} {
+		for _, values := range []string{
+			`SELECT STRUCT(CAST(NULL AS INT64) AS x, CAST(NULL AS STRUCT<y STRING>) AS s), ARRAY<STRUCT<x INT64>>[]`,
+			`SELECT STRUCT(1 AS x, STRUCT(CAST(NULL AS STRING) AS y) AS s), ARRAY<STRUCT<x INT64>>[]`,
+			`SELECT CAST(NULL AS STRUCT<x INT64, s STRUCT<y STRING>>), [STRUCT(CAST(NULL AS INT64) AS x)]`,
+		} {
+			for _, target := range []string{"TABLE failed", "OR REPLACE TABLE declared"} {
+				before := p.view("declared")
+				rows := p.read("SELECT TO_JSON_STRING(t) FROM declared AS t ORDER BY 1")
+				if err := p.run("CREATE " + target + " " + clause + " AS " + values); err == nil || !strings.Contains(err.Error(), "cannot be null") {
+					t.Fatalf("%s AS %s: want REQUIRED field error, got %v", clause, values, err)
+				}
+				if _, err := dataset.Table("failed").Metadata(ctx); err == nil {
+					t.Fatal("failed CTAS left a table behind")
+				}
+				if got := p.view("declared"); !reflect.DeepEqual(got, before) {
+					t.Fatalf("failed replacement changed metadata: %+v, want %+v", got, before)
+				}
+				if got := p.read("SELECT TO_JSON_STRING(t) FROM declared AS t ORDER BY 1"); !reflect.DeepEqual(got, rows) {
+					t.Fatalf("failed replacement changed rows: %v, want %v", got, rows)
+				}
+			}
+		}
+	}
+}

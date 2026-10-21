@@ -17,6 +17,7 @@
 #include "src/analyzer.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
+#include "src/schema_sql.h"
 #include "src/system_variables.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
@@ -143,7 +144,7 @@ std::optional<std::string> TranslateAppendedValue(const std::string& value,
                                                   const FieldSchema& source,
                                                   const FieldSchema& destination) {
   if (!RoundsToEven(destination)) {
-    return value;
+    return CheckedWriteValue(value, destination);
   }
   if (!RoundsAs(source, destination)) {
     return std::nullopt;
@@ -153,7 +154,9 @@ std::optional<std::string> TranslateAppendedValue(const std::string& value,
   if (!type.ok()) {
     return std::nullopt;
   }
-  return translator::RoundedToEven(value, *type, destination);
+  const auto rounded = translator::RoundedToEven(value, *type, destination);
+  return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, destination))
+                 : std::nullopt;
 }
 
 }  // namespace bigquery_emulator_duckdb

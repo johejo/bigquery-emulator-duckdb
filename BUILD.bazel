@@ -489,6 +489,7 @@ cc_library(
     implementation_deps = [
         ":analyzer",
         ":field_schema",
+        ":schema_sql",
         ":type_mapping",
         "//src/translator:context",
         "//src/translator:literal",
@@ -704,6 +705,7 @@ cc_library(
         ":table_comments",
         ":table_metadata",
         ":translated_statement",
+        "@googlesql//googlesql/public:value",
         "@nlohmann_json//:json",
     ],
 )

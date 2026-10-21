@@ -100,7 +100,7 @@ Scope DmlScope(const Scope& scope, const Target& target) {
 // The value `value` writes to the column `field`, or to a field of it; see WrittenValue.
 std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value,
                                     const FieldSchema* field, const Scope& scope,
-                                    const Columns& columns) {
+                                    const Columns& columns, bool assignment = false) {
   if (value.value()->Is<googlesql::ResolvedDMLDefault>()) {
     return "DEFAULT";
   }
@@ -108,7 +108,7 @@ std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value,
   if (!sql || field == nullptr) {
     return sql;
   }
-  return WrittenValue(*sql, value.value()->type(), *field);
+  return WrittenValue(*sql, value.value()->type(), *field, assignment);
 }
 
 // The assignments below one column or struct field: either its new value, or the fields of it
@@ -188,7 +188,7 @@ std::optional<std::string> UpdateItems(
         written = &written->fields.at(index);
       }
     }
-    const auto value = DmlValue(*item->set_value(), written, scope, columns);
+    const auto value = DmlValue(*item->set_value(), written, scope, columns, true);
     if (!value) {
       return std::nullopt;
     }

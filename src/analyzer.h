@@ -24,6 +24,7 @@ class ScriptExecutor;
 class ScriptSegment;
 class Type;
 class TypeFactory;
+class Value;
 struct TypeWithParameters;
 }  // namespace googlesql
 
@@ -60,6 +61,10 @@ class AnalyzerResult {
   // The statement, or the expression, that was analyzed.
   [[nodiscard]] const googlesql::ResolvedStatement& statement() const;
   [[nodiscard]] const googlesql::ResolvedExpr& expression() const;
+
+  // The analyzed expression's literal value, or nullptr when it is not a literal.
+  // The value belongs to this result and remains valid as long as the result does.
+  [[nodiscard]] const googlesql::Value* literal_value() const;
 
   // ResultSchema of the statement.
   [[nodiscard]] std::optional<std::vector<FieldSchema>> result_schema() const;

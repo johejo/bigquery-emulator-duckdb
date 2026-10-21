@@ -3,3 +3,21 @@
 
 CREATE TEMP TABLE c (x INT64 NOT NULL) AS SELECT 1 AS x; SELECT x FROM c
 => "1"
+
+# Nested REQUIRED fields, including the nullable parent case, answered by BigQuery in
+# testdata/unverified/create_table_copies.txt before support was added.
+CREATE TEMP TABLE src (r STRUCT<x INT64 NOT NULL>); CREATE TEMP TABLE dst LIKE src AS SELECT STRUCT(1 AS x) AS r; SELECT r.x FROM dst
+=> "1"
+
+CREATE TEMP TABLE src (r STRUCT<x INT64 NOT NULL>); CREATE TEMP TABLE dst LIKE src AS SELECT STRUCT(CAST(NULL AS INT64) AS x) AS r; SELECT r.x FROM dst
+=> error contains: Required field r.x cannot be null; error in writing field r
+
+CREATE TEMP TABLE src (r STRUCT<x INT64 NOT NULL>); CREATE TEMP TABLE dst LIKE src AS SELECT CAST(NULL AS STRUCT<x INT64>) AS r; SELECT r.x IS NULL FROM dst
+=> "true"
+
+CREATE TEMP TABLE c (s STRUCT<x INT64 NOT NULL>) AS SELECT STRUCT(1 AS x) AS s; SELECT s.x FROM c
+=> "1"
+
+# The record field itself can also be REQUIRED.
+CREATE TEMP TABLE c (s STRUCT<r STRUCT<x INT64> NOT NULL>) AS SELECT STRUCT(CAST(NULL AS STRUCT<x INT64>) AS r) AS s; SELECT 1
+=> error contains: Required field s.r cannot be null; error in writing field s

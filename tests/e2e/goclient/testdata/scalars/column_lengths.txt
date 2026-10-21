@@ -1,0 +1,57 @@
+# Parameterized STRING and BYTES reject overlong writes without truncating them.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#parameterized_data_types
+# LIKE cases were answered by BigQuery in unverified/create_table_copies.txt.
+
+CREATE TEMP TABLE src (s STRING(3)); CREATE TEMP TABLE dst LIKE src AS SELECT 'abc' AS s; SELECT s FROM dst
+=> "abc"
+
+CREATE TEMP TABLE src (s STRING(3)); CREATE TEMP TABLE dst LIKE src AS SELECT 'abcd' AS s; SELECT s FROM dst
+=> error contains: Field s: STRING(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE src (b BYTES(3)); CREATE TEMP TABLE dst LIKE src AS SELECT b'abcd' AS b; SELECT b FROM dst
+=> error contains: Field b: BYTES(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE src (r STRUCT<s STRING(3)>); CREATE TEMP TABLE dst LIKE src AS SELECT STRUCT('abcd' AS s) AS r; SELECT r.s FROM dst
+=> error contains: Field r: STRING(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE t (s STRING(3)) AS SELECT '日本語' AS s; SELECT s FROM t
+=> "日本語"
+
+CREATE TEMP TABLE t (s STRING(3)) AS SELECT '' AS s; SELECT s FROM t
+=> ""
+
+CREATE TEMP TABLE t (s STRING(3)) AS SELECT CAST(NULL AS STRING) AS s; SELECT s IS NULL FROM t
+=> "true"
+
+CREATE TEMP TABLE t (b BYTES(3)) AS SELECT b'\x00\xff\x01' AS b; SELECT TO_HEX(b) FROM t
+=> "00ff01"
+
+CREATE TEMP TABLE t (s STRING(3)); INSERT t VALUES ('abcd'); SELECT s FROM t
+=> error contains: STRING(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE t (s STRING(3)); INSERT t VALUES ('a  '); SELECT s FROM t
+=> "a  "
+
+CREATE TEMP TABLE t (a ARRAY<STRING(3)>); INSERT t VALUES (['abcd']); SELECT 1
+=> error contains: STRING(3) has maximum length 3 but got a value with length 4
+
+# Additional BigQuery answers: array errors name the outer column, STRING counts code points,
+# and BYTES counts the UTF-8 encoding's bytes.
+CREATE TEMP TABLE t (a ARRAY<STRUCT<s STRING(3)>>) AS SELECT [STRUCT('abcd' AS s)] AS a; SELECT 1
+=> error contains: Field a: STRING(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE t (r STRUCT<s STRING(3)>); INSERT t VALUES (STRUCT('abcd')); SELECT 1
+=> error contains: Field r: STRING(3) has maximum length 3 but got a value with length 4
+
+CREATE TEMP TABLE t (s STRING(1)) AS SELECT 'e\u0301' AS s; SELECT s FROM t
+=> error contains: Field s: STRING(1) has maximum length 1 but got a value with length 2
+
+CREATE TEMP TABLE t (s STRING(1)) AS SELECT '\U0001F600' AS s; SELECT s FROM t
+=> "😀"
+
+CREATE TEMP TABLE t (b BYTES(3)) AS SELECT CAST('日本' AS BYTES) AS b; SELECT TO_HEX(b) FROM t
+=> error contains: Field b: BYTES(3) has maximum length 3 but got a value with length 6
+
+# BigQuery rejects an overlong literal default when creating the table.
+CREATE TEMP TABLE t (s STRING(3) DEFAULT 'abcd'); SELECT 1
+=> error contains: Invalid value: Field s: STRING(3) has maximum length 3 but got a value with length 4

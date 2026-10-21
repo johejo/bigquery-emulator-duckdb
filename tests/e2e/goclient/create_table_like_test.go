@@ -61,7 +61,6 @@ func TestCreateTableLike(t *testing.T) {
 		 AS SELECT * FROM filled`,
 		`CREATE TABLE empty LIKE source AS SELECT * FROM source WHERE FALSE`,
 		`CREATE TABLE text_source (s STRING(3) OPTIONS (description = 'short'))`,
-		`CREATE TABLE nested_required (s STRUCT<x INT64 NOT NULL>)`,
 		// IF NOT EXISTS does not evaluate the query or change the existing metadata.
 		`CREATE TABLE IF NOT EXISTS filled LIKE source OPTIONS (description = 'ignored')
 		 AS SELECT ERROR('must not run'), day, amount, tags, point FROM source`,
@@ -192,10 +191,8 @@ func TestCreateTableLike(t *testing.T) {
 	}
 
 	for sql, want := range map[string]string{
-		"CREATE TABLE n LIKE nested_required AS SELECT STRUCT(1 AS x) AS s": "CREATE TABLE LIKE AS SELECT with nested NOT NULL",
-		"CREATE TABLE n LIKE text_source AS SELECT 'abc' AS s":              "CREATE TABLE LIKE AS SELECT with length parameters",
-		"CREATE TABLE n LIKE go_create_table_like.v":                        "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
-		"CREATE TABLE n LIKE go_create_table_like.v AS SELECT id FROM v":    "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
+		"CREATE TABLE n LIKE go_create_table_like.v":                     "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
+		"CREATE TABLE n LIKE go_create_table_like.v AS SELECT id FROM v": "Invalid value: Cannot CREATE TABLE LIKE `go_create_table_like.v`, which is VIEW.",
 		// BigQuery's message for a temporary table like a table that is not temporary.
 		"CREATE TEMP TABLE n LIKE source; SELECT 1":                         "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table.",
 		"CREATE TEMP TABLE n LIKE text_source AS SELECT 'a' AS s; SELECT 1": "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table.",

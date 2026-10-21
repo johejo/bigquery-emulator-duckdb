@@ -15,6 +15,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
+#include "src/schema_sql.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -196,8 +197,10 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
 }  // namespace
 
 std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
-                                        const FieldSchema& field) {
-  return RoundedToEven(ResultValue(value, type, field.name, true), type, field);
+                                        const FieldSchema& field, bool assignment) {
+  const auto rounded = RoundedToEven(ResultValue(value, type, field.name, true), type, field);
+  return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, field, assignment))
+                 : std::nullopt;
 }
 
 std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,
