@@ -267,6 +267,11 @@ Test dependencies are available through `TEST_TOOLS_PATH`, which the test and pr
 Spanner cases are skipped unless `SPANNER_EMULATOR_HOST` and `E2E_SPANNER_DATABASE` name an externally
 started emulator and an empty GoogleSQL database.
 
+Maintainers collect unresolved BigQuery behavior with `just bigquery-answers PROJECT`, or select
+one file with `just bigquery-answers PROJECT PATH`. SQL, REST and BigQuery Storage gRPC cases use
+[the bqanswers formats](tools/bqanswers/README.md). `just bigquery-answers-validate` checks API
+scenarios locally without authentication or requests.
+
 Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.md).
 
 ## License

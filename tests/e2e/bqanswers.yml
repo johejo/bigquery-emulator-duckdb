@@ -1,0 +1,8 @@
+desc: BigQuery answer scenarios run locally without overwriting BigQuery observations
+steps:
+  scenarios:
+    exec:
+      command: go test -count=1 ./tools/bqanswers -run '^TestScenarioFixturesAgainstEmulator$'
+    dump:
+      expr: current.stdout + current.stderr
+    test: current.exit_code == 0
