@@ -224,9 +224,9 @@ allocation limit is 256 MiB per query per thread; see
 
 ### Unsupported forms
 
-Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `OR REPLACE` and
-`IF NOT EXISTS` for temporary UDFs, `SAFE.` UDF calls, UDF options other than a persistent UDF's
-description, the `library` option, and views that call temporary SQL UDFs are unsupported.
+Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `SAFE.` UDF calls,
+UDF options other than a persistent UDF's description, the `library` option, and views that call
+temporary SQL UDFs are unsupported.
 Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do
 not support dry runs, destination tables or positional parameters.
 
