@@ -1,0 +1,74 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: read
+      # Main runs delete the caches they replace.
+      actions: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Restore Cppcheck cache
+        id: cppcheck-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cppcheck
+          key: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-${{ github.sha }}
+          restore-keys: cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
+      - name: Configure Go cache paths
+        run: |
+          echo "GOCACHE=$RUNNER_TEMP/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$HOME/.cache/go-mod" >> "$GITHUB_ENV"
+      # The Test workflow saves the shared Go caches; this job only restores them.
+      - name: Restore Go module cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/go-mod
+          key: go-mod-v2-${{ hashFiles('go.mod', 'go.sum') }}
+      - name: Restore Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.GOCACHE }}
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: go-build-v1-${{ runner.os }}-${{ runner.arch }}-
+      - name: Format check
+        if: success() || failure()
+        run: nix run .#fmt-check
+      - name: Cppcheck
+        if: success() || failure()
+        run: nix run .#cppcheck
+      - name: Go vet
+        if: success() || failure()
+        run: nix run .#go-vet
+      - name: Go staticcheck
+        if: success() || failure()
+        run: nix run .#go-staticcheck
+
+      - name: Save Cppcheck cache
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          steps.cppcheck-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cppcheck
+          key: ${{ steps.cppcheck-cache.outputs.cache-primary-key }}
+      - name: Prune older caches
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          .github/scripts/prune-caches.sh '${{ steps.cppcheck-cache.outputs.cache-primary-key }}'
+          'cppcheck-v1-${{ runner.os }}-${{ runner.arch }}-'
