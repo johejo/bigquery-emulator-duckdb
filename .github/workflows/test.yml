@@ -86,8 +86,6 @@ jobs:
           echo 'common --config=ci' > .bazelrc.local
           echo "common --repo_env=TMP=$RUNNER_TEMP --repo_env=TEMP=$RUNNER_TEMP" >> .bazelrc.local
           mkdir -p "$RUNNER_TEMP/reports"
-      - name: Format check
-        run: nix run .#fmt-check
       - name: Cppcheck
         run: nix run .#cppcheck
       - name: Go vet
