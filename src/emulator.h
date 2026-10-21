@@ -26,6 +26,7 @@
 #include "src/query_parameters.h"
 #include "src/references.h"
 #include "src/routine.h"
+#include "src/storage_snapshot.h"
 #include "src/system_variables.h"
 #include "src/table_metadata.h"
 
@@ -257,9 +258,12 @@ class Emulator {
   Routine WriteRoutine(Routine routine, bool update);
   void DeleteRoutine(RoutineReference routine);
   QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
-  // Materializes a Storage Read snapshot, without creating a query job. The restriction is
-  // parsed as one GoogleSQL expression before it is included in the SELECT.
-  QueryResult ReadStorageTable(TableReference table, const std::string& restriction);
+  // Materializes a Storage Read snapshot of the selected fields, or all of them, without
+  // creating a query job. The restriction is parsed as one GoogleSQL expression before it is
+  // included in the SELECT.
+  std::shared_ptr<const StorageSnapshot> ReadStorageTable(
+      TableReference table, const std::vector<std::string>& selected_fields,
+      const std::string& restriction);
   // Validates and inserts the whole Storage Write batch in one transaction. With validate_only,
   // rolls it back, for pending/buffered appends. Checks the schema in that same transaction.
   std::vector<InsertError> WriteStorageRows(TableReference table,

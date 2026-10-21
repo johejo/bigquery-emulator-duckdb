@@ -31,7 +31,9 @@
 #include "src/interval.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
+#include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
+#include "src/vector_cell.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -509,8 +511,6 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   }
 }
 
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays);
-
 // A RANGE as BigQuery writes it, "[start, end)", with each bound as its own cell would be, or
 // UNBOUNDED for an infinite or NULL one.
 std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
@@ -529,6 +529,8 @@ std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row)
   }
   return text + ")";
 }
+
+}  // namespace
 
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
@@ -638,6 +640,8 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
   return json{{"v", std::move(value)}};
 }
 
+namespace {
+
 // Statements that produce a result set. Everything else (DDL, DML, SET, ...) yields a
 // single "Count" or "Success" column that is not part of the BigQuery result.
 bool ProducesResultSet(duckdb_statement_type type) {
@@ -716,6 +720,38 @@ void Query(duckdb_connection connection, const std::string& sql, Result& result)
 void Query(duckdb_connection connection, const std::string& sql) {
   Result result;
   Query(connection, sql, result);
+}
+
+QueryResult Materialize(Result& result, bool null_arrays) {
+  const auto statement_type = duckdb_result_statement_type(result.result);
+  QueryResult query_result;
+  if (!ProducesResultSet(statement_type)) {
+    if (IsDml(statement_type)) {
+      query_result.affected_rows = static_cast<int64_t>(duckdb_rows_changed(&result.result));
+    }
+    return query_result;
+  }
+  query_result.has_rows = true;
+  for (idx_t i = 0; i < duckdb_column_count(&result.result); ++i) {
+    LogicalType const type(duckdb_column_logical_type(&result.result, i));
+    query_result.schema.push_back(ToFieldSchema(duckdb_column_name(&result.result, i), type.get()));
+  }
+  while (true) {
+    Chunk const chunk(duckdb_fetch_chunk(result.result));
+    if (chunk.get() == nullptr) {
+      break;
+    }
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(chunk.get()); ++row) {
+      json cells = json::array();
+      for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(chunk.get()); ++column) {
+        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), column);
+        LogicalType const type(duckdb_vector_get_column_type(vector));
+        cells.push_back(ToCell(vector, type.get(), row, null_arrays));
+      }
+      query_result.rows.push_back(json{{"f", std::move(cells)}});
+    }
+  }
+  return query_result;
 }
 
 // BigQuery evaluates timestamps in UTC; setup must run on the same connection.
@@ -839,35 +875,17 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   }
   Result result;
   Query(connection, statements.back(), result);
-  const auto statement_type = duckdb_result_statement_type(result.result);
-  QueryResult query_result;
-  if (!ProducesResultSet(statement_type)) {
-    if (IsDml(statement_type)) {
-      query_result.affected_rows = static_cast<int64_t>(duckdb_rows_changed(&result.result));
-    }
-    return query_result;
-  }
-  query_result.has_rows = true;
-  for (idx_t i = 0; i < duckdb_column_count(&result.result); ++i) {
-    LogicalType const type(duckdb_column_logical_type(&result.result, i));
-    query_result.schema.push_back(ToFieldSchema(duckdb_column_name(&result.result, i), type.get()));
-  }
-  while (true) {
-    Chunk const chunk(duckdb_fetch_chunk(result.result));
-    if (chunk.get() == nullptr) {
-      break;
-    }
-    for (idx_t row = 0; row < duckdb_data_chunk_get_size(chunk.get()); ++row) {
-      json cells = json::array();
-      for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(chunk.get()); ++column) {
-        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), column);
-        LogicalType const type(duckdb_vector_get_column_type(vector));
-        cells.push_back(ToCell(vector, type.get(), row, null_arrays));
-      }
-      query_result.rows.push_back(json{{"f", std::move(cells)}});
-    }
-  }
-  return query_result;
+  return Materialize(result, null_arrays);
+}
+
+std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(
+    const std::string& sql, std::vector<FieldSchema> schema) {
+  const auto session = std::shared_ptr<Backend>(NewSession());
+  auto* connection = session->session_->connection.get();
+  RunSetup(connection, {});
+  Result result;
+  Query(connection, sql, result);
+  return std::make_shared<const StorageSnapshot>(result.result, std::move(schema), session);
 }
 
 void Backend::ExecuteDdl(const std::string& sql,

@@ -1,0 +1,31 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include "nlohmann/json_fwd.hpp"
+#include "src/field_schema.h"
+
+struct ArrowArray;
+struct ArrowSchema;
+
+namespace bigquery_emulator_duckdb {
+
+// Storage Read wire encoders. Cells use QueryResult's {v: ...}/{f: ...} representation.
+
+// The Avro schema JSON, or the encapsulated Arrow IPC schema message, of `schema`.
+std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow);
+
+// Initializes `out` as the record batch type of `schema`: a non-nullable struct of its fields,
+// each of the Arrow type Storage Read gives it.
+void StorageArrowSchema(ArrowSchema* out, const std::vector<FieldSchema>& schema);
+
+// Appends a cell's value to an array building the type StorageArrowSchema gives `field`.
+void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const nlohmann::json& value);
+// Appends the Avro binary encoding of a cell's value.
+void AppendAvroCell(std::string& out, const FieldSchema& field, const nlohmann::json& value);
+
+// One encapsulated IPC record batch message of `array`, a struct array of the type `root`.
+std::string EncodeArrowRecordBatch(const ArrowSchema& root, const ArrowArray& array);
+
+}  // namespace bigquery_emulator_duckdb

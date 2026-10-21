@@ -649,11 +649,41 @@ cc_library(
 )
 
 cc_library(
-    name = "backend",
-    srcs = ["src/backend.cc"],
-    hdrs = ["src/backend.h"],
+    name = "storage_read_codec",
+    srcs = ["src/storage_read_codec.cc"],
+    hdrs = ["src/storage_read_codec.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":api_error",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:civil_time",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@nanoarrow",
+        "@nlohmann_json//:json",
+    ],
+    deps = [
+        ":field_schema",
+        "@nlohmann_json//:json",
+    ],
+)
+
+cc_library(
+    name = "backend",
+    srcs = [
+        "src/backend.cc",
+        "src/storage_snapshot.cc",
+        "src/vector_cell.h",
+    ],
+    hdrs = [
+        "src/backend.h",
+        "src/storage_snapshot.h",
+    ],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
         ":backend_error",
         ":backend_functions",
         ":bignumeric",
@@ -662,9 +692,12 @@ cc_library(
         ":interval",
         ":mysql_query",
         ":postgres_scanner",
+        ":storage_read_codec",
         ":type_mapping",
         "//third_party/duckdb",
         "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/types:timestamp_util",
+        "@nanoarrow",
     ],
     deps = [
         ":field_schema",

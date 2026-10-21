@@ -9,7 +9,6 @@
 #include <memory>
 #include <mutex>
 #include <random>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -31,13 +30,13 @@
 #include "grpcpp/support/sync_stream.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
-#include "src/backend.h"
-#include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
 #include "src/server/storage_codec.h"
+#include "src/storage_read_codec.h"
+#include "src/storage_snapshot.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -144,86 +143,8 @@ std::string NewId() {
   return result;
 }
 
-// Field projections retain the table's field order, including inside repeated STRUCTs.
-struct Projection {
-  FieldSchema field;
-  size_t index = 0;
-  std::vector<Projection> children;
-};
-
-std::vector<Projection> Select(const std::vector<FieldSchema>& schema,
-                               const std::vector<std::string>& paths) {
-  std::vector<Projection> result;
-  std::vector<bool> matched(paths.size(), false);
-  for (size_t i = 0; i < schema.size(); ++i) {
-    bool whole = paths.empty();
-    std::vector<std::string> children;
-    for (size_t j = 0; j < paths.size(); ++j) {
-      const auto dot = paths.at(j).find('.');
-      if (ToLowerAscii(paths.at(j).substr(0, dot)) == ToLowerAscii(schema.at(i).name)) {
-        matched.at(j) = true;
-        if (dot == std::string::npos) {
-          whole = true;
-        } else {
-          children.push_back(paths.at(j).substr(dot + 1));
-        }
-      }
-    }
-    if (!whole && children.empty()) {
-      continue;
-    }
-    Projection projection{.field = schema.at(i), .index = i, .children = {}};
-    if (!children.empty() && schema.at(i).type != FieldType::kRecord) {
-      Fail(grpc::StatusCode::INVALID_ARGUMENT,
-           "Cannot select a nested field of " + schema.at(i).name);
-    }
-    if (schema.at(i).type == FieldType::kRecord) {
-      if (whole && !children.empty()) {
-        (void)Select(schema.at(i).fields, children);
-      }
-      projection.children =
-          Select(schema.at(i).fields, whole ? std::vector<std::string>{} : children);
-      projection.field.fields.clear();
-      for (const auto& child : projection.children) {
-        projection.field.fields.push_back(child.field);
-      }
-    }
-    result.push_back(std::move(projection));
-  }
-  for (size_t j = 0; j < paths.size(); ++j) {
-    if (!matched.at(j)) {
-      Fail(grpc::StatusCode::INVALID_ARGUMENT, "Unknown selected field: " + paths.at(j));
-    }
-  }
-  return result;
-}
-
-json ProjectRecord(const json& value, const std::vector<Projection>& fields);
-
-json ProjectCell(const json& cell, const Projection& field) {
-  if (field.field.type != FieldType::kRecord || cell.at("v").is_null()) {
-    return cell;
-  }
-  if (field.field.mode == FieldMode::kRepeated) {
-    json result = json::array();
-    for (const auto& item : cell.at("v")) {
-      result.push_back({{"v", ProjectRecord(item.at("v"), field.children)}});
-    }
-    return {{"v", std::move(result)}};
-  }
-  return {{"v", ProjectRecord(cell.at("v"), field.children)}};
-}
-
-json ProjectRecord(const json& value, const std::vector<Projection>& fields) {
-  json cells = json::array();
-  for (const auto& field : fields) {
-    cells.push_back(ProjectCell(value.at("f").at(field.index), field));
-  }
-  return {{"f", std::move(cells)}};
-}
-
 struct Snapshot {
-  QueryResult data;
+  std::shared_ptr<const StorageSnapshot> rows;
   std::string schema;
   bool arrow = false;
   Clock::time_point expiry;
@@ -284,19 +205,11 @@ class ReadService final : public pb::BigQueryRead::Service {
       }
       const auto table = ParseTable(emulator_, session.table());
       const auto snapshot = std::make_shared<Snapshot>();
-      snapshot->data = emulator_.ReadStorageTable(table, options.row_restriction());
-      const auto projection = Select(snapshot->data.schema, {options.selected_fields().begin(),
-                                                             options.selected_fields().end()});
-      if (!options.selected_fields().empty()) {
-        snapshot->data.schema.clear();
-        for (const auto& field : projection) {
-          snapshot->data.schema.push_back(field.field);
-        }
-        std::ranges::transform(snapshot->data.rows, snapshot->data.rows.begin(),
-                               [&](const auto& row) { return ProjectRecord(row, projection); });
-      }
+      snapshot->rows = emulator_.ReadStorageTable(
+          table, {options.selected_fields().begin(), options.selected_fields().end()},
+          options.row_restriction());
       snapshot->arrow = session.data_format() == pb::ARROW;
-      snapshot->schema = StorageReadSchema(snapshot->data.schema, snapshot->arrow);
+      snapshot->schema = StorageReadSchema(snapshot->rows->schema(), snapshot->arrow);
       snapshot->expiry = Clock::now() + std::chrono::hours(6);
       const std::string location = emulator_
                                        .GetDataset(DatasetReference{
@@ -310,14 +223,14 @@ class ReadService final : public pb::BigQueryRead::Service {
       *response->mutable_read_options() = options;
       response->set_trace_id(session.trace_id());
       Timestamp(response->mutable_expire_time(), snapshot->expiry);
-      response->set_estimated_row_count(static_cast<int64_t>(snapshot->data.rows.size()));
+      response->set_estimated_row_count(static_cast<int64_t>(snapshot->rows->row_count()));
       if (snapshot->arrow) {
         response->mutable_arrow_schema()->set_serialized_schema(snapshot->schema);
       } else {
         response->mutable_avro_schema()->set_schema(snapshot->schema);
       }
       const size_t count = std::min<size_t>(std::max(1, request->max_stream_count()),
-                                            std::max<size_t>(1, snapshot->data.rows.size()));
+                                            std::max<size_t>(1, snapshot->rows->row_count()));
       std::scoped_lock const lock(mutex_);
       std::erase_if(streams_, [](const auto& stream) {
         return stream.second.snapshot->expiry <= Clock::now();
@@ -327,8 +240,8 @@ class ReadService final : public pb::BigQueryRead::Service {
         response->add_streams()->set_name(name);
         streams_.emplace(name, ReadStream{
                                    .snapshot = snapshot,
-                                   .begin = snapshot->data.rows.size() * i / count,
-                                   .end = snapshot->data.rows.size() * (i + 1) / count,
+                                   .begin = snapshot->rows->row_count() * i / count,
+                                   .end = snapshot->rows->row_count() * (i + 1) / count,
                                });
       }
     });
@@ -359,10 +272,7 @@ class ReadService final : public pb::BigQueryRead::Service {
         size_t count = std::min<size_t>(1024, stream.end - position);
         std::string bytes;
         while (true) {
-          bytes = StorageReadRows(
-              stream.snapshot->data.schema,
-              std::span<const json>(stream.snapshot->data.rows).subspan(position, count),
-              stream.snapshot->arrow);
+          bytes = stream.snapshot->rows->ReadRows(position, count, stream.snapshot->arrow);
           if (bytes.size() <= size_t{4} * 1024 * 1024 || count <= 1) {
             break;
           }

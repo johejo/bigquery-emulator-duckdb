@@ -12,6 +12,7 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
 #include "src/field_schema.h"
+#include "src/storage_snapshot.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -64,6 +65,11 @@ class Backend {
   // it as null for the emulator's own use of the value.
   QueryResult Execute(const std::string& sql, const std::vector<std::string>& setup = {},
                       bool null_arrays = false);
+
+  // Runs `sql` on a session of its own and keeps its result, whose columns are the fields of
+  // `schema`, as a Storage Read snapshot. The session lives as long as the snapshot.
+  std::shared_ptr<const StorageSnapshot> ExecuteStorageRead(const std::string& sql,
+                                                            std::vector<FieldSchema> schema);
 
   // Runs `statements` in order on one connection and materializes the result of the last one.
   // Statements before the last may open a transaction. Outside a session, a failure rolls it
