@@ -73,3 +73,8 @@ CREATE OR REPLACE VIEW errors_dataset_system_variables.project_id AS SELECT @@pr
 
 CREATE OR REPLACE FUNCTION errors_dataset_system_variables.project_id() AS (@@project_id)
 => error contains: Invalid reference to system variable @@project_id
+
+# BigQuery parses a query as a script and reports where the script stops parsing, as its answer
+# shows: AT is reserved, also for a variable.
+DECLARE at TIMESTAMP; SELECT 1
+=> error contains: Syntax error: Unexpected keyword AT

@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -167,14 +168,16 @@ std::vector<FieldSchema> UniqueResultNames(std::vector<FieldSchema> schema) {
   return schema;
 }
 
-// The script that `query` is, or null when it is a single statement or does not parse, which
-// RunQuery then reports as it does for a single statement.
+// The script that `query` is, or null when it is a single statement. BigQuery parses every query as
+// a script, so a query that does not parse as one fails with the script parser's error, as the
+// analyzer reports a statement's, rather than with the error of a single statement it is not.
 std::unique_ptr<googlesql::ParserOutput> ParseScript(const std::string& query) {
   std::unique_ptr<googlesql::ParserOutput> output;
-  if (!googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
-                              {.mode = googlesql::ERROR_MESSAGE_ONE_LINE}, &output)
-           .ok()) {
-    return nullptr;
+  if (const absl::Status status =
+          googlesql::ParseScript(query, googlesql::ParserOptions(GoogleSqlLanguageOptions()),
+                                 {.mode = googlesql::ERROR_MESSAGE_MULTI_LINE_WITH_CARET}, &output);
+      !status.ok()) {
+    throw std::runtime_error(status.ToString());
   }
   // A TEMP function needs a job-local catalog even when it is the only statement, and EXECUTE
   // IMMEDIATE, which GoogleSQL parses as a SQL statement, runs as a script.
