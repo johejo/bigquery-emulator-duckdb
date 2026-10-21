@@ -805,6 +805,17 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_COVEREDBY", {{.arity = 2, .spelling = "bq_st_covers($2, $1)"}}},
       {"ST_CONTAINS", call("bq_st_contains", 2)},
       {"ST_WITHIN", {{.arity = 2, .spelling = "bq_st_contains($2, $1)"}}},
+      {
+          "ST_UNION",
+          {
+              {.arity = 2, .spelling = "bq_st_union($1, $2)"},
+              {
+                  .arity = 1,
+                  .spelling =
+                      "bq_st_union_array(list_filter($1, geography -> geography IS NOT NULL))",
+              },
+          },
+      },
       {"ST_X", call("bq_st_x", 1)},
       {"ST_Y", call("bq_st_y", 1)},
       {"ST_GEOMETRYTYPE", call("bq_st_geometrytype", 1)},

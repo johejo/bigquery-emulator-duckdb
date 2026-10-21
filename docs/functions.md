@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 37 | 3 | 31 | 0 |
+| [Geography functions](#geography-functions) | 39 | 2 | 30 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -280,7 +280,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | Unsupported |  |  |
 | [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Unsupported |  |  |
 | [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Supported | S2 function |  |
-| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Partial | S2 function | Unsupported: ST_MAKEPOLYGON of an empty GEOGRAPHY, which makes the full polygon. |
+| [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Supported | S2 function |  |
 | [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Unsupported |  |  |
 | [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | Supported | S2 function |  |
 | [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | Supported | S2 function |  |
@@ -293,7 +293,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_SNAPTOGRID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_snaptogrid) | Unsupported |  |  |
 | [`ST_STARTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_startpoint) | Supported | S2 function |  |
 | [`ST_TOUCHES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_touches) | Supported | S2 function |  |
-| [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | Unsupported |  |  |
+| [`ST_UNION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union) | Supported | S2 function |  |
 | [`ST_UNION_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_union_agg) | Unsupported |  |  |
 | [`ST_WITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_within) | Supported | S2 function |  |
 | [`ST_X`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_x) | Supported | S2 function |  |

@@ -13,6 +13,10 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// BigQuery's WKT for the full polygon, as checked in scalars/geography_full.txt.
+const fullGeographyWkt = "GEOMETRYCOLLECTION(POLYGON((0 0, 120 0, -120 0, 0 0)), " +
+	"POLYGON((0 0, -120 0, 120 0, 0 0)))"
+
 // A table with GEOGRAPHY columns, also REPEATED and in a RECORD, takes WKT from
 // tabledata.insertAll and loads, and GEOGRAPHY values from queries and DML. tabledata.list
 // returns each as WKT, and queries read the columns as GEOGRAPHY. The WKT and coordinates are
@@ -116,5 +120,31 @@ func TestGeographyColumns(t *testing.T) {
 	if got, want := p.read("SELECT ST_AREA(g) < 1e11 FROM places WHERE id = 7"),
 		[][]bigquery.Value{{true}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("polygon query = %v, want %v", got, want)
+	}
+
+	// BigQuery writes the full polygon as these two hemispheres; both that WKT and FULLGLOBE
+	// must retain the full region through ingestion, storage and query destinations.
+	if err := inserter.Put(ctx, []*bigquery.ValuesSaver{
+		row(int64(9), "fullglobe", []bigquery.Value{fullGeographyWkt}, []bigquery.Value{"fullglobe"}),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.load("places", `{"id": 10, "g": "`+fullGeographyWkt+`"}`+"\n", schema,
+		bigquery.WriteAppend); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.query("SELECT 11 AS id, ST_GEOGFROMTEXT('fullglobe') AS g",
+		"places", bigquery.WriteAppend); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := p.read(`SELECT id, ST_ISCLOSED(g), ST_CONTAINS(g, ST_GEOGPOINT(0, -90))
+		FROM places WHERE id >= 9 ORDER BY id`), [][]bigquery.Value{
+		{int64(9), true, true}, {int64(10), true, true}, {int64(11), true, true},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stored full polygons = %v, want %v", got, want)
+	}
+	if got, want := p.read(`SELECT ST_ISCLOSED(gs[OFFSET(0)]), ST_ISCLOSED(r.g)
+		FROM places WHERE id = 9`), [][]bigquery.Value{{true, true}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("nested full polygons = %v, want %v", got, want)
 	}
 }

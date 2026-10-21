@@ -288,6 +288,7 @@ void AddLayers(S2Builder& builder, const Geography& geography, Snapped& output) 
   if (!geography.polygons.empty()) {
     builder.StartLayer(std::make_unique<s2builderutil::LaxPolygonLayer>(output.polygon.get()));
     builder.AddPolygon(*ToS2Polygon(geography));
+    builder.AddIsFullPolygonPredicate(S2Builder::IsFullPolygon(geography.Full()));
   }
 }
 
@@ -440,6 +441,9 @@ std::string GeometryType(const Geography& geography) {
 
 // A polygon's rings count their first vertex twice, as WKT writes them.
 int64_t NumPoints(const Geography& geography) {
+  if (geography.Full()) {
+    return 0;
+  }
   const auto lines = std::accumulate(
       geography.lines.begin(), geography.lines.end(), geography.points.size(),
       [](size_t count, const std::vector<S2Point>& line) { return count + line.size(); });
@@ -453,8 +457,11 @@ int64_t NumPoints(const Geography& geography) {
 }
 
 // A nonempty geography whose parts are all closed: a point is closed, and a linestring where it
-// ends where it starts. Only the full polygon, which the emulator does not hold, is closed.
+// ends where it starts. Only the full polygon is closed.
 bool IsClosed(const Geography& geography) {
+  if (geography.Full()) {
+    return true;
+  }
   return !geography.Empty() && geography.polygons.empty() &&
          std::ranges::all_of(geography.lines, [](const std::vector<S2Point>& line) {
            return Same(line.front(), line.back());
@@ -492,6 +499,10 @@ absl::StatusOr<double> Measure(const Arguments& args) {
 // near the geodesic ones, which the emulator does not.
 absl::StatusOr<std::string> AsGeoJson(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Full()) {
+    return "{ \"type\": \"Polygon\", \"coordinates\": [ [ [180, 90], [-180, 90], [-180, -90], "
+           "[180, -90], [180, 90] ] ] } ";
+  }
   if (geography.Empty()) {
     return std::string(R"({ "type": "GeometryCollection", "geometries": [ ] } )");
   }
@@ -522,6 +533,22 @@ absl::StatusOr<std::string> PointN(const Arguments& args) {
                                  ".");
   }
   return GeographyText(PointGeography(line.at(index > 0 ? index - 1 : size + index)));
+}
+
+// ST_UNION, with NULL array elements already removed by the translator.
+absl::StatusOr<std::optional<std::string>> UnionGeographies(
+    const std::vector<std::string>& geographies) {
+  if (geographies.empty()) {
+    return std::nullopt;
+  }
+  std::vector<Geography> parts;
+  parts.reserve(geographies.size());
+  for (const std::string& text : geographies) {
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, ParseGeography(text));
+    parts.push_back(std::move(geography));
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, Combine(parts));
+  return GeographyText(geography);
 }
 
 // The line through the vertices of `geographies`, each a single point or linestring, built as
@@ -559,9 +586,8 @@ absl::StatusOr<std::string> MakePolygon(const std::vector<std::string>& geograph
   for (const std::string& text : geographies) {
     GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(text));
     if (geography.Empty()) {
-      return absl::UnimplementedError(
-          "The emulator does not support ST_MAKEPOLYGON of an empty GEOGRAPHY, which makes the "
-          "full polygon");
+      rings.emplace_back();
+      continue;
     }
     if (geography.Count() != 1 || geography.lines.empty()) {
       return absl::OutOfRangeError(
@@ -596,6 +622,9 @@ absl::StatusOr<std::vector<std::string>> Rings(const Arguments& args, std::strin
         " must have exactly 1 polygon; argument either had no polygons or more than one.");
   }
   const Polygon& polygon = geography.polygons.front();
+  if (geography.Full()) {
+    return std::vector<std::string>{GeographyText(Geography{})};
+  }
   std::vector<std::string> rings(polygon.size());
   std::ranges::transform(polygon, rings.begin(), Ring);
   return rings;
@@ -762,9 +791,15 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(
       connection, "bq_st_makeline", {kVarchar, kVarchar}, kVarchar,
       EachRow<[](const Arguments& args) { return MakeLine({args.String(0), args.String(1)}); }>);
+  Register(connection, "bq_st_union", {kVarchar, kVarchar}, kVarchar,
+           EachRow<[](const Arguments& args) {
+             return UnionGeographies({args.String(0), args.String(1)});
+           }>);
   {
     const LogicalType varchar(duckdb_create_logical_type(kVarchar));
     const LogicalType list(duckdb_create_list_type(varchar.get()));
+    Register(connection, "bq_st_union_array", {list.get()}, varchar.get(),
+             EachRow<[](const Arguments& args) { return UnionGeographies(args.Strings(0)); }>);
     Register(connection, "bq_st_makeline_array", {list.get()}, varchar.get(),
              EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
     Register(connection, "bq_st_makepolygon_holes",

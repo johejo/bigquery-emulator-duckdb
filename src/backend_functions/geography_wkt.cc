@@ -158,7 +158,7 @@ absl::StatusOr<std::vector<Point>> ReadVertices(WktReader& reader, std::string_v
 
 // A point, a linestring or a polygon as WKT gives it, before it is built.
 struct Part {
-  enum class Type : uint8_t { kPoint, kLineString, kPolygon };
+  enum class Type : uint8_t { kPoint, kLineString, kPolygon, kFull };
   Type type;
   // A polygon's rings, or the vertices of a point or a linestring.
   std::vector<std::vector<Point>> rings;
@@ -212,6 +212,10 @@ absl::Status ReadLine(WktReader& reader, std::vector<Part>& parts) {
 // Reads a geometry of any type, adding its points, linestrings and polygons to `parts`. A
 // MULTIPOINT's points may be in parentheses or not.
 absl::Status ReadGeometry(WktReader& reader, std::vector<Part>& parts) {
+  if (reader.Word("FULLGLOBE")) {
+    parts.push_back({.type = Part::Type::kFull, .rings = {}});
+    return absl::OkStatus();
+  }
   if (reader.Word("POINT")) {
     if (reader.Word("EMPTY")) {
       return absl::OkStatus();
@@ -274,6 +278,8 @@ absl::StatusOr<Geography> Build(const Part& part, bool oriented) {
     std::ranges::transform(ring, vertices.begin(), ToS2Point);
   }
   switch (part.type) {
+    case Part::Type::kFull:
+      return FullGeography();
     case Part::Type::kPoint:
       return PointGeography(loops.front().front());
     case Part::Type::kLineString: {

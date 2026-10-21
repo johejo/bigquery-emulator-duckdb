@@ -26,8 +26,9 @@ struct Point {
 };
 
 // A polygon's loops, its shell and then its holes, each as S2Polygon holds it: counterclockwise
-// without repeating its first vertex, so that the shell encloses at most half the sphere and a
-// hole is the region it removes.
+// without repeating its first vertex. A shell can enclose more than half the sphere; a hole is
+// the region it removes. The full polygon has S2Loop::kFull() as its only ring, a single
+// sentinel vertex that is not part of its boundary.
 using Polygon = std::vector<std::vector<S2Point>>;
 
 // A geography as BigQuery holds it, the union of its points, linestrings of two or more vertices
@@ -41,9 +42,14 @@ struct Geography {
   [[nodiscard]] bool Empty() const { return points.empty() && lines.empty() && polygons.empty(); }
   // The number of points, linestrings and polygons.
   [[nodiscard]] size_t Count() const { return points.size() + lines.size() + polygons.size(); }
+  [[nodiscard]] bool Full() const {
+    return polygons.size() == 1 && polygons.front().size() == 1 &&
+           polygons.front().front().size() == 1;
+  }
 };
 
 Geography PointGeography(const S2Point& point);
+Geography FullGeography();
 
 // The shortest digits that round-trip, or with `precision` 15 significant digits, as printf's
 // %.15g writes them and BigQuery writes 0.1 + 0.2 as 0.3 and 0.0000001 as 1e-07. BigQuery writes
@@ -104,7 +110,8 @@ absl::StatusOr<Geography> BuildLine(const std::vector<S2Point>& vertices);
 // of each other snap to the one S2Builder keeps: a hole that collapses is dropped, and a shell
 // without holes that collapses is the linestring or the point it leaves. BigQuery also snaps edges,
 // and rings where they cross or touch at an edge, which is unsupported, as is a shell with holes
-// that collapses.
+// that collapses. An empty first ring denotes a full shell; its holes must be disjoint and
+// unnested. Other empty rings are invalid.
 absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& input,
                                        std::string_view failed);
 
