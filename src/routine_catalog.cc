@@ -19,6 +19,7 @@
 #include "googlesql/parser/parser.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/parse_resume_location.h"
+#include "googlesql/public/procedure.h"
 #include "googlesql/public/simple_catalog.h"
 #include "googlesql/public/sql_function.h"
 #include "googlesql/public/sql_tvf.h"
@@ -29,6 +30,7 @@
 #include "src/catalog.h"
 #include "src/catalog_table.h"
 #include "src/language_options.h"
+#include "src/procedure_validation.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/table_path.h"
@@ -50,6 +52,7 @@ struct RoutineCatalog::State {
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::Function>> functions;
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::Table>> views;
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::TableValuedFunction>> tvfs;
+  std::map<std::vector<std::string>, std::unique_ptr<googlesql::Procedure>> procedures;
   std::set<std::vector<std::string>> resolving;
 };
 
@@ -104,11 +107,34 @@ absl::Status RoutineCatalog::FindFunction(const absl::Span<const std::string>& p
   return absl::OkStatus();
 }
 
+absl::Status RoutineCatalog::FindProcedure(const absl::Span<const std::string>& path,
+                                           const googlesql::Procedure** procedure,
+                                           const FindOptions& /*options*/) {
+  const auto key = NormalizeTablePath(SplitTablePath(path), default_project(), "", &source());
+  if (key.size() != 3) {
+    return absl::NotFoundError("Procedure name must include a dataset");
+  }
+  if (const auto found = state_->procedures.find(key); found != state_->procedures.end()) {
+    *procedure = found->second.get();
+    return absl::OkStatus();
+  }
+  const auto routine = source().FindRoutine(
+      {.project_id = key.at(0), .dataset_id = key.at(1), .routine_id = key.at(2)});
+  if (!routine || routine->resource.at("routineType") != "PROCEDURE") {
+    return absl::NotFoundError("Procedure is not found");
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const auto analyzed,
+                             AnalyzeDefinition(RoutineStatement(*routine), key, key.at(0), ""));
+  const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateProcedureStmt>();
+  auto resolved = std::make_unique<googlesql::Procedure>(key, create.signature());
+  *procedure = resolved.get();
+  state_->procedures.emplace(key, std::move(resolved));
+  return absl::OkStatus();
+}
+
 absl::Status RoutineCatalog::CheckRoutine(const Routine& routine) {
   if (routine.resource.at("routineType") == "PROCEDURE") {
-    // CREATE PROCEDURE resolves the signature and checks the body's syntax. Strict mode,
-    // which would also resolve its statements, is rejected by the translator. BigQuery rejects
-    // query parameters in the body even without strict mode.
+    // BigQuery rejects query parameters in the body even without strict mode.
     std::unique_ptr<googlesql::ParserOutput> parsed;
     GOOGLESQL_RETURN_IF_ERROR(
         googlesql::ParseScript(routine.resource.at("definitionBody").get<std::string>(),
@@ -131,6 +157,10 @@ absl::Status RoutineCatalog::CheckRoutine(const Routine& routine) {
       for (int i = 0; i < node->num_children(); ++i) {
         nodes.push_back(node->child(i));
       }
+    }
+    if (routine.resource.value("strictMode", true)) {
+      RoutineCatalog catalog(source(), type_factory(), routine.reference.project_id, "");
+      return CheckProcedure(routine, *parsed->script(), catalog, *type_factory());
     }
     return absl::OkStatus();
   }

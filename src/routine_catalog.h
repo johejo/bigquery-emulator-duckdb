@@ -49,6 +49,11 @@ class RoutineCatalog : public BigQueryCatalog {
                                        const googlesql::TableValuedFunction** function,
                                        const FindOptions& options) override;
 
+  using BigQueryCatalog::FindProcedure;
+  absl::Status FindProcedure(const absl::Span<const std::string>& path,
+                             const googlesql::Procedure** procedure,
+                             const FindOptions& options) override;
+
   // Resolves the body of `routine` as a call would, which checks a routine about to be created.
   absl::Status CheckRoutine(const Routine& routine);
   // Checks the stored query in its own context, including cycles through views or routines.

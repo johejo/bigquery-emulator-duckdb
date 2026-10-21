@@ -25,7 +25,12 @@ of DuckDB execution. The main entry points are:
 
 For scripts, GoogleSQL's `ScriptExecutor` manages control flow and variables.
 [script.cc](../src/script.cc) analyzes and executes each statement through `ScriptHost`, which
-isolates it from emulator internals.
+isolates it from emulator internals. Strict procedure definitions use
+[procedure_validation.cc](../src/procedure_validation.cc) to analyze statements and expressions
+with typed variables and their constant values, without executing SQL statements. Validation
+stops at control statements, DDL, CALL and dynamic SQL, following BigQuery. Constant dynamic SQL
+is evaluated by GoogleSQL and checked for syntax. Its routine catalog resolves references in
+the procedure's own project, without job-local tables or functions.
 
 ## Translator
 

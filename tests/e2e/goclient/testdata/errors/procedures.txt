@@ -1,13 +1,5 @@
 # Explicitly unsupported procedure forms must fail without side effects.
 CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_strict() BEGIN SELECT 1; END
-=> error contains: The emulator does not support
-
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
-CREATE OR REPLACE PROCEDURE errors_procedures.proc_strict_true() OPTIONS(strict_mode=TRUE) BEGIN SELECT 1; END
-=> error contains: The emulator does not support
-
-CREATE SCHEMA IF NOT EXISTS errors_procedures;
 CREATE OR REPLACE PROCEDURE errors_procedures.proc_system() OPTIONS(strict_mode=FALSE) BEGIN SET @@time_zone = 'Asia/Tokyo'; END;
 BEGIN CALL errors_procedures.proc_system(); EXCEPTION WHEN ERROR THEN SELECT 1; END
 => error contains: The emulator does not support

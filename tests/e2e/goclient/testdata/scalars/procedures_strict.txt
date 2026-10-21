@@ -1,0 +1,312 @@
+# strict_mode defaults to TRUE and validates names and types at creation, without executing.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_procedure
+CREATE OR REPLACE PROCEDURE scalars.strict_default(x INT64)
+BEGIN SELECT x + 1; END;
+CALL scalars.strict_default(41)
+=> "42"
+
+DECLARE x INT64 DEFAULT 41;
+DECLARE y INT64;
+CREATE OR REPLACE PROCEDURE scalars.strict_true(INOUT x INT64, OUT y INT64)
+OPTIONS(strict_mode=TRUE) BEGIN SET y = x; SET x = x + 1; END;
+CALL scalars.strict_true(x, y);
+SELECT x + y
+=> "83"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_local(x INT64)
+BEGIN
+  DECLARE y DEFAULT x + 1;
+  BEGIN DECLARE z INT64 DEFAULT y; SET y = z + 1; END;
+  SELECT y;
+END;
+CALL scalars.strict_local(40)
+=> "42"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_if(x INT64)
+BEGIN
+  IF x < 0 THEN SELECT 1;
+  ELSEIF x = 0 THEN SELECT 2;
+  ELSE SELECT 3;
+  END IF;
+END;
+CALL scalars.strict_if(0)
+=> "2"
+
+DECLARE x INT64;
+CREATE OR REPLACE PROCEDURE scalars.strict_loop(OUT x INT64)
+BEGIN
+  SET x = 0;
+  WHILE x < 2 DO SET x = x + 1; END WHILE;
+  REPEAT SET x = x + 1; UNTIL x = 3 END REPEAT;
+END;
+CALL scalars.strict_loop(x);
+SELECT x
+=> "3"
+
+DECLARE x INT64; DECLARE y STRING;
+CREATE OR REPLACE PROCEDURE scalars.strict_tuple(OUT x INT64, OUT y STRING)
+BEGIN SET (x, y) = (42, 'value'); END;
+CALL scalars.strict_tuple(x, y);
+SELECT x
+=> "42"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_case(x INT64)
+BEGIN CASE x WHEN 1 THEN SELECT 42; ELSE SELECT 0; END CASE; END;
+CALL scalars.strict_case(1)
+=> "42"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_searched_case(x INT64)
+BEGIN CASE WHEN x = 1 THEN SELECT 42; ELSE SELECT 0; END CASE; END;
+CALL scalars.strict_searched_case(1)
+=> "42"
+
+DECLARE total INT64;
+CREATE OR REPLACE PROCEDURE scalars.strict_for(OUT total INT64)
+BEGIN
+  SET total = 0;
+  FOR row IN (SELECT n FROM UNNEST([1, 2, 3]) n) DO
+    SET total = total + row.n;
+  END FOR;
+END;
+CALL scalars.strict_for(total);
+SELECT total
+=> "6"
+
+DECLARE x INT64;
+CREATE OR REPLACE PROCEDURE scalars.strict_inner(OUT x INT64)
+BEGIN SET x = 42; END;
+CREATE OR REPLACE PROCEDURE scalars.strict_outer(OUT x INT64)
+BEGIN CALL scalars.strict_inner(x); END;
+CALL scalars.strict_outer(x);
+SELECT x
+=> "42"
+
+# Definition checks neither read nor write the table's rows.
+CREATE OR REPLACE TABLE scalars.strict_writes (n INT64);
+CREATE OR REPLACE PROCEDURE scalars.strict_write(x INT64)
+BEGIN INSERT scalars.strict_writes VALUES (x); END;
+SELECT COUNT(*) FROM scalars.strict_writes
+=> "0"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_table()
+BEGIN SELECT n FROM scalars.strict_missing_table; END;
+SELECT 1
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.strict_column()
+BEGIN SELECT nonexistent_column FROM scalars.t; END;
+SELECT 1
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.strict_variable()
+BEGIN SELECT undeclared_variable; END;
+SELECT 1
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.strict_assignment(x INT64)
+BEGIN SET x = 'not an integer'; END;
+SELECT 1
+=> error:
+
+CREATE OR REPLACE PROCEDURE scalars.strict_initializer()
+BEGIN DECLARE x INT64 DEFAULT 'not an integer'; END;
+SELECT 1
+=> error:
+
+# FALSE still defers name resolution until CALL.
+CREATE OR REPLACE PROCEDURE scalars.strict_disabled()
+OPTIONS(strict_mode=FALSE) BEGIN SELECT missing_column FROM scalars.strict_absent; END;
+SELECT 42
+=> "42"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_in_target(x INT64)
+BEGIN SELECT x + 2; END;
+CREATE OR REPLACE PROCEDURE scalars.strict_in_caller(x INT64)
+BEGIN CALL scalars.strict_in_target(x * 2); END;
+CALL scalars.strict_in_caller(20)
+=> "42"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_nested_type(x STRUCT<items ARRAY<INT64>>)
+BEGIN DECLARE y INT64 DEFAULT x.items[OFFSET(0)]; SELECT y IS NULL; END;
+CALL scalars.strict_nested_type(STRUCT([CAST(NULL AS INT64)] AS items))
+=> "true"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_sets_dataset()
+BEGIN SET @@dataset_id = 'scalars'; END;
+CALL scalars.strict_sets_dataset();
+SELECT @@dataset_id
+=> "scalars"
+
+CREATE OR REPLACE PROCEDURE scalars.strict_handler()
+BEGIN
+  SELECT ERROR('strict body');
+EXCEPTION WHEN ERROR THEN
+  SELECT @@error.message IS NOT NULL;
+END;
+CALL scalars.strict_handler()
+=> "true"
+
+# Answers collected from BigQuery with bqanswers.
+
+# Validation stops at IF, even when its condition is a literal FALSE.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dead_branch()
+BEGIN IF FALSE THEN SELECT nonexistent_column; END IF; END;
+SELECT 1
+=> "1"
+
+# Validation stops at RETURN.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_return()
+BEGIN RETURN; SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+# Constant dynamic SQL is checked for syntax.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_text()
+BEGIN EXECUTE IMMEDIATE 'not valid SQL'; END;
+SELECT 1
+=> error contains: Invalid EXECUTE IMMEDIATE sql string
+
+# A temporary table reference after DDL is not validated.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_created_table()
+BEGIN CREATE TEMP TABLE strict_rows (n INT64); SELECT n FROM strict_rows; END;
+SELECT 1
+=> "1"
+
+# A replacement may call the existing definition of the same procedure.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_recursive() BEGIN SELECT 1; END;
+CREATE OR REPLACE PROCEDURE scalars.strict_recursive()
+BEGIN CALL scalars.strict_recursive(); END;
+SELECT 1
+=> "1"
+
+# Default strict mode is omitted from INFORMATION_SCHEMA's reconstructed DDL.
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_ddl_default() BEGIN SELECT 1; END;
+SELECT REPLACE(REPLACE(ddl, CONCAT('`', @@project_id, '`'), 'PROJECT'), @@project_id, 'PROJECT') FROM scalars.INFORMATION_SCHEMA.ROUTINES WHERE routine_name = 'strict_ddl_default'
+=> "CREATE PROCEDURE PROJECT.scalars.strict_ddl_default()\nBEGIN SELECT 1; END;"
+
+# Strict validation stops at control statements, DDL, dynamic SQL and CALL.
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_if_true()
+BEGIN IF TRUE THEN SELECT nonexistent_column; END IF; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_if()
+BEGIN IF FALSE THEN SELECT 1; END IF; SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_if_condition()
+BEGIN IF nonexistent_condition THEN SELECT 1; END IF; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_temp_table()
+BEGIN CREATE TEMP TABLE strict_rows (n INT64); SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_ddl()
+BEGIN CREATE TABLE IF NOT EXISTS scalars.strict_created (n INT64); SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_names()
+BEGIN EXECUTE IMMEDIATE 'SELECT nonexistent_column'; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_dynamic()
+BEGIN EXECUTE IMMEDIATE 'SELECT 1'; SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_call_target() BEGIN SELECT 1; END;
+CREATE OR REPLACE PROCEDURE scalars.strict_after_call()
+BEGIN CALL scalars.strict_after_call_target(); SELECT nonexistent_column; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_while()
+BEGIN WHILE FALSE DO SELECT nonexistent_column; END WHILE; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_concat()
+BEGIN EXECUTE IMMEDIATE CONCAT('not valid ', 'SQL'); END;
+SELECT 1
+=> error contains: Invalid EXECUTE IMMEDIATE sql string
+
+# Answers collected from BigQuery with bqanswers.
+# Strict-validation boundaries: CALL, dynamic SQL variables, and unconditional loops.
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_missing_call_answer()
+BEGIN CALL scalars.strict_does_not_exist(); END;
+SELECT 1
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_arity_target_answer(x INT64) BEGIN SELECT x; END;
+CREATE OR REPLACE PROCEDURE scalars.strict_arity_answer()
+BEGIN CALL scalars.strict_arity_target_answer(); END;
+SELECT 1
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_using_answer()
+BEGIN EXECUTE IMMEDIATE 'SELECT @x' USING unknown_variable AS x; END;
+SELECT 1
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_into_answer()
+BEGIN EXECUTE IMMEDIATE 'SELECT 1' INTO unknown_variable; END;
+SELECT 1
+=> error:
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_null_answer()
+BEGIN EXECUTE IMMEDIATE CAST(NULL AS STRING); END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_dynamic_variable_answer()
+BEGIN DECLARE sql STRING DEFAULT 'not valid SQL'; EXECUTE IMMEDIATE sql; END;
+SELECT 1
+=> error contains: Invalid EXECUTE IMMEDIATE sql string
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_loop_answer()
+BEGIN LOOP SELECT nonexistent_column; BREAK; END LOOP; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_repeat_answer()
+BEGIN REPEAT SELECT nonexistent_column; UNTIL TRUE END REPEAT; END;
+SELECT 1
+=> "1"
+
+CREATE SCHEMA IF NOT EXISTS scalars;
+CREATE OR REPLACE PROCEDURE scalars.strict_ddl_query_answer()
+BEGIN CREATE TEMP TABLE strict_rows AS SELECT nonexistent_column; END;
+SELECT 1
+=> "1"

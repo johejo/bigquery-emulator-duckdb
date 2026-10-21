@@ -243,9 +243,8 @@ Roll back a failed transaction: it cannot preserve statements before the error f
 
 ## Stored procedures
 
-Definitions must explicitly set `OPTIONS(strict_mode = FALSE)` or `strictMode: false` in the
-Routine API. Strict mode's creation-time validation, `ANY TYPE` arguments, non-SQL procedures,
-and options other than `strict_mode` and `description` are unsupported.
+`ANY TYPE` arguments, non-SQL procedures, and options other than `strict_mode` and
+`description` are unsupported.
 
 Inside procedures, including their dynamic SQL, system variable reads are limited to
 `@@dataset_id`, `@@dataset_project_id`, `@@project_id`, `@@time_zone` and `@@error.message`;
