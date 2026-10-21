@@ -38,7 +38,7 @@ struct BaseTableDefinition {
   TableReference base_table;
   // cloneTime or snapshotTime in RFC 3339, as tables.get reports it; empty until the table is
   // created, which sets it to the table's creation time.
-  std::string time;
+  std::string time = {};
 };
 
 // What a table or view carries besides its schema: Table.description, friendlyName and labels,
