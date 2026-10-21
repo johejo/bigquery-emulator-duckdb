@@ -52,6 +52,8 @@ struct TableMetadata {
   std::map<std::string, std::string> labels;
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
+  // Queries must have a predicate eligible for partition elimination.
+  bool require_partition_filter = false;
   std::vector<std::string> clustering;  // Clustering.fields.
   std::string default_rounding_mode;    // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   std::optional<BaseTableDefinition> clone;
@@ -63,8 +65,9 @@ struct TableMetadata {
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           clustering.empty() && default_rounding_mode.empty() && !clone.has_value() &&
-           !snapshot.has_value() && !expiration_time.has_value() && creation_time == 0;
+           !require_partition_filter && clustering.empty() && default_rounding_mode.empty() &&
+           !clone.has_value() && !snapshot.has_value() && !expiration_time.has_value() &&
+           creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -125,7 +128,7 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
 // `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
 // tables.update replaces the description, friendly name, labels, clustering, default rounding mode
-// and expiration.
+// and expiration, including the required partition filter.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
 // cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);

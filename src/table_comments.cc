@@ -77,6 +77,9 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
 
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
   ValidateLabels(view.metadata.labels);
+  if (view.metadata.require_partition_filter) {
+    throw ApiError::Unsupported("requirePartitionFilter on views");
+  }
   if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
     throw ApiError::Invalid("A view cannot be partitioned or clustered");
   }

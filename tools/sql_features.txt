@@ -181,6 +181,10 @@ query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION B
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE)
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); SELECT a FROM n WHERE d >= DATE '2025-01-01'
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d; ALTER TABLE n SET OPTIONS (require_partition_filter = TRUE)
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); DELETE FROM n WHERE d >= DATE '2025-01-01'
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = NULL)
 note Partitioning and clustering | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
 query Primary and foreign keys | CREATE TABLE n (a INT64 REFERENCES u (id) NOT ENFORCED)

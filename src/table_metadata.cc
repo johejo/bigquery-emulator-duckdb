@@ -125,9 +125,6 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
   if (!value.value("expirationMs", json()).is_null()) {
     throw ApiError::Unsupported("partition expiration");
   }
-  if (value.value("requirePartitionFilter", false)) {
-    throw ApiError::Unsupported("requirePartitionFilter");
-  }
   return partitioning;
 }
 
@@ -169,9 +166,6 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
   metadata.range_partitioning = ParseRangePartitioning(Member(table, "rangePartitioning"));
   if (metadata.time_partitioning.has_value() && metadata.range_partitioning.has_value()) {
     throw ApiError::Invalid("A table cannot have both time and range partitioning");
-  }
-  if (Member(table, "requirePartitionFilter") == true) {
-    throw ApiError::Unsupported("requirePartitionFilter");
   }
 }
 
@@ -366,6 +360,9 @@ json TableMetadata::ToJson() const {
         },
     };
   }
+  if (require_partition_filter) {
+    fields["requirePartitionFilter"] = true;
+  }
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};
   }
@@ -445,6 +442,18 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
       (partitioning.time_partitioning != metadata.time_partitioning ||
        partitioning.range_partitioning != metadata.range_partitioning)) {
     throw ApiError::Invalid("Cannot change the partitioning of an existing table");
+  }
+  const json required =
+      body.contains("requirePartitionFilter")
+          ? Member(body, "requirePartitionFilter")
+          : Member(Member(body, "timePartitioning").is_object() ? Member(body, "timePartitioning")
+                                                                : json::object(),
+                   "requirePartitionFilter");
+  if (!required.is_null() && !required.is_boolean()) {
+    throw ApiError::Invalid("Field requirePartitionFilter must be a boolean");
+  }
+  if (!required.is_null() || !patch || body.contains("requirePartitionFilter")) {
+    metadata.require_partition_filter = required == true;
   }
   UpdateDescriptiveFields(metadata, body, patch);
   if (body.contains("expirationTime")) {
@@ -527,6 +536,9 @@ void ValidateLabels(const std::map<std::string, std::string>& labels) {
 }
 
 void ValidatePartitioning(const TableMetadata& metadata, const std::vector<FieldSchema>& schema) {
+  if (metadata.require_partition_filter && !metadata.partitioned()) {
+    throw ApiError::Unsupported("requirePartitionFilter on an unpartitioned table");
+  }
   if (metadata.time_partitioning.has_value()) {
     ValidateTimePartitioning(*metadata.time_partitioning, schema);
   }

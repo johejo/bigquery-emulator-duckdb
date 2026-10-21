@@ -63,6 +63,14 @@ bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
   return true;
 }
 
+bool BoolOption(const googlesql::Value& value, bool& into) {
+  if (value.is_null() || !value.type()->IsBool()) {
+    return false;
+  }
+  into = value.bool_value();
+  return true;
+}
+
 // The labels option, an ARRAY<STRUCT<STRING, STRING>> of keys and values, into `into`.
 bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::string>& into) {
   into.clear();
@@ -229,7 +237,9 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
         OptionValue(*option, OptionObject(statement), scope);
     const bool applied =
         value.has_value() &&
-        ((name == "description" && StringOption(*value, metadata.description)) ||
+        ((statement == "CREATE TABLE" && name == "require_partition_filter" &&
+          BoolOption(*value, metadata.require_partition_filter)) ||
+         (name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
          (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)) ||
@@ -282,7 +292,9 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
         OptionValue(*option, OptionObject(statement), scope);
     const bool applied =
         value.has_value() &&
-        ((name == "description" && StringOption(*value, updates.description.emplace())) ||
+        ((statement == "ALTER TABLE" && name == "require_partition_filter" &&
+          BoolOption(*value, updates.require_partition_filter.emplace())) ||
+         (name == "description" && StringOption(*value, updates.description.emplace())) ||
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
          (name == "labels" && LabelsOption(*value, updates.labels.emplace())) ||
          (statement == "ALTER TABLE" && name == "expiration_timestamp" &&

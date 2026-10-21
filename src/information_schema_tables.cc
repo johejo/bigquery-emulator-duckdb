@@ -267,6 +267,9 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
       std::vector<Option> options =
           CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
                         metadata->default_rounding_mode);
+      if (metadata->require_partition_filter) {
+        options.push_back({.name = "require_partition_filter", .type = "BOOL", .value = "true"});
+      }
       if (metadata->expiration_time.has_value()) {
         options.push_back({
             .name = "expiration_timestamp",
