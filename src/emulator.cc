@@ -20,6 +20,7 @@
 #include "src/external_query.h"
 #include "src/object_ref.h"
 #include "src/project.h"
+#include "src/table_history.h"
 #include "src/table_metadata.h"
 
 namespace bigquery_emulator_duckdb {
@@ -121,6 +122,9 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                        QuoteIdentifier(project.project_id));
       backend_.Execute("CREATE TABLE IF NOT EXISTS " + DatasetMetadataTable(project.project_id) +
                        " (dataset_id VARCHAR, metadata VARCHAR)");
+      for (const std::string& statement : CreateHistoryStatements(project.project_id)) {
+        backend_.Execute(statement);
+      }
     } catch (const BackendError& error) {
       throw ApiError::Internal("Failed to open " + database + ": " + error.what());
     }

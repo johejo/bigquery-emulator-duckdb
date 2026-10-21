@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <optional>
 #include <string>
@@ -14,6 +15,7 @@
 #include "src/location.h"
 #include "src/references.h"
 #include "src/table_comments.h"
+#include "src/table_history.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 
@@ -105,14 +107,32 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
       throw ApiError::NotFound("Not found: Table " + TableName(table));
     }
     auto schema = TableSchema(backend_, table);
-    auto statements = AlterTableStatements(*alteration, schema, CommentMetadata(*comment));
+    const TableMetadata metadata = CommentMetadata(*comment);
+    auto statements = AlterTableStatements(*alteration, schema, metadata);
     TableReference destination = table;
+    bool discards_history = false;
     for (const auto& action : alteration->actions) {
       if (const auto* rename = std::get_if<RenameTableAction>(&action)) {
         destination.table_id = rename->table_id;
       }
+      discards_history |= std::holds_alternative<AddColumnAction>(action) ||
+                          std::holds_alternative<DropColumnAction>(action);
     }
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
+    // A table's history follows it to its new name, but the emulator does not keep the rows it
+    // had in other columns.
+    if (const int64_t creation_time = HistoryCreationTime(table, metadata);
+        !statements.empty() && creation_time != 0) {
+      if (destination.table_id != table.table_id) {
+        std::ranges::move(RenameHistoryStatements(table, creation_time, destination.table_id),
+                          std::back_inserter(statements));
+      }
+      if (discards_history) {
+        std::ranges::move(DiscardHistoryStatements(destination, creation_time),
+                          std::back_inserter(statements));
+        statements.push_back(CommitVersionsStatement(table.project_id));
+      }
+    }
     return statements;
   }
   if (const auto& alteration = translation.altered_dataset) {

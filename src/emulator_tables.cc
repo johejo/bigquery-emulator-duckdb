@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cstdint>
 #include <format>
 #include <iterator>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
@@ -23,6 +25,7 @@
 #include "src/references.h"
 #include "src/schema_sql.h"
 #include "src/table_comments.h"
+#include "src/table_history.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 
@@ -195,6 +198,13 @@ TableInfo Emulator::UpdateTable(TableReference table,
     const std::string& mode = metadata.value_or(info.metadata).default_rounding_mode;
     ApplyDefaultRoundingMode(info.schema, *updated_schema, mode);
     statements = SchemaUpdateStatements(table, info.schema, *updated_schema);
+    // The rows kept from before the table had these columns are not those it has now.
+    if (const int64_t creation_time = HistoryCreationTime(table, info.metadata);
+        !statements.empty() && creation_time != 0) {
+      std::ranges::move(DiscardHistoryStatements(table, creation_time),
+                        std::back_inserter(statements));
+      statements.push_back(CommitVersionsStatement(table.project_id));
+    }
     std::ranges::move(ColumnCommentStatements(table, *updated_schema),
                       std::back_inserter(statements));
   }
@@ -260,6 +270,49 @@ void Emulator::WriteView(TableReference table, const json& definition,
   } catch (const std::runtime_error& error) {
     throw ApiError::Invalid(error.what());
   }
+}
+
+int64_t Emulator::HistoryCreationTime(const TableReference& table,
+                                      const TableMetadata& metadata) const {
+  return project_ids_.contains(table.project_id) ? metadata.creation_time : 0;
+}
+
+std::mutex& Emulator::HistoryMutex(const TableReference& table) {
+  if (project_ids_.contains(table.project_id)) {
+    SweepHistory(backend_, table.project_id);
+  }
+  const std::scoped_lock lock(history_mutexes_mutex_);
+  std::unique_ptr<std::mutex>& mutex = history_mutexes_[ToLowerAscii(QualifiedName(table))];
+  if (!mutex) {
+    mutex = std::make_unique<std::mutex>();
+  }
+  return *mutex;
+}
+
+std::unique_lock<std::mutex> Emulator::KeepVersion(Backend& backend, const TableReference& table) {
+  std::unique_lock<std::mutex> lock;
+  if (!backend.InTransaction()) {
+    lock = std::unique_lock(HistoryMutex(table));
+  }
+  const std::optional<json> comment =
+      RelationComment(backend, "duckdb_tables()", "table_name", table);
+  const int64_t creation_time =
+      comment.has_value() ? HistoryCreationTime(table, CommentMetadata(*comment)) : 0;
+  if (creation_time == 0) {
+    return lock;
+  }
+  const std::vector<std::string> statements = KeepVersionStatements(table, creation_time);
+  if (backend.InTransaction()) {
+    backend.ExecuteAll(statements);
+    backend.BeforeCommit(CommitVersionsStatement(table.project_id));
+    return lock;
+  }
+  const auto session = backend_.NewSession();
+  session->Transaction("BEGIN TRANSACTION");
+  session->ExecuteAll(statements);
+  session->BeforeCommit(CommitVersionsStatement(table.project_id));
+  session->Transaction("COMMIT");
+  return lock;
 }
 
 void RejectSnapshotWrite(const TableInfo& table) {

@@ -32,6 +32,7 @@
 #include "src/parquet_metadata.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
+#include "src/table_history.h"
 #include "src/table_metadata.h"
 #include "src/temporary_files.h"
 #include "src/translated_statement.h"
@@ -676,6 +677,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
                   sql, Join(aliases, ", ")),
       "BEGIN TRANSACTION",
   };
+  // Holds other writes to the destination until this one, which keeps its rows first, commits.
+  std::unique_lock<std::mutex> kept;
   if (!existing.has_value() || write == WriteDisposition::kWriteTruncate) {
     if (existing.has_value()) {
       statements.push_back("DROP TABLE " + target);
@@ -714,11 +717,20 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     std::ranges::move(ColumnDefaultStatements(destination, schema), std::back_inserter(statements));
     statements.push_back("INSERT INTO " + target + " SELECT * FROM " + result_table);
   } else {
+    if (const int64_t creation_time = HistoryCreationTime(destination, existing->metadata);
+        creation_time != 0) {
+      kept = std::unique_lock(HistoryMutex(destination));
+      std::ranges::move(KeepVersionStatements(destination, creation_time),
+                        std::back_inserter(statements));
+    }
     if (write == WriteDisposition::kWriteTruncateData) {
       statements.push_back("DELETE FROM " + target);
     }
     statements.push_back("INSERT INTO " + target + " BY NAME SELECT " + appended + " FROM " +
                          result_table);
+    if (kept.owns_lock()) {
+      statements.push_back(CommitVersionsStatement(destination.project_id));
+    }
   }
   statements.emplace_back("COMMIT");
   statements.push_back("SELECT " + (count_only ? "count(*)" : ReadColumns(schema)) + " FROM " +

@@ -292,6 +292,42 @@ func TestReconnectAndDefaultDestinationSwitch(t *testing.T) {
 	wantVisible(t, rest, "storage_write_switch", 2)
 }
 
+// FOR SYSTEM_TIME AS OF reads the rows a table had before an append committed.
+// https://cloud.google.com/bigquery/docs/time-travel
+func TestTimeTravelBeforeAppend(t *testing.T) {
+	rest, _, write := clients(t)
+	path := table(t, rest, "storage_write_time_travel", "id INT64, name STRING")
+	appendRow := func(id int64) {
+		t.Helper()
+		stream, err := write.AppendRows(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response := send(t, stream, appendRequest(path+"/streams/_default", true, nil, row(id, "x"))); response.GetError() != nil {
+			t.Fatal(response)
+		}
+		closeAppend(t, stream)
+	}
+	appendRow(1)
+	time.Sleep(5 * time.Millisecond)
+	before := time.Now()
+	time.Sleep(5 * time.Millisecond)
+	appendRow(2)
+	query := rest.Query("SELECT ARRAY_AGG(id ORDER BY id) FROM storage_write_time_travel.rows FOR SYSTEM_TIME AS OF @ts")
+	query.Parameters = []bigquery.QueryParameter{{Name: "ts", Value: before}}
+	rows, err := query.Read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values []bigquery.Value
+	if err := rows.Next(&values); err != nil {
+		t.Fatal(err)
+	}
+	if got := values[0]; !reflect.DeepEqual(got, []bigquery.Value{int64(1)}) {
+		t.Errorf("rows before the append: %v, want [1]", got)
+	}
+}
+
 func TestStorageStateAfterRestart(t *testing.T) {
 	binary := os.Getenv("BQ_EMULATOR_BINARY")
 	if binary == "" {

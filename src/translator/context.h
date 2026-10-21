@@ -38,6 +38,9 @@ struct Context {
   TranslatedStatement& statement;
   // The values of the system variables of the script that the statement belongs to, if any.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
+  // Whether the statement defines a view, whose DuckDB view queries never read: they read the
+  // view's GoogleSQL query, which the analyzer expands.
+  bool defines_view = false;
   // The first construct found unsupported, reported in the error the statement fails with.
   std::string unsupported = {};
   int next_name = 0;

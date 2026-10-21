@@ -52,6 +52,11 @@ class Backend {
   std::unique_ptr<Backend> NewSession();
   // Runs BEGIN TRANSACTION, COMMIT or ROLLBACK on a session.
   void Transaction(const std::string& statement);
+  // Whether this is a session with an open transaction.
+  [[nodiscard]] bool InTransaction() const;
+  // Runs `statement` when the session's open transaction commits, before COMMIT, once however
+  // often it is given.
+  void BeforeCommit(const std::string& statement);
 
   // Runs a single statement and materializes its result. `setup` statements run first on the
   // same connection and are used to select the default catalog and schema. A NULL array is

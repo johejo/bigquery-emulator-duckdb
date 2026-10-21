@@ -153,6 +153,8 @@ struct TranslatedStatement {
   std::optional<TableReference> ddl_target_table;
   std::optional<DatasetReference> ddl_target_dataset;
   std::optional<RoutineReference> ddl_target_routine;
+  // The table whose rows a DML statement or TRUNCATE TABLE changes.
+  std::optional<TableReference> written_table;
   // Whether a CREATE OR REPLACE TABLE replaces the table its target names, if there is one.
   bool replaces = false;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.

@@ -5,6 +5,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -639,6 +640,10 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
       throw;
     }
   } else {
+    std::unique_lock<std::mutex> kept;
+    if (translation.written_table.has_value()) {
+      kept = KeepVersion(backend, *translation.written_table);
+    }
     result = backend.Execute(translation.sql, setup, null_arrays);
   }
   if (schema.has_value()) {

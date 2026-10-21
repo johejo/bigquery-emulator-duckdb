@@ -98,10 +98,21 @@ forms.
 
 ### Table snapshots
 
-The emulator keeps no table history, so `CREATE SNAPSHOT TABLE` copies the table's current rows.
-`ALTER TABLE` actions other than `SET OPTIONS`, `ADD COLUMN` and `DROP COLUMN` are unsupported on a
+`FOR SYSTEM_TIME AS OF` has the limits of [time travel](#time-travel). `ALTER TABLE` actions other than `SET OPTIONS`, `ADD COLUMN` and `DROP COLUMN` are unsupported on a
 snapshot rather than rejected with BigQuery's message, and a table restored from a snapshot omits
 the empty `friendly_name` and `labels` that BigQuery lists in `TABLE_OPTIONS`.
+
+### Time travel
+
+`FOR SYSTEM_TIME AS OF` reads the rows a table had within BigQuery's default seven-day time travel
+window, which datasets cannot change. It is unsupported:
+
+- before the table was created, including a table it replaced by `CREATE OR REPLACE TABLE` or a
+  job's `WRITE_TRUNCATE`, before `ALTER TABLE ADD COLUMN` or `DROP COLUMN`, and before
+  `tables.patch` or `tables.update` changed its columns;
+- on temporary tables;
+- for times other than a query parameter, a script variable, or `CURRENT_TIMESTAMP()` with
+  `TIMESTAMP_ADD` or `TIMESTAMP_SUB`, since BigQuery evaluates the time in America/Los_Angeles.
 
 ### Schema changes
 

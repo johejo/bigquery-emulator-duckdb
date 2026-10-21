@@ -17,6 +17,7 @@
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
+#include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -67,6 +68,7 @@ bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
     throw std::invalid_argument("Invalid value: Table " + TableName(stored->reference()) +
                                 " is a snapshot, and snapshots are immutable.");
   }
+  scope.context.statement.written_table = stored->reference();
   return true;
 }
 

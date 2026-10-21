@@ -19,9 +19,9 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 34 | 0 | 0 |
+| [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 21 | 9 | 3 |
+| [DDL](#ddl) | 24 | 6 | 3 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -38,6 +38,7 @@ rejected.
 | `UNNEST ... WITH OFFSET` | Supported |  |
 | `WITH` | Supported |  |
 | `WITH RECURSIVE` | Supported |  |
+| `FOR SYSTEM_TIME AS OF` | Partial | See [Time travel](compatibility.md#time-travel). Unsupported: FOR SYSTEM_TIME AS OF a time other than a parameter, a variable or CURRENT_TIMESTAMP with TIMESTAMP_ADD or TIMESTAMP_SUB. |
 | Subqueries | Supported |  |
 | Correlated subqueries | Supported |  |
 | Aggregates and `GROUP BY` | Supported |  |
@@ -96,9 +97,9 @@ rejected.
 | Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |
 | `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
-| `CREATE TABLE COPY` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE COPY with FOR SYSTEM_TIME AS OF. |
-| `CREATE TABLE CLONE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF. |
-| `CREATE SNAPSHOT TABLE` | Partial | See [Table snapshots](compatibility.md#table-snapshots). Unsupported: CREATE SNAPSHOT TABLE with FOR SYSTEM_TIME AS OF. |
+| `CREATE TABLE COPY` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
+| `CREATE TABLE CLONE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
+| `CREATE SNAPSHOT TABLE` | Supported | See [Table snapshots](compatibility.md#table-snapshots). |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
 | `DROP SNAPSHOT TABLE` | Supported |  |

@@ -82,6 +82,11 @@ Table and column comments store BigQuery metadata. Dataset metadata lives in
 `main.emulator_datasets` because DuckDB cannot comment on schemas. Catalog changes and their
 metadata writes share a transaction.
 
+[table_history.cc](../src/table_history.cc) keeps a table's rows before each write for `FOR
+SYSTEM_TIME AS OF`, in tables of the project's `main` schema keyed by dataset, table and creation
+time. Writes outside a transaction hold a mutex so that each kept version is what the previous
+write committed; a transaction dates its versions when it commits.
+
 Logical views are native DuckDB views whose comments preserve the original GoogleSQL definition
 and result schema. Persistent SQL UDFs, table functions and procedures use macro comments.
 For analysis, `RoutineCatalog` resolves view and routine definitions against their owning project

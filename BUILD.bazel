@@ -675,6 +675,24 @@ cc_library(
 )
 
 cc_library(
+    name = "table_history",
+    srcs = ["src/table_history.cc"],
+    hdrs = ["src/table_history.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":backend",
+        ":backend_error",
+        ":duckdb_sql",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/time",
+    ],
+    deps = [
+        ":references",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
     name = "table_comments",
     srcs = ["src/table_comments.cc"],
     hdrs = ["src/table_comments.h"],
@@ -804,6 +822,7 @@ cc_library(
         ":schema_sql",
         ":script",
         ":table_comments",
+        ":table_history",
         ":table_path",
         ":table_source",
         ":temporary_files",
@@ -1208,6 +1227,7 @@ cc_library(
         ":routine",
         ":spanner_query",
         ":table_comments",
+        ":table_history",
         ":table_metadata",
         ":table_source",
         "@abseil-cpp//absl/status",

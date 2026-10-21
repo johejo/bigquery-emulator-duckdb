@@ -776,6 +776,7 @@ struct Backend::Database {
 struct Backend::Session {
   Connection connection;
   bool in_transaction = false;
+  std::vector<std::string> before_commit;
   explicit Session(Database& database) : connection(database.Connect()) {}
 };
 
@@ -797,8 +798,25 @@ void Backend::Transaction(const std::string& statement) {
   if (!session_) {
     throw BackendError("Transactions require a session");
   }
+  const std::vector<std::string> before_commit = std::exchange(session_->before_commit, {});
+  if (statement == "COMMIT") {
+    for (const std::string& pending : before_commit) {
+      Query(session_->connection.get(), pending);
+    }
+  }
   Query(session_->connection.get(), statement);
   session_->in_transaction = statement == "BEGIN TRANSACTION";
+}
+
+bool Backend::InTransaction() const { return session_ && session_->in_transaction; }
+
+void Backend::BeforeCommit(const std::string& statement) {
+  if (!InTransaction()) {
+    throw BackendError("No transaction to commit");
+  }
+  if (std::ranges::find(session_->before_commit, statement) == session_->before_commit.end()) {
+    session_->before_commit.push_back(statement);
+  }
 }
 
 QueryResult Backend::Execute(const std::string& sql, const std::vector<std::string>& setup,

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <iterator>
 #include <map>
@@ -13,8 +14,12 @@
 #include <utility>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
+#include "absl/time/time.h"
 #include "googlesql/public/catalog.h"
+#include "googlesql/public/function.h"
 #include "googlesql/public/table_valued_function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -22,6 +27,7 @@
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
+#include "src/table_source.h"
 #include "src/translator/aggregate.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -595,16 +601,97 @@ std::optional<Relation> SampleScan(const googlesql::ResolvedSampleScan& sample,
   return result;
 }
 
+// Whether `expression` has the same value in every time zone. BigQuery evaluates the time of FOR
+// SYSTEM_TIME AS OF in America/Los_Angeles rather than in UTC, which the analyzer has already
+// given a literal's time, so the emulator reads only times that do not depend on the zone.
+bool ZoneIndependent(const googlesql::ResolvedExpr& expression) {
+  if (expression.Is<googlesql::ResolvedParameter>() ||
+      expression.Is<googlesql::ResolvedConstant>()) {
+    return true;
+  }
+  if (expression.Is<googlesql::ResolvedLiteral>()) {
+    return !expression.type()->IsTimestamp() ||
+           expression.GetAs<googlesql::ResolvedLiteral>()->value().is_null();
+  }
+  if (!expression.Is<googlesql::ResolvedFunctionCall>()) {
+    return false;
+  }
+  const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
+  const std::string name = call.function()->Name();
+  return (name == "current_timestamp" || name == "timestamp_add" || name == "timestamp_sub") &&
+         std::ranges::all_of(call.argument_list(),
+                             [](const auto& argument) { return ZoneIndependent(*argument); });
+}
+
+}  // namespace
+
+std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& scan,
+                                          const Scope& scope, int64_t& time) {
+  const auto* stored = dynamic_cast<const BigQueryTable*>(scan.table());
+  TableSource* source = scope.context.defaults.source;
+  const auto& expression = *scan.for_system_time_expr();
+  if (stored == nullptr || source == nullptr || !scope.context.defaults.evaluate ||
+      !expression.type()->IsTimestamp()) {
+    return Unsupported(scope, "FOR SYSTEM_TIME AS OF this table");
+  }
+  if (stored->NumericReadQuery().has_value()) {
+    return Unsupported(scope, "FOR SYSTEM_TIME AS OF external numeric storage");
+  }
+  if (!ZoneIndependent(expression)) {
+    return Unsupported(scope,
+                       "FOR SYSTEM_TIME AS OF a time other than a parameter, a variable or "
+                       "CURRENT_TIMESTAMP with TIMESTAMP_ADD or TIMESTAMP_SUB");
+  }
+  // A query of the view reads the table at the time it evaluates, not at the view's creation.
+  if (scope.context.defines_view) {
+    return "SELECT * FROM " + QuoteIdentifierPath(stored->FullName()) +
+           " WHERE error('The emulator reads FOR SYSTEM_TIME AS OF in a view only through its "
+           "GoogleSQL query')";
+  }
+  // The time is a constant, which the emulator evaluates to find the rows the table had then.
+  const auto sql = Expression(expression, scope, {});
+  if (!sql) {
+    return std::nullopt;
+  }
+  const googlesql::Value value =
+      scope.context.defaults.evaluate("SELECT " + *sql, expression.type());
+  if (value.is_null()) {
+    throw std::invalid_argument("Query error: 'FOR SYSTEM_TIME AS OF' expression for table '" +
+                                stored->reference().project_id + "." +
+                                stored->reference().dataset_id + "." +
+                                stored->reference().table_id + "' is NULL.");
+  }
+  time = absl::ToUnixMicros(value.ToUnixPicos().ToAbslTime());
+  absl::StatusOr<std::string> rows = source->TimeTravelQuery(stored->reference(), time);
+  if (absl::IsUnimplemented(rows.status())) {
+    return Unsupported(scope, rows.status().message());
+  }
+  if (!rows.ok()) {
+    throw std::invalid_argument(std::string(rows.status().message()));
+  }
+  return *std::move(rows);
+}
+
+namespace {
+
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
   }
   if (scan.Is<googlesql::ResolvedTableScan>()) {
     const auto* table = scan.GetAs<googlesql::ResolvedTableScan>();
-    if (table->for_system_time_expr() != nullptr || table->lock_mode() != nullptr ||
-        table->read_as_row_type() || table->table()->IsValueTable() ||
+    if (table->lock_mode() != nullptr || table->read_as_row_type() ||
+        table->table()->IsValueTable() ||
         table->column_list_size() != table->column_index_list_size()) {
-      return Unsupported(scope, "table read with FOR SYSTEM_TIME, a lock mode or a value table");
+      return Unsupported(scope, "table read with a lock mode or a value table");
+    }
+    std::optional<std::string> history;
+    if (table->for_system_time_expr() != nullptr) {
+      int64_t time = 0;
+      history = TimeTravelRows(*table, scope, time);
+      if (!history) {
+        return std::nullopt;
+      }
     }
     Relation result;
     std::vector<std::string> projections;
@@ -628,9 +715,10 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
         stored_table == nullptr ? std::nullopt : stored_table->NumericReadQuery();
     result.sql = "SELECT " + (projections.empty() ? "1 AS _unit" : Join(projections, ", ")) +
                  " FROM " +
-                 (sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
-                  : converted          ? "(" + *converted + ") AS v"
-                                       : QuoteIdentifierPath(table->table()->FullName()));
+                 (history                ? "(" + *history + ") AS v"
+                  : sql_table != nullptr ? "(" + sql_table->sql() + ") AS v"
+                  : converted            ? "(" + *converted + ") AS v"
+                                         : QuoteIdentifierPath(table->table()->FullName()));
     return result;
   }
   if (scan.Is<googlesql::ResolvedTVFScan>()) {
