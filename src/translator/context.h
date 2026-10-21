@@ -7,11 +7,14 @@
 #include <string_view>
 #include <vector>
 
+#include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/query_parameters.h"
-#include "src/references.h"
 #include "src/system_variables.h"
-#include "src/translated_statement.h"
+
+namespace bigquery_emulator_duckdb {
+struct TranslatedStatement;
+}  // namespace bigquery_emulator_duckdb
 
 namespace bigquery_emulator_duckdb::translator {
 
@@ -30,20 +33,13 @@ struct WithQuery {
 struct Context {
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
+  // DDL records what it creates, alters or drops in the statement itself, so that this header,
+  // which every translator includes, does not need their definitions.
+  TranslatedStatement& statement;
   // The values of the system variables of the script that the statement belongs to, if any.
   const googlesql::SystemVariableValuesMap* system_variables = nullptr;
   // The first construct found unsupported, reported in the error the statement fails with.
   std::string unsupported = {};
-  // What DDL records about its target as it is translated.
-  std::optional<TableReference> ddl_target_table = {};
-  std::optional<DatasetReference> ddl_target_dataset = {};
-  std::optional<RoutineReference> ddl_target_routine = {};
-  std::optional<TableDefinition> table = {};
-  std::optional<TableAlteration> altered_table = {};
-  std::optional<ViewDefinition> view = {};
-  std::optional<DatasetDefinition> dataset = {};
-  std::optional<DatasetAlteration> altered_dataset = {};
-  std::optional<RoutineDefinition> routine = {};
   int next_name = 0;
 
   // A name no other call returns, for WITH queries and lambda parameters.

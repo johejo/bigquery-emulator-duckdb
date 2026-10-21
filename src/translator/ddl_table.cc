@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -305,12 +306,12 @@ std::optional<std::string> TemporaryTargetTable(const std::vector<std::string>& 
   if (temporary == nullptr || !name) {
     return Unsupported(scope, "temporary table " + Join(path, "."));
   }
-  scope.context.ddl_target_table = TableReference{
+  scope.context.statement.ddl_target_table = TableReference{
       .project_id = temporary->project,
       .dataset_id = temporary->dataset,
       .table_id = *name,
   };
-  return QualifiedName(*scope.context.ddl_target_table);
+  return QualifiedName(*scope.context.statement.ddl_target_table);
 }
 
 // The column `expression` reads, or "" when it is not a column.
@@ -520,7 +521,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
                                            const Scope& scope) {
   auto description = LikeDescription(create, scope);
   const auto head = CreateTableHead(create, scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   if (!description || !head || !target) {
     return std::nullopt;
   }
@@ -528,7 +529,7 @@ std::optional<std::string> CreateTableLike(const googlesql::ResolvedCreateTableS
   if (!columns) {
     return std::nullopt;
   }
-  scope.context.table = TableDefinition{
+  scope.context.statement.table = TableDefinition{
       .table = *target,
       .schema = std::move(description->schema),
       .metadata = std::move(description->metadata),
@@ -574,7 +575,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
       create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
   const TableReference source = dynamic_cast<const BigQueryTable*>(scan.table())->reference();
   const auto head = CreateTableHead(create, scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   if (clone) {
     description->metadata.clone = CloneDefinition{.base_table = source, .clone_time = Rfc3339Now()};
   }
@@ -588,7 +589,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   if (replace && ToLowerAscii(QualifiedName(*target)) == ToLowerAscii(QualifiedName(source))) {
     return Unsupported(scope, "CREATE OR REPLACE TABLE " + kind + " of itself");
   }
-  scope.context.table = TableDefinition{
+  scope.context.statement.table = TableDefinition{
       .table = *target,
       .schema = std::move(description->schema),
       .metadata = *std::move(metadata),
@@ -610,7 +611,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
 std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& alter,
                                       const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   if (!path || !target) {
     return std::nullopt;
   }
@@ -678,11 +679,12 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
           .expression = set.default_value()->sql(),
           .sql = *sql,
           .literal = set.default_value()->expression()->Is<googlesql::ResolvedLiteral>()
-                         ? std::optional(set.default_value()
-                                             ->expression()
-                                             ->GetAs<googlesql::ResolvedLiteral>()
-                                             ->value())
-                         : std::nullopt,
+                         ? std::make_shared<const googlesql::Value>(
+                               set.default_value()
+                                   ->expression()
+                                   ->GetAs<googlesql::ResolvedLiteral>()
+                                   ->value())
+                         : nullptr,
           .if_exists = set.is_if_exists(),
       });
     } else if (action->Is<googlesql::ResolvedAlterColumnDropDefaultAction>()) {
@@ -703,7 +705,7 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
       return Unsupported(scope, "ALTER TABLE action " + action->node_kind_string());
     }
   }
-  scope.context.altered_table = std::move(alteration);
+  scope.context.statement.altered_table = std::move(alteration);
   return "";
 }
 
@@ -711,12 +713,12 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
 std::optional<std::string> AlterTableSetOptions(
     const googlesql::ResolvedAlterTableSetOptionsStmt& alter, const Scope& scope) {
   const auto path = TargetTable(alter.name_path(), scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   OptionUpdates updates;
   if (!path || !target || !SetOptions(alter.option_list(), "ALTER TABLE", scope, updates)) {
     return std::nullopt;
   }
-  scope.context.altered_table = TableAlteration{
+  scope.context.statement.altered_table = TableAlteration{
       .table = *target,
       .actions = {std::move(updates)},
       .if_exists = alter.is_if_exists(),
@@ -733,7 +735,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
     return CreateTableLike(create, scope);
   }
   const auto head = CreateTableHead(create, scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   auto metadata = OptionsMetadata(create.option_list(), "CREATE TABLE", scope);
   if (!head || !target || !metadata || !PartitioningAndClustering(create, *metadata, scope)) {
     return std::nullopt;
@@ -776,7 +778,7 @@ std::optional<std::string> CreateTable(const googlesql::ResolvedCreateTableStmt&
   if (columns.empty()) {
     return Unsupported(scope, "CREATE TABLE without columns");
   }
-  scope.context.table = std::move(table);
+  scope.context.statement.table = std::move(table);
   return *head + " (" + Join(columns, ", ") + ")";
 }
 
@@ -789,7 +791,7 @@ std::optional<std::string> CreateTableAsSelect(
   }
   const bool like = create.like_table() != nullptr;
   const auto head = CreateTableHead(create, scope);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   std::optional<TableDescription> description;
   if (like) {
     description = LikeDescription(create, scope);
@@ -863,7 +865,7 @@ std::optional<std::string> CreateTableAsSelect(
     projections.push_back("CAST(" + *value + " AS " + *type + ") AS " +
                           QuoteIdentifier(field.name));
   }
-  scope.context.table = std::move(table);
+  scope.context.statement.table = std::move(table);
   return *head + " AS SELECT " + Join(projections, ", ") + relation->From() + relation->Order();
 }
 

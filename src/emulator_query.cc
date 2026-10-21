@@ -29,6 +29,7 @@
 #include "src/backend_error.h"
 #include "src/cell_value.h"
 #include "src/ddl_write.h"
+#include "src/default_dataset.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_table_source.h"

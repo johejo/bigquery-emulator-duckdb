@@ -35,12 +35,12 @@ std::optional<RoutineReference> TargetRoutine(const std::vector<std::string>& pa
   if (parts.empty()) {
     return Unsupported(scope, "routine name " + Join(path, "."));
   }
-  scope.context.ddl_target_routine = RoutineReference{
+  scope.context.statement.ddl_target_routine = RoutineReference{
       .project_id = parts.at(0),
       .dataset_id = parts.at(1),
       .routine_id = parts.at(2),
   };
-  return scope.context.ddl_target_routine;
+  return scope.context.statement.ddl_target_routine;
 }
 
 // `type` as BigQuery's StandardSqlDataType describes it, or nothing for a type BigQuery lacks.
@@ -157,7 +157,7 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
     }
     resource["returnType"] = *std::move(data_type);
   }
-  scope.context.routine = RoutineDefinition{
+  scope.context.statement.routine = RoutineDefinition{
       .routine = {.reference = *target, .resource = std::move(resource)},
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
@@ -231,7 +231,7 @@ std::optional<std::string> CreateTableFunction(
     }
     resource["returnTableType"] = {{"columns", std::move(columns)}};
   }
-  scope.context.routine = RoutineDefinition{
+  scope.context.statement.routine = RoutineDefinition{
       .routine = {.reference = *target, .resource = std::move(resource)},
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
@@ -294,7 +294,7 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
         {"dataType", *std::move(type)},
     });
   }
-  scope.context.routine = RoutineDefinition{
+  scope.context.statement.routine = RoutineDefinition{
       .routine = {.reference = *target, .resource = std::move(resource)},
       .if_not_exists =
           create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS,
