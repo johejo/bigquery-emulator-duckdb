@@ -16,6 +16,7 @@
 #include "nanoarrow/nanoarrow.hpp"
 #include "src/api_error.h"
 #include "src/backend_error.h"
+#include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
 #include "src/storage_read_codec.h"
@@ -65,6 +66,9 @@ std::string_view Format(FieldType type) {
       return "tsu:UTC";
     case FieldType::kNumeric:
       return "d:38,9,128";
+    case FieldType::kBigNumeric:
+      // DuckDB exports the stored bytes of a BIGNUM, which Normalize decodes.
+      return "z";
     case FieldType::kRecord:
       return "+s";
     default:
@@ -73,10 +77,14 @@ std::string_view Format(FieldType type) {
 }
 
 bool Eligible(const FieldSchema& field) {
-  // DuckDB can preserve NULL lists where BigQuery returns empty ones. Those, BIGNUMERIC and
-  // other logical types go through their cells.
-  return field.mode != FieldMode::kRepeated && !Format(field.type).empty() &&
-         std::ranges::all_of(field.fields, Eligible);
+  return !Format(field.type).empty() && std::ranges::all_of(field.fields, Eligible);
+}
+
+// The element of the REPEATED `field`, as Storage Read gives it.
+FieldSchema Item(const FieldSchema& field) {
+  FieldSchema item = field;
+  item.mode = FieldMode::kRequired;
+  return item;
 }
 
 bool NativeStorage(duckdb_logical_type type) {
@@ -93,7 +101,13 @@ bool NativeStorage(duckdb_logical_type type) {
     case DUCKDB_TYPE_TIMESTAMP:
     case DUCKDB_TYPE_TIMESTAMP_TZ:
     case DUCKDB_TYPE_DECIMAL:
+    // Query results keep a BIGNUMERIC as its units of 10^-38, with or without the storage alias.
+    case DUCKDB_TYPE_BIGNUM:
       return true;
+    case DUCKDB_TYPE_LIST: {
+      const LogicalType child(duckdb_list_type_child_type(type));
+      return NativeStorage(child.get());
+    }
     case DUCKDB_TYPE_STRUCT:
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
         const LogicalType child(duckdb_struct_type_child_type(type, i));
@@ -108,6 +122,10 @@ bool NativeStorage(duckdb_logical_type type) {
 }
 
 bool Matches(const ArrowSchema& arrow, const FieldSchema& field) {
+  if (field.mode == FieldMode::kRepeated) {
+    return std::string_view(arrow.format) == "+l" && arrow.n_children == 1 &&
+           Matches(*arrow.children[0], Item(field));
+  }
   if (std::string_view(arrow.format) != Format(field.type) ||
       std::cmp_not_equal(arrow.n_children, field.fields.size())) {
     return false;
@@ -120,10 +138,73 @@ bool Matches(const ArrowSchema& arrow, const FieldSchema& field) {
   return true;
 }
 
+// Rewrites a DuckDB Arrow export, whose layout Matches `field`, into the type `wire` that
+// Storage Read gives it. A NULL array, whose DuckDB offsets have zero length, becomes an empty
+// one, and a BIGNUM's stored bytes become its units of 10^-38, a decimal256 integer.
+void Normalize(ArrowArray* array, const ArrowSchema& wire, const FieldSchema& field) {
+  if (field.mode == FieldMode::kRepeated) {
+    array->buffers[0] = nullptr;
+    array->null_count = 0;
+    Normalize(array->children[0], *wire.children[0], Item(field));
+    return;
+  }
+  if (field.type == FieldType::kRecord) {
+    for (size_t i = 0; i < field.fields.size(); ++i) {
+      Normalize(array->children[i], *wire.children[i], field.fields.at(i));
+    }
+    return;
+  }
+  if (field.type != FieldType::kBigNumeric) {
+    return;
+  }
+  ArrowError error{};
+  nanoarrow::UniqueArrayView stored;
+  ArrowArrayViewInitFromType(stored.get(), NANOARROW_TYPE_BINARY);
+  Check(ArrowArrayViewSetArray(stored.get(), array, &error), error);
+  nanoarrow::UniqueArray decimals;
+  Check(ArrowArrayInitFromSchema(decimals.get(), &wire, &error), error);
+  Check(ArrowArrayStartAppending(decimals.get()), error);
+  Check(ArrowArrayReserve(decimals.get(), array->length), error);
+  ArrowDecimal decimal{};
+  ArrowDecimalInit(&decimal, 256, 76, 38);
+  for (int64_t row = 0; row < array->length; ++row) {
+    if (ArrowArrayViewIsNull(stored.get(), row) != 0) {
+      Check(ArrowArrayAppendNull(decimals.get(), 1), error);
+      continue;
+    }
+    const ArrowBufferView bytes = ArrowArrayViewGetBytesUnsafe(stored.get(), row);
+    const auto number = BigNumericFromBignum(
+        std::string_view(bytes.data.as_char,  // NOLINT(cppcoreguidelines-pro-type-union-access)
+                         static_cast<size_t>(bytes.size_bytes)));
+    if (!number.ok()) {
+      throw BackendError("DuckDB returned an invalid BIGNUMERIC: " +
+                         std::string(number.status().message()));
+    }
+    // GoogleSQL's packed form is little-endian two's complement; sign extend it to 32 bytes.
+    std::string packed = number->SerializeAsProtoBytes();
+    const bool negative =
+        !packed.empty() && (static_cast<unsigned char>(packed.back()) & 0x80U) != 0;
+    packed.resize(32, negative ? static_cast<char>(0xff) : '\0');
+    ArrowDecimalSetBytes(&decimal, reinterpret_cast<const uint8_t*>(packed.data()));
+    Check(ArrowArrayAppendDecimal(decimals.get(), &decimal), error);
+  }
+  Check(ArrowArrayFinishBuildingDefault(decimals.get(), &error), error);
+  ArrowArrayRelease(array);
+  ArrowArrayMove(decimals.get(), array);
+}
+
 // The cell codec parses civil times with GoogleSQL. Keep those range checks when their physical
 // Arrow buffers are passed through, including for externally created tables.
 void ValidateCivilTime(const ArrowArrayView& view, const FieldSchema& field, int64_t row) {
   if (ArrowArrayViewIsNull(&view, row) != 0) {
+    return;
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    const FieldSchema item = Item(field);
+    for (int64_t i = ArrowArrayViewListChildOffset(&view, row);
+         i < ArrowArrayViewListChildOffset(&view, row + 1); ++i) {
+      ValidateCivilTime(*view.children[0], item, i);
+    }
     return;
   }
   if (field.type == FieldType::kRecord) {
@@ -300,6 +381,7 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
       if (!state.direct.at(column)) {
         continue;
       }
+      Normalize(exported->children[source], *state.wire->children[column], state.fields.at(column));
       nanoarrow::UniqueArrayView view;
       Check(ArrowArrayViewInitFromSchema(view.get(), state.wire->children[column], &error), error);
       Check(ArrowArrayViewSetArray(view.get(), exported->children[source], &error), error);

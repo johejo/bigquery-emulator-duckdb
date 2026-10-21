@@ -394,7 +394,8 @@ func TestReadArrowSnapshotTypesAndConcurrentResume(t *testing.T) {
 	rest, read, _ := clients(t)
 	path := table(t, rest, "storage_read_arrow_snapshot_types", `id INT64 NOT NULL, s STRING,
 		b BYTES, flag BOOL, f FLOAT64, n NUMERIC, d DATE, tm TIME, dt DATETIME, ts TIMESTAMP,
-		rec STRUCT<x INT64, s STRING>`)
+		rec STRUCT<x INT64, s STRING>, bn BIGNUMERIC, tags ARRAY<STRING>,
+		recs ARRAY<STRUCT<d DATE, bn BIGNUMERIC>>`)
 	query(t, rest, `INSERT INTO storage_read_arrow_snapshot_types.rows
 		SELECT i, IF(MOD(i,5)=0, NULL, CONCAT('日本語', CAST(i AS STRING))), b'\x00\xff',
 			MOD(i,2)=0,
@@ -404,7 +405,12 @@ func TestReadArrowSnapshotTypesAndConcurrentResume(t *testing.T) {
 			CASE i WHEN 1 THEN DATE '0001-01-01' WHEN 4103 THEN DATE '9999-12-31' ELSE DATE '1969-12-31' END,
 			TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999',
 			TIMESTAMP '1969-12-31 23:59:59.999999+00',
-			IF(MOD(i,7)=0, NULL, STRUCT(i AS x, CAST(i AS STRING) AS s))
+			IF(MOD(i,7)=0, NULL, STRUCT(i AS x, CAST(i AS STRING) AS s)),
+			CASE WHEN i = 1 THEN BIGNUMERIC '578960446186580977117854925043439539266.34992332820282019728792003956564819967'
+				WHEN i = 2 THEN BIGNUMERIC '-578960446186580977117854925043439539266.34992332820282019728792003956564819968'
+				WHEN MOD(i,13)=0 THEN NULL ELSE BIGNUMERIC '-1.5' END,
+			CASE MOD(i,3) WHEN 0 THEN NULL WHEN 1 THEN [] ELSE ['a', CAST(i AS STRING)] END,
+			[STRUCT(DATE '1969-12-31' AS d, BIGNUMERIC '0.00000000000000000000000000000000000001' AS bn)]
 		FROM UNNEST(GENERATE_ARRAY(1,4103)) AS i`)
 	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 3)
 	query(t, rest, "DELETE FROM storage_read_arrow_snapshot_types.rows WHERE TRUE")
@@ -473,6 +479,43 @@ func TestReadArrowSnapshotTypesAndConcurrentResume(t *testing.T) {
 							if rec.IsNull(row) != (id%7 == 0) || (!rec.IsNull(row) &&
 								(rec.Field(0).(*array.Int64).Value(row) != id || rec.Field(1).(*array.String).Value(row) != fmt.Sprint(id))) {
 								t.Fatalf("struct at id %d: %v", id, rec)
+							}
+							big := r.Column(11).(*array.Decimal256)
+							wantNumber := "-150000000000000000000000000000000000000"
+							switch {
+							case id == 1:
+								wantNumber = "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+							case id == 2:
+								wantNumber = "-57896044618658097711785492504343953926634992332820282019728792003956564819968"
+							case id%13 == 0:
+								wantNumber = "null"
+							}
+							gotNumber := "null"
+							if !big.IsNull(row) {
+								gotNumber = big.Value(row).BigInt().String()
+							}
+							if gotNumber != wantNumber {
+								t.Fatalf("bignumeric at id %d: got %s, want %s", id, gotNumber, wantNumber)
+							}
+							tags := r.Column(12).(*array.List)
+							start, end := tags.ValueOffsets(row)
+							var gotTags []string
+							for i := start; i < end; i++ {
+								gotTags = append(gotTags, tags.ListValues().(*array.String).Value(int(i)))
+							}
+							var wantTags []string
+							if id%3 == 2 {
+								wantTags = []string{"a", fmt.Sprint(id)}
+							}
+							if tags.IsNull(row) || !slices.Equal(gotTags, wantTags) {
+								t.Fatalf("tags at id %d: %v", id, gotTags)
+							}
+							recs := r.Column(13).(*array.List)
+							start, end = recs.ValueOffsets(row)
+							elements := recs.ListValues().(*array.Struct)
+							if end-start != 1 || int64(elements.Field(0).(*array.Date32).Value(int(start))) != -1 ||
+								elements.Field(1).(*array.Decimal256).Value(int(start)).BigInt().String() != "1" {
+								t.Fatalf("recs at id %d", id)
 							}
 						}
 						total += r.NumRows()
