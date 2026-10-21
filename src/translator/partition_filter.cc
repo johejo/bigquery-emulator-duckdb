@@ -94,6 +94,19 @@ void Equalities(const Expr& expr, Filters& filters) {
   }
 }
 
+// Source restrictions can constrain an UPDATE/MERGE target through key equality.
+// Stop at the same scan boundaries as the ordinary query traversal.
+void InputFilters(const Scan& scan, Filters& filters) {
+  Aliases(scan, filters);
+  if (const auto* project = As<googlesql::ResolvedProjectScan>(scan)) {
+    InputFilters(*project->input_scan(), filters);
+  } else if (const auto* filter = As<googlesql::ResolvedFilterScan>(scan)) {
+    filters.predicates.push_back(filter->filter_expr());
+    Equalities(*filter->filter_expr(), filters);
+    InputFilters(*filter->input_scan(), filters);
+  }
+}
+
 // A subquery containing just SELECT <constant> can fold to a constant. A scan or
 // aggregate over inline rows is deliberately excluded: BigQuery rejects those bounds.
 bool Constant(const Expr& expr) {
@@ -327,6 +340,46 @@ void Check(const Node& node, Filters filters) {
   }
 }
 
+void CheckMerge(const googlesql::ResolvedMergeStmt& merge) {
+  const bool never_matches = Boolean(*merge.merge_expr()) == false;
+  for (const auto& branch : merge.when_clause_list()) {
+    const auto kind = branch->match_type();
+    Filters source;
+    InputFilters(*merge.from_scan(), source);
+    Filters matched = source;
+    matched.predicates.push_back(merge.merge_expr());
+    Equalities(*merge.merge_expr(), matched);
+    if (branch->match_expr() != nullptr) {
+      source.predicates.push_back(branch->match_expr());
+      matched.predicates.push_back(branch->match_expr());
+    }
+    if (kind == googlesql::ResolvedMergeWhen::MATCHED) {
+      if (!never_matches) {
+        CheckTable(*merge.table_scan(), matched);
+        Check(*merge.from_scan(), matched);
+      }
+    } else if (kind == googlesql::ResolvedMergeWhen::NOT_MATCHED_BY_SOURCE) {
+      // ON cannot restrict target rows preserved by the outer join.
+      Filters target;
+      if (branch->match_expr() != nullptr) {
+        target.predicates.push_back(branch->match_expr());
+      }
+      CheckTable(*merge.table_scan(), target);
+      if (!never_matches) {
+        Check(*merge.from_scan(), matched);
+      }
+    } else {
+      // Source rows preserved for insertion are restricted by WHEN, not ON.
+      if (!never_matches) {
+        CheckTable(*merge.table_scan(), matched);
+      }
+      Check(*merge.from_scan(), source);
+    }
+    Children(*branch);
+  }
+  Children(*merge.merge_expr());
+}
+
 }  // namespace
 
 void CheckPartitionFilters(const googlesql::ResolvedStatement& statement) {
@@ -338,23 +391,40 @@ void CheckPartitionFilters(const googlesql::ResolvedStatement& statement) {
       statement.Is<googlesql::ResolvedCreateSnapshotTableStmt>()) {
     return;
   }
-  const googlesql::ResolvedTableScan* target = nullptr;
   if (const auto* update = As<googlesql::ResolvedUpdateStmt>(statement)) {
-    target = update->table_scan();
-  } else if (const auto* del = As<googlesql::ResolvedDeleteStmt>(statement)) {
-    target = del->table_scan();
-  } else if (const auto* merge = As<googlesql::ResolvedMergeStmt>(statement)) {
-    target = merge->table_scan();
-  } else if (const auto* truncate = As<googlesql::ResolvedTruncateStmt>(statement)) {
-    target = truncate->table_scan();
-  }
-  if (target != nullptr) {
-    const auto* table = dynamic_cast<const BigQueryTable*>(target->table());
-    const auto description = table == nullptr ? std::nullopt : table->Describe();
-    if (description && description->metadata.require_partition_filter) {
-      throw ApiError::UnsupportedQuery(
-          "UPDATE, DELETE, MERGE or TRUNCATE on tables with require_partition_filter");
+    Filters filters;
+    filters.predicates.push_back(update->where_expr());
+    Equalities(*update->where_expr(), filters);
+    if (update->from_scan() != nullptr) {
+      InputFilters(*update->from_scan(), filters);
     }
+    CheckTable(*update->table_scan(), filters);
+    if (update->from_scan() != nullptr) {
+      Check(*update->from_scan(), filters);
+    }
+    Children(*update->where_expr());
+    for (const auto& item : update->update_item_list()) {
+      Children(*item);
+    }
+    return;
+  }
+  if (const auto* del = As<googlesql::ResolvedDeleteStmt>(statement)) {
+    Filters filters;
+    filters.predicates.push_back(del->where_expr());
+    CheckTable(*del->table_scan(), filters);
+    Children(*del->where_expr());
+    if (del->using_scan() != nullptr) {
+      Check(*del->using_scan(), filters);
+    }
+    return;
+  }
+  if (const auto* merge = As<googlesql::ResolvedMergeStmt>(statement)) {
+    CheckMerge(*merge);
+    return;
+  }
+  // TRUNCATE removes all partitions without reading the table.
+  if (statement.Is<googlesql::ResolvedTruncateStmt>()) {
+    return;
   }
   // INSERT's target is a write, rather than a scan requiring partition elimination.
   if (const auto* insert = As<googlesql::ResolvedInsertStmt>(statement)) {

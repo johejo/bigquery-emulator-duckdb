@@ -362,6 +362,9 @@ json TableMetadata::ToJson() const {
   }
   if (require_partition_filter) {
     fields["requirePartitionFilter"] = true;
+    if (time_partitioning.has_value()) {
+      fields["timePartitioning"]["requirePartitionFilter"] = true;
+    }
   }
   if (!clustering.empty()) {
     fields["clustering"] = {{"fields", clustering}};

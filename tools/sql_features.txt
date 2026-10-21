@@ -184,6 +184,9 @@ query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION B
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); SELECT a FROM n WHERE d >= DATE '2025-01-01'
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d; ALTER TABLE n SET OPTIONS (require_partition_filter = TRUE)
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); DELETE FROM n WHERE d >= DATE '2025-01-01'
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); UPDATE n SET a = 1 WHERE d = DATE '2025-01-01'
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); MERGE n t USING (SELECT 1 a) s ON t.a = s.a AND t.d = DATE '2025-01-01' WHEN MATCHED THEN UPDATE SET a = s.a
+query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = TRUE); TRUNCATE TABLE n
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d OPTIONS (require_partition_filter = NULL)
 note Partitioning and clustering | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering).
 query Primary and foreign keys | CREATE TABLE n (a INT64, PRIMARY KEY (a) NOT ENFORCED)
