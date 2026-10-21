@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 39 | 2 | 30 | 0 |
+| [Geography functions](#geography-functions) | 40 | 2 | 29 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -268,7 +268,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | Unsupported |  |  |
 | [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | Unsupported |  |  |
 | [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Supported | S2 function |  |
-| [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Unsupported |  |  |
+| [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Supported | S2 function |  |
 | [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Supported | S2 function |  |
 | [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | Unsupported |  |  |
 | [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Supported | S2 function |  |

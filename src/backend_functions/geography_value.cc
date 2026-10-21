@@ -24,6 +24,7 @@
 #include "s2/s1angle.h"
 #include "s2/s2boolean_operation.h"
 #include "s2/s2builder.h"
+#include "s2/s2builderutil_closed_set_normalizer.h"
 #include "s2/s2builderutil_s2point_vector_layer.h"
 #include "s2/s2builderutil_s2polygon_layer.h"
 #include "s2/s2builderutil_s2polyline_vector_layer.h"
@@ -692,8 +693,8 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
 
 namespace {
 
-// The output of a union, which the next one reads.
-struct Union {
+// The output of a boolean operation, which a subsequent union can read.
+struct BooleanResult {
   std::vector<S2Point> points;
   std::vector<std::unique_ptr<S2Polyline>> lines;
   S2Polygon polygon;
@@ -701,7 +702,7 @@ struct Union {
 
 // The geography of `output`, whose points on a linestring or a polygon's ring, which S2 keeps
 // unless they are its vertices, are dropped as BigQuery drops them.
-Geography Read(const Union& output) {
+Geography Read(const BooleanResult& output) {
   Geography geography = FromPolygon(output.polygon);
   absl::flat_hash_set<S2Point> vertices;
   for (const std::unique_ptr<S2Polyline>& polyline : output.lines) {
@@ -751,10 +752,10 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
   line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
   line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
   line_options.set_duplicate_edges(PolylineLayer::Options::DuplicateEdges::MERGE);
-  auto output = std::make_unique<Union>();
+  auto output = std::make_unique<BooleanResult>();
   auto index = std::make_unique<MutableS2ShapeIndex>();
   for (const std::unique_ptr<MutableS2ShapeIndex>& input : inputs) {
-    auto next = std::make_unique<Union>();
+    auto next = std::make_unique<BooleanResult>();
     std::vector<std::unique_ptr<S2Builder::Layer>> layers;
     layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&next->points));
     layers.push_back(std::make_unique<PolylineLayer>(&next->lines, line_options));
@@ -779,6 +780,30 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
     output = std::move(next);
   }
   return Read(*output);
+}
+
+absl::StatusOr<Geography> Intersection(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
+  S2BooleanOperation::Options options;
+  options.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
+  options.set_polyline_model(S2BooleanOperation::PolylineModel::CLOSED);
+  options.set_polyline_loops_have_boundaries(false);
+  using PolylineLayer = s2builderutil::S2PolylineVectorLayer;
+  PolylineLayer::Options line_options;
+  line_options.set_polyline_type(S2Builder::Graph::PolylineType::WALK);
+  line_options.set_edge_type(S2Builder::EdgeType::UNDIRECTED);
+  line_options.set_duplicate_edges(PolylineLayer::Options::DuplicateEdges::MERGE);
+  BooleanResult output;
+  std::vector<std::unique_ptr<S2Builder::Layer>> layers;
+  layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
+  layers.push_back(std::make_unique<PolylineLayer>(&output.lines, line_options));
+  layers.push_back(std::make_unique<s2builderutil::S2PolygonLayer>(&output.polygon));
+  S2BooleanOperation operation(S2BooleanOperation::OpType::INTERSECTION,
+                               s2builderutil::NormalizeClosedSet(std::move(layers)), options);
+  S2Error error;
+  if (!operation.Build(a, b, &error)) {
+    return absl::InternalError("S2BooleanOperation failed: " + std::string(error.message()));
+  }
+  return Read(output);
 }
 
 }  // namespace bigquery_emulator_duckdb::backend_functions
