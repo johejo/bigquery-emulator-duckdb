@@ -160,6 +160,8 @@ ring. Additional limits are:
 `ST_MAXDISTANCE` measures over edges, as BigQuery does, although its documentation describes
 vertices.
 
+`ST_BOUNDINGBOX` latitude bounds can differ from BigQuery in the last floating-point bit.
+
 ### RANGE_SESSIONIZE
 
 The range column, partitioning columns and sessionize option must be non-NULL literals.

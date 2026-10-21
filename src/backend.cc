@@ -273,6 +273,11 @@ std::string DoubleText(double number, duckdb_value value) {
     return number < 0 ? "-Infinity" : "Infinity";
   }
   const double magnitude = std::abs(number);
+  // BigQuery uses two significant digits for the smallest subnormal, which bounds at zero
+  // in ST_BOUNDINGBOX return. to_chars would write 5e-324 instead.
+  if (magnitude == std::numeric_limits<double>::denorm_min()) {
+    return number < 0 ? "-4.9E-324" : "4.9E-324";
+  }
   if (number == 0 || (magnitude >= 1e-3 && magnitude < 1e7)) {
     return ValueString(value);
   }

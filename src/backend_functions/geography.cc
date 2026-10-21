@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <numbers>
 #include <numeric>
@@ -36,6 +37,8 @@
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
 #include "s2/s2hausdorff_distance_query.h"
+#include "s2/s2latlng.h"
+#include "s2/s2latlng_rect.h"
 #include "s2/s2lax_polygon_shape.h"
 #include "s2/s2lax_polyline_shape.h"
 #include "s2/s2point.h"
@@ -410,6 +413,111 @@ absl::StatusOr<decltype(kFunction(Geography{}))> OfGeography(const Arguments& ar
   return kFunction(geography);
 }
 
+// A closed point set operation after snapping both inputs together.
+template <S2BooleanOperation::OpType kOperation>
+absl::StatusOr<std::string> SetOperation(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Geography result,
+      Relate<Geography>(a, b, [](const MutableS2ShapeIndex& x, const MutableS2ShapeIndex& y) {
+        return ClosedSetOperation(x, y, kOperation);
+      }));
+  return GeographyText(result);
+}
+
+absl::StatusOr<std::string> Boundary(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  std::vector<Geography> parts;
+  for (const std::vector<S2Point>& line : geography.lines) {
+    if (!Same(line.front(), line.back())) {
+      parts.push_back(PointGeography(line.front()));
+      parts.push_back(PointGeography(line.back()));
+    }
+  }
+  if (!geography.Full()) {
+    for (const Polygon& polygon : geography.polygons) {
+      for (const std::vector<S2Point>& loop : polygon) {
+        std::vector<S2Point> line = loop;
+        line.push_back(loop.front());
+        parts.push_back({.points = {}, .lines = {std::move(line)}, .polygons = {}});
+      }
+    }
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography boundary, Combine(parts));
+  return GeographyText(boundary);
+}
+
+struct BoundingBox {
+  double xmin;
+  double ymin;
+  double xmax;
+  double ymax;
+};
+
+void SetResult(duckdb_vector output, idx_t row, const BoundingBox& box) {
+  const std::array<double, 4> values = {box.xmin, box.ymin, box.xmax, box.ymax};
+  for (idx_t i = 0; i < values.size(); ++i) {
+    backend_functions::SetResult(duckdb_struct_vector_get_child(output, i), row, values.at(i));
+  }
+}
+
+std::optional<BoundingBox> Bounds(const Geography& geography) {
+  if (geography.Empty()) {
+    return std::nullopt;
+  }
+  BoundingBox box{.xmin = -180, .ymin = 90, .xmax = 180, .ymax = -90};
+  std::vector<std::pair<double, double>> longitudes;
+  const auto add = [&](const S2LatLngRect& bound) {
+    box.ymin = std::min(box.ymin, bound.lat_lo().degrees());
+    box.ymax = std::max(box.ymax, bound.lat_hi().degrees());
+    const double lo = bound.lng_lo().degrees();
+    const double hi = bound.lng_hi().degrees();
+    if (bound.lng().is_inverted()) {
+      longitudes.emplace_back(-180, hi);
+      longitudes.emplace_back(lo, 180);
+    } else {
+      longitudes.emplace_back(lo, hi);
+    }
+  };
+  for (const S2Point& point : geography.points) {
+    add(S2LatLngRect::FromPoint(S2LatLng(point)));
+  }
+  for (const std::vector<S2Point>& line : geography.lines) {
+    add(S2Polyline(line).GetRectBound());
+  }
+  if (!geography.polygons.empty()) {
+    add(ToS2Polygon(geography)->GetRectBound());
+  }
+  // The complement of the largest uncovered longitude gap is the smallest interval. Taking
+  // pairwise rectangle unions can miss it when there are several disconnected components.
+  std::ranges::sort(longitudes);
+  double end = longitudes.front().second;
+  const double last = std::ranges::max(longitudes, {}, &std::pair<double, double>::second).second;
+  double gap = longitudes.front().first + 360 - last;
+  box.xmin = longitudes.front().first;
+  box.xmax = last;
+  for (size_t i = 1; i < longitudes.size(); ++i) {
+    const auto [lo, hi] = longitudes.at(i);
+    if (lo - end > gap) {
+      gap = lo - end;
+      box.xmin = lo;
+      box.xmax = end + 360;
+    }
+    end = std::max(end, hi);
+  }
+  // BigQuery rounds each bound outward by one representable degree value, including zero,
+  // whose neighbors are subnormal. Full longitude intervals and the poles stay in range.
+  const double infinity = std::numeric_limits<double>::infinity();
+  if (gap > 0) {
+    box.xmin = std::nextafter(box.xmin, -infinity);
+    box.xmax = std::nextafter(box.xmax, infinity);
+  }
+  box.ymin = std::max(-90.0, std::nextafter(box.ymin, -infinity));
+  box.ymax = std::min(90.0, std::nextafter(box.ymax, infinity));
+  return box;
+}
+
 // The highest dimension of the parts of a geography, -1 for the empty geography.
 int64_t Dimension(const Geography& geography) {
   return !geography.polygons.empty() ? 2
@@ -756,13 +864,19 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_intersects", {kVarchar, kVarchar}, kBoolean,
            EachRow<OfGeographies<Intersects>>);
   Register(connection, "bq_st_intersection", {kVarchar, kVarchar}, kVarchar,
-           EachRow<[](const Arguments& args) -> absl::StatusOr<std::string> {
-             GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
-             GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
-             GOOGLESQL_ASSIGN_OR_RETURN(const Geography intersection,
-                                        Relate<Geography>(a, b, Intersection));
-             return GeographyText(intersection);
-           }>);
+           EachRow<SetOperation<S2BooleanOperation::OpType::INTERSECTION>>);
+  Register(connection, "bq_st_difference", {kVarchar, kVarchar}, kVarchar,
+           EachRow<SetOperation<S2BooleanOperation::OpType::DIFFERENCE>>);
+  Register(connection, "bq_st_boundary", {kVarchar}, kVarchar, EachRow<Boundary>);
+  {
+    const LogicalType varchar(duckdb_create_logical_type(kVarchar));
+    const LogicalType dbl(duckdb_create_logical_type(kDouble));
+    std::array<duckdb_logical_type, 4> fields = {dbl.get(), dbl.get(), dbl.get(), dbl.get()};
+    std::array<const char*, 4> names = {"xmin", "ymin", "xmax", "ymax"};
+    const LogicalType box(duckdb_create_struct_type(fields.data(), names.data(), fields.size()));
+    Register(connection, "bq_st_boundingbox", {varchar.get()}, box.get(),
+             EachRow<OfGeography<Bounds>>);
+  }
   Register(connection, "bq_st_touches", {kVarchar, kVarchar}, kBoolean,
            EachRow<OfGeographies<Touches>>);
   Register(connection, "bq_st_covers", {kVarchar, kVarchar}, kBoolean,

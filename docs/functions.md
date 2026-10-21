@@ -48,7 +48,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 40 | 2 | 29 | 0 |
+| [Geography functions](#geography-functions) | 43 | 2 | 26 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 0 | 0 | 0 | 12 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -235,8 +235,8 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a GEOMETRYCOLLECTION; ST_ASGEOJSON of a LINESTRING; ST_ASGEOJSON of a POLYGON. |
 | [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | Supported | S2 function |  |
 | [`ST_AZIMUTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_azimuth) | Supported | S2 function |  |
-| [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | Unsupported |  |  |
-| [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | Unsupported |  |  |
+| [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | Supported | S2 function |  |
+| [`ST_BOUNDINGBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox) | Supported | S2 function |  |
 | [`ST_BUFFER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_buffer) | Unsupported |  |  |
 | [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | Unsupported |  |  |
 | [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | Unsupported |  |  |
@@ -247,7 +247,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`ST_CONVEXHULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull) | Unsupported |  |  |
 | [`ST_COVEREDBY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_coveredby) | Supported | S2 function |  |
 | [`ST_COVERS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_covers) | Supported | S2 function |  |
-| [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | Unsupported |  |  |
+| [`ST_DIFFERENCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_difference) | Supported | S2 function |  |
 | [`ST_DIMENSION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_dimension) | Supported | S2 function |  |
 | [`ST_DISJOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_disjoint) | Supported | S2 function |  |
 | [`ST_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_distance) | Partial | S2 function | Unsupported: use_spheroid. |

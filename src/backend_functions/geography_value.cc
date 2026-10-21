@@ -782,7 +782,9 @@ absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts) {
   return Read(*output);
 }
 
-absl::StatusOr<Geography> Intersection(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
+absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
+                                             const MutableS2ShapeIndex& b,
+                                             S2BooleanOperation::OpType operation) {
   S2BooleanOperation::Options options;
   options.set_polygon_model(S2BooleanOperation::PolygonModel::CLOSED);
   options.set_polyline_model(S2BooleanOperation::PolylineModel::CLOSED);
@@ -797,10 +799,9 @@ absl::StatusOr<Geography> Intersection(const MutableS2ShapeIndex& a, const Mutab
   layers.push_back(std::make_unique<s2builderutil::S2PointVectorLayer>(&output.points));
   layers.push_back(std::make_unique<PolylineLayer>(&output.lines, line_options));
   layers.push_back(std::make_unique<s2builderutil::S2PolygonLayer>(&output.polygon));
-  S2BooleanOperation operation(S2BooleanOperation::OpType::INTERSECTION,
-                               s2builderutil::NormalizeClosedSet(std::move(layers)), options);
+  S2BooleanOperation op(operation, s2builderutil::NormalizeClosedSet(std::move(layers)), options);
   S2Error error;
-  if (!operation.Build(a, b, &error)) {
+  if (!op.Build(a, b, &error)) {
     return absl::InternalError("S2BooleanOperation failed: " + std::string(error.message()));
   }
   return Read(output);

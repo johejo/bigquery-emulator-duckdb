@@ -10,6 +10,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "s2/mutable_s2shape_index.h"
+#include "s2/s2boolean_operation.h"
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
 
@@ -122,8 +123,10 @@ absl::StatusOr<Geography> BuildPolygon(const std::vector<std::vector<S2Point>>& 
 // polygons the order of the parts they came from.
 absl::StatusOr<Geography> Combine(const std::vector<Geography>& parts);
 
-// The closed point set intersection of two shape indexes already snapped together. Degenerate
+// A closed point set operation on two shape indexes already snapped together. Degenerate
 // polygon shells become lines or points, and degenerate lines become points.
-absl::StatusOr<Geography> Intersection(const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b);
+absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
+                                             const MutableS2ShapeIndex& b,
+                                             S2BooleanOperation::OpType operation);
 
 }  // namespace bigquery_emulator_duckdb::backend_functions

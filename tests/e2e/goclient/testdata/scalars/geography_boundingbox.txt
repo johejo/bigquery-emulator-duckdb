@@ -1,0 +1,100 @@
+## GEOGRAPHY bounding rectangles
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundingbox
+# The polygon examples are documented. Round away floating-point error in spherical bounds.
+
+SELECT ST_BOUNDINGBOX(CAST(NULL AS GEOGRAPHY))
+=> null
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POINT EMPTY'))
+=> null
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING EMPTY'))
+=> null
+
+SELECT TYPEOF(ST_BOUNDINGBOX(ST_GEOGPOINT(1, 2)))
+=> "STRUCT<xmin FLOAT64, ymin FLOAT64, xmax FLOAT64, ymax FLOAT64>"
+
+SELECT ROUND(b.xmin, 10) = 1 AND ROUND(b.ymin, 10) = 2 AND ROUND(b.xmax, 10) = 1 AND ROUND(b.ymax, 10) = 2 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(1, 2)) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = -125 AND ROUND(b.ymin, 10) = 46 AND ROUND(b.xmax, 10) = -117 AND ROUND(b.ymax, 10) = 49 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((-125 48, -124 46, -117 46, -117 49, -125 48))')) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 172 AND ROUND(b.ymin, 10) = 53 AND ROUND(b.xmax, 10) = 230 AND ROUND(b.ymax, 10) = 70 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((172 53, -130 55, -141 70, 172 53))')) b)
+=> "true"
+
+SELECT b.xmin = -180 AND b.ymin = -90 AND b.xmax = 180 AND b.ymax = 90 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('fullglobe')) b)
+=> "true"
+
+# Equatorial arcs follow constant latitude. Disconnected points need no connecting arc.
+SELECT ROUND(b.xmin, 10) = 0 AND ROUND(b.xmax, 10) = 2 AND ROUND(b.ymin, 10) = 0 AND ROUND(b.ymax, 10) = 0 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0)')) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 170 AND ROUND(b.xmax, 10) = 190 AND ROUND(b.ymin, 10) = 0 AND ROUND(b.ymax, 10) = 0 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(170 0, -170 0)')) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 170 AND ROUND(b.xmax, 10) = 190 AND ROUND(b.ymin, 10) = -5 AND ROUND(b.ymax, 10) = 5 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('MULTIPOINT(170 -5, -170 5)')) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 0 AND ROUND(b.xmax, 10) = 2 AND ROUND(b.ymin, 10) = 0 AND ROUND(b.ymax, 10) = 2 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((0 0, 2 0, 0 2, 0 0))')) b)
+=> "true"
+
+SELECT ROUND(b.xmin, 10) = 0 AND ROUND(b.xmax, 10) = 9 AND ROUND(b.ymin, 10) = 0 AND ROUND(b.ymax, 10) = 9 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(9 9), LINESTRING(0 0, 2 0))')) b)
+=> "true"
+
+SELECT ST_BOUNDINGBOX(SAFE.ST_GEOGPOINT(0, 100))
+=> null
+
+SELECT ROUND((SAFE.ST_BOUNDINGBOX(ST_GEOGPOINT(1, 2))).xmin, 10)
+=> "1.0"
+
+# A great circle between equal latitudes reaches its extreme between the vertices.
+# For these endpoints its northern latitude is atan(sqrt(2)), by spherical geometry.
+SELECT ROUND(b.xmin, 10) = -45 AND ROUND(b.xmax, 10) = 45 AND ROUND(b.ymin, 10) = 45 AND ROUND(b.ymax, 10) = ROUND(ATAN(SQRT(2)) * 180 / ACOS(-1), 10) FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(-45 45, 45 45)')) b)
+=> "true"
+
+SELECT ROUND(b.ymin, 10) = ROUND(-ATAN(SQRT(2)) * 180 / ACOS(-1), 10) AND ROUND(b.ymax, 10) = -45 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(-45 -45, 45 -45)')) b)
+=> "true"
+
+SELECT b.xmin = -180 AND b.xmax = 180 AND ROUND(b.ymin, 10) = 80 AND b.ymax = 90 FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((0 80, 120 80, -120 80, 0 80))')) b)
+=> "true"
+
+SELECT COUNTIF(ST_BOUNDINGBOX(g) IS NULL) FROM UNNEST([ST_GEOGPOINT(1, 2), NULL, ST_GEOGFROMTEXT('POINT EMPTY'), ST_GEOGFROMTEXT('fullglobe')]) g
+=> "2"
+
+SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0))
+=> {"f":[{"v":"-4.9E-324"},{"v":"-4.9E-324"},{"v":"4.9E-324"},{"v":"4.9E-324"}]}
+
+# Source: BigQuery answers collected by the maintainer.
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('MULTIPOINT(-170 0, -60 1, 60 2, 170 3)'))
+=> {"f":[{"v":"59.999999999999986"},{"v":"-4.9E-324"},{"v":"300.00000000000006"},{"v":"3.000000000000001"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('MULTIPOINT(0 0, 180 0)'))
+=> {"f":[{"v":"-4.9E-324"},{"v":"-4.9E-324"},{"v":"180.00000000000003"},{"v":"4.9E-324"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('MULTIPOINT(-120 0, 0 0, 120 0)'))
+=> {"f":[{"v":"-120.0"},{"v":"-4.9E-324"},{"v":"120.0"},{"v":"4.9E-324"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(10, 90))
+=> {"f":[{"v":"9.999999999999998"},{"v":"89.99999999999999"},{"v":"10.000000000000002"},{"v":"90.0"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(-180, 0))
+=> {"f":[{"v":"179.99999999999997"},{"v":"-4.9E-324"},{"v":"180.00000000000003"},{"v":"4.9E-324"}]}
+
+# Source: BigQuery answers collected by the maintainer (edge and polygon rounding).
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(0 0, 2 0)'))
+=> {"f":[{"v":"-4.9E-324"},{"v":"-3.883275617352508E-14"},{"v":"2.0000000000000004"},{"v":"3.883275617352508E-14"}]}
+
+# Round the sampled bounds to 12 decimal places to allow a one-ULP S2 difference.
+SELECT STRUCT(ROUND(b.xmin, 12) AS xmin, ROUND(b.ymin, 12) AS ymin, ROUND(b.xmax, 12) AS xmax, ROUND(b.ymax, 12) AS ymax) FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('LINESTRING(-45 45, 45 45)')) b)
+=> {"f":[{"v":"-45.0"},{"v":"45.0"},{"v":"45.0"},{"v":"54.735610317245"}]}
+
+# Round the sampled bounds to 12 decimal places to allow a one-ULP S2 difference.
+SELECT STRUCT(ROUND(b.xmin, 12) AS xmin, ROUND(b.ymin, 12) AS ymin, ROUND(b.xmax, 12) AS xmax, ROUND(b.ymax, 12) AS ymax) FROM (SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((-125 48, -124 46, -117 46, -117 49, -125 48))')) b)
+=> {"f":[{"v":"-125.0"},{"v":"46.0"},{"v":"-117.0"},{"v":"49.0"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('fullglobe'))
+=> {"f":[{"v":"-180.0"},{"v":"-90.0"},{"v":"180.0"},{"v":"90.0"}]}
+
+SELECT ST_BOUNDINGBOX(ST_GEOGFROMTEXT('POLYGON((0 80, 120 80, -120 80, 0 80))'))
+=> {"f":[{"v":"-180.0"},{"v":"79.99999999999996"},{"v":"180.0"},{"v":"90.0"}]}
