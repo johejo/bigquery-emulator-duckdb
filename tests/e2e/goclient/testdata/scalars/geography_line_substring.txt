@@ -1,0 +1,54 @@
+# BigQuery observations for geography_line_substring
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 20)'), 0, 1)
+=> "LINESTRING(0 0, 10 0, 10 20)"
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 20)'), 0.2, 0.8)
+=> "LINESTRING(6 0, 10 0, 10 14)"
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), 0, 0)
+=> "POINT(0 0)"
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), 1, 1)
+=> "POINT(10 0)"
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('POINT EMPTY'), 0, 1)
+=> error: ST_LINESUBSTRING: Argument to STLineSubString must be a single line geography; an argument was the empty geography. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('POINT EMPTY'), 1, 0)
+=> error: ST_LINESUBSTRING: Argument to STLineSubString must be a single line geography; an argument was the empty geography. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('POINT(0 0)'), 0, 1)
+=> error: ST_LINESUBSTRING: Argument to STLineSubString must be a single line geography; an argument contained a point. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('MULTILINESTRING((0 0, 1 0), (2 0, 3 0))'), 0, 1)
+=> error: ST_LINESUBSTRING: Argument to STLineSubString must be a single line geography; an argument had 2 lines. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), 0.8, 0.2)
+=> error: ST_LINESUBSTRING: Second argument to STLineSubString must be <= Third argument. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), -0.1, 1)
+=> error: ST_LINESUBSTRING: Second argument to STLineSubString must be a float between 0.0 and 1.0. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), CAST('NaN' AS FLOAT64), 1)
+=> error: ST_LINESUBSTRING: Second argument to STLineSubString must be a float between 0.0 and 1.0. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), 0, CAST('+inf' AS FLOAT64))
+=> error: ST_LINESUBSTRING: Third argument to STLineSubString must be a float between 0.0 and 1.0. Error in ST_LINESUBSTRING expression
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0)'), NULL, 1)
+=> null
+
+# BigQuery geography function documentation.
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(20 70, 70 60, 10 70, 70 70)'), 0.5, 1)
+=> "LINESTRING(49.4760661523471 67.2419539103851, 10 70, 70 70)"
+
+SELECT ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(20 70, 70 60, 10 70, 70 70)'), 0.5, 0.5)
+=> "POINT(49.4760661523471 67.2419539103851)"
+
+SELECT SAFE.ST_LINESUBSTRING(ST_GEOGFROMTEXT('LINESTRING(0 0, 1 1)'), 1, 0)
+=> null
+
+SELECT ST_LINESUBSTRING(CAST(NULL AS GEOGRAPHY), 0, 1)
+=> null
