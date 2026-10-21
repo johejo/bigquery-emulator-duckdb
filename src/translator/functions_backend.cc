@@ -799,6 +799,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_DWITHIN", spheroid("bq_st_dwithin", {3, 4}, "ST_DWITHIN")},
       {"ST_EQUALS", call("bq_st_equals", 2)},
       {"ST_INTERSECTS", call("bq_st_intersects", 2)},
+      {"ST_INTERSECTION", call("bq_st_intersection", 2)},
       {"ST_DISJOINT", {{.arity = 2, .spelling = "(NOT bq_st_intersects($1, $2))"}}},
       {"ST_TOUCHES", call("bq_st_touches", 2)},
       {"ST_COVERS", call("bq_st_covers", 2)},

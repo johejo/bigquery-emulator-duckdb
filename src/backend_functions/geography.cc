@@ -305,11 +305,10 @@ void AddSnapped(Snapped snapped, MutableS2ShapeIndex& index) {
   }
 }
 
-// Whether `predicate` holds for nonempty `a` and `b` as BigQuery's predicates take them: snapped
-// together, so that a vertex of one within a micrometer of a vertex or an edge of the other
-// meets it there.
-template <typename Predicate>
-absl::StatusOr<bool> Relate(const Geography& a, const Geography& b, Predicate predicate) {
+// Applies `predicate` to `a` and `b` snapped together, so that a vertex of one within a
+// micrometer of a vertex or an edge of the other meets it there.
+template <typename Result = bool, typename Predicate>
+absl::StatusOr<Result> Relate(const Geography& a, const Geography& b, Predicate predicate) {
   S2Builder builder{
       S2Builder::Options(s2builderutil::IdentitySnapFunction(S2Earth::MetersToAngle(1e-6)))};
   Snapped snapped_a;
@@ -756,6 +755,14 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean, EachRow<Equals>);
   Register(connection, "bq_st_intersects", {kVarchar, kVarchar}, kBoolean,
            EachRow<OfGeographies<Intersects>>);
+  Register(connection, "bq_st_intersection", {kVarchar, kVarchar}, kVarchar,
+           EachRow<[](const Arguments& args) -> absl::StatusOr<std::string> {
+             GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+             GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+             GOOGLESQL_ASSIGN_OR_RETURN(const Geography intersection,
+                                        Relate<Geography>(a, b, Intersection));
+             return GeographyText(intersection);
+           }>);
   Register(connection, "bq_st_touches", {kVarchar, kVarchar}, kBoolean,
            EachRow<OfGeographies<Touches>>);
   Register(connection, "bq_st_covers", {kVarchar, kVarchar}, kBoolean,
