@@ -174,6 +174,12 @@ constexpr std::array kViews = {
         .rows = info::TablesRows,
     },
     ViewDefinition{
+        .name = "TABLE_SNAPSHOTS",
+        .scope = ViewScope::kDatasetOrRegion,
+        .columns = info::TableSnapshotsColumns,
+        .rows = info::TableSnapshotsRows,
+    },
+    ViewDefinition{
         .name = "TABLE_OPTIONS",
         .scope = ViewScope::kDatasetOrRegion,
         .columns = info::TableOptionsColumns,

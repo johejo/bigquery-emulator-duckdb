@@ -37,8 +37,8 @@ struct TranslatedStatement;
 // JobStatistics2.statementType of a multi-statement query.
 inline constexpr char kScriptStatementType[] = "SCRIPT";
 
-// What kind of table a dataset holds. The emulator creates only tables and views.
-enum class TableType : std::uint8_t { kTable, kView };
+// What kind of table a dataset holds. The emulator creates only tables, table snapshots and views.
+enum class TableType : std::uint8_t { kTable, kSnapshot, kView };
 
 struct TableListEntry {
   std::string table_id;
@@ -60,6 +60,10 @@ struct TableInfo {
   int64_t storage_id = 0;  // DuckDB table OID; distinguishes a dropped/recreated destination.
   std::optional<std::string> view_query;
 };
+
+// Throws ApiError::Invalid with BigQuery's message for a query, load or Storage write when `table`
+// is a table snapshot, whose rows cannot change.
+void RejectSnapshotWrite(const TableInfo& table);
 
 struct InsertError {
   size_t index;
@@ -304,6 +308,9 @@ class Emulator {
                            Backend* session = nullptr, JobLocation* location = nullptr);
   // Rejects DDL targets in DuckDB's internal schemas.
   static void CheckDdlTarget(const TranslatedStatement& translation);
+  // Rejects DDL that would change a table snapshot, as `backend` sees it, other than DROP SNAPSHOT
+  // TABLE, and DROP SNAPSHOT TABLE of a table that is not one.
+  static void CheckSnapshotTarget(Backend& backend, const TranslatedStatement& translation);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
   // for any other statement.

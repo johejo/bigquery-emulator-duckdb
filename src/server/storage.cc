@@ -35,6 +35,7 @@
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
+#include "src/project.h"
 #include "src/references.h"
 #include "src/server/storage_codec.h"
 
@@ -53,6 +54,13 @@ class RpcError : public std::runtime_error {
 
  private:
   grpc::StatusCode code_;
+};
+
+// An error that ends an AppendRows connection rather than answering one of its requests, as
+// BigQuery ends one whose destination cannot be appended to.
+class ConnectionError : public RpcError {
+ public:
+  using RpcError::RpcError;
 };
 
 [[noreturn]] void Fail(grpc::StatusCode code, const std::string& message) {
@@ -573,7 +581,18 @@ class WriteService final : public pb::BigQueryWrite::Service {
     pb::AppendRowsRequest request;
     while (rpc->Read(&request)) {
       pb::AppendRowsResponse response;
-      const grpc::Status status = Guard([&] { Append(request, connection, response); });
+      bool ends = false;
+      grpc::Status status = Guard([&] {
+        try {
+          Append(request, connection, response);
+        } catch (const ConnectionError&) {
+          ends = true;
+          throw;
+        }
+      });
+      if (ends) {
+        return status;
+      }
       if (!status.ok()) {
         response.mutable_error()->set_code(status.error_code());
         response.mutable_error()->set_message(status.error_message());
@@ -725,12 +744,37 @@ class WriteService final : public pb::BigQueryWrite::Service {
     std::shared_ptr<WriteState> lease;
   };
 
-  TableInfo DestinationInfo(const TableReference& table) {
+  // The table that a stream writes to, or the default stream `appended` appends to. BigQuery names
+  // a snapshot by its project number in the messages that reject it, and ends the AppendRows
+  // connection that appends to one.
+  TableInfo DestinationInfo(const TableReference& table, const std::string& appended = "") {
     TableInfo info = emulator_.GetTable(table, false);
     if (info.view_query) {
       Fail(grpc::StatusCode::INVALID_ARGUMENT, "Cannot write to a logical view");
     }
+    if (info.metadata.snapshot.has_value()) {
+      const std::string name =
+          ProjectNumber(table.project_id) + ":" + table.dataset_id + "." + table.table_id;
+      if (!appended.empty()) {
+        throw ConnectionError(
+            grpc::StatusCode::INVALID_ARGUMENT,
+            "The destination table `" + name + "` is non-appendable Entity: " + appended);
+      }
+      Fail(grpc::StatusCode::INVALID_ARGUMENT,
+           "Can not create stream metadata for table " + name +
+               " with type SNAPSHOT. Allowed type: TABLE, BIGLAKE with streaming. Entity: " +
+               TablePath(table));
+    }
     return info;
+  }
+
+  // The project number of `project`, or its ID for a project registered without one.
+  [[nodiscard]] std::string ProjectNumber(const std::string& project) const {
+    const std::vector<Project>& projects = emulator_.ListProjects();
+    const auto registered = std::ranges::find(projects, project, &Project::project_id);
+    return registered != projects.end() && registered->numeric_id.has_value()
+               ? *registered->numeric_id
+               : project;
   }
 
   static std::shared_ptr<WriteState> NewStream(const TableInfo& info, const std::string& name,
@@ -767,7 +811,7 @@ class WriteService final : public pb::BigQueryWrite::Service {
     }
     const auto table = ParseTable(emulator_, name.substr(0, name.rfind("/streams/")));
     const std::string canonical = TablePath(table) + "/streams/" + parts.at(7);
-    const auto info = DestinationInfo(table);
+    const auto info = DestinationInfo(table, canonical);
     auto found = streams_.find(canonical);
     if (IsDefault(canonical) &&
         (found == streams_.end() || found->second->storage_id != info.storage_id)) {

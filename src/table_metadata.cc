@@ -375,18 +375,24 @@ json TableMetadata::ToJson() const {
   if (expiration_time.has_value()) {
     fields["expirationTime"] = std::to_string(*expiration_time);
   }
-  if (clone.has_value()) {
-    fields["cloneDefinition"] = {
+  const auto base_table = [](const BaseTableDefinition& definition, const char* time) {
+    return json{
         {
             "baseTableReference",
             {
-                {"projectId", clone->base_table.project_id},
-                {"datasetId", clone->base_table.dataset_id},
-                {"tableId", clone->base_table.table_id},
+                {"projectId", definition.base_table.project_id},
+                {"datasetId", definition.base_table.dataset_id},
+                {"tableId", definition.base_table.table_id},
             },
         },
-        {"cloneTime", clone->clone_time},
+        {time, definition.time},
     };
+  };
+  if (clone.has_value()) {
+    fields["cloneDefinition"] = base_table(*clone, "cloneTime");
+  }
+  if (snapshot.has_value()) {
+    fields["snapshotDefinition"] = base_table(*snapshot, "snapshotTime");
   }
   return fields;
 }

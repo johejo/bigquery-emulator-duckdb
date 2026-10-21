@@ -193,8 +193,9 @@ absl::Status CheckCastTypeParameters(std::string_view sql, bool expression) {
   return absl::OkStatus();
 }
 
-// COPY and CLONE require a base-table scan, so reject views before their inlining changes
-// the scan's shape. LIKE likewise needs the source's stored metadata rather than its query.
+// COPY, CLONE and CREATE SNAPSHOT TABLE require a base-table scan, so reject views before their
+// inlining changes the scan's shape. LIKE likewise needs the source's stored metadata rather than
+// its query.
 absl::Status CheckViewSource(const googlesql::Table* table, std::string_view operation) {
   if (dynamic_cast<const googlesql::SQLView*>(table) == nullptr) {
     return absl::OkStatus();
@@ -205,10 +206,10 @@ absl::Status CheckViewSource(const googlesql::Table* table, std::string_view ope
                                                    path.at(1), ".", path.at(2),
                                                    "`, which is VIEW."));
   }
-  return absl::InvalidArgumentError(
-      absl::StrCat("Invalid value: Cannot clone ", path.at(0), ":", path.at(1), ".", path.at(2),
-                   " which has type VIEW. Allowed types: [",
-                   operation == "CLONE" ? "TABLE, SNAPSHOT" : "TABLE", "]"));
+  return absl::InvalidArgumentError(absl::StrCat(
+      "Invalid value: Cannot ", operation == "SNAPSHOT" ? "snapshot " : "clone ", path.at(0), ":",
+      path.at(1), ".", path.at(2), " which has type VIEW. Allowed types: [",
+      operation == "COPY" ? "TABLE" : "TABLE, SNAPSHOT", "]"));
 }
 
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
@@ -237,6 +238,14 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
           GOOGLESQL_RETURN_IF_ERROR(
               CheckViewSource(scan->GetAs<googlesql::ResolvedTableScan>()->table(), operation));
         }
+      }
+    }
+    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateSnapshotTableStmt>()) {
+      const auto* scan =
+          statement->GetAs<googlesql::ResolvedCreateSnapshotTableStmt>()->clone_from();
+      if (scan->Is<googlesql::ResolvedTableScan>()) {
+        GOOGLESQL_RETURN_IF_ERROR(
+            CheckViewSource(scan->GetAs<googlesql::ResolvedTableScan>()->table(), "SNAPSHOT"));
       }
     }
     if (statement != nullptr && statement->Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {

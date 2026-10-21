@@ -35,4 +35,15 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
   }
 }
 
+// A table snapshot is a DuckDB table; DROP SNAPSHOT TABLE drops only snapshots, which the
+// emulator checks when it runs.
+std::optional<std::string> DropSnapshotTable(const googlesql::ResolvedDropSnapshotTableStmt& drop,
+                                             const Scope& scope) {
+  const auto path = TargetTable(drop.name_path(), scope);
+  if (!path) {
+    return std::nullopt;
+  }
+  return "DROP TABLE " + std::string(drop.is_if_exists() ? "IF EXISTS " : "") + *path;
+}
+
 }  // namespace bigquery_emulator_duckdb::translator

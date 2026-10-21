@@ -198,6 +198,19 @@ std::shared_ptr<const Job> Emulator::RunJob(std::shared_ptr<Job> job, JobLocatio
 
 std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
   request.project_id = ResolveProject(request.project_id);
+  // BigQuery rejects a load into a table snapshot when the job is inserted, rather than failing
+  // the job as it does a query's.
+  try {
+    TableReference destination = request.load.destination_table;
+    destination.project_id = destination.project_id.empty()
+                                 ? request.project_id
+                                 : ResolveProject(destination.project_id);
+    RejectSnapshotWrite(GetTable(destination, /*include_row_count=*/false));
+  } catch (const ApiError& error) {
+    if (error.http_status() != 404) {
+      throw;
+    }
+  }
   JobLocation location(RequestedLocation(request.location));
   auto job = std::make_shared<Job>();
   job->project_id = request.project_id;
@@ -352,6 +365,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
       const TableInfo table = GetTable(source);
       if (table.view_query) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
+      }
+      if (table.metadata.snapshot.has_value()) {
+        throw ApiError::Invalid("Copy operation on SNAPSHOT types is not allowed.");
       }
       if (sql.empty()) {
         schema = table.schema;
@@ -512,6 +528,9 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   }
   if (existing.has_value() && existing->view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(destination));
+  }
+  if (existing.has_value()) {
+    RejectSnapshotWrite(*existing);
   }
   if (!existing.has_value() && create == CreateDisposition::kCreateNever) {
     throw ApiError::NotFound("Not found: Table " + TableName(destination));

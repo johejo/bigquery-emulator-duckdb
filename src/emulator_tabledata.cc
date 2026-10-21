@@ -59,9 +59,11 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
                                                     const json& rows, int64_t storage_id,
                                                     bool validate_only) {
   table.project_id = ResolveProject(table.project_id);
-  if (GetTable(table, false).view_query) {
+  const TableInfo info = GetTable(table, false);
+  if (info.view_query) {
     throw ApiError::Invalid("Cannot write to a view: " + TableName(table));
   }
+  RejectSnapshotWrite(info);
   try {
     const auto session = backend_.NewSession();
     session->Transaction("BEGIN TRANSACTION");
@@ -119,6 +121,9 @@ std::vector<InsertError> Emulator::InsertTableData(TableReference table, const j
   const TableInfo info = GetTable(table, false);
   if (info.view_query) {
     throw ApiError::Invalid("Cannot insert into a view: " + TableName(table));
+  }
+  if (info.metadata.snapshot.has_value()) {
+    throw ApiError::Invalid("Cannot add rows to a table of type SNAPSHOT.");
   }
   CheckWritableTable(backend_, table);
   const std::vector<FieldSchema>& schema = info.schema;

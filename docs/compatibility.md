@@ -87,6 +87,13 @@ have the limits described under [Options and expiration](#options-and-expiration
 For `CREATE TABLE LIKE`, `COPY` and `CLONE`, see the [SQL support table](sql.md) for rejected
 forms.
 
+### Table snapshots
+
+The emulator keeps no table history, so `CREATE SNAPSHOT TABLE` copies the table's current rows.
+`ALTER TABLE` actions other than `SET OPTIONS`, `ADD COLUMN` and `DROP COLUMN` are unsupported on a
+snapshot rather than rejected with BigQuery's message, and a table restored from a snapshot omits
+the empty `friendly_name` and `labels` that BigQuery lists in `TABLE_OPTIONS`.
+
 ### Schema changes
 
 `tables.patch` and `tables.update` change schema, view definition, description, friendly name,
