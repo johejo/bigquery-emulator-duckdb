@@ -2,10 +2,13 @@
 
 load(":clang_tidy.bzl", "clang_tidy")
 
-_Actions = provider(fields = ["actions"])
+_Actions = provider(fields = ["actions", "heavy_includes"])
 
 def _inspect_impl(target, _ctx):
-    return [_Actions(actions = [a for a in target.actions if a.mnemonic == "ClangTidy"])]
+    return [_Actions(
+        actions = [a for a in target.actions if a.mnemonic == "ClangTidy"],
+        heavy_includes = [a for a in target.actions if a.mnemonic == "HeavyIncludes"],
+    )]
 
 _inspect = aspect(
     implementation = _inspect_impl,
@@ -31,6 +34,10 @@ def _clang_tidy_test_impl(ctx):
             fail("Missing the emulator's httplib settings")
         if "-DCPPHTTPLIB_OPENSSL_SUPPORT" in action.argv:
             fail("cpp-httplib's private OpenSSL define leaked to the emulator")
+    if len(ctx.attr.header_target[_Actions].heavy_includes) != 1:
+        fail("Headers must be checked for heavy GoogleSQL includes")
+    if ctx.attr.test_target[_Actions].heavy_includes:
+        fail("Sources must not be checked for heavy GoogleSQL includes")
     outputs = ctx.attr.implementation_target[OutputGroupInfo].clang_tidy.to_list()
     if not any([f.short_path.endswith("/src/bignumeric.cc") for f in outputs]):
         fail("query_parameters must collect its implementation dependency's lint output")

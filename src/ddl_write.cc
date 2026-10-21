@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "googlesql/public/value.h"
 #include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
@@ -288,7 +289,8 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
         throw ApiError::Invalid("Column not found: " + value->name);
       }
       if (!value->drop) {
-        ValidateColumnDefault(*column, value->literal);
+        ValidateColumnDefault(
+            *column, value->literal != nullptr ? std::optional(*value->literal) : std::nullopt);
       }
       if (value->drop && column->default_value_expression.empty()) {
         throw ApiError::Invalid("Column has no default value: " + column->name);
@@ -297,7 +299,7 @@ std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
                                        QuoteIdentifier(column->name),
                                        value->drop ? "DROP DEFAULT" : "SET DEFAULT " + value->sql));
       column->default_value_expression =
-          value->literal.has_value() && value->literal->is_null() ? "" : value->expression;
+          value->literal != nullptr && value->literal->is_null() ? "" : value->expression;
       // REPEATED columns without a declared default still default to an empty array.
       std::ranges::move(RepeatedColumnDefaultStatements(table, {*column}),
                         std::back_inserter(statements));

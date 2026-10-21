@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
 #include "src/table_path.h"
@@ -24,9 +25,9 @@ std::optional<std::string> TargetTable(const std::vector<std::string>& path, con
   if (parts.empty()) {
     return Unsupported(scope, "table name " + Join(path, "."));
   }
-  scope.context.ddl_target_table =
+  scope.context.statement.ddl_target_table =
       TableReference{.project_id = parts.at(0), .dataset_id = parts.at(1), .table_id = parts.at(2)};
-  return QualifiedName(*scope.context.ddl_target_table);
+  return QualifiedName(*scope.context.statement.ddl_target_table);
 }
 
 std::optional<std::string> TargetDataset(const std::vector<std::string>& path, const Scope& scope) {
@@ -40,9 +41,9 @@ std::optional<std::string> TargetDataset(const std::vector<std::string>& path, c
   if (path.empty() || parts.empty()) {
     return Unsupported(scope, "dataset name " + Join(path, "."));
   }
-  scope.context.ddl_target_dataset =
+  scope.context.statement.ddl_target_dataset =
       DatasetReference{.project_id = parts.at(0), .dataset_id = parts.at(1)};
-  return QualifiedName(*scope.context.ddl_target_dataset);
+  return QualifiedName(*scope.context.statement.ddl_target_dataset);
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

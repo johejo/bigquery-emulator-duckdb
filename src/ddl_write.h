@@ -4,12 +4,15 @@
 #include <string>
 #include <vector>
 
-#include "googlesql/public/value.h"
 #include "src/field_schema.h"
 #include "src/location.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
+
+namespace googlesql {
+class Value;
+}  // namespace googlesql
 
 namespace bigquery_emulator_duckdb {
 

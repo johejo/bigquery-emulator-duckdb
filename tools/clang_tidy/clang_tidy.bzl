@@ -2,7 +2,9 @@
 
 Each checked-in file is its own action, so results are cached and checked in parallel. Generated
 and external files are omitted. Headers are checked as their own translation units too, since
-checks such as misc-include-cleaner look only at the main file.
+checks such as misc-include-cleaner look only at the main file. Each header is also preprocessed
+with stand-ins for GoogleSQL's slowest headers, so that it cannot pass their parsing time on to
+every file that includes it.
 """
 
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
@@ -119,13 +121,40 @@ def _clang_tidy_impl(target, ctx):
             env = env,
         )
         outputs.append(out)
+        if src.extension == "h":
+            outputs.append(_check_heavy_includes(ctx, cc_toolchain, src, flags, env, inputs))
     return [OutputGroupInfo(clang_tidy = depset(outputs, transitive = inherited))]
+
+def _check_heavy_includes(ctx, cc_toolchain, header, flags, env, inputs):
+    out = ctx.actions.declare_file("{}.heavy-includes/{}".format(ctx.label.name, header.short_path))
+    stand_ins = ctx.files._heavy_headers
+    root = stand_ins[0].path[:stand_ins[0].path.index("/googlesql/")]
+    args = ctx.actions.args()
+    args.add(cc_toolchain.compiler_executable)
+    args.add(out)
+
+    # Quoted includes search -iquote directories in order, so the stand-ins come first.
+    args.add_all(["-iquote", root])
+    args.add_all(flags)
+    args.add_all(["-Wno-pragma-once-outside-header", "-E", "-o", "/dev/null", header])
+    ctx.actions.run_shell(
+        command = 'tool=$1; out=$2; shift 2; "$tool" "$@" && touch "$out"',
+        arguments = [args],
+        inputs = depset([header] + stand_ins, transitive = [inputs]),
+        outputs = [out],
+        mnemonic = "HeavyIncludes",
+        progress_message = "Check the GoogleSQL headers " + header.short_path + " includes",
+        use_default_shell_env = True,
+        env = env,
+    )
+    return out
 
 clang_tidy = aspect(
     implementation = _clang_tidy_impl,
     attr_aspects = ["deps", "implementation_deps"],
     attrs = {
         "_clang_tidy": attr.label(default = Label("@clang_tidy_tool//:clang-tidy"), allow_single_file = True, cfg = "exec"),
+        "_heavy_headers": attr.label(default = Label("//tools/clang_tidy:heavy_headers")),
         # Lists every .clang-tidy in the repository.
         "_configs": attr.label(default = Label("//:clang_tidy_config")),
     },

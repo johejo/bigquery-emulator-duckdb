@@ -55,6 +55,7 @@
 #include "src/backend.h"
 #include "src/catalog.h"
 #include "src/cell_value.h"
+#include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/javascript_function.h"

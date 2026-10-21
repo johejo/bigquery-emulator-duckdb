@@ -32,6 +32,14 @@ Builtin include directories stay `-isystem`, with C++ directories placed ahead o
 and the order preserved within each group. Apple's SDK reports C headers before libc++, which
 breaks libc++'s `#include_next`. Using `-idirafter` instead mixes Nix and Apple headers.
 
+## Heavy GoogleSQL headers
+
+GoogleSQL's resolved AST, analyzer and script executor headers take about 30s each to parse at
+-O0, and a header that includes one passes that time to every file that includes it, also when it
+gets there through another GoogleSQL header such as `analyzer_options.h`. Each header is therefore
+also preprocessed with the stand-ins in `heavy_headers/` found first, whose `#error` makes clang
+show the chain of includes that reached one.
+
 ## Configuration and caching
 
 clang-tidy discovers each file's nearest `.clang-tidy` and any inherited configuration. Add every
@@ -44,5 +52,6 @@ produce the success marker.
 
 `//:clang_tidy_test` inspects the real `parquet_metadata_test`, `query_parameters` and `httplib`
 targets. It checks configuration and executable inputs, C++20 flags, httplib's public settings
-and private-define isolation, and implementation dependencies' lint outputs. It is included in
+and private-define isolation, that only headers get the heavy include check, and implementation
+dependencies' lint outputs. It is included in
 `just test`; `just tidy` executes the actual lint actions.

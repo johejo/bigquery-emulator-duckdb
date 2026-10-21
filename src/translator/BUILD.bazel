@@ -7,11 +7,10 @@ cc_library(
     hdrs = ["context.h"],
     visibility = ["//:__pkg__"],
     deps = [
+        "//:default_dataset",
         "//:duckdb_sql",
         "//:query_parameters",
-        "//:references",
         "//:system_variables",
-        "//:translated_statement",
     ],
 )
 
@@ -144,6 +143,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":context",
+        "//:default_dataset",
         "//:duckdb_sql",
         "//:references",
         "//:table_path",

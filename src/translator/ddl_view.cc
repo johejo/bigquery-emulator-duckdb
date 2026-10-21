@@ -55,7 +55,7 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
     return Unsupported(scope, "views that read EXTERNAL_QUERY");
   }
   const auto path = TargetTable(create.name_path(), scope, true);
-  const std::optional<TableReference> target = scope.context.ddl_target_table;
+  const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   const auto relation = Scan(*create.query(), scope);
   auto metadata = OptionsMetadata(create.option_list(), "CREATE VIEW", scope);
   if (!path || !target || !relation || !metadata) {
@@ -92,7 +92,7 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS) {
     head += "IF NOT EXISTS ";
   }
-  scope.context.view = std::move(view);
+  scope.context.statement.view = std::move(view);
   return head + *path + " AS SELECT " + Join(projections, ", ") + relation->From() +
          relation->Order();
 }

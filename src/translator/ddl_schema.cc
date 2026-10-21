@@ -19,7 +19,7 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
     return Unsupported(scope, "dataset collation");
   }
   const auto path = TargetDataset(create.name_path(), scope);
-  const std::optional<DatasetReference>& dataset = scope.context.ddl_target_dataset;
+  const std::optional<DatasetReference>& dataset = scope.context.statement.ddl_target_dataset;
   if (!path || !dataset) {
     return std::nullopt;
   }
@@ -29,7 +29,7 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
   if (!metadata) {
     return std::nullopt;
   }
-  scope.context.dataset = DatasetDefinition{
+  scope.context.statement.dataset = DatasetDefinition{
       .dataset = *dataset,
       .metadata = *std::move(metadata),
       .if_not_exists =
@@ -50,7 +50,7 @@ std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStm
 std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt& alter,
                                        const Scope& scope) {
   const auto path = TargetDataset(alter.name_path(), scope);
-  const std::optional<DatasetReference>& dataset = scope.context.ddl_target_dataset;
+  const std::optional<DatasetReference>& dataset = scope.context.statement.ddl_target_dataset;
   if (!path || !dataset) {
     return std::nullopt;
   }
@@ -64,7 +64,7 @@ std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt&
       return std::nullopt;
     }
   }
-  scope.context.altered_dataset = std::move(alteration);
+  scope.context.statement.altered_dataset = std::move(alteration);
   return "";
 }
 

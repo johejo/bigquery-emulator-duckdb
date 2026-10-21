@@ -480,6 +480,12 @@ cc_library(
 )
 
 cc_library(
+    name = "default_dataset",
+    hdrs = ["src/default_dataset.h"],
+    copts = ["-std=c++20"],
+)
+
+cc_library(
     name = "translated_statement",
     hdrs = ["src/translated_statement.h"],
     copts = ["-std=c++20"],
@@ -488,7 +494,6 @@ cc_library(
         ":references",
         ":routine",
         ":table_metadata",
-        "@googlesql//googlesql/public:value",
     ],
 )
 
@@ -519,6 +524,7 @@ cc_library(
         "@googlesql//googlesql/public:type",
     ],
     deps = [
+        ":default_dataset",
         ":query_parameters",
         ":system_variables",
         ":translated_statement",
@@ -710,6 +716,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":type_mapping",
+        "@googlesql//googlesql/public:value",
         "@googlesql//googlesql/reference_impl:type_parameter_constraints",
     ],
     deps = [
@@ -724,7 +731,6 @@ cc_library(
         ":table_comments",
         ":table_metadata",
         ":translated_statement",
-        "@googlesql//googlesql/public:value",
         "@nlohmann_json//:json",
     ],
 )
@@ -783,6 +789,7 @@ cc_library(
         ":cell_value",
         ":column_metadata",
         ":ddl_write",
+        ":default_dataset",
         ":duckdb_catalog",
         ":duckdb_sql",
         ":duckdb_table_source",
@@ -841,6 +848,7 @@ cc_library(
         ":api_error",
         ":catalog",
         ":cell_value",
+        ":default_dataset",
         ":duckdb_sql",
         ":field_schema",
         ":javascript_function",

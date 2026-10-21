@@ -1,48 +1,26 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
 
-#include "googlesql/public/value.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/table_metadata.h"
 
-// What the translator takes besides the resolved statement, and what it returns: the statement's
-// DuckDB SQL with what the emulator records about it besides DuckDB's own catalog.
+namespace googlesql {
+class Value;
+}  // namespace googlesql
+
+// What the translator returns: the statement's DuckDB SQL with what the emulator records about it
+// besides DuckDB's own catalog.
 
 namespace bigquery_emulator_duckdb {
-
-class TableSource;
-struct TemporaryTables;
-
-// The project and dataset that unqualified table and dataset names in DDL belong to, and the
-// temporary tables of a multi-statement query that take precedence over them, matching the
-// defaults the catalog resolves queries with, plus what the execution backend provides.
-// `dataset` may be empty.
-struct DefaultDataset {
-  std::string project;
-  std::string dataset;
-  const TemporaryTables* temporary = nullptr;
-  // The tables and datasets the statement is analyzed against, such as for the default rounding
-  // mode of the dataset that CREATE TABLE AS SELECT creates a table in.
-  TableSource* source = nullptr;
-  // Whether SESSION_USER is available from the execution backend.
-  bool has_session_user = false;
-  // Whether a query's rows are written to a destination table, which stores them as
-  // ResultValue's `stored` gives them.
-  bool stores_result = false;
-  // Runs a DuckDB query that returns one value of `type`, such as a DDL option expression or
-  // a TABLESAMPLE parameter. Without it, values requiring evaluation are unsupported.
-  std::function<googlesql::Value(const std::string& query, const googlesql::Type* type)> evaluate =
-      {};
-};
 
 // The view a CREATE VIEW defines, which the emulator records next to the DuckDB view: DuckDB
 // keeps neither the GoogleSQL query, its BigQuery schema nor the metadata its OPTIONS give.
@@ -131,12 +109,13 @@ struct ColumnOptionsAction {
 };
 
 // ALTER TABLE ALTER COLUMN [IF EXISTS] SET/DROP DEFAULT. Literal values allow constraint
-// validation.
+// validation. A pointer rather than an optional, so that the many files that read translated
+// statements do not parse GoogleSQL's value.h, which takes seconds.
 struct ColumnDefaultAction {
   std::string name;
   std::string expression = {};
   std::string sql = {};
-  std::optional<googlesql::Value> literal = {};
+  std::shared_ptr<const googlesql::Value> literal = {};
   bool drop = false;
   bool if_exists = false;
 };

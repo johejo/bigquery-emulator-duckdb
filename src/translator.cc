@@ -15,6 +15,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "src/analyzer.h"
+#include "src/default_dataset.h"
 #include "src/field_schema.h"
 #include "src/query_parameters.h"
 #include "src/schema_sql.h"
@@ -33,9 +34,11 @@ std::optional<TranslatedStatement> TranslateStatement(
     const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
     const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
+  TranslatedStatement translated;
   translator::Context context{
       .parameters = parameters,
       .defaults = defaults,
+      .statement = translated,
       .system_variables = system_variables,
   };
   auto sql = translator::Statement(statement, translator::Scope{.context = context});
@@ -45,29 +48,22 @@ std::optional<TranslatedStatement> TranslateStatement(
     }
     return std::nullopt;
   }
-  return TranslatedStatement{
-      .sql = *std::move(sql),
-      .statement_type = translator::StatementType(statement),
-      .result_schema = ResultSchema(statement),
-      .ddl_target_table = std::move(context.ddl_target_table),
-      .ddl_target_dataset = std::move(context.ddl_target_dataset),
-      .ddl_target_routine = std::move(context.ddl_target_routine),
-      .table = std::move(context.table),
-      .altered_table = std::move(context.altered_table),
-      .view = std::move(context.view),
-      .dataset = std::move(context.dataset),
-      .altered_dataset = std::move(context.altered_dataset),
-      .routine = std::move(context.routine),
-  };
+  translated.sql = *std::move(sql);
+  translated.statement_type = translator::StatementType(statement);
+  translated.result_schema = ResultSchema(statement);
+  return translated;
 }
 
 std::optional<std::string> TranslateExpression(
     const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
     const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
+  // Context takes a statement, though an expression records nothing in it.
+  TranslatedStatement translated;
   translator::Context context{
       .parameters = parameters,
       .defaults = defaults,
+      .statement = translated,
       .system_variables = system_variables,
   };
   auto sql = translator::Expression(expression, translator::Scope{.context = context}, {});

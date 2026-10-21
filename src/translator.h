@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include "src/default_dataset.h"
 #include "src/query_parameters.h"
 #include "src/system_variables.h"
 #include "src/translated_statement.h"
