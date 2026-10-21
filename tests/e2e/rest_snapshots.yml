@@ -1,0 +1,45 @@
+desc: tables.list reports a table snapshot's type without its snapshotDefinition, which tables.get reports
+# Fields follow https://cloud.google.com/bigquery/docs/reference/rest/v2/tables/list.
+# The Go client does not expose the type of a listed table, so check it through the HTTP runner.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/rest-snapshots/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: ds}
+    test: current.res.status == 200
+  snapshot:
+    req:
+      /projects/rest-snapshots/queries:
+        post:
+          body:
+            application/json:
+              useLegacySql: false
+              query: 'CREATE TABLE ds.base (id INT64); CREATE SNAPSHOT TABLE ds.snap CLONE ds.base'
+    test: current.res.status == 200 && !("errors" in current.res.body)
+  list_tables:
+    req:
+      /projects/rest-snapshots/datasets/ds/tables:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.tables[0].tableReference.tableId == "base" &&
+      current.res.body.tables[0].type == "TABLE" &&
+      current.res.body.tables[1].tableReference.tableId == "snap" &&
+      current.res.body.tables[1].type == "SNAPSHOT" &&
+      !("snapshotDefinition" in current.res.body.tables[1])
+  get_snapshot:
+    req:
+      /projects/rest-snapshots/datasets/ds/tables/snap:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.type == "SNAPSHOT" &&
+      current.res.body.snapshotDefinition.baseTableReference ==
+        {"projectId": "rest-snapshots", "datasetId": "ds", "tableId": "base"}

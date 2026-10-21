@@ -11,6 +11,9 @@ namespace bigquery_emulator_duckdb::information_schema {
 const std::vector<ViewColumn>& TablesColumns();
 absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context);
 
+const std::vector<ViewColumn>& TableSnapshotsColumns();
+absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context);
+
 const std::vector<ViewColumn>& TableOptionsColumns();
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context);
 

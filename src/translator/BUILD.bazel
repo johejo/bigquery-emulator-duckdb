@@ -230,6 +230,8 @@ cc_library(
         "//:catalog_table",
         "//:duckdb_sql",
         "//:field_schema",
+        "//:references",
+        "//:table_metadata",
         "//:type_mapping",
         "@googlesql//googlesql/public:catalog",
         "@googlesql//googlesql/public:type",

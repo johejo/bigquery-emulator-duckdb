@@ -32,17 +32,20 @@ struct RangePartitioning {
   bool operator==(const RangePartitioning&) const = default;
 };
 
-// Table.cloneDefinition: the table a CREATE TABLE CLONE cloned, and when.
-struct CloneDefinition {
+// Table.cloneDefinition or snapshotDefinition: the table a clone or a table snapshot was made
+// of, and when.
+struct BaseTableDefinition {
   TableReference base_table;
-  std::string clone_time;  // RFC 3339, as tables.get reports it.
+  // cloneTime or snapshotTime in RFC 3339, as tables.get reports it; empty until the table is
+  // created, which sets it to the table's creation time.
+  std::string time = {};
 };
 
 // What a table or view carries besides its schema: Table.description, friendlyName and labels,
 // and a table's partitioning and clustering, which only shape how BigQuery stores it, the
 // defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
-// cloneDefinition of a clone, and its expiration. An empty description, friendly name or rounding
-// mode is unset, as BigQuery reports it.
+// cloneDefinition of a clone or snapshotDefinition of a table snapshot, and its expiration. An
+// empty description, friendly name or rounding mode is unset, as BigQuery reports it.
 struct TableMetadata {
   std::string description;
   std::string friendly_name;
@@ -51,7 +54,9 @@ struct TableMetadata {
   std::optional<RangePartitioning> range_partitioning;
   std::vector<std::string> clustering;  // Clustering.fields.
   std::string default_rounding_mode;    // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
-  std::optional<CloneDefinition> clone;
+  std::optional<BaseTableDefinition> clone;
+  // A table snapshot is read-only: only its metadata can change.
+  std::optional<BaseTableDefinition> snapshot;
   std::optional<int64_t> expiration_time;  // Milliseconds since the Unix epoch.
   // Output only and persisted with the table; the Storage API's default stream uses it.
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old tables.
@@ -59,7 +64,7 @@ struct TableMetadata {
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
            clustering.empty() && default_rounding_mode.empty() && !clone.has_value() &&
-           !expiration_time.has_value() && creation_time == 0;
+           !snapshot.has_value() && !expiration_time.has_value() && creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -112,9 +117,9 @@ struct DatasetMetadata {
 };
 
 // The metadata of the Table resource `table`; a field it leaves out or sets to null is unset,
-// and cloneDefinition, which is output only, is ignored. Throws ApiError::Invalid for a field of
-// the wrong type, a label BigQuery rejects, or partitioning the emulator does not
-// support.
+// and cloneDefinition and snapshotDefinition, which are output only, are ignored. Throws
+// ApiError::Invalid for a field of the wrong type, a label BigQuery rejects, or partitioning the
+// emulator does not support.
 TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
@@ -122,7 +127,7 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 // tables.update replaces the description, friendly name, labels, clustering, default rounding mode
 // and expiration.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
-// cloneDefinition. Throws as TableMetadataFromJson does.
+// cloneDefinition and snapshotDefinition. Throws as TableMetadataFromJson does.
 void UpdateTableMetadata(TableMetadata& metadata, const nlohmann::json& body, bool patch);
 
 // The metadata of the Dataset resource `dataset`, in the US unless it names another location. Any

@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/time/time.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/type_parameter_constraints.h"
@@ -201,6 +202,14 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset) {
   TableMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
+  // A clone or snapshot made without time travel was made when it was created.
+  for (std::optional<BaseTableDefinition>* made : {&metadata.clone, &metadata.snapshot}) {
+    if (made->has_value() && (*made)->time.empty()) {
+      (*made)->time =
+          absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::FromUnixMillis(metadata.creation_time),
+                           absl::UTCTimeZone());
+    }
+  }
   std::vector<FieldSchema> schema = definition.schema;
   if (!definition.temporary) {
     metadata.expiration_time =

@@ -66,3 +66,12 @@ SELECT COUNT(*) FROM committed
 CREATE OR REPLACE TABLE scalars.options_labels_order (x INT64) OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
 SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_labels_order' AND option_name = 'labels'
 !> "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"
+
+# A table restored from a snapshot lists an empty friendly_name and labels in TABLE_OPTIONS, which
+# the emulator leaves out as unset.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_restored;
+CREATE OR REPLACE TABLE scalars_snapshot_restored.base (id INT64) OPTIONS (description = 'base');
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_restored.snap CLONE scalars_snapshot_restored.base OPTIONS (expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC');
+CREATE OR REPLACE TABLE scalars_snapshot_restored.restored CLONE scalars_snapshot_restored.snap;
+SELECT TO_JSON_STRING(STRUCT(t.table_type, t.base_table_name, ARRAY(SELECT AS STRUCT option_name, option_value FROM scalars_snapshot_restored.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'restored' ORDER BY option_name) AS options)) FROM scalars_snapshot_restored.INFORMATION_SCHEMA.TABLES AS t WHERE t.table_name = 'restored'
+!> "{\"table_type\":\"BASE TABLE\",\"base_table_name\":null,\"options\":[{\"option_name\":\"description\",\"option_value\":\"\\\"base\\\"\"},{\"option_name\":\"friendly_name\",\"option_value\":\"\\\"\\\"\"},{\"option_name\":\"labels\",\"option_value\":\"[]\"}]}"

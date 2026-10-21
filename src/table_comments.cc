@@ -26,22 +26,23 @@ json ParseComment(const json& comment) {
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
-// The cloneDefinition the emulator recorded in a table comment, which TableMetadataFromJson
-// ignores since clients cannot set it.
-std::optional<CloneDefinition> ParseCloneDefinition(const json& comment) {
-  const json clone = comment.value("cloneDefinition", json());
-  if (!clone.is_object()) {
+// The cloneDefinition or snapshotDefinition `definition` that the emulator recorded in a table
+// comment, which TableMetadataFromJson ignores since clients cannot set them; `time` names its
+// time.
+std::optional<BaseTableDefinition> ParseBaseTableDefinition(const json& definition,
+                                                            const char* time) {
+  if (!definition.is_object()) {
     return std::nullopt;
   }
-  const json base = clone.value("baseTableReference", json::object());
-  return CloneDefinition{
+  const json base = definition.value("baseTableReference", json::object());
+  return BaseTableDefinition{
       .base_table =
           {
               .project_id = base.value("projectId", ""),
               .dataset_id = base.value("datasetId", ""),
               .table_id = base.value("tableId", ""),
           },
-      .clone_time = clone.value("cloneTime", ""),
+      .time = definition.value(time, ""),
   };
 }
 
@@ -54,7 +55,9 @@ TableMetadata CommentMetadata(const json& comment) {
   }
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
-    metadata.clone = ParseCloneDefinition(object);
+    metadata.clone = ParseBaseTableDefinition(object.value("cloneDefinition", json()), "cloneTime");
+    metadata.snapshot =
+        ParseBaseTableDefinition(object.value("snapshotDefinition", json()), "snapshotTime");
     if (object.contains("creationTime") && object["creationTime"].is_string()) {
       metadata.creation_time = std::stoll(object["creationTime"].get<std::string>());
     }

@@ -53,10 +53,13 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
            .rows) {
     // Keep the wire-field decoding beside the named result fields.
     // cppcheck-suppress useStlAlgorithm
+    TableMetadata metadata = CommentMetadata(row["f"][2]["v"]);
     entries.push_back({
         .table_id = row["f"][0]["v"].get<std::string>(),
-        .type = row["f"][1]["v"] == "VIEW" ? TableType::kView : TableType::kTable,
-        .metadata = CommentMetadata(row["f"][2]["v"]),
+        .type = row["f"][1]["v"] == "VIEW"      ? TableType::kView
+                : metadata.snapshot.has_value() ? TableType::kSnapshot
+                                                : TableType::kTable,
+        .metadata = std::move(metadata),
     });
   }
   return entries;
@@ -176,6 +179,16 @@ TableInfo Emulator::UpdateTable(TableReference table,
   if (view.has_value()) {
     throw ApiError::Invalid("Table " + TableName(table) + " is not a view");
   }
+  // A snapshot's schema, clustering and default rounding mode cannot change.
+  if (info.metadata.snapshot.has_value() &&
+      ((schema.has_value() && SchemaToJson(*schema) != SchemaToJson(info.schema)) ||
+       (metadata.has_value() &&
+        (metadata->clustering != info.metadata.clustering ||
+         metadata->default_rounding_mode != info.metadata.default_rounding_mode)))) {
+    throw ApiError::Invalid(
+        "Only table expirationTime, description, friendlyName, labels and tags can be updated for "
+        "a snapshot.");
+  }
   std::vector<std::string> statements;
   std::optional<std::vector<FieldSchema>> updated_schema = schema;
   if (updated_schema.has_value()) {
@@ -246,6 +259,13 @@ void Emulator::WriteView(TableReference table, const json& definition,
     throw ApiError::Invalid(error.what());
   } catch (const std::runtime_error& error) {
     throw ApiError::Invalid(error.what());
+  }
+}
+
+void RejectSnapshotWrite(const TableInfo& table) {
+  if (table.metadata.snapshot.has_value()) {
+    throw ApiError::Invalid("Table " + TableName(table.reference) +
+                            " is a snapshot, and snapshots are immutable.");
   }
 }
 

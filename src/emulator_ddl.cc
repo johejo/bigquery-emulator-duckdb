@@ -36,6 +36,57 @@ void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
   }
 }
 
+void Emulator::CheckSnapshotTarget(Backend& backend, const TranslatedStatement& translation) {
+  const std::optional<TableReference>& target = translation.ddl_target_table;
+  if (!target.has_value()) {
+    return;
+  }
+  const std::optional<json> comment =
+      RelationComment(backend, "duckdb_tables()", "table_name", *target);
+  if (!comment.has_value()) {
+    return;
+  }
+  const bool snapshot = CommentMetadata(*comment).snapshot.has_value();
+  if (translation.statement_type == "DROP_SNAPSHOT_TABLE" && !snapshot) {
+    throw ApiError::InvalidQuery("Invalid value: Cannot drop " + TableName(*target) +
+                                 " which has type TABLE. A snapshot was expected.");
+  }
+  if (!snapshot) {
+    return;
+  }
+  if (translation.statement_type == "DROP_TABLE") {
+    throw ApiError::InvalidQuery("Invalid value: Cannot drop " + TableName(*target) +
+                                 " which has type SNAPSHOT. A table was expected.");
+  }
+  if (const auto& alteration = translation.altered_table) {
+    // BigQuery's messages for SET OPTIONS and for ADD and DROP COLUMN; what it reports for the
+    // other actions is not known.
+    const std::vector<TableAlterAction>& actions = alteration->actions;
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<OptionUpdates>(action);
+        })) {
+      throw ApiError::InvalidQuery(
+          "Invalid value: ALTER TABLE SET OPTIONS only supports setting options for tables, "
+          "while " +
+          target->table_id + " is a(n) snapshot");
+    }
+    if (std::ranges::all_of(actions, [](const TableAlterAction& action) {
+          return std::holds_alternative<AddColumnAction>(action) ||
+                 std::holds_alternative<DropColumnAction>(action);
+        })) {
+      throw ApiError::InvalidQuery(
+          "Invalid value: ALTER TABLE does not support modifying the schema of a(n) SNAPSHOT: " +
+          target->table_id);
+    }
+    throw ApiError::Unsupported("this ALTER TABLE action on a table snapshot");
+  }
+  if (translation.replaces) {
+    throw ApiError::InvalidQuery("Invalid value: " + TableName(*target) +
+                                 " is not allowed for this operation because it currently has "
+                                 "type SNAPSHOT.");
+  }
+}
+
 // Throws DuckDB's `error` about the macro that records the routine a CREATE or DROP FUNCTION
 // names in BigQuery's words, if it says that the routine exists or that it does not.
 std::optional<std::vector<std::string>> Emulator::AlterationStatements(

@@ -1,0 +1,102 @@
+# Table snapshots, as BigQuery answers. Each case uses a dataset of its own, since a snapshot needs
+# a permanent table.
+# https://cloud.google.com/bigquery/docs/table-snapshots-intro
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_drop_table;
+CREATE OR REPLACE TABLE scalars_snapshot_drop_table.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_drop_table.snap CLONE scalars_snapshot_drop_table.base;
+DROP TABLE scalars_snapshot_drop_table.snap
+=> error contains: scalars_snapshot_drop_table.snap which has type SNAPSHOT. A table was expected.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_drop_standard;
+CREATE OR REPLACE TABLE scalars_snapshot_drop_standard.base (id INT64);
+DROP SNAPSHOT TABLE scalars_snapshot_drop_standard.base
+=> error contains: scalars_snapshot_drop_standard.base which has type TABLE. A snapshot was expected.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_set_options;
+CREATE OR REPLACE TABLE scalars_snapshot_set_options.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_set_options.snap CLONE scalars_snapshot_set_options.base;
+ALTER TABLE scalars_snapshot_set_options.snap SET OPTIONS (description = 'changed')
+=> error contains: Invalid value: ALTER TABLE SET OPTIONS only supports setting options for tables, while snap is a(n) snapshot
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_add_column;
+CREATE OR REPLACE TABLE scalars_snapshot_add_column.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_add_column.snap CLONE scalars_snapshot_add_column.base;
+ALTER TABLE scalars_snapshot_add_column.snap ADD COLUMN extra STRING
+=> error contains: Invalid value: ALTER TABLE does not support modifying the schema of a(n) SNAPSHOT: snap
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_replace;
+CREATE OR REPLACE TABLE scalars_snapshot_replace.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_replace.snap CLONE scalars_snapshot_replace.base;
+CREATE OR REPLACE TABLE scalars_snapshot_replace.snap (id INT64)
+=> error contains: scalars_snapshot_replace.snap is not allowed for this operation because it currently has type SNAPSHOT.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_insert;
+CREATE OR REPLACE TABLE scalars_snapshot_insert.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_insert.snap CLONE scalars_snapshot_insert.base;
+INSERT scalars_snapshot_insert.snap (id) VALUES (1)
+=> error contains: scalars_snapshot_insert.snap is a snapshot, and snapshots are immutable.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_update;
+CREATE OR REPLACE TABLE scalars_snapshot_update.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_update.snap CLONE scalars_snapshot_update.base;
+UPDATE scalars_snapshot_update.snap SET id = 2 WHERE TRUE
+=> error contains: scalars_snapshot_update.snap is a snapshot, and snapshots are immutable.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_delete;
+CREATE OR REPLACE TABLE scalars_snapshot_delete.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_delete.snap CLONE scalars_snapshot_delete.base;
+DELETE scalars_snapshot_delete.snap WHERE TRUE
+=> error contains: scalars_snapshot_delete.snap is a snapshot, and snapshots are immutable.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_merge;
+CREATE OR REPLACE TABLE scalars_snapshot_merge.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_merge.snap CLONE scalars_snapshot_merge.base;
+MERGE scalars_snapshot_merge.snap USING scalars_snapshot_merge.base ON FALSE WHEN NOT MATCHED THEN INSERT (id) VALUES (id)
+=> error contains: scalars_snapshot_merge.snap is a snapshot, and snapshots are immutable.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_truncate;
+CREATE OR REPLACE TABLE scalars_snapshot_truncate.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_truncate.snap CLONE scalars_snapshot_truncate.base;
+TRUNCATE TABLE scalars_snapshot_truncate.snap
+=> error contains: scalars_snapshot_truncate.snap is a snapshot, and snapshots are immutable.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_copy;
+CREATE OR REPLACE TABLE scalars_snapshot_copy.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_copy.snap CLONE scalars_snapshot_copy.base;
+CREATE TABLE scalars_snapshot_copy.copied COPY scalars_snapshot_copy.snap
+=> error contains: scalars_snapshot_copy.snap which has type SNAPSHOT. Allowed types: [TABLE]
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_like;
+CREATE OR REPLACE TABLE scalars_snapshot_like.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_like.snap CLONE scalars_snapshot_like.base;
+CREATE TABLE scalars_snapshot_like.liked LIKE scalars_snapshot_like.snap
+=> error contains: Invalid value: Cannot CREATE TABLE LIKE `scalars_snapshot_like.snap`, which is SNAPSHOT.
+
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_view;
+CREATE OR REPLACE VIEW scalars_snapshot_view.v AS SELECT 1 AS id;
+CREATE SNAPSHOT TABLE scalars_snapshot_view.snap CLONE scalars_snapshot_view.v
+=> error contains: scalars_snapshot_view.v which has type VIEW. Allowed types: [TABLE, SNAPSHOT]
+
+# A snapshot takes the base table's description and labels but not its expiration, and OPTIONS
+# replace them.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_inherited;
+CREATE OR REPLACE TABLE scalars_snapshot_inherited.base (id INT64) OPTIONS (description = 'base', friendly_name = 'Base', labels = [('env', 'dev')], expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC');
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_inherited.snap CLONE scalars_snapshot_inherited.base OPTIONS (friendly_name = 'Snap');
+SELECT TO_JSON_STRING(ARRAY_AGG(STRUCT(option_name, option_value) ORDER BY option_name)) FROM scalars_snapshot_inherited.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'snap'
+=> "[{\"option_name\":\"description\",\"option_value\":\"\\\"base\\\"\"},{\"option_name\":\"friendly_name\",\"option_value\":\"\\\"Snap\\\"\"},{\"option_name\":\"labels\",\"option_value\":\"[STRUCT(\\\"env\\\", \\\"dev\\\")]\"}]"
+
+# A snapshot of a snapshot names that snapshot as its base table.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_of_snapshot;
+CREATE OR REPLACE TABLE scalars_snapshot_of_snapshot.base (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_of_snapshot.snap CLONE scalars_snapshot_of_snapshot.base;
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_of_snapshot.copied CLONE scalars_snapshot_of_snapshot.snap;
+SELECT TO_JSON_STRING(STRUCT(table_type, base_table_name)) FROM scalars_snapshot_of_snapshot.INFORMATION_SCHEMA.TABLES WHERE table_name = 'copied'
+=> "{\"table_type\":\"SNAPSHOT\",\"base_table_name\":\"snap\"}"
+
+# A snapshot of a temporary table names the job's project and a dataset of the script's.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_temporary;
+CREATE TEMP TABLE t (id INT64);
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_temporary.snap CLONE t;
+SELECT FORMAT('%t %t %s', base_table_catalog = @@project_id, STARTS_WITH(base_table_schema, '_script'), base_table_name) FROM scalars_snapshot_temporary.INFORMATION_SCHEMA.TABLE_SNAPSHOTS
+=> "true true t"

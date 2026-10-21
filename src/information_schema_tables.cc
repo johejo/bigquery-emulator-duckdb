@@ -149,14 +149,17 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
       const std::optional<std::string> view_query =
           view_description.has_value() ? std::optional(view_description->query) : std::nullopt;
       Cell ddl = kNull;
-      // A clone names its base table and the time it was cloned, as snapshot_time_ms.
-      std::optional<CloneDefinition> clone;
+      // A clone or snapshot names its base table and the time it was made, as snapshot_time_ms.
+      std::optional<BaseTableDefinition> base;
+      bool snapshot = false;
       int64_t creation_time =
           view_description.has_value() ? view_description->metadata.creation_time : 0;
       if (!view_query.has_value()) {
         if (std::optional<TableDescription> description =
                 context.source.DescribeTable(project, dataset.dataset_id, table)) {
-          clone = std::move(description->metadata.clone);
+          snapshot = description->metadata.snapshot.has_value();
+          base = snapshot ? std::move(description->metadata.snapshot)
+                          : std::move(description->metadata.clone);
           creation_time = description->metadata.creation_time;
         }
         absl::StatusOr<std::string> table_ddl =
@@ -168,31 +171,67 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
       } else if (!view_query->empty()) {
         ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query));
       }
-      rows.push_back(
-          Concat(Identity(dataset, table), {
-                                               String(view_query.has_value() ? "VIEW"
-                                                      : clone.has_value()    ? "CLONE"
-                                                                             : "BASE TABLE"),
-                                               view_query.has_value() ? kNull : String("NATIVE"),
-                                               String(view_query.has_value() ? "NO" : "YES"),
-                                               String("NO"),
-                                               String("NO"),
-                                               String("NO"),
-                                               CreationTime(creation_time),
-                                               clone ? String(clone->base_table.project_id) : kNull,
-                                               clone ? String(clone->base_table.dataset_id) : kNull,
-                                               clone ? String(clone->base_table.table_id) : kNull,
-                                               clone ? String(clone->clone_time) : kNull,
-                                               kNull,
-                                               kNull,
-                                               kNull,
-                                               kNull,
-                                               kNull,
-                                               ddl,
-                                               kNull,
-                                               kNull,
-                                               kNull,
-                                           }));
+      rows.push_back(Concat(Identity(dataset, table),
+                            {
+                                String(view_query.has_value() ? "VIEW"
+                                       : snapshot             ? "SNAPSHOT"
+                                       : base.has_value()     ? "CLONE"
+                                                              : "BASE TABLE"),
+                                view_query.has_value() ? kNull : String("NATIVE"),
+                                String(view_query.has_value() || snapshot ? "NO" : "YES"),
+                                String("NO"),
+                                String("NO"),
+                                String("NO"),
+                                CreationTime(creation_time),
+                                base ? String(base->base_table.project_id) : kNull,
+                                base ? String(base->base_table.dataset_id) : kNull,
+                                base ? String(base->base_table.table_id) : kNull,
+                                base ? String(base->time) : kNull,
+                                kNull,
+                                kNull,
+                                kNull,
+                                kNull,
+                                kNull,
+                                ddl,
+                                kNull,
+                                kNull,
+                                kNull,
+                            }));
+    }
+  }
+  return rows;
+}
+
+const std::vector<ViewColumn>& TableSnapshotsColumns() {
+  static const auto* const kColumns = new std::vector<ViewColumn>{
+      {.name = "table_catalog", .type = FieldType::kString},
+      {.name = "table_schema", .type = FieldType::kString},
+      {.name = "table_name", .type = FieldType::kString},
+      {.name = "base_table_catalog", .type = FieldType::kString},
+      {.name = "base_table_schema", .type = FieldType::kString},
+      {.name = "base_table_name", .type = FieldType::kString},
+      {.name = "snapshot_time", .type = FieldType::kTimestamp},
+  };
+  return *kColumns;
+}
+
+absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) {
+  std::vector<Row> rows;
+  for (const DatasetReference& dataset : context.datasets) {
+    for (const std::string& table :
+         context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
+      const std::optional<TableDescription> description =
+          context.source.DescribeTable(dataset.project_id, dataset.dataset_id, table);
+      if (!description.has_value() || !description->metadata.snapshot.has_value()) {
+        continue;
+      }
+      const BaseTableDefinition& snapshot = *description->metadata.snapshot;
+      rows.push_back(Concat(Identity(dataset, table), {
+                                                          String(snapshot.base_table.project_id),
+                                                          String(snapshot.base_table.dataset_id),
+                                                          String(snapshot.base_table.table_id),
+                                                          String(snapshot.time),
+                                                      }));
     }
   }
   return rows;

@@ -174,6 +174,8 @@ const char* TableTypeName(TableType type) {
   switch (type) {
     case TableType::kTable:
       return "TABLE";
+    case TableType::kSnapshot:
+      return "SNAPSHOT";
     case TableType::kView:
       return "VIEW";
   }
@@ -556,13 +558,16 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
 }
 
 json TableResource(const TableInfo& info) {
+  const TableType type = info.view_query                      ? TableType::kView
+                         : info.metadata.snapshot.has_value() ? TableType::kSnapshot
+                                                              : TableType::kTable;
   json resource{
       {"kind", "bigquery#table"},
       {"etag", kEtag},
       {"id", TableId(info.reference)},
       {"tableReference", TableReferenceJson(info.reference)},
       {"schema", SchemaToJson(info.schema)},
-      {"type", TableTypeName(info.view_query ? TableType::kView : TableType::kTable)},
+      {"type", TableTypeName(type)},
       {"numRows", std::to_string(info.num_rows)},
       {"numBytes", "0"},
       {"location", info.location},
@@ -606,10 +611,12 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
         {"tableReference", TableReferenceJson(table)},
         {"type", TableTypeName(entry.type)},
     };
-    // A list entry carries the metadata but the description and cloneDefinition.
+    // A list entry carries the metadata but the description, cloneDefinition and
+    // snapshotDefinition.
     item.update(entry.metadata.ToJson());
     item.erase("description");
     item.erase("cloneDefinition");
+    item.erase("snapshotDefinition");
     entries.push_back(std::move(item));
   }
   // BigQuery omits the tables of a dataset that has none.

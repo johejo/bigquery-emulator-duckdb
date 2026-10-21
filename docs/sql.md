@@ -21,9 +21,9 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 34 | 0 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 20 | 8 | 4 |
+| [DDL](#ddl) | 21 | 9 | 3 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
-| [INFORMATION_SCHEMA](#information_schema) | 10 | 0 | 0 |
+| [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
 ## Queries
 
@@ -98,9 +98,10 @@ rejected.
 | `CREATE TABLE LIKE` | Supported | See [Copies and clones](compatibility.md#copies-and-clones). |
 | `CREATE TABLE COPY` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE COPY with FOR SYSTEM_TIME AS OF. |
 | `CREATE TABLE CLONE` | Partial | See [Copies and clones](compatibility.md#copies-and-clones). Unsupported: CREATE TABLE CLONE with FOR SYSTEM_TIME AS OF. |
-| `CREATE SNAPSHOT TABLE` | Unsupported |  |
+| `CREATE SNAPSHOT TABLE` | Partial | See [Table snapshots](compatibility.md#table-snapshots). Unsupported: CREATE SNAPSHOT TABLE with FOR SYSTEM_TIME AS OF. |
 | `CREATE EXTERNAL TABLE` | Unsupported |  |
 | `DROP TABLE` | Supported |  |
+| `DROP SNAPSHOT TABLE` | Supported |  |
 | `ALTER TABLE` | Supported | See [ALTER TABLE](compatibility.md#alter-table). |
 | `CREATE SCHEMA` | Partial | See [Datasets](compatibility.md#datasets). Unsupported: BigQuery Omni location aws-us-east-1. |
 | `DROP SCHEMA` | Supported |  |
@@ -140,6 +141,7 @@ rejected.
 | `SCHEMATA` | Supported | See [Datasets](compatibility.md#datasets). |
 | `SCHEMATA_OPTIONS` | Supported |  |
 | `TABLES` | Supported |  |
+| `TABLE_SNAPSHOTS` | Supported |  |
 | `TABLE_OPTIONS` | Supported |  |
 | `PARTITIONS` | Supported | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). |
 | `COLUMNS` | Supported |  |

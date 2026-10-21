@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,6 +15,8 @@
 #include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/references.h"
+#include "src/table_metadata.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
@@ -44,16 +47,25 @@ const FieldSchema* ColumnField(const googlesql::Table* table, int index) {
 }
 
 // INSERT builds its columns separately from UPDATE/MERGE, but all DML must reject storage
-// whose ordinary numbers would be mistaken for scaled BIGNUMERIC query values.
+// whose ordinary numbers would be mistaken for scaled BIGNUMERIC query values, and a table
+// snapshot, which is read-only.
 bool WritableDmlTable(const googlesql::Table* table, const Scope& scope) {
   if (dynamic_cast<const SqlTable*>(table) != nullptr) {
     Unsupported(scope, "DML on an INFORMATION_SCHEMA view");
     return false;
   }
   const auto* stored = dynamic_cast<const BigQueryTable*>(table);
-  if (stored != nullptr && stored->NumericReadQuery().has_value()) {
+  if (stored == nullptr) {
+    return true;
+  }
+  if (stored->NumericReadQuery().has_value()) {
     Unsupported(scope, "DML on external numeric storage; copy the table first");
     return false;
+  }
+  if (const std::optional<TableDescription> description = stored->Describe();
+      description.has_value() && description->metadata.snapshot.has_value()) {
+    throw std::invalid_argument("Invalid value: Table " + TableName(stored->reference()) +
+                                " is a snapshot, and snapshots are immutable.");
   }
   return true;
 }

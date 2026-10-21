@@ -579,6 +579,7 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
   CheckDdlTarget(translation);
+  CheckSnapshotTarget(backend, translation);
   if (translation.ddl_target_routine) {
     const auto source = NewTableSource(&backend, false);
     const auto previous = source->FindRoutine(*translation.ddl_target_routine);

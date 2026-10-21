@@ -37,6 +37,7 @@ cc_library(
         "//:duckdb_sql",
         "//:emulator",
         "//:field_schema",
+        "//:project",
         "//:references",
         "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_grpc",
         "@googleapis//google/cloud/bigquery/storage/v1:storage_cc_proto",

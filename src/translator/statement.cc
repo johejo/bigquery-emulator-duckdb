@@ -39,6 +39,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   if (statement.Is<googlesql::ResolvedCreateTableStmt>()) {
     return CreateTable(*statement.GetAs<googlesql::ResolvedCreateTableStmt>(), scope);
   }
+  if (statement.Is<googlesql::ResolvedCreateSnapshotTableStmt>()) {
+    return CreateSnapshotTable(*statement.GetAs<googlesql::ResolvedCreateSnapshotTableStmt>(),
+                               scope);
+  }
   if (statement.Is<googlesql::ResolvedAlterTableStmt>()) {
     return AlterTable(*statement.GetAs<googlesql::ResolvedAlterTableStmt>(), scope);
   }
@@ -61,6 +65,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedDropSnapshotTableStmt>()) {
+    return DropSnapshotTable(*statement.GetAs<googlesql::ResolvedDropSnapshotTableStmt>(), scope);
   }
   if (statement.Is<googlesql::ResolvedCreateProcedureStmt>()) {
     return CreateProcedure(*statement.GetAs<googlesql::ResolvedCreateProcedureStmt>(), scope);
@@ -145,6 +152,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   if (statement.Is<googlesql::ResolvedCreateTableAsSelectStmt>()) {
     return "CREATE_TABLE_AS_SELECT";
   }
+  if (statement.Is<googlesql::ResolvedCreateSnapshotTableStmt>()) {
+    return "CREATE_SNAPSHOT_TABLE";
+  }
   if (statement.Is<googlesql::ResolvedAlterTableStmt>() ||
       statement.Is<googlesql::ResolvedAlterTableSetOptionsStmt>()) {
     return "ALTER_TABLE";
@@ -160,6 +170,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+  }
+  if (statement.Is<googlesql::ResolvedDropSnapshotTableStmt>()) {
+    return "DROP_SNAPSHOT_TABLE";
   }
   if (statement.Is<googlesql::ResolvedCreateProcedureStmt>()) {
     return "CREATE_PROCEDURE";

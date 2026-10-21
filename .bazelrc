@@ -14,9 +14,10 @@ build --action_env=TZDIR
 build --test_env=TZDIR
 
 # Enable warnings for this repository's sources, including build tools, and fail on them, without
-# changing dependency compilation flags.
-build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Werror
-build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Werror
+# changing dependency compilation flags. Apple clang leaves designated initializers that omit a
+# field out of -Wextra, while the Nix clang on Linux warns about them.
+build --per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
+build --host_per_file_copt=^(src|tests|tools)/.*@-Wall,-Wextra,-Wpedantic,-Wshadow,-Wmissing-designated-field-initializers,-Werror
 
 # Silence warnings from dependencies, which this repository cannot fix, while keeping warnings
 # from its own C++ sources. -w covers dependency sources. Dependency headers are found through

@@ -855,3 +855,32 @@ func TestStreamsFollowTableIdentity(t *testing.T) {
 		})
 	}
 }
+
+// A table snapshot is read-only, so the Storage Write API cannot write to it.
+// https://cloud.google.com/bigquery/docs/table-snapshots-intro
+func TestWriteToTableSnapshot(t *testing.T) {
+	rest, _, write := clients(t)
+	path := table(t, rest, "storage_write_snapshot", "id INT64 NOT NULL, name STRING")
+	query(t, rest, "CREATE SNAPSHOT TABLE storage_write_snapshot.snap CLONE storage_write_snapshot.rows")
+	snapshot := strings.TrimSuffix(path, "/rows") + "/snap"
+	_, err := write.CreateWriteStream(t.Context(), &storagepb.CreateWriteStreamRequest{
+		Parent: snapshot, WriteStream: &storagepb.WriteStream{Type: storagepb.WriteStream_COMMITTED},
+	})
+	// BigQuery names the table by its project's number, which the test project registers.
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(status.Convert(err).Message(),
+		":storage_write_snapshot.snap with type SNAPSHOT. Allowed type: TABLE, BIGLAKE with streaming. Entity: "+snapshot) {
+		t.Errorf("CreateWriteStream on a table snapshot: %v", err)
+	}
+	stream, err := write.AppendRows(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Send(appendRequest(snapshot+"/streams/_default", true, nil, row(1, "a"))); err != nil {
+		t.Fatal(err)
+	}
+	_, err = stream.Recv()
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(status.Convert(err).Message(),
+		":storage_write_snapshot.snap` is non-appendable Entity: "+snapshot+"/streams/_default") {
+		t.Errorf("default stream append to a table snapshot: %v", err)
+	}
+}
