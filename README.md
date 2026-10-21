@@ -16,6 +16,19 @@ bazelisk build //:bigquery-emulator-duckdb
 # -> bazel-bin/bigquery-emulator-duckdb
 ```
 
+To build a Linux executable for FHS distributions with glibc 2.28 or newer:
+
+```bash
+nix run .#release
+# -> .cache/release/bigquery-emulator-duckdb
+```
+
+This build statically links the other libraries, including the C++ runtime. It needs no Nix
+installation on the destination. Install the distribution's timezone data and CA certificates
+for named time zones and HTTPS connections. The release build supports x86_64 and aarch64 Linux;
+it uses a separate Bazel output directory. Extra Bazel build flags can follow `--`, such as
+`nix run .#release -- --jobs=4`.
+
 Run the server:
 
 ```bash

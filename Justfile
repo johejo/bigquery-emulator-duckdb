@@ -10,6 +10,12 @@ fmt:
 fmt-check:
     treefmt --ci
 
+# FHS Linux executable with glibc >= 2.28 as its only shared-library dependency.
+# Enter through nix run .#release so the release toolchain is selected.
+[positional-arguments]
+release *args:
+    bash tools/release/build.sh "$@"
+
 # compile_commands.json is for clangd; clang-tidy no longer needs it.
 refresh-compile-commands:
     bazelisk run //:refresh_compile_commands

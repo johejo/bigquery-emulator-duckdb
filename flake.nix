@@ -3,10 +3,14 @@
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.zst";
+    nixpkgs-libc = {
+      url = "github:NixOS/nixpkgs/34c7eb7545d155cc5b6f499b23a7cb1c96ab4d59";
+      flake = false;
+    };
   };
 
   outputs =
-    { nixpkgs, ... }:
+    { nixpkgs, nixpkgs-libc, ... }:
     let
       systems = [
         "aarch64-darwin"
@@ -17,6 +21,24 @@
         system:
         let
           pkgs = import nixpkgs { inherit system; };
+          releaseToolchain = import ./release-toolchain.nix {
+            inherit pkgs;
+            libcPkgs = import nixpkgs-libc { inherit system; };
+          };
+          releasePackages = [
+            pkgs.bazelisk
+            releaseToolchain.bintools
+            releaseToolchain.clang
+            pkgs.llvmPackages_23.llvm
+          ];
+          releaseEnvironment = {
+            BAZEL_DEVSHELL_PATH = pkgs.lib.makeBinPath (releasePackages ++ pkgs.stdenvNoCC.initialPath);
+            CC = "${releaseToolchain.clang}/bin/clang";
+            CXX = "${releaseToolchain.clang}/bin/clang++";
+            RELEASE_GLIBC = "${releaseToolchain.libc}";
+            FHS_INTERPRETER = if pkgs.stdenv.hostPlatform.isAarch64
+              then "/lib/ld-linux-aarch64.so.1" else "/lib64/ld-linux-x86-64.so.2";
+          };
           buildPackages =
             with pkgs;
             [ bazelisk ]
@@ -128,6 +150,9 @@
               shift
               exec "$bundle_dir/complianceci" run "$bundle_dir" "$@"
             '';
+          } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            release = mkApp "release" (releasePackages ++ [ pkgs.just pkgs.patchelf pkgs.python3 pkgs.binutils ])
+              releaseEnvironment ''exec just release "$@"'';
           };
         }
       );

@@ -3,6 +3,24 @@
 SQL follows the path `Server` → GoogleSQL analysis → translation → DuckDB execution.
 REST metadata operations and Storage RPCs share the same `Emulator` and catalog.
 
+## Linux release builds
+
+`nix run .#release` selects the toolchain in [release-toolchain.nix](../release-toolchain.nix).
+The compiler and LLD run in the current Nix environment, while target headers and startup objects
+come from a pinned older nixpkgs. That revision supplies glibc 2.27: nixpkgs skipped 2.28 when
+updating to 2.30. This sysroot is old enough for the release's glibc 2.28 baseline, which also
+covers DuckDB's prebuilt archives.
+
+GCC's runtime libraries and their libbacktrace dependency are rebuilt against that sysroot;
+statically linking the current Nix runtimes would retain their newer glibc requirements. GCC
+uses GNU binutils to build those runtimes, and the emulator uses Clang and LLD. Bazel builds its
+dependencies with the same release toolchain in a separate output base.
+
+The release recipe copies the executable, sets the FHS interpreter and removes its RPATH.
+[The ELF check](../tools/release/check.py) rejects shared libraries outside glibc and symbol
+versions above 2.28. The recipe then starts the executable with the old glibc's loader explicitly,
+so this check also runs on NixOS without an FHS loader.
+
 ## Server
 
 [`Server`](../src/server.h) owns the [REST](../src/server/rest.cc) and

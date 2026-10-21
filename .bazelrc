@@ -81,5 +81,12 @@ build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 test:ci --test_output=errors
 
+# The release recipe uses a separate output base and toolchain. glibc remains dynamic.
+build:release --compilation_mode=opt
+build:release --dynamic_mode=off
+build:release --linkopt=-static-libstdc++
+build:release --linkopt=-static-libgcc
+build:release --symlink_prefix=.cache/release/bazel-
+
 # Optional machine-specific settings (not checked into Git).
 try-import %workspace%/.bazelrc.local
