@@ -38,8 +38,8 @@ struct DefaultDataset {
   // Whether a query's rows are written to a destination table, which stores them as
   // ResultValue's `stored` gives them.
   bool stores_result = false;
-  // Runs a DuckDB query that returns one value of `type`, the value of a DDL option that is not
-  // a literal. Without it, such options are unsupported.
+  // Runs a DuckDB query that returns one value of `type`, such as a DDL option expression or
+  // a TABLESAMPLE parameter. Without it, values requiring evaluation are unsupported.
   std::function<googlesql::Value(const std::string& query, const googlesql::Type* type)> evaluate =
       {};
 };

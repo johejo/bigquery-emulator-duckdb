@@ -29,3 +29,7 @@ SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (100.1 PERCENT)
 # https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#tablesample_operator
 SELECT COUNT(*) FROM t TABLESAMPLE SYSTEM (50 PERCENT) REPEATABLE (42)
 => error:
+
+# EXECUTE IMMEDIATE passes USING values as query parameters.
+EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM scalars.t TABLESAMPLE SYSTEM (@percent PERCENT)' USING 100 AS percent
+=> "4"
