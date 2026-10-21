@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/reference_impl/type_parameter_constraints.h"
 #include "nlohmann/json.hpp"
@@ -81,6 +82,40 @@ bool HasDefaultTypeConstraints(const FieldSchema& field) {
 
 }  // namespace
 
+googlesql::Value RoundedColumnDefault(const FieldSchema& field, const googlesql::Value& value) {
+  if (value.is_null() || !RoundsToEven(field)) {
+    return value;
+  }
+  if (value.type()->IsArray()) {
+    std::vector<googlesql::Value> elements;
+    elements.reserve(value.num_elements());
+    for (int i = 0; i < value.num_elements(); ++i) {
+      elements.push_back(RoundedColumnDefault(field, value.element(i)));
+    }
+    return googlesql::Value::MakeArray(value.type()->AsArray(), elements).value();
+  }
+  if (value.type()->IsStruct()) {
+    std::vector<googlesql::Value> fields;
+    fields.reserve(value.num_fields());
+    for (int i = 0; i < value.num_fields(); ++i) {
+      fields.push_back(RoundedColumnDefault(field.fields.at(i), value.field(i)));
+    }
+    return googlesql::Value::MakeStruct(value.type()->AsStruct(), fields).value();
+  }
+  if (value.type()->IsNumericType()) {
+    const auto rounded = value.numeric_value().Round(field.scale.value_or(0), true);
+    if (!rounded.ok()) {
+      throw ApiError::Invalid(std::string(rounded.status().message()));
+    }
+    return googlesql::Value::Numeric(*rounded);
+  }
+  const auto rounded = value.bignumeric_value().Round(field.scale.value_or(0), true);
+  if (!rounded.ok()) {
+    throw ApiError::Invalid(std::string(rounded.status().message()));
+  }
+  return googlesql::Value::BigNumeric(*rounded);
+}
+
 void ValidateColumnDefault(const FieldSchema& field,
                            const std::optional<googlesql::Value>& literal_value) {
   const auto parameters = FieldTypeParameters(field, /*include_lengths=*/true);
@@ -91,7 +126,7 @@ void ValidateColumnDefault(const FieldSchema& field,
     throw ApiError::Unsupported("non-literal defaults on parameterized columns");
   }
   if (literal_value.has_value()) {
-    auto literal = *literal_value;
+    auto literal = RoundedColumnDefault(field, *literal_value);
     if (literal.is_null() && field.mode == FieldMode::kRequired) {
       throw ApiError::Invalid("NULL default for required column " + field.name);
     }
@@ -217,7 +252,7 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
 }
 
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
-                                              std::vector<FieldSchema> schema,
+                                              std::vector<FieldSchema>& schema,
                                               TableMetadata metadata) {
   TableReference table = alteration.table;
   std::vector<std::string> statements;

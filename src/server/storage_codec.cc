@@ -509,8 +509,9 @@ void ValidateDefaults(const std::vector<FieldSchema>& schema) {
     if (!field.default_value_expression.empty()) {
       throw ApiError::Invalid("Storage Write does not support column defaults");
     }
-    if (field.max_length || field.precision || field.scale) {
-      throw ApiError::Invalid("Storage Write does not support parameterized columns");
+    if (field.max_length) {
+      throw ApiError::Invalid(
+          "Storage Write does not support parameterized STRING or BYTES columns");
     }
     if (field.type == FieldType::kRecord) {
       ValidateDefaults(field.fields);

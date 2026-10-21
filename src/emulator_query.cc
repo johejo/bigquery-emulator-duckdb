@@ -44,6 +44,7 @@
 #include "src/table_source.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
+#include "src/translator/literal.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -441,6 +442,15 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
     }
     const auto* literal = analyzed->literal_value();
     ValidateColumnDefault(field, literal != nullptr ? std::optional(*literal) : std::nullopt);
+    if (literal != nullptr && RoundsToEven(field)) {
+      const auto sql = translator::Literal(RoundedColumnDefault(field, *literal));
+      if (!sql) {
+        throw ApiError::Unsupported("default value of field " + field.name);
+      }
+      statements.push_back(std::format("ALTER TABLE {} ALTER COLUMN {} SET DEFAULT {}",
+                                       QualifiedName(table), QuoteIdentifier(field.name), *sql));
+      continue;
+    }
     std::string unsupported;
     const std::optional<std::string> query =
         TranslateExpression(analyzed->expression(), {},
@@ -603,10 +613,16 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                  MetadataWrite(translation, CreatedInDataset(backend, translation),
                                translation.dataset.has_value() ? location->Resolve()
                                                                : std::string(kDefaultLocation))) {
-    if (translation.table.has_value() && translation.table->copies_table) {
-      std::ranges::move(
-          ColumnDefaultStatements(translation.table->table, translation.table->schema),
-          std::back_inserter(write->metadata_statements));
+    if (translation.table.has_value()) {
+      auto defaults = translation.table->schema;
+      if (!translation.table->keeps_rounding_modes) {
+        const auto dataset = CreatedInDataset(backend, translation);
+        ApplyDefaultRoundingMode(defaults, translation.table->metadata.default_rounding_mode.empty()
+                                               ? dataset.default_rounding_mode
+                                               : translation.table->metadata.default_rounding_mode);
+      }
+      std::ranges::move(ColumnDefaultStatements(translation.table->table, defaults),
+                        std::back_inserter(write->metadata_statements));
     }
     try {
       backend.ExecuteDdl(translation.sql, write->metadata_statements, write->skip_query, setup);

@@ -169,7 +169,6 @@ query Column rounding modes | CREATE TABLE n (s STRUCT<a NUMERIC(10, 1) OPTIONS 
 query Column rounding modes | CREATE TABLE n (a ARRAY<NUMERIC(10, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')); INSERT n VALUES ([NUMERIC '2.25']); UPDATE n SET a = [NUMERIC '-2.25'] WHERE TRUE
 query Column rounding modes | CREATE TABLE n (s STRUCT<a NUMERIC(10, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>) AS SELECT STRUCT(NUMERIC '2.25' AS a) AS s
 query Column rounding modes | CREATE TABLE n (a NUMERIC(10, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))
-note Column rounding modes | See [Rounding modes](compatibility.md#rounding-modes).
 query Default rounding modes | CREATE TABLE n (a NUMERIC(10, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); INSERT n (a) VALUES (2.25)
 query Default rounding modes | CREATE TABLE n (a NUMERIC(10, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT NUMERIC '2.25' AS a
 query Default rounding modes | ALTER TABLE t SET OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); ALTER TABLE t ADD COLUMN n NUMERIC(10, 1)
@@ -178,7 +177,6 @@ query Default rounding modes | CREATE SCHEMA e OPTIONS (default_rounding_mode = 
 query Default rounding modes | ALTER SCHEMA d SET OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')
 query Default rounding modes | CREATE TABLE n OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS a; CREATE TABLE m LIKE n
 query Default rounding modes | CREATE SCHEMA e OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN'); CREATE TABLE e.m LIKE t
-note Default rounding modes | See [Rounding modes](compatibility.md#rounding-modes).
 query Partitioning and clustering | CREATE TABLE n (a INT64, d DATE) PARTITION BY d CLUSTER BY a
 query Partitioning and clustering | CREATE TABLE n (a INT64, ts TIMESTAMP) PARTITION BY DATE(ts)
 query Partitioning and clustering | CREATE TABLE n (a INT64) PARTITION BY RANGE_BUCKET(a, GENERATE_ARRAY(0, 100, 10))

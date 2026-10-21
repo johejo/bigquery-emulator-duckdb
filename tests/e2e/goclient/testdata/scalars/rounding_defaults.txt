@@ -1,0 +1,59 @@
+# Literal defaults use the column's current rounding mode, including after ALTER COLUMN.
+# Expected values were collected from BigQuery.
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) DEFAULT 2.25 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "2.2"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) DEFAULT -2.25 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "-2.2"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "1"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(2, 1) DEFAULT 9.85 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "9.8"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(2, 1) DEFAULT 9.95 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> error contains: Invalid value: Field n: NUMERIC(2, 1) has precision 2 and scale 1 but got a value that is not in range of [-9.9, 9.9]
+
+CREATE TEMP TABLE rounding_default (n BIGNUMERIC(10, 0) DEFAULT 2.5 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "2"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) DEFAULT 2.25) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> error contains: OPTIONS on temporary tables are not supported
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+ALTER TABLE rounding_default ALTER COLUMN n SET DEFAULT 2.25;
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "2.2"
+
+CREATE TEMP TABLE rounding_default (n NUMERIC(5, 1) DEFAULT 2.25 OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'));
+ALTER TABLE rounding_default ALTER COLUMN n SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN');
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(n AS STRING) FROM rounding_default
+=> "2.2"
+
+CREATE TEMP TABLE rounding_default (s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')> DEFAULT STRUCT(NUMERIC '2.25'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT CAST(s.n AS STRING) FROM rounding_default
+=> "2.2"
+
+CREATE TEMP TABLE rounding_default (a ARRAY<NUMERIC(5, 1)> DEFAULT [NUMERIC '2.25', NUMERIC '-2.25'] OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+INSERT rounding_default VALUES (DEFAULT);
+SELECT ARRAY_TO_STRING(ARRAY(SELECT CAST(n AS STRING) FROM UNNEST(a) AS n WITH OFFSET ORDER BY offset), ',') FROM rounding_default
+=> "2.2,-2.2"

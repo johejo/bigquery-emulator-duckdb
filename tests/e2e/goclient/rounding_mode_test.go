@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/bigquery"
+	"google.golang.org/api/iterator"
 )
 
 // jsonRow is a tabledata.insertAll row the client sends as it is.
@@ -162,7 +163,7 @@ func TestColumnRoundingModes(t *testing.T) {
 	// Writes the emulator does not round to even are rejected.
 	for sql, want := range map[string]string{
 		"INSERT t (s) VALUES (STRUCT(NUMERIC '1'))":                                              "",
-		"CREATE TABLE r (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))": "defaults on parameterized ROUND_HALF_EVEN fields",
+		"CREATE TABLE r (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))": "",
 		"CREATE TABLE r (n INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))":                   "rounding modes on INTEGER fields",
 		"INSERT api (even) SELECT NUMERIC '2.25'":                                                "",
 	} {
@@ -401,9 +402,8 @@ func TestDefaultRoundingModes(t *testing.T) {
 	source := bigquery.NewReaderSource(strings.NewReader("{\"n\": 2.25}\n"))
 	source.SourceFormat = bigquery.JSON
 	source.Schema = api
-	if err := wait(ctx, dataset.Table("loaded").LoaderFrom(source)); err == nil ||
-		!strings.Contains(err.Error(), "load jobs that create or replace ROUND_HALF_EVEN columns") {
-		t.Errorf("load: error = %v", err)
+	if err := wait(ctx, dataset.Table("loaded").LoaderFrom(source)); err != nil {
+		t.Fatalf("load into unparameterized fields: %v", err)
 	}
 
 	// Later defaults apply to tables and fields added afterwards only.
@@ -428,12 +428,13 @@ func TestDefaultRoundingModes(t *testing.T) {
 	}
 
 	for table, want := range map[string]map[string]bigquery.RoundingMode{
-		"t":     {"n": even, "away": away, "s": "", "s.b": even, "i": "", "added": even, "patched": even},
-		"own":   {"n": away, "m": even},
-		"q":     {"n": even},
-		"ctas":  {"n": even},
-		"api":   {"n": even},
-		"later": {"n": away},
+		"t":      {"n": even, "away": away, "s": "", "s.b": even, "i": "", "added": even, "patched": even},
+		"own":    {"n": away, "m": even},
+		"q":      {"n": even},
+		"ctas":   {"n": even},
+		"api":    {"n": even},
+		"loaded": {"n": even},
+		"later":  {"n": away},
 	} {
 		if got := modes(table); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s rounding modes = %v, want %v", table, got, want)
@@ -442,8 +443,9 @@ func TestDefaultRoundingModes(t *testing.T) {
 	mustRun("INSERT t (n, away, added) VALUES (2.25, 2.25, 2.25); INSERT own (n, m) VALUES (2.25, 2.25)")
 	got := read(`SELECT 1 AS k, CAST(n AS STRING), CAST(away AS STRING), CAST(added AS STRING) FROM t
 		UNION ALL SELECT 2, CAST(n AS STRING), CAST(m AS STRING), NULL FROM own
-		UNION ALL SELECT 3, CAST(n AS STRING), NULL, NULL FROM ctas ORDER BY k`)
-	want := [][]bigquery.Value{{int64(1), "2.2", "2.3", "2.2"}, {int64(2), "2.3", "2.2", nil}, {int64(3), "2.2", nil, nil}}
+		UNION ALL SELECT 3, CAST(n AS STRING), NULL, NULL FROM ctas
+		UNION ALL SELECT 4, CAST(n AS STRING), NULL, NULL FROM loaded ORDER BY k`)
+	want := [][]bigquery.Value{{int64(1), "2.2", "2.3", "2.2"}, {int64(2), "2.3", "2.2", nil}, {int64(3), "2.2", nil, nil}, {int64(4), "2.25", nil, nil}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("rounded rows = %v, want %v", got, want)
 	}
@@ -569,9 +571,9 @@ func tableRoundingModes(t *testing.T, client *bigquery.Client, dataset, table st
 }
 
 // Copy jobs keep the rounding modes of the source's fields, but their new table takes no default
-// rounding mode, neither the source's nor the dataset's. Copy, query and load jobs that replace a
-// table keep its default, which the new fields do not take, and appending keeps it too. BigQuery's
-// answers, which bq show reported for the same jobs.
+// rounding mode, neither the source's nor the dataset's. Replacing a table keeps its default,
+// and copy and query results and an unparameterized load schema do not inherit it. Appending
+// keeps it too. BigQuery's answers, which bq show reported for the same jobs.
 func TestJobDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -642,6 +644,418 @@ func TestJobDefaultRoundingModes(t *testing.T) {
 		if defaultMode != c.defaultMode || fields["n"] != c.n {
 			t.Errorf("%s.%s: defaultRoundingMode = %q, n = %q; want %q, %q",
 				c.dataset, c.table, defaultMode, fields["n"], c.defaultMode, c.n)
+		}
+	}
+}
+
+// BigQuery rejects a copy between different numeric schemas, rather than rounding the source's
+// values to the destination's parameters or mode. A copy of the same schema needs no rounding.
+func TestCopyRoundingModes(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_copy_rounding_modes")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	if _, _, err := runScript(t, client, dataset.DatasetID, `
+	 CREATE TABLE src (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+	 INSERT src VALUES (NUMERIC '2.25');
+	 CREATE TABLE dst LIKE src;
+	 CREATE TABLE different_precision (n NUMERIC(6, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+	 CREATE TABLE different_mode (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'));
+	 INSERT different_precision VALUES (1);
+	 INSERT different_mode VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"src", "different_precision", "different_mode"} {
+		copier := dataset.Table("dst").CopierFrom(dataset.Table(name))
+		copier.WriteDisposition = bigquery.WriteAppend
+		err := wait(ctx, copier)
+		if name == "src" {
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else if err == nil || strings.Contains(err.Error(), "The emulator does not support") {
+			t.Errorf("copy from %s: got %v, want a schema error", name, err)
+		}
+	}
+	rows, err := client.Query("SELECT COUNT(*), CAST(MAX(n) AS STRING) FROM " + dataset.DatasetID + ".dst").Read(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []bigquery.Value
+	if err := rows.Next(&got); err != nil {
+		t.Fatal(err)
+	}
+	if want := []bigquery.Value{int64(1), "2.2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("copy destination = %v, want %v", got, want)
+	}
+}
+
+// Unparameterized decimal loads preserve their full scale regardless of the rounding mode.
+// NUMERIC's scale is 9 and BIGNUMERIC's is 38 (BigQuery's data types reference).
+func TestLoadedUnparameterizedRoundingModes(t *testing.T) {
+	t.Parallel()
+	client := newClient(t)
+	ctx := t.Context()
+	dataset := client.Dataset("go_loaded_rounding_modes")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	schema := bigquery.Schema{
+		{Name: "n", Type: bigquery.NumericFieldType, RoundingMode: bigquery.RoundHalfEven},
+		{Name: "b", Type: bigquery.BigNumericFieldType, RoundingMode: bigquery.RoundHalfEven},
+	}
+	for _, format := range []bigquery.DataFormat{bigquery.CSV, bigquery.JSON} {
+		t.Run(string(format), func(t *testing.T) {
+			table := dataset.Table(strings.ToLower(string(format)))
+			for _, disposition := range []bigquery.TableWriteDisposition{bigquery.WriteEmpty, bigquery.WriteTruncate} {
+				data := "2.250000001,2.50000000000000000000000000000000000001\n"
+				if format == bigquery.JSON {
+					data = `{"n": "2.250000001", "b": "2.50000000000000000000000000000000000001"}`
+				}
+				source := bigquery.NewReaderSource(strings.NewReader(data))
+				source.SourceFormat = format
+				source.Schema = schema
+				loader := table.LoaderFrom(source)
+				loader.WriteDisposition = disposition
+				if err := wait(ctx, loader); err != nil {
+					t.Fatalf("%s load: %v", disposition, err)
+				}
+				metadata, err := table.Metadata(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, field := range metadata.Schema {
+					if field.RoundingMode != bigquery.RoundHalfEven || field.Precision != 0 {
+						t.Errorf("loaded field = %+v", field)
+					}
+				}
+				rows, err := client.Query("SELECT COUNT(*), CAST(MAX(n) AS STRING), CAST(MAX(b) AS STRING) FROM " + dataset.DatasetID + "." + table.TableID).Read(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []bigquery.Value
+				if err := rows.Next(&got); err != nil {
+					t.Fatal(err)
+				}
+				if want := []bigquery.Value{int64(1), "2.250000001", "2.50000000000000000000000000000000000001"}; !reflect.DeepEqual(got, want) {
+					t.Errorf("%s load = %v, want %v", disposition, got, want)
+				}
+			}
+		})
+	}
+}
+
+// Expected metadata and values were collected from BigQuery using the REST answer collector.
+func TestUpdatedDefaultRoundingModes(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_updated_default_rounding")
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	const even, away, unspecified = "ROUND_HALF_EVEN", "ROUND_HALF_AWAY_FROM_ZERO", "ROUNDING_MODE_UNSPECIFIED"
+	for _, method := range []string{"PATCH", "PUT"} {
+		for index, modes := range [][2]string{{away, even}, {even, away}, {even, unspecified}, {away, unspecified}} {
+			t.Run(method+"/"+modes[0]+"/"+modes[1], func(t *testing.T) {
+				table := fmt.Sprintf("t_%s_%d", strings.ToLower(method), index)
+				sql := fmt.Sprintf("CREATE TABLE `%s.%s` (old NUMERIC(5,1)) OPTIONS(default_rounding_mode = '%s')", dataset.DatasetID, table, modes[0])
+				if _, _, err := runScript(t, client, "", sql); err != nil {
+					t.Fatal(err)
+				}
+				field := func(name, typ, precision, scale string) map[string]any {
+					f := map[string]any{"name": name, "type": typ, "precision": precision}
+					if scale != "" {
+						f["scale"] = scale
+					}
+					return f
+				}
+				old := field("old", "NUMERIC", "5", "1")
+				old["roundingMode"] = modes[0]
+				schema := map[string]any{"fields": []any{old, field("added", "NUMERIC", "5", "1"), field("big", "BIGNUMERIC", "10", ""), map[string]any{"name": "record", "type": "RECORD", "fields": []any{field("nested", "NUMERIC", "5", "1")}}}}
+				body, _ := json.Marshal(map[string]any{"tableReference": map[string]string{"projectId": client.Project(), "datasetId": dataset.DatasetID, "tableId": table}, "defaultRoundingMode": modes[1], "schema": schema})
+				url := fmt.Sprintf("%s/bigquery/v2/projects/%s/datasets/%s/tables/%s", os.Getenv("BQ_EMULATOR_API"), client.Project(), dataset.DatasetID, table)
+				request, err := http.NewRequestWithContext(ctx, method, url, strings.NewReader(string(body)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				response, err := http.DefaultClient.Do(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer response.Body.Close()
+				if response.StatusCode != 200 {
+					var failure any
+					_ = json.NewDecoder(response.Body).Decode(&failure)
+					t.Fatalf("update: %d: %v", response.StatusCode, failure)
+				}
+				defaultMode, fields := tableRoundingModes(t, client, dataset.DatasetID, table)
+				newMode, stored := modes[1], modes[1]
+				if newMode == unspecified {
+					newMode = ""
+					stored = modes[0]
+				}
+				if defaultMode != stored || fields["old"] != modes[0] || fields["added"] != newMode || fields["big"] != newMode {
+					t.Errorf("metadata = %s, %v", defaultMode, fields)
+				}
+				metadata, err := dataset.Table(table).Metadata(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(metadata.Schema[3].Schema[0].RoundingMode) != newMode {
+					t.Errorf("nested mode = %v", metadata.Schema[3].Schema[0].RoundingMode)
+				}
+				if _, _, err := runScript(t, client, dataset.DatasetID, "INSERT `"+table+"` VALUES (2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"); err != nil {
+					t.Fatal(err)
+				}
+				rows, err := client.Query(fmt.Sprintf("SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM `%s.%s`", dataset.DatasetID, table)).Read(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []bigquery.Value
+				if err := rows.Next(&got); err != nil {
+					t.Fatal(err)
+				}
+				oldValue, value, bigValue := "2.3", "2.3", "3"
+				if modes[0] == even {
+					oldValue = "2.2"
+				}
+				if newMode == even {
+					value = "2.2"
+					bigValue = "2"
+				}
+				if want := []bigquery.Value{oldValue, value, bigValue, value}; !reflect.DeepEqual(got, want) {
+					t.Errorf("values = %v, want %v", got, want)
+				}
+			})
+		}
+	}
+}
+
+func TestCreatedAndReplacedLoadRoundingModes(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_created_load_rounding")
+	_ = dataset.DeleteWithContents(ctx)
+	if _, _, err := runScript(t, client, "", "CREATE SCHEMA "+dataset.DatasetID+" OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	for _, format := range []bigquery.DataFormat{bigquery.CSV, bigquery.JSON} {
+		for _, explicit := range []bool{true, false} {
+			for _, replacement := range []string{"create", "unchanged", "changed_precision", "different_column_mode", "removed_parameters"} {
+				if explicit && replacement != "create" && replacement != "unchanged" {
+					continue
+				}
+				replace := replacement != "create"
+				name := fmt.Sprintf("%s_explicit_%t_%s", strings.ToLower(string(format)), explicit, replacement)
+				t.Run(name, func(t *testing.T) {
+					table := dataset.Table(name)
+					schema := bigquery.Schema{{Name: "n", Type: bigquery.NumericFieldType, Precision: 5, Scale: 1}, {Name: "b", Type: bigquery.BigNumericFieldType, Precision: 10}, {Name: "away", Type: bigquery.NumericFieldType, Precision: 5, Scale: 1, RoundingMode: bigquery.RoundHalfAwayFromZero}}
+					if replace {
+						original := "NUMERIC(5,1)"
+						if replacement == "changed_precision" {
+							original = "NUMERIC(6,1)"
+						}
+						if replacement == "different_column_mode" {
+							original += " OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')"
+						}
+						if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE `"+name+"` (n "+original+",b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT `"+name+"` VALUES(7,7,7)"); err != nil {
+							t.Fatal(err)
+						}
+					}
+					if replacement == "removed_parameters" {
+						for _, field := range schema {
+							field.Precision = 0
+							field.Scale = 0
+						}
+					}
+					if explicit {
+						schema[0].RoundingMode = bigquery.RoundHalfEven
+						schema[1].RoundingMode = bigquery.RoundHalfEven
+					}
+					load := func(data string) error {
+						source := bigquery.NewReaderSource(strings.NewReader(data))
+						source.SourceFormat = format
+						source.Schema = schema
+						loader := table.LoaderFrom(source)
+						if replace {
+							loader.WriteDisposition = bigquery.WriteTruncate
+						}
+						return wait(ctx, loader)
+					}
+					data := "2.25,2.5,2.25\n-2.25,-2.5,-2.25\n2.35,1.5,2.35\n"
+					if format == bigquery.JSON {
+						data = "{\"n\":2.25,\"b\":2.5,\"away\":2.25}\n{\"n\":-2.25,\"b\":-2.5,\"away\":-2.25}\n{\"n\":2.35,\"b\":1.5,\"away\":2.35}\n"
+					}
+					if err := load(data); err != nil {
+						t.Fatal(err)
+					}
+					metadata, err := table.Metadata(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					wantMode := bigquery.RoundHalfEven
+					if replace && replacement != "unchanged" {
+						wantMode = ""
+					}
+					if metadata.Schema[0].RoundingMode != wantMode || metadata.Schema[1].RoundingMode != wantMode || metadata.Schema[2].RoundingMode != bigquery.RoundHalfAwayFromZero {
+						t.Errorf("loaded schema = %+v", metadata.Schema)
+					}
+					wantPrecision, wantScale := int64(5), int64(1)
+					if replacement == "removed_parameters" {
+						wantPrecision, wantScale = 0, 0
+					}
+					if metadata.Schema[0].Precision != wantPrecision || metadata.Schema[0].Scale != wantScale {
+						t.Errorf("loaded NUMERIC parameters = (%d, %d), want (%d, %d)", metadata.Schema[0].Precision, metadata.Schema[0].Scale, wantPrecision, wantScale)
+					}
+					defaultMode, _ := tableRoundingModes(t, client, dataset.DatasetID, name)
+					if defaultMode != "ROUND_HALF_EVEN" {
+						t.Errorf("table default = %q", defaultMode)
+					}
+					rows, err := client.Query(fmt.Sprintf("SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM `%s.%s` ORDER BY n", dataset.DatasetID, name)).Read(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var got [][]bigquery.Value
+					for {
+						var row []bigquery.Value
+						err := rows.Next(&row)
+						if errors.Is(err, iterator.Done) {
+							break
+						}
+						if err != nil {
+							t.Fatal(err)
+						}
+						got = append(got, row)
+					}
+					want := [][]bigquery.Value{{"-2.3", "-3", "-2.3"}, {"2.3", "3", "2.3"}, {"2.4", "2", "2.4"}}
+					if explicit {
+						want = [][]bigquery.Value{{"-2.2", "-2", "-2.3"}, {"2.2", "2", "2.3"}, {"2.4", "2", "2.4"}}
+					}
+					if replacement == "removed_parameters" {
+						want = [][]bigquery.Value{{"-2.25", "-2.5", "-2.25"}, {"2.25", "2.5", "2.25"}, {"2.35", "1.5", "2.35"}}
+					}
+					if !reflect.DeepEqual(got, want) {
+						t.Errorf("loaded values = %v, want %v", got, want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// BigQuery's collected load answers cover nested numbers and strings, and show that a failed
+// create leaves no table while a failed replacement preserves the original rows.
+func TestLoadRoundingContainersAndOverflow(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_load_rounding_boundaries")
+	_ = dataset.DeleteWithContents(ctx)
+	if _, _, err := runScript(t, client, "", "CREATE SCHEMA "+dataset.DatasetID+" OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	numeric := func(name string) *bigquery.FieldSchema {
+		return &bigquery.FieldSchema{Name: name, Type: bigquery.NumericFieldType, Precision: 5, Scale: 1, RoundingMode: bigquery.RoundHalfEven}
+	}
+	for _, explicit := range []bool{true, false} {
+		for _, stringsInput := range []bool{false, true} {
+			name := fmt.Sprintf("nested_%t_%t", explicit, stringsInput)
+			array := numeric("a")
+			array.Repeated = true
+			schema := bigquery.Schema{numeric("n"), {Name: "b", Type: bigquery.BigNumericFieldType, Precision: 10, RoundingMode: bigquery.RoundHalfEven}, {Name: "away", Type: bigquery.NumericFieldType, Precision: 5, Scale: 1, RoundingMode: bigquery.RoundHalfAwayFromZero}, {Name: "s", Type: bigquery.RecordFieldType, Schema: bigquery.Schema{numeric("n")}}, array}
+			if !explicit {
+				schema[0].RoundingMode = ""
+				schema[1].RoundingMode = ""
+				schema[3].Schema[0].RoundingMode = ""
+				schema[4].RoundingMode = ""
+			}
+			data := `{"n":2.25,"b":2.5,"away":2.25,"s":{"n":-2.25},"a":[2.25,-2.25,2.35]}`
+			if stringsInput {
+				data = `{"n":"2.25","b":"2.5","away":"2.25","s":{"n":"-2.25"},"a":["2.25","-2.25","2.35"]}`
+			}
+			source := bigquery.NewReaderSource(strings.NewReader(data))
+			source.SourceFormat = bigquery.JSON
+			source.Schema = schema
+			if err := wait(ctx, dataset.Table(name).LoaderFrom(source)); err != nil {
+				t.Fatal(err)
+			}
+			rows, err := client.Query("SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING),CAST(s.n AS STRING),ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset),',') FROM " + dataset.DatasetID + "." + name).Read(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []bigquery.Value
+			if err := rows.Next(&got); err != nil {
+				t.Fatal(err)
+			}
+			want := []bigquery.Value{"2.2", "2", "2.3", "-2.2", "2.2,-2.2,2.4"}
+			if !explicit {
+				want = []bigquery.Value{"2.3", "3", "2.3", "-2.3", "2.3,-2.3,2.4"}
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("nested load = %v, want %v", got, want)
+			}
+		}
+	}
+	for _, format := range []bigquery.DataFormat{bigquery.CSV, bigquery.JSON} {
+		for _, big := range []bool{false, true} {
+			for _, replace := range []bool{false, true} {
+				name := fmt.Sprintf("overflow_%s_%t_%t", strings.ToLower(string(format)), big, replace)
+				schema := bigquery.Schema{numeric("n"), {Name: "b", Type: bigquery.BigNumericFieldType, Precision: 10, RoundingMode: bigquery.RoundHalfEven}, {Name: "away", Type: bigquery.NumericFieldType, Precision: 5, Scale: 1, RoundingMode: bigquery.RoundHalfAwayFromZero}}
+				if replace {
+					if _, _, err := runScript(t, client, dataset.DatasetID, "CREATE TABLE "+name+" (n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1)); INSERT "+name+" VALUES(7,7,7)"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				n, b := "9999.95", "1"
+				if big {
+					n, b = "1", "9999999999.5"
+				}
+				data := n + "," + b + ",1\n"
+				if format == bigquery.JSON {
+					data = `{"n":` + n + `,"b":` + b + `,"away":1}`
+				}
+				source := bigquery.NewReaderSource(strings.NewReader(data))
+				source.SourceFormat = format
+				source.Schema = schema
+				table := dataset.Table(name)
+				loader := table.LoaderFrom(source)
+				if replace {
+					loader.WriteDisposition = bigquery.WriteTruncate
+				}
+				if err := wait(ctx, loader); err == nil || !strings.Contains(err.Error(), "not in range") {
+					t.Errorf("%s overflow = %v", name, err)
+				}
+				if !replace {
+					if _, err := table.Metadata(ctx); err == nil {
+						t.Errorf("failed load created %s", name)
+					}
+					continue
+				}
+				rows, err := client.Query("SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING),CAST(MAX(away) AS STRING) FROM " + dataset.DatasetID + "." + name).Read(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []bigquery.Value
+				if err := rows.Next(&got); err != nil {
+					t.Fatal(err)
+				}
+				if want := []bigquery.Value{int64(1), "7", "7", "7"}; !reflect.DeepEqual(got, want) {
+					t.Errorf("failed replacement = %v, want %v", got, want)
+				}
+			}
 		}
 	}
 }

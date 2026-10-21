@@ -20,6 +20,7 @@ setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tab
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "w"}, "view": {"query": "SELECT 1 AS id", "useLegacySql": false}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "r"}, "schema": {"fields": [{"name": "record", "type": "RECORD", "mode": "REPEATED", "fields": [{"name": "id", "type": "INTEGER"}]}]}}
 setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "h"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]}}
+setup POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "hp"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]}}
 setup POST /bigquery/v2/projects/test/jobs {"jobReference": {"jobId": "j"}, "configuration": {"query": {"query": "SELECT 1 AS x", "useLegacySql": false}}}
 setup POST /bigquery/v2/projects/test/queries {"query": "CREATE FUNCTION d.f(x INT64) AS (x + 1)", "useLegacySql": false}
 
@@ -60,6 +61,7 @@ request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configurat
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "t"}, "writeDisposition": "WRITE_APPEND"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "h"}, "writeDisposition": "WRITE_APPEND"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "h"}, "writeDisposition": "WRITE_TRUNCATE"}}}
+request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"load": {"sourceUris": ["$DIR/people.csv"], "destinationTable": {"datasetId": "d", "tableId": "hp"}, "writeDisposition": "WRITE_TRUNCATE"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"query": {"query": "SELECT NUMERIC '1' AS a", "useLegacySql": false, "destinationTable": {"datasetId": "d", "tableId": "h"}, "writeDisposition": "WRITE_APPEND"}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "t"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
 request bigquery.jobs.insert | POST /bigquery/v2/projects/test/jobs {"configuration": {"copy": {"sourceTable": {"datasetId": "d", "tableId": "h"}, "destinationTable": {"datasetId": "d", "tableId": "c"}}}}
@@ -132,6 +134,7 @@ request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/h {"defaultRoundingMode": "ROUND_HALF_EVEN", "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}, {"name": "added", "type": "NUMERIC", "precision": "5", "scale": "1"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
 note bigquery.tables.patch | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes).
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}

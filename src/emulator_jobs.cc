@@ -78,6 +78,17 @@ void ReadUnrounded(std::vector<FieldSchema>& schema, const std::vector<FieldSche
   }
 }
 
+// An omitted decimal scale and an explicit zero name the same load type.
+std::vector<FieldSchema> NormalizeLoadScales(std::vector<FieldSchema> schema) {
+  for (auto& field : schema) {
+    if (field.scale == 0) {
+      field.scale.reset();
+    }
+    field.fields = NormalizeLoadScales(std::move(field.fields));
+  }
+  return schema;
+}
+
 // Whether a request that names `location`, or none, finds `job`: without a location, BigQuery
 // finds a job only in the US or EU multi-region.
 bool InLocation(const Job& job, const std::optional<std::string>& location) {
@@ -216,28 +227,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         throw;
       }
     }
-    // Values a load appends to ROUND_HALF_EVEN fields are read unrounded and rounded to even as
-    // WriteDestination writes them. A table the load creates takes its dataset's default rounding
-    // mode, but BigQuery stores 2.25 as 2.3 in a NUMERIC(5, 1) field that takes ROUND_HALF_EVEN
-    // from it, so loads that create or replace such fields are unsupported.
     const bool appends =
         existing.has_value() && load.write_disposition != WriteDisposition::kWriteTruncate;
-    const auto check_rounding = [&](std::vector<FieldSchema> written) {
-      if (appends) {
-        return;
-      }
-      if (!existing.has_value()) {
-        ApplyDefaultRoundingMode(written,
-                                 GetDataset(DatasetReference{
-                                                .project_id = load.destination_table.project_id,
-                                                .dataset_id = load.destination_table.dataset_id,
-                                            })
-                                     .default_rounding_mode);
-      }
-      if (HasRoundHalfEven(written)) {
-        throw ApiError::Unsupported("load jobs that create or replace ROUND_HALF_EVEN columns");
-      }
-    };
     std::vector<FieldSchema> requested_schema = SchemaFromJson(config.value("schema", json()));
     if (requested_schema.empty() && existing.has_value()) {
       requested_schema = *existing;
@@ -258,17 +249,45 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
         DetectParquetDecimals(requested_schema, parquet, config);
       }
     }
-    check_rounding(requested_schema);
+    auto read_schema = requested_schema;
     if (appends) {
-      ReadUnrounded(requested_schema, *existing);
+      ReadUnrounded(read_schema, *existing);
+    } else {
+      for (auto& field : read_schema) {
+        field = WithoutRoundingParameters(std::move(field));
+      }
     }
-    const std::string sql = LoadQuery(format, paths, config, requested_schema, parquet);
+    std::string sql = LoadQuery(format, paths, config, read_schema, parquet);
     const QueryResult prepared = Prepare(sql);
-    if (requested_schema.empty()) {
-      check_rounding(prepared.schema);
-    }
     std::vector<FieldSchema> written =
         requested_schema.empty() ? prepared.schema : requested_schema;
+    if (appends) {
+      written = read_schema.empty() ? prepared.schema : read_schema;
+    } else if (HasRoundHalfEven(written)) {
+      std::vector<std::string> columns;
+      for (size_t i = 0; i < written.size(); ++i) {
+        const auto& field = written.at(i);
+        const auto name = QuoteIdentifier(field.name);
+        const auto rounded = TranslateAppendedValue(name, prepared.schema.at(i), field);
+        if (!rounded) {
+          throw ApiError::Unsupported("loading values into ROUND_HALF_EVEN columns");
+        }
+        columns.push_back(*rounded + " AS " + name);
+      }
+      sql = "SELECT " + Join(columns, ", ") + " FROM (" + sql + ") AS source";
+    }
+    if (existing.has_value() && !appends) {
+      const auto info = GetTable(load.destination_table, /*include_row_count=*/false);
+      auto inherited = written;
+      ApplyDefaultRoundingMode(inherited, info.metadata.default_rounding_mode);
+      // BigQuery keeps an unchanged schema, including its modes. A changed schema is replaced
+      // as a whole with the load schema, without inheriting the retained table default.
+      if (SameSchema(NormalizeLoadScales(inherited), NormalizeLoadScales(info.schema))) {
+        written = info.schema;
+      } else {
+        SetModesGiven(written);
+      }
+    }
     // A table a load creates reports the mode of each field, given or detected.
     if (!existing.has_value()) {
       SetModesGiven(written);
@@ -511,7 +530,7 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
   std::string appended = "*";
   if (existing.has_value() && write != WriteDisposition::kWriteTruncate) {
     if (copy && HasRoundHalfEven(existing->schema) && !SameSchema(existing->schema, schema)) {
-      throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
+      throw ApiError::Invalid("Source and destination tables have different schemas");
     }
     std::vector<std::string> columns;
     for (const FieldSchema& field : schema) {
@@ -562,8 +581,8 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
     // The job's disposition decides what to replace; CreateTableWrite only initializes the table.
     // Only a table the job creates takes the dataset's default expiration, which BigQuery
     // documents for new tables. As BigQuery answers, a replaced table keeps its default rounding
-    // mode, which its new fields do not take, and a copy job's new table takes no default rounding
-    // mode, neither the source's nor the dataset's.
+    // mode, and a copy job's new table takes no default
+    // rounding mode, neither the source's nor the dataset's.
     TableDefinition definition{
         .table = destination,
         .schema = schema,

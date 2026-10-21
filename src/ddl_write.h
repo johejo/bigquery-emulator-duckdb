@@ -25,6 +25,9 @@ struct DdlWrite {
   std::string skip_query = {};
 };
 
+// Rounds a literal default with its column's current mode, including nested fields.
+googlesql::Value RoundedColumnDefault(const FieldSchema& field, const googlesql::Value& value);
+
 // Checks a literal column default against its REQUIRED mode and type parameters. A non-literal
 // default has no `literal_value` and is rejected for parameterized fields.
 void ValidateColumnDefault(const FieldSchema& field,
@@ -59,11 +62,12 @@ DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetada
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset);
 
 // The statements that apply `alteration` to its table, whose BigQuery schema and metadata are
-// `schema` and `metadata` when it runs, or none when its actions all have nothing to do. An added
+// `schema` and `metadata` when it runs, or none when its actions all have nothing to do. Updates
+// `schema` to the final schema so its defaults can be regenerated with the new modes. An added
 // column takes the table's default rounding mode. Throws ApiError::Invalid for an action BigQuery
 // rejects.
 std::vector<std::string> AlterTableStatements(const TableAlteration& alteration,
-                                              std::vector<FieldSchema> schema,
+                                              std::vector<FieldSchema>& schema,
                                               TableMetadata metadata);
 
 // The statements that apply `alteration` to its dataset, whose metadata is `metadata` when it

@@ -239,7 +239,8 @@ class Emulator {
   // of `view` it omits.
   TableInfo UpdateTable(TableReference table, const std::optional<std::vector<FieldSchema>>& schema,
                         const std::optional<nlohmann::json>& view,
-                        const std::optional<TableMetadata>& metadata = std::nullopt);
+                        const std::optional<TableMetadata>& metadata = std::nullopt,
+                        bool rounding_mode_unspecified = false);
   void DeleteTable(TableReference table);
   // The persistent UDFs of `dataset`, sorted by id.
   std::vector<Routine> ListRoutines(DatasetReference dataset);

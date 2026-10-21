@@ -417,6 +417,10 @@ bool PartitioningAndClustering(const CreateTable& create, TableMetadata& metadat
 // BigQuery's primary and foreign keys are never enforced, so they are dropped.
 std::optional<std::string> CreateTableHead(const googlesql::ResolvedCreateTableStmtBase& create,
                                            const Scope& scope) {
+  if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP &&
+      !create.option_list().empty()) {
+    throw std::invalid_argument("OPTIONS on temporary tables are not supported");
+  }
   if (create.is_value_table() || !create.pseudo_column_list().empty() ||
       create.collation_name() != nullptr || create.connection_list() != nullptr ||
       !create.check_constraint_list().empty()) {

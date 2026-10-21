@@ -26,7 +26,7 @@ using nlohmann::json;
 
 namespace {
 
-// The DuckDB expression for `value`, a value of `field` in a tabledata.insertAll row. DuckDB's
+// The DuckDB expression for `value`, a value of `field` in a streamed row. DuckDB's
 // casts round halfway values away from zero, so the values of ROUND_HALF_EVEN fields are read
 // unrounded and rounded to even, as BigQuery rounds the rows it streams.
 std::string RoundedInsertValue(const json& value, const FieldSchema& field,
@@ -35,7 +35,7 @@ std::string RoundedInsertValue(const json& value, const FieldSchema& field,
   const std::optional<std::string> rounded = TranslateAppendedValue(
       InsertValue(value, unrounded, ignore_unknown_values), unrounded, field);
   if (!rounded.has_value()) {
-    throw ApiError::Unsupported("tabledata.insertAll into ROUND_HALF_EVEN columns");
+    throw ApiError::Unsupported("streaming into ROUND_HALF_EVEN columns");
   }
   return *rounded;
 }
@@ -86,7 +86,8 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
         columns.push_back(QuoteIdentifier(field.name));
         const auto value = row.find(field.name);
         try {
-          values.push_back(InsertValue(value == row.end() ? json(nullptr) : *value, field, false));
+          values.push_back(
+              RoundedInsertValue(value == row.end() ? json(nullptr) : *value, field, false));
         } catch (const ApiError& error) {
           return {{.index = index, .message = error.what()}};
         }

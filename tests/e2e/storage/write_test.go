@@ -155,6 +155,113 @@ func TestProtobufTypes(t *testing.T) {
 	}
 }
 
+// Column rounding modes apply when values are written, including nested fields. The ties are
+// BigQuery's DDL rounding_mode examples; precision overflow must reject the entire append.
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#column_option_list
+func TestRoundingModes(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []storagepb.WriteStream_Type{
+		storagepb.WriteStream_TYPE_UNSPECIFIED, // The default stream.
+		storagepb.WriteStream_COMMITTED, storagepb.WriteStream_BUFFERED, storagepb.WriteStream_PENDING,
+	} {
+		t.Run(kind.String(), func(t *testing.T) {
+			t.Parallel()
+			rest, _, write := clients(t)
+			dataset := "storage_rounding_" + kind.String()
+			path := table(t, rest, dataset, `id INT64, name STRING,
+			 n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'),
+			 bn BIGNUMERIC(10, 0) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'),
+			 away NUMERIC(5, 1),
+			 a ARRAY<NUMERIC(5, 1)> OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'),
+			 s STRUCT<n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>`)
+			name := path + "/streams/_default"
+			if kind != storagepb.WriteStream_TYPE_UNSPECIFIED {
+				name = writeStream(t, write, path, kind).Name
+			}
+			descriptor := writerSchema()
+			for i, field := range []string{"n", "bn", "away", "a"} {
+				label := descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
+				if field == "a" {
+					label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+				}
+				descriptor.Field = append(descriptor.Field, &descriptorpb.FieldDescriptorProto{
+					Name: proto.String(field), Number: proto.Int32(int32(i + 3)),
+					Type: descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(), Label: label.Enum(),
+				})
+			}
+			descriptor.NestedType = []*descriptorpb.DescriptorProto{{Name: proto.String("Record"), Field: []*descriptorpb.FieldDescriptorProto{
+				{Name: proto.String("n"), Number: proto.Int32(1), Type: descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()},
+			}}}
+			descriptor.Field = append(descriptor.Field, &descriptorpb.FieldDescriptorProto{
+				Name: proto.String("s"), Number: proto.Int32(7), Type: descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".Row.Record"), Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+			})
+			data := row(1, "ties")
+			for i, value := range []string{"2.25", "2.5", "2.25", "2.25", "-2.25", "2.35"} {
+				number := protowire.Number(i + 3)
+				if number > 6 {
+					number = 6
+				}
+				data = protowire.AppendString(protowire.AppendTag(data, number, protowire.BytesType), value)
+			}
+			// NUMERIC 2.25 as a signed little-endian integer scaled by 10^9.
+			nested := protowire.AppendBytes(protowire.AppendTag(nil, 1, protowire.BytesType), []byte{0x80, 0x46, 0x1c, 0x86, 0})
+			data = protowire.AppendBytes(protowire.AppendTag(data, 7, protowire.BytesType), nested)
+			stream, err := write.AppendRows(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := appendRequest(name, true, nil, data, row(2, "missing"))
+			request.GetProtoRows().WriterSchema.ProtoDescriptor = descriptor
+			if response := send(t, stream, request); response.GetError() != nil {
+				t.Fatal(response)
+			}
+			for _, field := range []protowire.Number{3, 4, 6} {
+				value := "9999.95"
+				if field == 4 {
+					value = "9999999999.5"
+				}
+				bad := protowire.AppendString(protowire.AppendTag(row(4, "overflow"), field, protowire.BytesType), value)
+				response := send(t, stream, appendRequest("", false, nil, row(3, "rolled back"), bad))
+				if response.GetError().GetCode() != int32(codes.InvalidArgument) || len(response.RowErrors) != 1 || response.RowErrors[0].Index != 1 {
+					t.Fatalf("overflow batch: %v", response)
+				}
+			}
+			closeAppend(t, stream)
+			if kind == storagepb.WriteStream_BUFFERED {
+				if _, err := write.FlushRows(t.Context(), &storagepb.FlushRowsRequest{WriteStream: name}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if kind == storagepb.WriteStream_PENDING {
+				if _, err := write.FinalizeWriteStream(t.Context(), &storagepb.FinalizeWriteStreamRequest{Name: name}); err != nil {
+					t.Fatal(err)
+				}
+				response, err := write.BatchCommitWriteStreams(t.Context(), &storagepb.BatchCommitWriteStreamsRequest{Parent: path, WriteStreams: []string{name}})
+				if err != nil || len(response.GetStreamErrors()) != 0 {
+					t.Fatalf("commit: %v, %v", response, err)
+				}
+			}
+			wantVisible(t, rest, dataset, 1, 2)
+			rows, err := rest.Query(`SELECT CAST(n AS STRING), CAST(bn AS STRING), CAST(away AS STRING),
+			 ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset), ','),
+			 CAST(s.n AS STRING) FROM ` + dataset + `.rows ORDER BY id`).Read(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range [][]bigquery.Value{{"2.2", "2", "2.3", "2.2,-2.2,2.4", "2.2"}, {nil, nil, nil, "", nil}} {
+				var got []bigquery.Value
+				if err := rows.Next(&got); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("rounded values = %v, want %v", got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestReconnectAndDefaultDestinationSwitch(t *testing.T) {
 	rest, _, write := clients(t)
 	first := table(t, rest, "storage_write_reconnect", "id INT64, name STRING")

@@ -52,7 +52,7 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 ### Options and expiration
 
 Table options are limited to description, friendly name, labels, expiration and
-[default rounding mode](#rounding-modes); column options to description and rounding mode.
+default rounding mode; column options to description and rounding mode.
 Partition expiration is unsupported.
 
 DDL option values accept literals and constant expressions using query parameters and supported
@@ -71,19 +71,6 @@ unsupported. `INFORMATION_SCHEMA.PARTITIONS` counts rows when queried. Storage b
 including `tables.get`'s `numBytes`; partition `last_modified_time` is NULL and storage tier is
 always `ACTIVE`.
 
-### Rounding modes
-
-`ROUND_HALF_EVEN` writes are supported for DML, `CREATE TABLE AS SELECT`, query and load jobs
-that append to an existing table, and `tabledata.insertAll`, including parameterized fields
-inside STRUCTs and ARRAYs. The following forms are rejected:
-
-- Loads that create a table or replace one with `WRITE_TRUNCATE` using `ROUND_HALF_EVEN` columns.
-- Copy jobs that append to `ROUND_HALF_EVEN` columns with a different schema.
-- Storage Write API writes to `ROUND_HALF_EVEN` columns.
-- Defaults on parameterized `ROUND_HALF_EVEN` columns.
-- A `tables.patch` or `tables.update` that both changes the default rounding mode and adds
-  NUMERIC or BIGNUMERIC fields: which default those fields should take is unverified.
-
 ### Column defaults
 
 Parameterized columns accept literal defaults only. `tables.update` and `tables.patch` cannot
@@ -98,13 +85,13 @@ have the limits described under [Options and expiration](#options-and-expiration
 ### Copies and clones
 
 For `CREATE TABLE LIKE`, `COPY` and `CLONE`, see the [SQL support table](sql.md) for rejected
-forms and [Rounding modes](#rounding-modes) for write restrictions.
+forms.
 
 ### Schema changes
 
 `tables.patch` and `tables.update` change schema, view definition, description, friendly name,
-labels, clustering and expiration, and ignore other fields. Partitioning and a view's schema
-cannot change. `tables.update` keeps a schema or view definition omitted from the request.
+labels, clustering, default rounding mode and expiration, and ignore other fields. Partitioning and
+a view's schema cannot change. `tables.update` keeps a schema or view definition omitted from the request.
 
 ### Views
 

@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 34 | 0 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 19 | 9 | 4 |
+| [DDL](#ddl) | 20 | 8 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 10 | 0 | 0 |
 
@@ -89,8 +89,8 @@ rejected.
 | `CREATE TABLE AS SELECT` | Supported |  |
 | `CREATE TABLE AS SELECT` with `NOT NULL` | Supported |  |
 | Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
-| Column rounding modes | Partial | See [Rounding modes](compatibility.md#rounding-modes). Unsupported: defaults on parameterized ROUND_HALF_EVEN fields. |
-| Default rounding modes | Supported | See [Rounding modes](compatibility.md#rounding-modes). |
+| Column rounding modes | Supported |  |
+| Default rounding modes | Supported |  |
 | Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option require_partition_filter. |
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
