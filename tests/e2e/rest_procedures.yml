@@ -69,6 +69,59 @@ steps:
               routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
               routineType: PROCEDURE
               strictMode: true
+              definitionBody: 'BEGIN SELECT 2; END'
+    test: current.res.status == 200 && current.res.body.strictMode == true
+  strict_default:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              definitionBody: 'BEGIN SELECT 2; END'
+    test: current.res.status == 200
+  strict_default_invalid_body:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              definitionBody: 'BEGIN SELECT missing_default_column; END'
+    test: current.res.status == 400
+  strict_invalid_insert:
+    req:
+      /projects/rest-routines/datasets/procedures/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: invalid}
+              routineType: PROCEDURE
+              strictMode: true
+              definitionBody: 'BEGIN SELECT missing_insert_column; END'
+    test: current.res.status == 400
+  strict_invalid_body:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: true
+              definitionBody: 'BEGIN SELECT missing_column; END'
+    test: current.res.status == 400
+  strict_invalid_type:
+    req:
+      /projects/rest-routines/datasets/procedures/routines/p:
+        put:
+          body:
+            application/json:
+              routineReference: {projectId: rest-routines, datasetId: procedures, routineId: p}
+              routineType: PROCEDURE
+              strictMode: 'false'
               definitionBody: 'BEGIN SELECT 1; END'
     test: current.res.status == 400
   output_arguments:
@@ -142,7 +195,7 @@ steps:
               useLegacySql: false
               query: >-
                 CREATE OR REPLACE PROCEDURE procedures.p(IN x STRING, INOUT y INT64, OUT z INT64)
-                OPTIONS(strict_mode=FALSE, description='from DDL') BEGIN SELECT x; END
+                OPTIONS(strict_mode=TRUE, description='from DDL') BEGIN SELECT x; END
     test: current.res.status == 200 && !("errors" in current.res.body)
   list:
     req:
@@ -151,7 +204,7 @@ steps:
           body: null
     test: |
       current.res.status == 200 && len(current.res.body.routines) == 1 &&
-      current.res.body.routines[0].strictMode == false &&
+      current.res.body.routines[0].strictMode == true &&
       current.res.body.routines[0].description == "from DDL" &&
       current.res.body.routines[0].arguments[0].mode == "IN" &&
       current.res.body.routines[0].arguments[1].mode == "INOUT" &&

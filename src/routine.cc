@@ -171,8 +171,9 @@ std::string RoutineStatement(const Routine& routine) {
   const json& resource = routine.resource;
   const std::string statement = RoutineHead(routine);
   if (resource.at("routineType") == "PROCEDURE") {
-    return statement + " OPTIONS(strict_mode = FALSE) " +
-           resource.at("definitionBody").get<std::string>();
+    return statement +
+           " OPTIONS(strict_mode = " + (resource.value("strictMode", true) ? "TRUE" : "FALSE") +
+           ") " + resource.at("definitionBody").get<std::string>();
   }
   // On a line of its own, so that a comment at the end of the body cannot hide the parenthesis.
   return statement + " AS (" + resource.value("definitionBody", "") + "\n)";

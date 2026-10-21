@@ -656,9 +656,8 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
         "routines other than SQL scalar functions, table functions and procedures");
   }
   if (procedure) {
-    if (!resource.contains("strictMode") || !resource["strictMode"].is_boolean() ||
-        resource["strictMode"].get<bool>()) {
-      throw ApiError::Unsupported("procedures without strictMode = false");
+    if (resource.contains("strictMode") && !resource["strictMode"].is_boolean()) {
+      throw ApiError::Invalid("Invalid routine strictMode");
     }
   } else if (resource.contains("strictMode")) {
     throw ApiError::Unsupported("strictMode on functions");

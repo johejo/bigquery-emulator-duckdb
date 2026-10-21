@@ -242,8 +242,6 @@ std::optional<std::string> CreateTableFunction(
          QualifiedName(*target) + "() AS NULL";
 }
 
-// Strict mode needs catalog-dependent validation of every statement without executing it.
-// Until that exists, require callers to explicitly request syntax-only validation.
 std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProcedureStmt& create,
                                            const Scope& scope) {
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
@@ -264,7 +262,6 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
       {"creationTime", now},
       {"lastModifiedTime", now},
   };
-  bool syntax_only = false;
   for (const auto& option : create.option_list()) {
     const auto value = OptionValue(*option, "procedure", scope);
     if (!value) {
@@ -273,7 +270,6 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
     const std::string name = ToLowerAscii(option->name());
     std::string description;
     if (name == "strict_mode" && value->type()->IsBool() && !value->is_null()) {
-      syntax_only = !value->bool_value();
       resource["strictMode"] = value->bool_value();
     } else if (name == "description" && StringOption(*value, description)) {
       if (!value->is_null()) {
@@ -282,9 +278,6 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
     } else {
       return Unsupported(scope, "CREATE PROCEDURE option " + option->name());
     }
-  }
-  if (!syntax_only) {
-    return Unsupported(scope, "procedures without OPTIONS(strict_mode = FALSE)");
   }
   for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
     const auto& argument = create.signature().argument(static_cast<int>(i));
