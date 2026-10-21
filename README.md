@@ -230,6 +230,7 @@ These tables check execution, not agreement with BigQuery's results or metadata.
 
 Unsupported behavior is rejected, with these deliberate exceptions:
 
+- `TABLESAMPLE SYSTEM` samples DuckDB vectors of 2048 rows rather than BigQuery storage blocks.
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.
 - `EXTERNAL_QUERY` reaches the PostgreSQL, MySQL or Spanner databases that `--connection` configures,

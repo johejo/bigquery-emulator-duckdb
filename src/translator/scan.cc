@@ -1,6 +1,7 @@
 #include "src/translator/scan.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <format>
 #include <iterator>
@@ -546,6 +547,54 @@ std::optional<Relation> ArrayScan(const googlesql::ResolvedArrayScan& array, con
                     result->columns, {"u.e"}, scope);
 }
 
+std::optional<Relation> SampleScan(const googlesql::ResolvedSampleScan& sample,
+                                   const Scope& scope) {
+  if (sample.method() != "system" || sample.unit() != googlesql::ResolvedSampleScan::PERCENT ||
+      sample.repeatable_argument() != nullptr || sample.weight_column() != nullptr ||
+      !sample.partition_by_list().empty()) {
+    return Unsupported(scope, "TABLESAMPLE other than SYSTEM (PERCENT) without a suffix");
+  }
+  if (!sample.input_scan()->Is<googlesql::ResolvedTableScan>()) {
+    return Unsupported(scope, "TABLESAMPLE on a subquery or array");
+  }
+  const auto& size = *sample.size();
+  std::optional<googlesql::Value> value;
+  if (size.Is<googlesql::ResolvedLiteral>()) {
+    value = size.GetAs<googlesql::ResolvedLiteral>()->value();
+  } else if (size.Is<googlesql::ResolvedParameter>() && scope.context.defaults.evaluate) {
+    // DuckDB requires a numeric literal here, so evaluate the typed parameter first, as DDL
+    // option values do, rather than extracting a number from its generated SQL.
+    const auto sql = Expression(size, scope, {});
+    if (!sql) {
+      return std::nullopt;
+    }
+    value = scope.context.defaults.evaluate("SELECT " + *sql, size.type());
+  } else {
+    return Unsupported(scope, "TABLESAMPLE percentage");
+  }
+  if (value->is_null()) {
+    throw std::invalid_argument("Const must be a DOUBLE-compatible constant.");
+  }
+  double percent =
+      value->type()->IsInt64() ? static_cast<double>(value->int64_value()) : value->double_value();
+  // BigQuery returned every row for a NaN parameter, including across multiple partitions.
+  if (std::isnan(percent)) {
+    percent = 100;
+  }
+  // The analyzer validates literals, but parameter values still need checking.
+  if (percent < 0 || percent > 100) {
+    throw std::invalid_argument("Sampling rate must be between 0 and 100 percent.");
+  }
+  auto result = Scan(*sample.input_scan(), scope);
+  if (!result) {
+    return std::nullopt;
+  }
+  // SYSTEM samples DuckDB vectors instead of BigQuery storage blocks; see README's exceptions.
+  result->sql =
+      "SELECT q.*" + result->From() + std::format(" TABLESAMPLE SYSTEM ({} PERCENT)", percent);
+  return result;
+}
+
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
@@ -610,6 +659,9 @@ std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scop
   }
   if (scan.Is<googlesql::ResolvedArrayScan>()) {
     return ArrayScan(*scan.GetAs<googlesql::ResolvedArrayScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedSampleScan>()) {
+    return SampleScan(*scan.GetAs<googlesql::ResolvedSampleScan>(), scope);
   }
   const googlesql::ResolvedScan* input = nullptr;
   if (scan.Is<googlesql::ResolvedProjectScan>()) {

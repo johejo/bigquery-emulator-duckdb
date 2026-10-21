@@ -19,7 +19,7 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
-| [Queries](#queries) | 33 | 0 | 1 |
+| [Queries](#queries) | 34 | 0 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 19 | 9 | 4 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
@@ -59,7 +59,7 @@ rejected.
 | Struct field and array element access | Supported |  |
 | `PIVOT` | Supported |  |
 | `UNPIVOT` | Supported |  |
-| `TABLESAMPLE` | Unsupported |  |
+| `TABLESAMPLE` | Supported |  |
 | Pipe syntax | Supported |  |
 | INTERVAL values | Supported | See [INTERVAL values](compatibility.md#interval-values). |
 | RANGE values | Supported | See [RANGE values](compatibility.md#range-values). |
