@@ -233,7 +233,7 @@ void Normalize(ArrowArray* array, const ArrowSchema& wire, const FieldSchema& fi
   ArrowArrayMove(decimals.get(), array);
 }
 
-// The cell codec parses civil times with GoogleSQL. Keep those range checks when their physical
+// Vector conversion parses civil times with GoogleSQL. Keep those range checks when their physical
 // Arrow buffers are passed through, including for externally created tables.
 void ValidateCivilTime(const ArrowArrayView& view, const FieldSchema& field, int64_t row) {
   if (ArrowArrayViewIsNull(&view, row) != 0) {
@@ -331,7 +331,8 @@ StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema>
     duckdb_logical_type type = state.types.back().get();
     bool direct = Eligible(state.fields.at(i)) && NativeStorage(type);
     if (direct) {
-      // Some DuckDB types have no Arrow representation; their export fails and they use cells.
+      // Some DuckDB types have no Arrow representation; their export fails and they use vector
+      // conversion.
       const char* name = duckdb_column_name(&result, i);
       nanoarrow::UniqueSchema exported;
       const Handle<duckdb_error_data, duckdb_destroy_error_data> error(
@@ -367,11 +368,6 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
   if (offset > row_count() || count > row_count() - offset || count > duckdb_vector_size()) {
     throw std::out_of_range("Storage Read row range is outside the snapshot or vector capacity");
   }
-  const auto cell = [&](duckdb_data_chunk chunk, size_t column, size_t row) {
-    return ToCell(duckdb_data_chunk_get_vector(chunk, column), state.types.at(column).get(), row,
-                  false)
-        .at("v");
-  };
   nanoarrow::UniqueArray root;
   ArrowError error{};
   Check(ArrowArrayInitFromSchema(root.get(), state.wire.get(), &error), error);
@@ -383,7 +379,9 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
     Check(ArrowArrayStartAppending(child), error);
     state.Runs(offset, count, [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
       for (size_t row = begin; row < begin + take; ++row) {
-        AppendArrowCell(child, state.fields.at(column), cell(chunk, column, row));
+        AppendArrowVector(child, state.fields.at(column),
+                          duckdb_data_chunk_get_vector(chunk, column), state.types.at(column).get(),
+                          row);
       }
     });
     Check(ArrowArrayFinishBuildingDefault(child, &error), error);

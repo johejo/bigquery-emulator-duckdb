@@ -9,8 +9,8 @@ properties remain valid. Each response copies its rows of the columns whose Duck
 matches the BigQuery wire type into a private chunk, exports them through the Arrow C Data
 interface. A NULL array becomes an empty one, a BIGNUMERIC's stored bytes become a decimal256,
 and infinite RANGE bounds become NULL. Columns with other physical layouts are appended to Arrow
-arrays from their cells. The resulting arrays are serialized as Arrow IPC with Apache nanoarrow
-or encoded as Avro binary rows. Both formats use the table metadata to encode the public schema.
+arrays directly from their typed vectors. The resulting arrays are serialized as Arrow IPC with
+Apache nanoarrow or encoded as Avro binary rows. Both formats use the table metadata to encode the public schema.
 
 ## Server
 

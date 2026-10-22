@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 
 struct ArrowArray;
@@ -11,7 +10,7 @@ struct ArrowSchema;
 
 namespace bigquery_emulator_duckdb {
 
-// Storage Read wire encoders. Cells use QueryResult's {v: ...}/{f: ...} representation.
+// Storage Read wire encoders.
 
 // The Avro schema JSON, or the encapsulated Arrow IPC schema message, of `schema`.
 std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow);
@@ -21,8 +20,6 @@ std::string StorageReadSchema(const std::vector<FieldSchema>& schema, bool arrow
 // Arrow output rejects them.
 void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& schema, bool arrow);
 
-// Appends a cell's value to an array building the type StorageReadArraySchema gives `field`.
-void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const nlohmann::json& value);
 // Avro binary rows from the same arrays used for Arrow output.
 std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
                            const std::vector<FieldSchema>& schema);

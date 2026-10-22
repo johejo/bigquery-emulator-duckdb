@@ -656,18 +656,13 @@ cc_library(
     implementation_deps = [
         ":api_error",
         "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:civil_time",
-        "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:date_time_util",
         "@nanoarrow",
         "@nlohmann_json//:json",
     ],
-    deps = [
-        ":field_schema",
-        "@nlohmann_json//:json",
-    ],
+    deps = [":field_schema"],
 )
 
 cc_library(
@@ -695,7 +690,11 @@ cc_library(
         ":storage_read_codec",
         ":type_mapping",
         "//third_party/duckdb",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:civil_time",
         "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public/functions:date_time_util",
         "@googlesql//googlesql/public/types:timestamp_util",
         "@nanoarrow",
     ],

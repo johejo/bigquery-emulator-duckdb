@@ -13,11 +13,9 @@
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/strings/escaping.h"
 #include "absl/time/time.h"
 #include "googlesql/public/civil_time.h"
 #include "googlesql/public/functions/date_time_util.h"
-#include "googlesql/public/numeric_value.h"
 #include "nanoarrow/nanoarrow.h"
 #include "nanoarrow/nanoarrow.hpp"
 #include "nanoarrow/nanoarrow_ipc.h"
@@ -41,76 +39,6 @@ void ArrowCheck(int code) {
   if (code != NANOARROW_OK) {
     throw ApiError::Internal("Arrow IPC operation failed: " + std::to_string(code));
   }
-}
-
-std::string Text(const json& value) {
-  return value.is_string() ? value.get<std::string>() : value.dump();
-}
-
-std::string Bytes(const json& value) {
-  std::string result;
-  if (!absl::Base64Unescape(value.get<std::string>(), &result)) {
-    throw ApiError::Internal("Invalid internal BYTES value");
-  }
-  return result;
-}
-
-// The bounds of a RANGE cell, each a cell of its element type or null where unbounded.
-std::array<json, 2> RangeBounds(const json& value) {
-  const auto bounds = RangeCellBounds(Text(value));
-  if (!bounds) {
-    throw ApiError::Internal("Invalid internal RANGE value");
-  }
-  std::array<json, 2> cells;
-  std::ranges::transform(*bounds, cells.begin(),
-                         [](const auto& bound) { return bound ? json(*bound) : json(nullptr); });
-  return cells;
-}
-
-int64_t Temporal(const FieldSchema& field, const json& value) {
-  const std::string text = Text(value);
-  if (field.type == FieldType::kTimestamp) {
-    return std::stoll(text);
-  }
-  if (field.type == FieldType::kDate) {
-    int32_t days = 0;
-    Check(googlesql::functions::ConvertStringToDate(text, &days));
-    return days;
-  }
-  if (field.type == FieldType::kTime) {
-    googlesql::TimeValue time;
-    Check(googlesql::functions::ConvertStringToTime(text, googlesql::functions::kMicroseconds,
-                                                    &time));
-    return (((((time.Hour() * 60LL) + time.Minute()) * 60) + time.Second()) * 1000000) +
-           time.Microseconds();
-  }
-  googlesql::DatetimeValue datetime;
-  Check(googlesql::functions::ConvertStringToDatetime(text, googlesql::functions::kMicroseconds,
-                                                      &datetime));
-  absl::Time timestamp;
-  Check(
-      googlesql::functions::ConvertDatetimeToTimestamp(datetime, absl::UTCTimeZone(), &timestamp));
-  return absl::ToUnixMicros(timestamp);
-}
-
-// GoogleSQL's packed decimals are signed little-endian scaled integers, as required by the
-// Write API. Sign extend for Arrow's fixed width, or reverse for Avro's big-endian decimal.
-std::string DecimalBytes(const FieldSchema& field, const json& value) {
-  std::string result;
-  if (field.type == FieldType::kNumeric) {
-    const auto number = googlesql::NumericValue::FromStringStrict(Text(value));
-    Check(number.status());
-    result = number->SerializeAsProtoBytes();
-  } else {
-    const auto number = googlesql::BigNumericValue::FromStringStrict(Text(value));
-    Check(number.status());
-    result = number->SerializeAsProtoBytes();
-  }
-  const char pad = !result.empty() && (static_cast<unsigned char>(result.back()) & 0x80U) != 0
-                       ? static_cast<char>(0xff)
-                       : '\0';
-  result.resize(field.type == FieldType::kNumeric ? 16 : 32, pad);
-  return result;
 }
 
 void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
@@ -190,73 +118,6 @@ void ArrowField(ArrowSchema* out, const FieldSchema& field, bool arrow) {
     default:
       throw ApiError::Invalid("Storage Read does not support " +
                               std::string(FieldTypeName(field.type)));
-  }
-}
-
-void ArrowCell(ArrowArray* array, const FieldSchema& field, const json& value) {
-  if (field.mode == FieldMode::kRepeated) {
-    FieldSchema item = field;
-    item.mode = FieldMode::kRequired;
-    for (const auto& cell : value) {
-      ArrowCell(array->children[0], item, cell.at("v"));
-    }
-    ArrowCheck(ArrowArrayFinishElement(array));
-    return;
-  }
-  if (value.is_null()) {
-    ArrowCheck(ArrowArrayAppendNull(array, 1));
-    return;
-  }
-  switch (field.type) {
-    case FieldType::kRecord:
-      for (size_t i = 0; i < field.fields.size(); ++i) {
-        ArrowCell(array->children[i], field.fields.at(i), value.at("f").at(i).at("v"));
-      }
-      ArrowCheck(ArrowArrayFinishElement(array));
-      break;
-    case FieldType::kRange: {
-      const auto bounds = RangeBounds(value);
-      for (size_t i = 0; i < bounds.size(); ++i) {
-        ArrowCell(array->children[i], RangeBoundField(field, ""), bounds.at(i));
-      }
-      ArrowCheck(ArrowArrayFinishElement(array));
-      break;
-    }
-    case FieldType::kInteger:
-      ArrowCheck(ArrowArrayAppendInt(array, std::stoll(Text(value))));
-      break;
-    case FieldType::kBoolean:
-      ArrowCheck(ArrowArrayAppendInt(array, static_cast<int64_t>(Text(value) == "true")));
-      break;
-    case FieldType::kFloat:
-      ArrowCheck(ArrowArrayAppendDouble(array, std::stod(Text(value))));
-      break;
-    case FieldType::kDate:
-    case FieldType::kTime:
-    case FieldType::kTimestamp:
-    case FieldType::kDatetime:
-      ArrowCheck(ArrowArrayAppendInt(array, Temporal(field, value)));
-      break;
-    case FieldType::kNumeric:
-    case FieldType::kBigNumeric: {
-      const std::string bytes = DecimalBytes(field, value);
-      ArrowDecimal decimal{};
-      ArrowDecimalInit(&decimal, field.type == FieldType::kNumeric ? 128 : 256,
-                       field.type == FieldType::kNumeric ? 38 : 76,
-                       field.type == FieldType::kNumeric ? 9 : 38);
-      ArrowDecimalSetBytes(&decimal, reinterpret_cast<const uint8_t*>(bytes.data()));
-      ArrowCheck(ArrowArrayAppendDecimal(array, &decimal));
-      break;
-    }
-    default: {
-      const std::string bytes = field.type == FieldType::kBytes ? Bytes(value) : Text(value);
-      ArrowBufferView view{};
-      // nanoarrow exposes buffer pointers through its C API union.
-      view.data.data = bytes.data();  // NOLINT(cppcoreguidelines-pro-type-union-access)
-      view.size_bytes = static_cast<int64_t>(bytes.size());
-      ArrowCheck(ArrowArrayAppendBytes(array, view));
-      break;
-    }
   }
 }
 
@@ -496,10 +357,6 @@ void StorageReadArraySchema(ArrowSchema* out, const std::vector<FieldSchema>& sc
   for (size_t i = 0; i < schema.size(); ++i) {
     ArrowField(out->children[i], schema.at(i), arrow);
   }
-}
-
-void AppendArrowCell(ArrowArray* array, const FieldSchema& field, const json& value) {
-  ArrowCell(array, field, value);
 }
 
 std::string EncodeAvroRows(const ArrowSchema& root, const ArrowArray& array,
