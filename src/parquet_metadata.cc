@@ -360,7 +360,8 @@ ParquetColumn Column(const std::vector<ThriftValue>& schema, size_t& next, int d
         bool null_elements = false;
         if (item.kind == ParquetColumn::Kind::kStruct && item.children.size() == 1) {
           if (list_inference && child.name != "array" && child.name != column.name + "_tuple") {
-            item = item.children.front();
+            // Copy before replacing the parent, whose assignment destroys this child.
+            item = ParquetColumn(item.children.front());
             null_elements =
                 IntField(schema.at(item.element), parquet::kElementRepetition).value_or(0) ==
                 parquet::kOptional;
