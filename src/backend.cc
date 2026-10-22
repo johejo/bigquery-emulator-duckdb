@@ -20,7 +20,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
-#include "absl/time/time.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/common/internal_value.h"
@@ -31,9 +30,7 @@
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/types/type.h"
 #include "googlesql/public/value.h"
-#include "nanoarrow/nanoarrow.h"
 #include "nlohmann/json.hpp"
-#include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
 #include "src/backend_functions/javascript_limits.h"
@@ -49,7 +46,6 @@
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
-#include "src/vector_cell.h"
 #include "src/vector_value.h"
 
 namespace bigquery_emulator_duckdb {
@@ -207,150 +203,6 @@ std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row,
   }
   return text + ")";
 }
-
-}  // namespace
-
-void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vector vector,
-                       duckdb_logical_type type, idx_t row) {
-  const auto append = [](int code) {
-    if (code != NANOARROW_OK) {
-      throw ApiError::Internal("Arrow IPC operation failed: " + std::to_string(code));
-    }
-  };
-  const auto check = [](const absl::Status& status) {
-    if (!status.ok()) {
-      throw ApiError::Invalid(std::string(status.message()));
-    }
-  };
-  const bool null = IsNull(vector, row);
-  if (field.mode == FieldMode::kRepeated) {
-    if (!null) {
-      const ListElements elements(vector, type, row);
-      FieldSchema item = field;
-      item.mode = FieldMode::kRequired;
-      for (idx_t i = 0; i < elements.size(); ++i) {
-        AppendArrowVector(array->children[0], item, elements.child(), elements.type(),
-                          elements.row(i));
-      }
-    }
-    append(ArrowArrayFinishElement(array));
-    return;
-  }
-  if (null) {
-    append(ArrowArrayAppendNull(array, 1));
-    return;
-  }
-  if (field.type == FieldType::kRecord || field.type == FieldType::kRange) {
-    const bool range = field.type == FieldType::kRange;
-    const size_t count = range ? 2 : field.fields.size();
-    for (size_t i = 0; i < count; ++i) {
-      duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
-      const LogicalType child_type(duckdb_struct_type_child_type(type, i));
-      if (range && !IsFiniteBound(child, child_type.get(), row)) {
-        append(ArrowArrayAppendNull(array->children[i], 1));
-      } else {
-        AppendArrowVector(array->children[i],
-                          range ? RangeBoundField(field, "") : field.fields.at(i), child,
-                          child_type.get(), row);
-      }
-    }
-    append(ArrowArrayFinishElement(array));
-    return;
-  }
-  switch (field.type) {
-    case FieldType::kInteger:
-      append(ArrowArrayAppendInt(array, duckdb_get_int64(VectorValue(vector, type, row).get())));
-      return;
-    case FieldType::kBoolean:
-      append(ArrowArrayAppendInt(array, static_cast<int64_t>(VectorElement<bool>(vector, row))));
-      return;
-    case FieldType::kFloat:
-      append(
-          ArrowArrayAppendDouble(array, duckdb_get_double(VectorValue(vector, type, row).get())));
-      return;
-    case FieldType::kTimestamp:
-      append(ArrowArrayAppendInt(array, VectorElement<duckdb_timestamp>(vector, row).micros));
-      return;
-    case FieldType::kDate:
-    case FieldType::kTime:
-    case FieldType::kDatetime: {
-      // Preserve the civil-time parser's validation for external physical types (TIME_TZ,
-      // TIMESTAMP_S/MS/NS, and temporal infinities). NS truncates toward zero, as ToCell does.
-      const Value value = VectorValue(vector, type, row);
-      Value truncated;
-      if (duckdb_get_type_id(type) == DUCKDB_TYPE_TIMESTAMP_NS) {
-        const int64_t nanos = VectorElement<duckdb_timestamp_ns>(vector, row).nanos;
-        const bool infinite = nanos == std::numeric_limits<int64_t>::max() ||
-                              nanos == -std::numeric_limits<int64_t>::max();
-        *truncated.out() = duckdb_create_timestamp({infinite ? nanos : nanos / 1000});
-      }
-      const std::string text =
-          ValueString(truncated.get() != nullptr ? truncated.get() : value.get());
-      int64_t micros = 0;
-      if (field.type == FieldType::kDate) {
-        int32_t days = 0;
-        check(googlesql::functions::ConvertStringToDate(text, &days));
-        micros = days;
-      } else if (field.type == FieldType::kTime) {
-        googlesql::TimeValue time;
-        check(googlesql::functions::ConvertStringToTime(text, googlesql::functions::kMicroseconds,
-                                                        &time));
-        micros = (((((time.Hour() * 60LL) + time.Minute()) * 60) + time.Second()) * 1000000) +
-                 time.Microseconds();
-      } else {
-        googlesql::DatetimeValue datetime;
-        check(googlesql::functions::ConvertStringToDatetime(
-            text, googlesql::functions::kMicroseconds, &datetime));
-        absl::Time timestamp;
-        check(googlesql::functions::ConvertDatetimeToTimestamp(datetime, absl::UTCTimeZone(),
-                                                               &timestamp));
-        micros = absl::ToUnixMicros(timestamp);
-      }
-      append(ArrowArrayAppendInt(array, micros));
-      return;
-    }
-    case FieldType::kNumeric:
-    case FieldType::kBigNumeric: {
-      std::string packed;
-      if (field.type == FieldType::kNumeric) {
-        const auto number = googlesql::NumericValue::FromStringStrict(
-            ValueString(VectorValue(vector, type, row).get()));
-        check(number.status());
-        packed = number->SerializeAsProtoBytes();
-      } else {
-        const auto number = duckdb_get_type_id(type) == DUCKDB_TYPE_BIGNUM
-                                ? BigNumericFromBignum(VectorString(vector, row))
-                                : googlesql::BigNumericValue::FromStringStrict(
-                                      ValueString(VectorValue(vector, type, row).get()));
-        check(number.status());
-        packed = number->SerializeAsProtoBytes();
-      }
-      const bool negative =
-          !packed.empty() && (static_cast<unsigned char>(packed.back()) & 0x80U) != 0;
-      packed.resize(field.type == FieldType::kNumeric ? 16 : 32,
-                    negative ? static_cast<char>(0xff) : '\0');
-      ArrowDecimal decimal{};
-      ArrowDecimalInit(&decimal, field.type == FieldType::kNumeric ? 128 : 256,
-                       field.type == FieldType::kNumeric ? 38 : 76,
-                       field.type == FieldType::kNumeric ? 9 : 38);
-      ArrowDecimalSetBytes(&decimal, reinterpret_cast<const uint8_t*>(packed.data()));
-      append(ArrowArrayAppendDecimal(array, &decimal));
-      return;
-    }
-    default: {
-      const auto id = duckdb_get_type_id(type);
-      const std::string bytes = id == DUCKDB_TYPE_VARCHAR || id == DUCKDB_TYPE_BLOB
-                                    ? VectorString(vector, row)
-                                    : ValueString(VectorValue(vector, type, row).get());
-      ArrowBufferView view{};
-      view.data.data = bytes.data();  // NOLINT(cppcoreguidelines-pro-type-union-access)
-      view.size_bytes = static_cast<int64_t>(bytes.size());
-      append(ArrowArrayAppendBytes(array, view));
-    }
-  }
-}
-
-namespace {
 
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
             const CellEncoding& encoding) {

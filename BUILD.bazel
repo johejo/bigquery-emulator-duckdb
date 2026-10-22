@@ -672,7 +672,6 @@ cc_library(
         "src/backend.cc",
         "src/result_chunks.h",
         "src/storage_snapshot.cc",
-        "src/vector_cell.h",
     ],
     hdrs = [
         "src/backend.h",
