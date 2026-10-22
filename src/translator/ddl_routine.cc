@@ -124,7 +124,7 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
   };
   // A function's only option is its description, which BigQuery keeps as metadata.
   for (const auto& option : create.option_list()) {
-    const std::optional<googlesql::Value> value = OptionValue(*option, "function", scope);
+    const std::optional<googlesql::Value> value = OptionValue(*option, "CREATE FUNCTION", scope);
     std::string description;
     if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
         !StringOption(*value, description)) {
@@ -191,7 +191,8 @@ std::optional<std::string> CreateTableFunction(
   };
   // A function's only option is its description, which BigQuery keeps as metadata.
   for (const auto& option : create.option_list()) {
-    const std::optional<googlesql::Value> value = OptionValue(*option, "function", scope);
+    const std::optional<googlesql::Value> value =
+        OptionValue(*option, "CREATE TABLE FUNCTION", scope);
     std::string description;
     if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
         !StringOption(*value, description)) {
@@ -263,7 +264,7 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
       {"lastModifiedTime", now},
   };
   for (const auto& option : create.option_list()) {
-    const auto value = OptionValue(*option, "procedure", scope);
+    const auto value = OptionValue(*option, "CREATE PROCEDURE", scope);
     if (!value) {
       return std::nullopt;
     }

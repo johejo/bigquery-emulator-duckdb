@@ -1,13 +1,15 @@
 // Command restprobe probes the emulator through its REST API and prints the Markdown reports
-// docs/sql.md, docs/api.md and docs/functions.md. Each SQL and API probe starts a fresh emulator
-// from the binary that -emulator names, so that probes neither see nor disturb each other's data;
-// function calls need no data and share a few emulators. Probes run in parallel.
+// docs/sql.md, docs/options.md, docs/api.md and docs/functions.md. Each SQL, DDL option and API
+// probe starts a fresh emulator from the binary that -emulator names, so that probes neither see
+// nor disturb each other's data; function calls need no data and share a few emulators. Probes
+// run in parallel.
 //
 //	restprobe -emulator BINARY sql FEATURES_FILE
+//	restprobe -emulator BINARY options CATALOG
 //	restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE
 //	restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE
 //
-// FUNCTION_PROBE is //:function_probe, which builds the calls.
+// FUNCTION_PROBE is //:function_probe, which builds the calls. CATALOG is tools/ddl_options.json.
 package main
 
 import (
@@ -93,6 +95,7 @@ func main() {
 	binary := flag.String("emulator", "", "the emulator binary to probe")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: restprobe -emulator BINARY sql FEATURES_FILE")
+		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY options CATALOG")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY api DISCOVERY_FILE METHODS_FILE")
 		fmt.Fprintln(os.Stderr, "       restprobe -emulator BINARY functions FUNCTION_PROBE FUNCTIONS_FILE HINTS_FILE")
 	}
@@ -102,6 +105,8 @@ func main() {
 	switch {
 	case *binary != "" && len(args) == 2 && args[0] == "sql":
 		err = probeSQL(os.Stdout, *binary, args[1])
+	case *binary != "" && len(args) == 2 && args[0] == "options":
+		err = probeOptions(os.Stdout, *binary, args[1])
 	case *binary != "" && len(args) == 3 && args[0] == "api":
 		err = probeAPI(os.Stdout, *binary, args[1], args[2])
 	case *binary != "" && len(args) == 4 && args[0] == "functions":

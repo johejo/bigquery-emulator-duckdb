@@ -1327,3 +1327,41 @@ cc_library(
         "@nlohmann_json//:json",
     ],
 )
+
+# The types of the options the DDL handlers implement, which :ddl_options_catalog_test compares
+# with tools/ddl_options.json.
+cc_library(
+    name = "ddl_option_types",
+    srcs = ["src/ddl_option_types.cc"],
+    hdrs = ["src/ddl_option_types.h"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+    deps = [
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+    ],
+)
+
+cc_test(
+    name = "ddl_options_catalog_test",
+    srcs = ["tests/ddl_options_catalog_test.cc"],
+    copts = ["-std=c++20"],
+    data = ["tools/ddl_options.json"],
+    linkstatic = True,
+    deps = [
+        ":analyzer",
+        ":catalog",
+        ":ddl_option_types",
+        ":field_schema",
+        ":table_source",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:analyzer_output",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
+        "@nlohmann_json//:json",
+    ],
+)

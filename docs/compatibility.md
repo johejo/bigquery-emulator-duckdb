@@ -54,9 +54,8 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ### Options and expiration
 
-Table options are limited to description, friendly name, labels, expiration and
-default rounding mode; column options to description and rounding mode.
-Partition expiration is unsupported.
+[options.md](options.md) lists the DDL options the emulator accepts. Partition expiration is
+unsupported.
 
 DDL option values accept literals and constant expressions using query parameters and supported
 scalar functions. Other expressions, such as a parenthesized script variable, are unsupported.
@@ -123,7 +122,6 @@ a view's schema cannot change. `tables.update` keeps a schema or view definition
 ### Views
 
 Temporary, recursive and value-table views, and views that read temporary tables, are unsupported.
-View options are limited to description, friendly name, labels and expiration.
 
 Queries resolve views using the current definitions of persistent SQL UDFs and table functions.
 A changed UDF return type is reflected in query results, while the stored view schema stays
@@ -136,12 +134,11 @@ Materialized views are limited to a single managed base table, projections, filt
 Distinct aggregates, grouping sets, nested aggregation, joins, subqueries, CTEs, ordering, limits,
 view and snapshot references, and explicit output column lists are unsupported.
 
-Options are limited to description, friendly name, labels and expiration. Partitioning,
-clustering, replicas, non-incremental definitions, `max_staleness`, refresh configuration changes
-and `ALTER MATERIALIZED VIEW` are unsupported. The API accepts the default `enableRefresh: true`
-and `allowNonIncrementalDefinition: false`; changing the definition or refresh settings through
-`tables.patch` or `tables.update` is unsupported. Metadata-only updates preserve the definition
-and materialized-view type.
+Partitioning, clustering, replicas and `ALTER MATERIALIZED VIEW` are unsupported, and so are the
+options [options.md](options.md#create-materialized-view) lists as such. The API accepts the
+default `enableRefresh: true` and `allowNonIncrementalDefinition: false`; changing the definition
+or refresh settings through `tables.patch` or `tables.update` is unsupported. Metadata-only
+updates preserve the definition and materialized-view type.
 
 See the [README compatibility exceptions](../README.md#compatibility) for refresh state and storage statistics.
 

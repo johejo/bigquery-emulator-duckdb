@@ -120,5 +120,22 @@ For analysis, `RoutineCatalog` resolves view and routine definitions against the
 and dataset, shares their dependency state and detects recursion. This lets queries use current
 definitions while keeping job-local objects out of persistent dependencies.
 
+## DDL option probes
+
+`tools/ddl_options.json` is a snapshot of the option lists in BigQuery's DDL reference. `groups`
+maps each list's section anchor to its options: a name, a GoogleSQL type and SQL sample `values`.
+Each of `contexts` names a statement that takes a group's options, with a `template` holding
+`{option}` once, `setup` statements, and `only` or `exclude` to keep the options a language or
+form takes. `implementation` names the DDL handlers' context in `src/ddl_option_types.cc`.
+
+`internal/ddloptions` checks the catalog's structure and builds one statement per sample, which
+`tools/restprobe options` runs on fresh emulators to generate `docs/options.md`.
+`tests/ddl_options_catalog_test.cc` parses each type and sample with the emulator's analyzer
+settings, and compares types with the handlers' definitions, which must all appear in the catalog.
+
+`just update-ddl-options` refreshes names and types from the reference with `tools/ddloptions`,
+keeping samples and contexts. A new option has no samples, and a new list a context without a
+template, so both stay Untested until someone adds samples that meet the reference's constraints.
+
 See [compatibility.md](compatibility.md) for query and API limits and
 [storage-api.md](storage-api.md) for Storage client behavior.

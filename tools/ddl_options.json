@@ -1,0 +1,1870 @@
+{
+  "source": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language",
+  "groups": {
+    "add_replica_options_list": [
+      {
+        "name": "location",
+        "type": "STRING",
+        "values": [
+          "'US'"
+        ]
+      },
+      {
+        "name": "replica_kms_key",
+        "type": "STRING"
+      }
+    ],
+    "alter_capacity_commitment_option_list": [
+      {
+        "name": "plan",
+        "type": "STRING"
+      },
+      {
+        "name": "renewal_plan",
+        "type": "STRING"
+      }
+    ],
+    "alter_connection_option_list": [
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      }
+    ],
+    "alter_datapolicy_option_list": [
+      {
+        "name": "data_policy_type",
+        "type": "STRING"
+      },
+      {
+        "name": "masking_expression",
+        "type": "STRING"
+      }
+    ],
+    "alter_reservation_option_list": [
+      {
+        "name": "ignore_idle_slots",
+        "type": "BOOL"
+      },
+      {
+        "name": "slot_capacity",
+        "type": "INT64"
+      },
+      {
+        "name": "target_job_concurrency",
+        "type": "INT64"
+      },
+      {
+        "name": "autoscale_max_slots",
+        "type": "INT64"
+      },
+      {
+        "name": "secondary_location",
+        "type": "STRING"
+      },
+      {
+        "name": "is_primary",
+        "type": "BOOL"
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      }
+    ],
+    "assignment_option_list": [
+      {
+        "name": "assignee",
+        "type": "STRING"
+      },
+      {
+        "name": "job_type",
+        "type": "STRING"
+      },
+      {
+        "name": "scheduling_policy_max_slots",
+        "type": "INT64"
+      },
+      {
+        "name": "scheduling_policy_concurrency",
+        "type": "INT64"
+      }
+    ],
+    "bi_capacity_options_list": [
+      {
+        "name": "size_gb",
+        "type": "INT64"
+      },
+      {
+        "name": "preferred_tables",
+        "type": "ARRAY<STRING>"
+      }
+    ],
+    "bigtable_uri_option": [
+      {
+        "name": "uris",
+        "type": "STRING",
+        "source": "external_table_option_list"
+      }
+    ],
+    "capacity_commitment_option_list": [
+      {
+        "name": "plan",
+        "type": "STRING"
+      },
+      {
+        "name": "renewal_plan",
+        "type": "STRING"
+      },
+      {
+        "name": "slot_count",
+        "type": "INT64"
+      },
+      {
+        "name": "edition",
+        "type": "STRING"
+      }
+    ],
+    "column_option_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "data_policies",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "[\"{'name':'test.region-us.policy'}\"]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "data_governance_tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('test/tag_key', 'tag_value')]",
+          "NULL"
+        ]
+      }
+    ],
+    "column_set_options_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "data_policies",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "[\"{'name':'test.region-us.policy'}\"]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "data_governance_tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('test/tag_key', 'tag_value')]",
+          "NULL"
+        ]
+      }
+    ],
+    "connection_option_list": [
+      {
+        "name": "connection_type",
+        "type": "STRING"
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      }
+    ],
+    "datapolicy_option_list": [
+      {
+        "name": "data_policy_type",
+        "type": "STRING"
+      },
+      {
+        "name": "masking_expression",
+        "type": "STRING"
+      }
+    ],
+    "external_schema_option_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      },
+      {
+        "name": "location",
+        "type": "STRING",
+        "values": [
+          "'US'"
+        ]
+      },
+      {
+        "name": "external_source",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]"
+        ]
+      }
+    ],
+    "external_table_option_list": [
+      {
+        "name": "allow_jagged_rows",
+        "type": "BOOL"
+      },
+      {
+        "name": "allow_quoted_newlines",
+        "type": "BOOL"
+      },
+      {
+        "name": "bigtable_options",
+        "type": "STRING"
+      },
+      {
+        "name": "compression",
+        "type": "STRING"
+      },
+      {
+        "name": "decimal_target_types",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "enable_list_inference",
+        "type": "BOOL"
+      },
+      {
+        "name": "enable_logical_types",
+        "type": "BOOL"
+      },
+      {
+        "name": "encoding",
+        "type": "STRING"
+      },
+      {
+        "name": "enum_as_string",
+        "type": "BOOL"
+      },
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
+        ]
+      },
+      {
+        "name": "field_delimiter",
+        "type": "STRING"
+      },
+      {
+        "name": "format",
+        "type": "STRING"
+      },
+      {
+        "name": "hive_partition_uri_prefix",
+        "type": "STRING"
+      },
+      {
+        "name": "file_set_spec_type",
+        "type": "STRING"
+      },
+      {
+        "name": "ignore_unknown_values",
+        "type": "BOOL"
+      },
+      {
+        "name": "json_extension",
+        "type": "STRING"
+      },
+      {
+        "name": "max_bad_records",
+        "type": "INT64"
+      },
+      {
+        "name": "max_staleness",
+        "type": "INTERVAL",
+        "values": [
+          "INTERVAL 4 HOUR"
+        ]
+      },
+      {
+        "name": "null_marker",
+        "type": "STRING"
+      },
+      {
+        "name": "null_markers",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "object_metadata",
+        "type": "STRING"
+      },
+      {
+        "name": "preserve_ascii_control_characters",
+        "type": "BOOL"
+      },
+      {
+        "name": "projection_fields",
+        "type": "STRING"
+      },
+      {
+        "name": "quote",
+        "type": "STRING"
+      },
+      {
+        "name": "reference_file_schema_uri",
+        "type": "STRING"
+      },
+      {
+        "name": "require_hive_partition_filter",
+        "type": "BOOL"
+      },
+      {
+        "name": "sheet_range",
+        "type": "STRING"
+      },
+      {
+        "name": "skip_leading_rows",
+        "type": "INT64"
+      },
+      {
+        "name": "source_column_match",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]"
+        ]
+      },
+      {
+        "name": "time_zone",
+        "type": "STRING"
+      },
+      {
+        "name": "date_format",
+        "type": "STRING"
+      },
+      {
+        "name": "datetime_format",
+        "type": "STRING"
+      },
+      {
+        "name": "time_format",
+        "type": "STRING"
+      },
+      {
+        "name": "timestamp_format",
+        "type": "STRING"
+      },
+      {
+        "name": "uris",
+        "type": "ARRAY<STRING>"
+      }
+    ],
+    "function_option_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "library",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "['gs://probe/lib.js']"
+        ]
+      },
+      {
+        "name": "endpoint",
+        "type": "STRING"
+      },
+      {
+        "name": "user_defined_context",
+        "type": "ARRAY<STRUCT<STRING,STRING>>"
+      },
+      {
+        "name": "max_batching_rows",
+        "type": "INT64"
+      },
+      {
+        "name": "runtime_version",
+        "type": "STRING"
+      },
+      {
+        "name": "entry_point",
+        "type": "STRING"
+      },
+      {
+        "name": "packages",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "container_cpu",
+        "type": "FLOAT64"
+      },
+      {
+        "name": "container_memory",
+        "type": "STRING"
+      },
+      {
+        "name": "container_request_concurrency",
+        "type": "INT64"
+      }
+    ],
+    "generated_column_options": [
+      {
+        "name": "asynchronous",
+        "type": "BOOL",
+        "values": [
+          "TRUE"
+        ],
+        "source": "create_table_statement"
+      }
+    ],
+    "index_column_option_list": [
+      {
+        "name": "index_granularity",
+        "type": "STRING",
+        "values": [
+          "'COLUMN'"
+        ]
+      },
+      {
+        "name": "data_types",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "['STRING']"
+        ]
+      }
+    ],
+    "index_option_list": [
+      {
+        "name": "analyzer",
+        "type": "STRING",
+        "values": [
+          "'LOG_ANALYZER'",
+          "'NO_OP_ANALYZER'"
+        ]
+      },
+      {
+        "name": "analyzer_options",
+        "type": "STRING",
+        "values": [
+          "'{\"token_filters\": []}'"
+        ]
+      },
+      {
+        "name": "data_types",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "['STRING']"
+        ]
+      },
+      {
+        "name": "default_index_column_granularity",
+        "type": "STRING",
+        "values": [
+          "'COLUMN'"
+        ]
+      }
+    ],
+    "javascript-udaf-function-option-list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "library",
+        "type": "ARRAY<STRING>",
+        "values": [
+          "['gs://probe/lib.js']"
+        ]
+      }
+    ],
+    "materialized_view_option_list": [
+      {
+        "name": "enable_refresh",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE"
+        ]
+      },
+      {
+        "name": "refresh_interval_minutes",
+        "type": "FLOAT64",
+        "values": [
+          "20.0"
+        ]
+      },
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
+        ]
+      },
+      {
+        "name": "max_staleness",
+        "type": "INTERVAL",
+        "values": [
+          "INTERVAL 4 HOUR"
+        ]
+      },
+      {
+        "name": "allow_non_incremental_definition",
+        "type": "BOOL",
+        "values": [
+          "TRUE"
+        ]
+      },
+      {
+        "name": "kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]"
+        ]
+      }
+    ],
+    "materialized_view_replica_option_list": [
+      {
+        "name": "replication_interval_seconds",
+        "type": "INT64",
+        "values": [
+          "300"
+        ]
+      }
+    ],
+    "materialized_view_set_options_list": [
+      {
+        "name": "enable_refresh",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "refresh_interval_minutes",
+        "type": "FLOAT64",
+        "values": [
+          "20.0",
+          "NULL"
+        ]
+      },
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "max_staleness",
+        "type": "INTERVAL",
+        "values": [
+          "INTERVAL 4 HOUR",
+          "NULL"
+        ]
+      },
+      {
+        "name": "kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ],
+    "organization_set_options_list": [
+      {
+        "name": "default_kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'"
+        ]
+      },
+      {
+        "name": "default_time_zone",
+        "type": "STRING"
+      },
+      {
+        "name": "default_query_job_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_interactive_query_queue_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_batch_query_queue_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_query_optimizer_options",
+        "type": "STRING"
+      },
+      {
+        "name": "query_runtime",
+        "type": "STRING"
+      },
+      {
+        "name": "enable_global_queries_execution",
+        "type": "BOOL"
+      },
+      {
+        "name": "enable_global_queries_data_access",
+        "type": "BOOL"
+      },
+      {
+        "name": "reservation_override_mode",
+        "type": "STRING"
+      },
+      {
+        "name": "reusable_column_aliases_mode",
+        "type": "STRING"
+      },
+      {
+        "name": "disable_on_demand_billing",
+        "type": "BOOL"
+      },
+      {
+        "name": "default_location",
+        "type": "STRING"
+      }
+    ],
+    "procedure_option_list": [
+      {
+        "name": "strict_mode",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "engine",
+        "type": "STRING"
+      },
+      {
+        "name": "runtime_version",
+        "type": "STRING"
+      },
+      {
+        "name": "container_image",
+        "type": "STRING"
+      },
+      {
+        "name": "properties",
+        "type": "ARRAY<STRUCT<STRING,STRING>>"
+      },
+      {
+        "name": "main_file_uri",
+        "type": "STRING"
+      },
+      {
+        "name": "main_class",
+        "type": "STRING"
+      },
+      {
+        "name": "py_file_uris",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "jar_uris",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "file_uris",
+        "type": "ARRAY<STRING>"
+      },
+      {
+        "name": "archive_uris",
+        "type": "ARRAY<STRING>"
+      }
+    ],
+    "project_set_options_list": [
+      {
+        "name": "default_kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'"
+        ]
+      },
+      {
+        "name": "default_time_zone",
+        "type": "STRING"
+      },
+      {
+        "name": "default_query_job_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_interactive_query_queue_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_batch_query_queue_timeout_ms",
+        "type": "INT64"
+      },
+      {
+        "name": "default_query_optimizer_options",
+        "type": "STRING"
+      },
+      {
+        "name": "default_cloud_resource_connection_id",
+        "type": "STRING"
+      },
+      {
+        "name": "default_sql_dialect_option",
+        "type": "STRING"
+      },
+      {
+        "name": "query_runtime",
+        "type": "STRING"
+      },
+      {
+        "name": "enable_reservation_based_fairness",
+        "type": "BOOL"
+      },
+      {
+        "name": "enable_global_queries_execution",
+        "type": "BOOL"
+      },
+      {
+        "name": "enable_global_queries_data_access",
+        "type": "BOOL"
+      },
+      {
+        "name": "reservation_override_mode",
+        "type": "STRING"
+      },
+      {
+        "name": "reusable_column_aliases_mode",
+        "type": "STRING"
+      },
+      {
+        "name": "default_location",
+        "type": "STRING"
+      }
+    ],
+    "reservation_option_list": [
+      {
+        "name": "ignore_idle_slots",
+        "type": "BOOL"
+      },
+      {
+        "name": "slot_capacity",
+        "type": "INT64"
+      },
+      {
+        "name": "target_job_concurrency",
+        "type": "INT64"
+      },
+      {
+        "name": "edition",
+        "type": "STRING"
+      },
+      {
+        "name": "autoscale_max_slots",
+        "type": "INT64"
+      },
+      {
+        "name": "secondary_location",
+        "type": "STRING"
+      },
+      {
+        "name": "max_slots",
+        "type": "INT64"
+      },
+      {
+        "name": "scaling_mode",
+        "type": "STRING"
+      },
+      {
+        "name": "scheduling_policy_max_slots",
+        "type": "INT64"
+      },
+      {
+        "name": "scheduling_policy_concurrency",
+        "type": "INT64"
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      }
+    ],
+    "schema_option_list": [
+      {
+        "name": "default_kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'"
+        ]
+      },
+      {
+        "name": "default_partition_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "7",
+          "7.5"
+        ]
+      },
+      {
+        "name": "default_rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'"
+        ]
+      },
+      {
+        "name": "default_table_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "1",
+          "1.5"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "failover_reservation",
+        "type": "STRING"
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "is_case_insensitive",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE"
+        ]
+      },
+      {
+        "name": "is_primary",
+        "type": "BOOL"
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      },
+      {
+        "name": "location",
+        "type": "STRING",
+        "values": [
+          "'US'"
+        ]
+      },
+      {
+        "name": "max_time_travel_hours",
+        "type": "INT64",
+        "values": [
+          "48",
+          "168"
+        ]
+      },
+      {
+        "name": "primary_replica",
+        "type": "STRING"
+      },
+      {
+        "name": "storage_billing_model",
+        "type": "STRING",
+        "values": [
+          "'LOGICAL'",
+          "'PHYSICAL'"
+        ]
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]"
+        ]
+      }
+    ],
+    "schema_set_options_list": [
+      {
+        "name": "default_kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'"
+        ]
+      },
+      {
+        "name": "default_partition_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "7",
+          "7.5"
+        ]
+      },
+      {
+        "name": "default_rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'"
+        ]
+      },
+      {
+        "name": "default_table_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "1",
+          "1.5"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "failover_reservation",
+        "type": "STRING"
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      },
+      {
+        "name": "is_case_insensitive",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE"
+        ]
+      },
+      {
+        "name": "is_primary",
+        "type": "BOOL"
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]"
+        ]
+      },
+      {
+        "name": "max_time_travel_hours",
+        "type": "INT64",
+        "values": [
+          "48",
+          "168"
+        ]
+      },
+      {
+        "name": "primary_replica",
+        "type": "STRING"
+      },
+      {
+        "name": "storage_billing_model",
+        "type": "STRING",
+        "values": [
+          "'LOGICAL'",
+          "'PHYSICAL'"
+        ]
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]"
+        ]
+      }
+    ],
+    "snapshot_option_list": [
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ],
+    "sql-udaf-function-option-list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      }
+    ],
+    "table_function_options_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      }
+    ],
+    "table_option_list": [
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "partition_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "7",
+          "7.5",
+          "NULL"
+        ]
+      },
+      {
+        "name": "require_partition_filter",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "default_rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "enable_change_history",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "max_staleness",
+        "type": "INTERVAL",
+        "values": [
+          "INTERVAL 4 HOUR",
+          "NULL"
+        ]
+      },
+      {
+        "name": "enable_fine_grained_mutations",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "storage_uri",
+        "type": "STRING"
+      },
+      {
+        "name": "file_format",
+        "type": "STRING"
+      },
+      {
+        "name": "table_format",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ],
+    "table_set_options_list": [
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "partition_expiration_days",
+        "type": "FLOAT64",
+        "values": [
+          "7",
+          "7.5",
+          "NULL"
+        ]
+      },
+      {
+        "name": "require_partition_filter",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "kms_key_name",
+        "type": "STRING",
+        "values": [
+          "'projects/test/locations/us/keyRings/r/cryptoKeys/k'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "default_rounding_mode",
+        "type": "STRING",
+        "values": [
+          "'ROUND_HALF_EVEN'",
+          "'ROUND_HALF_AWAY_FROM_ZERO'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "enable_change_history",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "max_staleness",
+        "type": "INTERVAL",
+        "values": [
+          "INTERVAL 4 HOUR",
+          "NULL"
+        ]
+      },
+      {
+        "name": "enable_fine_grained_mutations",
+        "type": "BOOL",
+        "values": [
+          "TRUE",
+          "FALSE",
+          "NULL"
+        ]
+      },
+      {
+        "name": "storage_uri",
+        "type": "STRING"
+      },
+      {
+        "name": "file_format",
+        "type": "STRING"
+      },
+      {
+        "name": "table_format",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ],
+    "vector_index_option_list": [
+      {
+        "name": "index_type",
+        "type": "STRING",
+        "values": [
+          "'IVF'",
+          "'TREE_AH'"
+        ]
+      },
+      {
+        "name": "distance_type",
+        "type": "STRING",
+        "values": [
+          "'EUCLIDEAN'",
+          "'COSINE'",
+          "'DOT_PRODUCT'"
+        ]
+      },
+      {
+        "name": "ivf_options",
+        "type": "STRING",
+        "values": [
+          "'{\"num_lists\": 10}'"
+        ]
+      },
+      {
+        "name": "tree_ah_options",
+        "type": "STRING",
+        "values": [
+          "'{\"leaf_node_embedding_count\": 500}'"
+        ]
+      },
+      {
+        "name": "lexical_search_columns",
+        "type": "ARRAY<STRING>"
+      }
+    ],
+    "view_column_option_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'"
+        ]
+      }
+    ],
+    "view_column_set_options_list": [
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      }
+    ],
+    "view_option_list": [
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "privacy_policy",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ],
+    "view_set_options_list": [
+      {
+        "name": "expiration_timestamp",
+        "type": "TIMESTAMP",
+        "values": [
+          "TIMESTAMP '2099-01-01 00:00:00 UTC'",
+          "'2099-01-01 00:00:00 UTC'",
+          "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)",
+          "NULL"
+        ]
+      },
+      {
+        "name": "friendly_name",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "description",
+        "type": "STRING",
+        "values": [
+          "'probe'",
+          "NULL"
+        ]
+      },
+      {
+        "name": "labels",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('env', 'test')]",
+          "[]",
+          "NULL"
+        ]
+      },
+      {
+        "name": "privacy_policy",
+        "type": "STRING"
+      },
+      {
+        "name": "tags",
+        "type": "ARRAY<STRUCT<STRING,STRING>>",
+        "values": [
+          "[('123456789012/env', 'test')]",
+          "NULL"
+        ]
+      }
+    ]
+  },
+  "contexts": [
+    {
+      "name": "CREATE SCHEMA",
+      "group": "schema_option_list",
+      "template": "CREATE SCHEMA e OPTIONS ({option})",
+      "implementation": "CREATE SCHEMA"
+    },
+    {
+      "name": "ALTER SCHEMA SET OPTIONS",
+      "group": "schema_set_options_list",
+      "template": "ALTER SCHEMA d SET OPTIONS ({option})",
+      "implementation": "ALTER SCHEMA"
+    },
+    {
+      "name": "CREATE TABLE",
+      "group": "table_option_list",
+      "template": "CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS ({option})",
+      "implementation": "CREATE TABLE"
+    },
+    {
+      "name": "ALTER TABLE SET OPTIONS",
+      "group": "table_set_options_list",
+      "template": "ALTER TABLE t SET OPTIONS ({option})",
+      "implementation": "ALTER TABLE"
+    },
+    {
+      "name": "CREATE TABLE column",
+      "group": "column_option_list",
+      "template": "CREATE TABLE n (a NUMERIC OPTIONS ({option}))",
+      "implementation": "column"
+    },
+    {
+      "name": "ALTER TABLE ADD COLUMN",
+      "group": "column_option_list",
+      "template": "ALTER TABLE t ADD COLUMN b NUMERIC OPTIONS ({option})",
+      "implementation": "column"
+    },
+    {
+      "name": "ALTER TABLE ALTER COLUMN SET OPTIONS",
+      "group": "column_set_options_list",
+      "template": "ALTER TABLE t ALTER COLUMN a SET OPTIONS ({option})",
+      "implementation": "column"
+    },
+    {
+      "name": "CREATE SNAPSHOT TABLE",
+      "group": "snapshot_option_list",
+      "template": "CREATE SNAPSHOT TABLE n CLONE t OPTIONS ({option})",
+      "implementation": "CREATE SNAPSHOT TABLE"
+    },
+    {
+      "name": "CREATE VIEW",
+      "group": "view_option_list",
+      "template": "CREATE VIEW n OPTIONS ({option}) AS SELECT id FROM t",
+      "implementation": "CREATE VIEW"
+    },
+    {
+      "name": "CREATE VIEW column",
+      "group": "view_column_option_list",
+      "template": "CREATE VIEW n (id OPTIONS ({option})) AS SELECT id FROM t"
+    },
+    {
+      "name": "ALTER VIEW SET OPTIONS",
+      "group": "view_set_options_list",
+      "template": "ALTER VIEW v SET OPTIONS ({option})",
+      "setup": [
+        "CREATE VIEW d.v AS SELECT id FROM d.t"
+      ]
+    },
+    {
+      "name": "ALTER VIEW ALTER COLUMN SET OPTIONS",
+      "group": "view_column_set_options_list",
+      "template": "ALTER VIEW v ALTER COLUMN id SET OPTIONS ({option})",
+      "setup": [
+        "CREATE VIEW d.v AS SELECT id FROM d.t"
+      ]
+    },
+    {
+      "name": "CREATE MATERIALIZED VIEW",
+      "group": "materialized_view_option_list",
+      "template": "CREATE MATERIALIZED VIEW n OPTIONS ({option}) AS SELECT id, COUNT(*) AS n FROM t GROUP BY id",
+      "implementation": "CREATE MATERIALIZED VIEW"
+    },
+    {
+      "name": "ALTER MATERIALIZED VIEW SET OPTIONS",
+      "group": "materialized_view_set_options_list",
+      "template": "ALTER MATERIALIZED VIEW v SET OPTIONS ({option})",
+      "setup": [
+        "CREATE MATERIALIZED VIEW d.v AS SELECT id, COUNT(*) AS n FROM d.t GROUP BY id"
+      ]
+    },
+    {
+      "name": "CREATE FUNCTION SQL",
+      "group": "function_option_list",
+      "template": "CREATE FUNCTION d.f(x INT64) RETURNS INT64 AS (x + 1) OPTIONS ({option})",
+      "implementation": "CREATE FUNCTION",
+      "only": [
+        "description"
+      ]
+    },
+    {
+      "name": "CREATE FUNCTION JavaScript",
+      "group": "function_option_list",
+      "template": "CREATE FUNCTION d.f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js OPTIONS ({option}) AS \"return x + 1;\"",
+      "implementation": "CREATE FUNCTION",
+      "only": [
+        "description",
+        "library"
+      ]
+    },
+    {
+      "name": "CREATE TABLE FUNCTION",
+      "group": "table_function_options_list",
+      "template": "CREATE TABLE FUNCTION d.f() OPTIONS ({option}) AS SELECT 1 AS id",
+      "implementation": "CREATE TABLE FUNCTION"
+    },
+    {
+      "name": "CREATE PROCEDURE SQL",
+      "group": "procedure_option_list",
+      "template": "CREATE PROCEDURE d.p() OPTIONS ({option}) BEGIN SELECT 1; END",
+      "implementation": "CREATE PROCEDURE",
+      "only": [
+        "description",
+        "strict_mode"
+      ]
+    },
+    {
+      "name": "CREATE MATERIALIZED VIEW replica",
+      "group": "materialized_view_replica_option_list"
+    },
+    {
+      "name": "CREATE EXTERNAL SCHEMA",
+      "group": "external_schema_option_list"
+    },
+    {
+      "name": "CREATE FUNCTION remote",
+      "group": "function_option_list",
+      "only": [
+        "description",
+        "endpoint",
+        "user_defined_context",
+        "max_batching_rows"
+      ]
+    },
+    {
+      "name": "CREATE FUNCTION Python",
+      "group": "function_option_list",
+      "only": [
+        "description",
+        "library",
+        "max_batching_rows",
+        "runtime_version",
+        "entry_point",
+        "packages",
+        "container_cpu",
+        "container_memory",
+        "container_request_concurrency"
+      ]
+    },
+    {
+      "name": "CREATE AGGREGATE FUNCTION SQL",
+      "group": "sql-udaf-function-option-list"
+    },
+    {
+      "name": "CREATE AGGREGATE FUNCTION JavaScript",
+      "group": "javascript-udaf-function-option-list"
+    },
+    {
+      "name": "CREATE PROCEDURE Spark",
+      "group": "procedure_option_list",
+      "exclude": [
+        "strict_mode"
+      ]
+    },
+    {
+      "name": "CREATE CAPACITY",
+      "group": "capacity_commitment_option_list"
+    },
+    {
+      "name": "CREATE RESERVATION",
+      "group": "reservation_option_list"
+    },
+    {
+      "name": "CREATE ASSIGNMENT",
+      "group": "assignment_option_list"
+    },
+    {
+      "name": "CREATE SEARCH INDEX",
+      "group": "index_option_list"
+    },
+    {
+      "name": "CREATE SEARCH INDEX column",
+      "group": "index_column_option_list"
+    },
+    {
+      "name": "CREATE VECTOR INDEX",
+      "group": "vector_index_option_list"
+    },
+    {
+      "name": "CREATE DATA_POLICY",
+      "group": "datapolicy_option_list"
+    },
+    {
+      "name": "CREATE CONNECTION",
+      "group": "connection_option_list"
+    },
+    {
+      "name": "ALTER SCHEMA ADD REPLICA",
+      "group": "add_replica_options_list"
+    },
+    {
+      "name": "ALTER ORGANIZATION SET OPTIONS",
+      "group": "organization_set_options_list"
+    },
+    {
+      "name": "ALTER PROJECT SET OPTIONS",
+      "group": "project_set_options_list"
+    },
+    {
+      "name": "ALTER BI_CAPACITY SET OPTIONS",
+      "group": "bi_capacity_options_list"
+    },
+    {
+      "name": "ALTER CAPACITY SET OPTIONS",
+      "group": "alter_capacity_commitment_option_list"
+    },
+    {
+      "name": "ALTER RESERVATION SET OPTIONS",
+      "group": "alter_reservation_option_list"
+    },
+    {
+      "name": "ALTER DATA_POLICY SET OPTIONS",
+      "group": "alter_datapolicy_option_list"
+    },
+    {
+      "name": "ALTER CONNECTION SET OPTIONS",
+      "group": "alter_connection_option_list"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE",
+      "group": "external_table_option_list"
+    },
+    {
+      "name": "CREATE TABLE generated column",
+      "group": "generated_column_options"
+    },
+    {
+      "name": "CREATE EXTERNAL TABLE Bigtable URI",
+      "group": "bigtable_uri_option"
+    }
+  ]
+}
