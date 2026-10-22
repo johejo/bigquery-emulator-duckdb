@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -104,6 +106,62 @@ std::optional<int64_t> Int64Member(const json& value, const char* key) {
     }
   }
   throw ApiError::Invalid(std::string("Field ") + key + " must be an integer");
+}
+
+// Indexes refer to the original schema, so projecting keeps its order and spelling.
+struct SchemaSelection {
+  bool all = false;
+  std::map<size_t, SchemaSelection> fields = {};
+};
+
+void SelectSchemaField(const std::vector<FieldSchema>& schema, std::string_view path,
+                       SchemaSelection& selection) {
+  const auto dot = path.find('.');
+  const std::string_view name = path.substr(0, dot);
+  const auto field = std::ranges::find_if(schema, [name](const FieldSchema& candidate) {
+    return std::ranges::equal(candidate.name, name, [](unsigned char a, unsigned char b) {
+      return std::tolower(a) == std::tolower(b);
+    });
+  });
+  if (name.empty() || field == schema.end()) {
+    throw ApiError::Invalid("Unknown field in selectedFields: " + std::string(path));
+  }
+  auto& child = selection.fields[static_cast<size_t>(field - schema.begin())];
+  if (dot == std::string_view::npos) {
+    child.all = true;
+  } else {
+    if (field->type != FieldType::kRecord) {
+      throw ApiError::Invalid("Not a RECORD field in selectedFields: " + std::string(name));
+    }
+    SelectSchemaField(field->fields, path.substr(dot + 1), child);
+  }
+}
+
+SchemaSelection ParseSchemaSelection(const std::vector<FieldSchema>& schema,
+                                     std::string_view remaining) {
+  SchemaSelection selection;
+  while (true) {
+    const auto comma = remaining.find(',');
+    SelectSchemaField(schema, remaining.substr(0, comma), selection);
+    if (comma == std::string_view::npos) {
+      break;
+    }
+    remaining.remove_prefix(comma + 1);
+  }
+  return selection;
+}
+
+std::vector<FieldSchema> ProjectSchema(const std::vector<FieldSchema>& schema,
+                                       const SchemaSelection& selection) {
+  std::vector<FieldSchema> projected;
+  for (const auto& [index, child] : selection.fields) {
+    FieldSchema field = schema.at(index);
+    if (!child.all) {
+      field.fields = ProjectSchema(field.fields, child);
+    }
+    projected.push_back(std::move(field));
+  }
+  return projected;
 }
 
 }  // namespace
@@ -396,6 +454,11 @@ std::vector<FieldSchema> SchemaFromJson(const json& schema) {
     throw ApiError::Invalid("Field " + *duplicate + " already exists in schema");
   }
   return fields;
+}
+
+std::vector<FieldSchema> SelectFields(const std::vector<FieldSchema>& schema,
+                                      std::string_view selected_fields) {
+  return ProjectSchema(schema, ParseSchemaSelection(schema, selected_fields));
 }
 
 }  // namespace bigquery_emulator_duckdb

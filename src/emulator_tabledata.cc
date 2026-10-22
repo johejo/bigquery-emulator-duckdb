@@ -6,6 +6,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -43,16 +44,18 @@ std::string RoundedInsertValue(const json& value, const FieldSchema& field,
 
 }  // namespace
 
-QueryResult Emulator::ListTableData(TableReference table, int64_t start_index,
-                                    int64_t max_results) {
+QueryResult Emulator::ListTableData(TableReference table, int64_t start_index, int64_t max_results,
+                                    std::string_view selected_fields) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table);
   if (info.view_query) {
     throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
   }
-  return Execute("SELECT " + ReadColumns(info.schema) + " FROM " +
-                 ReadTableRelation(backend_, table) + " LIMIT " + std::to_string(max_results) +
-                 " OFFSET " + std::to_string(start_index));
+  const std::string columns = selected_fields.empty()
+                                  ? ReadColumns(info.schema)
+                                  : ReadColumns(SelectFields(info.schema, selected_fields), true);
+  return Execute("SELECT " + columns + " FROM " + ReadTableRelation(backend_, table) + " LIMIT " +
+                 std::to_string(max_results) + " OFFSET " + std::to_string(start_index));
 }
 
 std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,

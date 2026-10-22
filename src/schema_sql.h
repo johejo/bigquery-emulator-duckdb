@@ -41,8 +41,9 @@ std::string CheckedWriteValue(const std::string& sql, const FieldSchema& field,
 std::string StoredValue(const std::string& sql, const FieldSchema& field);
 
 // The select list of a table of `schema`, with each GEOGRAPHY, at any depth, as the WKT that
-// tabledata.list and query results return; `*` when it has none.
-std::string ReadColumns(const std::vector<FieldSchema>& schema);
+// tabledata.list and query results return; `*` when it has none. When `selected` is set,
+// `schema` is a selection of the table's, as SelectFields gives, and only its fields are read.
+std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected = false);
 
 // The DuckDB value of the RANGE `field` that `text`, a VARCHAR in the form "[start, end)", holds,
 // where NULL and UNBOUNDED are unbounded ends and each other bound is cast to the element type.
