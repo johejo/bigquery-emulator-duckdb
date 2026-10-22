@@ -23,10 +23,6 @@ jobs:
     # Jobs tend to finish sooner on the ARM runner.
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 120
-    permissions:
-      contents: read
-      # Main runs delete the caches they replace.
-      actions: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,15 +53,13 @@ jobs:
             ~/.cache/bazelisk
           key: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', '.bazelversion') }}
           restore-keys: bazel-repo-v2-${{ runner.os }}-${{ runner.arch }}-
+      # Test builds compliance tests into the shared ARM disk cache and saves it.
       - name: Restore Bazel disk cache
-        id: disk-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/bazel-disk
-          key: bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: |
-            bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-
-            bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+          key: bazel-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: bazel-disk-${{ runner.os }}-${{ runner.arch }}-
       - name: Configure Bazel for CI
         run: |
           echo 'common --config=ci' > .bazelrc.local
@@ -78,35 +72,6 @@ jobs:
           nix run .#bazel -- build //:compliance_test
       - name: Package tests and summary tool
         run: nix run .#compliance-package -- "$RUNNER_TEMP/compliance"
-      # Bazel collects the disk cache once idle. Give it time, then stop the server so that it does
-      # not delete entries while they are archived.
-      - name: Stop Bazel
-        if: >-
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-          steps.disk-cache.outputs.cache-hit != 'true'
-        run: |
-          du -sh ~/.cache/bazel-disk
-          sleep 30
-          nix run .#bazel -- --ignore_all_rc_files shutdown
-          du -sh ~/.cache/bazel-disk
-      # Save after the build so test failures do not discard compiled dependencies. Only main
-      # pushes save caches; pull requests and manual runs reuse them.
-      - name: Save Bazel disk cache
-        if: >-
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-          steps.disk-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/bazel-disk
-          key: ${{ steps.disk-cache.outputs.cache-primary-key }}
-      - name: Prune older caches
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: >-
-          .github/scripts/prune-caches.sh '${{ steps.disk-cache.outputs.cache-primary-key }}'
-          'bazel-compliance-disk-${{ runner.os }}-${{ runner.arch }}-'
       - name: Upload test bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
