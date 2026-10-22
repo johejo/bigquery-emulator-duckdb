@@ -3,6 +3,15 @@
 SQL follows the path `Server` → GoogleSQL analysis → translation → DuckDB execution.
 REST metadata operations and Storage RPCs share the same `Emulator` and catalog.
 
+A Storage Read session keeps its rows as the DuckDB vectors of one query, which selects the
+requested fields in GoogleSQL, on a backend session the snapshot owns so that Arrow's connection
+properties remain valid. Each response copies its rows of the columns whose DuckDB Arrow layout
+matches the BigQuery wire type into a private chunk, exports them through the Arrow C Data
+interface. A NULL array becomes an empty one, a BIGNUMERIC's stored bytes become a decimal256,
+and infinite RANGE bounds become NULL. Columns with other physical layouts are appended to Arrow
+arrays directly from their typed vectors. The resulting arrays are serialized as Arrow IPC with
+Apache nanoarrow or encoded as Avro binary rows. Both formats use the table metadata to encode the public schema.
+
 ## Server
 
 [`Server`](../src/server.h) owns the [REST](../src/server/rest.cc) and

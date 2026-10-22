@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -141,6 +144,33 @@ func arrowIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.Read
 	return ids
 }
 
+func readIDs(t *testing.T, read storagepb.BigQueryReadClient, s *storagepb.ReadSession, name string, offset int64) []int64 {
+	t.Helper()
+	if s.DataFormat == storagepb.DataFormat_ARROW {
+		return arrowIDs(t, read, s, name, offset)
+	}
+	codec, err := goavro.NewCodec(s.GetAvroSchema().Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, block := range responses(t, read, name, offset) {
+		data := block.GetAvroRows().SerializedBinaryRows
+		for range block.RowCount {
+			value, remaining, err := codec.NativeFromBinary(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, union(value.(map[string]any)["id"]).(int64))
+			data = remaining
+		}
+		if len(data) != 0 {
+			t.Fatal("unexpected trailing Avro bytes")
+		}
+	}
+	return ids
+}
+
 // The Storage API documents snapshot isolation, disjoint read streams, schema order and
 // offset resumption. Expectations here follow those guarantees and the rows we insert.
 func TestReadSnapshotProjectionSplitAndOffset(t *testing.T) {
@@ -196,6 +226,63 @@ func TestReadSnapshotProjectionSplitAndOffset(t *testing.T) {
 	}
 }
 
+// A projection keeps a NULL STRUCT NULL, the order of repeated elements, and returns a NULL
+// array as an empty one, as BigQuery stores it.
+func TestReadArrowProjectionNullsAndOrder(t *testing.T) {
+	t.Parallel()
+	rest, read, _ := clients(t)
+	path := table(t, rest, "storage_read_projection_nulls", `id INT64, rec STRUCT<a INT64, b STRING>,
+		records ARRAY<STRUCT<a INT64, nested STRUCT<x INT64, y STRING>>>`)
+	query(t, rest, `INSERT INTO storage_read_projection_nulls.rows VALUES
+		(1, NULL, NULL),
+		(2, STRUCT(2, 'b'), [STRUCT(3 AS a, STRUCT(30 AS x, 'p' AS y) AS nested), STRUCT(1, NULL), STRUCT(2, STRUCT(20, 'q'))])`)
+	s := session(t, read, path, storagepb.DataFormat_ARROW, &storagepb.ReadSession_TableReadOptions{
+		SelectedFields: []string{"rec.b", "records.nested.y", "id"},
+	}, 1)
+	block := responses(t, read, s.Streams[0].Name, 0)[0]
+	data := append(bytes.Clone(s.GetArrowSchema().SerializedSchema), block.GetArrowRecordBatch().SerializedRecordBatch...)
+	reader, err := ipc.NewReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Release()
+	if !reader.Next() {
+		t.Fatal(reader.Err())
+	}
+	r := reader.RecordBatch()
+	got := map[int64]string{}
+	for row := 0; row < int(r.NumRows()); row++ {
+		rec := r.Column(1).(*array.Struct)
+		text := "rec=null"
+		if !rec.IsNull(row) {
+			text = "rec=" + rec.Field(0).(*array.String).Value(row)
+		}
+		records := r.Column(2).(*array.List)
+		if records.IsNull(row) {
+			t.Fatalf("row %d: NULL array", row)
+		}
+		start, end := records.ValueOffsets(row)
+		elements := records.ListValues().(*array.Struct)
+		inner := elements.Field(0).(*array.Struct)
+		text += " records="
+		for i := int(start); i < int(end); i++ {
+			if elements.NumField() != 1 || inner.NumField() != 1 {
+				t.Fatal("nested projection lost STRUCT shape")
+			}
+			if inner.IsNull(i) {
+				text += "[null]"
+			} else {
+				text += "[" + inner.Field(0).(*array.String).Value(i) + "]"
+			}
+		}
+		got[r.Column(0).(*array.Int64).Value(row)] = text
+	}
+	want := map[int64]string{1: "rec=null records=", 2: "rec=b records=[p][null][q]"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func union(value any) any {
 	if m, ok := value.(map[string]any); ok && len(m) == 1 {
 		for _, value := range m {
@@ -207,8 +294,8 @@ func union(value any) any {
 
 func TestReadAvroTypes(t *testing.T) {
 	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_avro", "id INT64, name STRING, payload BYTES, n NUMERIC, bn BIGNUMERIC, tags ARRAY<STRING>, rec STRUCT<a INT64, b STRING>, ts TIMESTAMP, d DATE, tm TIME, dt DATETIME")
-	query(t, rest, `INSERT INTO storage_read_avro.rows VALUES (-1, '日本語', b'\x00\xff', NUMERIC '-123456789.123456789', BIGNUMERIC '-12345678901234567890123456789012345678.12345678901234567890123456789012345678', ['a','b'], STRUCT(1,'nested'), TIMESTAMP '1969-12-31 23:59:59.999999+00', DATE '1969-12-31', TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999'), (2, NULL, b'', 0, 0, [], NULL, NULL, NULL, NULL, NULL)`)
+	path := table(t, rest, "storage_read_avro", "id INT64, name STRING, payload BYTES, n NUMERIC, bn BIGNUMERIC, tags ARRAY<STRING>, rec STRUCT<a INT64, b STRING>, ts TIMESTAMP, d DATE, tm TIME, dt DATETIME, flag BOOL, f FLOAT64")
+	query(t, rest, `INSERT INTO storage_read_avro.rows VALUES (-1, '日本語', b'\x00\xff', NUMERIC '-123456789.123456789', BIGNUMERIC '-12345678901234567890123456789012345678.12345678901234567890123456789012345678', ['a','b'], STRUCT(1,'nested'), TIMESTAMP '1969-12-31 23:59:59.999999+00', DATE '1969-12-31', TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999', TRUE, -1.25), (2, NULL, b'', 0, 0, [], NULL, NULL, NULL, NULL, NULL, FALSE, CAST('inf' AS FLOAT64))`)
 	s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
 	// The official Storage schema mapping annotates DATETIME as string/datetime.
 	var schema struct {
@@ -256,6 +343,10 @@ func TestReadAvroTypes(t *testing.T) {
 		}
 	}
 	row := values[-1]
+	if union(row["flag"]) != true || union(row["f"]) != float64(-1.25) ||
+		union(values[2]["flag"]) != false || !math.IsInf(union(values[2]["f"]).(float64), 1) {
+		t.Fatalf("boolean/float: %v, %v", row, values[2])
+	}
 	if union(row["name"]) != "日本語" || !bytes.Equal(union(row["payload"]).([]byte), []byte{0, 255}) {
 		t.Fatalf("text/bytes: %v", row)
 	}
@@ -270,6 +361,97 @@ func TestReadAvroTypes(t *testing.T) {
 	}
 	if values[2]["name"] != nil || values[2]["rec"] != nil || len(values[2]["tags"].([]any)) != 0 {
 		t.Fatalf("NULL/empty: %v", values[2])
+	}
+}
+
+// Avro represents JSON as JSON text and GEOGRAPHY as WKT, both string/sqlType:
+// https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
+func TestReadAvroJSONAndGeography(t *testing.T) {
+	for _, tc := range []struct {
+		name, kind, value, want string
+	}{
+		{"json", "JSON", `JSON '{"text":"日本語"}'`, `{"text":"日本語"}`},
+		{"geography", "GEOGRAPHY", "ST_GEOGPOINT(1, 2)", "POINT(1 2)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rest, read, _ := clients(t)
+			dataset := "storage_read_avro_" + tc.name
+			path := table(t, rest, dataset, fmt.Sprintf("id INT64, value %s, items ARRAY<%s>, rec STRUCT<value %s>, records ARRAY<STRUCT<value %s>>", tc.kind, tc.kind, tc.kind, tc.kind))
+			query(t, rest, fmt.Sprintf("INSERT INTO %s.rows VALUES (1, %s, [%s], STRUCT(%s), [STRUCT(%s)]), (2, NULL, [], NULL, [])", dataset, tc.value, tc.value, tc.value, tc.value))
+			s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
+			var schema struct {
+				Fields []struct {
+					Name string
+					Type json.RawMessage
+				}
+			}
+			if err := json.Unmarshal([]byte(s.GetAvroSchema().Schema), &schema); err != nil {
+				t.Fatal(err)
+			}
+			var branches []json.RawMessage
+			if err := json.Unmarshal(schema.Fields[1].Type, &branches); err != nil {
+				t.Fatal(err)
+			}
+			var kind struct{ Type, SQLType string }
+			if err := json.Unmarshal(branches[1], &kind); err != nil {
+				t.Fatal(err)
+			}
+			if kind.Type != "string" || kind.SQLType != tc.kind {
+				t.Fatalf("schema = %s", branches[1])
+			}
+			codec, err := goavro.NewCodec(s.GetAvroSchema().Schema)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows := make(map[int64]map[string]any)
+			for _, block := range responses(t, read, s.Streams[0].Name, 0) {
+				data := block.GetAvroRows().SerializedBinaryRows
+				for range block.RowCount {
+					value, remaining, err := codec.NativeFromBinary(data)
+					if err != nil {
+						t.Fatal(err)
+					}
+					row := value.(map[string]any)
+					rows[union(row["id"]).(int64)] = row
+					data = remaining
+				}
+				if len(data) != 0 {
+					t.Fatal("unexpected trailing Avro bytes")
+				}
+			}
+			if len(rows) != 2 {
+				t.Fatalf("rows = %v", rows)
+			}
+			row := rows[1]
+			for _, value := range []any{
+				union(row["value"]), row["items"].([]any)[0],
+				union(union(row["rec"]).(map[string]any)["value"]),
+				union(row["records"].([]any)[0].(map[string]any)["value"]),
+			} {
+				got := value.(string)
+				if tc.kind == "JSON" {
+					var compact bytes.Buffer
+					if err := json.Compact(&compact, []byte(got)); err != nil {
+						t.Fatal(err)
+					}
+					got = compact.String()
+				}
+				if got != tc.want {
+					t.Fatalf("value = %q, want %q", got, tc.want)
+				}
+			}
+			if rows[2]["value"] != nil || rows[2]["rec"] != nil || len(rows[2]["items"].([]any)) != 0 || len(rows[2]["records"].([]any)) != 0 {
+				t.Fatalf("NULL/empty: %v", rows[2])
+			}
+			_, err = read.CreateReadSession(t.Context(), &storagepb.CreateReadSessionRequest{
+				Parent:      "projects/test",
+				ReadSession: &storagepb.ReadSession{Table: path, DataFormat: storagepb.DataFormat_ARROW},
+			})
+			if status.Code(err) != codes.Unimplemented {
+				t.Fatalf("Arrow session error = %v", err)
+			}
+		})
 	}
 }
 
@@ -299,23 +481,183 @@ func TestGoClientStorageRead(t *testing.T) {
 }
 
 func TestReadEmptyAndMultipleBatches(t *testing.T) {
+	for _, format := range []storagepb.DataFormat{storagepb.DataFormat_ARROW, storagepb.DataFormat_AVRO} {
+		t.Run(format.String(), func(t *testing.T) {
+			t.Parallel()
+			rest, read, _ := clients(t)
+			dataset := "storage_read_batches_" + format.String()
+			path := table(t, rest, dataset, "id INT64")
+			empty := session(t, read, path, format, nil, 1)
+			if ids := readIDs(t, read, empty, empty.Streams[0].Name, 0); len(ids) != 0 {
+				t.Fatal(ids)
+			}
+			query(t, rest, "INSERT INTO "+dataset+".rows SELECT i FROM UNNEST(GENERATE_ARRAY(1, 2050)) AS i")
+			s := session(t, read, path, format, nil, 1)
+			ids := readIDs(t, read, s, s.Streams[0].Name, 0)
+			sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+			if len(ids) != 2050 {
+				t.Fatalf("row count: %d", len(ids))
+			}
+			for i, id := range ids {
+				if id != int64(i+1) {
+					t.Fatalf("row %d: %d", i, id)
+				}
+			}
+			// Resume across response boundaries and DuckDB vector boundaries.
+			original := readIDs(t, read, s, s.Streams[0].Name, 0)
+			for _, offset := range []int64{1, 1023, 2047, 2050} {
+				got := readIDs(t, read, s, s.Streams[0].Name, offset)
+				if !slices.Equal(got, original[offset:]) {
+					t.Fatalf("offset %d: got %v, want %v", offset, got, original[offset:])
+				}
+			}
+		})
+	}
+}
+
+// Storage Read's documented Arrow types and snapshot isolation determine the expected values:
+// https://docs.cloud.google.com/bigquery/docs/reference/storage#arrow_schema_details
+func TestReadArrowSnapshotTypesAndConcurrentResume(t *testing.T) {
+	t.Parallel()
 	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_batches", "id INT64")
-	empty := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
-	if ids := arrowIDs(t, read, empty, empty.Streams[0].Name, 0); len(ids) != 0 {
-		t.Fatal(ids)
-	}
-	query(t, rest, "INSERT INTO storage_read_batches.rows SELECT i FROM UNNEST(GENERATE_ARRAY(1, 2050)) AS i")
-	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 1)
-	ids := arrowIDs(t, read, s, s.Streams[0].Name, 0)
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	if len(ids) != 2050 {
-		t.Fatalf("row count: %d", len(ids))
-	}
-	for i, id := range ids {
-		if id != int64(i+1) {
-			t.Fatalf("row %d: %d", i, id)
-		}
+	path := table(t, rest, "storage_read_arrow_snapshot_types", `id INT64 NOT NULL, s STRING,
+		b BYTES, flag BOOL, f FLOAT64, n NUMERIC, d DATE, tm TIME, dt DATETIME, ts TIMESTAMP,
+		rec STRUCT<x INT64, s STRING>, bn BIGNUMERIC, tags ARRAY<STRING>,
+		recs ARRAY<STRUCT<d DATE, bn BIGNUMERIC>>`)
+	query(t, rest, `INSERT INTO storage_read_arrow_snapshot_types.rows
+		SELECT i, IF(MOD(i,5)=0, NULL, CONCAT('日本語', CAST(i AS STRING))), b'\x00\xff',
+			MOD(i,2)=0,
+			CASE i WHEN 1 THEN CAST('NaN' AS FLOAT64) WHEN 2 THEN CAST('inf' AS FLOAT64)
+				WHEN 3 THEN CAST('-inf' AS FLOAT64) WHEN 4 THEN -0.0 ELSE CAST(i AS FLOAT64)/2 END,
+			IF(MOD(i,11)=0, NULL, NUMERIC '-1.000000001'),
+			CASE i WHEN 1 THEN DATE '0001-01-01' WHEN 4103 THEN DATE '9999-12-31' ELSE DATE '1969-12-31' END,
+			TIME '23:59:59.999999', DATETIME '1969-12-31 23:59:59.999999',
+			TIMESTAMP '1969-12-31 23:59:59.999999+00',
+			IF(MOD(i,7)=0, NULL, STRUCT(i AS x, CAST(i AS STRING) AS s)),
+			CASE WHEN i = 1 THEN BIGNUMERIC '578960446186580977117854925043439539266.34992332820282019728792003956564819967'
+				WHEN i = 2 THEN BIGNUMERIC '-578960446186580977117854925043439539266.34992332820282019728792003956564819968'
+				WHEN MOD(i,13)=0 THEN NULL ELSE BIGNUMERIC '-1.5' END,
+			CASE MOD(i,3) WHEN 0 THEN NULL WHEN 1 THEN [] ELSE ['a', CAST(i AS STRING)] END,
+			[STRUCT(DATE '1969-12-31' AS d, BIGNUMERIC '0.00000000000000000000000000000000000001' AS bn)]
+		FROM UNNEST(GENERATE_ARRAY(1,4103)) AS i`)
+	s := session(t, read, path, storagepb.DataFormat_ARROW, nil, 3)
+	query(t, rest, "DELETE FROM storage_read_arrow_snapshot_types.rows WHERE TRUE")
+	// Concurrent readers share the immutable snapshot, including its nested variable-width data.
+	for _, offset := range []int64{0, 17, 1023} {
+		t.Run(fmt.Sprint(offset), func(t *testing.T) {
+			t.Parallel()
+			var total int64
+			seen := make(map[int64]bool)
+			for _, stream := range s.Streams {
+				for _, block := range responses(t, read, stream.Name, offset) {
+					data := append(bytes.Clone(s.GetArrowSchema().SerializedSchema), block.GetArrowRecordBatch().SerializedRecordBatch...)
+					reader, err := ipc.NewReader(bytes.NewReader(data))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if reader.Schema().Field(0).Nullable || !reader.Schema().Field(1).Nullable {
+						t.Fatal("lost required/nullable field modes")
+					}
+					for reader.Next() {
+						r := reader.RecordBatch()
+						for row := 0; row < int(r.NumRows()); row++ {
+							id := r.Column(0).(*array.Int64).Value(row)
+							if id < 1 || id > 4103 || seen[id] {
+								t.Fatalf("invalid or duplicate id: %d", id)
+							}
+							seen[id] = true
+							wantFloat := float64(id) / 2
+							switch id {
+							case 1:
+								wantFloat = math.NaN()
+							case 2:
+								wantFloat = math.Inf(1)
+							case 3:
+								wantFloat = math.Inf(-1)
+							case 4:
+								wantFloat = math.Copysign(0, -1)
+							}
+							f := r.Column(4).(*array.Float64).Value(row)
+							if !(math.IsNaN(f) && math.IsNaN(wantFloat)) && (f != wantFloat || math.Signbit(f) != math.Signbit(wantFloat)) {
+								t.Fatalf("float at id %d: got %v, want %v", id, f, wantFloat)
+							}
+							wantDate := int64(-1)
+							if id == 1 {
+								wantDate = -719162
+							} else if id == 4103 {
+								wantDate = 2932896
+							}
+							number := r.Column(5).(*array.Decimal128)
+							if number.IsNull(row) != (id%11 == 0) || (!number.IsNull(row) && number.Value(row).BigInt().String() != "-1000000001") {
+								t.Fatalf("numeric at id %d: %v", id, number)
+							}
+							text := r.Column(1).(*array.String)
+							if text.IsNull(row) != (id%5 == 0) || (!text.IsNull(row) && text.Value(row) != fmt.Sprint("日本語", id)) {
+								t.Fatalf("string at id %d: %v", id, text)
+							}
+							if !bytes.Equal(r.Column(2).(*array.Binary).Value(row), []byte{0, 255}) ||
+								r.Column(3).(*array.Boolean).Value(row) != (id%2 == 0) ||
+								int64(r.Column(6).(*array.Date32).Value(row)) != wantDate ||
+								r.Column(7).(*array.Time64).Value(row) != 86399999999 ||
+								r.Column(8).(*array.Timestamp).Value(row) != -1 ||
+								r.Column(9).(*array.Timestamp).Value(row) != -1 {
+								t.Fatalf("scalar value at id %d", id)
+							}
+							rec := r.Column(10).(*array.Struct)
+							if rec.IsNull(row) != (id%7 == 0) || (!rec.IsNull(row) &&
+								(rec.Field(0).(*array.Int64).Value(row) != id || rec.Field(1).(*array.String).Value(row) != fmt.Sprint(id))) {
+								t.Fatalf("struct at id %d: %v", id, rec)
+							}
+							big := r.Column(11).(*array.Decimal256)
+							wantNumber := "-150000000000000000000000000000000000000"
+							switch {
+							case id == 1:
+								wantNumber = "57896044618658097711785492504343953926634992332820282019728792003956564819967"
+							case id == 2:
+								wantNumber = "-57896044618658097711785492504343953926634992332820282019728792003956564819968"
+							case id%13 == 0:
+								wantNumber = "null"
+							}
+							gotNumber := "null"
+							if !big.IsNull(row) {
+								gotNumber = big.Value(row).BigInt().String()
+							}
+							if gotNumber != wantNumber {
+								t.Fatalf("bignumeric at id %d: got %s, want %s", id, gotNumber, wantNumber)
+							}
+							tags := r.Column(12).(*array.List)
+							start, end := tags.ValueOffsets(row)
+							var gotTags []string
+							for i := start; i < end; i++ {
+								gotTags = append(gotTags, tags.ListValues().(*array.String).Value(int(i)))
+							}
+							var wantTags []string
+							if id%3 == 2 {
+								wantTags = []string{"a", fmt.Sprint(id)}
+							}
+							if tags.IsNull(row) || !slices.Equal(gotTags, wantTags) {
+								t.Fatalf("tags at id %d: %v", id, gotTags)
+							}
+							recs := r.Column(13).(*array.List)
+							start, end = recs.ValueOffsets(row)
+							elements := recs.ListValues().(*array.Struct)
+							if end-start != 1 || int64(elements.Field(0).(*array.Date32).Value(int(start))) != -1 ||
+								elements.Field(1).(*array.Decimal256).Value(int(start)).BigInt().String() != "1" {
+								t.Fatalf("recs at id %d", id)
+							}
+						}
+						total += r.NumRows()
+					}
+					if err := reader.Err(); err != nil {
+						t.Fatal(err)
+					}
+					reader.Release()
+				}
+			}
+			if want := 4103 - int64(len(s.Streams))*offset; total != want {
+				t.Fatalf("read %d rows, want %d", total, want)
+			}
+		})
 	}
 }
 
@@ -397,9 +739,12 @@ func TestGoClientStorageReadRange(t *testing.T) {
 // https://docs.cloud.google.com/bigquery/docs/reference/storage#avro_schema_details
 func TestReadAvroRange(t *testing.T) {
 	rest, read, _ := clients(t)
-	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>")
+	path := table(t, rest, "storage_read_avro_range", "id INT64, d1 RANGE<DATE>, d2 RANGE<DATE>, dt RANGE<DATETIME>, ts RANGE<TIMESTAMP>, nested STRUCT<rs ARRAY<RANGE<DATE>>>")
 	query(t, rest, `INSERT INTO storage_read_avro_range.rows VALUES
-		(1, RANGE<DATE> '[1969-12-31, UNBOUNDED)', RANGE<DATE> '[UNBOUNDED, 1970-01-02)')`)
+		(1, RANGE<DATE> '[1969-12-31, UNBOUNDED)', RANGE<DATE> '[UNBOUNDED, 1970-01-02)',
+		 RANGE<DATETIME> '[1969-12-31 23:59:59.999999, UNBOUNDED)',
+		 RANGE<TIMESTAMP> '[UNBOUNDED, 1970-01-01 00:00:00.000001+00)',
+		 STRUCT([RANGE<DATE> '[UNBOUNDED, UNBOUNDED)']))`)
 	s := session(t, read, path, storagepb.DataFormat_AVRO, nil, 1)
 	var schema struct {
 		Fields []struct {
@@ -448,5 +793,15 @@ func TestReadAvroRange(t *testing.T) {
 	d2 := union(row["d2"]).(map[string]any)
 	if day(d1["start"]) != "1969-12-31" || d1["end"] != nil || d2["start"] != nil || day(d2["end"]) != "1970-01-02" {
 		t.Fatalf("RANGE values: %v", row)
+	}
+	dt := union(row["dt"]).(map[string]any)
+	ts := union(row["ts"]).(map[string]any)
+	if union(dt["start"]) != "1969-12-31 23:59:59.999999" || dt["end"] != nil ||
+		ts["start"] != nil || !union(ts["end"]).(time.Time).Equal(time.UnixMicro(1)) {
+		t.Fatalf("temporal RANGE values: %v", row)
+	}
+	nested := union(row["nested"]).(map[string]any)["rs"].([]any)[0].(map[string]any)
+	if nested["start"] != nil || nested["end"] != nil {
+		t.Fatalf("nested unbounded RANGE: %v", nested)
 	}
 }

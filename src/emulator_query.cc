@@ -43,6 +43,7 @@
 #include "src/references.h"
 #include "src/routine_catalog.h"
 #include "src/script.h"
+#include "src/storage_snapshot.h"
 #include "src/table_source.h"
 #include "src/translated_statement.h"
 #include "src/translator.h"
@@ -216,6 +217,86 @@ std::string ScriptStatementType(const googlesql::ParserOutput& script) {
   return query ? "SELECT" : kScriptStatementType;
 }
 
+// A field of a Storage Read projection, with only the selected fields of a RECORD.
+struct Projection {
+  FieldSchema field;
+  bool whole = false;
+  std::vector<Projection> children;
+};
+
+// The fields selected_fields names, in the table's field order, including inside RECORDs.
+std::vector<Projection> Select(const std::vector<FieldSchema>& schema,
+                               const std::vector<std::string>& paths) {
+  std::vector<Projection> result;
+  std::vector<bool> matched(paths.size(), false);
+  for (const auto& field : schema) {
+    bool whole = paths.empty();
+    std::vector<std::string> children;
+    for (size_t j = 0; j < paths.size(); ++j) {
+      const auto dot = paths.at(j).find('.');
+      if (ToLowerAscii(paths.at(j).substr(0, dot)) == ToLowerAscii(field.name)) {
+        matched.at(j) = true;
+        if (dot == std::string::npos) {
+          whole = true;
+        } else {
+          children.push_back(paths.at(j).substr(dot + 1));
+        }
+      }
+    }
+    if (!whole && children.empty()) {
+      continue;
+    }
+    Projection projection{.field = field, .whole = whole, .children = {}};
+    if (!children.empty() && field.type != FieldType::kRecord) {
+      throw ApiError::Invalid("Cannot select a nested field of " + field.name);
+    }
+    if (field.type == FieldType::kRecord) {
+      if (whole && !children.empty()) {
+        (void)Select(field.fields, children);
+      }
+      projection.children = Select(field.fields, whole ? std::vector<std::string>{} : children);
+      projection.field.fields.clear();
+      for (const auto& child : projection.children) {
+        projection.field.fields.push_back(child.field);
+      }
+    }
+    result.push_back(std::move(projection));
+  }
+  for (size_t j = 0; j < paths.size(); ++j) {
+    if (!matched.at(j)) {
+      throw ApiError::Invalid("Unknown selected field: " + paths.at(j));
+    }
+  }
+  return result;
+}
+
+// The GoogleSQL expression of `projection` of `value`. A NULL RECORD stays NULL, and the
+// elements of a REPEATED one keep their order.
+std::string ProjectionSql(const Projection& projection, const std::string& value, int depth) {
+  if (projection.whole) {
+    return value;
+  }
+  const auto fields = [&](const std::string& record) {
+    std::vector<std::string> items;
+    for (const auto& child : projection.children) {
+      const std::string name = googlesql::ToIdentifierLiteral(child.field.name);
+      std::string path = record;
+      path += "." + name;
+      std::string item = ProjectionSql(child, path, depth + 1);
+      item += " AS " + name;
+      items.push_back(std::move(item));
+    }
+    return absl::StrJoin(items, ", ");
+  };
+  if (projection.field.mode == FieldMode::kRepeated) {
+    const std::string element = "_bq_element_" + std::to_string(depth);
+    const std::string offset = "_bq_offset_" + std::to_string(depth);
+    return "ARRAY(SELECT AS STRUCT " + fields(element) + " FROM UNNEST(" + value + ") AS " +
+           element + " WITH OFFSET AS " + offset + " ORDER BY " + offset + ")";
+  }
+  return "IF(" + value + " IS NULL, NULL, STRUCT(" + fields(value) + "))";
+}
+
 }  // namespace
 
 // Runs the statements of a script as parts of one job, in `location`.
@@ -266,15 +347,27 @@ QueryResult Emulator::Prepare(const std::string& sql, const std::vector<std::str
   }
 }
 
-QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& restriction) {
+std::shared_ptr<const StorageSnapshot> Emulator::ReadStorageTable(
+    TableReference table, const std::vector<std::string>& selected_fields,
+    const std::string& restriction) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table, false);
   if (info.view_query) {
     throw ApiError::Invalid("Storage Read does not support logical views");
   }
-  std::string query =
-      "SELECT * FROM " + googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
-                                                        "." + table.table_id);
+  // SELECT * preserves the table's field order and its stored modes and logical types.
+  std::vector<std::string> columns;
+  std::vector<FieldSchema> schema;
+  for (const auto& projection : Select(info.schema, selected_fields)) {
+    const std::string name = googlesql::ToIdentifierLiteral(projection.field.name);
+    columns.push_back(ProjectionSql(projection, name, 0) + " AS " + name);
+    schema.push_back(projection.field);
+  }
+  std::string query = "SELECT " +
+                      (selected_fields.empty() ? std::string("*") : absl::StrJoin(columns, ", ")) +
+                      " FROM " +
+                      googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
+                                                     "." + table.table_id);
   if (!restriction.empty()) {
     if (restriction.size() > size_t{1024} * 1024) {
       throw ApiError::Invalid("row_restriction exceeds 1 MB");
@@ -300,16 +393,18 @@ QueryResult Emulator::ReadStorageTable(TableReference table, const std::string& 
     query += " WHERE (" + restriction + ")";
   }
   const TranslatedStatement translated = Translate(query, {}, table.project_id, table.dataset_id);
-  QueryResult result = Execute(translated.sql);
+  std::shared_ptr<const StorageSnapshot> snapshot;
+  try {
+    snapshot = backend_.ExecuteStorageRead(translated.sql, std::move(schema));
+  } catch (const BackendError& error) {
+    throw ApiError::InvalidQuery(error.what());
+  }
   const TableInfo after = GetTable(table, false);
   if (after.storage_id != info.storage_id ||
-      SchemaToJson(after.schema) != SchemaToJson(info.schema) ||
-      result.schema.size() != info.schema.size()) {
+      SchemaToJson(after.schema) != SchemaToJson(info.schema)) {
     throw ApiError::Invalid("Table changed while creating the Storage Read snapshot");
   }
-  // SELECT * preserves the table's field order and its stored modes and logical types.
-  result.schema = info.schema;
-  return result;
+  return snapshot;
 }
 
 TranslatedStatement Emulator::Translate(const std::string& query, const QueryParameters& parameters,
