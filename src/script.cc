@@ -49,18 +49,17 @@
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
 #include "googlesql/scripting/type_aliases.h"
-#include "nlohmann/json.hpp"
 #include "src/analyzer.h"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/catalog.h"
-#include "src/cell_value.h"
 #include "src/default_dataset.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
 #include "src/query_parameters.h"
+#include "src/result_value.h"
 #include "src/routine.h"
 #include "src/routine_catalog.h"
 #include "src/system_variables.h"
@@ -330,11 +329,10 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
                          return absl::OkStatus();
                        }));
       std::vector<std::vector<googlesql::Value>> rows;
-      for (const nlohmann::json& row : result.rows) {
+      for (size_t row = 0; row < result.rows.size(); ++row) {
         std::vector<googlesql::Value>& values = rows.emplace_back();
         for (size_t i = 0; i < types.size(); ++i) {
-          GOOGLESQL_ASSIGN_OR_RETURN(values.emplace_back(),
-                                     Decode(types.at(i), row.at("f").at(i).at("v")));
+          GOOGLESQL_ASSIGN_OR_RETURN(values.emplace_back(), Decode(result, row, i, types.at(i)));
         }
       }
       iterator = std::make_unique<RowIterator>(std::move(names), std::move(types), std::move(rows));
@@ -894,13 +892,13 @@ class ScriptEvaluator : public googlesql::StatementEvaluator {
       return Unsupported(unsupported);
     }
     const QueryResult result = backend_->Execute(*query, setup_, true);
-    return Decode(analyzed.expression().type(), result.rows.at(0).at("f").at(0).at("v"));
+    return Decode(result, 0, 0, analyzed.expression().type());
   }
 
   // A value of a result, which the emulator cannot hold in a variable when it cannot decode it.
-  static absl::StatusOr<googlesql::Value> Decode(const googlesql::Type* type,
-                                                 const nlohmann::json& cell) {
-    absl::StatusOr<googlesql::Value> value = CellValue(type, cell);
+  static absl::StatusOr<googlesql::Value> Decode(const QueryResult& result, size_t row,
+                                                 size_t column, const googlesql::Type* type) {
+    absl::StatusOr<googlesql::Value> value = result.rows.GoogleSqlValue(row, column, type);
     if (!value.ok()) {
       return Unsupported("values of type " + type->DebugString() + " in variables");
     }
