@@ -11,6 +11,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -284,9 +285,12 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     GOOGLESQL_ASSIGN_OR_RETURN(QueryParameters query_parameters, ToQueryParameters(parameters));
     const std::shared_ptr<const Job> job =
         emulator_->RunQuery(QueryRequest{.project_id = kProject,
+                                         .location = std::nullopt,
                                          .query = sql,
                                          .default_dataset = DatasetReference{kProject, kDataset},
+                                         .job_id = {},
                                          .parameters = std::move(query_parameters),
+                                         .destination_table = std::nullopt,
                                          // BigQuery returns a NULL array as an empty one, which
                                          // would fail every case that expects a NULL array.
                                          .null_arrays = true});
@@ -331,9 +335,12 @@ class EmulatorTestDriver : public googlesql::TestDriver {
     GOOGLESQL_ASSIGN_OR_RETURN(QueryParameters parameters, ToQueryParameters({{"rows", kept}}));
     const std::shared_ptr<const Job> job = emulator_->RunQuery(
         QueryRequest{.project_id = kProject,
+                     .location = std::nullopt,
                      .query = absl::StrCat("INSERT INTO `", name, "` SELECT * FROM UNNEST(@rows)"),
                      .default_dataset = DatasetReference{kProject, kDataset},
-                     .parameters = std::move(parameters)});
+                     .job_id = {},
+                     .parameters = std::move(parameters),
+                     .destination_table = std::nullopt});
     if (job->error.has_value()) {
       return JobStatus(*job->error);
     }
