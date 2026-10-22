@@ -16,8 +16,9 @@ class ResolvedCreateSchemaStmt;
 class ResolvedCreateSnapshotTableStmt;
 class ResolvedCreateTableAsSelectStmt;
 class ResolvedCreateTableStmt;
-class ResolvedCreateViewStmt;
+class ResolvedCreateViewBase;
 class ResolvedDropFunctionStmt;
+class ResolvedDropMaterializedViewStmt;
 class ResolvedDropSnapshotTableStmt;
 class ResolvedDropTableFunctionStmt;
 class ResolvedDropStmt;
@@ -37,13 +38,15 @@ std::optional<std::string> AlterTable(const googlesql::ResolvedAlterTableStmt& a
                                       const Scope& scope);
 std::optional<std::string> AlterTableSetOptions(
     const googlesql::ResolvedAlterTableSetOptionsStmt& alter, const Scope& scope);
-std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
+std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& create,
                                       const Scope& scope);
 std::optional<std::string> CreateSchema(const googlesql::ResolvedCreateSchemaStmt& create,
                                         const Scope& scope);
 std::optional<std::string> AlterSchema(const googlesql::ResolvedAlterSchemaStmt& alter,
                                        const Scope& scope);
 std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const Scope& scope);
+std::optional<std::string> DropMaterializedView(
+    const googlesql::ResolvedDropMaterializedViewStmt& drop, const Scope& scope);
 std::optional<std::string> DropSnapshotTable(const googlesql::ResolvedDropSnapshotTableStmt& drop,
                                              const Scope& scope);
 // A persistent SQL UDF, which the emulator records on a DuckDB macro of its dataset; see Routine.

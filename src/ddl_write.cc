@@ -191,7 +191,13 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
   write.metadata_statements = {
       "SELECT * FROM " + QualifiedName(table) + " LIMIT 0",
       ViewCommentStatement(table,
-                           {.query = view.query, .schema = view.schema, .metadata = metadata}),
+                           {
+                               .query = view.query,
+                               .schema = view.schema,
+                               .metadata = metadata,
+                               .materialized = view.materialized,
+                               .materialized_source = view.materialized_source,
+                           }),
   };
   if (view.if_not_exists) {
     write.skip_query = "SELECT 1 WHERE " + TableExists(table);

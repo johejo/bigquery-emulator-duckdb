@@ -129,6 +129,22 @@ Queries resolve views using the current definitions of persistent SQL UDFs and t
 A changed UDF return type is reflected in query results, while the stored view schema stays
 unchanged.
 
+### Materialized views
+
+Materialized views are limited to a single managed base table, projections, filters and
+`COUNT`, `COUNTIF`, `SUM`, `MIN`, `MAX` and `AVG`, with aggregate results used directly as outputs.
+Distinct aggregates, grouping sets, nested aggregation, joins, subqueries, CTEs, ordering, limits,
+view and snapshot references, and explicit output column lists are unsupported.
+
+Options are limited to description, friendly name, labels and expiration. Partitioning,
+clustering, replicas, non-incremental definitions, `max_staleness`, refresh configuration changes
+and `ALTER MATERIALIZED VIEW` are unsupported. The API accepts the default `enableRefresh: true`
+and `allowNonIncrementalDefinition: false`; changing the definition or refresh settings through
+`tables.patch` or `tables.update` is unsupported. Metadata-only updates preserve the definition
+and materialized-view type.
+
+See the [README compatibility exceptions](../README.md#compatibility) for refresh state and storage statistics.
+
 ## Types
 
 ### STRUCT values

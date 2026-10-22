@@ -56,11 +56,13 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
                           where, where));
   for (size_t row = 0; row < result.rows.size(); ++row) {
     TableMetadata metadata = CommentMetadata(result.rows.OptionalString(row, 2));
+    const auto view = ParseViewMetadata(result.rows.OptionalString(row, 2));
     entries.push_back({
         .table_id = result.rows.String(row, 0),
-        .type = result.rows.String(row, 1) == "VIEW" ? TableType::kView
-                : metadata.snapshot.has_value()      ? TableType::kSnapshot
-                                                     : TableType::kTable,
+        .type = view && view->materialized             ? TableType::kMaterializedView
+                : result.rows.String(row, 1) == "VIEW" ? TableType::kView
+                : metadata.snapshot.has_value()        ? TableType::kSnapshot
+                                                       : TableType::kTable,
         .metadata = std::move(metadata),
     });
   }
@@ -83,6 +85,8 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
       throw ApiError::Invalid("View " + TableName(table) +
                               " was not created by the emulator and has no GoogleSQL definition");
     }
+    info.materialized = metadata->materialized;
+    info.materialized_source = std::move(metadata->materialized_source);
     info.view_query = std::move(metadata->query);
     info.schema = std::move(metadata->schema);
     info.metadata = std::move(metadata->metadata);
@@ -144,10 +148,10 @@ TableInfo Emulator::CreateTable(TableReference table, const std::vector<FieldSch
 }
 
 TableInfo Emulator::CreateView(TableReference table, const json& definition,
-                               const TableMetadata& metadata) {
+                               const TableMetadata& metadata, bool materialized) {
   std::scoped_lock const lock(expiration_mutex_);
   table.project_id = ResolveProject(table.project_id);
-  WriteView(table, definition, metadata, /*replace=*/false);
+  WriteView(table, definition, metadata, /*replace=*/false, materialized);
   return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
 }
 
@@ -163,6 +167,9 @@ TableInfo Emulator::UpdateTable(TableReference table,
     if (schema.has_value()) {
       throw ApiError::Unsupported("changing the schema of a view; change its query instead");
     }
+    if (view.has_value() && info.materialized) {
+      throw ApiError::Invalid("A materialized view cannot be changed to a logical view");
+    }
     if (view.has_value()) {
       // Every view the emulator keeps is GoogleSQL.
       json definition = {{"query", *info.view_query}, {"useLegacySql", false}};
@@ -173,8 +180,13 @@ TableInfo Emulator::UpdateTable(TableReference table,
     } else if (metadata.has_value()) {
       TableMetadata updated = *metadata;
       updated.creation_time = info.metadata.creation_time;
-      Execute(ViewCommentStatement(
-          table, {.query = *info.view_query, .schema = info.schema, .metadata = updated}));
+      Execute(ViewCommentStatement(table, {
+                                              .query = *info.view_query,
+                                              .schema = info.schema,
+                                              .metadata = updated,
+                                              .materialized = info.materialized,
+                                              .materialized_source = info.materialized_source,
+                                          }));
     }
     return GetTable(table, /*include_row_count=*/true, /*expire=*/false);
   }
@@ -229,11 +241,28 @@ TableInfo Emulator::UpdateTable(TableReference table,
 }
 
 void Emulator::WriteView(TableReference table, const json& definition,
-                         const TableMetadata& metadata, bool replace) {
+                         const TableMetadata& metadata, bool replace, bool materialized) {
   table.project_id = ResolveProject(table.project_id);
   const DatasetMetadata dataset =
       GetDataset(DatasetReference{.project_id = table.project_id, .dataset_id = table.dataset_id});
-  if (definition.value("useLegacySql", true)) {
+  if (!definition.is_object()) {
+    throw ApiError::Invalid("Invalid view definition");
+  }
+  if (materialized) {
+    for (const auto& [name, value] : definition.items()) {
+      if (name == "lastRefreshTime" || name == "refreshWatermark") {
+        continue;  // Output-only fields.
+      }
+      if ((name == "enableRefresh" && value == true) ||
+          (name == "allowNonIncrementalDefinition" && value == false)) {
+        continue;
+      }
+      if (name != "query") {
+        throw ApiError::Unsupported("materializedView field " + name);
+      }
+    }
+  }
+  if (!materialized && definition.value("useLegacySql", true)) {
     throw ApiError::Unsupported("legacy SQL views");
   }
   if (definition.contains("userDefinedFunctionResources")) {
@@ -247,7 +276,9 @@ void Emulator::WriteView(TableReference table, const json& definition,
   JobLocation location(dataset.Location());
   try {
     const TranslatedStatement translation =
-        Translate(std::string(replace ? "CREATE OR REPLACE VIEW " : "CREATE VIEW ") +
+        Translate(std::string(materialized ? "CREATE MATERIALIZED VIEW "
+                              : replace    ? "CREATE OR REPLACE VIEW "
+                                           : "CREATE VIEW ") +
                       googlesql::ToIdentifierLiteral(table.project_id + "." + table.dataset_id +
                                                      "." + table.table_id) +
                       " AS " + query,

@@ -80,6 +80,7 @@ struct DatasetInsertRequest {
 
 struct TableInsertRequest {
   TableReference table;
+  bool materialized = false;
   // The view definition, when the request creates a view rather than a table.
   std::optional<nlohmann::json> view;
   std::vector<FieldSchema> schema;

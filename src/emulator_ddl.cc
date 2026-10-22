@@ -38,12 +38,26 @@ void Emulator::CheckDdlTarget(const TranslatedStatement& translation) {
   }
 }
 
-void Emulator::CheckSnapshotTarget(Backend& backend, const TranslatedStatement& translation) {
+void Emulator::CheckRelationTarget(Backend& backend, const TranslatedStatement& translation) {
   const std::optional<TableReference>& target = translation.ddl_target_table;
   if (!target.has_value()) {
     return;
   }
+  const auto view_comment = ViewComment(backend, *target);
+  const auto view = view_comment ? ParseViewMetadata(*view_comment) : std::nullopt;
+  const bool materialized = view && view->materialized;
+  if (translation.statement_type == "DROP_VIEW" && materialized) {
+    throw ApiError::Invalid("Cannot drop " + TableName(*target) +
+                            " which has type MATERIALIZED_VIEW. A view was expected.");
+  }
+  if ((translation.statement_type == "DROP_MATERIALIZED_VIEW" && view_comment && !materialized) ||
+      (translation.replaces && materialized)) {
+    throw ApiError::InvalidQuery("Object type does not match " + TableName(*target));
+  }
   const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", *target);
+  if (translation.statement_type == "DROP_MATERIALIZED_VIEW" && comment.has_value()) {
+    throw ApiError::InvalidQuery("A materialized view was expected: " + TableName(*target));
+  }
   if (!comment.has_value()) {
     return;
   }

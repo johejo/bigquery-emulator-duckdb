@@ -206,6 +206,8 @@ class DuckDbTableSource : public TableSource {
     return ViewDescription{
         .query = std::move(metadata->query),
         .metadata = std::move(metadata->metadata),
+        .materialized = metadata->materialized,
+        .materialized_source = std::move(metadata->materialized_source),
     };
   }
 

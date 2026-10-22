@@ -21,7 +21,7 @@ rejected.
 | --- | --- | --- | --- |
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
-| [DDL](#ddl) | 24 | 6 | 3 |
+| [DDL](#ddl) | 25 | 7 | 2 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
 
@@ -109,7 +109,8 @@ rejected.
 | `ALTER SCHEMA` | Supported | See [Datasets](compatibility.md#datasets). |
 | `CREATE VIEW` | Supported | See [Views](compatibility.md#views). |
 | `DROP VIEW` | Supported |  |
-| `CREATE MATERIALIZED VIEW` | Unsupported |  |
+| `CREATE MATERIALIZED VIEW` | Partial | See [Materialized views](compatibility.md#materialized-views). Unsupported: CREATE MATERIALIZED VIEW option enable_refresh; CREATE MATERIALIZED VIEW option max_staleness; materialized views with this aggregate. |
+| `DROP MATERIALIZED VIEW` | Supported | See [Materialized views](compatibility.md#materialized-views). |
 | `CREATE FUNCTION` | Partial | See [User-defined functions](compatibility.md#user-defined-functions). Unsupported: JavaScript UDF arguments of type DATE; function IFERROR; persistent non-SQL UDFs; volatile SQL UDF arguments with subquery bodies. |
 | `DROP FUNCTION` | Supported |  |
 | `CREATE TABLE FUNCTION` | Partial | See [Table functions](compatibility.md#table-functions). Unsupported: TVF arguments other than fixed scalar types; non-SQL, temporary or value-table TVFs and TVF security. |

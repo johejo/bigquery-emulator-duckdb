@@ -348,7 +348,8 @@ class RestServer::Impl {
           const TableInsertRequest insert =
               ParseTableInsert(DatasetFromPath(request), ParseBody(request));
           if (insert.view.has_value()) {
-            return TableResource(emulator_.CreateView(insert.table, *insert.view, insert.metadata));
+            return TableResource(emulator_.CreateView(insert.table, *insert.view, insert.metadata,
+                                                      insert.materialized));
           }
           return TableResource(emulator_.CreateTable(insert.table, insert.schema, insert.metadata));
         }));

@@ -610,7 +610,16 @@ TableInsertRequest ParseTableInsert(const DatasetReference& dataset, const json&
       .dataset_id = dataset.dataset_id,
       .table_id = StringField(reference, "tableId", "table ID"),
   };
-  if (body.contains("view")) {
+  if (body.contains("materializedView")) {
+    if (body.contains("view")) {
+      throw ApiError::Invalid("Cannot specify both view and materializedView");
+    }
+    if (body.contains("maxStaleness")) {
+      throw ApiError::Unsupported("materialized view maxStaleness");
+    }
+    request.materialized = true;
+    request.view = body["materializedView"];
+  } else if (body.contains("view")) {
     request.view = body["view"];
   } else {
     request.schema = SchemaFromJson(body.value("schema", json::object()));
@@ -731,6 +740,9 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
 TableUpdateRequest ParseTableUpdate(const json& body) {
   if (!body.is_object()) {
     throw ApiError::Invalid("Invalid table resource");
+  }
+  if (body.contains("materializedView") || body.contains("maxStaleness")) {
+    throw ApiError::Unsupported("updating materializedView or maxStaleness");
   }
   TableUpdateRequest request;
   if (body.contains("schema") && !body["schema"].is_null()) {

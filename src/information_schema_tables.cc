@@ -42,8 +42,9 @@ absl::StatusOr<std::string> TableDdl(const std::string& project, const std::stri
 }
 
 std::string ViewDdl(const std::string& project, const std::string& dataset,
-                    const std::string& table, const std::string& query) {
-  return "CREATE VIEW `" + project + "." + dataset + "." + table + "`\nAS " + query + ";";
+                    const std::string& table, const std::string& query, bool materialized) {
+  return std::string(materialized ? "CREATE MATERIALIZED VIEW `" : "CREATE VIEW `") + project +
+         "." + dataset + "." + table + "`\nAS " + query + ";";
 }
 
 // The ID of the partition of a row of a table partitioned as `metadata` says, as a DuckDB
@@ -169,34 +170,37 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
         }
         ddl = String(*table_ddl);
       } else if (!view_query->empty()) {
-        ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query));
+        ddl = String(ViewDdl(project, dataset.dataset_id, table, *view_query,
+                             view_description->materialized));
       }
-      rows.push_back(Concat(Identity(dataset, table),
-                            {
-                                String(view_query.has_value() ? "VIEW"
-                                       : snapshot             ? "SNAPSHOT"
-                                       : base.has_value()     ? "CLONE"
-                                                              : "BASE TABLE"),
-                                view_query.has_value() ? kNull : String("NATIVE"),
-                                String(view_query.has_value() || snapshot ? "NO" : "YES"),
-                                String("NO"),
-                                String("NO"),
-                                String("NO"),
-                                CreationTime(creation_time),
-                                base ? String(base->base_table.project_id) : kNull,
-                                base ? String(base->base_table.dataset_id) : kNull,
-                                base ? String(base->base_table.table_id) : kNull,
-                                base ? String(base->time) : kNull,
-                                kNull,
-                                kNull,
-                                kNull,
-                                kNull,
-                                kNull,
-                                ddl,
-                                kNull,
-                                kNull,
-                                kNull,
-                            }));
+      rows.push_back(
+          Concat(Identity(dataset, table),
+                 {
+                     String(view_description && view_description->materialized ? "MATERIALIZED VIEW"
+                            : view_query.has_value()                           ? "VIEW"
+                            : snapshot                                         ? "SNAPSHOT"
+                            : base.has_value()                                 ? "CLONE"
+                                                                               : "BASE TABLE"),
+                     view_query.has_value() ? kNull : String("NATIVE"),
+                     String(view_query.has_value() || snapshot ? "NO" : "YES"),
+                     String("NO"),
+                     String("NO"),
+                     String("NO"),
+                     CreationTime(creation_time),
+                     base ? String(base->base_table.project_id) : kNull,
+                     base ? String(base->base_table.dataset_id) : kNull,
+                     base ? String(base->base_table.table_id) : kNull,
+                     base ? String(base->time) : kNull,
+                     kNull,
+                     kNull,
+                     kNull,
+                     kNull,
+                     kNull,
+                     ddl,
+                     kNull,
+                     kNull,
+                     kNull,
+                 }));
     }
   }
   return rows;
@@ -356,7 +360,7 @@ absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
          context.source.ListTables(dataset.project_id, dataset.dataset_id)) {
       const std::optional<ViewDescription> description =
           context.source.FindView(dataset.project_id, dataset.dataset_id, table);
-      if (!description.has_value()) {
+      if (!description.has_value() || description->materialized) {
         continue;
       }
       rows.push_back(

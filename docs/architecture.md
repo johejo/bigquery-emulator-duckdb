@@ -104,7 +104,10 @@ time. Writes outside a transaction hold a mutex so that each kept version is wha
 write committed; a transaction dates its versions when it commits.
 
 Logical views are native DuckDB views whose comments preserve the original GoogleSQL definition
-and result schema. Persistent SQL UDFs, table functions and procedures use macro comments.
+and result schema. Materialized views use the same execution path, with their own object type
+and base-table creation identity recorded in the comment. Reads compute current results, and
+recreating the base table invalidates its materialized views. Persistent SQL UDFs, table functions
+and procedures use macro comments.
 For analysis, `RoutineCatalog` resolves view and routine definitions against their owning project
 and dataset, shares their dependency state and detects recursion. This lets queries use current
 definitions while keeping job-local objects out of persistent dependencies.

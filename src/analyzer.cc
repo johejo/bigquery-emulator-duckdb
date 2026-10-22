@@ -212,6 +212,89 @@ absl::Status CheckViewSource(const googlesql::Table* table, std::string_view ope
       operation == "COPY" ? "TABLE" : "TABLE, SNAPSHOT", "]"));
 }
 
+// Validate before rewriting: view expansion and UDF inlining would otherwise erase forms
+// BigQuery does not accept in an incremental materialized view. Deliberately support only
+// a single base table, optional filters/projections, and basic aggregates used directly as
+// outputs. Other forms remain unsupported rather than being treated as ordinary views.
+absl::Status CheckMaterializedView(const googlesql::ResolvedCreateMaterializedViewStmt& create) {
+  const auto unsupported = [](std::string_view what) {
+    return absl::UnimplementedError(
+        absl::StrCat("The emulator does not support materialized views with ", what));
+  };
+  if (create.query() == nullptr) {
+    return unsupported("replicas");
+  }
+  int tables = 0;
+  std::vector<const googlesql::ResolvedNode*> nodes{create.query()};
+  while (!nodes.empty()) {
+    const auto* node = nodes.back();
+    nodes.pop_back();
+    if (node->Is<googlesql::ResolvedScan>()) {
+      if (node->Is<googlesql::ResolvedTableScan>()) {
+        const auto& scan = *node->GetAs<googlesql::ResolvedTableScan>();
+        ++tables;
+        if (dynamic_cast<const googlesql::SQLView*>(scan.table()) != nullptr ||
+            scan.for_system_time_expr() != nullptr) {
+          return unsupported("view references or time travel");
+        }
+      } else if (node->Is<googlesql::ResolvedProjectScan>()) {
+        const auto& project = *node->GetAs<googlesql::ResolvedProjectScan>();
+        std::vector<const googlesql::ResolvedNode*> aggregates;
+        project.input_scan()->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_SCAN},
+                                                      &aggregates);
+        if (!aggregates.empty() && std::ranges::any_of(project.expr_list(), [](const auto& column) {
+              return !column->expr()->template Is<googlesql::ResolvedColumnRef>();
+            })) {
+          return unsupported("expressions over aggregate results");
+        }
+      } else if (node->Is<googlesql::ResolvedFilterScan>()) {
+        std::vector<const googlesql::ResolvedNode*> aggregates;
+        node->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_SCAN}, &aggregates);
+        if (!aggregates.empty()) {
+          return unsupported("HAVING");
+        }
+      } else if (node->Is<googlesql::ResolvedAggregateScan>()) {
+        const auto& aggregate = *node->GetAs<googlesql::ResolvedAggregateScan>();
+        std::vector<const googlesql::ResolvedNode*> nested;
+        aggregate.input_scan()->GetDescendantsWithKinds({googlesql::RESOLVED_AGGREGATE_SCAN},
+                                                        &nested);
+        if (aggregate.aggregate_list().empty() || !aggregate.grouping_set_list().empty() ||
+            !nested.empty()) {
+          return unsupported("DISTINCT, grouping sets or nested aggregation");
+        }
+      } else {
+        return unsupported(node->node_kind_string());
+      }
+    }
+    if (node->Is<googlesql::ResolvedFunctionCallBase>()) {
+      const auto& call = *node->GetAs<googlesql::ResolvedFunctionCallBase>();
+      if (!IsBuiltinFunction(*call.function()) ||
+          call.function()->function_options().volatility != googlesql::FunctionEnums::IMMUTABLE) {
+        return unsupported("UDFs or non-deterministic functions");
+      }
+      if (node->Is<googlesql::ResolvedAggregateFunctionCall>()) {
+        const auto& aggregate = *node->GetAs<googlesql::ResolvedAggregateFunctionCall>();
+        const std::string name = call.function()->Name();
+        if ((name != "count" && name != "$count_star" && name != "countif" && name != "sum" &&
+             name != "min" && name != "max" && name != "avg") ||
+            aggregate.distinct() || aggregate.having_modifier() != nullptr ||
+            !aggregate.order_by_item_list().empty() || aggregate.limit() != nullptr) {
+          return unsupported("this aggregate");
+        }
+      }
+    }
+    if (node->Is<googlesql::ResolvedSubqueryExpr>() || node->Is<googlesql::ResolvedParameter>() ||
+        node->Is<googlesql::ResolvedSystemVariable>() ||
+        node->Is<googlesql::ResolvedArgumentRef>()) {
+      return unsupported("subqueries, parameters or variables");
+    }
+    std::vector<const googlesql::ResolvedNode*> children;
+    node->GetChildNodes(&children);
+    nodes.insert(nodes.end(), children.begin(), children.end());
+  }
+  return tables == 1 ? absl::OkStatus() : unsupported("queries without a single base table");
+}
+
 // The options a statement of a request, or of the script `settings.script`, is analyzed with.
 absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSettings& settings,
                                                            googlesql::ErrorMessageMode mode) {
@@ -229,6 +312,10 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   // inlining erases the function calls.
   options.AddPreRewriteCallback([](const googlesql::AnalyzerOutput& output) -> absl::Status {
     const auto* statement = output.resolved_statement();
+    if (statement != nullptr && statement->Is<googlesql::ResolvedCreateMaterializedViewStmt>()) {
+      GOOGLESQL_RETURN_IF_ERROR(CheckMaterializedView(
+          *statement->GetAs<googlesql::ResolvedCreateMaterializedViewStmt>()));
+    }
     if (statement != nullptr && statement->Is<googlesql::ResolvedCreateTableStmt>()) {
       const auto* create = statement->GetAs<googlesql::ResolvedCreateTableStmt>();
       GOOGLESQL_RETURN_IF_ERROR(CheckViewSource(create->like_table(), "LIKE"));
@@ -531,6 +618,9 @@ AnalyzerResult AnalyzeGoogleSql(const std::string& sql, googlesql::Catalog& cata
     // The analyzer nests an error of the catalog's, such as EXTERNAL_QUERY's, in one of its own.
     // One that the emulator does not support is the statement's error.
     const std::string_view formatted_message = formatted.message();
+    if (formatted_message.starts_with("The emulator does not support ")) {
+      throw std::runtime_error(std::string(formatted_message));
+    }
     if (const size_t nested = formatted_message.find("\nThe emulator does not support ");
         nested != std::string_view::npos) {
       throw std::runtime_error(std::string(formatted_message.substr(nested + 1)));

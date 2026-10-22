@@ -17,6 +17,8 @@ struct ViewMetadata {
   std::string query;
   std::vector<FieldSchema> schema;
   TableMetadata metadata;
+  bool materialized = false;
+  std::optional<MaterializedViewSource> materialized_source = {};
 };
 
 // The metadata a table or view comment records, or none for a comment of someone else's.

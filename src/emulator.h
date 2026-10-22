@@ -38,8 +38,8 @@ struct TranslatedStatement;
 // JobStatistics2.statementType of a multi-statement query.
 inline constexpr char kScriptStatementType[] = "SCRIPT";
 
-// What kind of table a dataset holds. The emulator creates only tables, table snapshots and views.
-enum class TableType : std::uint8_t { kTable, kSnapshot, kView };
+// What kind of table a dataset holds.
+enum class TableType : std::uint8_t { kTable, kSnapshot, kView, kMaterializedView };
 
 struct TableListEntry {
   std::string table_id;
@@ -60,6 +60,8 @@ struct TableInfo {
   int64_t num_rows = 0;
   int64_t storage_id = 0;  // DuckDB table OID; distinguishes a dropped/recreated destination.
   std::optional<std::string> view_query;
+  bool materialized = false;
+  std::optional<MaterializedViewSource> materialized_source = {};
 };
 
 // Throws ApiError::Invalid with BigQuery's message for a query, load or Storage write when `table`
@@ -243,7 +245,7 @@ class Emulator {
   TableInfo CreateTable(TableReference table, const std::vector<FieldSchema>& schema,
                         const TableMetadata& metadata = {});
   TableInfo CreateView(TableReference table, const nlohmann::json& definition,
-                       const TableMetadata& metadata = {});
+                       const TableMetadata& metadata, bool materialized = false);
   // tables.patch and tables.update: gives a table the schema `schema`, or a view the definition
   // `view`, and either the metadata `metadata`. What is left out is kept, including the fields
   // of `view` it omits.
@@ -321,8 +323,8 @@ class Emulator {
   // Rejects DDL targets in DuckDB's internal schemas.
   static void CheckDdlTarget(const TranslatedStatement& translation);
   // Rejects DDL that would change a table snapshot, as `backend` sees it, other than DROP SNAPSHOT
-  // TABLE, and DROP SNAPSHOT TABLE of a table that is not one.
-  static void CheckSnapshotTarget(Backend& backend, const TranslatedStatement& translation);
+  // TABLE, and rejects DROP or replacement of a materialized view with a different object type.
+  static void CheckRelationTarget(Backend& backend, const TranslatedStatement& translation);
   // The DuckDB statements that apply the ALTER TABLE or ALTER SCHEMA `translation` to what the
   // table or dataset has now, which are none when IF EXISTS finds nothing to alter, or nothing
   // for any other statement.
@@ -339,7 +341,7 @@ class Emulator {
   // Creates the view `table` from the ViewDefinition `definition` with `metadata`, replacing the
   // one there when `replace` is set; a view created anew takes its dataset's default expiration.
   void WriteView(TableReference table, const nlohmann::json& definition,
-                 const TableMetadata& metadata, bool replace);
+                 const TableMetadata& metadata, bool replace, bool materialized = false);
   // Registers `job` under its ID, generating one when it is empty, runs `body` on it and keeps
   // the finished job, which runs where `location` settles. A failure in `body` becomes the job's
   // error. Dry runs are not registered.

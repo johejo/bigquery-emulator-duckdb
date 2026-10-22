@@ -1,0 +1,52 @@
+desc: tables.list reports materialized views with their own type
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_materialized_views}
+    test: current.res.status == 200
+  create:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: >-
+                CREATE TABLE rest_materialized_views.source (id INT64);
+                CREATE MATERIALIZED VIEW rest_materialized_views.mv AS
+                SELECT COUNT(*) AS n FROM rest_materialized_views.source
+              useLegacySql: false
+    test: current.res.status == 200
+  list:
+    req:
+      /projects/test/datasets/rest_materialized_views/tables:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.tables[0].tableReference.tableId == 'mv' &&
+      current.res.body.tables[0].type == 'MATERIALIZED_VIEW' &&
+      current.res.body.tables[1].type == 'TABLE'
+  wrong_drop:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: DROP VIEW rest_materialized_views.mv
+              useLegacySql: false
+    test: |
+      current.res.status == 400 &&
+      current.res.body.error.errors[0].reason == 'invalid' &&
+      current.res.body.error.message == 'Cannot drop test:rest_materialized_views.mv which has type MATERIALIZED_VIEW. A view was expected.'
+  cleanup:
+    req:
+      /projects/test/datasets/rest_materialized_views?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

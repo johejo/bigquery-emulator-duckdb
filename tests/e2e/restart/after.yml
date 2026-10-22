@@ -19,6 +19,25 @@ steps:
     test: |
       current.res.status == 200 &&
       current.res.body.view.query == 'SELECT a, b FROM persist.t'
+  materialized_view:
+    req:
+      /projects/test/datasets/persist/tables/mv:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.type == 'MATERIALIZED_VIEW' &&
+      current.res.body.materializedView.query == 'SELECT COUNT(*) AS n FROM persist.t'
+  materialized_view_rows:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT n FROM persist.mv
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "1"}]}]
   scoped_dataset:
     req:
       /projects/example.com:proj/datasets:
