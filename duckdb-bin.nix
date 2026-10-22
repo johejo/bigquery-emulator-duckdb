@@ -1,6 +1,5 @@
 {
   lib,
-  unzip,
   stdenv,
   stdenvNoCC,
   fetchurl,
@@ -12,7 +11,7 @@ let
   # The DuckDB CLI, for trying a query against the engine the emulator embeds without building
   # anything. Keep it at the version of the duckdb_prebuilt_* archives in MODULE.bazel;
   # `just duckdb-version-check` fails when they differ.
-  version = "1.5.6";
+  version = "2.0.0";
   fetch =
     name: hash:
     fetchurl {
@@ -23,9 +22,9 @@ let
       inherit hash;
     };
   sources = {
-    aarch64-darwin = fetch "duckdb_cli-osx-universal.zip" "sha256-gKgMaHNr196lPosCRH6XWdsMhZbqFWR2ujlsRPVMWBA=";
-    x86_64-linux = fetch "duckdb_cli-linux-amd64.zip" "sha256-bonerB67w27tApHK+LVnsDDHuGrDWZj3GFTiKzxdXi8=";
-    aarch64-linux = fetch "duckdb_cli-linux-arm64.zip" "sha256-xUTpLJt8MfxTwhOYAsq9ji0bKz4/kzEX8xYRI5wUAts=";
+    aarch64-darwin = fetch "duckdb-cli-osx-universal.tar.gz" "sha256-io9n58f30TkvpjujlxlIOROS/iol/KY+cAjjPFC+tMI=";
+    x86_64-linux = fetch "duckdb-cli-linux-amd64.tar.gz" "sha256-xlByBrr3eTxgE9vYI2hGmkXyDcDhem+S8gRgL2Uu0rw=";
+    aarch64-linux = fetch "duckdb-cli-linux-arm64.tar.gz" "sha256-hZ4YddKpUV+7S/iHEGFDehSvgjINpox1PwlMS3djSP4=";
   };
 in
 stdenvNoCC.mkDerivation {
@@ -34,7 +33,10 @@ stdenvNoCC.mkDerivation {
   src = sources.${stdenvNoCC.hostPlatform.system};
   sourceRoot = ".";
 
-  nativeBuildInputs = [ unzip ] ++ lib.optionals stdenvNoCC.hostPlatform.isLinux [ autoPatchelfHook ];
+  nativeBuildInputs = lib.optionals stdenvNoCC.hostPlatform.isLinux [ autoPatchelfHook ];
+
+  # Sorting program headers with patchelf 0.19 makes the release CLI crash at startup.
+  patchelfFlags = [ "--no-sort" ];
 
   buildInputs = lib.optionals stdenvNoCC.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
 

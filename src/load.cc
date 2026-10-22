@@ -334,7 +334,7 @@ std::string ParquetShape(const std::string& sql, const ParquetColumn& column, in
           value);
     }
     std::string list =
-        value == name ? sql : std::format("list_transform({}, {} -> {})", sql, name, value);
+        value == name ? sql : std::format("list_transform({}, lambda {}: {})", sql, name, value);
     return column.nullable ? std::format("coalesce({}, [])", list) : list;
   }
   if (column.kind != ParquetColumn::Kind::kStruct) {

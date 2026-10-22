@@ -140,7 +140,7 @@ std::string Expand(const Rule& rule, const std::vector<FunctionArgument>& argume
   if (!bind) {
     return body;
   }
-  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _fn -> " + body + ")[1]";
+  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], lambda _fn: " + body + ")[1]";
 }
 
 std::string Invoke(std::string_view function, const std::vector<FunctionArgument>& arguments) {

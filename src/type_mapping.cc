@@ -308,7 +308,7 @@ std::optional<std::string> ReadNumericStorage(const std::string& sql, duckdb_log
       if (!converted) {
         return std::nullopt;
       }
-      return "list_transform(" + sql + ", " + element + " -> " + *converted + ")";
+      return "list_transform(" + sql + ", lambda " + element + ": " + *converted + ")";
     }
     case DUCKDB_TYPE_STRUCT: {
       std::vector<std::string> fields;

@@ -48,3 +48,21 @@ MERGE t USING (SELECT id FROM UNNEST([1, 1]) AS id) AS s ON t.id = s.id
 WHEN MATCHED THEN DELETE;
 SELECT TO_JSON_STRING(ARRAY(SELECT id FROM t ORDER BY id))
 => "[2,2,3]"
+
+# A matched DELETE can coexist with INSERT; matching duplicates are not inserted, while
+# unmatched duplicates are. A true DELETE predicate on any match removes the target row.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement
+CREATE TEMP TABLE t AS SELECT id, 0 AS rowid, 0 AS _r, 0 AS _t FROM UNNEST([1, 2, 2, 3]) AS id;
+MERGE t USING UNNEST([STRUCT(1 AS id, FALSE AS del), (1, TRUE), (2, TRUE), (4, FALSE), (4, FALSE)]) AS s ON t.id = s.id
+WHEN MATCHED AND s.del THEN DELETE
+WHEN NOT MATCHED THEN INSERT (id, rowid) VALUES (s.id, 0);
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM t ORDER BY id))
+=> "[3,4,4]"
+
+# Matches that do not delete still prevent NOT MATCHED BY SOURCE from deleting the target.
+CREATE TEMP TABLE t AS SELECT id FROM UNNEST([1, 2, 2, 3, NULL]) AS id;
+MERGE t USING UNNEST([STRUCT(1 AS id, FALSE AS del), (1, FALSE), (2, FALSE), (2, TRUE)]) AS s ON t.id = s.id
+WHEN MATCHED AND s.del THEN DELETE
+WHEN NOT MATCHED BY SOURCE THEN DELETE;
+SELECT TO_JSON_STRING(ARRAY(SELECT id FROM t))
+=> "[1]"

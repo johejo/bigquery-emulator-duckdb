@@ -3,25 +3,17 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-# The core, the generated extension loader and the extensions the release loads statically
-# (core_functions, icu, json, parquet, autocomplete) reference each other in a cycle, which GNU ld
-# cannot resolve in one pass over the archives, so they are linked whole. The unused tpch and tpcds
-# extensions are left out.
+# DuckDB v2 folds vendored dependencies into the core and extension archives. The core and
+# extensions reference each other, so keep them whole. Register only the extensions used here;
+# the shell and the remaining release extensions are not linked.
 _WHOLE = [
     "libautocomplete_extension.a",
     "libcore_functions_extension.a",
-    "libduckdb_generated_extension_loader.a",
     "libduckdb_static.a",
     "libicu_extension.a",
     "libjson_extension.a",
     "libparquet_extension.a",
 ]
-
-# The vendored third-party libraries, whose symbols DuckDB keeps in its own namespaces.
-_VENDORED = glob(
-    ["libduckdb_*.a"],
-    exclude = _WHOLE,
-)
 
 [
     cc_import(
@@ -33,18 +25,12 @@ _VENDORED = glob(
     for lib in _WHOLE
 ]
 
-[
-    cc_import(
-        name = lib.removesuffix(".a"),
-        static_library = lib,
-        visibility = ["//visibility:private"],
-    )
-    for lib in _VENDORED
-]
-
 cc_library(
     name = "duckdb",
-    hdrs = ["duckdb.h"],
+    hdrs = [
+        "duckdb.h",
+        "duckdb_static_extension.h",
+    ],
     linkopts = select({
         "@platforms//os:linux": [
             "-lpthread",
@@ -52,5 +38,5 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
-    deps = [":" + lib.removesuffix(".a") for lib in _WHOLE + _VENDORED],
+    deps = [":" + lib.removesuffix(".a") for lib in _WHOLE],
 )

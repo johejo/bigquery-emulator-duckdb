@@ -220,7 +220,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       const std::string list = std::string("list(") + (call.distinct() ? "DISTINCT " : "") +
                                args.at(0) + order + ") FILTER (WHERE " + Join(conditions, " AND ") +
                                ")";
-      return finish("array_to_string(list_slice(" + list + ", 1, " + limit + "), " +
+      return finish("list_aggr(list_slice(" + list + ", 1, " + limit + "), 'string_agg', " +
                         (args.size() > 1 ? args.at(1) : "','") + ")",
                     over);
     }
@@ -616,12 +616,15 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
     // which a window over the group computes alongside the input; INTERVAL values compare by
     // their keys.
     std::vector<std::string> partition;
+    std::vector<std::string> partition_values;
     for (const auto& key : aggregate.group_by_list()) {
       const auto sql = Expression(*key->expr(), scope, input->columns);
       if (!sql) {
         return std::nullopt;
       }
-      partition.push_back(IntervalKey(key->expr()->type(), *sql));
+      const std::string name = "_partition" + std::to_string(partition.size());
+      partition_values.push_back(IntervalKey(key->expr()->type(), *sql) + " AS " + name);
+      partition.push_back("q." + name);
     }
     std::vector<std::string> inner;
     Columns columns;
@@ -651,6 +654,11 @@ std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& ag
       havings.emplace(call, IntervalKey(type, *row) + " = q." + name);
     }
     if (!havings.empty()) {
+      // A guarded expression can contain error(), which DuckDB v2 considers volatile and
+      // forbids directly in a window's PARTITION BY. Bind the keys below the window instead.
+      if (!partition_values.empty()) {
+        input->sql = "SELECT q.*, " + Join(partition_values, ", ") + input->From();
+      }
       input = Relation{.sql = "SELECT " + Join(inner, ", ") + input->From(), .columns = columns};
     }
     for (const auto& key : aggregate.group_by_list()) {

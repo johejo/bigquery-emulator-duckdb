@@ -183,14 +183,14 @@ std::vector<Rule> RangeBucket() {
   for (const bool floating : {true, false}) {
     const std::string nan_point = floating ? " OR isnan($1)" : "";
     const std::string nan_elements =
-        floating ? " WHEN len(list_filter($2, _e -> isnan(_e))) > 0 THEN !2" : "";
+        floating ? " WHEN len(list_filter($2, lambda _e: isnan(_e))) > 0 THEN !2" : "";
     std::string spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL";
     spelling += nan_point;
     spelling += " THEN NULL WHEN list_count($2) <> len($2) THEN !1";
     spelling += nan_elements;
     spelling +=
-        " WHEN len(list_filter($2, (_e, _i) -> _e < $2[_i - 1])) > 0 THEN !3 "
-        "ELSE len(list_filter($2, _e -> _e <= $1)) END";
+        " WHEN len(list_filter($2, lambda _e, _i: _e < $2[_i - 1])) > 0 THEN !3 "
+        "ELSE len(list_filter($2, lambda _e: _e <= $1)) END";
     rules.push_back({
         .arity = 2,
         .spelling = std::move(spelling),
@@ -297,14 +297,21 @@ std::vector<Rule> RangeIntersect() {
   };
 }
 
+// DuckDB v2 binds DECIMAL precision before evaluating NULL arguments. Give the binder a
+// non-NULL precision, then propagate the original NULL as BigQuery does.
+std::string RoundWithDigits(std::string_view function) {
+  return "CASE WHEN $2 IS NULL THEN NULL ELSE " + std::string(function) +
+         "($1, CAST(coalesce($2, 0) AS INTEGER)) END";
+}
+
 // ROUND with ROUND_HALF_EVEN. A value is at a tie when it is as far from its truncation as from
 // its rounding away from zero, and the two then differ by one unit of the last digit.
 std::string RoundHalfEven() {
-  const std::string away = "round($1, CAST($2 AS INTEGER))";
-  const std::string toward = "trunc($1, CAST($2 AS INTEGER))";
-  return "CASE WHEN " + away + " = " + toward + " OR " + away + " - $1 <> $1 - " + toward +
-         " THEN " + away + " WHEN " + toward + " % (2 * (" + away + " - " + toward +
-         ")) = 0 THEN " + toward + " ELSE " + away + " END";
+  const std::string away = "round($1, CAST(coalesce($2, 0) AS INTEGER))";
+  const std::string toward = "trunc($1, CAST(coalesce($2, 0) AS INTEGER))";
+  return "CASE WHEN $2 IS NULL THEN NULL WHEN " + away + " = " + toward + " OR " + away +
+         " - $1 <> $1 - " + toward + " THEN " + away + " WHEN " + toward + " % (2 * (" + away +
+         " - " + toward + ")) = 0 THEN " + toward + " ELSE " + away + " END";
 }
 
 // The values of a type the date arithmetic functions return, as DuckDB literals, and how a
@@ -507,7 +514,7 @@ std::vector<Rule> GenerateTimestampArray() {
     rules.push_back({
         .arity = 4,
         .spelling = "list_transform([struct_pack(a := $1, b := $2, s := $3 * " + micros +
-                    ")], _g -> CASE WHEN _g.s = 0 THEN !1 "
+                    ")], lambda _g: CASE WHEN _g.s = 0 THEN !1 "
                     "ELSE generate_series(_g.a, _g.b, to_microseconds(_g.s)) END)[1]",
         .conditions = {Part(4, {part})},
         .defaults = {},
@@ -612,6 +619,7 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 // Functions implemented by DuckDB SQL templates.
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      {"IF", {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}}},
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
       // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
@@ -904,10 +912,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               BigNumericRounding("bq_bignumeric_round", true),
               {
                   {.arity = 1, .spelling = "round($1)"},
-                  {.arity = 2, .spelling = "round($1, CAST($2 AS INTEGER))"},
+                  {.arity = 2, .spelling = RoundWithDigits("round")},
                   {
                       .arity = 3,
-                      .spelling = "round($1, CAST($2 AS INTEGER))",
+                      .spelling = RoundWithDigits("round"),
                       .conditions = {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
                   },
                   {
@@ -924,7 +932,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               BigNumericRounding("bq_bignumeric_trunc", false),
               {
                   {.arity = 1, .spelling = "trunc($1)"},
-                  {.arity = 2, .spelling = "trunc($1, CAST($2 AS INTEGER))"},
+                  {.arity = 2, .spelling = RoundWithDigits("trunc")},
               },
           }),
       },
@@ -1164,9 +1172,10 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
               {
                   .arity = 1,
                   .spelling =
-                      "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], _s -> "
-                      "list_transform([list_filter(range(1, len(_s) + 1), _i -> _i = 1 OR "
-                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], _b -> list_transform(_b, (_r, _k) -> "
+                      "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
+                      "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = 1 OR "
+                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, lambda "
+                      "_r, _k: "
                       "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], len(_s) + 1) "
                       "- "
                       "_r)))[1])[1]",
@@ -1180,37 +1189,42 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {"RANGE_CONTAINS", RangeContains()},
       {"RANGE_OVERLAPS", {{.arity = 2, .spelling = Overlap()}}},
       {"RANGE_INTERSECT", RangeIntersect()},
-      // DuckDB's array_to_string() skips NULL elements, has no NULL text, and ignores a NULL
-      // delimiter.
+      // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
+      // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
       {
           "ARRAY_TO_STRING",
           {
               {
                   .arity = 2,
-                  .spelling = "if($2 IS NULL, NULL, array_to_string($1, $2))",
+                  .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                              "ELSE list_aggr($1, 'string_agg', $2) END",
                   .conditions = {Is(2, {TYPE_STRING})},
               },
               {
                   .arity = 3,
-                  .spelling = "if($2 IS NULL OR $3 IS NULL, NULL, "
-                              "array_to_string(list_transform($1, _e -> coalesce(_e, $3)), $2))",
+                  .spelling =
+                      "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                      "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
+                      "'string_agg', $2) END",
                   .conditions = {Is(2, {TYPE_STRING})},
               },
               // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with ||,
               // starting from NULL when the delimiter or NULL text is NULL.
               {
                   .arity = 2,
-                  .spelling = "list_reduce(list_filter($1, _e -> _e IS NOT NULL), (_a, _e, _i) -> "
-                              "_a || if(_i = 1, _e, $2 || _e), if($2 IS NULL, NULL, CAST('' AS "
-                              "BLOB)))",
+                  .spelling =
+                      "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda _a, _e, _i: "
+                      "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                      "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
                   .conditions = {Is(2, {TYPE_BYTES})},
               },
               {
                   .arity = 3,
-                  .spelling =
-                      "list_reduce(list_transform($1, _e -> coalesce(_e, $3)), (_a, _e, _i) "
-                      "-> _a || if(_i = 1, _e, $2 || _e), if($2 IS NULL OR $3 IS NULL, "
-                      "NULL, CAST('' AS BLOB)))",
+                  .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda "
+                              "_a, _e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL "
+                              "ELSE CAST('' AS BLOB) END)",
                   .conditions = {Is(2, {TYPE_BYTES})},
               },
           },
@@ -1237,7 +1251,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling =
                       "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS "
                       "VARCHAR), "
-                      "CAST($3 AS VARCHAR)), _e -> CAST(_e AS BIGNUM))",
+                      "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
                   .conditions = {Is(1, {TYPE_BIGNUMERIC})},
                   .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
               },

@@ -2,7 +2,7 @@ desc: edits the stopped emulator's database as another DuckDB client would
 steps:
   edit:
     exec:
-      command: duckdb "$E2E_DATA_DIR/test.duckdb"
+      command: duckdb -no-agent "$E2E_DATA_DIR/test.duckdb"
       stdin: |
         -- Comments the emulator did not write, or that describe another column.
         COMMENT ON COLUMN persist.column_comments.b IS 'written by someone else';
@@ -17,7 +17,7 @@ steps:
   # A view written by another DuckDB client has no GoogleSQL definition or schema.
   unmanaged_view:
     exec:
-      command: duckdb "$E2E_DATA_DIR/test.duckdb"
+      command: duckdb -no-agent "$E2E_DATA_DIR/test.duckdb"
       stdin: |
         CREATE SCHEMA unmanaged;
         CREATE VIEW unmanaged.v AS SELECT 1 AS x;
@@ -25,7 +25,7 @@ steps:
   # A table written by another DuckDB client can hold types the emulator never writes.
   duckdb_types:
     exec:
-      command: duckdb "$E2E_DATA_DIR/test.duckdb"
+      command: duckdb -no-agent "$E2E_DATA_DIR/test.duckdb"
       stdin: |
         CREATE SCHEMA duckdb_types;
         CREATE TABLE duckdb_types.t AS SELECT
@@ -56,7 +56,7 @@ steps:
       current.stdout contains 'example%2Ecom%3Aproj.duckdb'
   numeric_storage_type:
     exec:
-      command: duckdb -noheader -csv "$E2E_DATA_DIR/test.duckdb"
+      command: duckdb -no-agent -noheader -csv "$E2E_DATA_DIR/test.duckdb"
       stdin: SELECT typeof(n), typeof(p), typeof(s), typeof(a) FROM persist.numeric_storage;
     test: |
       current.exit_code == 0 && current.stderr == "" &&

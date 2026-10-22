@@ -28,8 +28,9 @@ std::vector<Rule> GenerateRangeArray() {
       {
           .arity = {2, 3},
           .spelling = "list_transform([bq_generate_range_array(" + bound(kRangeStart) + ", " +
-                      bound(kRangeEnd) + ", $2, $3)], _b -> list_transform(range(1, len(_b)), " +
-                      "_i -> struct_pack(" + QuoteIdentifier(kRangeStart) + " := _b[_i], " +
+                      bound(kRangeEnd) +
+                      ", $2, $3)], lambda _b: list_transform(range(1, len(_b)), " +
+                      "lambda _i: struct_pack(" + QuoteIdentifier(kRangeStart) + " := _b[_i], " +
                       QuoteIdentifier(kRangeEnd) + " := _b[_i + 1])))[1]",
           .conditions = {},
           .defaults = {"true"},
@@ -820,7 +821,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
               {
                   .arity = 1,
                   .spelling =
-                      "bq_st_union_array(list_filter($1, geography -> geography IS NOT NULL))",
+                      "bq_st_union_array(list_filter($1, lambda geography: geography IS NOT NULL))",
               },
           },
       },

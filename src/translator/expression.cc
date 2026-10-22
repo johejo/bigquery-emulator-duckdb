@@ -93,14 +93,15 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       return std::nullopt;
     }
     if (!safe) {
-      return "list_transform(" + sql + ", " + element + " -> " + *cast + ")";
+      return "list_transform(" + sql + ", lambda " + element + ": " + *cast + ")";
     }
     // A value cast to NULL from a value that is not NULL failed.
     const std::string array = context.FreshName("_a");
     const std::string casts = context.FreshName("_c");
-    return "list_transform([" + sql + "], " + array + " -> list_transform([list_transform(" +
-           array + ", " + element + " -> " + *cast + ")], " + casts + " -> CASE WHEN list_count(" +
-           casts + ") < list_count(" + array + ") THEN NULL ELSE " + casts + " END)[1])[1]";
+    return "list_transform([" + sql + "], lambda " + array + ": list_transform([list_transform(" +
+           array + ", lambda " + element + ": " + *cast + ")], lambda " + casts +
+           ": CASE WHEN list_count(" + casts + ") < list_count(" + array + ") THEN NULL ELSE " +
+           casts + " END)[1])[1]";
   }
   if (from->IsStruct() && to->IsStruct()) {
     const std::string value = context.FreshName("_s");
@@ -122,11 +123,11 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       failures.push_back(std::move(failure));
     }
     const std::string fields_sql = "struct_pack(" + Join(fields, ", ") + ")";
-    const std::string cast_sql = safe ? "list_transform([" + fields_sql + "], " + casts +
-                                            " -> CASE WHEN " + Join(failures, " OR ") +
+    const std::string cast_sql = safe ? "list_transform([" + fields_sql + "], lambda " + casts +
+                                            ": CASE WHEN " + Join(failures, " OR ") +
                                             " THEN NULL ELSE " + casts + " END)[1]"
                                       : fields_sql;
-    return "list_transform([" + sql + "], " + value + " -> CASE WHEN " + value +
+    return "list_transform([" + sql + "], lambda " + value + ": CASE WHEN " + value +
            " IS NULL THEN NULL ELSE " + cast_sql + " END)[1]";
   }
   const std::string flag = safe ? "true" : "false";
@@ -152,7 +153,7 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
       }
       bounds.push_back("CASE WHEN isfinite(" + bound + ") THEN " + *text + " ELSE 'UNBOUNDED' END");
     }
-    return "list_transform([" + sql + "], " + range + " -> CASE WHEN " + range +
+    return "list_transform([" + sql + "], lambda " + range + ": CASE WHEN " + range +
            " IS NULL THEN NULL ELSE '[' || " + bounds.at(0) + " || ', ' || " + bounds.at(1) +
            " || ')' END)[1]";
   }
@@ -179,11 +180,11 @@ std::optional<std::string> CastValue(const googlesql::Type* from, const googlesq
     if (safe) {
       range = "CASE WHEN " + Join(failures, " OR ") + " THEN NULL ELSE " + range + " END";
     }
-    return "list_transform([" + sql + "], " + text + " -> CASE WHEN " + text +
+    return "list_transform([" + sql + "], lambda " + text + ": CASE WHEN " + text +
            " IS NULL THEN NULL ELSE list_transform([bq_range_bounds(" + text + ", " +
-           (safe ? "true" : "false") + ")], " + texts + " -> CASE WHEN " + texts +
+           (safe ? "true" : "false") + ")], lambda " + texts + ": CASE WHEN " + texts +
            " IS NULL THEN NULL ELSE list_transform([struct_pack(s := " + bounds.at(0) +
-           ", e := " + bounds.at(1) + ")], " + pair + " -> " + range + ")[1] END)[1] END)[1]";
+           ", e := " + bounds.at(1) + ")], lambda " + pair + ": " + range + ")[1] END)[1] END)[1]";
   }
   if (HasRange(from) || HasRange(to)) {
     return std::nullopt;
@@ -418,7 +419,8 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
         return std::nullopt;
       }
       const std::string name = scope.context.FreshName("_udf");
-      wrappers.push_back("list_transform([struct_pack(value := " + *value + ")], " + name + " -> ");
+      wrappers.push_back("list_transform([struct_pack(value := " + *value + ")], lambda " + name +
+                         ": ");
       const std::string reference = name + ".value";
       bound[assignment->column().column_id()] = reference;
       body_scope.outer[assignment->column().column_id()] = reference;
@@ -536,7 +538,7 @@ std::string NestedIntervalKey(const googlesql::Type* type, const std::string& sq
   }
   if (type->IsArray()) {
     const std::string element = "_ik" + std::to_string(depth);
-    return "list_transform(" + sql + ", " + element + " -> " +
+    return "list_transform(" + sql + ", lambda " + element + ": " +
            NestedIntervalKey(type->AsArray()->element_type(), element, depth + 1) + ")";
   }
   // row() of a NULL STRUCT's fields would be a STRUCT of NULLs.

@@ -102,7 +102,7 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
   // Each level binds its value once, under a name of its own.
   const std::string name = "_result" + std::to_string(depth);
   if (type->IsArray()) {
-    return "list_transform(" + value + ", " + name + " -> CASE WHEN " + name +
+    return "list_transform(" + value + ", lambda " + name + ": CASE WHEN " + name +
            " IS NULL THEN error(" +
            QuoteLiteral("Array cannot have a null element; error in writing field " +
                         std::string(column)) +
@@ -118,7 +118,7 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
                      ResultValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
                                  structure->field(i).type, column, stored, depth + 1));
   }
-  return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
+  return "list_transform([" + value + "], lambda " + name + ": CASE WHEN " + name +
          " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
 }
 
@@ -145,7 +145,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
     if (!element) {
       return std::nullopt;
     }
-    return "coalesce(list_transform(" + value + ", " + name + " -> CASE WHEN " + name +
+    return "coalesce(list_transform(" + value + ", lambda " + name + ": CASE WHEN " + name +
            " IS NULL THEN error(" +
            QuoteLiteral("Array cannot have a null element; error in writing field " +
                         std::string(column)) +
@@ -164,7 +164,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
       }
       fields.push_back(QuoteIdentifier(names.at(i)) + " := " + *rounded);
     }
-    return "list_transform([" + value + "], " + name + " -> CASE WHEN " + name +
+    return "list_transform([" + value + "], lambda " + name + ": CASE WHEN " + name +
            " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
   }
   auto rounded = TranslateFunction(
@@ -189,9 +189,9 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
       std::to_string(scale) + ") has precision " + std::to_string(precision) + " and scale " +
       std::to_string(scale) + " but got a value that is not in range of [-" + bound + ", " + bound +
       "]";
-  return "list_transform([" + *rounded + "], " + name + " -> CASE WHEN abs(" + name + ") > CAST(" +
-         QuoteLiteral(bound) + " AS DECIMAL(38,9)) THEN error(" + QuoteLiteral(message) +
-         ") ELSE " + name + " END)[1]";
+  return "list_transform([" + *rounded + "], lambda " + name + ": CASE WHEN abs(" + name +
+         ") > CAST(" + QuoteLiteral(bound) + " AS DECIMAL(38,9)) THEN error(" +
+         QuoteLiteral(message) + ") ELSE " + name + " END)[1]";
 }
 
 }  // namespace
@@ -399,7 +399,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
     } else if (compares_intervals && keyed(argument->type())) {
-      args.push_back("list_transform(" + *sql + ", _ik -> " + IntervalKey("_ik") + ")");
+      args.push_back("list_transform(" + *sql + ", lambda _ik: " + IntervalKey("_ik") + ")");
     } else {
       args.push_back(*sql);
     }
@@ -439,8 +439,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (bound.empty()) {
     return "TRY(" + *sql + ")";
   }
-  return "list_transform([struct_pack(" + Join(bound, ", ") + ")], " + lambda + " -> TRY(" + *sql +
-         "))[1]";
+  return "list_transform([struct_pack(" + Join(bound, ", ") + ")], lambda " + lambda + ": TRY(" +
+         *sql + "))[1]";
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

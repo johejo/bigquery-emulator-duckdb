@@ -70,7 +70,7 @@ std::string WriteCondition(const std::string& sql, const FieldSchema& field,
   std::string condition = "true";
   if (field.mode == FieldMode::kRepeated) {
     const std::string name = "_write_element" + std::to_string(depth);
-    condition = "coalesce(list_bool_and(list_transform(" + sql + ", " + name + " -> " +
+    condition = "coalesce(list_bool_and(list_transform(" + sql + ", lambda " + name + ": " +
                 WriteCondition(name, AsNullable(field), path, column, depth + 1, assignment) +
                 ")), true)";
   } else if (field.type == FieldType::kRecord) {
@@ -214,7 +214,7 @@ std::string ToDuckDbType(const FieldSchema& field) {
 std::string RangeFromText(const std::string& text, const FieldSchema& field) {
   const std::string element = ToDuckDbType(RangeBoundField(field, field.name));
   return std::format(
-      "list_transform([bq_range_bounds({}, false)], _b -> CASE WHEN _b IS NULL THEN NULL ELSE "
+      "list_transform([bq_range_bounds({}, false)], lambda _b: CASE WHEN _b IS NULL THEN NULL ELSE "
       "CAST({} AS {}) END)[1]",
       text, DuckDbRange("CAST(_b[1] AS " + element + ")", "CAST(_b[2] AS " + element + ")"),
       ToDuckDbType(field));
@@ -291,7 +291,7 @@ std::string CheckedWriteValue(const std::string& sql, const FieldSchema& field, 
     return sql;
   }
   const std::string name = "_write_value";
-  return "list_transform([" + sql + "], " + name + " -> CASE WHEN " +
+  return "list_transform([" + sql + "], lambda " + name + ": CASE WHEN " +
          WriteCondition(name, field, field.name, field.name, 0, assignment) + " THEN " + name +
          " END)[1]";
 }
@@ -357,7 +357,7 @@ std::string MapElements(
     const std::string& sql, const FieldSchema& field, int depth,
     const std::function<std::string(const std::string&, const FieldSchema&, int)>& element) {
   const std::string name = "_e" + std::to_string(depth);
-  return std::format("list_transform({}, {} -> {})", sql, name,
+  return std::format("list_transform({}, lambda {}: {})", sql, name,
                      element(name, AsNullable(field), depth + 1));
 }
 

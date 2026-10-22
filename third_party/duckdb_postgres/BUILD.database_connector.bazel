@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "database_connector",
-    srcs = glob(["src/attached/*.cpp"]),
+    srcs = glob(["src/**/*.cpp"]),
     hdrs = glob(["src/include/**/*.hpp"]),
     includes = ["src/include"],
     deps = ["@duckdb_source//:headers"],
