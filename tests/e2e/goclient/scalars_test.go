@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // The table that the cases in testdata/scalars/*.txt read as `t` from their default dataset, and
@@ -39,6 +40,15 @@ type queryResponse struct {
 	} `json:"error"`
 }
 
+// Retire idle connections before cpp-httplib's five-second keep-alive timeout.
+// Otherwise a POST can race the server closing a reused connection and fail with
+// EOF; retrying queries is unsafe because they can have side effects.
+var queryHTTPClient = func() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.IdleConnTimeout = time.Second
+	return &http.Client{Transport: transport}
+}()
+
 // runQuery calls jobs.query directly so that the cell comes back exactly as the REST API
 // encodes it, rather than converted by a client library. An empty dataset means no default.
 func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
@@ -51,7 +61,7 @@ func runQuery(endpoint, project, dataset, sql string) (queryResponse, error) {
 		return queryResponse{}, err
 	}
 	url := fmt.Sprintf("%s/bigquery/v2/projects/%s/queries", endpoint, project)
-	response, err := http.Post(url, "application/json", bytes.NewReader(body))
+	response, err := queryHTTPClient.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return queryResponse{}, err
 	}
