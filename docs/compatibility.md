@@ -78,7 +78,7 @@ For `require_partition_filter`, transforms of temporal partition keys are limite
 `DATE_SUB`, `EXTRACT(YEAR FROM ...)`, `DATE_TRUNC`, `DATE` and `TIMESTAMP_TRUNC`, with constant
 arguments besides the key. Projections propagate filters through direct column renames only. Outer
 predicates do not propagate through aggregation, LIMIT or other scan boundaries.
-The DDL option cannot be NULL, or be enabled on an unpartitioned table or view.
+The option cannot be enabled on an unpartitioned table or view.
 
 ### Column defaults
 

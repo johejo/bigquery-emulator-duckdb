@@ -92,7 +92,7 @@ rejected.
 | Table and column options | Supported | See [Options and expiration](compatibility.md#options-and-expiration). |
 | Column rounding modes | Supported |  |
 | Default rounding modes | Supported |  |
-| Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option require_partition_filter. |
+| Partitioning and clustering | Partial | See [Partitioning and clustering](compatibility.md#partitioning-and-clustering). Unsupported: CREATE TABLE option partition_expiration_days. |
 | Primary and foreign keys | Supported | Accepted and dropped. |
 | Collation | Unsupported |  |
 | `CREATE TEMP TABLE` | Supported | See [Scripts and transactions](compatibility.md#scripts-and-transactions). |

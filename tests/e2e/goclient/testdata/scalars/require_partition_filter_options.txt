@@ -1,0 +1,23 @@
+# BigQuery answers: NULL clears the partition filter requirement inherited by LIKE/COPY/CLONE.
+
+CREATE OR REPLACE TABLE scalars.partition_filter_null_like_source (day DATE) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+CREATE OR REPLACE TABLE scalars.partition_filter_null_like LIKE scalars.partition_filter_null_like_source OPTIONS (require_partition_filter = NULL);
+SELECT COUNT(*) FROM scalars.partition_filter_null_like
+=> "0"
+
+CREATE OR REPLACE TABLE scalars.partition_filter_null_copy_source (day DATE) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+CREATE OR REPLACE TABLE scalars.partition_filter_null_copy COPY scalars.partition_filter_null_copy_source OPTIONS (require_partition_filter = NULL);
+SELECT COUNT(*) FROM scalars.partition_filter_null_copy
+=> "0"
+
+CREATE OR REPLACE TABLE scalars.partition_filter_null_clone_source (day DATE) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+CREATE OR REPLACE TABLE scalars.partition_filter_null_clone CLONE scalars.partition_filter_null_clone_source OPTIONS (require_partition_filter = NULL);
+SELECT COUNT(*) FROM scalars.partition_filter_null_clone
+=> "0"
+
+# BigQuery answer: ALTER TABLE also clears the required partition filter with NULL.
+
+CREATE OR REPLACE TABLE scalars.partition_filter_null_alter (day DATE) PARTITION BY day OPTIONS (require_partition_filter = TRUE);
+ALTER TABLE scalars.partition_filter_null_alter SET OPTIONS (require_partition_filter = NULL);
+SELECT COUNT(*) FROM scalars.partition_filter_null_alter
+=> "0"
