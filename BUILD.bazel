@@ -182,8 +182,10 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
     ],
     deps = [
         ":api_error",
@@ -192,11 +194,11 @@ cc_library(
         ":parquet_metadata",
         ":schema_sql",
         ":type_mapping",
+        "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/public:json_value",
         "@googlesql//googlesql/public:numeric_value",
         "@googlesql//googlesql/public/functions:convert_string",
         "@googlesql//googlesql/public/functions:date_time_util",
-        "@nlohmann_json//:json",
         "@zlib",
     ],
 )

@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
@@ -569,7 +570,10 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     } else {
       const QueryResult result = Execute("SELECT * FROM " + ReadTableRelation(backend_, source));
       WriteTextExtract(
-          table.schema, result.rows.size(), [&](size_t i) { return result.rows.at(i); },
+          table.schema, result.rows.size(),
+          [&](size_t row, size_t column, const googlesql::Type* type) {
+            return result.rows.GoogleSqlValue(row, column, type);
+          },
           {
               .json = format == "NEWLINE_DELIMITED_JSON",
               .gzip = compression == "GZIP",
