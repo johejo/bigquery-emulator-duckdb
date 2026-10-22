@@ -1,9 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
-#include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/references.h"
 
@@ -32,7 +32,7 @@ std::string ColumnCommentsQuery(const TableReference& table);
 // column's comment records. A column without one, such as one added by a DuckDB statement the
 // emulator did not write, or one whose comment someone else wrote, keeps its derived field.
 // Throws ApiError when numeric metadata disagrees with a column's actual DuckDB type.
-std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
-                                             const std::vector<nlohmann::json>& comments);
+std::vector<FieldSchema> ApplyColumnComments(
+    std::vector<FieldSchema> derived, const std::vector<std::optional<std::string>>& comments);
 
 }  // namespace bigquery_emulator_duckdb

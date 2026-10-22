@@ -56,8 +56,7 @@ nlohmann::json TableGetResource(const TableInfo& info, const TableGetRequest& re
 nlohmann::json TableList(const DatasetReference& dataset, const std::vector<TableListEntry>& tables,
                          const ListPage& page);
 // `result` holds the rows from `page.start_index` on; the table has `total_rows`.
-nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
-                             std::string_view selected_fields);
+nlohmann::json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page);
 nlohmann::json InsertAllResponse(const std::vector<InsertError>& errors);
 nlohmann::json RoutineResource(const Routine& routine);
 // Filters, pages and projects routines sorted by ID.

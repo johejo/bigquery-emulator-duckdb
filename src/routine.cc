@@ -79,11 +79,12 @@ std::string SqlTypeName(const json& type) {
 
 }  // namespace
 
-std::optional<Routine> ParseRoutineComment(const RoutineReference& reference, const json& comment) {
-  if (!comment.is_string()) {
+std::optional<Routine> ParseRoutineComment(const RoutineReference& reference,
+                                           const std::optional<std::string>& comment) {
+  if (!comment.has_value()) {
     return std::nullopt;
   }
-  json resource = json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
+  json resource = json::parse(*comment, nullptr, /*allow_exceptions=*/false);
   if (!resource.is_object() || !resource.contains("definitionBody")) {
     return std::nullopt;
   }

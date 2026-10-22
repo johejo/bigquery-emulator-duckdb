@@ -302,18 +302,36 @@ std::string StoredValue(const std::string& sql, const FieldSchema& field) {
   });
 }
 
-std::string ReadColumns(const std::vector<FieldSchema>& schema) {
-  if (!HasGeography(schema)) {
+namespace {
+
+// The DuckDB value `sql` of `field` as ReadColumns reads it: each GEOGRAPHY in it as WKT and,
+// when `selected` is set, only the fields `field` keeps of each RECORD in it.
+std::string ReadValue(const std::string& sql, const FieldSchema& field, int depth, bool selected) {
+  if (!selected || field.type != FieldType::kRecord) {
+    return MapGeographies(sql, field, depth,
+                          [](const std::string& value) { return "bq_st_astext(" + value + ")"; });
+  }
+  if (field.mode == FieldMode::kRepeated) {
+    return MapElements(sql, field, depth,
+                       [](const std::string& name, const FieldSchema& element, int element_depth) {
+                         return ReadValue(name, element, element_depth, true);
+                       });
+  }
+  return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
+    return ReadValue(value, child, depth, true);
+  });
+}
+
+}  // namespace
+
+std::string ReadColumns(const std::vector<FieldSchema>& schema, bool selected) {
+  if (!selected && !HasGeography(schema)) {
     return "*";
   }
   std::vector<std::string> columns;
   for (const FieldSchema& field : schema) {
     const std::string name = QuoteIdentifier(field.name);
-    columns.push_back(std::format(
-        "{} AS {}",
-        MapGeographies(name, field, 0,
-                       [](const std::string& value) { return "bq_st_astext(" + value + ")"; }),
-        name));
+    columns.push_back(std::format("{} AS {}", ReadValue(name, field, 0, selected), name));
   }
   return Join(columns, ", ");
 }

@@ -22,7 +22,7 @@ struct Routine {
 
 // The routine a macro comment records, or nothing for a comment the emulator did not write.
 std::optional<Routine> ParseRoutineComment(const RoutineReference& reference,
-                                           const nlohmann::json& comment);
+                                           const std::optional<std::string>& comment);
 
 // The statements that record `routine` on its macro, which must exist.
 std::vector<std::string> RoutineCommentStatements(const Routine& routine);

@@ -4,9 +4,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
+#include <cstddef>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <ios>
 #include <iterator>
 #include <string>
@@ -16,12 +17,15 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "absl/time/time.h"
 #include "googlesql/public/functions/convert_string.h"
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/json_value.h"
 #include "googlesql/public/numeric_value.h"
-#include "nlohmann/json.hpp"
+#include "googlesql/public/types/type.h"
+#include "googlesql/public/types/type_factory.h"
+#include "googlesql/public/value.h"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
@@ -30,8 +34,6 @@
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
-
-using nlohmann::json;
 
 namespace {
 
@@ -49,32 +51,62 @@ void Check(const absl::Status& status) {
   }
 }
 
-// The text CAST(value AS STRING) gives a scalar, or for TIMESTAMP the spelling BigQuery exports,
-// from its wire format. JSON is serialized as GoogleSQL does.
-std::string ScalarText(const FieldSchema& field, const std::string& value) {
+// A DATETIME or TIME as query results spell it, without trailing zeros in the fraction.
+std::string TrimFraction(std::string text) {
+  if (text.find('.') != std::string::npos) {
+    text.erase(text.find_last_not_of('0') + 1);
+    if (text.back() == '.') {
+      text.pop_back();
+    }
+  }
+  return text;
+}
+
+// The text CAST(value AS STRING) gives a scalar, except that BYTES is base64, TIMESTAMP is spelled
+// as BigQuery exports it, and DATETIME and TIME as query results spell them. JSON is serialized
+// as GoogleSQL does.
+std::string ScalarText(const googlesql::Value& value) {
   std::string out;
-  switch (field.type) {
-    case FieldType::kFloat: {
+  switch (value.type_kind()) {
+    case googlesql::TYPE_STRING:
+      return value.string_value();
+    case googlesql::TYPE_BYTES:
+      return absl::Base64Escape(value.bytes_value());
+    case googlesql::TYPE_BOOL:
+      return value.bool_value() ? "true" : "false";
+    case googlesql::TYPE_INT64:
+      return std::to_string(value.int64_value());
+    case googlesql::TYPE_DOUBLE: {
       absl::Status error;
-      if (!googlesql::functions::NumericToString(std::strtod(value.c_str(), nullptr), &out, &error,
-                                                 false)) {
+      if (!googlesql::functions::NumericToString(value.double_value(), &out, &error, false)) {
         Check(error);
       }
       return out;
     }
-    case FieldType::kNumeric:
-      return Checked(googlesql::NumericValue::FromString(value)).ToString();
-    case FieldType::kBigNumeric:
-      return Checked(googlesql::BigNumericValue::FromString(value)).ToString();
-    case FieldType::kTimestamp:
-      Check(googlesql::functions::FormatTimestampToString(
-          "%Y-%m-%d %H:%M:%E*S UTC", std::stoll(value), absl::UTCTimeZone(), &out));
+    case googlesql::TYPE_NUMERIC:
+      return value.numeric_value().ToString();
+    case googlesql::TYPE_BIGNUMERIC:
+      return value.bignumeric_value().ToString();
+    case googlesql::TYPE_DATE:
+      Check(googlesql::functions::ConvertDateToString(value.date_value(), &out));
       return out;
-    case FieldType::kJson:
-      return Checked(googlesql::JSONValue::ParseJSONString(value)).GetConstRef().ToString();
+    case googlesql::TYPE_TIMESTAMP:
+      Check(googlesql::functions::FormatTimestampToString(
+          "%Y-%m-%d %H:%M:%E*S UTC", value.ToUnixPicos().ToAbslTime(), absl::UTCTimeZone(), &out));
+      return out;
+    case googlesql::TYPE_DATETIME:
+      Check(googlesql::functions::ConvertDatetimeToString(
+          value.datetime_value(), googlesql::functions::kMicroseconds, &out));
+      out.at(10) = 'T';
+      return TrimFraction(std::move(out));
+    case googlesql::TYPE_TIME:
+      Check(googlesql::functions::ConvertTimeToString(value.time_value(),
+                                                      googlesql::functions::kMicroseconds, &out));
+      return TrimFraction(std::move(out));
+    case googlesql::TYPE_JSON:
+      return value.json_value().ToString();
     default:
-      // STRING, BYTES (already base64), INT64, BOOL, DATE, TIME and DATETIME.
-      return value;
+      throw ApiError::Unsupported("extracting " + value.type()->DebugString() + " values");
   }
 }
 
@@ -89,23 +121,27 @@ void CheckTextFields(const std::vector<FieldSchema>& fields) {
   }
 }
 
-void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells, std::string& out);
+// The JSON object of a row or RECORD whose fields are `fields` and whose field `i` is
+// value_at(i). NULL fields are left out.
+template <typename F>
+void AppendJsonObject(const std::vector<FieldSchema>& fields, const F& value_at, std::string& out);
 
 // One non-NULL value of `field`: an element of a REPEATED field or a whole scalar or RECORD.
 // INT64, NUMERIC and BIGNUMERIC are strings, so that readers keep their precision.
-void AppendJsonValue(const FieldSchema& field, const json& value, std::string& out) {
+void AppendJsonValue(const FieldSchema& field, const googlesql::Value& value, std::string& out) {
   switch (field.type) {
     case FieldType::kRecord:
-      AppendJsonObject(field.fields, value.at("f"), out);
+      AppendJsonObject(
+          field.fields,
+          [&](size_t i) -> const googlesql::Value& { return value.field(static_cast<int>(i)); },
+          out);
       return;
     case FieldType::kBoolean:
-      out += value.get<std::string>();
-      return;
     case FieldType::kJson:
-      out += ScalarText(field, value.get<std::string>());
+      out += ScalarText(value);
       return;
     case FieldType::kFloat: {
-      const double number = std::strtod(value.get<std::string>().c_str(), nullptr);
+      const double number = value.double_value();
       // TO_JSON's spelling of the values JSON has no number for.
       out += std::isnan(number)   ? "\"NaN\""
              : std::isinf(number) ? (number > 0 ? "\"Infinity\"" : "\"-Infinity\"")
@@ -113,19 +149,17 @@ void AppendJsonValue(const FieldSchema& field, const json& value, std::string& o
       return;
     }
     default:
-      out += googlesql::JSONValue(ScalarText(field, value.get<std::string>()))
-                 .GetConstRef()
-                 .ToString();
+      out += googlesql::JSONValue(ScalarText(value)).GetConstRef().ToString();
   }
 }
 
-// NULL fields are left out.
-void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells, std::string& out) {
+template <typename F>
+void AppendJsonObject(const std::vector<FieldSchema>& fields, const F& value_at, std::string& out) {
   out += '{';
   bool first = true;
   for (size_t i = 0; i < fields.size(); ++i) {
     const FieldSchema& field = fields.at(i);
-    const json& value = cells.at(i).at("v");
+    const googlesql::Value& value = value_at(i);
     if (value.is_null()) {
       continue;
     }
@@ -140,11 +174,11 @@ void AppendJsonObject(const std::vector<FieldSchema>& fields, const json& cells,
       continue;
     }
     out += '[';
-    for (size_t j = 0; j < value.size(); ++j) {
+    for (int j = 0; j < value.num_elements(); ++j) {
       if (j > 0) {
         out += ',';
       }
-      AppendJsonValue(field, value[j].at("v"), out);
+      AppendJsonValue(field, value.element(j), out);
     }
     out += ']';
   }
@@ -296,14 +330,30 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
 
 }  // namespace
 
-void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<json>& rows,
-                      const TextExtractOptions& options, const std::string& path) {
+void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
+                      const ExtractValue& value, const TextExtractOptions& options,
+                      const std::string& path) {
   CheckTextFields(schema);
+  googlesql::TypeFactory type_factory;
+  std::vector<const googlesql::Type*> types;
+  std::ranges::transform(schema, std::back_inserter(types), [&](const FieldSchema& field) {
+    return Checked(GoogleSqlType(field, &type_factory));
+  });
+  const auto row = [&](size_t r) {
+    std::vector<googlesql::Value> values;
+    values.reserve(types.size());
+    for (size_t i = 0; i < types.size(); ++i) {
+      values.push_back(Checked(value(r, i, types.at(i))));
+    }
+    return values;
+  };
   std::string contents;
   if (options.json) {
-    for (const json& row : rows) {
+    for (size_t r = 0; r < row_count; ++r) {
       std::string line;
-      AppendJsonObject(schema, row.at("f"), line);
+      const std::vector<googlesql::Value> values = row(r);
+      AppendJsonObject(
+          schema, [&](size_t i) -> const googlesql::Value& { return values.at(i); }, line);
       contents += EscapeHtml(line) + "\n";
     }
   } else {
@@ -324,15 +374,14 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
       }
       contents += '\n';
     }
-    for (const json& row : rows) {
-      const json& cells = row.at("f");
-      for (size_t i = 0; i < schema.size(); ++i) {
+    for (size_t r = 0; r < row_count; ++r) {
+      const std::vector<googlesql::Value> values = row(r);
+      for (size_t i = 0; i < values.size(); ++i) {
         if (i > 0) {
           contents += delimiter;
         }
-        const json& value = cells.at(i).at("v");
-        if (!value.is_null()) {
-          AppendCsvField(ScalarText(schema.at(i), value.get<std::string>()), delimiter, contents);
+        if (!values.at(i).is_null()) {
+          AppendCsvField(ScalarText(values.at(i)), delimiter, contents);
         }
       }
       contents += '\n';

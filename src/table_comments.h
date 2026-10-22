@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "nlohmann/json_fwd.hpp"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -21,7 +20,7 @@ struct ViewMetadata {
 };
 
 // The metadata a table or view comment records, or none for a comment of someone else's.
-TableMetadata CommentMetadata(const nlohmann::json& comment);
+TableMetadata CommentMetadata(const std::optional<std::string>& comment);
 
 // The statement that records `metadata` on the DuckDB table `table`, whose schema is `schema`.
 // Throws ApiError::Invalid for metadata BigQuery rejects.
@@ -34,6 +33,6 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
 
 // Parses a view comment, or returns nothing for a view the emulator did not create, which has
 // no comment or a comment of its own.
-std::optional<ViewMetadata> ParseViewMetadata(const nlohmann::json& comment);
+std::optional<ViewMetadata> ParseViewMetadata(const std::optional<std::string>& comment);
 
 }  // namespace bigquery_emulator_duckdb

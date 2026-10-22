@@ -257,7 +257,10 @@ class Emulator {
   Routine GetRoutine(RoutineReference routine);
   Routine WriteRoutine(Routine routine, bool update);
   void DeleteRoutine(RoutineReference routine);
-  QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results);
+  // Reads the rows of `table` from `start_index` on, with only the fields `selected_fields` names,
+  // as SelectFields takes them, unless it is empty.
+  QueryResult ListTableData(TableReference table, int64_t start_index, int64_t max_results,
+                            std::string_view selected_fields);
   // Materializes a Storage Read snapshot of the selected fields, or all of them, without
   // creating a query job. The restriction is parsed as one GoogleSQL expression before it is
   // included in the SELECT.

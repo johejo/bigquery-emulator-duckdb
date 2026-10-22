@@ -134,6 +134,13 @@ std::vector<FieldSchema> SchemaFromJson(const nlohmann::json& schema);
 // query result.
 void SetModesGiven(std::vector<FieldSchema>& schema);
 
+// The fields of `schema` that `selected_fields`, a comma-separated list of field paths such as
+// a,r.x, names, in the schema's order and spelling, with only the named fields of a RECORD whose
+// fields are named. Throws ApiError::Invalid for an unknown field or a path through a field that
+// is not a RECORD.
+std::vector<FieldSchema> SelectFields(const std::vector<FieldSchema>& schema,
+                                      std::string_view selected_fields);
+
 // Whether `a` and `b` are the same schema, whether or not their modes were given.
 bool SameSchema(std::vector<FieldSchema> a, std::vector<FieldSchema> b);
 

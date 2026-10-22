@@ -12,29 +12,20 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
 #include "src/field_schema.h"
+#include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 
 namespace bigquery_emulator_duckdb {
 
-// A materialized query result. Rows are already encoded in BigQuery's wire format
-// ({"f": [{"v": ...}, ...]}) so that they can be returned to clients as is.
+// A query result, whose rows are encoded in BigQuery's wire format as they are read.
 struct QueryResult {
   std::vector<FieldSchema> schema;
-  std::vector<nlohmann::json> rows;
+  ResultRows rows;
   bool has_rows = false;       // False for statements that produce no result set (DDL, SET, ...).
   int64_t affected_rows = -1;  // Rows changed by a DML statement, -1 when not applicable.
 
   [[nodiscard]] nlohmann::json SchemaToJson() const;
 };
-
-// Whether `schema` has a TIMESTAMP field anywhere, including inside a RECORD.
-bool HasTimestampField(const std::vector<FieldSchema>& schema);
-
-// Rewrites the TIMESTAMP cells of `row` from the epoch microseconds that results carry
-// internally to BigQuery's default decimal-seconds spelling. Clients that ask for
-// formatOptions.useInt64Timestamp are served the row as it is.
-nlohmann::json TimestampsAsSeconds(const std::vector<FieldSchema>& schema,
-                                   const nlohmann::json& row);
 
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {

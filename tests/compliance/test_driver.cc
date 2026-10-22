@@ -36,12 +36,12 @@
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
-#include "src/cell_value.h"
 #include "src/emulator.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/query_parameters.h"
 #include "src/references.h"
+#include "src/result_value.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb {
@@ -185,8 +185,13 @@ absl::StatusOr<Value> ResultValue(const QueryResult& result, googlesql::TypeFact
   GOOGLESQL_ASSIGN_OR_RETURN(const googlesql::ArrayType* table_type,
                              type_factory->MakeArrayType(row_type));
   std::vector<Value> rows;
-  for (const json& row : result.rows) {
-    GOOGLESQL_ASSIGN_OR_RETURN(rows.emplace_back(), CellValue(row_type, row));
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    std::vector<Value> values;
+    for (size_t column = 0; column < columns.size(); ++column) {
+      GOOGLESQL_ASSIGN_OR_RETURN(values.emplace_back(),
+                                 result.rows.GoogleSqlValue(row, column, columns.at(column).type));
+    }
+    GOOGLESQL_ASSIGN_OR_RETURN(rows.emplace_back(), Value::MakeStruct(row_type, std::move(values)));
   }
   // ORDER BY is not checked: the result does not say whether the query ordered its rows.
   return googlesql::InternalValue::ArrayNotChecked(

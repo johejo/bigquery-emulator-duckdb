@@ -1,6 +1,7 @@
 #include "src/table_history.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
@@ -137,9 +138,9 @@ void SweepHistory(Backend& backend, const std::string& project) {
         "'emulator_history.' || dataset_id || '.' || table_id || '.' || creation_time FROM ({}) "
         "WHERE creation_time IS NOT NULL)",
         QuoteLiteral(project), tables));
-    for (const auto& row : forgotten.rows) {
+    for (size_t row = 0; row < forgotten.rows.size(); ++row) {
       backend.Execute(std::format("DROP TABLE IF EXISTS {}.main.{}", QuoteIdentifier(project),
-                                  QuoteIdentifier(row.at("f").at(0).at("v").get<std::string>())));
+                                  QuoteIdentifier(forgotten.rows.String(row, 0))));
     }
     backend.Execute(std::format(
         "DELETE FROM {} AS h WHERE dataset_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ({}) AS t "
@@ -184,12 +185,11 @@ absl::StatusOr<std::string> TimeTravelQuery(Backend& backend, const TableReferen
       "SELECT count(*) FILTER (WHERE NOT kept), count(*) FROM {} WHERE ({} OR dataset_id IS NULL) "
       "AND valid_to > {}",
       history, versions, time));
-  const auto& cells = later.rows.at(0).at("f");
-  if (cells.at(0).at("v") != "0") {
+  if (later.rows.Int64(0, 0) != 0) {
     return absl::UnimplementedError(
         "FOR SYSTEM_TIME AS OF a time before the table's schema changed or it was renamed");
   }
-  if (cells.at(1).at("v") == "0") {
+  if (later.rows.Int64(0, 1) == 0) {
     return "SELECT * FROM " + QualifiedName(table);
   }
   // Selecting the version as the query runs keeps the result right if a write commits meanwhile.

@@ -6,7 +6,6 @@
 #include <string_view>
 #include <vector>
 
-#include "nlohmann/json.hpp"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/table_metadata.h"
@@ -23,7 +22,7 @@ bool IsDuckDbSchema(const std::string& name);
 std::string DatasetsQuery(const std::string& project);
 std::string DatasetEntriesQuery(const std::string& project,
                                 const std::optional<std::string>& dataset = std::nullopt);
-DatasetMetadata ParseDatasetMetadata(const nlohmann::json& recorded);
+DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded);
 std::string TablesQuery(const DatasetReference& dataset);
 
 // Lazy expiration shares the emulator's mutex with mutations. Each drop rechecks the comment
@@ -31,10 +30,13 @@ std::string TablesQuery(const DatasetReference& dataset);
 void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
                   const std::optional<DatasetReference>& dataset = std::nullopt);
 
-// An absent relation returns nullopt; a relation without a comment returns JSON null.
-std::optional<nlohmann::json> RelationComment(Backend& backend, std::string_view relations,
-                                              std::string_view name, const TableReference& table);
-std::optional<nlohmann::json> ViewComment(Backend& backend, const TableReference& table);
+// An absent relation returns nullopt; a relation without a comment returns an empty comment.
+std::optional<std::optional<std::string>> RelationComment(Backend& backend,
+                                                          std::string_view relations,
+                                                          std::string_view name,
+                                                          const TableReference& table);
+std::optional<std::optional<std::string>> ViewComment(Backend& backend,
+                                                      const TableReference& table);
 
 // Restores view and column metadata without requiring a view's execution identity.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table);

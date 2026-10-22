@@ -43,8 +43,7 @@ void Emulator::CheckSnapshotTarget(Backend& backend, const TranslatedStatement& 
   if (!target.has_value()) {
     return;
   }
-  const std::optional<json> comment =
-      RelationComment(backend, "duckdb_tables()", "table_name", *target);
+  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", *target);
   if (!comment.has_value()) {
     return;
   }
@@ -98,8 +97,7 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
     if (ViewComment(backend_, table).has_value()) {
       throw ApiError::Invalid("ALTER TABLE cannot alter view " + TableName(table));
     }
-    const std::optional<json> comment =
-        RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
     if (!comment.has_value()) {
       if (alteration->if_exists) {
         return std::vector<std::string>{};
@@ -146,7 +144,7 @@ std::optional<std::vector<std::string>> Emulator::AlterationStatements(
                                dataset.dataset_id);
     }
     return AlterDatasetStatements(*alteration,
-                                  ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]));
+                                  ParseDatasetMetadata(result.rows.OptionalString(0, 1)));
   }
   return std::nullopt;
 }
@@ -165,7 +163,7 @@ DatasetMetadata Emulator::CreatedInDataset(Backend& backend,
   const QueryResult result =
       backend.Execute(DatasetEntriesQuery(table->project_id, table->dataset_id));
   return result.rows.empty() ? DatasetMetadata{}
-                             : ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+                             : ParseDatasetMetadata(result.rows.OptionalString(0, 1));
 }
 
 std::optional<std::string> Emulator::DatasetLocation(Backend& backend,

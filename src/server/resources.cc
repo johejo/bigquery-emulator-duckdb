@@ -1,13 +1,11 @@
 #include "src/server/resources.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <functional>
 #include <iterator>
-#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -23,6 +21,7 @@
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
+#include "src/result_rows.h"
 #include "src/routine.h"
 #include "src/server/requests.h"
 #include "src/table_metadata.h"
@@ -35,49 +34,6 @@ using nlohmann::json;
 // The emulator does not version resources, so every resource and list has the same etag.
 constexpr char kEtag[] = "";
 
-// Indexes refer to the original schema, so projecting keeps its order and spelling.
-struct SchemaSelection {
-  bool all = false;
-  std::map<size_t, SchemaSelection> fields = {};
-};
-
-void SelectSchemaField(const std::vector<FieldSchema>& schema, std::string_view path,
-                       SchemaSelection& selection) {
-  const auto dot = path.find('.');
-  const std::string_view name = path.substr(0, dot);
-  const auto field = std::ranges::find_if(schema, [name](const FieldSchema& candidate) {
-    return std::ranges::equal(candidate.name, name, [](unsigned char a, unsigned char b) {
-      return std::tolower(a) == std::tolower(b);
-    });
-  });
-  if (name.empty() || field == schema.end()) {
-    throw ApiError::Invalid("Unknown field in selectedFields: " + std::string(path));
-  }
-  auto& child = selection.fields[static_cast<size_t>(field - schema.begin())];
-  if (dot == std::string_view::npos) {
-    child.all = true;
-  } else {
-    if (field->type != FieldType::kRecord) {
-      throw ApiError::Invalid("Not a RECORD field in selectedFields: " + std::string(name));
-    }
-    SelectSchemaField(field->fields, path.substr(dot + 1), child);
-  }
-}
-
-SchemaSelection ParseSchemaSelection(const std::vector<FieldSchema>& schema,
-                                     std::string_view remaining) {
-  SchemaSelection selection;
-  while (true) {
-    const auto comma = remaining.find(',');
-    SelectSchemaField(schema, remaining.substr(0, comma), selection);
-    if (comma == std::string_view::npos) {
-      break;
-    }
-    remaining.remove_prefix(comma + 1);
-  }
-  return selection;
-}
-
 json ProjectResource(const json& resource, const ResourceMask& mask) {
   if (mask.all) {
     return resource;
@@ -89,42 +45,6 @@ json ProjectResource(const json& resource, const ResourceMask& mask) {
     }
   }
   return result;
-}
-
-// Project BigQuery's positional wire cells using the same indexes as the schema projection.
-json ProjectRow(const std::vector<FieldSchema>& schema, const SchemaSelection& selection,
-                const json& row) {
-  json cells = json::array();
-  for (const auto& [index, child] : selection.fields) {
-    json cell = row.at("f").at(index);
-    if (!child.all && !cell.at("v").is_null()) {
-      const FieldSchema& field = schema.at(index);
-      if (field.mode == FieldMode::kRepeated) {
-        for (auto& element : cell["v"]) {
-          if (!element.at("v").is_null()) {
-            element["v"] = ProjectRow(field.fields, child, element.at("v"));
-          }
-        }
-      } else {
-        cell["v"] = ProjectRow(field.fields, child, cell.at("v"));
-      }
-    }
-    cells.push_back(std::move(cell));
-  }
-  return json{{"f", std::move(cells)}};
-}
-
-std::vector<FieldSchema> ProjectSchema(const std::vector<FieldSchema>& schema,
-                                       const SchemaSelection& selection) {
-  std::vector<FieldSchema> projected;
-  for (const auto& [index, child] : selection.fields) {
-    FieldSchema field = schema.at(index);
-    if (!child.all) {
-      field.fields = ProjectSchema(field.fields, child);
-    }
-    projected.push_back(std::move(field));
-  }
-  return projected;
 }
 
 json ErrorProto(const ApiError& error) {
@@ -317,11 +237,11 @@ json JobListEntry(const Job& job, bool full) {
 // Copies the rows of `result` in [begin, end) into a response, in the timestamp encoding the
 // request asked for.
 json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool int64_timestamps) {
-  const bool as_seconds = !int64_timestamps && HasTimestampField(result.schema);
+  const TimestampEncoding timestamps =
+      int64_timestamps ? TimestampEncoding::kMicros : TimestampEncoding::kSeconds;
   json rows = json::array();
   for (int64_t i = begin; i < end; ++i) {
-    rows.push_back(as_seconds ? TimestampsAsSeconds(result.schema, result.rows.at(i))
-                              : result.rows.at(i));
+    rows.push_back(result.rows.at(i, timestamps));
   }
   return rows;
 }
@@ -588,8 +508,7 @@ json TableGetResource(const TableInfo& info, const TableGetRequest& request) {
     resource.erase("numBytes");
   }
   if (!request.selected_fields.empty()) {
-    const SchemaSelection selection = ParseSchemaSelection(info.schema, request.selected_fields);
-    resource["schema"] = SchemaToJson(ProjectSchema(info.schema, selection));
+    resource["schema"] = SchemaToJson(SelectFields(info.schema, request.selected_fields));
   }
   return resource;
 }
@@ -626,11 +545,7 @@ json TableList(const DatasetReference& dataset, const std::vector<TableListEntry
   return response;
 }
 
-json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page,
-                   std::string_view selected_fields) {
-  const SchemaSelection selection = selected_fields.empty()
-                                        ? SchemaSelection{.all = true}
-                                        : ParseSchemaSelection(result.schema, selected_fields);
+json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPage& page) {
   const auto size = static_cast<int64_t>(result.rows.size());
   json response = {
       {"kind", "bigquery#tableDataList"},
@@ -638,12 +553,6 @@ json TableDataList(const QueryResult& result, int64_t total_rows, const ResultPa
       {"totalRows", std::to_string(total_rows)},
       {"rows", RowsForResponse(result, 0, size, page.int64_timestamps)},
   };
-  if (!selection.all) {
-    json& rows = response["rows"];
-    std::ranges::transform(rows, rows.begin(), [&](const json& row) {
-      return ProjectRow(result.schema, selection, row);
-    });
-  }
   if (page.start_index + size < total_rows) {
     response["pageToken"] = std::to_string(page.start_index + size);
   }

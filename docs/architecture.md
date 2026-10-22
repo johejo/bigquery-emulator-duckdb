@@ -3,6 +3,13 @@
 SQL follows the path `Server` → GoogleSQL analysis → translation → DuckDB execution.
 REST metadata operations and Storage RPCs share the same `Emulator` and catalog.
 
+A query result keeps its rows as the DuckDB chunks of the statement's result, which a job keeps
+for `jobs.getQueryResults`. A row is encoded as BigQuery's JSON cells only when a response reads
+it, so a page encodes only its rows; the emulator's own reads, such as script variables and
+extracts, read values from the vectors. Columns whose values can fail to
+encode, such as an INTERVAL or BIGNUMERIC out of range, are encoded once when the statement
+runs, so that the statement fails rather than a later read.
+
 A Storage Read session keeps its rows as the DuckDB vectors of one query, which selects the
 requested fields in GoogleSQL, on a backend session the snapshot owns so that Arrow's connection
 properties remain valid. Each response copies its rows of the columns whose DuckDB Arrow layout
