@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iterator>
@@ -48,20 +49,18 @@ std::vector<TableListEntry> Emulator::ListTableEntries(DatasetReference dataset)
       std::format("WHERE database_name = {} AND schema_name = {}", QuoteLiteral(dataset.project_id),
                   QuoteLiteral(dataset.dataset_id));
   std::vector<TableListEntry> entries;
-  for (const json& row :
-       Execute(std::format("SELECT table_name, 'TABLE', comment FROM duckdb_tables() {}"
-                           " UNION ALL SELECT view_name, 'VIEW', comment FROM duckdb_views() {}"
-                           " ORDER BY 1",
-                           where, where))
-           .rows) {
-    // Keep the wire-field decoding beside the named result fields.
-    // cppcheck-suppress useStlAlgorithm
-    TableMetadata metadata = CommentMetadata(row["f"][2]["v"]);
+  const QueryResult result =
+      Execute(std::format("SELECT table_name, 'TABLE', comment FROM duckdb_tables() {}"
+                          " UNION ALL SELECT view_name, 'VIEW', comment FROM duckdb_views() {}"
+                          " ORDER BY 1",
+                          where, where));
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    TableMetadata metadata = CommentMetadata(result.rows.OptionalString(row, 2));
     entries.push_back({
-        .table_id = row["f"][0]["v"].get<std::string>(),
-        .type = row["f"][1]["v"] == "VIEW"      ? TableType::kView
-                : metadata.snapshot.has_value() ? TableType::kSnapshot
-                                                : TableType::kTable,
+        .table_id = result.rows.String(row, 0),
+        .type = result.rows.String(row, 1) == "VIEW" ? TableType::kView
+                : metadata.snapshot.has_value()      ? TableType::kSnapshot
+                                                     : TableType::kTable,
         .metadata = std::move(metadata),
     });
   }
@@ -78,7 +77,7 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   TableInfo info;
   info.reference = table;
   info.location = location;
-  if (const std::optional<json> comment = ViewComment(backend_, table); comment.has_value()) {
+  if (const auto comment = ViewComment(backend_, table); comment.has_value()) {
     std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
     if (!metadata.has_value()) {
       throw ApiError::Invalid("View " + TableName(table) +
@@ -92,7 +91,7 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
   try {
     info.schema = TableSchema(backend_, table);
     info.metadata = CommentMetadata(
-        RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(nullptr));
+        RelationComment(backend_, "duckdb_tables()", "table_name", table).value_or(std::nullopt));
     const QueryResult identity =
         backend_.Execute(std::format("SELECT table_oid FROM duckdb_tables() WHERE database_name = "
                                      "{} AND schema_name = {} AND table_name = {}",
@@ -101,10 +100,10 @@ TableInfo Emulator::GetTable(TableReference table, bool include_row_count, bool 
     if (identity.rows.empty()) {
       throw ApiError::NotFound("Table not found: " + table.table_id);
     }
-    info.storage_id = std::stoll(FirstColumnStrings(identity).at(0));
+    info.storage_id = identity.rows.Int64(0, 0);
     if (include_row_count) {
       const QueryResult count = backend_.Execute("SELECT count(*) FROM " + QualifiedName(table));
-      info.num_rows = std::stoll(FirstColumnStrings(count).at(0));
+      info.num_rows = count.rows.Int64(0, 0);
     }
   } catch (const BackendError& error) {
     throw ApiError::NotFound("Not found: Table " + table.project_id + ":" + table.dataset_id + "." +
@@ -294,8 +293,7 @@ std::unique_lock<std::mutex> Emulator::KeepVersion(Backend& backend, const Table
   if (!backend.InTransaction()) {
     lock = std::unique_lock(HistoryMutex(table));
   }
-  const std::optional<json> comment =
-      RelationComment(backend, "duckdb_tables()", "table_name", table);
+  const auto comment = RelationComment(backend, "duckdb_tables()", "table_name", table);
   const int64_t creation_time =
       comment.has_value() ? HistoryCreationTime(table, CommentMetadata(*comment)) : 0;
   if (creation_time == 0) {

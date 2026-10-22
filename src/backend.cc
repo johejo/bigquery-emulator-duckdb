@@ -972,6 +972,64 @@ json ResultRows::at(size_t row, TimestampEncoding timestamps) const {
   return json{{"f", std::move(cells)}};
 }
 
+namespace {
+
+// The value of `column` in row `row` of `chunks`, as `read` reads it from the column's vector, or
+// nullopt for NULL. The column's type must be `type`.
+template <typename T, typename F>
+std::optional<T> ReadValue(const ResultChunks& chunks, size_t row, size_t column, duckdb_type type,
+                           const F& read) {
+  if (row >= chunks.row_count() || column >= chunks.column_count()) {
+    throw std::out_of_range("Query result value is out of range");
+  }
+  if (duckdb_get_type_id(chunks.type(column)) != type) {
+    throw BackendError("Query result column " + std::to_string(column) + " has DuckDB type " +
+                       std::to_string(duckdb_get_type_id(chunks.type(column))) + ", not " +
+                       std::to_string(type));
+  }
+  std::optional<T> value;
+  chunks.Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
+    duckdb_vector vector = duckdb_data_chunk_get_vector(chunk, column);
+    uint64_t* validity = duckdb_vector_get_validity(vector);
+    if (validity == nullptr || duckdb_validity_row_is_valid(validity, index)) {
+      value = read(vector, index);
+    }
+  });
+  return value;
+}
+
+// The value of `column` in row `row`, which must not be NULL.
+template <typename T>
+T NotNull(std::optional<T> value, size_t row, size_t column) {
+  if (!value.has_value()) {
+    throw BackendError("Query result column " + std::to_string(column) + " is NULL in row " +
+                       std::to_string(row));
+  }
+  return *std::move(value);
+}
+
+}  // namespace
+
+std::optional<std::string> ResultRows::OptionalString(size_t row, size_t column) const {
+  if (!chunks_) {
+    throw std::out_of_range("Query result value is out of range");
+  }
+  return ReadValue<std::string>(*chunks_, row, column, DUCKDB_TYPE_VARCHAR, VectorString);
+}
+
+std::string ResultRows::String(size_t row, size_t column) const {
+  return NotNull(OptionalString(row, column), row, column);
+}
+
+int64_t ResultRows::Int64(size_t row, size_t column) const {
+  if (!chunks_) {
+    throw std::out_of_range("Query result value is out of range");
+  }
+  return NotNull(
+      ReadValue<int64_t>(*chunks_, row, column, DUCKDB_TYPE_BIGINT, VectorElement<int64_t>), row,
+      column);
+}
+
 json QueryResult::SchemaToJson() const {
   std::vector<FieldSchema> given = schema;
   SetModesGiven(given);

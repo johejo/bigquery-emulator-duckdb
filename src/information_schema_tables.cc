@@ -71,7 +71,7 @@ std::string PartitionId(const TableMetadata& metadata) {
            " THEN '__UNPARTITIONED__' ELSE CAST(" + start + " + (" + column + " - " + start +
            ") // " + interval + " * " + interval + " AS VARCHAR) END";
   }
-  return "NULL";
+  return "CAST(NULL AS VARCHAR)";
 }
 
 // Appends a COLUMN_FIELD_PATHS row for `field` and for each field nested in it. The fields of

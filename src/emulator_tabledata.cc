@@ -75,7 +75,7 @@ std::vector<InsertError> Emulator::WriteStorageRows(TableReference table,
                                      "{} AND schema_name = {} AND table_name = {}",
                                      QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id),
                                      QuoteLiteral(table.table_id)));
-    if (identity.rows.empty() || std::stoll(FirstColumnStrings(identity).at(0)) != storage_id) {
+    if (identity.rows.empty() || identity.rows.Int64(0, 0) != storage_id) {
       throw ApiError::NotFound("The Storage Write destination table was dropped or replaced");
     }
     CheckWritableTable(*session, table);

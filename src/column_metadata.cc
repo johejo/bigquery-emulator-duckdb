@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <format>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -70,14 +71,14 @@ bool NumericStorageMismatch(const FieldSchema& recorded, const FieldSchema& stor
 
 }  // namespace
 
-std::vector<FieldSchema> ApplyColumnComments(std::vector<FieldSchema> derived,
-                                             const std::vector<json>& comments) {
+std::vector<FieldSchema> ApplyColumnComments(
+    std::vector<FieldSchema> derived, const std::vector<std::optional<std::string>>& comments) {
   for (size_t i = 0; i < derived.size() && i < comments.size(); ++i) {
-    if (!comments.at(i).is_string()) {
+    const std::optional<std::string>& comment = comments.at(i);
+    if (!comment.has_value()) {
       continue;
     }
-    const json value =
-        json::parse(comments.at(i).get<std::string>(), nullptr, /*allow_exceptions=*/false);
+    const json value = json::parse(*comment, nullptr, /*allow_exceptions=*/false);
     if (!value.is_object()) {
       continue;
     }

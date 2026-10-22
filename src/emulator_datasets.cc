@@ -1,8 +1,8 @@
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
@@ -15,8 +15,6 @@
 
 namespace bigquery_emulator_duckdb {
 
-using nlohmann::json;
-
 std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
   project_id = ResolveProject(project_id);
   return FirstColumnStrings(Execute(DatasetsQuery(project_id)));
@@ -25,12 +23,12 @@ std::vector<std::string> Emulator::ListDatasets(std::string project_id) {
 std::vector<DatasetListEntry> Emulator::ListDatasetEntries(std::string project_id) {
   project_id = ResolveProject(project_id);
   std::vector<DatasetListEntry> entries;
-  for (const json& row : Execute(DatasetEntriesQuery(project_id)).rows) {
-    // Keep the wire-field decoding beside the named result fields.
-    // cppcheck-suppress useStlAlgorithm
+  const QueryResult result = Execute(DatasetEntriesQuery(project_id));
+  entries.reserve(result.rows.size());
+  for (size_t row = 0; row < result.rows.size(); ++row) {
     entries.push_back({
-        .dataset_id = row["f"][0]["v"].get<std::string>(),
-        .metadata = ParseDatasetMetadata(row["f"][1]["v"]),
+        .dataset_id = result.rows.String(row, 0),
+        .metadata = ParseDatasetMetadata(result.rows.OptionalString(row, 1)),
     });
   }
   return entries;
@@ -42,7 +40,7 @@ DatasetMetadata Emulator::GetDataset(DatasetReference dataset) {
   if (result.rows.empty()) {
     throw ApiError::NotFound("Not found: Dataset " + dataset.project_id + ":" + dataset.dataset_id);
   }
-  return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+  return ParseDatasetMetadata(result.rows.OptionalString(0, 1));
 }
 
 void Emulator::CreateDataset(DatasetReference dataset, const DatasetMetadata& metadata) {

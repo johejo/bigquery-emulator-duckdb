@@ -1,9 +1,7 @@
 #include "src/duckdb_table_source.h"
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -15,7 +13,6 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "nlohmann/json.hpp"
 #include "src/backend.h"
 #include "src/backend_error.h"
 #include "src/duckdb_catalog.h"
@@ -33,8 +30,6 @@
 #include "src/table_source.h"
 
 namespace bigquery_emulator_duckdb {
-
-using nlohmann::json;
 
 namespace {
 
@@ -86,8 +81,7 @@ class DuckDbTableSource : public TableSource {
   }
 
   absl::StatusOr<std::string> TimeTravelQuery(const TableReference& table, int64_t time) override {
-    const std::optional<json> comment =
-        RelationComment(backend_, "duckdb_tables()", "table_name", table);
+    const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", table);
     if (!comment.has_value() || !project_ids_.contains(table.project_id)) {
       return absl::UnimplementedError("FOR SYSTEM_TIME AS OF a temporary table");
     }
@@ -103,8 +97,7 @@ class DuckDbTableSource : public TableSource {
       return std::nullopt;
     }
     try {
-      const std::optional<json> comment =
-          RelationComment(backend_, "duckdb_tables()", "table_name", reference);
+      const auto comment = RelationComment(backend_, "duckdb_tables()", "table_name", reference);
       if (!comment.has_value()) {
         return std::nullopt;
       }
@@ -128,7 +121,7 @@ class DuckDbTableSource : public TableSource {
     if (result.rows.empty()) {
       return std::nullopt;
     }
-    DatasetMetadata metadata = ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]);
+    DatasetMetadata metadata = ParseDatasetMetadata(result.rows.OptionalString(0, 1));
     Use(project, dataset);
     return metadata;
   }
@@ -193,19 +186,15 @@ class DuckDbTableSource : public TableSource {
     }
     std::vector<std::pair<std::optional<std::string>, int64_t>> counts;
     counts.reserve(result.rows.size());
-    std::ranges::transform(result.rows, std::back_inserter(counts), [](const json& row) {
-      const json& value = row["f"][0]["v"];
-      return std::pair{
-          value.is_null() ? std::nullopt : std::optional(value.get<std::string>()),
-          std::stoll(row["f"][1]["v"].get<std::string>()),
-      };
-    });
+    for (size_t row = 0; row < result.rows.size(); ++row) {
+      counts.emplace_back(result.rows.OptionalString(row, 0), result.rows.Int64(row, 1));
+    }
     return counts;
   }
 
   std::optional<ViewDescription> FindView(const std::string& project, const std::string& dataset,
                                           const std::string& table) override {
-    const std::optional<json> comment = ViewComment(
+    const auto comment = ViewComment(
         backend_, TableReference{.project_id = project, .dataset_id = dataset, .table_id = table});
     if (!comment.has_value()) {
       return std::nullopt;
@@ -225,14 +214,15 @@ class DuckDbTableSource : public TableSource {
     if (IsDuckDbSchema(dataset.dataset_id)) {
       return routines;
     }
-    for (const json& row : backend_.Execute(RoutinesQuery(dataset)).rows) {
+    const QueryResult result = backend_.Execute(RoutinesQuery(dataset));
+    for (size_t row = 0; row < result.rows.size(); ++row) {
       if (auto routine = ParseRoutineComment(
               {
                   .project_id = dataset.project_id,
                   .dataset_id = dataset.dataset_id,
-                  .routine_id = row["f"][0]["v"].get<std::string>(),
+                  .routine_id = result.rows.String(row, 0),
               },
-              row["f"][1]["v"])) {
+              result.rows.OptionalString(row, 1))) {
         routines.push_back(*std::move(routine));
       }
     }
@@ -247,7 +237,7 @@ class DuckDbTableSource : public TableSource {
     if (result.rows.empty()) {
       return std::nullopt;
     }
-    std::optional<Routine> found = ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+    std::optional<Routine> found = ParseRoutineComment(routine, result.rows.OptionalString(0, 0));
     Use(routine.project_id, routine.dataset_id);
     return found;
   }

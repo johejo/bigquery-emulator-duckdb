@@ -1,10 +1,9 @@
 #include "src/duckdb_catalog.h"
 
-#include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <format>
-#include <iterator>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -30,8 +29,9 @@ using nlohmann::json;
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
   values.reserve(result.rows.size());
-  std::ranges::transform(result.rows, std::back_inserter(values),
-                         [](const json& row) { return row["f"][0]["v"].get<std::string>(); });
+  for (size_t row = 0; row < result.rows.size(); ++row) {
+    values.push_back(result.rows.String(row, 0));
+  }
   return values;
 }
 
@@ -62,11 +62,11 @@ std::string DatasetEntriesQuery(const std::string& project,
       dataset.has_value() ? " AND schema_name = " + QuoteLiteral(*dataset) : "");
 }
 
-DatasetMetadata ParseDatasetMetadata(const json& recorded) {
-  if (!recorded.is_string()) {
+DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded) {
+  if (!recorded.has_value()) {
     return {};
   }
-  const json object = json::parse(recorded.get<std::string>());
+  const json object = json::parse(*recorded);
   DatasetMetadata metadata = DatasetMetadataFromJson(object);
   if (object.contains("creationTime") && object["creationTime"].is_string()) {
     metadata.creation_time = std::stoll(object["creationTime"].get<std::string>());
@@ -102,18 +102,18 @@ void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
   const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
                           .count();
-  for (const json& row : relations.rows) {
-    const json& comment = row["f"][3]["v"];
+  for (size_t row = 0; row < relations.rows.size(); ++row) {
+    const std::string comment = relations.rows.String(row, 3);
     const auto expiration = CommentMetadata(comment).expiration_time;
     if (!expiration.has_value() || *expiration > now) {
       continue;
     }
     const TableReference table{
-        .project_id = row["f"][0]["v"].get<std::string>(),
-        .dataset_id = row["f"][1]["v"].get<std::string>(),
-        .table_id = row["f"][2]["v"].get<std::string>(),
+        .project_id = relations.rows.String(row, 0),
+        .dataset_id = relations.rows.String(row, 1),
+        .table_id = relations.rows.String(row, 2),
     };
-    const bool view = row["f"][4]["v"] == "VIEW";
+    const bool view = relations.rows.String(row, 4) == "VIEW";
     // Recheck the comment in the drop's transaction: a concurrent update may have extended
     // the expiration, or another request may have replaced the table since the sweep.
     const std::string skip = std::format(
@@ -121,7 +121,7 @@ void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
         " AND schema_name = {} AND {} = {} AND comment = {})",
         view ? "duckdb_views()" : "duckdb_tables()", QuoteLiteral(table.project_id),
         QuoteLiteral(table.dataset_id), view ? "view_name" : "table_name",
-        QuoteLiteral(table.table_id), QuoteLiteral(comment.get<std::string>()));
+        QuoteLiteral(table.table_id), QuoteLiteral(comment));
     std::scoped_lock const lock(expiration_mutex);
     backend.ExecuteDdl(
         std::string(view ? "DROP VIEW IF EXISTS " : "DROP TABLE IF EXISTS ") + QualifiedName(table),
@@ -130,10 +130,12 @@ void ExpireTables(Backend& backend, std::recursive_mutex& expiration_mutex,
 }
 
 // The comment of `table` in `relations`, duckdb_tables() or duckdb_views(), whose `name` column
-// names it. The comment is NULL when it has none, and nothing is returned when there is no such
+// names it. The comment is nullopt when it has none, and nothing is returned when there is no such
 // table or view.
-std::optional<json> RelationComment(Backend& backend, std::string_view relations,
-                                    std::string_view name, const TableReference& table) {
+std::optional<std::optional<std::string>> RelationComment(Backend& backend,
+                                                          std::string_view relations,
+                                                          std::string_view name,
+                                                          const TableReference& table) {
   const QueryResult result = backend.Execute(std::format(
       "SELECT comment FROM {} WHERE database_name = {} AND schema_name = {} AND {} = {}", relations,
       QuoteLiteral(table.project_id), QuoteLiteral(table.dataset_id), name,
@@ -141,10 +143,11 @@ std::optional<json> RelationComment(Backend& backend, std::string_view relations
   if (result.rows.empty()) {
     return std::nullopt;
   }
-  return result.rows.at(0)["f"][0]["v"];
+  return result.rows.OptionalString(0, 0);
 }
 
-std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
+std::optional<std::optional<std::string>> ViewComment(Backend& backend,
+                                                      const TableReference& table) {
   return RelationComment(backend, "duckdb_views()", "view_name", table);
 }
 
@@ -154,17 +157,19 @@ std::optional<json> ViewComment(Backend& backend, const TableReference& table) {
 // support.
 std::vector<FieldSchema> TableSchema(Backend& backend, const TableReference& table) {
   // Reading a view's schema must not require its execution identity to be configured.
-  if (const std::optional<json> comment = ViewComment(backend, table); comment.has_value()) {
+  if (const auto comment = ViewComment(backend, table); comment.has_value()) {
     if (const std::optional<ViewMetadata> metadata = ParseViewMetadata(*comment);
         metadata.has_value()) {
       return metadata->schema;
     }
   }
   std::vector<FieldSchema> schema = backend.Prepare("SELECT * FROM " + QualifiedName(table)).schema;
-  std::vector<json> comments;
-  std::ranges::transform(backend.Execute(ColumnCommentsQuery(table)).rows,
-                         std::back_inserter(comments),
-                         [](const json& row) { return row["f"][0]["v"]; });
+  const QueryResult columns = backend.Execute(ColumnCommentsQuery(table));
+  std::vector<std::optional<std::string>> comments;
+  comments.reserve(columns.rows.size());
+  for (size_t row = 0; row < columns.rows.size(); ++row) {
+    comments.push_back(columns.rows.OptionalString(row, 0));
+  }
   schema = ApplyColumnComments(std::move(schema), comments);
   if (const std::optional<std::string> error = backend.UnreadableColumnError(QualifiedName(table));
       error.has_value()) {
@@ -201,7 +206,7 @@ std::optional<std::string> LocationOf(Backend& backend, const DatasetReference& 
   if (result.rows.empty()) {
     return std::nullopt;
   }
-  return ParseDatasetMetadata(result.rows.at(0)["f"][1]["v"]).Location();
+  return ParseDatasetMetadata(result.rows.OptionalString(0, 1)).Location();
 }
 
 }  // namespace bigquery_emulator_duckdb

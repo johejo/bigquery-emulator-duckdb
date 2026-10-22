@@ -381,7 +381,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
     const QueryResult result =
         WriteDestination(job.project_id, load.destination_table, load.create_disposition,
                          load.write_disposition, sql, written, {}, true);
-    job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job.output_rows = result.rows.Int64(0, 0);
     job.result = QueryResult{};
   });
 }
@@ -497,7 +497,7 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         WriteDestination(job.project_id, copy.destination_table, copy.create_disposition,
                          copy.write_disposition, sql, schema, {}, true, metadata, /*copy=*/true,
                          /*restore=*/copy.operation == CopyOperation::kRestore);
-    job.output_rows = std::stoll(result.rows.at(0).at("f").at(0).at("v").get<std::string>());
+    job.output_rows = result.rows.Int64(0, 0);
     job.result = QueryResult{};
   });
 }

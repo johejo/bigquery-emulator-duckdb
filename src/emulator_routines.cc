@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <optional>
@@ -85,13 +86,15 @@ std::vector<Routine> Emulator::ListRoutines(DatasetReference dataset) {
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   std::vector<Routine> routines;
-  for (const json& row : Execute(RoutinesQuery(dataset)).rows) {
+  const QueryResult result = Execute(RoutinesQuery(dataset));
+  for (size_t row = 0; row < result.rows.size(); ++row) {
     const RoutineReference reference{
         .project_id = dataset.project_id,
         .dataset_id = dataset.dataset_id,
-        .routine_id = row["f"][0]["v"].get<std::string>(),
+        .routine_id = result.rows.String(row, 0),
     };
-    if (std::optional<Routine> routine = ParseRoutineComment(reference, row["f"][1]["v"])) {
+    if (std::optional<Routine> routine =
+            ParseRoutineComment(reference, result.rows.OptionalString(row, 1))) {
       routines.push_back(*std::move(routine));
     }
   }
@@ -102,9 +105,9 @@ Routine Emulator::GetRoutine(RoutineReference routine) {
   routine.project_id = ResolveProject(routine.project_id);
   GetDataset(DatasetReference{.project_id = routine.project_id, .dataset_id = routine.dataset_id});
   const QueryResult result = Execute(RoutineQuery(routine));
-  std::optional<Routine> found = result.rows.empty()
-                                     ? std::nullopt
-                                     : ParseRoutineComment(routine, result.rows.at(0)["f"][0]["v"]);
+  std::optional<Routine> found =
+      result.rows.empty() ? std::nullopt
+                          : ParseRoutineComment(routine, result.rows.OptionalString(0, 0));
   if (!found.has_value()) {
     throw ApiError::NotFound("Not found: Routine " + routine.project_id + ":" + routine.dataset_id +
                              "." + routine.routine_id);

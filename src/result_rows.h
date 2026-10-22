@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <iterator>
 #include <memory>
+#include <optional>
+#include <string>
 
 #include "nlohmann/json.hpp"
 
@@ -52,6 +54,13 @@ class ResultRows {
   // Encodes row `row`; throws std::out_of_range past the last one.
   [[nodiscard]] nlohmann::json at(size_t row,
                                   TimestampEncoding timestamps = TimestampEncoding::kMicros) const;
+  // The value of `column` in row `row`, read from its vector without encoding the row: String
+  // and OptionalString read a VARCHAR and Int64 a BIGINT. OptionalString returns nullopt for
+  // NULL, where the others throw BackendError, as they do for a column of another type. Each
+  // throws std::out_of_range past the last row or column.
+  [[nodiscard]] std::string String(size_t row, size_t column) const;
+  [[nodiscard]] std::optional<std::string> OptionalString(size_t row, size_t column) const;
+  [[nodiscard]] int64_t Int64(size_t row, size_t column) const;
   [[nodiscard]] Iterator begin() const { return {this, 0}; }
   [[nodiscard]] Iterator end() const { return {this, size()}; }
 

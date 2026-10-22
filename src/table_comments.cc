@@ -18,11 +18,11 @@ namespace {
 using nlohmann::json;
 
 // The JSON object a comment holds, or null for a comment the emulator did not write.
-json ParseComment(const json& comment) {
-  if (!comment.is_string()) {
+json ParseComment(const std::optional<std::string>& comment) {
+  if (!comment.has_value()) {
     return nullptr;
   }
-  json parsed = json::parse(comment.get<std::string>(), nullptr, /*allow_exceptions=*/false);
+  json parsed = json::parse(*comment, nullptr, /*allow_exceptions=*/false);
   return parsed.is_object() ? parsed : json(nullptr);
 }
 
@@ -48,7 +48,7 @@ std::optional<BaseTableDefinition> ParseBaseTableDefinition(const json& definiti
 
 }  // namespace
 
-TableMetadata CommentMetadata(const json& comment) {
+TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   const json object = ParseComment(comment);
   if (object.is_null()) {
     return {};
@@ -95,7 +95,7 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
                      QuoteLiteral(comment.dump()));
 }
 
-std::optional<ViewMetadata> ParseViewMetadata(const json& comment) {
+std::optional<ViewMetadata> ParseViewMetadata(const std::optional<std::string>& comment) {
   const json metadata = ParseComment(comment);
   if (!metadata.is_object() || !metadata.contains("query") || !metadata["query"].is_string() ||
       !metadata.contains("fields") || !metadata["fields"].is_array()) {
