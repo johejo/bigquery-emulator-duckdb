@@ -98,6 +98,8 @@ const char* TableTypeName(TableType type) {
       return "SNAPSHOT";
     case TableType::kView:
       return "VIEW";
+    case TableType::kMaterializedView:
+      return "MATERIALIZED_VIEW";
   }
   return "TABLE";
 }
@@ -478,7 +480,8 @@ json DatasetList(const std::string& project_id, const std::vector<DatasetListEnt
 }
 
 json TableResource(const TableInfo& info) {
-  const TableType type = info.view_query                      ? TableType::kView
+  const TableType type = info.materialized                    ? TableType::kMaterializedView
+                         : info.view_query                    ? TableType::kView
                          : info.metadata.snapshot.has_value() ? TableType::kSnapshot
                                                               : TableType::kTable;
   json resource{
@@ -494,9 +497,20 @@ json TableResource(const TableInfo& info) {
   };
   resource.update(info.metadata.ToJson());
   if (info.view_query) {
-    resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
-    resource.erase("numRows");
-    resource.erase("numBytes");
+    if (info.materialized) {
+      resource["materializedView"] = {
+          {"query", *info.view_query},
+          {"enableRefresh", true},
+          {"refreshIntervalMs", "1800000"},
+      };
+      resource["materializedViewStatus"] = json::object();
+    } else {
+      resource["view"] = {{"query", *info.view_query}, {"useLegacySql", false}};
+    }
+    if (!info.materialized) {
+      resource.erase("numRows");
+      resource.erase("numBytes");
+    }
   }
   return resource;
 }

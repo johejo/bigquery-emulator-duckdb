@@ -56,8 +56,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     return CreateTableAsSelect(*statement.GetAs<googlesql::ResolvedCreateTableAsSelectStmt>(),
                                scope);
   }
-  if (statement.Is<googlesql::ResolvedCreateViewStmt>()) {
-    return CreateView(*statement.GetAs<googlesql::ResolvedCreateViewStmt>(), scope);
+  if (statement.Is<googlesql::ResolvedCreateViewStmt>() ||
+      statement.Is<googlesql::ResolvedCreateMaterializedViewStmt>()) {
+    return CreateView(*statement.GetAs<googlesql::ResolvedCreateViewBase>(), scope);
   }
   if (statement.Is<googlesql::ResolvedCreateSchemaStmt>()) {
     return CreateSchema(*statement.GetAs<googlesql::ResolvedCreateSchemaStmt>(), scope);
@@ -67,6 +68,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return Drop(*statement.GetAs<googlesql::ResolvedDropStmt>(), scope);
+  }
+  if (statement.Is<googlesql::ResolvedDropMaterializedViewStmt>()) {
+    return DropMaterializedView(*statement.GetAs<googlesql::ResolvedDropMaterializedViewStmt>(),
+                                scope);
   }
   if (statement.Is<googlesql::ResolvedDropSnapshotTableStmt>()) {
     return DropSnapshotTable(*statement.GetAs<googlesql::ResolvedDropSnapshotTableStmt>(), scope);
@@ -164,6 +169,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   if (statement.Is<googlesql::ResolvedAlterSchemaStmt>()) {
     return "ALTER_SCHEMA";
   }
+  if (statement.Is<googlesql::ResolvedCreateMaterializedViewStmt>()) {
+    return "CREATE_MATERIALIZED_VIEW";
+  }
   if (statement.Is<googlesql::ResolvedCreateViewStmt>()) {
     return "CREATE_VIEW";
   }
@@ -172,6 +180,9 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
     return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+  }
+  if (statement.Is<googlesql::ResolvedDropMaterializedViewStmt>()) {
+    return "DROP_MATERIALIZED_VIEW";
   }
   if (statement.Is<googlesql::ResolvedDropSnapshotTableStmt>()) {
     return "DROP_SNAPSHOT_TABLE";

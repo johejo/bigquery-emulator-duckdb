@@ -6,8 +6,10 @@
 
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
+#include "src/catalog_table.h"
 #include "src/duckdb_sql.h"
 #include "src/references.h"
+#include "src/table_metadata.h"
 #include "src/table_path.h"
 #include "src/translated_statement.h"
 #include "src/translator/context.h"
@@ -37,8 +39,19 @@ bool ReadsTemporaryTable(const googlesql::ResolvedScan& query, const Scope& scop
 
 }  // namespace
 
-std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& create,
+std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewBase& create,
                                       const Scope& scope) {
+  const bool materialized = create.Is<googlesql::ResolvedCreateMaterializedViewStmt>();
+  if (materialized) {
+    const auto& mv = *create.GetAs<googlesql::ResolvedCreateMaterializedViewStmt>();
+    if (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE ||
+        !mv.partition_by_list().empty() || !mv.cluster_by_list().empty() ||
+        mv.replica_source() != nullptr || create.has_explicit_columns()) {
+      return Unsupported(
+          scope,
+          "materialized view replacement, partitioning, clustering, replicas or explicit columns");
+    }
+  }
   if (create.create_scope() != googlesql::ResolvedCreateStatement::CREATE_DEFAULT_SCOPE ||
       create.recursive() || create.is_value_table()) {
     return Unsupported(scope, "temporary, recursive or value-table views");
@@ -56,9 +69,12 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
   }
   const auto path = TargetTable(create.name_path(), scope, true);
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
+  scope.context.statement.replaces =
+      create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_OR_REPLACE;
   scope.context.defines_view = true;
   const auto relation = Scan(*create.query(), scope);
-  auto metadata = OptionsMetadata(create.option_list(), "CREATE VIEW", scope);
+  auto metadata = OptionsMetadata(create.option_list(),
+                                  materialized ? "CREATE MATERIALIZED VIEW" : "CREATE VIEW", scope);
   if (!path || !target || !relation || !metadata) {
     return std::nullopt;
   }
@@ -68,7 +84,26 @@ std::optional<std::string> CreateView(const googlesql::ResolvedCreateViewStmt& c
       .metadata = *std::move(metadata),
       .if_not_exists =
           (create.create_mode() == googlesql::ResolvedCreateStatement::CREATE_IF_NOT_EXISTS),
+      .materialized = materialized,
   };
+  if (materialized) {
+    std::vector<const googlesql::ResolvedNode*> tables;
+    create.query()->GetDescendantsWithKinds({googlesql::RESOLVED_TABLE_SCAN}, &tables);
+    if (tables.size() != 1) {
+      return Unsupported(scope, "materialized view base table");
+    }
+    const auto* table = dynamic_cast<const BigQueryTable*>(
+        tables.front()->GetAs<googlesql::ResolvedTableScan>()->table());
+    const auto description = table != nullptr ? table->Describe() : std::nullopt;
+    if (!description || description->metadata.creation_time == 0 ||
+        description->metadata.snapshot) {
+      return Unsupported(scope, "materialized views over unmanaged tables or snapshots");
+    }
+    view.materialized_source = MaterializedViewSource{
+        .table = table->reference(),
+        .creation_time = description->metadata.creation_time,
+    };
+  }
   std::vector<std::string> projections;
   for (const auto& output : create.output_column_list()) {
     const auto column = relation->columns.find(output->column().column_id());

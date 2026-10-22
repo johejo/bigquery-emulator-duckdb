@@ -264,6 +264,16 @@ absl::Status RoutineCatalog::FindTable(const absl::Span<const std::string>& path
   if (!view || view->query.empty()) {
     return absl::OkStatus();
   }
+  if (view->materialized_source) {
+    const auto& base = *view->materialized_source;
+    const auto current =
+        source().DescribeTable(base.table.project_id, base.table.dataset_id, base.table.table_id);
+    if (!current || current->metadata.creation_time != base.creation_time) {
+      return absl::InvalidArgumentError(
+          "The base table of materialized view " + stored->FullName() +
+          " was deleted or recreated; recreate the materialized view");
+    }
+  }
   auto analyzed = AnalyzeDefinition(view->query, key, reference.project_id, reference.dataset_id);
   if (!analyzed.ok()) {
     return absl::InvalidArgumentError(std::string(analyzed.status().message()) +

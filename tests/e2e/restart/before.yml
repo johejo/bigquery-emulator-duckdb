@@ -29,6 +29,15 @@ steps:
               useLegacySql: false
     test: current.res.status == 200
   # A domain-scoped project id is escaped into the file name.
+  materialized_view:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: CREATE MATERIALIZED VIEW persist.mv AS SELECT COUNT(*) AS n FROM persist.t
+              useLegacySql: false
+    test: current.res.status == 200
   scoped_dataset:
     req:
       /projects/example.com:proj/datasets:

@@ -1,5 +1,6 @@
 #include "src/table_comments.h"
 
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <string>
@@ -81,6 +82,9 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
     throw ApiError::Unsupported("requirePartitionFilter on views");
   }
   if (view.metadata.partitioned() || !view.metadata.clustering.empty()) {
+    if (view.materialized) {
+      throw ApiError::Unsupported("partitioning or clustering of materialized views");
+    }
     throw ApiError::Invalid("A view cannot be partitioned or clustered");
   }
   // A view has no columns of its own to give a default rounding mode, and what BigQuery does with
@@ -89,6 +93,18 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
     throw ApiError::Unsupported("defaultRoundingMode on views");
   }
   json comment = view.metadata.ToJson();
+  if (view.materialized) {
+    comment["materialized"] = true;
+    if (view.materialized_source) {
+      const auto& source = *view.materialized_source;
+      comment["materializedSource"] = {
+          {"projectId", source.table.project_id},
+          {"datasetId", source.table.dataset_id},
+          {"tableId", source.table.table_id},
+          {"creationTime", source.creation_time},
+      };
+    }
+  }
   comment["query"] = view.query;
   comment["fields"] = SchemaToJson(view.schema).at("fields");
   return std::format("COMMENT ON VIEW {} IS {}", QualifiedName(table),
@@ -105,8 +121,21 @@ std::optional<ViewMetadata> ParseViewMetadata(const std::optional<std::string>& 
       .query = metadata["query"].get<std::string>(),
       .schema = {},
       .metadata = CommentMetadata(comment),
+      .materialized = metadata.value("materialized", false),
   };
   try {
+    if (view.materialized && metadata.contains("materializedSource")) {
+      const auto& source = metadata["materializedSource"];
+      view.materialized_source = MaterializedViewSource{
+          .table =
+              {
+                  .project_id = source.at("projectId").get<std::string>(),
+                  .dataset_id = source.at("datasetId").get<std::string>(),
+                  .table_id = source.at("tableId").get<std::string>(),
+              },
+          .creation_time = source.at("creationTime").get<int64_t>(),
+      };
+    }
     for (const json& field : metadata["fields"]) {
       view.schema.push_back(FieldSchemaFromJson(field));
     }

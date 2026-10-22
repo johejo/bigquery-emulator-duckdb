@@ -30,6 +30,8 @@ struct ViewDefinition {
   std::vector<FieldSchema> schema = {};
   TableMetadata metadata;
   bool if_not_exists = false;
+  bool materialized = false;
+  std::optional<MaterializedViewSource> materialized_source = {};
 };
 
 // The table a CREATE TABLE [AS SELECT] defines, whose BigQuery schema the emulator records with
@@ -155,7 +157,7 @@ struct TranslatedStatement {
   std::optional<RoutineReference> ddl_target_routine;
   // The table whose rows a DML statement or TRUNCATE TABLE changes.
   std::optional<TableReference> written_table;
-  // Whether a CREATE OR REPLACE TABLE replaces the table its target names, if there is one.
+  // Whether CREATE OR REPLACE replaces the relation its target names, if there is one.
   bool replaces = false;
   // What the emulator records besides DuckDB's own catalog, at most one of which is set.
   std::optional<TableDefinition> table;

@@ -383,7 +383,7 @@ void CheckMerge(const googlesql::ResolvedMergeStmt& merge) {
 }  // namespace
 
 void CheckPartitionFilters(const googlesql::ResolvedStatement& statement) {
-  if (statement.Is<googlesql::ResolvedCreateViewStmt>() ||
+  if (statement.Is<googlesql::ResolvedCreateViewBase>() ||
       statement.Is<googlesql::ResolvedCreateFunctionStmt>() ||
       statement.Is<googlesql::ResolvedCreateTableFunctionStmt>() ||
       statement.Is<googlesql::ResolvedCreateProcedureStmt>() ||

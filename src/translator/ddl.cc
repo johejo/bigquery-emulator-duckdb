@@ -35,6 +35,15 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
   }
 }
 
+std::optional<std::string> DropMaterializedView(
+    const googlesql::ResolvedDropMaterializedViewStmt& drop, const Scope& scope) {
+  const auto path = TargetTable(drop.name_path(), scope);
+  if (!path) {
+    return std::nullopt;
+  }
+  return "DROP VIEW " + std::string(drop.is_if_exists() ? "IF EXISTS " : "") + *path;
+}
+
 // A table snapshot is a DuckDB table; DROP SNAPSHOT TABLE drops only snapshots, which the
 // emulator checks when it runs.
 std::optional<std::string> DropSnapshotTable(const googlesql::ResolvedDropSnapshotTableStmt& drop,

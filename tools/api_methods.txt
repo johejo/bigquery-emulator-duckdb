@@ -132,7 +132,9 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC", "precision": "10", "scale": "1", "roundingMode": "ROUND_HALF_EVEN", "defaultValueExpression": "1"}]}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "NUMERIC"}]}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
-note bigquery.tables.insert | See [Tables](compatibility.md#tables).
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t"}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t","enableRefresh":false}}
+note bigquery.tables.insert | See [Tables](compatibility.md#tables) and [Materialized views](compatibility.md#materialized-views).
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"expirationTime": "1893456000000"}

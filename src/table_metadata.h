@@ -83,11 +83,20 @@ struct TableDescription {
   TableMetadata metadata;
 };
 
+// The identity of the base table of a materialized view. Recreating the table does not
+// repair the materialized view; its original creation time must still match.
+struct MaterializedViewSource {
+  TableReference table;
+  int64_t creation_time = 0;
+};
+
 // A view as INFORMATION_SCHEMA describes it: its GoogleSQL query, empty when it is unknown, and
 // its metadata.
 struct ViewDescription {
   std::string query;
   TableMetadata metadata;
+  bool materialized = false;
+  std::optional<MaterializedViewSource> materialized_source = {};
 };
 
 // What a dataset carries besides its reference: Dataset.description, friendlyName and labels,

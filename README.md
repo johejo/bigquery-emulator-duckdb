@@ -181,7 +181,7 @@ just run --project='{"projectId":"test"}' \
 By default all data lives in memory and is lost when the server exits. With `--data-dir DIR`,
 each project is stored in `DIR/<project>.duckdb` (characters outside `[A-Za-z0-9_-]` are
 percent-encoded, so `example.com:proj` becomes `example%2Ecom%3Aproj.duckdb`) and its registration,
-datasets, tables and logical views survive restarts. Jobs and Storage session/stream state remain
+datasets, tables, logical views and materialized views survive restarts. Jobs and Storage session/stream state remain
 in memory only.
 
 On SIGINT or SIGTERM the server shuts down cleanly and checkpoints every project file. A
@@ -230,6 +230,9 @@ These tables check execution, not agreement with BigQuery's results or metadata.
 
 Unsupported behavior is rejected, with these deliberate exceptions:
 
+- Materialized views compute current results on every read. Background refresh state is not
+  simulated, and their stored row and byte counts are always zero. See
+  [Materialized views](docs/compatibility.md#materialized-views) for the supported forms.
 - `TABLESAMPLE SYSTEM` samples DuckDB vectors of 2048 rows rather than BigQuery storage blocks.
 - `SESSION_USER()` returns the configured `--session-user` identity, rather than an authenticated
   caller.

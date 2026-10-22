@@ -48,6 +48,9 @@ QueryResult Emulator::ListTableData(TableReference table, int64_t start_index, i
                                     std::string_view selected_fields) {
   table.project_id = ResolveProject(table.project_id);
   const TableInfo info = GetTable(table);
+  if (info.materialized) {
+    throw ApiError::Invalid("Cannot list a table of type MATERIALIZED_VIEW.");
+  }
   if (info.view_query) {
     throw ApiError::Invalid("Cannot read a view with tabledata.list; use a query instead");
   }
