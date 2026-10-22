@@ -222,6 +222,7 @@ What the emulator supports is listed in generated pages:
 - [docs/api.md](docs/api.md): REST API methods
 - [docs/storage.md](docs/storage.md): Storage v1 gRPC methods
 - [docs/sql.md](docs/sql.md): statements and clauses
+- [docs/options.md](docs/options.md): DDL options
 - [docs/functions.md](docs/functions.md): built-in functions
 
 These tables check execution, not agreement with BigQuery's results or metadata.

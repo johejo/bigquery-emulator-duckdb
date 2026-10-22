@@ -8,6 +8,7 @@ require (
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/creack/pty v1.1.24
 	github.com/linkedin/goavro/v2 v2.14.1
+	golang.org/x/net v0.59.0
 	google.golang.org/api v0.299.0
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
@@ -46,7 +47,6 @@ require (
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect

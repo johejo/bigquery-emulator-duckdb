@@ -1342,3 +1342,26 @@ cc_library(
         "@googlesql//googlesql/public/types",
     ],
 )
+
+cc_test(
+    name = "ddl_options_catalog_test",
+    srcs = ["tests/ddl_options_catalog_test.cc"],
+    copts = ["-std=c++20"],
+    data = ["tools/ddl_options.json"],
+    linkstatic = True,
+    deps = [
+        ":analyzer",
+        ":catalog",
+        ":ddl_option_types",
+        ":field_schema",
+        ":table_source",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:analyzer_output",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public/types",
+        "@nlohmann_json//:json",
+    ],
+)
