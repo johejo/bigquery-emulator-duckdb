@@ -1174,7 +1174,10 @@ cc_test(
         # no statement name, which no known error can list, and run the rest in UTC instead.
         # match_recognize_in_sql_functions fails to prepare a function that uses MATCH_RECOGNIZE,
         # which the emulator's language options leave out.
+        # Temporarily skip TestDeepArray: DuckDB v2 copies nested list lambda expressions,
+        # reaching about 36 GiB at depth 10. Restore it when that memory regression is fixed.
         "--gtest_filter=-Test*DotProduct/*:TestsManhattanDistance/*:TestsL1Norm/*:TestsL2Norm/*:" +
+        "ComplianceCodebasedTests.TestDeepArray:" +
         "TestDepthLimitDetectorTestCases/*:" +
         "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/cast_timestamp_with_timezone_test:" +
         "FilebasedTest/ComplianceFilebasedTests.FilebasedTest/default_timezone_ist_test:" +
