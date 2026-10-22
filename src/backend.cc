@@ -96,6 +96,34 @@ QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const 
   return query_result;
 }
 
+// Prepares `sql`, which binds names and types without running the statement.
+Prepared PrepareStatement(duckdb_connection connection, const std::string& sql) {
+  Prepared prepared;
+  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
+    throw BackendError(
+        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
+  }
+  return prepared;
+}
+
+struct Column {
+  std::string name;
+  LogicalType type;
+};
+
+// The result columns of a prepared statement.
+std::vector<Column> Columns(const Prepared& prepared) {
+  std::vector<Column> columns;
+  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
+    DuckString const name(duckdb_prepared_statement_column_name(prepared.get(), i));
+    columns.push_back({
+        .name = name.get(),
+        .type = LogicalType(duckdb_prepared_statement_column_logical_type(prepared.get(), i)),
+    });
+  }
+  return columns;
+}
+
 // BigQuery evaluates timestamps in UTC; setup must run on the same connection.
 void RunSetup(duckdb_connection connection, const std::vector<std::string>& setup) {
   Query(connection, "SET TimeZone = 'UTC'");
@@ -147,6 +175,22 @@ struct Backend::Session {
   explicit Session(Database& database) : connection(database.Connect()) {}
 };
 
+class Backend::CallConnection {
+ public:
+  explicit CallConnection(duckdb_connection session) : connection_(session) {}
+  explicit CallConnection(Connection owned) : owned_(std::move(owned)), connection_(owned_.get()) {}
+
+  [[nodiscard]] duckdb_connection get() const { return connection_; }
+
+ private:
+  Connection owned_;
+  duckdb_connection connection_;
+};
+
+Backend::CallConnection Backend::Connect() const {
+  return session_ ? CallConnection(session_->connection.get()) : CallConnection(db_->Connect());
+}
+
 Backend::Backend(const std::optional<std::string>& session_user,
                  const backend_functions::JavaScriptLimits& javascript,
                  const backend_functions::ObjectStorage& storage)
@@ -197,104 +241,84 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   if (statements.empty()) {
     throw BackendError("No statement to execute");
   }
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  RunSetup(connection, setup);
+  const CallConnection connection = Connect();
+  RunSetup(connection.get(), setup);
   // A transaction left open by a failed statement is rolled back when the connection closes.
   for (size_t i = 0; i + 1 < statements.size(); ++i) {
-    Query(connection, statements.at(i));
+    Query(connection.get(), statements.at(i));
   }
   Result result;
-  Query(connection, statements.back(), result);
+  Query(connection.get(), statements.back(), result);
   return Materialize(result, null_arrays, db_);
 }
 
 std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(
     const std::string& sql, std::vector<FieldSchema> schema) {
   const auto session = std::shared_ptr<Backend>(NewSession());
-  auto* connection = session->session_->connection.get();
-  RunSetup(connection, {});
+  const CallConnection connection = session->Connect();
+  RunSetup(connection.get(), {});
   Result result;
-  Query(connection, sql, result);
+  Query(connection.get(), sql, result);
   return std::make_shared<const StorageSnapshot>(result.result, std::move(schema), session);
 }
 
 void Backend::ExecuteDdl(const std::string& sql,
                          const std::vector<std::string>& metadata_statements,
                          const std::string& skip_query, const std::vector<std::string>& setup) {
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  RunSetup(connection, setup);
+  const CallConnection connection = Connect();
+  RunSetup(connection.get(), setup);
   const bool own_transaction = !session_ || !session_->in_transaction;
   if (own_transaction) {
-    Query(connection, "BEGIN TRANSACTION");
+    Query(connection.get(), "BEGIN TRANSACTION");
   }
   try {
     if (!skip_query.empty()) {
       Result existing;
-      Query(connection, skip_query, existing);
+      Query(connection.get(), skip_query, existing);
       if (duckdb_row_count(&existing.result) != 0) {
         if (own_transaction) {
-          Query(connection, "COMMIT");
+          Query(connection.get(), "COMMIT");
         }
         return;
       }
     }
-    Query(connection, sql);
+    Query(connection.get(), sql);
     for (const std::string& statement : metadata_statements) {
-      Query(connection, statement);
+      Query(connection.get(), statement);
     }
     if (own_transaction) {
-      Query(connection, "COMMIT");
+      Query(connection.get(), "COMMIT");
     }
   } catch (...) {
     if (own_transaction && session_) {
-      Query(connection, "ROLLBACK");
+      Query(connection.get(), "ROLLBACK");
     }
     throw;
   }
 }
 
 QueryResult Backend::Prepare(const std::string& sql, const std::vector<std::string>& setup) {
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  RunSetup(connection, setup);
-  // Preparing binds names and types without running the statement, which is what a dry run
-  // needs: the query is validated and its result schema is known, but nothing is read or
-  // written.
-  Prepared prepared;
-  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
-    throw BackendError(
-        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
-  }
-
+  const CallConnection connection = Connect();
+  RunSetup(connection.get(), setup);
+  // A dry run is validated and knows its result schema, but reads and writes nothing.
+  const Prepared prepared = PrepareStatement(connection.get(), sql);
   QueryResult query_result;
   if (!ProducesResultSet(duckdb_prepared_statement_type(prepared.get()))) {
     return query_result;
   }
   query_result.has_rows = true;
-  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
-    DuckString const name(duckdb_prepared_statement_column_name(prepared.get(), i));
-    LogicalType const type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
-    query_result.schema.push_back(ResultFieldSchema(name.get(), type.get()));
+  for (const Column& column : Columns(prepared)) {
+    query_result.schema.push_back(ResultFieldSchema(column.name, column.type.get()));
   }
   return query_result;
 }
 
 std::optional<std::string> Backend::UnreadableColumnError(const std::string& relation) {
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  Prepared prepared;
-  const std::string sql = "SELECT * FROM " + relation;
-  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
-    throw BackendError(
-        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
-  }
-  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
-    LogicalType const type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
-    if (const std::string name = UnsupportedDuckDbType(type.get()); !name.empty()) {
-      DuckString const column(duckdb_prepared_statement_column_name(prepared.get(), i));
-      return "Column " + std::string(column.get()) + " has the DuckDB type " + name +
+  const CallConnection connection = Connect();
+  for (const Column& column :
+       Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
+    if (const std::string type = UnsupportedDuckDbType(column.type.get()); !type.empty()) {
+      return "Column " + column.name + " has the DuckDB type " + type +
              ", which the emulator does not support";
     }
   }
@@ -302,23 +326,15 @@ std::optional<std::string> Backend::UnreadableColumnError(const std::string& rel
 }
 
 std::optional<std::string> Backend::NumericReadQuery(const std::string& relation) {
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  Prepared prepared;
-  const std::string sql = "SELECT * FROM " + relation;
-  if (duckdb_prepare(connection, sql.c_str(), prepared.out()) == DuckDBError) {
-    throw BackendError(
-        ErrorMessage(duckdb_prepare_error(prepared.get()), "DuckDB failed to prepare the query"));
-  }
+  const CallConnection connection = Connect();
   std::vector<std::string> columns;
   bool changed = false;
-  for (idx_t i = 0; i < duckdb_prepared_statement_column_count(prepared.get()); ++i) {
-    DuckString const name(duckdb_prepared_statement_column_name(prepared.get(), i));
-    LogicalType const type(duckdb_prepared_statement_column_logical_type(prepared.get(), i));
-    const std::string column = QuoteIdentifier(name.get());
-    const auto converted = ReadNumericStorage(column, type.get());
+  for (const Column& column :
+       Columns(PrepareStatement(connection.get(), "SELECT * FROM " + relation))) {
+    const std::string name = QuoteIdentifier(column.name);
+    const auto converted = ReadNumericStorage(name, column.type.get());
     changed |= converted.has_value();
-    columns.push_back(converted.value_or(column) + " AS " + column);
+    columns.push_back(converted.value_or(name) + " AS " + name);
   }
   return changed ? std::make_optional("SELECT " + Join(columns, ", ") + " FROM " + relation)
                  : std::nullopt;
@@ -326,26 +342,25 @@ std::optional<std::string> Backend::NumericReadQuery(const std::string& relation
 
 std::vector<std::pair<size_t, std::string>> Backend::InsertRows(
     const std::vector<std::string>& statements, bool skip_invalid_rows) {
-  Connection const owned = session_ ? Connection{} : db_->Connect();
-  auto* const connection = session_ ? session_->connection.get() : owned.get();
-  RunSetup(connection, {});
+  const CallConnection connection = Connect();
+  RunSetup(connection.get(), {});
   std::vector<std::pair<size_t, std::string>> errors;
   if (!skip_invalid_rows) {
-    Query(connection, "BEGIN TRANSACTION");
+    Query(connection.get(), "BEGIN TRANSACTION");
   }
   for (size_t i = 0; i < statements.size(); ++i) {
     Result result;
-    if (duckdb_query(connection, statements.at(i).c_str(), &result.result) == DuckDBError) {
+    if (duckdb_query(connection.get(), statements.at(i).c_str(), &result.result) == DuckDBError) {
       const char* error = duckdb_result_error(&result.result);
       errors.emplace_back(i, error != nullptr ? error : "DuckDB insert failed");
       if (!skip_invalid_rows) {
-        Query(connection, "ROLLBACK");
+        Query(connection.get(), "ROLLBACK");
         return errors;
       }
     }
   }
   if (!skip_invalid_rows) {
-    Query(connection, "COMMIT");
+    Query(connection.get(), "COMMIT");
   }
   return errors;
 }

@@ -96,7 +96,10 @@ class Backend {
  private:
   struct Database;
   struct Session;
+  class CallConnection;
   explicit Backend(std::shared_ptr<Database> database);
+  // The session's connection, or outside a session a new one that closes with the result.
+  [[nodiscard]] CallConnection Connect() const;
   std::shared_ptr<Database> db_;
   std::unique_ptr<Session> session_;
 };
