@@ -13,6 +13,7 @@
 #include "src/translator/ddl.h"
 #include "src/translator/dml.h"
 #include "src/translator/function.h"
+#include "src/translator/graph.h"
 #include "src/translator/partition_filter.h"
 #include "src/translator/scan.h"
 
@@ -20,6 +21,10 @@ namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
                                      const Scope& scope) {
   CheckPartitionFilters(statement);
+  if (statement.Is<googlesql::ResolvedCreatePropertyGraphStmt>()) {
+    return CreatePropertyGraph(*statement.GetAs<googlesql::ResolvedCreatePropertyGraphStmt>(),
+                               scope);
+  }
   if (!statement.hint_list().empty()) {
     return Unsupported(scope, "statement hints");
   }
@@ -138,6 +143,9 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
 
 // JobStatistics2.statementType of a statement the translator supports.
 std::string StatementType(const googlesql::ResolvedStatement& statement) {
+  if (statement.Is<googlesql::ResolvedCreatePropertyGraphStmt>()) {
+    return "CREATE_PROPERTY_GRAPH";
+  }
   if (statement.Is<googlesql::ResolvedInsertStmt>()) {
     return "INSERT";
   }
@@ -179,7 +187,8 @@ std::string StatementType(const googlesql::ResolvedStatement& statement) {
     return "CREATE_SCHEMA";
   }
   if (statement.Is<googlesql::ResolvedDropStmt>()) {
-    return "DROP_" + ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+    const auto type = ToUpperAscii(statement.GetAs<googlesql::ResolvedDropStmt>()->object_type());
+    return type == "PROPERTY GRAPH" ? "DROP_PROPERTY_GRAPH" : "DROP_" + type;
   }
   if (statement.Is<googlesql::ResolvedDropMaterializedViewStmt>()) {
     return "DROP_MATERIALIZED_VIEW";

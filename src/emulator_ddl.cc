@@ -207,6 +207,9 @@ void Emulator::UseTargets(Backend& backend, const TranslatedStatement& translati
   if (const auto& target = translation.ddl_target_table) {
     use({.project_id = target->project_id, .dataset_id = target->dataset_id});
   }
+  if (const auto& target = translation.property_graph) {
+    use({.project_id = target->project_id, .dataset_id = target->dataset_id});
+  }
   if (const auto& target = translation.ddl_target_routine) {
     use({.project_id = target->project_id, .dataset_id = target->dataset_id});
   }

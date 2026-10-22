@@ -166,6 +166,10 @@ struct TranslatedStatement {
   std::optional<DatasetDefinition> dataset;
   std::optional<DatasetAlteration> altered_dataset;
   std::optional<RoutineDefinition> routine;
+  // Canonical GoogleSQL DDL, kept for resolving subsequent graph queries.
+  std::optional<std::string> property_graph_definition;
+  std::optional<TableReference> property_graph;
+  bool reads_property_graph = false;
 };
 
 }  // namespace bigquery_emulator_duckdb

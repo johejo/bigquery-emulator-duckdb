@@ -1,0 +1,11 @@
+diff --git a/src/parser/parsed_data/drop_property_graph_info.cpp b/src/parser/parsed_data/drop_property_graph_info.cpp
+--- a/src/parser/parsed_data/drop_property_graph_info.cpp
++++ b/src/parser/parsed_data/drop_property_graph_info.cpp
+@@ -17,6 +17,7 @@
+ 
+ unique_ptr<DropInfo> DropPropertyGraphInfo::Copy() const {
+ 	auto result = make_uniq<DropPropertyGraphInfo>(property_graph_name, missing_ok);
++	result->SetQualifiedName(GetQualifiedName());
+ 	return std::move(result);
+ }
+ 

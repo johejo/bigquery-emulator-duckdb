@@ -12,6 +12,9 @@
 
 namespace bigquery_emulator_duckdb {
 
+std::string PropertyGraphsTable(const std::string& project);
+std::string PropertyGraphQuery(const TableReference& graph);
+
 class Backend;
 struct QueryResult;
 

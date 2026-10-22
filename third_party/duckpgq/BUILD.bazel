@@ -1,0 +1,4 @@
+exports_files([
+    "BUILD.duckpgq.bazel",
+    "drop_name.patch",
+])

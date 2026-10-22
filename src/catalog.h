@@ -14,6 +14,7 @@
 
 namespace googlesql {
 class TableValuedFunction;
+class AnalyzerOutput;
 class TVFInputArgumentType;
 class TVFSignature;
 class TypeFactory;
@@ -50,6 +51,10 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
                                        const googlesql::TableValuedFunction** function,
                                        const FindOptions& options) override;
 
+  absl::Status FindPropertyGraph(absl::Span<const std::string> path,
+                                 const googlesql::PropertyGraph*& graph,
+                                 const FindOptions& options) override;
+
  protected:
   [[nodiscard]] TableSource& source() const { return source_; }
   [[nodiscard]] googlesql::TypeFactory* type_factory() const { return type_factory_; }
@@ -68,6 +73,9 @@ class BigQueryCatalog : public googlesql::CatalogWrapper {
   // so they must stay valid for as long as the catalog does.
   std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleTable>> tables_;
   std::unique_ptr<googlesql::TableValuedFunction> external_query_;
+  // Destroy graphs before their analyzer outputs and the tables they borrow.
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> graph_artifacts_;
+  std::map<std::vector<std::string>, std::unique_ptr<googlesql::SimpleCatalog>> graphs_;
 };
 
 }  // namespace bigquery_emulator_duckdb

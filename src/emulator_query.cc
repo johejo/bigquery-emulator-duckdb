@@ -661,6 +661,10 @@ std::shared_ptr<const Job> Emulator::RunQuery(QueryRequest request) {
                                 translation.sql, written, setup);
     } else if (!AlterationStatements(translation).has_value()) {
       // A dry run checks an alteration against the table or dataset without running it.
+      std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
+      if (translation.property_graph || translation.reads_property_graph) {
+        graph_lock.lock();
+      }
       result = Prepare(translation.sql, setup);
     }
     if (translation.result_schema.has_value()) {
@@ -677,6 +681,10 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    const std::vector<std::string>& setup, bool null_arrays,
                                    Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
+  std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
+  if (translation.property_graph || translation.reads_property_graph) {
+    graph_lock.lock();
+  }
   CheckDdlTarget(translation);
   CheckRelationTarget(backend, translation);
   if (translation.ddl_target_routine) {
@@ -703,8 +711,41 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
     schema = UniqueResultNames(*translation.result_schema);
   }
   QueryResult result;
-  if (const std::optional<std::vector<std::string>> statements =
-          AlterationStatements(translation)) {
+  if (translation.property_graph) {
+    const auto& graph = *translation.property_graph;
+    if (!DatasetLocation(backend,
+                         {.project_id = graph.project_id, .dataset_id = graph.dataset_id})) {
+      throw ApiError::NotFound("Not found: Dataset " + graph.project_id + ":" + graph.dataset_id);
+    }
+    const auto previous = backend.Execute(PropertyGraphQuery(graph));
+    const bool creating = translation.property_graph_definition.has_value();
+    if (creating && !previous.rows.empty()) {
+      throw ApiError::Duplicate("Property graph already exists");
+    }
+    if (!creating && previous.rows.empty()) {
+      throw ApiError::NotFound("Property graph not found");
+    }
+    try {
+      backend.Execute(translation.sql, setup);
+    } catch (const BackendError& error) {
+      if (std::string_view(error.what()).find("Incomplete edge") != std::string_view::npos) {
+        throw ApiError::UnsupportedQuery("property graphs with incomplete edges");
+      }
+      throw;
+    }
+    const std::string predicate =
+        " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
+        ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+    if (creating) {
+      backend.Execute("INSERT INTO " + PropertyGraphsTable(graph.project_id) + " VALUES (" +
+                      QuoteLiteral(graph.dataset_id) + ", " + QuoteLiteral(graph.table_id) + ", " +
+                      QuoteLiteral(*translation.property_graph_definition) + ", " +
+                      QuoteLiteral(translation.sql) + ")");
+    } else {
+      backend.Execute("DELETE FROM " + PropertyGraphsTable(graph.project_id) + predicate);
+    }
+  } else if (const std::optional<std::vector<std::string>> statements =
+                 AlterationStatements(translation)) {
     if (!statements->empty()) {
       backend.ExecuteDdl(statements->front(), {statements->begin() + 1, statements->end()}, "",
                          setup);

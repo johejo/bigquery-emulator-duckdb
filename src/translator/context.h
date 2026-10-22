@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -54,12 +55,16 @@ struct Context {
 // What a scan can see besides its own input: correlated columns of enclosing queries, which
 // are referenced unqualified because every scope aliases its input as q, and named WITH queries.
 // Nested scopes copy it; they all share one Context.
+struct Relation;
+
 struct Scope {
   Context& context;
   Columns outer = {};
   std::map<std::string, WithQuery> with = {};
   // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
   std::optional<WithQuery> recursive = {};
+  std::string graph_name = {};
+  std::shared_ptr<Relation> graph_input = {};
 };
 
 // Records why the statement is unsupported. The innermost failure is recorded first, and the

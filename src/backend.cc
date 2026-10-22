@@ -20,6 +20,7 @@
 #include "src/backend_functions/object_metadata.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
+#include "src/duckpgq.h"
 #include "src/field_schema.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
@@ -191,6 +192,7 @@ struct Backend::Database {
     RegisterBackendFunctions(handle.get(), session_user, javascript, storage);
     RegisterPostgresScanner(handle.get());
     RegisterMySqlScanner(handle.get());
+    RegisterDuckPGQ(handle.get());
   }
 
   [[nodiscard]] Connection Connect() const {
@@ -198,6 +200,9 @@ struct Backend::Database {
     if (duckdb_connect(handle.get(), connection.out()) == DuckDBError) {
       throw BackendError("DuckDB failed to connect");
     }
+    Query(connection.get(), "SET active_grammar_extensions = ['duckpgq']");
+    Query(connection.get(), "SET duckpgq_vertex_join_elimination = false");
+    Query(connection.get(), "SET duckpgq_factorized_joins = false");
     return Connection(connection.release());
   }
 };

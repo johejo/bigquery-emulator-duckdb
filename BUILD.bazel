@@ -313,7 +313,10 @@ cc_library(
 
 cc_library(
     name = "catalog",
-    srcs = ["src/catalog.cc"],
+    srcs = [
+        "src/catalog.cc",
+        "src/catalog_graph.cc",
+    ],
     hdrs = ["src/catalog.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
@@ -326,11 +329,14 @@ cc_library(
         ":type_mapping",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:analyzer_output",
         "@googlesql//googlesql/public:builtin_function_cc_proto",
         "@googlesql//googlesql/public:builtin_function_options",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:options_cc_proto",
+        "@googlesql//googlesql/public:simple_catalog_util",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
     ],
@@ -615,6 +621,18 @@ cc_library(
 )
 
 cc_library(
+    name = "duckpgq",
+    srcs = ["src/duckpgq.cc"],
+    hdrs = ["src/duckpgq.h"],
+    implementation_deps = [
+        ":backend_error",
+        "@duckdb_source//:headers",
+        "@duckpgq",
+    ],
+    deps = ["//third_party/duckdb"],
+)
+
+cc_library(
     name = "postgres_scanner",
     srcs = ["src/postgres_scanner.cc"],
     hdrs = ["src/postgres_scanner.h"],
@@ -720,6 +738,7 @@ cc_library(
         ":bignumeric",
         ":duckdb_handle",
         ":duckdb_sql",
+        ":duckpgq",
         ":mysql_query",
         ":postgres_scanner",
         ":storage_read_codec",
@@ -802,6 +821,7 @@ cc_library(
     hdrs = ["src/ddl_write.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":duckdb_catalog",
         ":type_mapping",
         "@abseil-cpp//absl/time",
         "@googlesql//googlesql/public:type",

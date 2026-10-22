@@ -14,6 +14,10 @@ import (
 // The table that the cases in testdata/scalars/*.txt read as `t` from their default dataset, and
 // a dataset whose default rounding mode is ROUND_HALF_EVEN, which cases create tables in.
 var scalarFixture = []string{
+	"CREATE SCHEMA IF NOT EXISTS scalar_graph",
+	"CREATE TABLE scalar_graph.Person (id INT64, name STRING)",
+	"INSERT scalar_graph.Person VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee')",
+	"CREATE PROPERTY GRAPH scalar_graph.FinGraph NODE TABLES (scalar_graph.Person KEY (id))",
 	"CREATE SCHEMA IF NOT EXISTS scalars",
 	"CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",

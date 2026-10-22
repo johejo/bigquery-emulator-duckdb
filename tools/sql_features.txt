@@ -17,6 +17,20 @@ setup INSERT d.t (id, name, tags, s) VALUES (1, 'a', ['x'], STRUCT(1, 'p')), (2,
 setup CREATE TABLE d.u (id INT64, v INT64)
 setup INSERT d.u (id, v) VALUES (1, 10), (3, 30)
 
+setup CREATE PROPERTY GRAPH d.g NODE TABLES (d.t KEY (id) LABEL Person PROPERTIES (id, name)) EDGE TABLES (d.t AS friendships KEY (id) SOURCE KEY (id) REFERENCES t (id) DESTINATION KEY (id) REFERENCES t (id) LABEL Knows NO PROPERTIES)
+
+section Graphs
+
+query `CREATE PROPERTY GRAPH` | CREATE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
+query `CREATE PROPERTY GRAPH` | CREATE OR REPLACE PROPERTY GRAPH d.g2 NODE TABLES (d.t KEY (id) PROPERTIES (id, name))
+query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH d.g
+query `DROP PROPERTY GRAPH` | DROP PROPERTY GRAPH IF EXISTS d.missing
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (p:Person) RETURN p.id)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->(b:Person) RETURN a.name, b.id)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.name)
+note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
+note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
+
 section Queries
 
 query `SELECT` without `FROM` | SELECT 1 AS x, 'a' AS y

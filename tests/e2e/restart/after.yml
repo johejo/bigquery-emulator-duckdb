@@ -313,3 +313,14 @@ steps:
             application/json: {query: 'SELECT s FROM persist.numeric_anonymous', useLegacySql: false}
     test: |
       current.res.status == 200 && current.res.body.rows == steps.numeric_anonymous_rows.res.body.rows
+  graph:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: SELECT item.a, t.b FROM GRAPH_TABLE(persist.g MATCH (n:Item) RETURN n.a AS a) AS item JOIN persist.t AS t ON item.a = t.a
+              useLegacySql: false
+    test: |
+      current.res.status == 200 &&
+      current.res.body.rows == [{"f": [{"v": "1"}, {"v": [{"v": "x"}, {"v": "y"}]}]}]

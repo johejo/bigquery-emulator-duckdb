@@ -1,0 +1,38 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Embed the extension's PEG grammar exactly as its CMake build does.
+genrule(
+    name = "grammar",
+    srcs = glob(["src/core/parser/grammar/*.gram"]),
+    outs = [
+        "generated/duckpgq_create_property_graph_grammar.hpp",
+        "generated/duckpgq_graph_table_grammar.hpp",
+        "generated/duckpgq_graph_management_grammar.hpp",
+    ],
+    cmd = """
+      for item in 'create_property_graph DUCKPGQ_CREATE_PROPERTY_GRAPH_RULES' 'graph_table DUCKPGQ_GRAPH_TABLE_RULES' 'graph_management DUCKPGQ_GRAPH_MANAGEMENT_RULES'; do
+        set -- $$item
+        input=$$(find $(SRCS) -name "$$1.gram")
+        output=$(@D)/generated/duckpgq_$$1_grammar.hpp
+        { echo '#pragma once'; echo "namespace duckdb { static constexpr const char *$$2[] = {";
+          sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$$//' -e '/^#/d' -e '/^$$/d' -e 's/^/R"duckpgq_rule(/' -e 's/$$/)duckpgq_rule",/' "$$input"
+          echo '}; }'; } > "$$output"
+      done
+    """,
+)
+
+cc_library(
+    name = "duckpgq",
+    srcs = glob(["src/**/*.cpp"]),
+    hdrs = glob(["src/include/**/*.hpp"]) + [":grammar"],
+    # Match the upstream extension build. C++20 constant-initializes inline static
+    # strings which DuckDB's C++17 prebuilt parser still initializes dynamically.
+    copts = ["-std=c++17"],
+    includes = [
+        "generated",
+        "src/include",
+    ],
+    deps = ["@duckdb_source//:headers"],
+)

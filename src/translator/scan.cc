@@ -7,6 +7,7 @@
 #include <format>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -32,6 +33,7 @@
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
+#include "src/translator/graph.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -675,6 +677,29 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
 namespace {
 
 std::optional<Relation> ScanBody(const googlesql::ResolvedScan& scan, const Scope& scope) {
+  if (scan.Is<googlesql::ResolvedGraphTableScan>()) {
+    return GraphTableScan(*scan.GetAs<googlesql::ResolvedGraphTableScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedGraphScan>()) {
+    return GraphScan(*scan.GetAs<googlesql::ResolvedGraphScan>(), scope);
+  }
+  if (scan.Is<googlesql::ResolvedGraphRefScan>()) {
+    if (!scope.graph_input) {
+      return Unsupported(scope, "graph input reference");
+    }
+    return *scope.graph_input;
+  }
+  if (scan.Is<googlesql::ResolvedGraphLinearScan>()) {
+    Scope linear = scope;
+    for (const auto& step : scan.GetAs<googlesql::ResolvedGraphLinearScan>()->scan_list()) {
+      auto result = Scan(*step, linear);
+      if (!result) {
+        return std::nullopt;
+      }
+      linear.graph_input = std::make_shared<Relation>(*std::move(result));
+    }
+    return linear.graph_input ? std::optional<Relation>(*linear.graph_input) : std::nullopt;
+  }
   if (scan.Is<googlesql::ResolvedSingleRowScan>()) {
     return Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}};
   }

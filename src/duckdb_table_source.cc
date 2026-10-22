@@ -76,6 +76,18 @@ class DuckDbTableSource : public TableSource {
     }
   }
 
+  std::optional<std::string> FindPropertyGraph(const TableReference& graph) override {
+    if (IsDuckDbSchema(graph.dataset_id) || !HasProject(graph.project_id)) {
+      return std::nullopt;
+    }
+    const auto result = backend_.Execute(PropertyGraphQuery(graph));
+    if (result.rows.empty()) {
+      return std::nullopt;
+    }
+    Use(graph.project_id, graph.dataset_id);
+    return result.rows.String(0, 0);
+  }
+
   std::optional<std::string> NumericReadQuery(const TableReference& table) override {
     return backend_.NumericReadQuery(QualifiedName(table));
   }
