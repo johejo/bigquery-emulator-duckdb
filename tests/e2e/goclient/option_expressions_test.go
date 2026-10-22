@@ -9,6 +9,42 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
+// CREATE TABLE ignores NULL option values, without enabling partition expiration or encryption.
+// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_statement
+func TestCreateTableNullOptions(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	client := newClient(t)
+	dataset := client.Dataset("go_create_table_null_options")
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	for _, tc := range []struct {
+		name   string
+		create string
+	}{
+		{"plain", "CREATE TABLE plain (day DATE)"},
+		{"partitioned", "CREATE TABLE partitioned (day DATE) PARTITION BY day"},
+		{"as_select", "CREATE TABLE as_select PARTITION BY day"},
+	} {
+		sql := tc.create + ` OPTIONS (partition_expiration_days = NULL, kms_key_name = NULL)`
+		if tc.name == "as_select" {
+			sql += " AS SELECT DATE '2025-01-01' AS day"
+		}
+		if _, _, err := runScript(t, client, dataset.DatasetID, sql); err != nil {
+			t.Fatal(err)
+		}
+		metadata, err := dataset.Table(tc.name).Metadata(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if metadata.EncryptionConfig != nil || (metadata.TimePartitioning != nil && metadata.TimePartitioning.Expiration != 0) {
+			t.Errorf("%s: NULL enabled encryption or partition expiration: %+v", tc.name, metadata)
+		}
+	}
+}
+
 // An option's VALUE "is a constant expression containing only literals, query parameters, and
 // scalar functions", which cannot contain functions such as REPEAT, and expiration_timestamp is a
 // TIMESTAMP

@@ -64,10 +64,10 @@ bool DaysOption(const googlesql::Value& value, std::optional<int64_t>& into) {
 }
 
 bool BoolOption(const googlesql::Value& value, bool& into) {
-  if (value.is_null() || !value.type()->IsBool()) {
+  if (!value.is_null() && !value.type()->IsBool()) {
     return false;
   }
-  into = value.bool_value();
+  into = !value.is_null() && value.bool_value();
   return true;
 }
 
@@ -239,6 +239,8 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
         value.has_value() &&
         ((statement == "CREATE TABLE" && name == "require_partition_filter" &&
           BoolOption(*value, metadata.require_partition_filter)) ||
+         (statement == "CREATE TABLE" && value->is_null() &&
+          (name == "partition_expiration_days" || name == "kms_key_name")) ||
          (name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels)) ||
