@@ -16,6 +16,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/api_error.h"
+#include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
@@ -157,6 +158,9 @@ bool ConstantOptionValue(const googlesql::ResolvedExpr& expression, std::string_
 
 // The object whose options `statement`, such as CREATE TABLE, sets, as BigQuery's errors name it.
 std::string OptionObject(std::string_view statement) {
+  if (statement.ends_with("FUNCTION")) {
+    return "function";
+  }
   return ToLowerAscii(statement.substr(statement.find(' ') + 1));
 }
 
@@ -184,14 +188,26 @@ bool LocationOption(const googlesql::Value& value, std::string& into) {
 // which the backend evaluates as a query would. nullopt for += and -=, and for a value the
 // emulator does not support, which `scope` may then name.
 std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
-                                            std::string_view object, const Scope& scope) {
+                                            std::string_view context, const Scope& scope) {
+  const std::string object = context == "column" ? "column" : OptionObject(context);
+  const auto* definition = FindDdlOption(context, ToLowerAscii(option.name()));
+  if (definition == nullptr) {
+    Unsupported(scope, std::string(context) + " option " + option.name());
+    return std::nullopt;
+  }
+  const auto checked = [&](std::optional<googlesql::Value> value) {
+    if (value && !DdlOptionValueMatches(definition->type, *value)) {
+      return std::optional<googlesql::Value>{};
+    }
+    return value;
+  };
   if (!option.qualifier().empty() ||
       option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN) {
     return std::nullopt;
   }
   const googlesql::ResolvedExpr& expression = *option.value();
   if (expression.Is<googlesql::ResolvedLiteral>()) {
-    return expression.GetAs<googlesql::ResolvedLiteral>()->value();
+    return checked(expression.GetAs<googlesql::ResolvedLiteral>()->value());
   }
   const auto& evaluate = scope.context.defaults.evaluate;
   if (!evaluate || !ConstantOptionValue(expression, option.name(), object, scope)) {
@@ -201,7 +217,7 @@ std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& opt
   if (!sql.has_value()) {
     return std::nullopt;
   }
-  return evaluate("SELECT " + *sql, expression.type());
+  return checked(evaluate("SELECT " + *sql, expression.type()));
 }
 
 // A STRING option into `into`; NULL leaves it unset.
@@ -233,8 +249,7 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
                                              const Scope& scope, TableMetadata metadata) {
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value =
-        OptionValue(*option, OptionObject(statement), scope);
+    const std::optional<googlesql::Value> value = OptionValue(*option, statement, scope);
     const bool applied =
         value.has_value() &&
         ((statement == "CREATE TABLE" && name == "require_partition_filter" &&
@@ -261,7 +276,7 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
   DatasetMetadata metadata;
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
-    const std::optional<googlesql::Value> value = OptionValue(*option, "schema", scope);
+    const std::optional<googlesql::Value> value = OptionValue(*option, "CREATE SCHEMA", scope);
     const bool applied =
         value.has_value() &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
@@ -290,8 +305,7 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
     if (statement == "ALTER SCHEMA" && name == "location") {
       throw ApiError::InvalidQuery("Unknown option: " + option->name());
     }
-    const std::optional<googlesql::Value> value =
-        OptionValue(*option, OptionObject(statement), scope);
+    const std::optional<googlesql::Value> value = OptionValue(*option, statement, scope);
     const bool applied =
         value.has_value() &&
         ((statement == "ALTER TABLE" && name == "require_partition_filter" &&
