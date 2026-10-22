@@ -321,3 +321,19 @@ The `SAFE.` prefix is unsupported on volatile functions.
 Transcendental functions, such as SIN and EXP, and GEOGRAPHY measurements, such as ST_AREA, use
 the platform's math library, so their FLOAT64 results can differ from BigQuery's in the last bits,
 such as on macOS.
+
+## Graphs
+
+Property graphs support INT64 or STRING column keys, one static label per element table, and column
+properties of type INT64, STRING, BOOL or FLOAT64. Edge endpoints must exist when a graph is created. Computed properties, views as
+element tables, graph options and creation modes such as OR REPLACE and IF NOT
+EXISTS are unsupported.
+
+`GRAPH_TABLE` supports a single fixed path with explicit labels, directed edges,
+property projections through `RETURN`, and scalar filters. Each element must
+resolve to one table. Optional matching, quantified paths, path values, search
+prefixes, undirected edges and graph element results are unsupported. SQL/PGQ's
+`COLUMNS` clause is unsupported; use BigQuery's `RETURN` syntax.
+
+`DROP PROPERTY GRAPH` does not support IF EXISTS. Property graph definitions are
+kept across emulator restarts.

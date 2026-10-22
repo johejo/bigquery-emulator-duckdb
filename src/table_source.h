@@ -26,6 +26,10 @@ class TableSource {
                                                             const std::string& dataset,
                                                             const std::string& table) = 0;
 
+  virtual std::optional<std::string> FindPropertyGraph(const TableReference& /*graph*/) {
+    return std::nullopt;
+  }
+
   // A query that converts a table's external numeric storage to query values, or nullopt for
   // the emulator's native storage. A table that needs this conversion is read-only.
   virtual std::optional<std::string> NumericReadQuery(const TableReference& /*table*/) {

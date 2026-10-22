@@ -12,6 +12,7 @@
 #include "googlesql/public/analyzer.h"
 #include "googlesql/public/constant.h"
 #include "googlesql/public/function.h"
+#include "googlesql/public/property_graph.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -359,6 +360,23 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
       return Unsupported(scope, "literal of type " + expr.type()->DebugString());
     }
     return literal;
+  }
+  if (expr.Is<googlesql::ResolvedGraphGetElementProperty>()) {
+    const auto& property = *expr.GetAs<googlesql::ResolvedGraphGetElementProperty>();
+    if (property.property() == nullptr) {
+      return Unsupported(scope, "dynamic graph properties");
+    }
+    if (!property.expr()->Is<googlesql::ResolvedColumnRef>()) {
+      return Unsupported(scope, "graph properties of expressions");
+    }
+    const auto& ref = *property.expr()->GetAs<googlesql::ResolvedColumnRef>();
+    const auto& visible = ref.is_correlated() ? scope.outer : columns;
+    const auto value = visible.find(ref.column().column_id());
+    if (value == visible.end()) {
+      return std::nullopt;
+    }
+    return "struct_extract(" + value->second + ", " + QuoteLiteral(property.property()->Name()) +
+           ")";
   }
   if (expr.Is<googlesql::ResolvedColumnRef>()) {
     const auto* ref = expr.GetAs<googlesql::ResolvedColumnRef>();

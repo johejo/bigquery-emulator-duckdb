@@ -129,3 +129,12 @@ steps:
               query: CREATE TABLE persist.numeric_anonymous AS SELECT STRUCT(BIGNUMERIC '1.25') AS s
               useLegacySql: false
     test: current.res.status == 200
+  graph:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: CREATE PROPERTY GRAPH persist.g NODE TABLES (persist.t KEY (a) LABEL Item PROPERTIES (a))
+              useLegacySql: false
+    test: current.res.status == 200

@@ -6,6 +6,8 @@
 
 namespace bigquery_emulator_duckdb {
 
+std::string DuckPGQName(const std::vector<std::string>& path);
+
 std::string ToUpperAscii(std::string_view text);
 std::string ToLowerAscii(std::string_view text);
 

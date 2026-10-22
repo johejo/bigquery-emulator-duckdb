@@ -175,3 +175,14 @@ http_archive(
     strip_prefix = "mariadb-connector-c-3.4.8",
     urls = ["https://github.com/mariadb-corporation/mariadb-connector-c/archive/refs/tags/v3.4.8.tar.gz"],
 )
+
+# SQL/PGQ grammar and graph execution, compiled against the same DuckDB as the backend.
+http_archive(
+    name = "duckpgq",
+    build_file = "//third_party/duckpgq:BUILD.duckpgq.bazel",
+    patch_args = ["-p1"],
+    patches = ["//third_party/duckpgq:drop_name.patch"],
+    sha256 = "37d30316f9a7ba50b5c52beb8463c1456c884ab569797488125a5080ddf313e8",
+    strip_prefix = "duckpgq-extension-29ca668a2218810862bed794cc501add03a4149a",
+    urls = ["https://github.com/cwida/duckpgq-extension/archive/29ca668a2218810862bed794cc501add03a4149a.tar.gz"],
+)

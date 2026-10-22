@@ -19,11 +19,20 @@ rejected.
 
 | Section | Supported | Partial | Unsupported |
 | --- | --- | --- | --- |
+| [Graphs](#graphs) | 0 | 3 | 0 |
 | [Queries](#queries) | 34 | 1 | 0 |
 | [DML](#dml) | 9 | 0 | 0 |
 | [DDL](#ddl) | 25 | 7 | 2 |
 | [Multi-statement queries](#multi-statement-queries) | 11 | 2 | 0 |
 | [INFORMATION_SCHEMA](#information_schema) | 11 | 0 | 0 |
+
+## Graphs
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| `CREATE PROPERTY GRAPH` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: property graph creation modes or options. |
+| `DROP PROPERTY GRAPH` | Partial | Unsupported: this DROP PROPERTY GRAPH form. |
+| `GRAPH_TABLE` | Partial | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
 
 ## Queries
 

@@ -59,6 +59,14 @@ DuckDB differs, including NULL ordering and STRUCT comparisons.
 GoogleSQL backend functions or S2 according to their semantics. See
 [AGENTS.md](../AGENTS.md#implementing-functions) for backend selection and registration.
 
+Graph statements use [DuckPGQ](https://github.com/cwida/duckpgq-extension), linked
+statically beside DuckDB. The graph translator turns resolved fixed paths into
+SQL/PGQ `GRAPH_TABLE` calls and leaves property expressions and filters to the
+ordinary SQL translator. Private graph names encode the project, dataset and
+graph name, since DuckPGQ's registry is shared across catalogs. Each project's
+`main._property_graphs` table keeps canonical GoogleSQL DDL for catalog resolution
+and native DDL for restoring DuckPGQ's registry on startup.
+
 ## Backend
 
 DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a

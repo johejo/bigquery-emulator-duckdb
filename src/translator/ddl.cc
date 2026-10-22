@@ -5,6 +5,9 @@
 
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/references.h"
+#include "src/table_path.h"
+#include "src/translated_statement.h"
 #include "src/translator/context.h"
 #include "src/translator/ddl_names.h"
 
@@ -14,6 +17,20 @@ std::optional<std::string> Drop(const googlesql::ResolvedDropStmt& drop, const S
   const std::string object_type = ToUpperAscii(drop.object_type());
   if (object_type == "PROCEDURE") {
     return DropProcedure(drop, scope);
+  }
+  if (object_type == "PROPERTY GRAPH") {
+    const auto parts =
+        NormalizeTablePath(drop.name_path(), scope.context.defaults.project,
+                           scope.context.defaults.dataset, scope.context.defaults.source);
+    if (parts.size() != 3 || drop.is_if_exists()) {
+      return Unsupported(scope, "this DROP PROPERTY GRAPH form");
+    }
+    scope.context.statement.property_graph = TableReference{
+        .project_id = parts.at(0),
+        .dataset_id = parts.at(1),
+        .table_id = parts.at(2),
+    };
+    return "DROP PROPERTY GRAPH " + DuckPGQName(parts);
   }
   const bool is_schema = object_type == "SCHEMA";
   if (object_type != "TABLE" && object_type != "VIEW" && !is_schema) {

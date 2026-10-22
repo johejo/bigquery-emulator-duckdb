@@ -26,6 +26,16 @@ namespace bigquery_emulator_duckdb {
 
 using nlohmann::json;
 
+std::string PropertyGraphsTable(const std::string& project) {
+  return QuoteIdentifier(project) + ".main._property_graphs";
+}
+
+std::string PropertyGraphQuery(const TableReference& graph) {
+  return "SELECT definition, native_sql FROM " + PropertyGraphsTable(graph.project_id) +
+         " WHERE lower(dataset_id) = lower(" + QuoteLiteral(graph.dataset_id) +
+         ") AND lower(graph_id) = lower(" + QuoteLiteral(graph.table_id) + ")";
+}
+
 std::vector<std::string> FirstColumnStrings(const QueryResult& result) {
   std::vector<std::string> values;
   values.reserve(result.rows.size());

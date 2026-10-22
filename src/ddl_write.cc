@@ -18,6 +18,7 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/column_metadata.h"
+#include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
@@ -173,7 +174,14 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
 
 // DROP SCHEMA IF EXISTS of a missing dataset forgets nothing.
 DdlWrite DropDatasetWrite(const DatasetReference& dataset) {
-  return {.metadata_statements = {DatasetMetadataStatements(dataset, {}).front()}};
+  return {
+      .metadata_statements =
+          {
+              DatasetMetadataStatements(dataset, {}).front(),
+              "DELETE FROM " + PropertyGraphsTable(dataset.project_id) +
+                  " WHERE dataset_id = " + QuoteLiteral(dataset.dataset_id),
+          },
+  };
 }
 
 DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& dataset) {

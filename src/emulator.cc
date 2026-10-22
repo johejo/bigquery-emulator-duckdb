@@ -1,6 +1,7 @@
 #include "src/emulator.h"
 
 #include <cctype>
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -16,6 +17,7 @@
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/object_ref.h"
@@ -122,11 +124,28 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                        QuoteIdentifier(project.project_id));
       backend_.Execute("CREATE TABLE IF NOT EXISTS " + DatasetMetadataTable(project.project_id) +
                        " (dataset_id VARCHAR, metadata VARCHAR)");
+      backend_.Execute(
+          "CREATE TABLE IF NOT EXISTS " + PropertyGraphsTable(project.project_id) +
+          " (dataset_id VARCHAR, graph_id VARCHAR, definition VARCHAR, native_sql VARCHAR)");
       for (const std::string& statement : CreateHistoryStatements(project.project_id)) {
         backend_.Execute(statement);
       }
     } catch (const BackendError& error) {
       throw ApiError::Internal("Failed to open " + database + ": " + error.what());
+    }
+  }
+  // All projects must be attached before graph definitions can refer to their tables.
+  for (const Project& project : projects_) {
+    const auto graphs =
+        backend_.Execute("SELECT native_sql FROM " + PropertyGraphsTable(project.project_id));
+    for (size_t row = 0; row < graphs.rows.size(); ++row) {
+      try {
+        backend_.Execute(graphs.rows.String(row, 0));
+      } catch (const BackendError&) {
+        // A graph whose input table was dropped or altered must fail when queried,
+        // without preventing the emulator from opening its other datasets.
+        continue;
+      }
     }
   }
   if (!data_dir_.empty()) {

@@ -381,6 +381,8 @@ class Emulator {
   GcsClient gcs_client_;
   std::string data_dir_;
   std::mutex mutex_;
+  // DuckPGQ updates the graph registry of every connection when a graph changes.
+  std::mutex graph_mutex_;
   // Keeps each table's rows and the write that changes them together, by the table's DuckDB name;
   // see HistoryMutex.
   std::mutex history_mutexes_mutex_;

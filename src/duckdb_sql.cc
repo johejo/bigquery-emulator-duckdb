@@ -8,6 +8,20 @@
 #include <vector>
 
 namespace bigquery_emulator_duckdb {
+
+std::string DuckPGQName(const std::vector<std::string>& path) {
+  constexpr char digits[] = "0123456789abcdef";
+  std::string result = "_bq_graph";
+  for (const auto& part : path) {
+    result += '_';
+    for (const unsigned char c : ToUpperAscii(part)) {
+      result += digits[c / 16];
+      result += digits[c % 16];
+    }
+  }
+  return QuoteIdentifier(result);
+}
+
 std::string ToUpperAscii(std::string_view text) {
   std::string result(text);
   std::ranges::transform(result, result.begin(), [](char c) {
