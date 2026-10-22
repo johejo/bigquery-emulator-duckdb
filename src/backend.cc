@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "duckdb.h"
+#include "duckdb_static_extension.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
@@ -26,6 +27,16 @@
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
+
+// DuckDB v2 requires explicit registration of statically linked extensions before opening a
+// database. Keep using duckdb.h's V1 C API for database access.
+extern "C" {
+int32_t duckdb_extension_autocomplete_describe(duckdb_extension_descriptor*);
+int32_t duckdb_extension_core_functions_describe(duckdb_extension_descriptor*);
+int32_t duckdb_extension_icu_describe(duckdb_extension_descriptor*);
+int32_t duckdb_extension_json_describe(duckdb_extension_descriptor*);
+int32_t duckdb_extension_parquet_describe(duckdb_extension_descriptor*);
+}
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -148,8 +159,31 @@ struct Backend::Database {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
+    static const bool registered = [] {
+      for (const auto describe : {
+               duckdb_extension_autocomplete_describe,
+               duckdb_extension_core_functions_describe,
+               duckdb_extension_icu_describe,
+               duckdb_extension_json_describe,
+               duckdb_extension_parquet_describe,
+           }) {
+        if (duckdb_register_static_extension(describe) != 0) {
+          throw BackendError("DuckDB failed to register a static extension");
+        }
+      }
+      return true;
+    }();
+    (void)registered;
+    Handle<duckdb_config, duckdb_destroy_config> config;
+    // Catalog discovery can encounter missing objects while a script transaction is open.
+    // Preserve the pre-v2 policy: binding errors must not abort that transaction.
+    if (duckdb_create_config(config.out()) == DuckDBError ||
+        duckdb_set_config(config.get(), "default_transaction_invalidation_policy",
+                          "SYNTACTIC_ERRORS_DO_NOT_INVALIDATE") == DuckDBError) {
+      throw BackendError("DuckDB failed to configure transaction invalidation");
+    }
     char* error = nullptr;
-    const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), nullptr, &error);
+    const duckdb_state state = duckdb_open_ext(nullptr, handle.out(), config.get(), &error);
     DuckString const message(error);
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");

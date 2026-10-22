@@ -10,8 +10,11 @@ known_errors {
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_covar_samp_double_extreme_inf"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_rows_unbounded_current_row_params"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_rows_unbounded_current_row_params_2"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_var_pop_double_extreme_inf"
   label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_KDjrF6nUHds_157e@308>"
   label: "code:ArrayAvg_ARRAY<FLOAT64>_<-1@79769_Z2n3zEGqg0Q_08, NULL>"
   label: "stat_aggregation_test:covar_pop_double_extreme_negative_slope"
   label: "stat_aggregation_test:covar_samp_double_extreme_negative_slope"
+  label: "stat_aggregation_test:var_pop_double_extreme_inf"
+  label: "stat_aggregation_test:var_samp_double_extreme_inf"
 }

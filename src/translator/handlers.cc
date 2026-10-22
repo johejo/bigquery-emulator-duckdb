@@ -109,7 +109,7 @@ std::string Bind(const std::vector<std::string>& args, const std::vector<size_t>
   std::ranges::transform(indexes, std::back_inserter(fields), [&](size_t i) {
     return "a" + std::to_string(i + 1) + " := " + args.at(i);
   });
-  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _sc -> " + body + ")[1]";
+  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], lambda _sc: " + body + ")[1]";
 }
 
 std::string Bound(size_t i) { return "_sc.a" + std::to_string(i + 1); }
@@ -121,8 +121,8 @@ std::string StructInArray(const googlesql::Type* type, const std::string& value,
   // TRUE when an element is equal, otherwise NULL when a comparison is NULL; FALSE for an empty
   // or NULL array.
   return Bind({value, array}, {0, 1},
-              "list_transform([list_transform(_sc.a2, _e -> " + Equal(type, "_sc.a1", "_e") +
-                  ")], _b -> CASE WHEN list_contains(_b, true) THEN true WHEN len(_b) > "
+              "list_transform([list_transform(_sc.a2, lambda _e: " + Equal(type, "_sc.a1", "_e") +
+                  ")], lambda _b: CASE WHEN list_contains(_b, true) THEN true WHEN len(_b) > "
                   "list_count(_b) THEN NULL ELSE false END)[1]");
 }
 
@@ -193,7 +193,8 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
     // A day past the origin's day of the month starts the next bucket, and last days of the
     // month count as the same day.
     bucket =
-        "list_transform([(year(_bk.x) - year(_bk.o)) * 12 + month(_bk.x) - month(_bk.o)], _m -> "
+        "list_transform([(year(_bk.x) - year(_bk.o)) * 12 + month(_bk.x) - month(_bk.o)], lambda "
+        "_m: "
         "CAST(_bk.o + to_months(CAST(_m - _m % _bk.w - CASE WHEN _m % _bk.w < 0 OR (_m % _bk.w = "
         "0 AND NOT (_bk.o = last_day(_bk.o) AND _bk.x = last_day(_bk.x)) AND day(_bk.x) < "
         "day(_bk.o)) THEN _bk.w ELSE 0 END AS INTEGER)) AS DATE))[1]";
@@ -210,7 +211,7 @@ std::optional<std::string> Bucket(const ScalarCall& call) {
                                ? "'Zero bucket width INTERVAL is not allowed'"
                                : "'Exactly one non-zero INTERVAL part in bucket width is required'";
   return "list_transform([struct_pack(x := " + args.at(0) + ", w := " + args.at(1) +
-         ", o := " + origin + ")], _bk -> CASE WHEN _bk.w < 0 THEN " +
+         ", o := " + origin + ")], lambda _bk: CASE WHEN _bk.w < 0 THEN " +
          call.Raise("'Negative bucket width INTERVAL is not allowed'") + " WHEN _bk.w = 0 THEN " +
          call.Raise(zero) + " ELSE " + bucket + " END)[1]";
 }
@@ -368,7 +369,7 @@ std::optional<std::string> ArrayConcat(const ScalarCall& call) {
     nulls.push_back("_cat." + field + " IS NULL");
     lists.push_back("_cat." + field);
   }
-  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], _cat -> CASE WHEN " +
+  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], lambda _cat: CASE WHEN " +
          Join(nulls, " OR ") + " THEN NULL ELSE list_concat(" + Join(lists, ", ") + ") END)[1]";
 }
 
@@ -407,7 +408,7 @@ std::optional<std::string> Extremum(const ScalarCall& call) {
     body += "WHEN isnan(list_max(_ext)) THEN list_max(_ext) ";
   }
   body += std::string("ELSE ") + (greatest ? "list_max" : "list_min") + "(_ext) END";
-  return "list_transform([[" + Join(Sqls(call), ", ") + "]], _ext -> " + body + ")[1]";
+  return "list_transform([[" + Join(Sqls(call), ", ") + "]], lambda _ext: " + body + ")[1]";
 }
 
 // KEYS.ADD_KEY_FROM_RAW_BYTES with the key type 'AES_GCM'. 'AES_CBC_PKCS' keys decrypt a
@@ -445,12 +446,13 @@ std::optional<std::string> MakeRef(const ScalarCall& call) {
   const std::string project = QuoteLiteral(call.project);
   if (args.size() == 2) {
     return "list_transform([" + args.at(0) +
-           "], _objref -> CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := "
+           "], lambda _objref: CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := "
            "_objref.uri, version := _objref.version, authorizer := bq_obj_replace_authorizer(" +
            args.at(1) + ", " + project + "), details := _objref.details) AS " + *type + ") END)[1]";
   }
   return "list_transform([" + args.at(0) +
-         "], _objref -> CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := _objref, "
+         "], lambda _objref: CASE WHEN _objref IS NULL THEN NULL ELSE CAST(struct_pack(uri := "
+         "_objref, "
          "version := " +
          args.at(2) + ", authorizer := bq_obj_authorizer(" + args.at(1) + ", " + project +
          "), details := bq_obj_details(" + args.at(3) + ")) AS " + *type + ") END)[1]";
@@ -469,7 +471,8 @@ std::optional<std::string> FetchMetadata(const ScalarCall& call) {
            ") AS " + *type + ")";
   };
   if (result->IsArray()) {
-    return "list_transform(" + call.arguments.at(0).sql + ", _objref -> " + fetch("_objref") + ")";
+    return "list_transform(" + call.arguments.at(0).sql + ", lambda _objref: " + fetch("_objref") +
+           ")";
   }
   return fetch(call.arguments.at(0).sql);
 }

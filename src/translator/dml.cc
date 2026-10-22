@@ -514,12 +514,69 @@ std::optional<std::string> Merge(const googlesql::ResolvedMergeStmt& merge, cons
     }
     affected.push_back("(" + *predicate + ")");
   }
-  const std::string source_sql =
-      has_matched_update
-          ? CheckedDmlSource(source->sql, *target, *condition, Join(affected, " OR "))
-          : source->sql;
-  return "MERGE INTO " + target->table + " AS _t USING (" + source_sql + ") AS q ON " + *condition +
-         " " + Join(clauses, " ");
+  std::string source_sql = source->sql;
+  std::string merge_condition = *condition;
+  if (has_matched_update) {
+    source_sql = CheckedDmlSource(source_sql, *target, merge_condition, Join(affected, " OR "));
+  } else if (!affected.empty()) {
+    // BigQuery permits duplicate matches when no matched clause updates. DuckDB v2 rejects
+    // duplicate deletes too: retain one source per target value, preferring a deleting match.
+    // Keep every unmatched source for INSERT, and match against the original target snapshot.
+    // Whole rows also cover identical target rows without relying on an unshadowed rowid.
+    Target matched_target = *target;
+    for (const auto& [id, name] : target->names) {
+      matched_target.columns.at(id) =
+          StoredColumn("_t._bq_row." + name, target->column_types.at(id));
+    }
+    const Scope matched_scope = DmlScope(scope, matched_target);
+    Columns matched_columns = matched_target.columns;
+    matched_columns.insert(source->columns.begin(), source->columns.end());
+    const auto matched_condition = Expression(*merge.merge_expr(), matched_scope, matched_columns);
+    if (!matched_condition) {
+      return std::nullopt;
+    }
+    std::vector<std::string> snapshot_fields;
+    std::vector<std::string> target_fields;
+    for (int i = 0; i < merge.table_scan()->table()->NumColumns(); ++i) {
+      const std::string name = QuoteIdentifier(merge.table_scan()->table()->GetColumn(i)->Name());
+      snapshot_fields.emplace_back(name).append(" := _r.").append(name);
+      target_fields.emplace_back(name).append(" := _t.").append(name);
+    }
+    std::vector<std::string> deletes;
+    std::vector<std::string> unmatched_clauses;
+    for (int i = 0; i < merge.when_clause_list_size(); ++i) {
+      const auto& when = merge.when_clause_list(i);
+      if (when->match_type() != googlesql::ResolvedMergeWhen::MATCHED) {
+        unmatched_clauses.push_back(clauses.at(i));
+        continue;
+      }
+      const auto predicate = when->match_expr() == nullptr
+                                 ? std::optional<std::string>("TRUE")
+                                 : Expression(*when->match_expr(), matched_scope, matched_columns);
+      if (!predicate) {
+        return std::nullopt;
+      }
+      deletes.push_back("(" + *predicate + ")");
+    }
+    source_sql = "WITH _source AS MATERIALIZED (" + source_sql +
+                 ") SELECT * EXCLUDE (_bq_rank) FROM (SELECT *, row_number() OVER (PARTITION BY "
+                 "_bq_target ORDER BY _bq_delete DESC NULLS LAST) AS _bq_rank FROM (SELECT q.*, "
+                 "CASE WHEN _t._bq_present THEN _t._bq_row END AS _bq_target, (" +
+                 Join(deletes, " OR ") +
+                 ") AS _bq_delete FROM _source AS q LEFT JOIN "
+                 "(SELECT struct_pack(" +
+                 Join(snapshot_fields, ", ") + ") AS _bq_row, TRUE AS _bq_present FROM " +
+                 target->table + " AS _r) AS _t ON " + *matched_condition +
+                 ")) WHERE _bq_target IS NULL OR _bq_rank = 1";
+    merge_condition =
+        "q._bq_target IS NOT NULL AND q._bq_target IS NOT DISTINCT FROM "
+        "struct_pack(" +
+        Join(target_fields, ", ") + ")";
+    clauses = {"WHEN MATCHED AND q._bq_delete THEN DELETE"};
+    clauses.insert(clauses.end(), unmatched_clauses.begin(), unmatched_clauses.end());
+  }
+  return "MERGE INTO " + target->table + " AS _t USING (" + source_sql + ") AS q ON " +
+         merge_condition + " " + Join(clauses, " ");
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

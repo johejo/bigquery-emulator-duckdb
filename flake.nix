@@ -20,7 +20,6 @@
           buildPackages =
             with pkgs;
             [ bazelisk ]
-            # llvm supplies the prefixed tools used to patch DuckDB archives in MODULE.bazel.
             # bintools wraps ld.lld so Nix's runtime paths are set.
             ++ lib.optionals stdenv.hostPlatform.isLinux [
               llvmPackages_23.bintools

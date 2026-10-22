@@ -92,100 +92,67 @@ http_archive(
 )
 
 # Prebuilt static libduckdb per platform, linked into the binary; //third_party/duckdb selects the
-# one for the target platform, so only that archive is downloaded.
-#
-# DuckDB's ICU extension embeds ICU 66 and GoogleSQL links ICU 76. ICU versions nearly all of its
-# symbols, but the UCaseMap constructors and destructors sit outside the versioned namespace and
-# the two versions' layouts differ, so DuckDB's copies are made local to its archive.
-#
-# The checks around the localization fail the fetch when a new release no longer matches these
-# assumptions: the symbols must be defined in libicu_extension.a, no object may reference them
-# from outside (such a reference would silently bind to GoogleSQL's ICU 76 copy once DuckDB's is
-# local), and afterwards no archive may still export them.
-#
-# The tools are named explicitly so that no other nm or objcopy on PATH is picked up: Apple's own
-# on macOS, where nmedit exists only in cctools, and the devshell's LLVM on Linux.
-_UCASEMAP_ERROR = "echo 'DuckDB static-libs: %s; revisit the UCaseMap localization in MODULE.bazel' >&2; exit 1"
-
-_UCASEMAP_BEFORE = "; ".join([
-    "set -euo pipefail",
-    "defined=$(\"$NM\" -g --defined-only libicu_extension.a | awk '/ZN8UCaseMap/ {print $3}')",
-    "if [ -z \"$defined\" ]; then " + _UCASEMAP_ERROR % "libicu_extension.a defines no UCaseMap symbols" + "; fi",
-    "undefined=$(\"$NM\" -u lib*.a)",
-    "if grep -q ZN8UCaseMap <<<\"$undefined\"; then " + _UCASEMAP_ERROR % "an object references UCaseMap from outside its definition" + "; fi",
-]) + "; "
-
-_UCASEMAP_AFTER = "; " + "; ".join([
-    "exported=$(\"$NM\" -g --defined-only lib*.a)",
-    "if grep -q ZN8UCaseMap <<<\"$exported\"; then " + _UCASEMAP_ERROR % "UCaseMap symbols are still exported" + "; fi",
-])
-
-_LOCALIZE_UCASEMAP_MACOS = "NM=/usr/bin/nm; " + _UCASEMAP_BEFORE + "printf '%s\\n' \"$defined\" > ucasemap.syms && /usr/bin/nmedit -R ucasemap.syms libicu_extension.a && rm ucasemap.syms" + _UCASEMAP_AFTER
-
-_LOCALIZE_UCASEMAP_LINUX = "NM=llvm-nm; " + _UCASEMAP_BEFORE + "llvm-objcopy --wildcard --localize-symbol='_ZN8UCaseMap*' libicu_extension.a" + _UCASEMAP_AFTER
-
+# one for the target platform, so only that archive is downloaded. DuckDB v2's ICU extension
+# no longer embeds ICU, so the UCaseMap symbol localization used with v1 is unnecessary.
 http_archive(
     name = "duckdb_prebuilt_macos_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = [_LOCALIZE_UCASEMAP_MACOS],
-    sha256 = "e77c382fba15e3f5c0b3265d12e3a4de534699fdb91bcc9d10d4a857a58103d5",
+    sha256 = "c3a571e6d4a0da97534c631df463ab13c07f8cf78049625f5df936b7beaab9ce",
     urls = [
-        "https://install.duckdb.org/v1.5.6/static-libs-osx-arm64.zip",
-        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-osx-arm64.zip",
+        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-osx-arm64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-osx-arm64.tar.gz",
     ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_amd64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
-    sha256 = "ab3d1d33951b8cb8bdcae740d8e06adf66bfb7ee880a3f7052d7a35088e16d2d",
+    sha256 = "112d62c980f5447cd303a70b3dacbc09acd41ccb4ef6d154e8629f543a0f8568",
     urls = [
-        "https://install.duckdb.org/v1.5.6/static-libs-linux-amd64.zip",
-        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-linux-amd64.zip",
+        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-linux-amd64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-linux-amd64.tar.gz",
     ],
 )
 
 http_archive(
     name = "duckdb_prebuilt_linux_arm64",
     build_file = "//third_party/duckdb:BUILD.duckdb.bazel",
-    patch_cmds = [_LOCALIZE_UCASEMAP_LINUX],
-    sha256 = "56249751117a4c04289764e06eb431352ce33fb3f8e2f30401122d4d0e184139",
+    sha256 = "8171b4842e68a85b2e82b342d3bf7b542a88fd6666e0c18438d7b459012494ee",
     urls = [
-        "https://install.duckdb.org/v1.5.6/static-libs-linux-arm64.zip",
-        "https://github.com/duckdb/duckdb/releases/download/v1.5.6/static-libs-linux-arm64.zip",
+        "https://install.duckdb.org/v2.0.0/duckdb-static-libs-linux-arm64.tar.gz",
+        "https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-static-libs-linux-arm64.tar.gz",
     ],
 )
 
 # DuckDB's postgres_scanner extension, compiled against the C++ headers of the same DuckDB release
 # as the prebuilt libraries and linked into the binary; see third_party/duckdb_postgres. The
-# extension and database-connector commits are those DuckDB v1.5.6 pins in
+# extension and database-connector commits are those DuckDB v2.0.0 pins in
 # .github/config/extensions/postgres_scanner.cmake and in the extension's submodule.
 http_archive(
     name = "duckdb_source",
     build_file = "//third_party/duckdb_postgres:BUILD.duckdb_source.bazel",
-    sha256 = "1fadcbe9e69e1470f9093b6bcde08daf477d729c449e59a807f45c346622099b",
-    strip_prefix = "duckdb-1.5.6",
-    urls = ["https://github.com/duckdb/duckdb/archive/refs/tags/v1.5.6.tar.gz"],
+    sha256 = "7e89053255046bfb26afbd7f524a2fb84df7dbef496aa911ea35e4a1182fdc00",
+    strip_prefix = "duckdb-2.0.0",
+    urls = ["https://github.com/duckdb/duckdb/archive/refs/tags/v2.0.0.tar.gz"],
 )
 
 http_archive(
     name = "duckdb_postgres",
     build_file = "//third_party/duckdb_postgres:BUILD.duckdb_postgres.bazel",
-    sha256 = "6c063c0149914c63e43a876fdd68c72aafe9f0943ab600fea6a1cb826eb570cb",
-    strip_prefix = "duckdb-postgres-318dabb2474fc3789b0199301a2e661e19c1b4fc",
-    urls = ["https://github.com/duckdb/duckdb-postgres/archive/318dabb2474fc3789b0199301a2e661e19c1b4fc.tar.gz"],
+    sha256 = "f887a835e224e2b3134d9bc67f77efbca6a5a09f7d575aac13df91cfd26a84f3",
+    strip_prefix = "duckdb-postgres-c0f5a3c0c4b68b02afbf669d36d7f0e503985c88",
+    urls = ["https://github.com/duckdb/duckdb-postgres/archive/c0f5a3c0c4b68b02afbf669d36d7f0e503985c88.tar.gz"],
 )
 
 http_archive(
     name = "duckdb_database_connector",
     build_file = "//third_party/duckdb_postgres:BUILD.database_connector.bazel",
-    sha256 = "75183a89b801ce7a172594580665ce321684e6831dbb632d8770be94b166e07b",
-    strip_prefix = "database-connector-0a8505f775dae7bb30edd37f848d5975bf72884e",
-    urls = ["https://github.com/duckdb/database-connector/archive/0a8505f775dae7bb30edd37f848d5975bf72884e.tar.gz"],
+    sha256 = "34ec9b87023960e9286ce23351c926a21efff44ae137e5a1409ad2b3c6e365cf",
+    strip_prefix = "database-connector-c305670b5729cc6dbda8d395eeb63b4d1487c064",
+    urls = ["https://github.com/duckdb/database-connector/archive/c305670b5729cc6dbda8d395eeb63b4d1487c064.tar.gz"],
 )
 
-# MySQL extension pinned by DuckDB v1.5.6. Keep decimals lossless until BigQuery conversion.
+# MySQL extension pinned by DuckDB v2.0.0. Keep decimals lossless until BigQuery conversion.
 http_archive(
     name = "duckdb_mysql",
     build_file = "//third_party/duckdb_mysql:BUILD.duckdb_mysql.bazel",
@@ -194,9 +161,9 @@ http_archive(
         "//third_party/duckdb_mysql:bigquery_types.patch",
         "//third_party/duckdb_mysql:static_symbols.patch",
     ],
-    sha256 = "32ec9a3b97ddee39f93d2460a57ed6f2d69a960d1e5041a608913c5425343230",
-    strip_prefix = "duckdb-mysql-99c2e091b153b7f1cbd449988332232e75684b41",
-    urls = ["https://github.com/duckdb/duckdb-mysql/archive/99c2e091b153b7f1cbd449988332232e75684b41.tar.gz"],
+    sha256 = "a4d3c1c924852304987dcf108edab0956ceefe63ff7f5cf802d247421245bf59",
+    strip_prefix = "duckdb-mysql-f7fc0d42716534aa5ad48626d21ced9807b33967",
+    urls = ["https://github.com/duckdb/duckdb-mysql/archive/f7fc0d42716534aa5ad48626d21ced9807b33967.tar.gz"],
 )
 
 http_archive(

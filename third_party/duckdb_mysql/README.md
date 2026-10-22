@@ -2,7 +2,7 @@
 
 DuckDB's [mysql_scanner](https://github.com/duckdb/duckdb-mysql) extension is compiled against
 `duckdb_source` and linked statically, as [postgres_scanner](../duckdb_postgres/README.md) is.
-`MODULE.bazel` pins the commit that DuckDB v1.5.6 uses. Both extensions use the same
+`MODULE.bazel` pins the commit that DuckDB v2.0.0 uses. Both extensions use the same
 `database-connector` sources.
 
 `bigquery_types.patch` reads DECIMAL as VARCHAR so no digits are lost before EXTERNAL_QUERY

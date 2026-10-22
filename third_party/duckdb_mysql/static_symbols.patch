@@ -1,7 +1,7 @@
 diff --git a/src/storage/mysql_catalog.cpp b/src/storage/mysql_catalog.cpp
 --- a/src/storage/mysql_catalog.cpp
 +++ b/src/storage/mysql_catalog.cpp
-@@ -68,7 +68,7 @@
+@@ -100,6 +100,6 @@
  	return result;
  }
  
@@ -9,11 +9,10 @@ diff --git a/src/storage/mysql_catalog.cpp b/src/storage/mysql_catalog.cpp
 +static unique_ptr<SecretEntry> GetSecret(ClientContext &context, const string &secret_name) {
  	auto &secret_manager = SecretManager::Get(context);
  	auto transaction = CatalogTransaction::GetSystemCatalogTransaction(context);
- 	// FIXME: this should be adjusted once the `GetSecretByName` API supports this
 diff --git a/src/storage/mysql_schema_entry.cpp b/src/storage/mysql_schema_entry.cpp
 --- a/src/storage/mysql_schema_entry.cpp
 +++ b/src/storage/mysql_schema_entry.cpp
-@@ -174,7 +174,7 @@
+@@ -179,7 +179,7 @@
  	tables.AlterTable(mysql_transaction, alter);
  }
  

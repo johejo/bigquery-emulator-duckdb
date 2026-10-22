@@ -1491,8 +1491,6 @@ known_errors {
   label: "analytic_avg_test:analytic_avg_distinct_numeric_no_overflow_1"
   label: "analytic_avg_test:analytic_avg_range_current_and_following_double_asc"
   label: "analytic_avg_test:analytic_avg_range_current_and_following_double_desc"
-  label: "analytic_avg_test:analytic_avg_trailing_rows_moving_avg_2"
-  label: "analytic_avg_test:analytic_avg_trailing_rows_moving_avg_3"
 }
 
 known_errors {
@@ -1601,12 +1599,6 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "DuckDB cannot flatten a FULL JOIN of arrays in a correlated subquery"
-  label: "array_joins_test:array_full_join_in_correlated_subquery_with_offset"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
   reason: "DuckDB rejects RANGE window frames ordered by BIGNUMERIC"
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_asc_with_special_values_1"
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_asc_with_special_values_10"
@@ -1629,13 +1621,6 @@ known_errors {
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_desc_with_special_values_6"
   label: "analytic_bignumeric_range_window_frames_test:bignumeric_range_window_desc_without_special_values_1"
   label: "analytic_bignumeric_range_window_frames_test:range_window_asc_with_special_values_7"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "DuckDB rejects a LEFT JOIN of UNNEST whose condition does not compare both sides"
-  label: "unnest_queries_test:unnest_6"
-  label: "unnest_queries_test:unnest_7"
 }
 
 known_errors {
@@ -1838,7 +1823,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "ROUND fails on a precision beyond INT32 and rounds infinities and NaN to 0"
+  reason: "ROUND differs at FLOAT64 rounding boundaries and overflows on large finite values"
   label: "code:round_FLOAT64_3@1415925_INT64_-9223372036854775808"
   label: "code:round_FLOAT64_3@1415925_INT64_9223372036854775807"
   label: "code:safe_error_mode__safe_round_NUMERIC_-99999999999999999999999999999.999999999"
@@ -1853,11 +1838,8 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "ROUND fails on a precision beyond INT32 and rounds infinities and NaN to 0"
-  label: "code:round_FLOAT64_-inf_INT64_-1000"
+  reason: "ROUND differs at FLOAT64 rounding boundaries and overflows on large finite values"
   label: "code:round_FLOAT64_1@2345_INT64_3"
-  label: "code:round_FLOAT64_inf_INT64_-1000"
-  label: "code:round_FLOAT64_nan_INT64_-1000"
   label: "code:safe_error_mode__safe_round_FLOAT64_1@6e308_INT64_-308"
 }
 
@@ -1958,16 +1940,10 @@ known_errors {
 }
 
 known_errors {
-  mode: ALLOW_ERROR
-  reason: "Variance, standard deviation, covariance and correlation over windows fail as out of range or lose precision where BigQuery returns a result"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_bounded_begin"
-  label: "analytic_stat_aggregation_test:analytic_stats_double_column_bounded_end"
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "Window statistics return NaN instead of NULL for a single pair, or zero instead of NaN for a nonfinite singleton"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_cumulative"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_moving_window"
-  label: "analytic_stat_aggregation_test:analytic_stats_single_column_bounded_begin"
-  label: "analytic_stat_aggregation_test:analytic_stats_single_column_bounded_end"
-  label: "analytic_stat_aggregation_test:analytic_stats_single_column_cumulative"
-  label: "analytic_stat_aggregation_test:analytic_stats_single_column_moving_window"
   label: "analytic_stat_aggregation_test:analytic_stats_single_column_range_offset_preceding"
 }
 
@@ -1976,6 +1952,17 @@ known_errors {
   reason: "Variance, standard deviation, covariance and correlation over windows fail as out of range or lose precision where BigQuery returns a result"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_cumulative_numeric"
   label: "analytic_stat_aggregation_test:analytic_stats_double_column_moving_window_numeric"
+}
+
+known_errors {
+  mode: ALLOW_ERROR_OR_WRONG_ANSWER
+  reason: "GoogleSQL's reference implementation computes extreme FLOAT64 averages and statistics in long double, and the emulator's results differ from it"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_rows_unbounded_current_row_params_2"
+  label: "analytic_stat_aggregation_test:analytic_stats_single_column_stddev_samp_double_extreme"
+  label: "stat_aggregation_test:corr_double_extreme_negative_slope"
+  label: "stat_aggregation_test:stddev_pop_double_extreme"
+  label: "stat_aggregation_test:stddev_samp_double_extreme"
 }
 
 known_errors {
@@ -2003,4 +1990,34 @@ known_errors {
   label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_-1"
   label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_0"
   label: "code:safe_error_mode__safe_json_keys_JSON_NULL_INT64_1_STRING_<invalid>"
+}
+
+known_errors {
+  mode: ALLOW_ERROR
+  reason: "DuckDB v2 rejects invalid UTF-8 in SQL literals before the backend can report the expected runtime error"
+  label: "code:CastTo_BYTES_STRING_<@xc2@xa3_dTGF3WUAsUQ_@xc2@xa3>_STRING_<utf-8>"
+  label: "code:CastTo_BYTES_STRING_<@xc2@xa3_dTGF3WUAsUQ_@xc2@xa3>_STRING_<utf8>"
+  label: "code:CastTo_BYTES_STRING_<sd@xffsd>_STRING_<ascii>"
+  label: "code:Like_STRING_<>_STRING_<@xc2>"
+  label: "code:Like_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8%>"
+  label: "code:Like_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0>"
+  label: "code:Like_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0_>"
+  label: "code:Like_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0__>"
+  label: "code:NotLike_STRING_<>_STRING_<@xc2>"
+  label: "code:NotLike_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8%>"
+  label: "code:NotLike_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0>"
+  label: "code:NotLike_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0_>"
+  label: "code:NotLike_STRING_<a@xe8@xb_hJW0JnUfL_E_@xb7@x62>_STRING_<a@xe8@xb0__>"
+  label: "code:initcap_STRING_<>_STRING_<a@xa7@x65q>"
+  label: "code:initcap_STRING_<a@xa7@x65q>"
+  label: "code:initcap_STRING_<a@xa7@x65q>_STRING_< >"
+  label: "code:regexp_extract_STRING_<a@xa7@x65q>_STRING_<@xa7>_INT64_1"
+  label: "code:regexp_instr_STRING_<a@xa7@x65q>_STRING_<@xa7>_INT64_1"
+  label: "code:to_code_points_STRING_<@x11@xff@xff>"
+  label: "code:to_code_points_STRING_<@xd7@xff@xd8@xff>"
+  label: "code:translate_STRING_<abcde>_STRING_<a@xc0>_STRING_<bc>"
+  label: "code:translate_STRING_<abcde>_STRING_<ab>_STRING_<b@xc0>"
+  label: "code:unicode_STRING_<@xd8>"
+  label: "code:unicode_STRING_<@xdf@xff>"
+  label: "code:unicode_STRING_<@xff@xff@xff@xff>"
 }
