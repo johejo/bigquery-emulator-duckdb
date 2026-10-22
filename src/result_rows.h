@@ -52,7 +52,9 @@ class ResultRows {
   };
 
   ResultRows() = default;
-  // A NULL array is an empty one, as BigQuery returns it, unless `null_arrays` is set.
+  // A NULL array is an empty one, as BigQuery returns it, unless `null_arrays` is set. Values
+  // that can fail to encode, such as an INTERVAL or BIGNUMERIC out of range, are encoded now and
+  // throw BackendError, so that the statement fails rather than a later read of its rows.
   ResultRows(std::shared_ptr<const ResultChunks> chunks, bool null_arrays);
 
   [[nodiscard]] size_t size() const;
