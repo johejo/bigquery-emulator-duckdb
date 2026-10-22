@@ -184,7 +184,7 @@ absl::StatusOr<std::string> TimeTravelQuery(Backend& backend, const TableReferen
       "SELECT count(*) FILTER (WHERE NOT kept), count(*) FROM {} WHERE ({} OR dataset_id IS NULL) "
       "AND valid_to > {}",
       history, versions, time));
-  const auto& cells = later.rows.at(0).at("f");
+  const nlohmann::json cells = later.rows.at(0).at("f");
   if (cells.at(0).at("v") != "0") {
     return absl::UnimplementedError(
         "FOR SYSTEM_TIME AS OF a time before the table's schema changed or it was renamed");

@@ -19,6 +19,7 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
 #include "src/field_schema.h"
+#include "src/result_chunks.h"
 #include "src/storage_read_codec.h"
 #include "src/vector_cell.h"
 
@@ -290,29 +291,11 @@ class StorageSnapshot::Impl {
   std::shared_ptr<Backend> session;
   Handle<duckdb_arrow_options, duckdb_destroy_arrow_options> options;
   std::vector<FieldSchema> fields;
-  std::vector<LogicalType> types;
   // Whether DuckDB exports each column in the layout Storage Read gives it.
   std::vector<bool> direct;
   std::vector<duckdb_logical_type> direct_types;
   nanoarrow::UniqueSchema wire;
-  std::vector<Chunk> chunks;
-  std::vector<size_t> ends;
-
-  // Calls visit(chunk, begin, take, copied) for each run of rows [offset, offset + count) in
-  // one chunk, where `copied` rows precede it.
-  template <typename F>
-  void Runs(size_t offset, size_t count, const F& visit) const {
-    size_t copied = 0;
-    size_t index = std::ranges::upper_bound(ends, offset) - ends.begin();
-    while (copied < count) {
-      const size_t begin = index == 0 ? 0 : ends.at(index - 1);
-      const size_t take = std::min(count - copied, ends.at(index) - offset);
-      visit(chunks.at(index).get(), offset - begin, take, copied);
-      copied += take;
-      offset += take;
-      ++index;
-    }
-  }
+  std::unique_ptr<const ResultChunks> chunks;
 };
 
 StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema> schema,
@@ -326,9 +309,9 @@ StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema>
   state.fields = std::move(schema);
   *state.options.out() = duckdb_result_get_arrow_options(&result);
   StorageReadArraySchema(state.wire.get(), state.fields, false);
+  state.chunks = std::make_unique<const ResultChunks>(result, state.session);
   for (idx_t i = 0; i < state.fields.size(); ++i) {
-    state.types.emplace_back(duckdb_column_logical_type(&result, i));
-    duckdb_logical_type type = state.types.back().get();
+    duckdb_logical_type type = state.chunks->type(i);
     bool direct = Eligible(state.fields.at(i)) && NativeStorage(type);
     if (direct) {
       // Some DuckDB types have no Arrow representation; their export fails and they use vector
@@ -345,23 +328,13 @@ StorageSnapshot::StorageSnapshot(duckdb_result& result, std::vector<FieldSchema>
       state.direct_types.push_back(type);
     }
   }
-  size_t count = 0;
-  while (true) {
-    Chunk chunk(duckdb_fetch_chunk(result));
-    if (chunk.get() == nullptr) {
-      break;
-    }
-    count += duckdb_data_chunk_get_size(chunk.get());
-    state.chunks.push_back(std::move(chunk));
-    state.ends.push_back(count);
-  }
 }
 
 StorageSnapshot::~StorageSnapshot() = default;
 
 const std::vector<FieldSchema>& StorageSnapshot::schema() const { return impl_->fields; }
 
-size_t StorageSnapshot::row_count() const { return impl_->ends.empty() ? 0 : impl_->ends.back(); }
+size_t StorageSnapshot::row_count() const { return impl_->chunks->row_count(); }
 
 std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) const {
   auto& state = *impl_;
@@ -377,13 +350,14 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
     }
     ArrowArray* child = root->children[column];
     Check(ArrowArrayStartAppending(child), error);
-    state.Runs(offset, count, [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
-      for (size_t row = begin; row < begin + take; ++row) {
-        AppendArrowVector(child, state.fields.at(column),
-                          duckdb_data_chunk_get_vector(chunk, column), state.types.at(column).get(),
-                          row);
-      }
-    });
+    state.chunks->Runs(offset, count,
+                       [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
+                         for (size_t row = begin; row < begin + take; ++row) {
+                           AppendArrowVector(child, state.fields.at(column),
+                                             duckdb_data_chunk_get_vector(chunk, column),
+                                             state.chunks->type(column), row);
+                         }
+                       });
     Check(ArrowArrayFinishBuildingDefault(child, &error), error);
   }
   if (!state.direct_types.empty()) {
@@ -394,19 +368,19 @@ std::string StorageSnapshot::ReadRows(size_t offset, size_t count, bool arrow) c
     const Handle<duckdb_selection_vector, DestroySelection> selection(
         duckdb_create_selection_vector(count));
     auto* indices = duckdb_selection_vector_get_data_ptr(selection.get());
-    state.Runs(offset, count,
-               [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t copied) {
-                 for (size_t i = 0; i < take; ++i) {
-                   indices[i] = static_cast<sel_t>(begin + i);
-                 }
-                 for (size_t column = 0, target = 0; column < state.fields.size(); ++column) {
-                   if (state.direct.at(column)) {
-                     duckdb_vector_copy_sel(duckdb_data_chunk_get_vector(chunk, column),
-                                            duckdb_data_chunk_get_vector(selected.get(), target++),
-                                            selection.get(), take, 0, copied);
-                   }
-                 }
-               });
+    state.chunks->Runs(
+        offset, count, [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t copied) {
+          for (size_t i = 0; i < take; ++i) {
+            indices[i] = static_cast<sel_t>(begin + i);
+          }
+          for (size_t column = 0, target = 0; column < state.fields.size(); ++column) {
+            if (state.direct.at(column)) {
+              duckdb_vector_copy_sel(duckdb_data_chunk_get_vector(chunk, column),
+                                     duckdb_data_chunk_get_vector(selected.get(), target++),
+                                     selection.get(), take, 0, copied);
+            }
+          }
+        });
     duckdb_data_chunk_set_size(selected.get(), count);
     nanoarrow::UniqueArray exported;
     Check(duckdb_data_chunk_to_arrow(state.options.get(), selected.get(), exported.get()));

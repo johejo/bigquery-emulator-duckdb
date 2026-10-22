@@ -37,6 +37,7 @@
 #include "src/interval.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
+#include "src/result_chunks.h"
 #include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
 #include "src/vector_cell.h"
@@ -517,6 +518,10 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   }
 }
 
+// The cell, {"v": ...}, of `row` of a result vector in BigQuery's wire format. A NULL array is
+// an empty one, as BigQuery returns it, unless `null_arrays` is set.
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays);
+
 // A RANGE as BigQuery writes it, "[start, end)", with each bound as its own cell would be, or
 // UNBOUNDED for an infinite or NULL one.
 std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
@@ -692,6 +697,8 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
   }
 }
 
+namespace {
+
 json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
   const bool is_null = validity != nullptr && !duckdb_validity_row_is_valid(validity, row);
@@ -800,8 +807,6 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
   return json{{"v", std::move(value)}};
 }
 
-namespace {
-
 // Statements that produce a result set. Everything else (DDL, DML, SET, ...) yields a
 // single "Count" or "Success" column that is not part of the BigQuery result.
 bool ProducesResultSet(duckdb_statement_type type) {
@@ -882,7 +887,54 @@ void Query(duckdb_connection connection, const std::string& sql) {
   Query(connection, sql, result);
 }
 
-QueryResult Materialize(Result& result, bool null_arrays) {
+// Whether encoding a value of `type` as a cell can fail, such as a BIGNUMERIC out of range.
+bool MayFailToEncode(duckdb_logical_type type) {
+  switch (duckdb_get_type_id(type)) {
+    case DUCKDB_TYPE_BOOLEAN:
+    case DUCKDB_TYPE_TINYINT:
+    case DUCKDB_TYPE_SMALLINT:
+    case DUCKDB_TYPE_INTEGER:
+    case DUCKDB_TYPE_BIGINT:
+    case DUCKDB_TYPE_UTINYINT:
+    case DUCKDB_TYPE_USMALLINT:
+    case DUCKDB_TYPE_UINTEGER:
+    case DUCKDB_TYPE_UBIGINT:
+    case DUCKDB_TYPE_HUGEINT:
+    case DUCKDB_TYPE_UHUGEINT:
+    case DUCKDB_TYPE_FLOAT:
+    case DUCKDB_TYPE_DOUBLE:
+    case DUCKDB_TYPE_DATE:
+    case DUCKDB_TYPE_TIME:
+    case DUCKDB_TYPE_TIME_NS:
+    case DUCKDB_TYPE_TIME_TZ:
+    case DUCKDB_TYPE_TIMESTAMP:
+    case DUCKDB_TYPE_TIMESTAMP_S:
+    case DUCKDB_TYPE_TIMESTAMP_MS:
+    case DUCKDB_TYPE_TIMESTAMP_NS:
+    case DUCKDB_TYPE_TIMESTAMP_TZ:
+    case DUCKDB_TYPE_VARCHAR:
+    case DUCKDB_TYPE_BLOB:
+    case DUCKDB_TYPE_UUID:
+    case DUCKDB_TYPE_ENUM:
+    case DUCKDB_TYPE_BIT:
+      return false;
+    case DUCKDB_TYPE_LIST:
+    case DUCKDB_TYPE_ARRAY:
+      return MayFailToEncode(ElementType(type).get());
+    case DUCKDB_TYPE_STRUCT:
+      for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
+        LogicalType const child(duckdb_struct_type_child_type(type, i));
+        if (MayFailToEncode(child.get())) {
+          return true;
+        }
+      }
+      return false;
+    default:
+      return true;
+  }
+}
+
+QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const void> owner) {
   const auto statement_type = duckdb_result_statement_type(result.result);
   QueryResult query_result;
   if (!ProducesResultSet(statement_type)) {
@@ -896,21 +948,22 @@ QueryResult Materialize(Result& result, bool null_arrays) {
     LogicalType const type(duckdb_column_logical_type(&result.result, i));
     query_result.schema.push_back(ToFieldSchema(duckdb_column_name(&result.result, i), type.get()));
   }
-  while (true) {
-    Chunk const chunk(duckdb_fetch_chunk(result.result));
-    if (chunk.get() == nullptr) {
-      break;
+  auto chunks = std::make_shared<const ResultChunks>(result.result, std::move(owner));
+  // Rows are encoded as they are read. Encode the values that can fail now, so that the
+  // statement fails rather than a later read of its rows.
+  for (size_t column = 0; column < chunks->column_count(); ++column) {
+    if (!MayFailToEncode(chunks->type(column))) {
+      continue;
     }
-    for (idx_t row = 0; row < duckdb_data_chunk_get_size(chunk.get()); ++row) {
-      json cells = json::array();
-      for (idx_t column = 0; column < duckdb_data_chunk_get_column_count(chunk.get()); ++column) {
-        duckdb_vector vector = duckdb_data_chunk_get_vector(chunk.get(), column);
-        LogicalType const type(duckdb_vector_get_column_type(vector));
-        cells.push_back(ToCell(vector, type.get(), row, null_arrays));
-      }
-      query_result.rows.push_back(json{{"f", std::move(cells)}});
-    }
+    chunks->Runs(0, chunks->row_count(),
+                 [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
+                   for (size_t row = begin; row < begin + take; ++row) {
+                     (void)ToCell(duckdb_data_chunk_get_vector(chunk, column), chunks->type(column),
+                                  row, null_arrays);
+                   }
+                 });
   }
+  query_result.rows = ResultRows(std::move(chunks), null_arrays);
   return query_result;
 }
 
@@ -923,6 +976,25 @@ void RunSetup(duckdb_connection connection, const std::vector<std::string>& setu
 }
 
 }  // namespace
+
+ResultRows::ResultRows(std::shared_ptr<const ResultChunks> chunks, bool null_arrays)
+    : chunks_(std::move(chunks)), null_arrays_(null_arrays) {}
+
+size_t ResultRows::size() const { return chunks_ ? chunks_->row_count() : 0; }
+
+json ResultRows::at(size_t row) const {
+  if (row >= size()) {
+    throw std::out_of_range("Query result row is out of range");
+  }
+  json cells = json::array();
+  chunks_->Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
+    for (size_t column = 0; column < chunks_->column_count(); ++column) {
+      cells.push_back(ToCell(duckdb_data_chunk_get_vector(chunk, column), chunks_->type(column),
+                             index, null_arrays_));
+    }
+  });
+  return json{{"f", std::move(cells)}};
+}
 
 json QueryResult::SchemaToJson() const {
   std::vector<FieldSchema> given = schema;
@@ -1035,7 +1107,7 @@ QueryResult Backend::ExecuteAll(const std::vector<std::string>& statements,
   }
   Result result;
   Query(connection, statements.back(), result);
-  return Materialize(result, null_arrays);
+  return Materialize(result, null_arrays, db_);
 }
 
 std::shared_ptr<const StorageSnapshot> Backend::ExecuteStorageRead(

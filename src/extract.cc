@@ -4,9 +4,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <ios>
 #include <iterator>
 #include <string>
@@ -296,14 +298,15 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
 
 }  // namespace
 
-void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<json>& rows,
-                      const TextExtractOptions& options, const std::string& path) {
+void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
+                      const std::function<json(size_t)>& row, const TextExtractOptions& options,
+                      const std::string& path) {
   CheckTextFields(schema);
   std::string contents;
   if (options.json) {
-    for (const json& row : rows) {
+    for (size_t i = 0; i < row_count; ++i) {
       std::string line;
-      AppendJsonObject(schema, row.at("f"), line);
+      AppendJsonObject(schema, row(i).at("f"), line);
       contents += EscapeHtml(line) + "\n";
     }
   } else {
@@ -324,8 +327,8 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, const std::vector<
       }
       contents += '\n';
     }
-    for (const json& row : rows) {
-      const json& cells = row.at("f");
+    for (size_t r = 0; r < row_count; ++r) {
+      const json cells = row(r).at("f");
       for (size_t i = 0; i < schema.size(); ++i) {
         if (i > 0) {
           contents += delimiter;

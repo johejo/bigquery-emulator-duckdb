@@ -12,15 +12,15 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
 #include "src/field_schema.h"
+#include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 
 namespace bigquery_emulator_duckdb {
 
-// A materialized query result. Rows are already encoded in BigQuery's wire format
-// ({"f": [{"v": ...}, ...]}) so that they can be returned to clients as is.
+// A query result, whose rows are encoded in BigQuery's wire format as they are read.
 struct QueryResult {
   std::vector<FieldSchema> schema;
-  std::vector<nlohmann::json> rows;
+  ResultRows rows;
   bool has_rows = false;       // False for statements that produce no result set (DDL, SET, ...).
   int64_t affected_rows = -1;  // Rows changed by a DML statement, -1 when not applicable.
 

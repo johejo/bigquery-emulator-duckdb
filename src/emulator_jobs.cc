@@ -567,15 +567,16 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
                           compression == "NONE" ? "uncompressed" : ToLowerAscii(compression)));
       AnnotateParquetBigNumerics(path, table.schema);
     } else {
-      WriteTextExtract(table.schema,
-                       Execute("SELECT * FROM " + ReadTableRelation(backend_, source)).rows,
-                       {
-                           .json = format == "NEWLINE_DELIMITED_JSON",
-                           .gzip = compression == "GZIP",
-                           .field_delimiter = config.value("fieldDelimiter", ","),
-                           .print_header = config.value("printHeader", true),
-                       },
-                       path);
+      const QueryResult result = Execute("SELECT * FROM " + ReadTableRelation(backend_, source));
+      WriteTextExtract(
+          table.schema, result.rows.size(), [&](size_t i) { return result.rows.at(i); },
+          {
+              .json = format == "NEWLINE_DELIMITED_JSON",
+              .gzip = compression == "GZIP",
+              .field_delimiter = config.value("fieldDelimiter", ","),
+              .print_header = config.value("printHeader", true),
+          },
+          path);
     }
     if (uri.starts_with("gs://")) {
       gcs_client_.Upload(path, uri);
