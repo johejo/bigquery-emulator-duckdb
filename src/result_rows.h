@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 
@@ -9,6 +10,10 @@
 namespace bigquery_emulator_duckdb {
 
 class ResultChunks;
+
+// How a row encodes a TIMESTAMP: as epoch microseconds, which the emulator reads and clients get
+// with formatOptions.useInt64Timestamp, or as BigQuery's default seconds since the epoch.
+enum class TimestampEncoding : uint8_t { kMicros, kSeconds };
 
 // The rows of a query result, kept as the DuckDB chunks of its result. Each row is encoded in
 // BigQuery's wire format ({"f": [{"v": ...}, ...]}) when it is read, and copies share the chunks.
@@ -45,7 +50,8 @@ class ResultRows {
   [[nodiscard]] size_t size() const;
   [[nodiscard]] bool empty() const { return size() == 0; }
   // Encodes row `row`; throws std::out_of_range past the last one.
-  [[nodiscard]] nlohmann::json at(size_t row) const;
+  [[nodiscard]] nlohmann::json at(size_t row,
+                                  TimestampEncoding timestamps = TimestampEncoding::kMicros) const;
   [[nodiscard]] Iterator begin() const { return {this, 0}; }
   [[nodiscard]] Iterator end() const { return {this, size()}; }
 

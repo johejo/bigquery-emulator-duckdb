@@ -38,6 +38,7 @@
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
 #include "src/result_chunks.h"
+#include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
 #include "src/vector_cell.h"
@@ -518,25 +519,41 @@ Value VectorValue(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
   }
 }
 
-// The cell, {"v": ...}, of `row` of a result vector in BigQuery's wire format. A NULL array is
-// an empty one, as BigQuery returns it, unless `null_arrays` is set.
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays);
+// How a cell encodes its value. A NULL array is an empty one, as BigQuery returns it, unless
+// `null_arrays` is set.
+struct CellEncoding {
+  bool null_arrays = false;
+  TimestampEncoding timestamps = TimestampEncoding::kMicros;
+};
+
+// The cell, {"v": ...}, of `row` of a result vector in BigQuery's wire format.
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+            const CellEncoding& encoding);
 
 // A RANGE as BigQuery writes it, "[start, end)", with each bound as its own cell would be, or
-// UNBOUNDED for an infinite or NULL one.
-std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row) {
+// UNBOUNDED for an infinite or NULL one. A TIMESTAMP bound in seconds keeps all six digits of
+// the fraction, unlike a TIMESTAMP cell.
+std::string RangeText(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+                      TimestampEncoding timestamps) {
   std::string text = "[";
   for (idx_t i = 0; i < 2; ++i) {
     duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
     LogicalType const bound(duckdb_struct_type_child_type(type, i));
-    const json cell = ToCell(child, bound.get(), row, false).at("v");
+    const json cell = ToCell(child, bound.get(), row, {}).at("v");
+    const auto id = duckdb_get_type_id(bound.get());
     const bool finite =
         !cell.is_null() &&
-        (duckdb_get_type_id(bound.get()) == DUCKDB_TYPE_DATE
+        (id == DUCKDB_TYPE_DATE
              ? duckdb_is_finite_date(VectorElement<duckdb_date>(child, row))
              : duckdb_is_finite_timestamp(VectorElement<duckdb_timestamp>(child, row)));
     text += i == 0 ? "" : ", ";
-    text += finite ? cell.get<std::string>() : "UNBOUNDED";
+    if (!finite) {
+      text += "UNBOUNDED";
+    } else if (id == DUCKDB_TYPE_TIMESTAMP_TZ && timestamps == TimestampEncoding::kSeconds) {
+      text += EpochSecondsString(VectorElement<duckdb_timestamp>(child, row).micros);
+    } else {
+      text += cell.get<std::string>();
+    }
   }
   return text + ")";
 }
@@ -699,10 +716,11 @@ void AppendArrowVector(ArrowArray* array, const FieldSchema& field, duckdb_vecto
 
 namespace {
 
-json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null_arrays) {
+json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row,
+            const CellEncoding& encoding) {
   uint64_t* validity = duckdb_vector_get_validity(vector);
   const bool is_null = validity != nullptr && !duckdb_validity_row_is_valid(validity, row);
-  if (IsListLike(type) && !(is_null && null_arrays)) {
+  if (IsListLike(type) && !(is_null && encoding.null_arrays)) {
     json elements = json::array();
     if (!is_null) {
       LogicalType const child_type = ElementType(type);
@@ -714,7 +732,7 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
       duckdb_vector child =
           array ? duckdb_array_vector_get_child(vector) : duckdb_list_vector_get_child(vector);
       for (idx_t i = 0; i < entry.length; ++i) {
-        elements.push_back(ToCell(child, child_type.get(), entry.offset + i, null_arrays));
+        elements.push_back(ToCell(child, child_type.get(), entry.offset + i, encoding));
       }
     }
     return json{{"v", std::move(elements)}};
@@ -723,7 +741,7 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
     return json{{"v", nullptr}};
   }
   if (IsRange(type)) {
-    return json{{"v", RangeText(vector, type, row)}};
+    return json{{"v", RangeText(vector, type, row, encoding.timestamps)}};
   }
   json value;
   switch (duckdb_get_type_id(type)) {
@@ -732,7 +750,7 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
       for (idx_t i = 0; i < duckdb_struct_type_child_count(type); ++i) {
         LogicalType const child_type(duckdb_struct_type_child_type(type, i));
         fields.push_back(
-            ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row, null_arrays));
+            ToCell(duckdb_struct_vector_get_child(vector, i), child_type.get(), row, encoding));
       }
       value = json{{"f", std::move(fields)}};
       break;
@@ -746,10 +764,12 @@ json ToCell(duckdb_vector vector, duckdb_logical_type type, idx_t row, bool null
     case DUCKDB_TYPE_DOUBLE:
       value = DoubleText(VectorElement<double>(vector, row), VectorValue(vector, type, row).get());
       break;
-    case DUCKDB_TYPE_TIMESTAMP_TZ:
-      // Keep epoch microseconds internally for formatOptions.useInt64Timestamp.
-      value = std::to_string(VectorElement<duckdb_timestamp>(vector, row).micros);
+    case DUCKDB_TYPE_TIMESTAMP_TZ: {
+      const int64_t micros = VectorElement<duckdb_timestamp>(vector, row).micros;
+      value = encoding.timestamps == TimestampEncoding::kSeconds ? EpochSecondsDouble(micros)
+                                                                 : std::to_string(micros);
       break;
+    }
     case DUCKDB_TYPE_TIMESTAMP:
     case DUCKDB_TYPE_TIMESTAMP_S:
     case DUCKDB_TYPE_TIMESTAMP_MS:
@@ -818,50 +838,6 @@ bool ProducesResultSet(duckdb_statement_type type) {
 bool IsDml(duckdb_statement_type type) {
   return type == DUCKDB_STATEMENT_TYPE_INSERT || type == DUCKDB_STATEMENT_TYPE_UPDATE ||
          type == DUCKDB_STATEMENT_TYPE_DELETE || type == DUCKDB_STATEMENT_TYPE_MERGE_INTO;
-}
-
-json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells);
-
-// One value of a cell: the element of a REPEATED field, or the whole value of a scalar one.
-json ValueAsSeconds(const FieldSchema& field, const json& value) {
-  if (value.is_null()) {
-    return value;
-  }
-  if (field.type == FieldType::kTimestamp) {
-    return EpochSecondsDouble(std::stoll(value.get<std::string>()));
-  }
-  if (field.type == FieldType::kRange && field.range_element_type == FieldType::kTimestamp) {
-    const auto bounds = RangeCellBounds(value.get<std::string>());
-    if (!bounds) {
-      return value;
-    }
-    const auto bound = [](const std::optional<std::string>& micros) {
-      return micros ? EpochSecondsString(std::stoll(*micros)) : std::string("UNBOUNDED");
-    };
-    return "[" + bound(bounds->at(0)) + ", " + bound(bounds->at(1)) + ")";
-  }
-  if (field.type == FieldType::kRecord) {
-    return json{{"f", CellsAsSeconds(field.fields, value.at("f"))}};
-  }
-  return value;
-}
-
-json CellsAsSeconds(const std::vector<FieldSchema>& schema, const json& cells) {
-  json result = json::array();
-  for (size_t i = 0; i < schema.size() && i < cells.size(); ++i) {
-    const FieldSchema& field = schema.at(i);
-    const json& value = cells[i].at("v");
-    if (field.mode != FieldMode::kRepeated || value.is_null()) {
-      result.push_back(json{{"v", ValueAsSeconds(field, value)}});
-      continue;
-    }
-    json elements = json::array();
-    for (const json& element : value) {
-      elements.push_back(json{{"v", ValueAsSeconds(field, element.at("v"))}});
-    }
-    result.push_back(json{{"v", std::move(elements)}});
-  }
-  return result;
 }
 
 // DuckDB's message for a failed statement. DuckDB's error() raises the messages the translation
@@ -959,7 +935,7 @@ QueryResult Materialize(Result& result, bool null_arrays, std::shared_ptr<const 
                  [&](duckdb_data_chunk chunk, size_t begin, size_t take, size_t) {
                    for (size_t row = begin; row < begin + take; ++row) {
                      (void)ToCell(duckdb_data_chunk_get_vector(chunk, column), chunks->type(column),
-                                  row, null_arrays);
+                                  row, {.null_arrays = null_arrays});
                    }
                  });
   }
@@ -982,7 +958,7 @@ ResultRows::ResultRows(std::shared_ptr<const ResultChunks> chunks, bool null_arr
 
 size_t ResultRows::size() const { return chunks_ ? chunks_->row_count() : 0; }
 
-json ResultRows::at(size_t row) const {
+json ResultRows::at(size_t row, TimestampEncoding timestamps) const {
   if (row >= size()) {
     throw std::out_of_range("Query result row is out of range");
   }
@@ -990,7 +966,7 @@ json ResultRows::at(size_t row) const {
   chunks_->Runs(row, 1, [&](duckdb_data_chunk chunk, size_t index, size_t, size_t) {
     for (size_t column = 0; column < chunks_->column_count(); ++column) {
       cells.push_back(ToCell(duckdb_data_chunk_get_vector(chunk, column), chunks_->type(column),
-                             index, null_arrays_));
+                             index, {.null_arrays = null_arrays_, .timestamps = timestamps}));
     }
   });
   return json{{"f", std::move(cells)}};
@@ -1000,17 +976,6 @@ json QueryResult::SchemaToJson() const {
   std::vector<FieldSchema> given = schema;
   SetModesGiven(given);
   return bigquery_emulator_duckdb::SchemaToJson(given);
-}
-
-bool HasTimestampField(const std::vector<FieldSchema>& schema) {
-  return std::ranges::any_of(schema, [](const FieldSchema& field) {
-    return field.type == FieldType::kTimestamp ||
-           field.range_element_type == FieldType::kTimestamp || HasTimestampField(field.fields);
-  });
-}
-
-json TimestampsAsSeconds(const std::vector<FieldSchema>& schema, const json& row) {
-  return json{{"f", CellsAsSeconds(schema, row.at("f"))}};
 }
 
 struct Backend::Database {

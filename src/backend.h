@@ -27,15 +27,6 @@ struct QueryResult {
   [[nodiscard]] nlohmann::json SchemaToJson() const;
 };
 
-// Whether `schema` has a TIMESTAMP field anywhere, including inside a RECORD.
-bool HasTimestampField(const std::vector<FieldSchema>& schema);
-
-// Rewrites the TIMESTAMP cells of `row` from the epoch microseconds that results carry
-// internally to BigQuery's default decimal-seconds spelling. Clients that ask for
-// formatOptions.useInt64Timestamp are served the row as it is.
-nlohmann::json TimestampsAsSeconds(const std::vector<FieldSchema>& schema,
-                                   const nlohmann::json& row);
-
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
 class Backend {
  public:

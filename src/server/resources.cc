@@ -23,6 +23,7 @@
 #include "src/field_schema.h"
 #include "src/project.h"
 #include "src/references.h"
+#include "src/result_rows.h"
 #include "src/routine.h"
 #include "src/server/requests.h"
 #include "src/table_metadata.h"
@@ -317,11 +318,11 @@ json JobListEntry(const Job& job, bool full) {
 // Copies the rows of `result` in [begin, end) into a response, in the timestamp encoding the
 // request asked for.
 json RowsForResponse(const QueryResult& result, int64_t begin, int64_t end, bool int64_timestamps) {
-  const bool as_seconds = !int64_timestamps && HasTimestampField(result.schema);
+  const TimestampEncoding timestamps =
+      int64_timestamps ? TimestampEncoding::kMicros : TimestampEncoding::kSeconds;
   json rows = json::array();
   for (int64_t i = begin; i < end; ++i) {
-    rows.push_back(as_seconds ? TimestampsAsSeconds(result.schema, result.rows.at(i))
-                              : result.rows.at(i));
+    rows.push_back(result.rows.at(i, timestamps));
   }
   return rows;
 }
