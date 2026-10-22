@@ -145,9 +145,9 @@ void RegisterRangeFunctions(duckdb_connection connection) {
   // One name for each element type, so that DuckDB picks the overload.
   constexpr duckdb_type kInterval = DUCKDB_TYPE_INTERVAL;
   for (const auto& [element, function] : {
-           std::pair{kDate, GenerateRanges<DateBounds>},
-           std::pair{kDatetime, GenerateRanges<DatetimeBounds>},
-           std::pair{kTimestamp, GenerateRanges<TimestampBounds>},
+           std::pair{kDate, &GenerateRanges<DateBounds>},
+           std::pair{kDatetime, &GenerateRanges<DatetimeBounds>},
+           std::pair{kTimestamp, &GenerateRanges<TimestampBounds>},
        }) {
     LogicalType const type(duckdb_create_logical_type(element));
     LogicalType const list(duckdb_create_list_type(type.get()));
