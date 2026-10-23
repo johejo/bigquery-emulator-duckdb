@@ -151,7 +151,7 @@ enum class ViewScope : std::uint8_t {
 struct ViewDefinition {
   std::string_view name;
   ViewScope scope;
-  std::span<const ViewColumn> (*columns)();
+  std::span<const ViewColumn> columns;
   absl::StatusOr<std::vector<Row>> (*rows)(const ViewContext&);
 };
 
@@ -159,67 +159,67 @@ constexpr std::array kViews = {
     ViewDefinition{
         .name = "SCHEMATA",
         .scope = ViewScope::kProject,
-        .columns = info::SchemataColumns,
+        .columns = info::kSchemataColumns,
         .rows = info::SchemataRows,
     },
     ViewDefinition{
         .name = "SCHEMATA_OPTIONS",
         .scope = ViewScope::kProject,
-        .columns = info::SchemataOptionsColumns,
+        .columns = info::kSchemataOptionsColumns,
         .rows = info::SchemataOptionsRows,
     },
     ViewDefinition{
         .name = "TABLES",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TablesColumns,
+        .columns = info::kTablesColumns,
         .rows = info::TablesRows,
     },
     ViewDefinition{
         .name = "TABLE_SNAPSHOTS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TableSnapshotsColumns,
+        .columns = info::kTableSnapshotsColumns,
         .rows = info::TableSnapshotsRows,
     },
     ViewDefinition{
         .name = "TABLE_OPTIONS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TableOptionsColumns,
+        .columns = info::kTableOptionsColumns,
         .rows = info::TableOptionsRows,
     },
     ViewDefinition{
         .name = "PARTITIONS",
         .scope = ViewScope::kDataset,
-        .columns = info::PartitionsColumns,
+        .columns = info::kPartitionsColumns,
         .rows = info::PartitionsRows,
     },
     ViewDefinition{
         .name = "VIEWS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ViewsColumns,
+        .columns = info::kViewsColumns,
         .rows = info::ViewsRows,
     },
     ViewDefinition{
         .name = "COLUMNS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ColumnsColumns,
+        .columns = info::kColumnsColumns,
         .rows = info::ColumnsRows,
     },
     ViewDefinition{
         .name = "COLUMN_FIELD_PATHS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ColumnFieldPathsColumns,
+        .columns = info::kColumnFieldPathsColumns,
         .rows = info::ColumnFieldPathsRows,
     },
     ViewDefinition{
         .name = "ROUTINES",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::RoutinesColumns,
+        .columns = info::kRoutinesColumns,
         .rows = info::RoutinesRows,
     },
     ViewDefinition{
         .name = "PARAMETERS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ParametersColumns,
+        .columns = info::kParametersColumns,
         .rows = info::ParametersRows,
     },
 };
@@ -313,7 +313,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     }
   }
 
-  const std::span<const ViewColumn> columns = definition->columns();
+  const std::span<const ViewColumn> columns = definition->columns;
   absl::StatusOr<std::vector<Row>> rows = definition->rows(context);
   if (!rows.ok()) {
     return rows.status();

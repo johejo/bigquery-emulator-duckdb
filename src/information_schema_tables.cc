@@ -1,10 +1,8 @@
 #include "src/information_schema_tables.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -107,35 +105,6 @@ absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
 
 }  // namespace
 
-std::span<const ViewColumn> TablesColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "table_type", .type = FieldType::kString},
-      {.name = "managed_table_type", .type = FieldType::kString},
-      {.name = "is_insertable_into", .type = FieldType::kString},
-      {.name = "is_fine_grained_mutations_enabled", .type = FieldType::kString},
-      {.name = "is_typed", .type = FieldType::kString},
-      {.name = "is_change_history_enabled", .type = FieldType::kString},
-      {.name = "creation_time", .type = FieldType::kTimestamp},
-      {.name = "base_table_catalog", .type = FieldType::kString},
-      {.name = "base_table_schema", .type = FieldType::kString},
-      {.name = "base_table_name", .type = FieldType::kString},
-      {.name = "snapshot_time_ms", .type = FieldType::kTimestamp},
-      {.name = "replica_source_catalog", .type = FieldType::kString},
-      {.name = "replica_source_schema", .type = FieldType::kString},
-      {.name = "replica_source_name", .type = FieldType::kString},
-      {.name = "replication_status", .type = FieldType::kString},
-      {.name = "replication_error", .type = FieldType::kString},
-      {.name = "ddl", .type = FieldType::kString},
-      {.name = "default_collation_name", .type = FieldType::kString},
-      {.name = "sync_status", .type = FieldType::kJson},
-      {.name = "upsert_stream_apply_watermark", .type = FieldType::kTimestamp},
-  });
-  return kColumns;
-}
-
 absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
@@ -208,19 +177,6 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
   return rows;
 }
 
-std::span<const ViewColumn> TableSnapshotsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "base_table_catalog", .type = FieldType::kString},
-      {.name = "base_table_schema", .type = FieldType::kString},
-      {.name = "base_table_name", .type = FieldType::kString},
-      {.name = "snapshot_time", .type = FieldType::kTimestamp},
-  });
-  return kColumns;
-}
-
 absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
@@ -241,18 +197,6 @@ absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) 
     }
   }
   return rows;
-}
-
-std::span<const ViewColumn> TableOptionsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "option_name", .type = FieldType::kString},
-      {.name = "option_type", .type = FieldType::kString},
-      {.name = "option_value", .type = FieldType::kString},
-  });
-  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
@@ -287,21 +231,6 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
     }
   }
   return rows;
-}
-
-std::span<const ViewColumn> PartitionsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "partition_id", .type = FieldType::kString},
-      {.name = "total_rows", .type = FieldType::kInteger},
-      {.name = "total_logical_bytes", .type = FieldType::kInteger},
-      {.name = "total_billable_bytes", .type = FieldType::kInteger},
-      {.name = "last_modified_time", .type = FieldType::kTimestamp},
-      {.name = "storage_tier", .type = FieldType::kString},
-  });
-  return kColumns;
 }
 
 // Counts the rows of each partition of each table while the query is analyzed, as the other views
@@ -343,18 +272,6 @@ absl::StatusOr<std::vector<Row>> PartitionsRows(const ViewContext& context) {
   return rows;
 }
 
-std::span<const ViewColumn> ViewsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "view_definition", .type = FieldType::kString},
-      {.name = "check_option", .type = FieldType::kString},
-      {.name = "use_standard_sql", .type = FieldType::kString},
-  });
-  return kColumns;
-}
-
 absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
@@ -376,38 +293,6 @@ absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
     }
   }
   return rows;
-}
-
-std::span<const ViewColumn> ColumnsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "column_name", .type = FieldType::kString},
-      {.name = "ordinal_position", .type = FieldType::kInteger},
-      {.name = "is_nullable", .type = FieldType::kString},
-      {.name = "data_type", .type = FieldType::kString},
-      {.name = "is_generated", .type = FieldType::kString},
-      {.name = "generation_expression", .type = FieldType::kString},
-      {.name = "is_stored", .type = FieldType::kString},
-      {.name = "is_hidden", .type = FieldType::kString},
-      {.name = "is_updatable", .type = FieldType::kString},
-      {.name = "is_system_defined", .type = FieldType::kString},
-      {.name = "is_partitioning_column", .type = FieldType::kString},
-      {.name = "clustering_ordinal_position", .type = FieldType::kInteger},
-      {.name = "collation_name", .type = FieldType::kString},
-      {.name = "column_default", .type = FieldType::kString},
-      {.name = "rounding_mode", .type = FieldType::kString},
-      {.name = "policy_tags", .type = FieldType::kString, /*repeated=*/.repeated = true},
-      {.name = "is_identity", .type = FieldType::kString},
-      {.name = "identity_generation", .type = FieldType::kString},
-      {.name = "identity_start", .type = FieldType::kInteger},
-      {.name = "identity_increment", .type = FieldType::kInteger},
-      {.name = "identity_maximum", .type = FieldType::kInteger},
-      {.name = "identity_minimum", .type = FieldType::kInteger},
-      {.name = "identity_cycle", .type = FieldType::kString},
-  });
-  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
@@ -457,22 +342,6 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
   }
   return rows;
 }
-std::span<const ViewColumn> ColumnFieldPathsColumns() {
-  static constexpr auto kColumns = std::to_array<ViewColumn>({
-      {.name = "table_catalog", .type = FieldType::kString},
-      {.name = "table_schema", .type = FieldType::kString},
-      {.name = "table_name", .type = FieldType::kString},
-      {.name = "column_name", .type = FieldType::kString},
-      {.name = "field_path", .type = FieldType::kString},
-      {.name = "data_type", .type = FieldType::kString},
-      {.name = "description", .type = FieldType::kString},
-      {.name = "collation_name", .type = FieldType::kString},
-      {.name = "rounding_mode", .type = FieldType::kString},
-      {.name = "policy_tags", .type = FieldType::kString, /*repeated=*/.repeated = true},
-  });
-  return kColumns;
-}
-
 absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
