@@ -1,6 +1,7 @@
 #include "src/server/requests.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -25,6 +26,43 @@
 
 namespace bigquery_emulator_duckdb::server {
 namespace {
+
+constexpr auto kRoutineReferenceFields = std::to_array<std::string_view>({
+    "projectId",
+    "datasetId",
+    "routineId",
+});
+
+constexpr auto kIgnoredRoutineFields = std::to_array<std::string_view>({
+    "routineReference",
+    "creationTime",
+    "lastModifiedTime",
+    "etag",
+    "buildStatus",
+});
+
+constexpr auto kRoutineFields = std::to_array<std::string_view>({
+    "routineType",
+    "language",
+    "arguments",
+    "returnType",
+    "returnTableType",
+    "definitionBody",
+    "description",
+    "strictMode",
+});
+
+constexpr auto kRoutineArgumentFields = std::to_array<std::string_view>({
+    "name",
+    "argumentKind",
+    "dataType",
+});
+
+constexpr auto kProcedureArgumentModes = std::to_array<std::string_view>({
+    "IN",
+    "OUT",
+    "INOUT",
+});
 
 using nlohmann::json;
 
@@ -637,7 +675,7 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
     throw ApiError::Invalid("Invalid routine reference");
   }
   for (const auto& [name, value] : reference.items()) {
-    if (name != "projectId" && name != "datasetId" && name != "routineId") {
+    if (std::ranges::find(kRoutineReferenceFields, name) == kRoutineReferenceFields.end()) {
       throw ApiError::Invalid("Invalid routine reference field: " + name);
     }
   }
@@ -651,13 +689,11 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   }
   json resource = json::object();
   for (const auto& [name, value] : body.items()) {
-    if (name == "routineReference" || name == "creationTime" || name == "lastModifiedTime" ||
-        name == "etag" || name == "buildStatus" || value.is_null()) {
+    if (std::ranges::find(kIgnoredRoutineFields, name) != kIgnoredRoutineFields.end() ||
+        value.is_null()) {
       continue;
     }
-    if (name != "routineType" && name != "language" && name != "arguments" &&
-        name != "returnType" && name != "returnTableType" && name != "definitionBody" &&
-        name != "description" && name != "strictMode") {
+    if (std::ranges::find(kRoutineFields, name) == kRoutineFields.end()) {
       throw ApiError::Unsupported("routine field " + name);
     }
     resource[name] = value;
@@ -704,14 +740,14 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
       throw ApiError::Invalid("Invalid routine argument");
     }
     for (const auto& [name, value] : argument.items()) {
-      if (name != "name" && name != "argumentKind" && name != "dataType" &&
+      if (std::ranges::find(kRoutineArgumentFields, name) == kRoutineArgumentFields.end() &&
           !(procedure && name == "mode")) {
         throw ApiError::Unsupported("routine argument field " + name);
       }
     }
     if (procedure && argument.contains("mode")) {
       const std::string mode = StringField(argument, "mode", "argument mode");
-      if (mode != "IN" && mode != "OUT" && mode != "INOUT") {
+      if (std::ranges::find(kProcedureArgumentModes, mode) == kProcedureArgumentModes.end()) {
         throw ApiError::Unsupported("procedure argument mode " + mode);
       }
     }

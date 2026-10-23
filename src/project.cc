@@ -1,5 +1,7 @@
 #include "src/project.h"
 
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <fstream>
@@ -10,12 +12,22 @@
 
 namespace bigquery_emulator_duckdb {
 
+namespace {
+
+constexpr auto kProjectFields = std::to_array<std::string_view>({
+    "projectId",
+    "numericId",
+    "friendlyName",
+});
+
+}  // namespace
+
 Project ParseProject(const nlohmann::json& value) {
   if (!value.is_object()) {
     throw std::invalid_argument("Project must be a JSON object");
   }
   for (const auto& [key, field] : value.items()) {
-    if (key != "projectId" && key != "numericId" && key != "friendlyName") {
+    if (std::ranges::find(kProjectFields, key) == kProjectFields.end()) {
       throw std::invalid_argument("Unknown project field: " + key);
     }
     if (!field.is_string()) {

@@ -1,6 +1,7 @@
 #include "src/table_metadata.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cstddef>
@@ -27,6 +28,13 @@ namespace bigquery_emulator_duckdb {
 using nlohmann::json;
 
 namespace {
+
+constexpr auto kTimePartitioningTypes = std::to_array<std::string_view>({
+    "DAY",
+    "HOUR",
+    "MONTH",
+    "YEAR",
+});
 
 constexpr size_t kMaxLabels = 64;
 constexpr size_t kMaxLabelLength = 63;
@@ -115,8 +123,8 @@ std::optional<TimePartitioning> ParseTimePartitioning(const json& value) {
       .type = StringValue(value.value("type", json()), "type"),
       .field = StringValue(value.value("field", json()), "field"),
   };
-  if (partitioning.type != "DAY" && partitioning.type != "HOUR" && partitioning.type != "MONTH" &&
-      partitioning.type != "YEAR") {
+  if (std::ranges::find(kTimePartitioningTypes, partitioning.type) ==
+      kTimePartitioningTypes.end()) {
     throw ApiError::Invalid("Invalid time partitioning type: " + partitioning.type);
   }
   if (partitioning.field.empty()) {

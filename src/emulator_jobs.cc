@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -41,6 +42,22 @@
 
 namespace bigquery_emulator_duckdb {
 namespace {
+
+constexpr auto kLoadAndExtractFormats = std::to_array<std::string_view>({
+    "CSV",
+    "NEWLINE_DELIMITED_JSON",
+    "PARQUET",
+});
+
+constexpr auto kCommonExtractCompressions = std::to_array<std::string_view>({
+    "NONE",
+    "GZIP",
+});
+
+constexpr auto kParquetExtractCompressions = std::to_array<std::string_view>({
+    "SNAPPY",
+    "ZSTD",
+});
 
 using nlohmann::json;
 
@@ -300,7 +317,7 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
 
     const json& config = load.configuration;
     const std::string format = config.value("sourceFormat", "CSV");
-    if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
+    if (std::ranges::find(kLoadAndExtractFormats, format) == kLoadAndExtractFormats.end()) {
       throw ApiError::Invalid("Unsupported source format: " + format);
     }
     TemporaryFiles downloads;
@@ -524,12 +541,16 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
     if (format == "AVRO") {
       throw ApiError::Unsupported("Avro extracts");
     }
-    if (format != "CSV" && format != "NEWLINE_DELIMITED_JSON" && format != "PARQUET") {
+    if (std::ranges::find(kLoadAndExtractFormats, format) == kLoadAndExtractFormats.end()) {
       throw ApiError::Invalid("Unsupported destination format: " + format);
     }
     const bool parquet = format == "PARQUET";
-    if (compression != "NONE" && compression != "GZIP" &&
-        !(parquet && (compression == "SNAPPY" || compression == "ZSTD"))) {
+    const bool supported_compression =
+        std::ranges::find(kCommonExtractCompressions, compression) !=
+            kCommonExtractCompressions.end() ||
+        (parquet && std::ranges::find(kParquetExtractCompressions, compression) !=
+                        kParquetExtractCompressions.end());
+    if (!supported_compression) {
       throw ApiError::Invalid("Unsupported compression " + compression + " for " + format);
     }
     if (extract.destination_uris.size() != 1) {

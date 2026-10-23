@@ -19,6 +19,12 @@
 namespace bigquery_emulator_duckdb {
 namespace {
 
+constexpr auto kContainerTypeFields = std::to_array<std::pair<std::string_view, std::string_view>>({
+    {"ARRAY", "arrayElementType"},
+    {"RANGE", "rangeElementType"},
+    {"STRUCT", "structType"},
+});
+
 using nlohmann::json;
 
 // The GoogleSQL spelling of the StandardSqlDataType `type`.
@@ -37,9 +43,9 @@ std::string SqlTypeName(const json& type) {
     throw ApiError::Invalid("Invalid typeKind: " + kind);
   }
   for (const auto& [name, value] : type.items()) {
-    if (name != "typeKind" && !(kind == "ARRAY" && name == "arrayElementType") &&
-        !(kind == "RANGE" && name == "rangeElementType") &&
-        !(kind == "STRUCT" && name == "structType")) {
+    if (name != "typeKind" && std::ranges::none_of(kContainerTypeFields, [&](const auto& field) {
+          return kind == field.first && name == field.second;
+        })) {
       throw ApiError::Invalid("Invalid routine data type field: " + name);
     }
   }

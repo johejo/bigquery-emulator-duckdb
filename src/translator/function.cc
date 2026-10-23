@@ -1,6 +1,7 @@
 #include "googlesql/public/function.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <stdexcept>
@@ -26,6 +27,34 @@
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
+
+constexpr auto kGraphValueFunctions = std::to_array<std::string_view>({
+    "LABELS",
+    "NODES",
+    "EDGES",
+    "PATH_FIRST",
+    "PATH_LAST",
+    "PATH_LENGTH",
+    "IS_ACYCLIC",
+    "IS_SIMPLE",
+    "IS_TRAIL",
+    "IF",
+    "IFNULL",
+    "COALESCE",
+    "$CASE_NO_VALUE",
+    "$IS_NULL",
+    "$ARRAY_AT_OFFSET",
+    "$ARRAY_AT_ORDINAL",
+    "$SAFE_ARRAY_AT_OFFSET",
+    "$SAFE_ARRAY_AT_ORDINAL",
+    "ARRAY_LENGTH",
+});
+
+constexpr auto kIntervalComparisonFunctions = std::to_array<std::string_view>({
+    "GREATEST",
+    "LEAST",
+    "NULLIF",
+});
 
 // The DuckDB spelling of a scalar call over already translated arguments.
 std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
@@ -282,13 +311,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGraph(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGraph(argument->type()); })) &&
-      function != "LABELS" && function != "NODES" && function != "EDGES" &&
-      function != "PATH_FIRST" && function != "PATH_LAST" && function != "PATH_LENGTH" &&
-      function != "IS_ACYCLIC" && function != "IS_SIMPLE" && function != "IS_TRAIL" &&
-      function != "IF" && function != "IFNULL" && function != "COALESCE" &&
-      function != "$CASE_NO_VALUE" && function != "$IS_NULL" && function != "$ARRAY_AT_OFFSET" &&
-      function != "$ARRAY_AT_ORDINAL" && function != "$SAFE_ARRAY_AT_OFFSET" &&
-      function != "$SAFE_ARRAY_AT_ORDINAL" && function != "ARRAY_LENGTH") {
+      std::ranges::find(kGraphValueFunctions, function) == kGraphValueFunctions.end()) {
     return Unsupported(scope, "function " + name + " with graph values");
   }
   const bool interval = HasInterval(call.type()) ||
@@ -297,7 +320,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         });
   // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. CASE compares
   // its first argument with its WHEN values.
-  if (((function == "GREATEST" || function == "LEAST" || function == "NULLIF") &&
+  if ((std::ranges::find(kIntervalComparisonFunctions, function) !=
+           kIntervalComparisonFunctions.end() &&
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return argument->type()->IsInterval(); })) ||
       (function == "$CASE_WITH_VALUE" && call.argument_list(0)->type()->IsInterval())) {
