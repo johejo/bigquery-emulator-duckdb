@@ -21,19 +21,19 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 5 | 1 | 6 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 4 | 1 | 6 | 3 |
-| [CREATE TABLE](#create-table) | 5 | 3 | 4 | 3 |
-| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 5 | 1 | 6 | 3 |
+| [CREATE SCHEMA](#create-schema) | 6 | 0 | 6 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 5 | 0 | 6 | 3 |
+| [CREATE TABLE](#create-table) | 6 | 2 | 4 | 3 |
+| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 6 | 0 | 6 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ADD COLUMN](#alter-table-add-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ALTER COLUMN SET OPTIONS](#alter-table-alter-column-set-options) | 2 | 0 | 2 | 0 |
-| [CREATE SNAPSHOT TABLE](#create-snapshot-table) | 3 | 1 | 1 | 0 |
-| [CREATE VIEW](#create-view) | 3 | 1 | 1 | 1 |
+| [CREATE SNAPSHOT TABLE](#create-snapshot-table) | 4 | 0 | 1 | 0 |
+| [CREATE VIEW](#create-view) | 4 | 0 | 1 | 1 |
 | [CREATE VIEW column](#create-view-column) | 0 | 0 | 1 | 0 |
 | [ALTER VIEW SET OPTIONS](#alter-view-set-options) | 0 | 0 | 5 | 1 |
 | [ALTER VIEW ALTER COLUMN SET OPTIONS](#alter-view-alter-column-set-options) | 0 | 0 | 1 | 0 |
-| [CREATE MATERIALIZED VIEW](#create-materialized-view) | 3 | 1 | 6 | 0 |
+| [CREATE MATERIALIZED VIEW](#create-materialized-view) | 4 | 0 | 6 | 0 |
 | [ALTER MATERIALIZED VIEW SET OPTIONS](#alter-materialized-view-set-options) | 0 | 0 | 9 | 0 |
 | [CREATE FUNCTION SQL](#create-function-sql) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
@@ -53,7 +53,7 @@ the emulator rejected.
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `STRING` | Supported |  |
 | [`is_case_insensitive`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `BOOL` | Unsupported |  |
 | [`is_primary`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `BOOL` | Untested | No sample for this option's constraints. |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `CREATE SCHEMA e OPTIONS (labels = [])`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`location`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `STRING` | Supported |  |
 | [`max_time_travel_hours`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `INT64` | Unsupported |  |
 | [`primary_replica`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `STRING` | Untested | No sample for this option's constraints. |
@@ -73,7 +73,7 @@ the emulator rejected.
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `STRING` | Supported |  |
 | [`is_case_insensitive`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `BOOL` | Unsupported |  |
 | [`is_primary`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `BOOL` | Untested | No sample for this option's constraints. |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER SCHEMA d SET OPTIONS (labels = [])`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`max_time_travel_hours`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `INT64` | Unsupported |  |
 | [`primary_replica`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `STRING` | Unsupported |  |
@@ -89,7 +89,7 @@ the emulator rejected.
 | [`kms_key_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Partial | Unsupported: `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (kms_key_name = 'projects/test/locations/us/keyRings/r/cryptoKeys/k')`. |
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Supported |  |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `CREATE TABLE n (id INT64, d DATE, a NUMERIC) PARTITION BY d OPTIONS (labels = [])`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`default_rounding_mode`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Supported |  |
 | [`enable_change_history`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `BOOL` | Unsupported |  |
 | [`max_staleness`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `INTERVAL` | Unsupported |  |
@@ -109,7 +109,7 @@ the emulator rejected.
 | [`kms_key_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Unsupported |  |
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Supported |  |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER TABLE t SET OPTIONS (labels = [])`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`default_rounding_mode`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Supported |  |
 | [`enable_change_history`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `BOOL` | Unsupported |  |
 | [`max_staleness`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `INTERVAL` | Unsupported |  |
@@ -153,7 +153,7 @@ the emulator rejected.
 | [`expiration_timestamp`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `TIMESTAMP` | Supported |  |
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `STRING` | Supported |  |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `CREATE SNAPSHOT TABLE n CLONE t OPTIONS (labels = [])`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
 
 ## CREATE VIEW
@@ -163,7 +163,7 @@ the emulator rejected.
 | [`expiration_timestamp`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `TIMESTAMP` | Supported |  |
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `STRING` | Supported |  |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `CREATE VIEW n OPTIONS (labels = []) AS SELECT id FROM t`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`privacy_policy`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
 
@@ -202,7 +202,7 @@ the emulator rejected.
 | [`kms_key_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `STRING` | Unsupported |  |
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `STRING` | Supported |  |
-| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `CREATE MATERIALIZED VIEW n OPTIONS (labels = []) AS SELECT id, COUNT(*) AS n FROM t GROUP BY id`. |
+| [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
 
 ## ALTER MATERIALIZED VIEW SET OPTIONS
