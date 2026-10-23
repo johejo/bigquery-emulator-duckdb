@@ -43,7 +43,7 @@ const std::unordered_map<std::string_view, NamedFunction>& FunctionNames() {
 // with different semantics. Extend this list with execution coverage.
 const std::unordered_set<std::string_view>& PlainFunctions() {
   static const auto* const kPlain = new std::unordered_set<std::string_view>{
-      "IFNULL", "NULLIF", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH", "ARRAY_LENGTH",
+      "IFNULL", "COALESCE", "CHAR_LENGTH", "CHARACTER_LENGTH", "ARRAY_LENGTH",
   };
   return *kPlain;
 }

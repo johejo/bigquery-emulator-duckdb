@@ -164,7 +164,7 @@ functions.
 | [`COALESCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#coalesce) | Supported | DuckDB function |  |
 | [`IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#if) | Supported | DuckDB SQL |  |
 | [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | Supported | DuckDB function |  |
-| [`NULLIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#nullif) | Supported | DuckDB function |  |
+| [`NULLIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#nullif) | Supported | DuckDB SQL |  |
 
 ## Conversion functions
 
