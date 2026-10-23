@@ -802,6 +802,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_LINESUBSTRING", call("bq_st_linesubstring", 3)},
       {"ST_AZIMUTH", call("bq_st_azimuth", 2)},
       {"ST_DISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_DISTANCE")},
+      {"ST_HAUSDORFFDISTANCE", call("bq_st_hausdorffdistance", {2, 3}, {"false"})},
       {"ST_MAXDISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_MAXDISTANCE")},
       {"ST_DWITHIN", spheroid("bq_st_dwithin", {3, 4}, "ST_DWITHIN")},
       {"ST_EQUALS", call("bq_st_equals", 2)},

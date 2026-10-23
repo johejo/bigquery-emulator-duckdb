@@ -251,6 +251,26 @@ absl::StatusOr<bool> DWithin(const Arguments& args) {
                                                  S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
 
+// The discrete Hausdorff distance measures vertices of the first geography to the second's
+// edges and interiors; the undirected form takes the maximum in both directions.
+absl::StatusOr<std::optional<double>> HausdorffDistance(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  MutableS2ShapeIndex index;
+  AddShapes(a, index);
+  MutableS2ShapeIndex other;
+  AddShapes(b, other);
+  const S2HausdorffDistanceQuery query;
+  const S1ChordAngle distance =
+      args.Bool(2) ? query.GetDirectedDistance(&index, &other) : query.GetDistance(&index, &other);
+  // S2 returns infinity when no distance exists. BigQuery returns NULL, including where a
+  // full polygon has no vertices in a direction being measured.
+  if (distance.is_infinity()) {
+    return std::nullopt;
+  }
+  return Meters(distance);
+}
+
 // Whether each point of either of `a` and `b`, nonempty, is within a micrometer of the other, as
 // Same takes points.
 bool Near(const Geography& a, const Geography& b) {
@@ -1054,6 +1074,8 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);
   Register(connection, "bq_st_distance", {kVarchar, kVarchar, kBoolean, kVarchar}, kDouble,
            EachRow<Distance>);
+  Register(connection, "bq_st_hausdorffdistance", {kVarchar, kVarchar, kBoolean}, kDouble,
+           EachRow<HausdorffDistance>);
   Register(connection, "bq_st_dwithin", {kVarchar, kVarchar, kDouble, kBoolean, kVarchar}, kBoolean,
            EachRow<DWithin>);
   Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean, EachRow<Equals>);
