@@ -154,6 +154,10 @@ lead for what to check, never as an expected value. REST and BigQuery Storage gR
 [bqanswers scenario format](tools/bqanswers/README.md); the same `just bigquery-answers` command
 records their selected responses. Validate these files locally with `just bigquery-answers-validate`.
 
+When BigQuery's documentation and an observed BigQuery answer disagree, comment on the test case
+with the discrepancy and a link to the documentation. Keep the observation's context so a future
+behavior change can be checked against both sources.
+
 Until an independent source settles a case, do not rely on a guessed answer to support the
 behavior that case covers; the rest of the function can still be supported. An unverified case
 alone does not require removing existing support.

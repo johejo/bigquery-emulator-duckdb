@@ -34,6 +34,8 @@
 #include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2closest_edge_query.h"
+#include "s2/s2convex_hull_query.h"
+#include "s2/s2debug.h"
 #include "s2/s2earth.h"
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
@@ -42,6 +44,7 @@
 #include "s2/s2latlng_rect.h"
 #include "s2/s2lax_polygon_shape.h"
 #include "s2/s2lax_polyline_shape.h"
+#include "s2/s2loop.h"
 #include "s2/s2point.h"
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
@@ -347,6 +350,42 @@ absl::StatusOr<Result> Relate(const Geography& a, const Geography& b, Predicate 
   return predicate(index_a, index_b);
 }
 
+// S2's hull can be a thin loop for a line. Normalize its snapped closed set
+// so these loops collapse to lines rather than polygons.
+absl::StatusOr<std::optional<std::string>> ConvexHull(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Empty()) {
+    return std::nullopt;
+  }
+  // BigQuery preserves a single point; S2's artificial tiny loop can move it when snapped.
+  if (geography.Count() == 1 && geography.points.size() == 1) {
+    return GeographyText(geography);
+  }
+  S2ConvexHullQuery query;
+  for (const S2Point& point : geography.points) {
+    query.AddPoint(point);
+  }
+  for (const std::vector<S2Point>& line : geography.lines) {
+    query.AddPolyline(S2Polyline(line));
+  }
+  if (!geography.polygons.empty()) {
+    query.AddPolygon(*ToS2Polygon(geography));
+  }
+  const std::unique_ptr<S2Loop> loop = query.GetConvexHull();
+  const auto vertices = loop->vertices_span();
+  const Geography hull{
+      .points = {},
+      .lines = {},
+      .polygons = {{{vertices.begin(), vertices.end()}}},
+  };
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Geography result,
+      Relate<Geography>(hull, {}, [](const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
+        return ClosedSetOperation(a, b, S2BooleanOperation::OpType::UNION);
+      }));
+  return GeographyText(result);
+}
+
 // Whether `a` and `b` share a point or, with `interiors`, a point of their interiors as OGC
 // defines them: a polygon's without its rings, a linestring's without its endpoints unless it
 // ends where it starts, and a point's, which is the point.
@@ -593,6 +632,22 @@ bool IsClosed(const Geography& geography) {
          });
 }
 
+// A ring is one closed linestring with no repeated point except its endpoints.
+// S2Loop validates both repeated vertices and crossings between edges.
+bool IsRing(const Geography& geography) {
+  if (geography.Count() != 1 || geography.lines.size() != 1 || !IsClosed(geography)) {
+    return false;
+  }
+  const std::vector<S2Point>& line = geography.lines.front();
+  if (line.size() < 4) {
+    return false;
+  }
+  const std::vector<S2Point> vertices(line.begin(), line.end() - 1);
+  const S2Loop loop(vertices, S2Debug::DISABLE);
+  S2Error error;
+  return !loop.FindValidationError(&error);
+}
+
 // Only the highest dimension contributes. S2's centroids already include the
 // measure of each component, so their sum gives the weighted centroid.
 absl::StatusOr<std::string> Centroid(const Arguments& args) {
@@ -686,7 +741,7 @@ absl::StatusOr<std::string> PointN(const Arguments& args) {
 
 // BigQuery names the operation and the kind of invalid component in its errors.
 absl::Status CheckLine(const Geography& geography, std::string_view function,
-                       std::string_view context, bool allow_empty) {
+                       std::string_view context, bool allow_empty, bool prefix_function = true) {
   if ((allow_empty && geography.Empty()) ||
       (geography.Count() == 1 && geography.lines.size() == 1)) {
     return absl::OkStatus();
@@ -696,7 +751,8 @@ absl::Status CheckLine(const Geography& geography, std::string_view function,
                              : !geography.points.empty()
                                  ? "contained a point"
                                  : "had " + std::to_string(geography.lines.size()) + " lines";
-  return absl::OutOfRangeError(std::string(function) + ": Argument to " + std::string(context) +
+  return absl::OutOfRangeError((prefix_function ? std::string(function) + ": " : "") +
+                               "Argument to " + std::string(context) +
                                " must be a single line geography; an argument " + reason +
                                ". Error in " + std::string(function) + " expression");
 }
@@ -716,6 +772,22 @@ absl::StatusOr<std::string> LineInterpolatePoint(const Arguments& args) {
     return GeographyText(geography);
   }
   return GeographyText(PointGeography(S2Polyline(geography.lines.front()).Interpolate(fraction)));
+}
+
+// Project onto the geodesic line, then measure the fraction along its edges.
+absl::StatusOr<double> LineLocatePoint(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckLine(geography, "ST_LINELOCATEPOINT", "STLineLocatePoint", false, false));
+  const auto point = ParsePoint(args, 1, "Argument to STLineLocatePoint");
+  if (!point.ok()) {
+    return absl::Status(point.status().code(), std::string(point.status().message()) +
+                                                   " Error in ST_LINELOCATEPOINT expression");
+  }
+  const S2Polyline line(geography.lines.front());
+  int next_vertex = 0;
+  const S2Point projected = line.Project(*point, &next_vertex);
+  return line.UnInterpolate(projected, next_vertex);
 }
 
 absl::StatusOr<std::string> LineSubstring(const Arguments& args) {
@@ -972,8 +1044,11 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_asgeojson", {kVarchar}, kVarchar, EachRow<AsGeoJson>);
   Register(connection, "bq_st_angle", {kVarchar, kVarchar, kVarchar}, kDouble, EachRow<Angle>);
   Register(connection, "bq_st_centroid", {kVarchar}, kVarchar, EachRow<Centroid>);
+  Register(connection, "bq_st_convexhull", {kVarchar}, kVarchar, EachRow<ConvexHull>);
   Register(connection, "bq_st_lineinterpolatepoint", {kVarchar, kDouble}, kVarchar,
            EachRow<LineInterpolatePoint>);
+  Register(connection, "bq_st_linelocatepoint", {kVarchar, kVarchar}, kDouble,
+           EachRow<LineLocatePoint>);
   Register(connection, "bq_st_linesubstring", {kVarchar, kDouble, kDouble}, kVarchar,
            EachRow<LineSubstring>);
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);
@@ -1019,6 +1094,7 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
              return static_cast<int64_t>(geography.Count());
            }>>);
   Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean, EachRow<OfGeography<IsClosed>>);
+  Register(connection, "bq_st_isring", {kVarchar}, kBoolean, EachRow<OfGeography<IsRing>>);
   Register(connection, "bq_st_length", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Length>);
   Register(connection, "bq_st_measure", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Measure>);
   Register(connection, "bq_st_exteriorring", {kVarchar}, kVarchar,
