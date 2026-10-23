@@ -50,6 +50,8 @@ struct TableMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
+  // DDL array order, which TABLE_OPTIONS exposes.
+  std::vector<std::string> label_order;
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
   // Queries must have a predicate eligible for partition elimination.
@@ -109,6 +111,7 @@ struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
+  std::vector<std::string> label_order;
   std::optional<int64_t> default_table_expiration_ms;
   std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   // Output only and recorded with the dataset.

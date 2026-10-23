@@ -19,7 +19,8 @@ std::string StringOptionValue(const std::string& value) {
 // The options that metadata of a dataset, a table or a view sets, which are common to both.
 std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,
                                   const std::map<std::string, std::string>& labels,
-                                  const std::string& default_rounding_mode) {
+                                  const std::string& default_rounding_mode,
+                                  const std::vector<std::string>& label_order) {
   std::vector<Option> options;
   if (!default_rounding_mode.empty()) {
     options.push_back({
@@ -38,10 +39,21 @@ std::vector<Option> CommonOptions(const std::string& description, const std::str
   }
   if (!labels.empty()) {
     std::vector<std::string> entries;
-    std::ranges::transform(labels, std::back_inserter(entries), [](const auto& label) {
-      return "STRUCT(" + StringOptionValue(label.first) + ", " + StringOptionValue(label.second) +
-             ")";
-    });
+    const auto append = [&](const std::string& key) {
+      if (const auto it = labels.find(key); it != labels.end()) {
+        entries.push_back("STRUCT(" + StringOptionValue(it->first) + ", " +
+                          StringOptionValue(it->second) + ")");
+      }
+    };
+    if (label_order.empty()) {
+      for (const auto& label : labels) {
+        append(label.first);
+      }
+    } else {
+      for (const std::string& key : label_order) {
+        append(key);
+      }
+    }
     options.push_back({
         .name = "labels",
         .type = "ARRAY<STRUCT<STRING, STRING>>",

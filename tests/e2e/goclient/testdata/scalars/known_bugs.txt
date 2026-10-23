@@ -61,8 +61,3 @@ EXCEPTION WHEN ERROR THEN
 END;
 SELECT COUNT(*) FROM committed
 !> "1"
-
-# TABLE_OPTIONS lists labels in the order DDL gives them; the emulator keeps labels sorted by key.
-CREATE OR REPLACE TABLE scalars.options_labels_order (x INT64) OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
-SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_labels_order' AND option_name = 'labels'
-!> "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"

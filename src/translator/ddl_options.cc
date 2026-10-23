@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "absl/time/time.h"
 #include "googlesql/public/type.h"
@@ -73,8 +74,10 @@ bool BoolOption(const googlesql::Value& value, bool& into) {
 }
 
 // The labels option, an ARRAY<STRUCT<STRING, STRING>> of keys and values, into `into`.
-bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::string>& into) {
+bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::string>& into,
+                  std::vector<std::string>& order) {
   into.clear();
+  order.clear();
   if (value.is_null()) {
     return true;
   }
@@ -92,7 +95,11 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
     if (element.is_null() || element.field(0).is_null() || element.field(1).is_null()) {
       return false;
     }
-    into[element.field(0).string_value()] = element.field(1).string_value();
+    const std::string& key = element.field(0).string_value();
+    if (!into.contains(key)) {
+      order.push_back(key);
+    }
+    into[key] = element.field(1).string_value();
   }
   return true;
 }
@@ -258,7 +265,7 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
           (name == "partition_expiration_days" || name == "kms_key_name")) ||
          (name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
-         (name == "labels" && LabelsOption(*value, metadata.labels)) ||
+         (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
          (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)) ||
          (statement == "CREATE TABLE" && name == "default_rounding_mode" &&
           RoundingModeOption(*value, metadata.default_rounding_mode)));
@@ -281,7 +288,7 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
         value.has_value() &&
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
-         (name == "labels" && LabelsOption(*value, metadata.labels)) ||
+         (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
          (name == "default_table_expiration_days" &&
           DaysOption(*value, metadata.default_table_expiration_ms)) ||
          (name == "default_rounding_mode" &&
@@ -312,7 +319,8 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
           BoolOption(*value, updates.require_partition_filter.emplace())) ||
          (name == "description" && StringOption(*value, updates.description.emplace())) ||
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
-         (name == "labels" && LabelsOption(*value, updates.labels.emplace())) ||
+         (name == "labels" &&
+          LabelsOption(*value, updates.labels.emplace(), updates.label_order)) ||
          (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
           ExpirationOption(*value, updates.expiration_time.emplace())) ||
          (statement == "ALTER SCHEMA" && name == "default_table_expiration_days" &&

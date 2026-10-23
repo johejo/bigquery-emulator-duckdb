@@ -57,6 +57,7 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
   }
   if (updates.labels.has_value()) {
     metadata.labels = *updates.labels;
+    metadata.label_order = updates.label_order;
   }
   if (updates.default_rounding_mode.has_value()) {
     metadata.default_rounding_mode = *updates.default_rounding_mode;
@@ -165,9 +166,13 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
       std::format("DELETE FROM {} WHERE dataset_id = {}", table, QuoteLiteral(dataset.dataset_id)),
   };
   if (!metadata.empty()) {
+    nlohmann::json recorded = metadata.ToJson();
+    if (!metadata.label_order.empty()) {
+      recorded["labelOrder"] = metadata.label_order;
+    }
     statements.push_back(std::format("INSERT INTO {} VALUES ({}, {})", table,
                                      QuoteLiteral(dataset.dataset_id),
-                                     QuoteLiteral(metadata.ToJson().dump())));
+                                     QuoteLiteral(recorded.dump())));
   }
   return statements;
 }

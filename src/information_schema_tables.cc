@@ -216,7 +216,7 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
       }
       std::vector<Option> options =
           CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
-                        metadata->default_rounding_mode);
+                        metadata->default_rounding_mode, metadata->label_order);
       if (metadata->restored_from_snapshot) {
         if (metadata->friendly_name.empty()) {
           options.push_back({.name = "friendly_name", .type = "STRING", .value = "\"\""});
