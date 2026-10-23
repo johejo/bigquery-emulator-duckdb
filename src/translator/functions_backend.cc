@@ -796,6 +796,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_ASGEOJSON", call("bq_st_asgeojson", 1)},
       {"ST_ANGLE", call("bq_st_angle", 3)},
       {"ST_CENTROID", call("bq_st_centroid", 1)},
+      {"ST_CONVEXHULL", call("bq_st_convexhull", 1)},
       {"ST_LINEINTERPOLATEPOINT", call("bq_st_lineinterpolatepoint", 2)},
       {"ST_LINELOCATEPOINT", call("bq_st_linelocatepoint", 2)},
       {"ST_LINESUBSTRING", call("bq_st_linesubstring", 3)},

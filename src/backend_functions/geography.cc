@@ -34,6 +34,7 @@
 #include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2closest_edge_query.h"
+#include "s2/s2convex_hull_query.h"
 #include "s2/s2debug.h"
 #include "s2/s2earth.h"
 #include "s2/s2error.h"
@@ -347,6 +348,42 @@ absl::StatusOr<Result> Relate(const Geography& a, const Geography& b, Predicate 
   MutableS2ShapeIndex index_b;
   AddSnapped(std::move(snapped_b), index_b);
   return predicate(index_a, index_b);
+}
+
+// S2's hull can be a thin loop for a line. Normalize its snapped closed set
+// so these loops collapse to lines rather than polygons.
+absl::StatusOr<std::optional<std::string>> ConvexHull(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  if (geography.Empty()) {
+    return std::nullopt;
+  }
+  // BigQuery preserves a single point; S2's artificial tiny loop can move it when snapped.
+  if (geography.Count() == 1 && geography.points.size() == 1) {
+    return GeographyText(geography);
+  }
+  S2ConvexHullQuery query;
+  for (const S2Point& point : geography.points) {
+    query.AddPoint(point);
+  }
+  for (const std::vector<S2Point>& line : geography.lines) {
+    query.AddPolyline(S2Polyline(line));
+  }
+  if (!geography.polygons.empty()) {
+    query.AddPolygon(*ToS2Polygon(geography));
+  }
+  const std::unique_ptr<S2Loop> loop = query.GetConvexHull();
+  const auto vertices = loop->vertices_span();
+  const Geography hull{
+      .points = {},
+      .lines = {},
+      .polygons = {{{vertices.begin(), vertices.end()}}},
+  };
+  GOOGLESQL_ASSIGN_OR_RETURN(
+      const Geography result,
+      Relate<Geography>(hull, {}, [](const MutableS2ShapeIndex& a, const MutableS2ShapeIndex& b) {
+        return ClosedSetOperation(a, b, S2BooleanOperation::OpType::UNION);
+      }));
+  return GeographyText(result);
 }
 
 // Whether `a` and `b` share a point or, with `interiors`, a point of their interiors as OGC
@@ -1007,6 +1044,7 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_asgeojson", {kVarchar}, kVarchar, EachRow<AsGeoJson>);
   Register(connection, "bq_st_angle", {kVarchar, kVarchar, kVarchar}, kDouble, EachRow<Angle>);
   Register(connection, "bq_st_centroid", {kVarchar}, kVarchar, EachRow<Centroid>);
+  Register(connection, "bq_st_convexhull", {kVarchar}, kVarchar, EachRow<ConvexHull>);
   Register(connection, "bq_st_lineinterpolatepoint", {kVarchar, kDouble}, kVarchar,
            EachRow<LineInterpolatePoint>);
   Register(connection, "bq_st_linelocatepoint", {kVarchar, kVarchar}, kDouble,
