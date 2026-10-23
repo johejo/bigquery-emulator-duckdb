@@ -89,6 +89,16 @@ std::string EndpointMatch(const googlesql::ResolvedGraphElementScan& node,
   return "(" + Join(keys, " AND ") + ")";
 }
 
+const googlesql::ResolvedColumnRef* GraphColumn(const googlesql::ResolvedExpr& expr) {
+  const auto* value = &expr;
+  // The resolver casts repeated variables to a common property set when their labels differ.
+  while (value->Is<googlesql::ResolvedCast>() && value->type()->IsGraphElement()) {
+    value = value->GetAs<googlesql::ResolvedCast>()->expr();
+  }
+  return value->Is<googlesql::ResolvedColumnRef>() ? value->GetAs<googlesql::ResolvedColumnRef>()
+                                                   : nullptr;
+}
+
 // Resolution joins occurrences of a pattern variable using equality between distinct columns
 // with the same name. Compare their identities; user-written graph comparisons still go
 // through Expression and remain unsupported.
@@ -109,15 +119,17 @@ std::optional<std::string> GraphFilter(const googlesql::ResolvedExpr& expr, cons
       return "(" + Join(terms, " AND ") + ")";
     }
     if (name == "$equal" && call.argument_list_size() == 2 &&
-        call.argument_list(0)->Is<googlesql::ResolvedColumnRef>() &&
-        call.argument_list(1)->Is<googlesql::ResolvedColumnRef>()) {
-      const auto& left = call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>()->column();
-      const auto& right = call.argument_list(1)->GetAs<googlesql::ResolvedColumnRef>()->column();
+        GraphColumn(*call.argument_list(0)) != nullptr &&
+        GraphColumn(*call.argument_list(1)) != nullptr) {
+      const auto* lhs_ref = GraphColumn(*call.argument_list(0));
+      const auto* rhs_ref = GraphColumn(*call.argument_list(1));
+      const auto& left = lhs_ref->column();
+      const auto& right = rhs_ref->column();
       if (left.type()->IsGraphElement() && right.type()->IsGraphElement() &&
           left.column_id() != right.column_id() &&
           ToLowerAscii(left.name()) == ToLowerAscii(right.name())) {
-        const auto lhs = Expression(*call.argument_list(0), scope, columns);
-        const auto rhs = Expression(*call.argument_list(1), scope, columns);
+        const auto lhs = Expression(*lhs_ref, scope, columns);
+        const auto rhs = Expression(*rhs_ref, scope, columns);
         if (!lhs || !rhs) {
           return std::nullopt;
         }
@@ -449,34 +461,59 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
 }  // namespace
 
 std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, const Scope& scope) {
-  if (scope.graph_name.empty() || scan.optional() ||
-      (scan.input_scan() != nullptr &&
-       !scan.input_scan()->Is<googlesql::ResolvedSingleRowScan>()) ||
-      scan.input_scan_list().empty()) {
-    return Unsupported(scope, "optional or chained graph patterns");
+  if (scope.graph_name.empty() || scan.input_scan_list().empty()) {
+    return Unsupported(scope, "graph patterns without a graph or paths");
+  }
+  const auto input = scan.input_scan() == nullptr
+                         ? std::optional<Relation>(
+                               Relation{.sql = "SELECT 1 AS _unit", .columns = {}, .ordering = {}})
+                         : Scan(*scan.input_scan(), scope);
+  if (!input) {
+    return std::nullopt;
+  }
+  const auto left = QuoteIdentifier(scope.context.FreshName("graph_input"));
+  Columns input_columns;
+  std::vector<std::string> outputs;
+  for (const auto& [id, unused] : input->columns) {
+    input_columns.emplace(id, left + "." + ColumnName(id));
+    outputs.push_back(left + "." + ColumnName(id) + " AS " + ColumnName(id));
   }
   Relation result;
   std::vector<std::string> paths;
   std::vector<std::string> projections;
   for (const auto& path : scan.input_scan_list()) {
-    const auto input = GraphPath(*path, scope);
-    if (!input) {
+    const auto match = GraphPath(*path, scope);
+    if (!match) {
       return std::nullopt;
     }
     const auto alias = QuoteIdentifier("p" + std::to_string(paths.size()));
-    paths.push_back("(" + input->sql + ") AS " + alias);
-    for (const auto& [id, unused] : input->columns) {
+    paths.push_back("(" + match->sql + ") AS " + alias);
+    for (const auto& [id, unused] : match->columns) {
       projections.push_back(alias + "." + ColumnName(id) + " AS " + ColumnName(id));
       result.columns.emplace(id, "q." + ColumnName(id));
+      outputs.push_back("graph_match." + ColumnName(id) + " AS " + ColumnName(id));
     }
   }
   result.sql = "SELECT " + Join(projections, ", ") + " FROM " + Join(paths, " CROSS JOIN ");
+  Columns filter_columns = input_columns;
+  for (const auto& [id, unused] : result.columns) {
+    filter_columns.emplace(id, "graph_match." + ColumnName(id));
+  }
+  std::string condition = "TRUE";
   if (scan.filter_expr() != nullptr) {
-    const auto filter = GraphFilter(*scan.filter_expr(), scope, result.columns);
+    const auto filter = GraphFilter(*scan.filter_expr(), scope, filter_columns);
     if (!filter) {
       return std::nullopt;
     }
-    result.sql = "SELECT q.*" + result.From() + " WHERE " + *filter;
+    condition = *filter;
+  }
+  // The entire pattern is the right side of the join. Its WHERE is a join condition,
+  // so an optional match preserves the input row when every candidate is rejected.
+  result.sql = "SELECT " + Join(outputs, ", ") + " FROM (" + input->sql + ") AS " + left +
+               (scan.optional() ? " LEFT JOIN (" : " INNER JOIN (") + result.sql +
+               ") AS graph_match ON " + condition;
+  for (const auto& [id, unused] : input->columns) {
+    result.columns.emplace(id, "q." + ColumnName(id));
   }
   return result;
 }
