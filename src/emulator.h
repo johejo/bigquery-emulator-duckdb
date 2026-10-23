@@ -18,6 +18,7 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/backend_functions/python.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
@@ -206,7 +207,8 @@ class Emulator {
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
       const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
-      const std::vector<ExternalConnection>& connections = {});
+      const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
+      const backend_functions::PythonOptions& python = {});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

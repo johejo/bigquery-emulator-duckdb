@@ -1,0 +1,154 @@
+# Python UDF structure and scalar type mappings:
+# https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python
+# Each case has its own persistent routine because scalar cases run concurrently.
+
+CREATE OR REPLACE FUNCTION scalars.py_multiply(x FLOAT64, y FLOAT64)
+RETURNS FLOAT64 LANGUAGE python
+OPTIONS(runtime_version='python-3.11', entry_point='multiply') AS r'''
+def multiply(x, y):
+    return x * y
+''';
+SELECT scalars.py_multiply(2, 10)
+=> "20.0"
+
+CREATE OR REPLACE FUNCTION scalars.py_bool(x BOOL)
+RETURNS BOOL LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT scalars.py_bool(FALSE)
+=> "false"
+
+CREATE OR REPLACE FUNCTION scalars.py_int(x INT64)
+RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT scalars.py_int(9223372036854775807)
+=> "9223372036854775807"
+
+CREATE OR REPLACE FUNCTION scalars.py_min_int(x INT64)
+RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT scalars.py_min_int(-9223372036854775808)
+=> "-9223372036854775808"
+
+CREATE OR REPLACE FUNCTION scalars.py_unicode(x STRING)
+RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT scalars.py_unicode('日本語 🐍\x00')
+=> "日本語 🐍\u0000"
+
+CREATE OR REPLACE FUNCTION scalars.py_empty_string(x STRING)
+RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT scalars.py_empty_string('')
+=> ""
+
+CREATE OR REPLACE FUNCTION scalars.py_bytes(x BYTES)
+RETURNS BYTES LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT TO_HEX(scalars.py_bytes(b'\x00\xfb\xff'))
+=> "00fbff"
+
+CREATE OR REPLACE FUNCTION scalars.py_empty_bytes(x BYTES)
+RETURNS BYTES LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='identity') AS r'''
+def identity(x):
+    return x
+''';
+SELECT TO_HEX(scalars.py_empty_bytes(b''))
+=> ""
+
+# Python's math module is part of the standard library; sqrt(9) = 3.
+# https://docs.python.org/3.11/library/math.html#math.sqrt
+CREATE OR REPLACE FUNCTION scalars.py_sqrt(x FLOAT64)
+RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='root') AS r'''
+import math
+def root(x):
+    return math.sqrt(x)
+''';
+SELECT scalars.py_sqrt(9)
+=> "3.0"
+
+CREATE OR REPLACE FUNCTION scalars.py_rows(x FLOAT64)
+RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='multiply') AS r'''
+def multiply(x):
+    return x * 2
+''';
+SELECT SUM(scalars.py_rows(x)) FROM UNNEST([1.0, 2.0, 3.0]) AS x
+=> "12.0"
+
+# The documentation's logging example explicitly maps None to SQL NULL.
+# https://docs.cloud.google.com/bigquery/docs/user-defined-functions-python#enable_logging
+CREATE OR REPLACE FUNCTION scalars.py_null_result()
+RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): return None';
+SELECT scalars.py_null_result() IS NULL
+=> "true"
+
+# Python stdout, including native writes, must not corrupt the worker protocol.
+CREATE OR REPLACE FUNCTION scalars.py_print(x STRING)
+RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS r'''
+import os
+import sys
+def f(x):
+    print('stdout')
+    print('stderr', file=sys.stderr)
+    os.write(1, b'native output\n')
+    return x
+''';
+SELECT scalars.py_print('value')
+=> "value"
+
+# The Python UDF documentation explicitly excludes temporary functions.
+CREATE TEMP FUNCTION py_temporary(x INT64) RETURNS INT64 LANGUAGE python
+OPTIONS(runtime_version='python-3.11', entry_point='identity') AS 'def identity(x): return x';
+SELECT py_temporary(1)
+=> error:
+
+# Observed BigQuery answers for NULL, return conversions, nonfinite values and exceptions.
+# BigQuery exceptions include a service traceback; check the stable exception type and message.
+CREATE OR REPLACE FUNCTION scalars.py_null_argument(x STRING)
+RETURNS BOOL LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS r'''
+def f(x):
+    return x is None
+''';
+SELECT scalars.py_null_argument(NULL)
+=> "true"
+
+CREATE OR REPLACE FUNCTION scalars.py_overflow()
+RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): return 2**63';
+SELECT scalars.py_overflow()
+=> error contains: Python int too large to convert to C long
+
+CREATE OR REPLACE FUNCTION scalars.py_float_from_int()
+RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): return 1';
+SELECT scalars.py_float_from_int()
+=> "1.0"
+
+CREATE OR REPLACE FUNCTION scalars.py_int_from_bool()
+RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): return True';
+SELECT scalars.py_int_from_bool()
+=> error contains: Expected integer, got bool
+
+CREATE OR REPLACE FUNCTION scalars.py_nonfinite(x FLOAT64)
+RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x';
+SELECT FORMAT('%T', scalars.py_nonfinite(CAST('NaN' AS FLOAT64)))
+=> "CAST(\"nan\" AS FLOAT64)"
+
+CREATE OR REPLACE FUNCTION scalars.py_negative_zero(x FLOAT64)
+RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x';
+SELECT IEEE_DIVIDE(1, scalars.py_negative_zero(-0.0))
+=> "-Infinity"
+
+CREATE OR REPLACE FUNCTION scalars.py_exception()
+RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(): raise ValueError("bad input")';
+SELECT scalars.py_exception()
+=> error contains: ValueError: bad input

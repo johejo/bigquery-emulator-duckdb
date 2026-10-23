@@ -312,6 +312,9 @@ query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ANY TYPE, y ANY TYPE) RETURNS
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x FLOAT64) RETURNS FLOAT64 LANGUAGE js AS 'return x'; SELECT f(1)
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x ARRAY<STRUCT<a BYTES>>) RETURNS STRING LANGUAGE js AS 'return x[0].a'; SELECT f([STRUCT(b'a' AS a)])
 query `CREATE FUNCTION` | CREATE TEMP FUNCTION f(x DATE) RETURNS FLOAT64 LANGUAGE js AS 'return 1'; SELECT f(CURRENT_DATE())
+query `CREATE FUNCTION` | CREATE FUNCTION d.py(x FLOAT64) RETURNS FLOAT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x * 2'; SELECT d.py(1)
+query `CREATE FUNCTION` | CREATE FUNCTION d.py(x BYTES) RETURNS BYTES LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x'; SELECT d.py(b'abc')
+query `CREATE FUNCTION` | CREATE FUNCTION d.py(x ARRAY<INT64>) RETURNS INT64 LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return len(x)'; SELECT d.py([1, 2])
 note `CREATE FUNCTION` | See [User-defined functions](compatibility.md#user-defined-functions).
 query `DROP FUNCTION` | CREATE FUNCTION d.f(x INT64) AS (x); DROP FUNCTION d.f
 query `DROP FUNCTION` | DROP FUNCTION IF EXISTS d.missing

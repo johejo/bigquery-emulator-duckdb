@@ -53,6 +53,8 @@ constexpr auto kOptions = std::to_array<DdlOptionDefinition>({
     {.context = "column", .name = "description", .type = kString},
     {.context = "column", .name = "rounding_mode", .type = kString},
     {.context = "CREATE FUNCTION", .name = "description", .type = kString},
+    {.context = "CREATE FUNCTION", .name = "runtime_version", .type = kString},
+    {.context = "CREATE FUNCTION", .name = "entry_point", .type = kString},
     {.context = "CREATE TABLE FUNCTION", .name = "description", .type = kString},
     {.context = "CREATE PROCEDURE", .name = "description", .type = kString},
     {.context = "CREATE PROCEDURE", .name = "strict_mode", .type = kBool},

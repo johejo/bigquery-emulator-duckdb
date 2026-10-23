@@ -138,3 +138,12 @@ steps:
               query: CREATE PROPERTY GRAPH persist.g NODE TABLES (persist.t KEY (a) LABEL Item PROPERTIES (a))
               useLegacySql: false
     test: current.res.status == 200
+  python_routine:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: "CREATE FUNCTION persist.py(x STRING) RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x'"
+              useLegacySql: false
+    test: current.res.status == 200

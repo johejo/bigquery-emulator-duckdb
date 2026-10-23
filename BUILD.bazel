@@ -367,6 +367,7 @@ cc_library(
         ":catalog_table",
         ":duckdb_sql",
         ":language_options",
+        ":python_function",
         ":system_variables",
         ":table_path",
         ":table_source",
@@ -443,6 +444,21 @@ cc_library(
         "@googlesql//googlesql/base:status",
         "@googlesql//googlesql/public:analyzer_options",
         "@googlesql//googlesql/scripting:type_aliases",
+    ],
+)
+
+cc_library(
+    name = "python_function",
+    srcs = ["src/python_function.cc"],
+    hdrs = ["src/python_function.h"],
+    implementation_deps = [
+        "@googlesql//googlesql/public:type",
+        # GoogleSQL's json_value also brings this spelling of nlohmann/json.hpp.
+        "@nlohmann_json//:singleheader-json",
+    ],
+    deps = [
+        "@googlesql//googlesql/public:function",
+        "@nlohmann_json//:json",
     ],
 )
 
@@ -566,6 +582,7 @@ cc_library(
     deps = [
         "//src/backend_functions:javascript_limits",
         "//src/backend_functions:object_metadata",
+        "//src/backend_functions:python",
         "//third_party/duckdb",
     ],
 )
@@ -759,6 +776,7 @@ cc_library(
         ":result_rows",
         "//src/backend_functions:javascript_limits",
         "//src/backend_functions:object_metadata",
+        "//src/backend_functions:python",
         "@nlohmann_json//:json",
     ],
 )
@@ -944,6 +962,7 @@ cc_library(
         ":system_variables",
         ":table_metadata",
         "//src/backend_functions:javascript_limits",
+        "//src/backend_functions:python",
         "@nlohmann_json//:json",
     ],
 )
@@ -1081,6 +1100,32 @@ cc_library(
     deps = ["//src/shell:format"],
 )
 
+genrule(
+    name = "python_runtime_path",
+    srcs = ["@python_3_11//:python3"],
+    outs = ["python_runtime_path.h"],
+    cmd = "echo 'inline constexpr char kPythonRuntime[] = \"$(rlocationpath @python_3_11//:python3)\";' > $@",
+)
+
+cc_binary(
+    name = "python_udf_worker",
+    srcs = [
+        "src/python_worker.cc",
+        ":python_runtime_path",
+    ],
+    data = [
+        "@python_3_11//:files",
+        "@python_3_11//:python3",
+    ],
+    deps = [
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+        "@python_3_11//:libpython",
+        "@python_3_11//:python_headers",
+        "@rules_cc//cc/runfiles",
+    ],
+)
+
 cc_binary(
     name = "bigquery-emulator-duckdb",
     srcs = ["src/main.cc"],
@@ -1100,6 +1145,7 @@ cc_binary(
         ":server",
         ":shell",
         "//src/backend_functions:javascript_limits",
+        "//src/backend_functions:python",
         "//src/shell:format",
     ],
 )

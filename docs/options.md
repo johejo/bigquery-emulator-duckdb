@@ -39,6 +39,9 @@ the emulator rejected.
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
 | [CREATE TABLE FUNCTION](#create-table-function) | 1 | 0 | 0 | 0 |
 | [CREATE PROCEDURE SQL](#create-procedure-sql) | 2 | 0 | 0 | 0 |
+| [CREATE FUNCTION Python](#create-function-python) | 1 | 0 | 1 | 5 |
+| [CREATE FUNCTION Python runtime](#create-function-python-runtime) | 1 | 0 | 0 | 0 |
+| [CREATE FUNCTION Python entry point](#create-function-python-entry-point) | 1 | 0 | 0 | 0 |
 
 ## CREATE SCHEMA
 
@@ -245,6 +248,30 @@ the emulator rejected.
 | [`strict_mode`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#procedure_option_list) | `BOOL` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#procedure_option_list) | `STRING` | Supported |  |
 
+## CREATE FUNCTION Python
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `STRING` | Supported |  |
+| [`library`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `ARRAY<STRING>` | Unsupported |  |
+| [`max_batching_rows`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `INT64` | Untested | No sample for this option's constraints. |
+| [`packages`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `ARRAY<STRING>` | Untested | No sample for this option's constraints. |
+| [`container_cpu`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `FLOAT64` | Untested | No sample for this option's constraints. |
+| [`container_memory`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `STRING` | Untested | No sample for this option's constraints. |
+| [`container_request_concurrency`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `INT64` | Untested | No sample for this option's constraints. |
+
+## CREATE FUNCTION Python runtime
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`runtime_version`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `STRING` | Supported |  |
+
+## CREATE FUNCTION Python entry point
+
+| Option | Type | Status | Notes |
+| --- | --- | --- | --- |
+| [`entry_point`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list) | `STRING` | Supported |  |
+
 ## Unprobed contexts
 
 These contexts have no statement template yet, so none of their options is probed.
@@ -252,7 +279,6 @@ These contexts have no statement template yet, so none of their options is probe
 - [CREATE MATERIALIZED VIEW replica](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_replica_option_list): `replication_interval_seconds`
 - [CREATE EXTERNAL SCHEMA](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#external_schema_option_list): `description`, `friendly_name`, `labels`, `location`, `external_source`, `tags`
 - [CREATE FUNCTION remote](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list): `description`, `endpoint`, `user_defined_context`, `max_batching_rows`
-- [CREATE FUNCTION Python](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#function_option_list): `description`, `library`, `max_batching_rows`, `runtime_version`, `entry_point`, `packages`, `container_cpu`, `container_memory`, `container_request_concurrency`
 - [CREATE AGGREGATE FUNCTION SQL](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#sql-udaf-function-option-list): `description`
 - [CREATE AGGREGATE FUNCTION JavaScript](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#javascript-udaf-function-option-list): `description`, `library`
 - [CREATE PROCEDURE Spark](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#procedure_option_list): `description`, `engine`, `runtime_version`, `container_image`, `properties`, `main_file_uri`, `main_class`, `py_file_uris`, `jar_uris`, `file_uris`, `archive_uris`

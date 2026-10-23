@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "src/backend_functions/javascript_limits.h"
+#include "src/backend_functions/python.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
 #include "src/project.h"
@@ -30,11 +31,11 @@ void PrintUsage() {
   std::cerr
       << "Usage: bigquery-emulator-duckdb [--host HOST] [--port PORT] [--grpc-port PORT] "
          "[--data-dir DIR] [--project "
-         "JSON|@FILE]... [--session-user ID] [JAVASCRIPT LIMITS]\n"
+         "JSON|@FILE]... [--session-user ID] [UDF OPTIONS]\n"
          "       [--connection ID=CONNINFO]...\n"
          "       bigquery-emulator-duckdb shell [--project-id ID] [--dataset-id DATASET] "
          "[--format FORMAT] [-e SQL] [--data-dir DIR] [--project JSON|@FILE]... "
-         "[--session-user ID] [JAVASCRIPT LIMITS]\n"
+         "[--session-user ID] [UDF OPTIONS]\n"
          "       [--connection ID=CONNINFO]...\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
@@ -42,6 +43,10 @@ void PrintUsage() {
          "                              300000)\n"
          "  --javascript-memory-mib MIB  How much memory JavaScript UDF calls may allocate per\n"
          "                               query on each thread (default: 256)\n"
+         "  --python-worker PATH  Override the bundled libpython worker executable\n"
+         "  --python-timeout-ms MS  Python UDF call timeout, including worker startup (default: "
+         "300000)\n"
+         "  --python-memory-mib MIB  Python worker memory limit (default: 256)\n"
          "  --connection ID=CONNINFO  Let EXTERNAL_QUERY reach PostgreSQL, MySQL or Spanner\n"
          "                  (libpq connection string/URI or "
          "spanner://projects/P/instances/I/databases/D),\n"
@@ -97,6 +102,7 @@ int Run(int argc, char* const* argv) {
   std::string data_dir;
   std::optional<std::string> session_user;
   bigquery_emulator_duckdb::backend_functions::JavaScriptLimits javascript;
+  bigquery_emulator_duckdb::backend_functions::PythonOptions python;
   std::vector<bigquery_emulator_duckdb::Project> projects;
   std::vector<bigquery_emulator_duckdb::ExternalConnection> connections;
   for (int i = shell ? 2 : 1; i < argc; ++i) {
@@ -114,8 +120,13 @@ int Run(int argc, char* const* argv) {
       session_user = argv[++i];
     } else if (arg.starts_with("--session-user=")) {
       session_user = arg.substr(15);
+    } else if (arg == "--python-worker" && has_value) {
+      python.worker = argv[++i];
+    } else if (arg.starts_with("--python-worker=")) {
+      python.worker = arg.substr(16);
     } else if (const std::string_view name = arg.substr(0, arg.find('='));
-               name == "--javascript-timeout-ms" || name == "--javascript-memory-mib") {
+               name == "--javascript-timeout-ms" || name == "--javascript-memory-mib" ||
+               name == "--python-timeout-ms" || name == "--python-memory-mib") {
       std::optional<uint32_t> value;
       if (name.size() < arg.size()) {
         value = ParsePositive(arg.substr(name.size() + 1));
@@ -128,6 +139,10 @@ int Run(int argc, char* const* argv) {
       }
       if (name == "--javascript-timeout-ms") {
         javascript.call_time = std::chrono::milliseconds(*value);
+      } else if (name == "--python-timeout-ms") {
+        python.call_time = std::chrono::milliseconds(*value);
+      } else if (name == "--python-memory-mib") {
+        python.memory = size_t{*value} << 20U;
       } else {
         javascript.memory = size_t{*value} << 20U;
       }
@@ -166,13 +181,13 @@ int Run(int argc, char* const* argv) {
 
   if (shell) {
     bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                                connections);
+                                                connections, python);
     return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
   }
 
   const sigset_t signals = BlockShutdownSignals();
   bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                              connections);
+                                              connections, python);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Start()) {
     std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "

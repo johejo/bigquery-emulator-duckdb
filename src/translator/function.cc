@@ -16,6 +16,7 @@
 #include "src/field_schema.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
+#include "src/python_function.h"
 #include "src/schema_sql.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
@@ -239,22 +240,25 @@ std::optional<std::string> RoundedToEven(const std::string& value, const googles
 
 namespace {
 
-// A call to a JavaScript UDF, which the backend function for its result type runs on `source`.
-std::optional<std::string> JavaScriptCall(const googlesql::ResolvedFunctionCall& call,
-                                          const std::string& source, const Scope& scope,
-                                          const Columns& columns) {
+// An external-language UDF, run by the backend function for its result type.
+std::optional<std::string> ExternalCall(const googlesql::ResolvedFunctionCall& call,
+                                        const std::string& source, const Scope& scope,
+                                        const Columns& columns, bool python = false) {
   const std::string name = call.function()->Name();
   if (call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
-    return Unsupported(scope, "SAFE. calls of JavaScript UDFs");
+    return Unsupported(scope,
+                       python ? "SAFE. calls of Python UDFs" : "SAFE. calls of JavaScript UDFs");
   }
   const googlesql::Type* type = call.type();
-  const char* function = type->IsBool()     ? "bq_js_bool"
-                         : type->IsDouble() ? "bq_js_double"
-                         : type->IsString() ? "bq_js_string"
-                         : type->IsInt64()  ? "bq_js_int64"
-                                            : nullptr;
-  if (function == nullptr) {
-    return Unsupported(scope, "JavaScript UDF " + name + " result type");
+  const char* result = type->IsBool()              ? "bool"
+                       : type->IsDouble()          ? "double"
+                       : type->IsString()          ? "string"
+                       : type->IsInt64()           ? "int64"
+                       : python && type->IsBytes() ? "bytes"
+                                                   : nullptr;
+  if (result == nullptr) {
+    return Unsupported(
+        scope, std::string(python ? "Python" : "JavaScript") + " UDF " + name + " result type");
   }
   std::vector<std::string> args = {QuoteLiteral(source)};
   for (const auto& argument : call.argument_list()) {
@@ -265,7 +269,7 @@ std::optional<std::string> JavaScriptCall(const googlesql::ResolvedFunctionCall&
     }
     args.push_back("CAST(" + *sql + " AS " + *duckdb_type + ")");
   }
-  return std::string(function) + "(" + Join(args, ", ") + ")";
+  return std::string(python ? "bq_py_" : "bq_js_") + result + "(" + Join(args, ", ") + ")";
 }
 
 }  // namespace
@@ -277,8 +281,11 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !call.collation_list().empty()) {
     return Unsupported(scope, "function " + name + " with generic arguments, hints or collation");
   }
+  if (const auto* python = dynamic_cast<const PythonFunction*>(call.function())) {
+    return ExternalCall(call, python->definition(), scope, columns, true);
+  }
   if (const auto* javascript = dynamic_cast<const JavaScriptFunction*>(call.function())) {
-    return JavaScriptCall(call, javascript->source(), scope, columns);
+    return ExternalCall(call, javascript->source(), scope, columns);
   }
   if (!IsBuiltinFunction(*call.function())) {
     return Unsupported(scope, "function " + name);

@@ -17,6 +17,7 @@
 #include "src/api_error.h"
 #include "src/backend_error.h"
 #include "src/backend_functions/javascript_limits.h"
+#include "src/backend_functions/python.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
@@ -54,7 +55,8 @@ std::string ProjectFileName(const std::string& project_id) {
 Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
                    const backend_functions::JavaScriptLimits& javascript,
-                   const std::vector<ExternalConnection>& connections)
+                   const std::vector<ExternalConnection>& connections,
+                   const backend_functions::PythonOptions& python)
     : backend_(
           session_user, javascript,
           {
@@ -65,7 +67,8 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                   },
               .has_connection =
                   [this](const std::string& key) { return connections_.conninfo.contains(key); },
-          }),
+          },
+          python),
       has_session_user_(session_user.has_value()),
       data_dir_(std::move(data_dir)) {
   for (const ExternalConnection& connection : connections) {

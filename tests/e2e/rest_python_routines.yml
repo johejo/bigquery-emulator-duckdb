@@ -1,0 +1,75 @@
+desc: Python routine definitions round-trip through DDL and the REST API
+# Field names and types follow the Routine and PythonOptions REST reference.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_python}
+    test: current.res.status == 200
+  insert:
+    req:
+      /projects/test/datasets/rest_python/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: test, datasetId: rest_python, routineId: api}
+              routineType: SCALAR_FUNCTION
+              language: PYTHON
+              runtimeVersion: python-3.11
+              pythonOptions: {entryPoint: identity}
+              arguments: [{name: x, dataType: {typeKind: STRING}}]
+              returnType: {typeKind: STRING}
+              definitionBody: 'def identity(x): return x'
+              description: Python API routine
+    test: |
+      current.res.status == 200 && current.res.body.language == 'PYTHON' &&
+      current.res.body.runtimeVersion == 'python-3.11' &&
+      current.res.body.pythonOptions == {'entryPoint': 'identity'}
+  call:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: "SELECT rest_python.api('API')"
+              useLegacySql: false
+    test: |
+      current.res.status == 200 && current.res.body.rows == [{'f': [{'v': 'API'}]}]
+  replace_with_ddl:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              query: "CREATE OR REPLACE FUNCTION rest_python.api(x STRING) RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='other', description='DDL routine') AS 'def other(x): return x'"
+              useLegacySql: false
+    test: current.res.status == 200
+  get:
+    req:
+      /projects/test/datasets/rest_python/routines/api:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.description == 'DDL routine' &&
+      current.res.body.definitionBody == 'def other(x): return x' &&
+      current.res.body.runtimeVersion == 'python-3.11' &&
+      current.res.body.pythonOptions == {'entryPoint': 'other'}
+  reject_packages:
+    req:
+      /projects/test/datasets/rest_python/routines:
+        post:
+          body:
+            application/json:
+              routineReference: {projectId: test, datasetId: rest_python, routineId: packages}
+              routineType: SCALAR_FUNCTION
+              language: PYTHON
+              runtimeVersion: python-3.11
+              pythonOptions: {entryPoint: f, packages: ['numpy']}
+              returnType: {typeKind: INT64}
+              definitionBody: 'def f(): return 1'
+    test: current.res.status == 400

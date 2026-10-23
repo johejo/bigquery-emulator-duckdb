@@ -20,6 +20,7 @@
 #include "src/backend_functions/object_metadata.h"
 #include "src/backend_functions/objectref.h"
 #include "src/backend_functions/percentile.h"
+#include "src/backend_functions/python.h"
 #include "src/backend_functions/range.h"
 #include "src/backend_functions/string.h"
 #include "src/backend_functions/text_analysis.h"
@@ -124,7 +125,8 @@ void RegisterFetchMetadata(duckdb_connection connection,
 void RegisterBackendFunctions(duckdb_database database,
                               const std::optional<std::string>& session_user,
                               const backend_functions::JavaScriptLimits& javascript,
-                              const backend_functions::ObjectStorage& storage) {
+                              const backend_functions::ObjectStorage& storage,
+                              const backend_functions::PythonOptions& python) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -145,6 +147,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);
+  backend_functions::RegisterPythonFunctions(connection.get(), python);
   backend_functions::RegisterObjectRefFunctions(connection.get(), storage.has_connection);
   RegisterFetchMetadata(connection.get(), storage.fetch);
 }
