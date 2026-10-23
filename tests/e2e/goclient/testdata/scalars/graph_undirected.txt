@@ -1,0 +1,69 @@
+# Any-direction patterns match directed edges in either direction.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#edge_pattern
+# Self-loop deduplication also follows GoogleSQL's graph_table.test self_edge_deduped.
+# FinGraph has reciprocal edges (10, 11), parallel edges (10, 13), and a self-loop (12).
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 1 AND b.id = 2 RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND b.id = 1 RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 3 RETURN COUNT(*) AS result)
+=> "0"
+
+# Traversal never swaps an edge's source and destination properties, including in filters.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN e.src AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows WHERE e.src = 2]-(b:Person) WHERE a.id = 1 RETURN b.id AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) FILTER a.id = 2 AND e.id = 10 RETURN e.dst AS result)
+=> "2"
+
+# Paths record traversal order. WALK permits revisiting nodes and reusing edges.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN PATH_FIRST(p).name AS result)
+=> "Dana"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN PATH_LAST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person) WHERE a.id = 2 AND e.id = 10 RETURN EDGES(p)[OFFSET(0)].src AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNT(*) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNTIF(IS_TRAIL(p)) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNTIF(IS_ACYCLIC(p)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNTIF(IS_SIMPLE(p)) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]->(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE e.id = 12 AND f.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH p = (a:Person)-[e:Knows]-(b:Person) RETURN COUNTIF(IS_ACYCLIC(p)) AS result)
+=> "6"
+
+# Different node tables constrain the possible orientations, even when their keys coincide.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Account)-[e:Owns]-(b:Person) RETURN b.name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Owns]-(b:Account) RETURN b.kind AS result)
+=> "checking"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Account)-[e:Owns]-(b:Account) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH p = (a:Author)-[e:Knows]-(b:Reader) WHERE e.id = 12 RETURN IS_ACYCLIC(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Reader)-[e:Knows]-(b:Author) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+
+# Match every component of composite keys; reverse traversal retains original properties.
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE a.tenant = 'b' AND b.tenant = 'a' RETURN e.edge_id AS result)
+=> "y"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE a.tenant = 'b' AND b.tenant = 'a' RETURN e.origin AS result)
+=> "a"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE a.tenant = 'b' AND b.tenant = 'a' RETURN e.target AS result)
+=> "b"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE e.edge_id = 'loop' RETURN COUNT(*) AS result)
+=> "1"

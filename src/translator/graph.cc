@@ -62,6 +62,31 @@ std::optional<std::string> Keys(
   return "(" + Join(names, ", ") + ")";
 }
 
+std::string ElementAlias(const googlesql::ResolvedGraphElementScan& element) {
+  return QuoteIdentifier("g" + std::to_string(element.column_list(0).column_id()));
+}
+
+std::string EndpointMatch(const googlesql::ResolvedGraphElementScan& node,
+                          const googlesql::ResolvedGraphElementScan& edge,
+                          const googlesql::GraphNodeTableReference& reference) {
+  const auto* node_table = node.target_element_table_list(0);
+  if (node_table != reference.GetReferencedNodeTable()) {
+    return "FALSE";
+  }
+  const auto* edge_table = edge.target_element_table_list(0)->GetTable();
+  std::vector<std::string> keys;
+  keys.reserve(reference.GetEdgeTableColumns().size());
+  for (size_t i = 0; i < reference.GetEdgeTableColumns().size(); ++i) {
+    keys.push_back(std::format(
+        "{}.{} = {}.{}", ElementAlias(edge),
+        QuoteIdentifier(edge_table->GetColumn(reference.GetEdgeTableColumns().at(i))->Name()),
+        ElementAlias(node),
+        QuoteIdentifier(
+            node_table->GetTable()->GetColumn(reference.GetNodeTableColumns().at(i))->Name())));
+  }
+  return "(" + Join(keys, " AND ") + ")";
+}
+
 }  // namespace
 
 std::optional<std::string> CreatePropertyGraph(
@@ -212,7 +237,9 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
   std::vector<std::string> filters;
   std::vector<std::string> path_nodes;
   std::vector<std::string> path_edges;
-  std::string pattern;
+  std::vector<std::string> tables;
+  std::vector<std::string> connections;
+  std::vector<const googlesql::ResolvedGraphElementScan*> elements;
   for (const auto& part : path.input_scan_list()) {
     if (!part->Is<googlesql::ResolvedGraphElementScan>()) {
       return Unsupported(scope, "nested graph paths");
@@ -224,31 +251,24 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
       return Unsupported(scope, "graph patterns without a single table and label");
     }
     const auto& column = element.column_list(0);
-    const std::string variable = QuoteIdentifier("g" + std::to_string(column.column_id()));
-    const std::string body =
-        variable + ":" +
-        QuoteIdentifier(
-            element.label_expr()->GetAs<googlesql::ResolvedGraphLabel>()->label()->Name());
+    const std::string variable = ElementAlias(element);
     if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
       const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
       if (!edge.lhs_hint_list().empty() || !edge.rhs_hint_list().empty() ||
-          edge.cost_expr() != nullptr ||
-          edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY) {
-        return Unsupported(scope, "undirected graph edges or edge hints");
+          edge.cost_expr() != nullptr) {
+        return Unsupported(scope, "graph edge hints or costs");
       }
-      pattern += edge.orientation() == googlesql::ResolvedGraphEdgeScan::LEFT
-                     ? std::format("<-[{}]-", body)
-                     : std::format("-[{}]->", body);
-    } else {
-      pattern += std::format("({})", body);
     }
     const auto* element_table = element.target_element_table_list(0);
+    tables.push_back(QuoteIdentifierPath(element_table->GetTable()->FullName()) + " AS " +
+                     variable);
+    elements.push_back(&element);
     std::vector<std::string> keys;
     for (size_t i = 0; i < element_table->GetKeyColumns().size(); ++i) {
       const auto output =
           QuoteIdentifier("key_" + std::to_string(column.column_id()) + "_" + std::to_string(i));
-      // A key need not be a graph property. DuckPGQ passes expressions through to its table
-      // aliases, so read the underlying column without exposing it as a public property.
+      // A key need not be a graph property. Read the underlying column without exposing it
+      // as a public property.
       const auto* key = element_table->GetTable()->GetColumn(element_table->GetKeyColumns().at(i));
       outputs.push_back(std::format("CAST({}.{} AS VARCHAR) AS {}", variable,
                                     QuoteIdentifier(key->Name()), output));
@@ -329,8 +349,28 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
   if (outputs.empty()) {
     outputs.emplace_back("1 AS _unit");
   }
-  result.sql = "SELECT " + Join(projections, ", ") + " FROM GRAPH_TABLE(" + scope.graph_name +
-               " MATCH " + pattern + " COLUMNS (" + Join(outputs, ", ") + ")) AS q";
+  for (size_t i = 1; i + 1 < elements.size(); i += 2) {
+    const auto& edge = *elements.at(i)->GetAs<googlesql::ResolvedGraphEdgeScan>();
+    const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
+    const auto direction = [&](bool reverse) {
+      return "(" +
+             EndpointMatch(*elements.at(i - 1), edge,
+                           *(reverse ? table->GetDestNodeTable() : table->GetSourceNodeTable())) +
+             " AND " +
+             EndpointMatch(*elements.at(i + 1), edge,
+                           *(reverse ? table->GetSourceNodeTable() : table->GetDestNodeTable())) +
+             ")";
+    };
+    // Match both orientations against the original edge row. OR emits a self-loop once
+    // and preserves parallel edges, composite endpoint keys and edge properties.
+    connections.push_back(
+        edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY
+            ? "(" + direction(false) + " OR " + direction(true) + ")"
+            : direction(edge.orientation() == googlesql::ResolvedGraphEdgeScan::LEFT));
+  }
+  const auto rows = "SELECT " + Join(outputs, ", ") + " FROM " + Join(tables, " CROSS JOIN ") +
+                    (connections.empty() ? "" : " WHERE " + Join(connections, " AND "));
+  result.sql = "SELECT " + Join(projections, ", ") + " FROM (" + rows + ") AS q";
   for (const auto& part : path.input_scan_list()) {
     const auto* filter = part->GetAs<googlesql::ResolvedGraphElementScan>()->filter_expr();
     if (filter != nullptr) {
