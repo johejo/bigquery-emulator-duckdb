@@ -48,12 +48,12 @@ jobs:
         with:
           path: ~/.cache/bazel-disk
           key: bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: |
-            bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-
-            bazel-disk-${{ runner.os }}-${{ runner.arch }}-
+          restore-keys: bazel-clang-tidy-disk-${{ runner.os }}-${{ runner.arch }}-
       - name: Configure Bazel for CI
         run: |
           echo 'common --config=ci' > .bazelrc.local
+          # A full clang-tidy run needs less than 1G; leave room for changes between runs.
+          echo 'build:ci --experimental_disk_cache_gc_max_size=2G' >> .bazelrc.local
           echo "common --repo_env=TMP=$RUNNER_TEMP --repo_env=TEMP=$RUNNER_TEMP" >> .bazelrc.local
           mkdir -p "$RUNNER_TEMP/bazel-reports"
       - name: Clang-tidy
