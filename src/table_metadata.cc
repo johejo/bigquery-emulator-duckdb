@@ -54,7 +54,8 @@ std::string StringValue(const json& value, const char* key) {
 }
 
 // Applies the labels of `labels`, a JSON object, to `into`; a null value removes a label.
-void MergeLabels(const json& labels, std::map<std::string, std::string>& into) {
+void MergeLabels(const json& labels, std::map<std::string, std::string>& into,
+                 std::vector<std::string>& order) {
   if (labels.is_null()) {
     return;
   }
@@ -64,7 +65,11 @@ void MergeLabels(const json& labels, std::map<std::string, std::string>& into) {
   for (const auto& [key, value] : labels.items()) {
     if (value.is_null()) {
       into.erase(key);
+      std::erase(order, key);
     } else {
+      if (!into.contains(key)) {
+        order.push_back(key);
+      }
       into[key] = StringValue(value, "labels");
     }
   }
@@ -181,9 +186,11 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
 // resource `body` to `metadata`, as UpdateTableMetadata documents.
 template <typename Metadata>
 void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
-  if constexpr (requires { metadata.label_order; }) {
-    if (!patch || body.contains("labels")) {
-      metadata.label_order.clear();
+  // Every REST update sorts the existing labels before applying additions and deletions.
+  metadata.label_order.clear();
+  if (patch) {
+    for (const auto& label : metadata.labels) {
+      metadata.label_order.push_back(label.first);
     }
   }
   if (!patch) {
@@ -200,7 +207,8 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
       [&](const json& value) { metadata.description = StringValue(value, "description"); });
   set("friendlyName",
       [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
-  set("labels", [&](const json& value) { MergeLabels(value, metadata.labels); });
+  set("labels",
+      [&](const json& value) { MergeLabels(value, metadata.labels, metadata.label_order); });
   set("defaultRoundingMode", [&](const json& value) {
     const std::string mode = StringValue(value, "defaultRoundingMode");
     std::optional<std::string> parsed = ParseRoundingMode(mode);
@@ -502,6 +510,8 @@ void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool pat
     throw ApiError::Unsupported("changing the location of a dataset");
   }
   UpdateDescriptiveFields(metadata, body, patch);
+  // Dataset REST ordering is unverified; retain its existing key ordering.
+  metadata.label_order.clear();
   if (body.contains("defaultTableExpirationMs") || !patch) {
     const bool unset = Member(body, "defaultTableExpirationMs").is_null() ||
                        Int64Member(body, "defaultTableExpirationMs") == 0;

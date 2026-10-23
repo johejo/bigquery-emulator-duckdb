@@ -76,8 +76,11 @@ DatasetMetadata ParseDatasetMetadata(const std::optional<std::string>& recorded)
   if (!recorded.has_value()) {
     return {};
   }
-  const json object = json::parse(*recorded);
+  json object = json::parse(*recorded);
+  std::vector<std::string> label_order = object.value("labelOrder", std::vector<std::string>{});
+  object.erase("labelOrder");
   DatasetMetadata metadata = DatasetMetadataFromJson(object);
+  metadata.label_order = std::move(label_order);
   if (object.contains("creationTime") && object["creationTime"].is_string()) {
     metadata.creation_time = std::stoll(object["creationTime"].get<std::string>());
   }

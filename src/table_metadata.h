@@ -111,6 +111,7 @@ struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
+  std::vector<std::string> label_order;
   std::optional<int64_t> default_table_expiration_ms;
   std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   // Output only and recorded with the dataset.

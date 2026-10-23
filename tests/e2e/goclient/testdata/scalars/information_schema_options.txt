@@ -91,3 +91,8 @@ ALTER TABLE scalars.options_labels_altered SET OPTIONS (labels = [('org', 'dev')
 ALTER TABLE scalars.options_labels_altered SET OPTIONS (description = 'updated');
 SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_labels_altered' AND option_name = 'labels'
 => "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"
+
+# BigQuery preserves the DDL label order for datasets too.
+CREATE SCHEMA IF NOT EXISTS scalars_options_labels_order OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
+SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_labels_order' AND option_name = 'labels'
+=> "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"
