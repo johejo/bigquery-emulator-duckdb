@@ -3,6 +3,7 @@
 #include <array>
 #include <charconv>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,8 +38,8 @@ std::string Float64OptionValue(double value) {
 
 }  // namespace
 
-const std::vector<ViewColumn>& SchemataColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> SchemataColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "catalog_name", .type = FieldType::kString},
       {.name = "schema_name", .type = FieldType::kString},
       {.name = "schema_owner", .type = FieldType::kString},
@@ -48,8 +49,8 @@ const std::vector<ViewColumn>& SchemataColumns() {
       {.name = "ddl", .type = FieldType::kString},
       {.name = "default_collation_name", .type = FieldType::kString},
       {.name = "sync_status", .type = FieldType::kJson},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
@@ -78,15 +79,15 @@ absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& SchemataOptionsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> SchemataOptionsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "catalog_name", .type = FieldType::kString},
       {.name = "schema_name", .type = FieldType::kString},
       {.name = "option_name", .type = FieldType::kString},
       {.name = "option_type", .type = FieldType::kString},
       {.name = "option_value", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context) {

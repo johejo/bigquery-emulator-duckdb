@@ -1,6 +1,6 @@
 #pragma once
 
-#include <string>
+#include <string_view>
 #include <vector>
 
 #include "src/field_schema.h"
@@ -18,7 +18,7 @@ namespace bigquery_emulator_duckdb::information_schema {
 
 // A column of a view and its BigQuery type, from which its GoogleSQL and DuckDB types follow.
 struct ViewColumn {
-  std::string name;
+  std::string_view name;
   FieldType type;
   bool repeated = false;
 };

@@ -1,6 +1,8 @@
 #include "src/information_schema_routines.h"
 
+#include <array>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,8 +17,8 @@
 
 namespace bigquery_emulator_duckdb::information_schema {
 
-const std::vector<ViewColumn>& RoutinesColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> RoutinesColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "specific_catalog", .type = FieldType::kString},
       {.name = "specific_schema", .type = FieldType::kString},
       {.name = "specific_name", .type = FieldType::kString},
@@ -34,8 +36,8 @@ const std::vector<ViewColumn>& RoutinesColumns() {
       {.name = "last_altered", .type = FieldType::kTimestamp},
       {.name = "ddl", .type = FieldType::kString},
       {.name = "connection", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context) {
@@ -72,8 +74,8 @@ absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& ParametersColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> ParametersColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "specific_catalog", .type = FieldType::kString},
       {.name = "specific_schema", .type = FieldType::kString},
       {.name = "specific_name", .type = FieldType::kString},
@@ -84,8 +86,8 @@ const std::vector<ViewColumn>& ParametersColumns() {
       {.name = "data_type", .type = FieldType::kString},
       {.name = "parameter_default", .type = FieldType::kString},
       {.name = "is_aggregate", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context) {

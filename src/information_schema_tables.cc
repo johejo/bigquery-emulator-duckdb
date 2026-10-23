@@ -1,8 +1,10 @@
 #include "src/information_schema_tables.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -105,8 +107,8 @@ absl::Status AppendFieldPaths(const Row& identity, const std::string& column,
 
 }  // namespace
 
-const std::vector<ViewColumn>& TablesColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> TablesColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
@@ -130,8 +132,8 @@ const std::vector<ViewColumn>& TablesColumns() {
       {.name = "default_collation_name", .type = FieldType::kString},
       {.name = "sync_status", .type = FieldType::kJson},
       {.name = "upsert_stream_apply_watermark", .type = FieldType::kTimestamp},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
@@ -206,8 +208,8 @@ absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& TableSnapshotsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> TableSnapshotsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
@@ -215,8 +217,8 @@ const std::vector<ViewColumn>& TableSnapshotsColumns() {
       {.name = "base_table_schema", .type = FieldType::kString},
       {.name = "base_table_name", .type = FieldType::kString},
       {.name = "snapshot_time", .type = FieldType::kTimestamp},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) {
@@ -241,16 +243,16 @@ absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context) 
   return rows;
 }
 
-const std::vector<ViewColumn>& TableOptionsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> TableOptionsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
       {.name = "option_name", .type = FieldType::kString},
       {.name = "option_type", .type = FieldType::kString},
       {.name = "option_value", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
@@ -287,8 +289,8 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& PartitionsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> PartitionsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
@@ -298,8 +300,8 @@ const std::vector<ViewColumn>& PartitionsColumns() {
       {.name = "total_billable_bytes", .type = FieldType::kInteger},
       {.name = "last_modified_time", .type = FieldType::kTimestamp},
       {.name = "storage_tier", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 // Counts the rows of each partition of each table while the query is analyzed, as the other views
@@ -341,16 +343,16 @@ absl::StatusOr<std::vector<Row>> PartitionsRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& ViewsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> ViewsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
       {.name = "view_definition", .type = FieldType::kString},
       {.name = "check_option", .type = FieldType::kString},
       {.name = "use_standard_sql", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
@@ -376,8 +378,8 @@ absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context) {
   return rows;
 }
 
-const std::vector<ViewColumn>& ColumnsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> ColumnsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
@@ -404,8 +406,8 @@ const std::vector<ViewColumn>& ColumnsColumns() {
       {.name = "identity_maximum", .type = FieldType::kInteger},
       {.name = "identity_minimum", .type = FieldType::kInteger},
       {.name = "identity_cycle", .type = FieldType::kString},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
@@ -455,8 +457,8 @@ absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context) {
   }
   return rows;
 }
-const std::vector<ViewColumn>& ColumnFieldPathsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
+std::span<const ViewColumn> ColumnFieldPathsColumns() {
+  static constexpr auto kColumns = std::to_array<ViewColumn>({
       {.name = "table_catalog", .type = FieldType::kString},
       {.name = "table_schema", .type = FieldType::kString},
       {.name = "table_name", .type = FieldType::kString},
@@ -467,8 +469,8 @@ const std::vector<ViewColumn>& ColumnFieldPathsColumns() {
       {.name = "collation_name", .type = FieldType::kString},
       {.name = "rounding_mode", .type = FieldType::kString},
       {.name = "policy_tags", .type = FieldType::kString, /*repeated=*/.repeated = true},
-  };
-  return *kColumns;
+  });
+  return kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context) {

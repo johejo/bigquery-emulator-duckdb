@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -8,10 +9,10 @@
 
 namespace bigquery_emulator_duckdb::information_schema {
 
-const std::vector<ViewColumn>& RoutinesColumns();
+std::span<const ViewColumn> RoutinesColumns();
 absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& ParametersColumns();
+std::span<const ViewColumn> ParametersColumns();
 absl::StatusOr<std::vector<Row>> ParametersRows(const ViewContext& context);
 
 }  // namespace bigquery_emulator_duckdb::information_schema

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -8,25 +9,25 @@
 
 namespace bigquery_emulator_duckdb::information_schema {
 
-const std::vector<ViewColumn>& TablesColumns();
+std::span<const ViewColumn> TablesColumns();
 absl::StatusOr<std::vector<Row>> TablesRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& TableSnapshotsColumns();
+std::span<const ViewColumn> TableSnapshotsColumns();
 absl::StatusOr<std::vector<Row>> TableSnapshotsRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& TableOptionsColumns();
+std::span<const ViewColumn> TableOptionsColumns();
 absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& PartitionsColumns();
+std::span<const ViewColumn> PartitionsColumns();
 absl::StatusOr<std::vector<Row>> PartitionsRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& ViewsColumns();
+std::span<const ViewColumn> ViewsColumns();
 absl::StatusOr<std::vector<Row>> ViewsRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& ColumnsColumns();
+std::span<const ViewColumn> ColumnsColumns();
 absl::StatusOr<std::vector<Row>> ColumnsRows(const ViewContext& context);
 
-const std::vector<ViewColumn>& ColumnFieldPathsColumns();
+std::span<const ViewColumn> ColumnFieldPathsColumns();
 absl::StatusOr<std::vector<Row>> ColumnFieldPathsRows(const ViewContext& context);
 
 }  // namespace bigquery_emulator_duckdb::information_schema
