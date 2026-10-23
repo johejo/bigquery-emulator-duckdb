@@ -75,8 +75,8 @@ build:ci --repo_contents_cache=~/.cache/bazel-repo/contents
 build:ci --repo_contents_cache_gc_idle_delay=5s
 # Let Gazelle reuse the Go caches that CI saves between runs.
 build:ci --repo_env=GO_REPOSITORY_USE_HOST_CACHE=1
-# Keep the disk cache within the repository's cache quota; a full macOS run uses about 6G.
-build:ci --experimental_disk_cache_gc_max_size=7G
+# Limit cache growth while leaving room for earlier builds; a recent cold macOS run used 2.1G.
+build:ci --experimental_disk_cache_gc_max_size=5G
 build:ci --experimental_disk_cache_gc_max_age=3d
 build:ci --experimental_disk_cache_gc_idle_delay=5s
 test:ci --test_output=errors
