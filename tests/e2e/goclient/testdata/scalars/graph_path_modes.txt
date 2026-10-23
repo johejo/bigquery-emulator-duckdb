@@ -1,0 +1,70 @@
+# WALK keeps all paths, TRAIL excludes repeated edges, and ACYCLIC excludes repeated nodes.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+# FinGraph's edges 10 and 13 are parallel, 11 reverses them, and 12 is a self-loop.
+# The only two-edge directed walk that repeats an edge is (12, 12).
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH WALK (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "0"
+
+# TRAIL permits self-loops and revisiting nodes, but ACYCLIC excludes both.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 12 AND f.id = 12 RETURN COUNT(*) AS result)
+=> "0"
+
+# Undirected traversals share edge identity regardless of traversal direction.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE a.id = 2 AND c.id = 2 RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person) WHERE e.id = 10 AND f.id = 10 RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]-(b:Person) RETURN COUNT(*) AS result)
+=> "6"
+
+# Path variables retain their normal shape after applying a mode.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN PATH_LENGTH(p) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ACYCLIC (a:Person)<-[e:Knows]-(b:Person) WHERE e.id = 10 RETURN PATH_FIRST(p).name AS result)
+=> "Dana"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNTIF(NOT IS_TRAIL(p)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ACYCLIC (a:Person)-[e:Knows]-(b:Person) RETURN COUNTIF(NOT IS_ACYCLIC(p)) AS result)
+=> "0"
+
+# Single-node paths satisfy both modes, including TRAIL's empty edge set.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = TRAIL (a:Person) WHERE a.id = 3 RETURN PATH_LENGTH(p) AS result)
+=> "0"
+
+# Identity includes hidden keys, every composite key component, and the element table.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH TRAIL (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH ACYCLIC (a:Person)-[e:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH ACYCLIC (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE e.edge_id = 'y' RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH TRAIL (a:Compound)-[e:CompoundEdge]->(b:Compound)-[f:CompoundEdge]->(c:Compound) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH ACYCLIC (a:Author)-[e:Knows]-(b:Reader) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+
+# PATH and PATHS are optional syntax with no semantic effect.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL PATH (a:Person)-[e:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC PATHS (a:Person)-[e:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+
+# GoogleSQL's SIMPLE mode is absent from BigQuery's path-mode grammar.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH SIMPLE (a:Person)-[e:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> error contains: The emulator does not support

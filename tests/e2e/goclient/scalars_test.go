@@ -31,6 +31,18 @@ var scalarFixture = []string{
 	"CREATE PROPERTY GRAPH scalar_graph.HiddenKeys NODE TABLES (scalar_graph.Person KEY (id) NO PROPERTIES) " +
 		"EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id) " +
 		"DESTINATION KEY (dst) REFERENCES Person (id) NO PROPERTIES)",
+	"CREATE TABLE scalar_graph.Compound (tenant STRING, id INT64)",
+	"INSERT scalar_graph.Compound VALUES ('a', 1), ('a', 2), ('b', 1)",
+	"CREATE TABLE scalar_graph.CompoundEdge (id STRING, src_tenant STRING, src_id INT64, dst_tenant STRING, dst_id INT64)",
+	"INSERT scalar_graph.CompoundEdge VALUES ('x', 'a', 1, 'a', 2), ('y', 'a', 1, 'b', 1), ('loop', 'b', 1, 'b', 1)",
+	"CREATE PROPERTY GRAPH scalar_graph.CompoundGraph NODE TABLES (scalar_graph.Compound KEY (tenant, id)) " +
+		"EDGE TABLES (scalar_graph.CompoundEdge KEY (id) SOURCE KEY (src_tenant, src_id) REFERENCES Compound (tenant, id) " +
+		"DESTINATION KEY (dst_tenant, dst_id) REFERENCES Compound (tenant, id) " +
+		"PROPERTIES (id AS edge_id, src_tenant AS origin, dst_tenant AS target))",
+	"CREATE PROPERTY GRAPH scalar_graph.AliasedNodes NODE TABLES (scalar_graph.Person AS Authors KEY (id) LABEL Author, " +
+		"scalar_graph.Person AS Readers KEY (id) LABEL Reader) " +
+		"EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Authors (id) " +
+		"DESTINATION KEY (dst) REFERENCES Readers (id))",
 	"CREATE SCHEMA IF NOT EXISTS scalars",
 	"CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",

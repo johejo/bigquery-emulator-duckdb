@@ -328,10 +328,11 @@ properties of type INT64, STRING, BOOL or FLOAT64. Edge endpoints must exist whe
 element tables, graph options and creation modes such as OR REPLACE and IF NOT
 EXISTS are unsupported.
 
-`GRAPH_TABLE` supports a single fixed path with explicit labels, directed edges,
+`GRAPH_TABLE` supports multiple fixed path patterns in one MATCH, directed or undirected edges,
 property projections through `RETURN`, and scalar filters. Each element must
-resolve to one table. Fixed-length path variables support node and edge access and path
-predicates. Optional matching, quantified paths, search prefixes, undirected edges,
+resolve to one table; shared variables join by element identity. Fixed paths support WALK, TRAIL
+and ACYCLIC modes; path variables support node and edge access and path predicates. Chained or
+optional matching, quantified or nested paths, search prefixes,
 graph element or path results, and graph values in comparisons, grouping or aggregate and
 analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
 SQL/PGQ's
