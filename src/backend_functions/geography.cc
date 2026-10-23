@@ -34,6 +34,7 @@
 #include "s2/s2builderutil_snap_functions.h"
 #include "s2/s2cell_id.h"
 #include "s2/s2closest_edge_query.h"
+#include "s2/s2debug.h"
 #include "s2/s2earth.h"
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
@@ -42,6 +43,7 @@
 #include "s2/s2latlng_rect.h"
 #include "s2/s2lax_polygon_shape.h"
 #include "s2/s2lax_polyline_shape.h"
+#include "s2/s2loop.h"
 #include "s2/s2point.h"
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
@@ -593,6 +595,22 @@ bool IsClosed(const Geography& geography) {
          });
 }
 
+// A ring is one closed linestring with no repeated point except its endpoints.
+// S2Loop validates both repeated vertices and crossings between edges.
+bool IsRing(const Geography& geography) {
+  if (geography.Count() != 1 || geography.lines.size() != 1 || !IsClosed(geography)) {
+    return false;
+  }
+  const std::vector<S2Point>& line = geography.lines.front();
+  if (line.size() < 4) {
+    return false;
+  }
+  const std::vector<S2Point> vertices(line.begin(), line.end() - 1);
+  const S2Loop loop(vertices, S2Debug::DISABLE);
+  S2Error error;
+  return !loop.FindValidationError(&error);
+}
+
 // Only the highest dimension contributes. S2's centroids already include the
 // measure of each component, so their sum gives the weighted centroid.
 absl::StatusOr<std::string> Centroid(const Arguments& args) {
@@ -1038,6 +1056,7 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
              return static_cast<int64_t>(geography.Count());
            }>>);
   Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean, EachRow<OfGeography<IsClosed>>);
+  Register(connection, "bq_st_isring", {kVarchar}, kBoolean, EachRow<OfGeography<IsRing>>);
   Register(connection, "bq_st_length", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Length>);
   Register(connection, "bq_st_measure", {kVarchar, kBoolean, kVarchar}, kDouble, EachRow<Measure>);
   Register(connection, "bq_st_exteriorring", {kVarchar}, kVarchar,

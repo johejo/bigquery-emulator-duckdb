@@ -848,6 +848,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
           },
       },
       {"ST_ISCLOSED", call("bq_st_isclosed", 1)},
+      {"ST_ISRING", call("bq_st_isring", 1)},
       {"ST_LENGTH", spheroid("bq_st_length", {1, 2}, "ST_LENGTH")},
       {"ST_AREA", spheroid("bq_st_measure", {1, 2}, "ST_AREA")},
       {"ST_PERIMETER", spheroid("bq_st_measure", {1, 2}, "ST_PERIMETER")},

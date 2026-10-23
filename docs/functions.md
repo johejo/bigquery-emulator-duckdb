@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 48 | 2 | 21 | 0 |
+| [Geography functions](#geography-functions) | 49 | 2 | 20 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 1 | 8 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -276,7 +276,7 @@ functions.
 | [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Supported | S2 function |  |
 | [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | Supported | S2 function |  |
 | [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | Supported | S2 function |  |
-| [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | Unsupported |  |  |
+| [`ST_ISRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isring) | Supported | S2 function |  |
 | [`ST_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_length) | Supported | S2 function |  |
 | [`ST_LINEINTERPOLATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_lineinterpolatepoint) | Supported | S2 function |  |
 | [`ST_LINELOCATEPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linelocatepoint) | Supported | S2 function |  |
