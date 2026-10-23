@@ -160,4 +160,5 @@ argument conversion and calls. A private Unix socket carries JSON records, with 
 and strings for floating-point values so nonfinite values survive transport. Standard input,
 output and error point to the null device, separately from the protocol socket. The parent polls
 nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
-waits for its child. Address space limits apply before Python initializes.
+waits for its child. On Linux, address space limits apply before Python initializes. On macOS,
+where Darwin rejects `RLIMIT_AS`, the parent samples the worker's resident memory while polling.

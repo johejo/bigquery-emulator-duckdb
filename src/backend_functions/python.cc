@@ -5,12 +5,14 @@
 #include <spawn.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
-#include <sys/types.h>
+#include <sys/types.h>  // IWYU pragma: keep -- POSIX provider of pid_t.
 #include <sys/wait.h>
 #include <unistd.h>
 #ifdef __APPLE__
 #include <crt_externs.h>
+#include <libproc.h>
 #include <mach-o/dyld.h>
+#include <sys/proc_info.h>
 #endif
 
 #include <algorithm>
@@ -62,7 +64,7 @@ std::string Executable() {
   return path;
 #else
   std::string path(65536, '\0');
-  const ssize_t size = readlink("/proc/self/exe", path.data(), path.size());
+  const auto size = readlink("/proc/self/exe", path.data(), path.size());
   if (size <= 0 || static_cast<size_t>(size) == path.size()) {
     throw std::runtime_error("Cannot locate executable");
   }
@@ -108,7 +110,7 @@ class Worker {
 #else
       constexpr int flags = MSG_NOSIGNAL;
 #endif
-      const ssize_t count = send(socket_, request.data() + offset, request.size() - offset, flags);
+      const auto count = send(socket_, request.data() + offset, request.size() - offset, flags);
       if (count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) {
         continue;
       }
@@ -121,7 +123,7 @@ class Worker {
     char buffer[8192];
     while (response.empty() || response.back() != '\n') {
       Wait(POLLIN, deadline);
-      const ssize_t count = recv(socket_, buffer, sizeof(buffer), 0);
+      const auto count = recv(socket_, buffer, sizeof(buffer), 0);
       if (count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) {
         continue;
       }
@@ -149,10 +151,24 @@ class Worker {
       if (remaining <= 0) {
         throw std::runtime_error("Python UDF timed out");
       }
+      int64_t interval = remaining;
+#ifdef __APPLE__
+      // Darwin rejects RLIMIT_AS. Check resident memory while waiting, including during
+      // interpreter startup and native calls that do not return to Python.
+      proc_taskinfo info{};
+      const int size = proc_pidinfo(pid_, PROC_PIDTASKINFO, 0, &info, sizeof(info));
+      if (std::cmp_equal(size, sizeof(info)) && info.pti_resident_size > options_.memory) {
+        throw std::runtime_error("Python UDF worker memory limit exceeded");
+      }
+      if (std::cmp_not_equal(size, sizeof(info)) && (size != 0 || errno != ESRCH)) {
+        throw std::runtime_error("Cannot read Python worker memory usage");
+      }
+      interval = std::min<int64_t>(interval, 10);
+#endif
       pollfd descriptor{.fd = socket_, .events = events, .revents = 0};
       const int ready =
           poll(&descriptor, 1,
-               static_cast<int>(std::min<int64_t>(remaining, std::numeric_limits<int>::max())));
+               static_cast<int>(std::min<int64_t>(interval, std::numeric_limits<int>::max())));
       if (ready < 0 && errno == EINTR) {
         continue;
       }
@@ -217,7 +233,7 @@ class Worker {
     const int no_sigpipe = 1;
     setsockopt(socket_, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
 #endif
-    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_t actions{};
     posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_addclose(&actions, sockets[0]);
     posix_spawn_file_actions_adddup2(&actions, sockets[1], 3);
@@ -227,9 +243,9 @@ class Worker {
     for (int fd = 0; fd < 3; ++fd) {
       posix_spawn_file_actions_addopen(&actions, fd, "/dev/null", O_RDWR, 0);
     }
-    posix_spawnattr_t attributes;
+    posix_spawnattr_t attributes{};
     posix_spawnattr_init(&attributes);
-    sigset_t mask;
+    sigset_t mask{};
     sigemptyset(&mask);
     posix_spawnattr_setsigmask(&attributes, &mask);
     posix_spawnattr_setpgroup(&attributes, 0);

@@ -159,7 +159,9 @@ SELECT ds.multiply(2, 10);
 ```
 
 The default timeout is 5 minutes per call, including initial worker startup, and the worker's
-address space limit is 256 MiB. `--python-timeout-ms MS` and `--python-memory-mib MIB` change
+memory limit is 256 MiB. On Linux this limits address space; on macOS the parent checks resident
+memory every 10 ms, so short allocations can exceed the limit between checks.
+`--python-timeout-ms MS` and `--python-memory-mib MIB` change
 these limits; both take positive integers. `--python-worker PATH` overrides the bundled worker.
 The same options work in `shell` mode. See [Python UDF limits](docs/compatibility.md#python-udfs).
 

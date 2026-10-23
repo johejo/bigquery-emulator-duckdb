@@ -46,7 +46,7 @@ void PrintUsage() {
          "  --python-worker PATH  Override the bundled libpython worker executable\n"
          "  --python-timeout-ms MS  Python UDF call timeout, including worker startup (default: "
          "300000)\n"
-         "  --python-memory-mib MIB  Python worker address space limit (default: 256)\n"
+         "  --python-memory-mib MIB  Python worker memory limit (default: 256)\n"
          "  --connection ID=CONNINFO  Let EXTERNAL_QUERY reach PostgreSQL, MySQL or Spanner\n"
          "                  (libpq connection string/URI or "
          "spanner://projects/P/instances/I/databases/D),\n"

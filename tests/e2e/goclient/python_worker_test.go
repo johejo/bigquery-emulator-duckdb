@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,10 @@ func TestPythonWorkerIsolation(t *testing.T) {
 	if err := client.Dataset("ds").Create(ctx, nil); err != nil {
 		t.Fatal(err)
 	}
+	memoryError := "MemoryError"
+	if runtime.GOOS == "darwin" {
+		memoryError = "worker memory limit exceeded"
+	}
 	for _, tc := range []struct {
 		name string
 		body string
@@ -51,7 +56,7 @@ func TestPythonWorkerIsolation(t *testing.T) {
 		{"blocking_native", "import time\ndef f(): time.sleep(3600)", "timed out"},
 		{"crash", "import os\ndef f(): os._exit(7)", "worker exited"},
 		{"exception", "def f(): raise ValueError('worker test')", "ValueError: worker test"},
-		{"memory", "def f(): return len(bytes(512 * 1024 * 1024))", "MemoryError"},
+		{"memory", "def f():\n    blocks = []\n    while True: blocks.append(b'x' * (1024 * 1024))", memoryError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

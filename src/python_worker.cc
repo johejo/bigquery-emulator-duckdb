@@ -1,8 +1,9 @@
 // Only this executable links libpython. The emulator never initializes an interpreter.
 #include <Python.h>  // IWYU pragma: keep
 #include <fcntl.h>
+#ifndef __APPLE__
 #include <sys/resource.h>
-#include <sys/types.h>
+#endif
 #include <unistd.h>
 
 #include <cerrno>
@@ -228,7 +229,7 @@ void Reply(const json& value) {
   const std::string encoded = value.dump() + "\n";
   size_t offset = 0;
   while (offset < encoded.size()) {
-    const ssize_t count = write(3, encoded.data() + offset, encoded.size() - offset);
+    const auto count = write(3, encoded.data() + offset, encoded.size() - offset);
     if (count < 0 && errno == EINTR) {
       continue;
     }
@@ -243,11 +244,14 @@ int Run(int argc, char** argv) {
   if (argc != 2) {
     return 2;
   }
+#ifndef __APPLE__
+  // macOS enforces its resident-memory limit in the parent instead.
   const rlim_t memory = std::stoull(argv[1]);
   const rlimit limit{.rlim_cur = memory, .rlim_max = memory};
   if (setrlimit(RLIMIT_AS, &limit) != 0) {
     throw std::runtime_error("Cannot set Python worker memory limit");
   }
+#endif
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) -- POSIX fcntl takes an integer flag.
   if (fcntl(3, F_SETFD, FD_CLOEXEC) < 0) {
     return 1;
@@ -258,7 +262,7 @@ int Run(int argc, char** argv) {
     std::string pending;
     char buffer[8192];
     while (true) {
-      const ssize_t count = read(3, buffer, sizeof(buffer));
+      const auto count = read(3, buffer, sizeof(buffer));
       if (count < 0 && errno == EINTR) {
         continue;
       }
@@ -285,7 +289,12 @@ int Run(int argc, char** argv) {
 int main(int argc, char** argv) {
   try {
     return Run(argc, argv);
-  } catch (const std::exception&) {
+  } catch (const std::exception& error) {
+    try {
+      Reply({{"error", error.what()}});
+    } catch (const std::exception&) {
+      return 1;
+    }
     return 1;
   }
 }
