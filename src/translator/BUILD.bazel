@@ -49,6 +49,7 @@ cc_library(
         "//:table_source",
         "//:translated_statement",
         "//:type_mapping",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",

@@ -1,0 +1,67 @@
+# Graph patterns join path matches on the identity of shared variables; independent paths
+# form a cross product. Labels on a shared variable constrain all of its occurrences.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#graph_pattern
+# FinGraph has directed edges 10:1->2, 11:2->1, 12:1->1, 13:1->2.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[:Owns]->(c:Account) WHERE a.id = 2 RETURN c.kind AS result)
+=> "checking"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (a)-[:Owns]->(c:Account) WHERE b.id = 2 RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) RETURN COUNT(*) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 999), (b:Person) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE a.id = b.id RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (a) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (a), (A) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Account) FILTER a.id = 3 RETURN a.name AS result)
+=> "Lee"
+
+# Repeated edges also join by identity, preserving parallel edges and counting self-loops once.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[e]->(d:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[e]->(d:Person) WHERE e.id = 12 RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person), (b)-[e]-(c:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(a) WHERE a.id = 1 AND b.id = 2 RETURN COUNT(*) AS result)
+=> "2"
+
+# Modes constrain each path separately, so edges and nodes may recur in other paths.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person), (b)-[e]-(c:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person)-[e]-(c:Person) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(c:Person), (c)-[e]-(d:Person) WHERE e.id = 10 AND f.id = 11 RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]-(b:Person), (b)-[f:Knows]-(a) WHERE e.id = 10 AND f.id = 11 RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[e:Knows]-(b:Person)-[f:Knows]-(a) WHERE e.id = 10 AND f.id = 11 RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = TRAIL (a:Person)-[e:Knows]-(b:Person), q = ACYCLIC (b)-[f:Knows]-(c:Person) WHERE a.id = 1 AND e.id = 10 AND f.id = 11 RETURN PATH_LENGTH(p) + PATH_LENGTH(q) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person), q = (b)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN PATH_LAST(p).name AS result)
+=> "Dana"
+
+# Equality joins use hidden keys and every component of composite keys, not visible properties.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[e]->(d:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]->(b:Compound), (b)-[f:CompoundEdge]->(c:Compound) RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound), (a), (b:Compound), (b) RETURN COUNT(*) AS result)
+=> "9"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1)-[e:Knows]->(b:Person), (b WHERE b.id = 2)-[f:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "2"
+
+# Implicit equality for repeated variables does not enable user-written graph comparisons.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE a = b RETURN COUNT(*) AS result)
+=> error contains: The emulator does not support
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) RETURN a = a AS result)
+=> error contains: The emulator does not support

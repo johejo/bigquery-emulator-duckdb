@@ -63,8 +63,9 @@ Graph definitions use [DuckPGQ](https://github.com/cwida/duckpgq-extension), lin
 statically beside DuckDB. The graph translator turns resolved fixed paths into
 joins on element tables and endpoint keys, and leaves property expressions and filters to the
 ordinary SQL translator. Undirected edges match either orientation with OR over the same edge
-row, preserving its properties and emitting self-loops once. Private graph names encode the
-project, dataset and graph name, since DuckPGQ's registry is shared across catalogs. Each project's
+row, preserving its properties and emitting self-loops once. Each path applies its own mode
+before paths are joined by shared variables' identities. Private graph names encode the project,
+dataset and graph name, since DuckPGQ's registry is shared across catalogs. Each project's
 `main._property_graphs` table keeps canonical GoogleSQL DDL for catalog resolution
 and native DDL for restoring DuckPGQ's registry on startup.
 Query intermediates keep graph elements as structs containing a private identity from the
