@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "description": "Graph SQL identity encoding, result serialization and NULL behavior. The recorded attempt returned HTTP 412 because Graph queries require an Enterprise or Enterprise Plus reservation; semantic results remain unverified. Remove answer before retrying in an eligible project. Fixture is isolated and removed after observations.",
+  "vars": {
+    "dataset": "bqa_${run}_${case}"
+  },
+  "cases": [
+    {
+      "name": "graph_values",
+      "steps": [
+        {
+          "name": "create_dataset",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/datasets",
+            "body": {
+              "datasetReference": {
+                "datasetId": "${dataset}"
+              },
+              "location": "US"
+            }
+          }
+        },
+        {
+          "name": "fixture",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "CREATE TABLE `${project}.${dataset}.Person` (id INT64, name STRING);\nINSERT `${project}.${dataset}.Person` VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee');\nCREATE TABLE `${project}.${dataset}.Knows` (id INT64, src INT64, dst INT64);\nINSERT `${project}.${dataset}.Knows` VALUES (10, 1, 2), (11, 2, 1), (12, 1, 1), (13, 1, 2);\nCREATE PROPERTY GRAPH `${project}.${dataset}.FinGraph`\nNODE TABLES (`${project}.${dataset}.Person` AS Person KEY(id))\nEDGE TABLES (`${project}.${dataset}.Knows` AS Knows KEY(id) SOURCE KEY(src) REFERENCES Person(id) DESTINATION KEY(dst) REFERENCES Person(id));",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          }
+        },
+        {
+          "name": "element_ids",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph`\nMATCH (a:Person)-[e:Knows]->(b:Person)\nRETURN a.id AS src, b.id AS dst, e.id AS edge,\nELEMENT_ID(a) AS node_id, ELEMENT_ID(e) AS edge_id,\nSOURCE_NODE_ID(e) AS source_id, DESTINATION_NODE_ID(e) AS destination_id,\nLABELS(a) AS node_labels, LABELS(e) AS edge_labels)\nORDER BY edge",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "path_values",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph`\nMATCH p = (a:Person)-[e:Knows]->(b:Person)\nRETURN e.id AS edge, PATH_LENGTH(p) AS length, IS_ACYCLIC(p) AS acyclic,\nIS_SIMPLE(p) AS simple, IS_TRAIL(p) AS trail,\nPATH_FIRST(p).id AS first_id, PATH_LAST(p).id AS last_id,\nARRAY_LENGTH(NODES(p)) AS node_count, ARRAY_LENGTH(EDGES(p)) AS edge_count)\nORDER BY edge",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "graph_result_serialization",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph`\nMATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10\nRETURN a AS node, e AS edge, p AS path, NODES(p) AS nodes, EDGES(p) AS edges)",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "null_graph_values",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph`\nMATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10\nRETURN LABELS(IF(FALSE, a, NULL)) AS labels,\nELEMENT_ID(IF(FALSE, a, NULL)) AS element_id,\nSOURCE_NODE_ID(IF(FALSE, e, NULL)) AS source_id,\nDESTINATION_NODE_ID(IF(FALSE, e, NULL)) AS destination_id,\nPATH_LENGTH(IF(FALSE, p, NULL)) AS length,\nIS_ACYCLIC(IF(FALSE, p, NULL)) AS acyclic,\nIS_SIMPLE(IF(FALSE, p, NULL)) AS simple,\nIS_TRAIL(IF(FALSE, p, NULL)) AS trail,\nPATH_FIRST(IF(FALSE, p, NULL)).id AS first_id,\nARRAY_LENGTH(NODES(IF(FALSE, p, NULL))) AS nodes)",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "name": "delete_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
+          }
+        }
+      ],
+      "answer": {
+        "project": "johejo-sandbox",
+        "run": "hvc6zhlj4vjrfbt2svq7eqrems",
+        "steps": {
+          "element_ids": {
+            "error": {
+              "body": {
+                "error": {
+                  "code": 412,
+                  "errors": [
+                    {
+                      "domain": "global",
+                      "location": "If-Match",
+                      "locationType": "header",
+                      "message": "BigQuery Graph queries require a reservation with Enterprise or Enterprise Plus edition. See https://cloud.google.com/bigquery/docs/editions-intro for more information.",
+                      "reason": "conditionNotMet"
+                    }
+                  ],
+                  "message": "BigQuery Graph queries require a reservation with Enterprise or Enterprise Plus edition. See https://cloud.google.com/bigquery/docs/editions-intro for more information.",
+                  "status": "FAILED_PRECONDITION"
+                }
+              },
+              "status": 412
+            }
+          }
+        }
+      }
+    }
+  ]
+}

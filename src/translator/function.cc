@@ -277,6 +277,20 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!SupportsBigNumeric(function) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
+  // Private graph metadata is not a SQL STRUCT's value. Opt functions in explicitly rather
+  // than accidentally comparing properties, formatting metadata or serializing private IDs.
+  if ((HasGraph(call.type()) ||
+       std::ranges::any_of(call.argument_list(),
+                           [](const auto& argument) { return HasGraph(argument->type()); })) &&
+      function != "LABELS" && function != "NODES" && function != "EDGES" &&
+      function != "PATH_FIRST" && function != "PATH_LAST" && function != "PATH_LENGTH" &&
+      function != "IS_ACYCLIC" && function != "IS_SIMPLE" && function != "IS_TRAIL" &&
+      function != "IF" && function != "IFNULL" && function != "COALESCE" &&
+      function != "$CASE_NO_VALUE" && function != "$IS_NULL" && function != "$ARRAY_AT_OFFSET" &&
+      function != "$ARRAY_AT_ORDINAL" && function != "$SAFE_ARRAY_AT_OFFSET" &&
+      function != "$SAFE_ARRAY_AT_ORDINAL" && function != "ARRAY_LENGTH") {
+    return Unsupported(scope, "function " + name + " with graph values");
+  }
   const bool interval = HasInterval(call.type()) ||
                         std::ranges::any_of(call.argument_list(), [](const auto& argument) {
                           return HasInterval(argument->type());

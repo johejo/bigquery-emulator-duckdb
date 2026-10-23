@@ -150,6 +150,34 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       return "BOOLEAN";
     case googlesql::TYPE_STRING:
       return "VARCHAR";
+    case googlesql::TYPE_GRAPH_ELEMENT: {
+      if (use != TypeUse::kQuery) {
+        return std::nullopt;
+      }
+      std::vector<std::string> properties;
+      for (const auto& property : type->AsGraphElement()->property_types()) {
+        const auto mapped = MapToDuckDb(property.value_type, nullptr, use);
+        if (!mapped) {
+          return std::nullopt;
+        }
+        properties.push_back(QuoteIdentifier(property.name) + " " + *mapped);
+      }
+      if (properties.empty()) {
+        properties.emplace_back("\"$empty\" BOOLEAN");
+      }
+      return R"(STRUCT("$id" VARCHAR, "$labels" VARCHAR[], "$properties" STRUCT()" +
+             Join(properties, ", ") + "))";
+    }
+    case googlesql::TYPE_GRAPH_PATH: {
+      if (use != TypeUse::kQuery) {
+        return std::nullopt;
+      }
+      const auto nodes = MapToDuckDb(type->AsGraphPath()->node_type(), nullptr, use);
+      const auto edges = MapToDuckDb(type->AsGraphPath()->edge_type(), nullptr, use);
+      return nodes && edges ? std::optional<std::string>("STRUCT(\"$nodes\" " + *nodes +
+                                                         "[], \"$edges\" " + *edges + "[])")
+                            : std::nullopt;
+    }
     case googlesql::TYPE_BYTES:
       return "BLOB";
     case googlesql::TYPE_DATE:
@@ -591,6 +619,17 @@ std::string DuckDbRange(std::string_view start, std::string_view end, std::strin
 std::optional<std::string> DuckDbType(const googlesql::Type* type,
                                       const googlesql::TypeParameters* parameters) {
   return MapToDuckDb(type, parameters, TypeUse::kQuery);
+}
+
+bool HasGraph(const googlesql::Type* type) {
+  if (type->IsArray()) {
+    return HasGraph(type->AsArray()->element_type());
+  }
+  if (type->IsStruct()) {
+    return std::ranges::any_of(type->AsStruct()->fields(),
+                               [](const auto& field) { return HasGraph(field.type); });
+  }
+  return type->IsGraphElement() || type->IsGraphPath();
 }
 
 std::optional<std::string> DuckDbColumnType(const googlesql::Type* type,

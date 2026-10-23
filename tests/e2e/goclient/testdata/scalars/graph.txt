@@ -8,3 +8,103 @@ SELECT name FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person) RETURN p.nam
 => "Lee"
 SELECT name FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (p:Person) FILTER p.id = 3 RETURN p.name AS name)
 => "Lee"
+
+# Graph function definitions, including single-node paths and repeated nodes/edges.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN LABELS(a) AS result)
+=> [{"v":"Person"}]
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN LABELS(e) AS result)
+=> [{"v":"Knows"}]
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_LENGTH(p) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_LAST(p).name AS result)
+=> "Dana"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN ARRAY_LENGTH(NODES(p)) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN ARRAY_LENGTH(EDGES(p)) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN NODES(p)[OFFSET(1)].name AS result)
+=> "Dana"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN EDGES(p)[OFFSET(0)].id AS result)
+=> "10"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_ACYCLIC(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_SIMPLE(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_TRAIL(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN PATH_LENGTH(p) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN ARRAY_LENGTH(NODES(p)) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN ARRAY_LENGTH(EDGES(p)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN PATH_LAST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN IS_ACYCLIC(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN IS_SIMPLE(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person) WHERE a.id = 1 RETURN IS_TRAIL(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN IS_ACYCLIC(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN IS_SIMPLE(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN IS_TRAIL(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN PATH_LENGTH(p) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN IS_ACYCLIC(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN IS_SIMPLE(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 10 AND f.id = 11 RETURN IS_TRAIL(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 12 AND f.id = 12 RETURN IS_ACYCLIC(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 12 AND f.id = 12 RETURN IS_SIMPLE(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) WHERE e.id = 12 AND f.id = 12 RETURN IS_TRAIL(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_LENGTH(IF(FALSE, p, NULL)) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_ACYCLIC(IF(FALSE, p, NULL)) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_SIMPLE(IF(FALSE, p, NULL)) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IS_TRAIL(IF(FALSE, p, NULL)) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_FIRST(IF(FALSE, p, NULL)).id AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN ARRAY_LENGTH(NODES(IF(FALSE, p, NULL))) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN ARRAY_LENGTH(EDGES(IF(FALSE, p, NULL))) AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN PATH_LAST(p).kind AS result)
+=> "checking"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN PATH_FIRST(p).kind AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN PATH_LAST(p).name AS result)
+=> null
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN NODES(p)[OFFSET(1)].id AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN LABELS(PATH_LAST(p)) AS result)
+=> [{"v":"Account"}]
+# Hidden keys still distinguish nodes and parallel edges with no visible properties.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN COUNTIF(IS_ACYCLIC(p)) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH p = (a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person) RETURN COUNTIF(NOT IS_TRAIL(p)) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (b:Person)<-[e:Knows]-(a:Person) WHERE e.id = 10 RETURN PATH_FIRST(p).name AS result)
+=> "Dana"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (b:Person)<-[e:Knows]-(a:Person) WHERE e.id = 10 RETURN PATH_LAST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (b:Person)<-[e:Knows]-(a:Person) WHERE e.id = 10 RETURN EDGES(p)[OFFSET(0)].id AS result)
+=> "10"

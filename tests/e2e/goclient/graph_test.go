@@ -73,6 +73,10 @@ func TestPropertyGraph(t *testing.T) {
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person)-[:Owns]->{1,2}(a:Account) RETURN p.name)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) OPTIONAL MATCH (p)-[:Owns]->(a:Account) RETURN p.name)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) COLUMNS (p.name))",
+		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN p)",
+		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH path = (p:Person) RETURN path)",
+		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH path = (p:Person) RETURN NODES(path))",
+		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN TO_JSON_STRING(p))",
 	} {
 		if _, err := client.Query(sql).Read(ctx); err == nil {
 			t.Fatalf("unsupported form succeeded: %s", sql)

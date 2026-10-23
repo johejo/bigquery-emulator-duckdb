@@ -39,6 +39,19 @@ type function struct {
 	Unsupported    []string `json:"unsupported"`
 }
 
+// Graph values cannot be literals or query parameters. Their samples in the hints read this
+// small graph, installed on each worker before any function queries run.
+var functionGraphFixture = []string{
+	"CREATE SCHEMA function_graph",
+	"CREATE TABLE function_graph.Person (id INT64, name STRING)",
+	"INSERT function_graph.Person VALUES (1, 'Alex'), (2, 'Dana')",
+	"CREATE TABLE function_graph.Knows (id INT64, src INT64, dst INT64)",
+	"INSERT function_graph.Knows VALUES (10, 1, 2)",
+	"CREATE PROPERTY GRAPH function_graph.FinGraph NODE TABLES (function_graph.Person KEY (id)) " +
+		"EDGE TABLES (function_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id) " +
+		"DESTINATION KEY (dst) REFERENCES Person (id))",
+}
+
 // mainDoc is the page that documents the function itself rather than a variant of it, such as AVG
 // over aggregate-dp-functions#dp_avg: the one whose anchor is the function's name.
 func mainDoc(f *function) string {
@@ -89,7 +102,7 @@ func category(f *function) string {
 }
 
 // probeFunctions runs the calls that the function probe at path builds from args on emulators
-// started from binary. The calls need no data, so each emulator runs many of them.
+// started from binary. Each emulator runs many calls, sharing a small fixture for graph values.
 func probeFunctions(w io.Writer, binary, path string, args []string) error {
 	command := exec.Command(path, args...)
 	command.Stderr = os.Stderr
@@ -151,10 +164,18 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 		emulator, err := startEmulator(binary, "--session-user", "jdoe@example.com",
 			"--connection", "test.us.postgres="+postgres.Conninfo,
 			"--connection", "test.us.mysql="+mysql.Conninfo)
-		if err == nil {
-			emulators <- emulator
+		if err != nil {
+			return err
 		}
-		return err
+		for _, sql := range functionGraphFixture {
+			message, failed, err := query(emulator.URL, sql, "")
+			if err != nil || failed {
+				emulator.Stop()
+				return fmt.Errorf("graph fixture %s: %s: %v", sql, message, err)
+			}
+		}
+		emulators <- emulator
+		return nil
 	}); err != nil {
 		return err
 	}

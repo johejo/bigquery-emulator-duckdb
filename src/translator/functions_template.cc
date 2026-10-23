@@ -619,6 +619,104 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 // Functions implemented by DuckDB SQL templates.
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+      {
+          "LABELS",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "struct_extract($1, '$labels')",
+                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT})},
+              },
+          },
+      },
+      {
+          "NODES",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "struct_extract($1, '$nodes')",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "EDGES",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "struct_extract($1, '$edges')",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "PATH_FIRST",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "struct_extract($1, '$nodes')[1]",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "PATH_LAST",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "struct_extract($1, '$nodes')[-1]",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "PATH_LENGTH",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "len(struct_extract($1, '$edges'))",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "IS_ACYCLIC",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                              "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "IS_TRAIL",
+          {
+              {
+                  .arity = 1,
+                  .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
+                              "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
+      {
+          "IS_SIMPLE",
+          {
+              {
+                  .arity = 1,
+                  .spelling =
+                      "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                      "struct_extract(n, "
+                      "'$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
+                      "len(struct_extract($1, "
+                      "'$nodes')) > 1 AND struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
+                      "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE 0 END",
+                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+              },
+          },
+      },
       {"IF", {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}}},
       // Avoid DuckDB v2's NULLIF macro binder; repeated arguments are bound once by Expand.
       {

@@ -1,5 +1,6 @@
 #include "src/translator/statement.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@
 #include "src/translator/graph.h"
 #include "src/translator/partition_filter.h"
 #include "src/translator/scan.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 std::optional<std::string> Statement(const googlesql::ResolvedStatement& statement,
@@ -101,6 +103,10 @@ std::optional<std::string> Statement(const googlesql::ResolvedStatement& stateme
     return Unsupported(scope, "statement " + statement.node_kind_string());
   }
   const auto* query = statement.GetAs<googlesql::ResolvedQueryStmt>();
+  if (std::ranges::any_of(query->output_column_list(),
+                          [](const auto& output) { return HasGraph(output->column().type()); })) {
+    return Unsupported(scope, "graph element or path results");
+  }
   const auto relation = Scan(*query->query(), scope);
   if (!relation) {
     return std::nullopt;

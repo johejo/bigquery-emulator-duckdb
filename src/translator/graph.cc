@@ -1,6 +1,7 @@
 #include "src/translator/graph.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <format>
 #include <iterator>
 #include <map>
@@ -22,6 +23,7 @@
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/scan.h"
+#include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
@@ -197,17 +199,19 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
     return Unsupported(scope, "optional, chained or multiple graph patterns");
   }
   const auto& path = *scan.input_scan_list(0);
-  if (path.quantifier() != nullptr || path.path() != nullptr || path.search_prefix() != nullptr ||
+  if (path.quantifier() != nullptr || path.search_prefix() != nullptr ||
       path.path_cost() != nullptr || !path.hint_list().empty() || !path.path_hint_list().empty() ||
       (path.path_mode() != nullptr &&
        path.path_mode()->path_mode() != googlesql::ResolvedGraphPathMode::WALK &&
        path.path_mode()->path_mode() != googlesql::ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED)) {
-    return Unsupported(scope, "quantified paths, path values, search prefixes or path modes");
+    return Unsupported(scope, "quantified paths, search prefixes or path modes");
   }
   Relation result;
   std::vector<std::string> outputs;
   std::vector<std::string> projections;
   std::vector<std::string> filters;
+  std::vector<std::string> path_nodes;
+  std::vector<std::string> path_edges;
   std::string pattern;
   for (const auto& part : path.input_scan_list()) {
     if (!part->Is<googlesql::ResolvedGraphElementScan>()) {
@@ -238,20 +242,88 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
     } else {
       pattern += std::format("({})", body);
     }
+    const auto* element_table = element.target_element_table_list(0);
+    std::vector<std::string> keys;
+    for (size_t i = 0; i < element_table->GetKeyColumns().size(); ++i) {
+      const auto output =
+          QuoteIdentifier("key_" + std::to_string(column.column_id()) + "_" + std::to_string(i));
+      // A key need not be a graph property. DuckPGQ passes expressions through to its table
+      // aliases, so read the underlying column without exposing it as a public property.
+      const auto* key = element_table->GetTable()->GetColumn(element_table->GetKeyColumns().at(i));
+      outputs.push_back(std::format("CAST({}.{} AS VARCHAR) AS {}", variable,
+                                    QuoteIdentifier(key->Name()), output));
+      keys.push_back("q." + output);
+    }
+    const auto identity =
+        "CAST(to_json(struct_pack(\"$table\" := " + QuoteLiteral(element_table->FullName()) +
+        ", \"$keys\" := [" + Join(keys, ", ") + "])) AS VARCHAR)";
+    const auto label =
+        element.label_expr()->GetAs<googlesql::ResolvedGraphLabel>()->label()->Name();
     std::vector<std::string> fields;
     for (const auto& property : column.type()->AsGraphElement()->property_types()) {
       const std::string name = QuoteIdentifier(property.name);
       const std::string output =
           QuoteIdentifier("g" + std::to_string(column.column_id()) + "_" + property.name);
-      outputs.push_back(std::format("{}.{} AS {}", variable, name, output));
+      const googlesql::GraphPropertyDefinition* definition = nullptr;
+      if (!element_table->FindPropertyDefinitionByName(property.name, definition).ok()) {
+        return Unsupported(scope, "graph property definition");
+      }
+      const auto value = definition->GetValueExpression();
+      if (!value.ok() || !(*value)->Is<googlesql::ResolvedCatalogColumnRef>()) {
+        return Unsupported(scope, "graph properties other than columns");
+      }
+      const auto* source = (*value)->GetAs<googlesql::ResolvedCatalogColumnRef>()->column();
+      outputs.push_back(
+          std::format("{}.{} AS {}", variable, QuoteIdentifier(source->Name()), output));
       fields.push_back(std::format("{} := q.{}", name, output));
     }
     if (fields.empty()) {
       // DuckDB structs need a field even for a graph element with no properties.
-      fields.emplace_back("_unit := 1");
+      fields.emplace_back("\"$empty\" := TRUE");
     }
-    projections.push_back("struct_pack(" + Join(fields, ", ") + ") AS " +
-                          ColumnName(column.column_id()));
+    const auto pack = [&](const std::vector<std::string>& properties) {
+      return "struct_pack(\"$id\" := " + identity + ", \"$labels\" := [" + QuoteLiteral(label) +
+             "], \"$properties\" := struct_pack(" + Join(properties, ", ") + "))";
+    };
+    projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
+    if (path.path() != nullptr) {
+      const auto* path_type = path.path()->column().type()->AsGraphPath();
+      const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
+      const auto* target = is_edge ? path_type->edge_type() : path_type->node_type();
+      std::vector<std::string> path_properties;
+      for (const auto& property : target->property_types()) {
+        const auto property_type = DuckDbType(property.value_type);
+        if (!property_type) {
+          return Unsupported(scope, "graph path property type");
+        }
+        const auto& available = column.type()->AsGraphElement()->property_types();
+        const bool present = std::ranges::any_of(available, [&](const auto& candidate) {
+          return ToLowerAscii(candidate.name) == ToLowerAscii(property.name);
+        });
+        const auto output =
+            QuoteIdentifier("g" + std::to_string(column.column_id()) + "_" + property.name);
+        path_properties.push_back(
+            QuoteIdentifier(property.name) +
+            " := " + (present ? "q." + output : "CAST(NULL AS " + *property_type + ")"));
+      }
+      if (path_properties.empty()) {
+        path_properties.emplace_back("\"$empty\" := TRUE");
+      }
+      (is_edge ? path_edges : path_nodes).push_back(pack(path_properties));
+    }
+    result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
+  }
+  if (path.path() != nullptr) {
+    const auto& column = path.path()->column();
+    const auto* path_type = column.type()->AsGraphPath();
+    const auto node_type = DuckDbType(path_type->node_type());
+    const auto edge_type = DuckDbType(path_type->edge_type());
+    if (!node_type || !edge_type) {
+      return Unsupported(scope, "graph path element type");
+    }
+    projections.push_back("struct_pack(\"$nodes\" := CAST([" + Join(path_nodes, ", ") + "] AS " +
+                          *node_type + "[]), \"$edges\" := CAST([" + Join(path_edges, ", ") +
+                          "] AS " + *edge_type + "[])) AS " + ColumnName(column.column_id()));
     result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
   }
   if (outputs.empty()) {

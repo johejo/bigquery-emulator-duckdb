@@ -376,17 +376,12 @@ std::optional<std::string> Expression(const googlesql::ResolvedExpr& expr, const
     if (property.property() == nullptr) {
       return Unsupported(scope, "dynamic graph properties");
     }
-    if (!property.expr()->Is<googlesql::ResolvedColumnRef>()) {
-      return Unsupported(scope, "graph properties of expressions");
-    }
-    const auto& ref = *property.expr()->GetAs<googlesql::ResolvedColumnRef>();
-    const auto& visible = ref.is_correlated() ? scope.outer : columns;
-    const auto value = visible.find(ref.column().column_id());
-    if (value == visible.end()) {
+    const auto value = Expression(*property.expr(), scope, columns);
+    if (!value) {
       return std::nullopt;
     }
-    return "struct_extract(" + value->second + ", " + QuoteLiteral(property.property()->Name()) +
-           ")";
+    return "struct_extract(struct_extract(" + *value + ", '$properties'), " +
+           QuoteLiteral(property.property()->Name()) + ")";
   }
   if (expr.Is<googlesql::ResolvedColumnRef>()) {
     const auto* ref = expr.GetAs<googlesql::ResolvedColumnRef>();

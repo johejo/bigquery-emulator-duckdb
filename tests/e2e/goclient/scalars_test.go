@@ -18,7 +18,19 @@ var scalarFixture = []string{
 	"CREATE SCHEMA IF NOT EXISTS scalar_graph",
 	"CREATE TABLE scalar_graph.Person (id INT64, name STRING)",
 	"INSERT scalar_graph.Person VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee')",
-	"CREATE PROPERTY GRAPH scalar_graph.FinGraph NODE TABLES (scalar_graph.Person KEY (id))",
+	"CREATE TABLE scalar_graph.Knows (id INT64, src INT64, dst INT64)",
+	"INSERT scalar_graph.Knows VALUES (10, 1, 2), (11, 2, 1), (12, 1, 1), (13, 1, 2)",
+	"CREATE TABLE scalar_graph.Account (id INT64, kind STRING)",
+	"INSERT scalar_graph.Account VALUES (7, 'checking')",
+	"CREATE TABLE scalar_graph.Owns (id INT64, account_id INT64)",
+	"INSERT scalar_graph.Owns VALUES (1, 7)",
+	"CREATE PROPERTY GRAPH scalar_graph.FinGraph NODE TABLES (scalar_graph.Person KEY (id), scalar_graph.Account KEY (id)) " +
+		"EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id) " +
+		"DESTINATION KEY (dst) REFERENCES Person (id), scalar_graph.Owns KEY (id, account_id) " +
+		"SOURCE KEY (id) REFERENCES Person (id) DESTINATION KEY (account_id) REFERENCES Account (id))",
+	"CREATE PROPERTY GRAPH scalar_graph.HiddenKeys NODE TABLES (scalar_graph.Person KEY (id) NO PROPERTIES) " +
+		"EDGE TABLES (scalar_graph.Knows KEY (id) SOURCE KEY (src) REFERENCES Person (id) " +
+		"DESTINATION KEY (dst) REFERENCES Person (id) NO PROPERTIES)",
 	"CREATE SCHEMA IF NOT EXISTS scalars",
 	"CREATE SCHEMA IF NOT EXISTS scalars_rounding_even OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')",
 	"CREATE OR REPLACE TABLE scalars.t (a INT64, b STRING, raw BYTES)",
