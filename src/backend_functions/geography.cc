@@ -686,7 +686,7 @@ absl::StatusOr<std::string> PointN(const Arguments& args) {
 
 // BigQuery names the operation and the kind of invalid component in its errors.
 absl::Status CheckLine(const Geography& geography, std::string_view function,
-                       std::string_view context, bool allow_empty) {
+                       std::string_view context, bool allow_empty, bool prefix_function = true) {
   if ((allow_empty && geography.Empty()) ||
       (geography.Count() == 1 && geography.lines.size() == 1)) {
     return absl::OkStatus();
@@ -696,7 +696,8 @@ absl::Status CheckLine(const Geography& geography, std::string_view function,
                              : !geography.points.empty()
                                  ? "contained a point"
                                  : "had " + std::to_string(geography.lines.size()) + " lines";
-  return absl::OutOfRangeError(std::string(function) + ": Argument to " + std::string(context) +
+  return absl::OutOfRangeError((prefix_function ? std::string(function) + ": " : "") +
+                               "Argument to " + std::string(context) +
                                " must be a single line geography; an argument " + reason +
                                ". Error in " + std::string(function) + " expression");
 }
@@ -716,6 +717,22 @@ absl::StatusOr<std::string> LineInterpolatePoint(const Arguments& args) {
     return GeographyText(geography);
   }
   return GeographyText(PointGeography(S2Polyline(geography.lines.front()).Interpolate(fraction)));
+}
+
+// Project onto the geodesic line, then measure the fraction along its edges.
+absl::StatusOr<double> LineLocatePoint(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  GOOGLESQL_RETURN_IF_ERROR(
+      CheckLine(geography, "ST_LINELOCATEPOINT", "STLineLocatePoint", false, false));
+  const auto point = ParsePoint(args, 1, "Argument to STLineLocatePoint");
+  if (!point.ok()) {
+    return absl::Status(point.status().code(), std::string(point.status().message()) +
+                                                   " Error in ST_LINELOCATEPOINT expression");
+  }
+  const S2Polyline line(geography.lines.front());
+  int next_vertex = 0;
+  const S2Point projected = line.Project(*point, &next_vertex);
+  return line.UnInterpolate(projected, next_vertex);
 }
 
 absl::StatusOr<std::string> LineSubstring(const Arguments& args) {
@@ -974,6 +991,8 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_centroid", {kVarchar}, kVarchar, EachRow<Centroid>);
   Register(connection, "bq_st_lineinterpolatepoint", {kVarchar, kDouble}, kVarchar,
            EachRow<LineInterpolatePoint>);
+  Register(connection, "bq_st_linelocatepoint", {kVarchar, kVarchar}, kDouble,
+           EachRow<LineLocatePoint>);
   Register(connection, "bq_st_linesubstring", {kVarchar, kDouble, kDouble}, kVarchar,
            EachRow<LineSubstring>);
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);

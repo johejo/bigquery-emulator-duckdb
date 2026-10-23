@@ -797,6 +797,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
       {"ST_ANGLE", call("bq_st_angle", 3)},
       {"ST_CENTROID", call("bq_st_centroid", 1)},
       {"ST_LINEINTERPOLATEPOINT", call("bq_st_lineinterpolatepoint", 2)},
+      {"ST_LINELOCATEPOINT", call("bq_st_linelocatepoint", 2)},
       {"ST_LINESUBSTRING", call("bq_st_linesubstring", 3)},
       {"ST_AZIMUTH", call("bq_st_azimuth", 2)},
       {"ST_DISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_DISTANCE")},
