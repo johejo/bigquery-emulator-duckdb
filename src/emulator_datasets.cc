@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -70,6 +71,8 @@ void Emulator::UpdateDataset(DatasetReference dataset, const DatasetMetadata& me
 }
 
 void Emulator::DeleteDataset(DatasetReference dataset, bool delete_contents) {
+  // CASCADE drops expired relations too, and must not race the lazy expiration sweep.
+  std::scoped_lock const lock(expiration_mutex_);
   dataset.project_id = ResolveProject(dataset.project_id);
   GetDataset(dataset);
   if (!delete_contents &&
