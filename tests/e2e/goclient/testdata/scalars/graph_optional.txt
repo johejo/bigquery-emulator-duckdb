@@ -1,0 +1,56 @@
+# OPTIONAL MATCH preserves incoming rows and represents missing matches as NULL.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-query-statements#gql_match
+# FinGraph has Owns 1->7; persons 2 and 3 have no Owns edge.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) RETURN COUNT(b.id) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) RETURN COUNTIF(b IS NULL) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) FILTER b IS NULL RETURN STRING_AGG(a.name, ',' ORDER BY a.name) AS result)
+=> "Dana,Lee"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) WHERE b.id = 999 RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) WHERE b.id = 999 RETURN COUNT(b.id) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (b:Account) WHERE a.id = 1 RETURN COUNT(*) AS result)
+=> "3"
+
+# The entire pattern is optional, rather than each path independently.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account), (c:Person WHERE c.id = 999) RETURN COUNT(b.id) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Knows]->(b:Person) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 999) OPTIONAL MATCH (b:Account) RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph OPTIONAL MATCH (a:Person WHERE a.id = 999) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph OPTIONAL MATCH (a:Person WHERE a.id = 999) RETURN a.name AS result)
+=> null
+
+# Following MATCH statements retain the optional row's original shared variables.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) MATCH (a:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) OPTIONAL MATCH (a:Person)-[:Knows]->(c:Person) RETURN COUNT(*) AS result)
+=> "5"
+# A NULL shared variable cannot match an element in a later stage.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) MATCH (b:Account) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[:Owns]->(b:Account) OPTIONAL MATCH (b:Account)<-[:Owns]-(c:Person) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH p = (a:Person)-[:Owns]->(b:Account) FILTER p IS NULL RETURN COUNT(*) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 2) OPTIONAL MATCH p = (a:Person)-[:Owns]->(b:Account) RETURN PATH_LENGTH(p) AS result)
+=> null
+
+# Key identity survives the left join, including keys that are not public properties.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person) OPTIONAL MATCH (a:Person)-[e:Knows]->(b:Person) RETURN COUNTIF(e IS NULL) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound) OPTIONAL MATCH (a:Compound)-[e:CompoundEdge]->(b:Compound) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Account) RETURN COUNT(a.id) AS result)
+=> "3"
+
+# Scalar columns from a preceding linear query are retained by an optional match.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) RETURN a.id AS id NEXT OPTIONAL MATCH (b:Account) WHERE b.id = id RETURN SUM(id) AS result)
+=> "6"

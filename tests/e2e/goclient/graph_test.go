@@ -70,7 +70,6 @@ func TestPropertyGraph(t *testing.T) {
 		"CREATE OR REPLACE PROPERTY GRAPH go_graph.FinGraph NODE TABLES (go_graph.Person KEY (id))",
 		"CREATE PROPERTY GRAPH go_graph.computed NODE TABLES (go_graph.Person KEY (id) PROPERTIES (id + 1 AS x))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person)-[:Owns]->{1,2}(a:Account) RETURN p.name)",
-		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) OPTIONAL MATCH (p)-[:Owns]->(a:Account) RETURN p.name)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) COLUMNS (p.name))",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH (p:Person) RETURN p)",
 		"SELECT * FROM GRAPH_TABLE(go_graph.FinGraph MATCH path = (p:Person) RETURN path)",
