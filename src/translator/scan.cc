@@ -1,6 +1,7 @@
 #include "src/translator/scan.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,12 @@
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
+
+constexpr auto kZoneIndependentFunctions = std::to_array<std::string_view>({
+    "current_timestamp",
+    "timestamp_add",
+    "timestamp_sub",
+});
 
 // Converts an external result column to the BigQuery type the catalog gave it. MySQL decimals
 // and PostgreSQL numerics beyond DuckDB's precision arrive as text. MySQL TIMESTAMP arrives as
@@ -620,7 +627,7 @@ bool ZoneIndependent(const googlesql::ResolvedExpr& expression) {
   }
   const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
   const std::string name = call.function()->Name();
-  return (name == "current_timestamp" || name == "timestamp_add" || name == "timestamp_sub") &&
+  return std::ranges::find(kZoneIndependentFunctions, name) != kZoneIndependentFunctions.end() &&
          std::ranges::all_of(call.argument_list(),
                              [](const auto& argument) { return ZoneIndependent(*argument); });
 }

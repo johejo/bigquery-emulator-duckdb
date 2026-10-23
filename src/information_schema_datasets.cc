@@ -10,7 +10,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "src/duckdb_sql.h"
-#include "src/field_schema.h"
 #include "src/information_schema_options.h"
 #include "src/information_schema_rows.h"
 #include "src/information_schema_view.h"
@@ -37,21 +36,6 @@ std::string Float64OptionValue(double value) {
 
 }  // namespace
 
-const std::vector<ViewColumn>& SchemataColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
-      {.name = "catalog_name", .type = FieldType::kString},
-      {.name = "schema_name", .type = FieldType::kString},
-      {.name = "schema_owner", .type = FieldType::kString},
-      {.name = "creation_time", .type = FieldType::kTimestamp},
-      {.name = "last_modified_time", .type = FieldType::kTimestamp},
-      {.name = "location", .type = FieldType::kString},
-      {.name = "ddl", .type = FieldType::kString},
-      {.name = "default_collation_name", .type = FieldType::kString},
-      {.name = "sync_status", .type = FieldType::kJson},
-  };
-  return *kColumns;
-}
-
 absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
   std::vector<Row> rows;
   for (const DatasetReference& dataset : context.datasets) {
@@ -76,17 +60,6 @@ absl::StatusOr<std::vector<Row>> SchemataRows(const ViewContext& context) {
         }));
   }
   return rows;
-}
-
-const std::vector<ViewColumn>& SchemataOptionsColumns() {
-  static const auto* const kColumns = new std::vector<ViewColumn>{
-      {.name = "catalog_name", .type = FieldType::kString},
-      {.name = "schema_name", .type = FieldType::kString},
-      {.name = "option_name", .type = FieldType::kString},
-      {.name = "option_type", .type = FieldType::kString},
-      {.name = "option_value", .type = FieldType::kString},
-  };
-  return *kColumns;
 }
 
 absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context) {

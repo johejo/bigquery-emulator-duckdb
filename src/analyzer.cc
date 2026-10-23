@@ -71,6 +71,16 @@ std::optional<std::vector<FieldSchema>> AnalyzerResult::result_schema() const {
 
 namespace {
 
+constexpr auto kMaterializedViewAggregates = std::to_array<std::string_view>({
+    "count",
+    "$count_star",
+    "countif",
+    "sum",
+    "min",
+    "max",
+    "avg",
+});
+
 // The name BigQuery reports for field `index` (0-based) of a STRUCT in a result schema.
 std::string StructFieldName(const std::string& name, int index) {
   return name.empty() ? "_field_" + std::to_string(index + 1) : name;
@@ -275,8 +285,8 @@ absl::Status CheckMaterializedView(const googlesql::ResolvedCreateMaterializedVi
       if (node->Is<googlesql::ResolvedAggregateFunctionCall>()) {
         const auto& aggregate = *node->GetAs<googlesql::ResolvedAggregateFunctionCall>();
         const std::string name = call.function()->Name();
-        if ((name != "count" && name != "$count_star" && name != "countif" && name != "sum" &&
-             name != "min" && name != "max" && name != "avg") ||
+        if (std::ranges::find(kMaterializedViewAggregates, name) ==
+                kMaterializedViewAggregates.end() ||
             aggregate.distinct() || aggregate.having_modifier() != nullptr ||
             !aggregate.order_by_item_list().empty() || aggregate.limit() != nullptr) {
           return unsupported("this aggregate");

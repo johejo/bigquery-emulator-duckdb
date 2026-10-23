@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <format>
 #include <memory>
@@ -39,6 +40,18 @@
 
 namespace bigquery_emulator_duckdb::translator {
 namespace {
+
+constexpr auto kDefaultExpressionFunctions = std::to_array<std::string_view>({
+    "$make_array",
+    "current_date",
+    "current_datetime",
+    "current_time",
+    "current_timestamp",
+    "generate_uuid",
+    "rand",
+    "session_user",
+    "st_geogpoint",
+});
 
 bool HasCollation(const googlesql::ResolvedColumnAnnotations* annotations) {
   if (annotations == nullptr) {
@@ -214,9 +227,7 @@ bool SupportedDefaultExpression(const googlesql::ResolvedExpr& expression, const
     const auto& call = *expression.GetAs<googlesql::ResolvedFunctionCall>();
     const std::string name = ToLowerAscii(call.function()->Name());
     if (call.function()->IsGoogleSQLBuiltin() &&
-        (name == "$make_array" || name == "current_date" || name == "current_datetime" ||
-         name == "current_time" || name == "current_timestamp" || name == "generate_uuid" ||
-         name == "rand" || name == "session_user" || name == "st_geogpoint")) {
+        std::ranges::find(kDefaultExpressionFunctions, name) != kDefaultExpressionFunctions.end()) {
       return std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
         return SupportedDefaultExpression(*argument, scope, name == "$make_array");
       });

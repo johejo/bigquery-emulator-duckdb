@@ -7,6 +7,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -40,7 +41,7 @@ using info::ViewContext;
 
 FieldSchema ColumnField(const ViewColumn& column) {
   return {
-      .name = column.name,
+      .name = std::string(column.name),
       .type = column.type,
       .mode = column.repeated ? FieldMode::kRepeated : FieldMode::kNullable,
   };
@@ -48,18 +49,18 @@ FieldSchema ColumnField(const ViewColumn& column) {
 
 // Selects the rows as `columns`. The values are cast in one outer SELECT so that a column is
 // typed even when every row has NULL in it.
-absl::StatusOr<std::string> ViewSql(const std::vector<ViewColumn>& columns,
+absl::StatusOr<std::string> ViewSql(std::span<const ViewColumn> columns,
                                     const std::vector<Row>& rows) {
   std::vector<std::string> names;
   std::vector<std::string> projections;
-  for (size_t i = 0; i < columns.size(); ++i) {
-    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(columns.at(i)));
+  for (const ViewColumn& column : columns) {
+    absl::StatusOr<std::string> type = DuckDbColumnType(ColumnField(column));
     if (!type.ok()) {
       return type.status();
     }
-    names.push_back("c" + std::to_string(i));
+    names.push_back("c" + std::to_string(names.size()));
     projections.push_back("CAST(" + names.back() + " AS " + *type + ") AS " +
-                          QuoteIdentifier(columns.at(i).name));
+                          QuoteIdentifier(column.name));
   }
   std::vector<std::string> values;
   for (const Row& row : rows) {
@@ -150,7 +151,7 @@ enum class ViewScope : std::uint8_t {
 struct ViewDefinition {
   std::string_view name;
   ViewScope scope;
-  const std::vector<ViewColumn>& (*columns)();
+  std::span<const ViewColumn> columns;
   absl::StatusOr<std::vector<Row>> (*rows)(const ViewContext&);
 };
 
@@ -158,67 +159,67 @@ constexpr std::array kViews = {
     ViewDefinition{
         .name = "SCHEMATA",
         .scope = ViewScope::kProject,
-        .columns = info::SchemataColumns,
+        .columns = info::kSchemataColumns,
         .rows = info::SchemataRows,
     },
     ViewDefinition{
         .name = "SCHEMATA_OPTIONS",
         .scope = ViewScope::kProject,
-        .columns = info::SchemataOptionsColumns,
+        .columns = info::kSchemataOptionsColumns,
         .rows = info::SchemataOptionsRows,
     },
     ViewDefinition{
         .name = "TABLES",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TablesColumns,
+        .columns = info::kTablesColumns,
         .rows = info::TablesRows,
     },
     ViewDefinition{
         .name = "TABLE_SNAPSHOTS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TableSnapshotsColumns,
+        .columns = info::kTableSnapshotsColumns,
         .rows = info::TableSnapshotsRows,
     },
     ViewDefinition{
         .name = "TABLE_OPTIONS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::TableOptionsColumns,
+        .columns = info::kTableOptionsColumns,
         .rows = info::TableOptionsRows,
     },
     ViewDefinition{
         .name = "PARTITIONS",
         .scope = ViewScope::kDataset,
-        .columns = info::PartitionsColumns,
+        .columns = info::kPartitionsColumns,
         .rows = info::PartitionsRows,
     },
     ViewDefinition{
         .name = "VIEWS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ViewsColumns,
+        .columns = info::kViewsColumns,
         .rows = info::ViewsRows,
     },
     ViewDefinition{
         .name = "COLUMNS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ColumnsColumns,
+        .columns = info::kColumnsColumns,
         .rows = info::ColumnsRows,
     },
     ViewDefinition{
         .name = "COLUMN_FIELD_PATHS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ColumnFieldPathsColumns,
+        .columns = info::kColumnFieldPathsColumns,
         .rows = info::ColumnFieldPathsRows,
     },
     ViewDefinition{
         .name = "ROUTINES",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::RoutinesColumns,
+        .columns = info::kRoutinesColumns,
         .rows = info::RoutinesRows,
     },
     ViewDefinition{
         .name = "PARAMETERS",
         .scope = ViewScope::kDatasetOrRegion,
-        .columns = info::ParametersColumns,
+        .columns = info::kParametersColumns,
         .rows = info::ParametersRows,
     },
 };
@@ -312,7 +313,7 @@ absl::StatusOr<std::unique_ptr<SqlTable>> InformationSchemaView(
     }
   }
 
-  const std::vector<ViewColumn>& columns = definition->columns();
+  const std::span<const ViewColumn> columns = definition->columns;
   absl::StatusOr<std::vector<Row>> rows = definition->rows(context);
   if (!rows.ok()) {
     return rows.status();
