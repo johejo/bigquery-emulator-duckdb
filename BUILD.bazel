@@ -410,6 +410,7 @@ cc_library(
     hdrs = ["src/analyzer.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":ddl_option_types",
         ":duckdb_sql",
         ":language_options",
         ":table_path",

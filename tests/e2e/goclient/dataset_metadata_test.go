@@ -106,6 +106,12 @@ func TestDatasetMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(ddl, metadata{"altered", "", map[string]string{"tier": "1"}})
+	// An empty labels array removes all labels.
+	// https://cloud.google.com/bigquery/docs/deleting-labels
+	if err := run("ALTER SCHEMA go_dataset_metadata_ddl SET OPTIONS (labels = [])"); err != nil {
+		t.Fatal(err)
+	}
+	check(ddl, metadata{"altered", "", nil})
 	if err := run("ALTER SCHEMA IF EXISTS go_dataset_metadata_missing SET OPTIONS (description = 'x')"); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +119,7 @@ func TestDatasetMetadata(t *testing.T) {
 	if err := run("DROP SCHEMA go_dataset_metadata_ddl"); err != nil {
 		t.Fatal(err)
 	}
-	if err := run("CREATE SCHEMA go_dataset_metadata_ddl"); err != nil {
+	if err := run("CREATE SCHEMA go_dataset_metadata_ddl OPTIONS (labels = [])"); err != nil {
 		t.Fatal(err)
 	}
 	delete(created, ddl.DatasetID)

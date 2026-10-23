@@ -35,6 +35,7 @@
 #include "googlesql/scripting/error_helpers.h"
 #include "googlesql/scripting/script_executor.h"
 #include "googlesql/scripting/script_segment.h"
+#include "src/ddl_option_types.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
@@ -375,6 +376,8 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   // since the option has a type, rejects a bare identifier that names a script variable.
   googlesql::AllowedHintsAndOptions allowed = options.allowed_hints_and_options();
   allowed.AddOption("expiration_timestamp", googlesql::types::TimestampType());
+  // Give an untyped empty array the labels type rather than the default ARRAY<INT64>.
+  allowed.AddOption("labels", DdlOptionSqlType(DdlOptionType::kLabels));
   options.set_allowed_hints_and_options(allowed);
   // BigQuery interprets civil times without an explicit zone as UTC.
   options.set_default_time_zone(absl::UTCTimeZone());

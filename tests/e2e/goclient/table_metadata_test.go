@@ -82,6 +82,30 @@ func TestTableMetadata(t *testing.T) {
 	check("ddl", metadata{"from DDL", "DDL", map[string]string{"env": "prod"}})
 	check("v", metadata{"a view", "", map[string]string{"kind": "view"}})
 
+	// Empty labels arrays create unlabeled resources, including snapshots of labeled tables.
+	// https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language
+	for _, tc := range []struct {
+		name, sql string
+		want      metadata
+	}{
+		{"empty_table", "CREATE TABLE empty_table (id INT64) OPTIONS (labels = [])", metadata{}},
+		{"empty_view", "CREATE VIEW empty_view OPTIONS (labels = []) AS SELECT id FROM ddl", metadata{}},
+		{"empty_mv", "CREATE MATERIALIZED VIEW empty_mv OPTIONS (labels = []) AS SELECT id, COUNT(*) AS n FROM ddl GROUP BY id", metadata{}},
+		{"empty_snapshot", "CREATE SNAPSHOT TABLE empty_snapshot CLONE ddl OPTIONS (labels = [])", metadata{"from DDL", "DDL", nil}},
+	} {
+		if err := run(tc.sql); err != nil {
+			t.Fatalf("%s: %v", tc.sql, err)
+		}
+		check(tc.name, tc.want)
+	}
+
+	// SET OPTIONS with an empty array removes labels and preserves other metadata.
+	// https://cloud.google.com/bigquery/docs/deleting-labels
+	if err := run("ALTER TABLE ddl SET OPTIONS (labels = [])"); err != nil {
+		t.Fatal(err)
+	}
+	check("ddl", metadata{"from DDL", "DDL", nil})
+
 	// Replacing a table replaces its metadata.
 	if err := run("CREATE OR REPLACE TABLE ddl AS SELECT 1 AS id"); err != nil {
 		t.Fatal(err)
