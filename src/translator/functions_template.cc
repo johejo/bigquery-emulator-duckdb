@@ -620,6 +620,19 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       {"IF", {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}}},
+      // Avoid DuckDB v2's NULLIF macro binder; repeated arguments are bound once by Expand.
+      {
+          "NULLIF",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CASE WHEN " + FloatCompare("$1", "=", "$2") + " THEN NULL ELSE $1 END",
+                  .conditions = {Is(1, {TYPE_DOUBLE})},
+              },
+              {.arity = 2, .spelling = "CASE WHEN $1 = $2 THEN NULL ELSE $1 END"},
+          },
+      },
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
       // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
