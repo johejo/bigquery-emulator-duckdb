@@ -151,7 +151,6 @@ class Worker {
       if (remaining <= 0) {
         throw std::runtime_error("Python UDF timed out");
       }
-      int64_t interval = remaining;
 #ifdef __APPLE__
       // Darwin rejects RLIMIT_AS. Check resident memory while waiting, including during
       // interpreter startup and native calls that do not return to Python.
@@ -163,7 +162,9 @@ class Worker {
       if (std::cmp_not_equal(size, sizeof(info)) && (size != 0 || errno != ESRCH)) {
         throw std::runtime_error("Cannot read Python worker memory usage");
       }
-      interval = std::min<int64_t>(interval, 10);
+      const int64_t interval = std::min<int64_t>(remaining, 10);
+#else
+      const int64_t interval = remaining;
 #endif
       pollfd descriptor{.fd = socket_, .events = events, .revents = 0};
       const int ready =
