@@ -79,3 +79,15 @@ SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_na
 CREATE SCHEMA IF NOT EXISTS scalars_options_days OPTIONS (default_table_expiration_days = 3.75);
 SELECT option_value FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_options_days' AND option_name = 'default_table_expiration_days'
 => "3.75"
+
+# TABLE_OPTIONS lists labels in the order DDL gives them.
+CREATE OR REPLACE TABLE scalars.options_labels_order (x INT64) OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_labels_order' AND option_name = 'labels'
+=> "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"
+
+# SET OPTIONS replaces label order, and updating another option preserves it.
+CREATE OR REPLACE TABLE scalars.options_labels_altered (x INT64) OPTIONS (labels = [('a', 'b'), ('org', 'dev')]);
+ALTER TABLE scalars.options_labels_altered SET OPTIONS (labels = [('org', 'dev'), ('a', 'b')]);
+ALTER TABLE scalars.options_labels_altered SET OPTIONS (description = 'updated');
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'options_labels_altered' AND option_name = 'labels'
+=> "[STRUCT(\"org\", \"dev\"), STRUCT(\"a\", \"b\")]"

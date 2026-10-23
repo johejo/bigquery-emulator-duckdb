@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "description": "Label ordering after REST label mutations and for dataset DDL, whose answers are not established by the verified TABLE_OPTIONS DDL case.",
+  "vars": {
+    "dataset": "bqa_${run}_${case}"
+  },
+  "cases": [
+    {
+      "name": "labels_order",
+      "steps": [
+        {
+          "name": "dataset",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/datasets",
+            "body": {
+              "datasetReference": {
+                "datasetId": "${dataset}"
+              },
+              "location": "US"
+            }
+          }
+        },
+        {
+          "name": "fixture",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "CREATE TABLE `${project}.${dataset}.t` (x INT64) OPTIONS(labels = [('org', 'dev'), ('a', 'b')]); CREATE SCHEMA IF NOT EXISTS `${project}.${dataset}_labels` OPTIONS(labels = [('org', 'dev'), ('a', 'b')]);",
+              "useLegacySql": false
+            }
+          }
+        },
+        {
+          "name": "dataset_order",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT option_value FROM `${project}`.INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = '${dataset}_labels' AND option_name = 'labels'",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "rows": "/body/rows",
+            "errors": "/body/errors"
+          }
+        },
+        {
+          "name": "unrelated_patch",
+          "rest": {
+            "method": "PATCH",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t",
+            "body": {
+              "description": "updated"
+            }
+          }
+        },
+        {
+          "name": "unrelated_patch_order",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT option_value FROM `${project}.${dataset}`.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 't' AND option_name = 'labels'",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "rows": "/body/rows",
+            "errors": "/body/errors"
+          }
+        },
+        {
+          "name": "existing_label_patch",
+          "rest": {
+            "method": "PATCH",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t",
+            "body": {
+              "labels": {
+                "org": "prod"
+              }
+            }
+          }
+        },
+        {
+          "name": "existing_label_patch_order",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT option_value FROM `${project}.${dataset}`.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 't' AND option_name = 'labels'",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "rows": "/body/rows",
+            "errors": "/body/errors"
+          }
+        },
+        {
+          "name": "new_label_patch",
+          "rest": {
+            "method": "PATCH",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t",
+            "body": {
+              "labels": {
+                "z": "last",
+                "b": "middle"
+              }
+            }
+          }
+        },
+        {
+          "name": "new_label_patch_order",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT option_value FROM `${project}.${dataset}`.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 't' AND option_name = 'labels'",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "rows": "/body/rows",
+            "errors": "/body/errors"
+          }
+        },
+        {
+          "name": "delete_label_patch",
+          "rest": {
+            "method": "PATCH",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t",
+            "body": {
+              "labels": {
+                "a": null
+              }
+            }
+          }
+        },
+        {
+          "name": "delete_label_patch_order",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT option_value FROM `${project}.${dataset}`.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 't' AND option_name = 'labels'",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "rows": "/body/rows",
+            "errors": "/body/errors"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "name": "delete_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
+          }
+        },
+        {
+          "name": "delete_labels_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}_labels?deleteContents=true"
+          }
+        }
+      ]
+    }
+  ]
+}

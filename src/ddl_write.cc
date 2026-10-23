@@ -57,6 +57,9 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
   }
   if (updates.labels.has_value()) {
     metadata.labels = *updates.labels;
+    if constexpr (requires { metadata.label_order; }) {
+      metadata.label_order = updates.label_order;
+    }
   }
   if (updates.default_rounding_mode.has_value()) {
     metadata.default_rounding_mode = *updates.default_rounding_mode;

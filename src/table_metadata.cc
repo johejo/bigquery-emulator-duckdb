@@ -181,6 +181,11 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
 // resource `body` to `metadata`, as UpdateTableMetadata documents.
 template <typename Metadata>
 void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
+  if constexpr (requires { metadata.label_order; }) {
+    if (!patch || body.contains("labels")) {
+      metadata.label_order.clear();
+    }
+  }
   if (!patch) {
     metadata.labels.clear();
   }

@@ -60,6 +60,9 @@ unsupported.
 DDL option values accept literals and constant expressions using query parameters and supported
 scalar functions. Other expressions, such as a parenthesized script variable, are unsupported.
 
+Tables and views created before DDL label order was recorded list labels in key order until
+`SET OPTIONS (labels = ...)` replaces them.
+
 Expired tables and views are deleted when the catalog is read, including before query analysis,
 except by statements in a transaction, which can still read a table that expires while the
 transaction is open.

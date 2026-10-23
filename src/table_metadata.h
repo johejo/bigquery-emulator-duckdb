@@ -50,6 +50,8 @@ struct TableMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
+  // DDL array order, which TABLE_OPTIONS exposes.
+  std::vector<std::string> label_order;
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
   // Queries must have a predicate eligible for partition elimination.

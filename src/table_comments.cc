@@ -56,6 +56,7 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   }
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
+    metadata.label_order = object.value("labelOrder", std::vector<std::string>{});
     metadata.restored_from_snapshot = object.value("restoredFromSnapshot", false);
     metadata.clone = ParseBaseTableDefinition(object.value("cloneDefinition", json()), "cloneTime");
     metadata.snapshot =
@@ -74,6 +75,9 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
   ValidateLabels(metadata.labels);
   ValidatePartitioning(metadata, schema);
   json comment = metadata.ToJson();
+  if (!metadata.label_order.empty()) {
+    comment["labelOrder"] = metadata.label_order;
+  }
   if (metadata.restored_from_snapshot) {
     comment["restoredFromSnapshot"] = true;
   }
@@ -98,6 +102,9 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
     throw ApiError::Unsupported("defaultRoundingMode on views");
   }
   json comment = view.metadata.ToJson();
+  if (!view.metadata.label_order.empty()) {
+    comment["labelOrder"] = view.metadata.label_order;
+  }
   if (view.materialized) {
     comment["materialized"] = true;
     if (view.materialized_source) {
