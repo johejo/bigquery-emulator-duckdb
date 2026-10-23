@@ -159,3 +159,50 @@ func TestTableExpirationConcurrentReads(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// Deleting a dataset and sweeping its expired views must not make unrelated queries fail.
+func TestTableExpirationConcurrentDatasetDeletion(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	client := newClient(t)
+	dataset := client.Dataset("go_expiration_dataset_deletion")
+	_ = dataset.DeleteWithContents(ctx)
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	for i := range 32 {
+		if err := dataset.Create(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := dataset.Table("expired").Create(ctx, &bigquery.TableMetadata{
+			ViewQuery:      "SELECT 1 AS id",
+			ExpirationTime: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		start := make(chan struct{})
+		errors := make(chan error, 5)
+		var workers sync.WaitGroup
+		workers.Go(func() {
+			<-start
+			if err := dataset.DeleteWithContents(ctx); err != nil {
+				errors <- fmt.Errorf("delete dataset: %w", err)
+			}
+		})
+		for range 4 {
+			workers.Go(func() {
+				<-start
+				if _, err := client.Query("SELECT 1").Read(ctx); err != nil {
+					errors <- fmt.Errorf("unrelated query: %w", err)
+				}
+			})
+		}
+		close(start)
+		workers.Wait()
+		close(errors)
+		for err := range errors {
+			t.Errorf("iteration %d: %v", i, err)
+		}
+		if t.Failed() {
+			return
+		}
+	}
+}

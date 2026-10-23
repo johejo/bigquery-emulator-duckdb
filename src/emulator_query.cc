@@ -681,6 +681,10 @@ QueryResult Emulator::RunStatement(const TranslatedStatement& translation,
                                    const std::vector<std::string>& setup, bool null_arrays,
                                    Backend* session, JobLocation* location) {
   Backend& backend = session != nullptr ? *session : backend_;
+  std::unique_lock<std::recursive_mutex> expiration_lock(expiration_mutex_, std::defer_lock);
+  if (translation.statement_type == "DROP_SCHEMA") {
+    expiration_lock.lock();
+  }
   std::unique_lock<std::mutex> graph_lock(graph_mutex_, std::defer_lock);
   if (translation.property_graph || translation.reads_property_graph) {
     graph_lock.lock();
