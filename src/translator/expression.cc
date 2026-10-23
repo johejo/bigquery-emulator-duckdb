@@ -33,6 +33,13 @@ namespace {
 // STRING and BLOB through escapes rather than UTF-8. `safe` makes a conversion's errors NULL.
 std::optional<std::string> ConvertedCast(const googlesql::Type* from, const googlesql::Type* to,
                                          const std::string& sql, bool safe) {
+  if (from->IsDouble() && to->IsInt64()) {
+    // DuckDB rounds halfway values to even and reports different overflow errors.
+    return "bq_float64_to_int64(" + sql + ", " + (safe ? "true" : "false") + ")";
+  }
+  if (from->IsTimestamp() && to->IsTime()) {
+    return "CAST((" + sql + " AT TIME ZONE 'UTC') AS TIME)";
+  }
   if (to->IsString()) {
     if (from->IsBytes()) {
       return "bq_bytes_to_string(" + sql + ", " + (safe ? "true" : "false") + ")";
@@ -58,6 +65,9 @@ std::optional<std::string> ConvertedCast(const googlesql::Type* from, const goog
       return "encode(" + sql + ")";
     }
     const std::string arguments = "(" + sql + ", " + (safe ? "true" : "false") + ")";
+    if (to->IsBool()) {
+      return "bq_string_to_bool" + arguments;
+    }
     if (to->IsDate()) {
       return "bq_string_to_date" + arguments;
     }

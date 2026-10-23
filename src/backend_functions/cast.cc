@@ -60,6 +60,22 @@ absl::StatusOr<std::string> BytesToUtf8(std::string_view bytes) {
   return out.string_value();
 }
 
+// Keep the conversion's range checks and error text, including values at the INT64 limits.
+absl::StatusOr<int64_t> Float64ToInt64(double value) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Value out,
+                             googlesql::CastValue(Value::Double(value), absl::UTCTimeZone(),
+                                                  GoogleSqlLanguageOptions(), types::Int64Type()));
+  return out.int64_value();
+}
+
+// BigQuery accepts only case-insensitive "true" and "false", unlike DuckDB's BOOL cast.
+absl::StatusOr<bool> StringToBool(std::string_view text) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Value out,
+                             googlesql::CastValue(Value::String(text), absl::UTCTimeZone(),
+                                                  GoogleSqlLanguageOptions(), types::BoolType()));
+  return out.bool_value();
+}
+
 absl::StatusOr<std::string> BytesToString(std::string_view bytes, std::string_view format) {
   return FormatString(Value::Bytes(bytes), format);
 }
@@ -146,6 +162,10 @@ void RegisterCastFunctions(duckdb_connection connection) {
   LogicalType const boolean(duckdb_create_logical_type(kBoolean));
   Register(connection, "bq_bytes_to_string", {kBlob, kBoolean}, kVarchar,
            Apply<BytesToUtf8, kSafe>);
+  Register(connection, "bq_float64_to_int64", {kDouble, kBoolean}, kBigint,
+           Apply<Float64ToInt64, kSafe>);
+  Register(connection, "bq_string_to_bool", {kVarchar, kBoolean}, kBoolean,
+           Apply<StringToBool, kSafe>);
   // Each cast with FORMAT takes the value, the format, the time zone for a cast from or to
   // TIMESTAMP, the current timestamp for a cast to DATE, DATETIME or TIMESTAMP and whether it is
   // SAFE_CAST.

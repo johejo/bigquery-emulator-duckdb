@@ -1,0 +1,78 @@
+# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_bool
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_int64
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_time
+# UNNEST keeps the analyzer from folding the casts.
+
+SELECT CAST(x AS BOOL) FROM UNNEST(['0']) AS x
+=> error: Bad bool value: 0
+
+SELECT CAST(x AS BOOL) FROM UNNEST(['1']) AS x
+=> error:
+
+SELECT CAST(x AS BOOL) FROM UNNEST(['']) AS x
+=> error:
+
+SELECT CAST(x AS BOOL) FROM UNNEST([' true ']) AS x
+=> error:
+
+SELECT ARRAY_AGG(CAST(x AS BOOL) ORDER BY i) FROM UNNEST(['true', 'TRUE', 'TrUe', 'false', 'FALSE']) AS x WITH OFFSET i
+=> [{"v":"true"},{"v":"true"},{"v":"true"},{"v":"false"},{"v":"false"}]
+
+SELECT TO_JSON_STRING(ARRAY(SELECT SAFE_CAST(x AS BOOL) FROM UNNEST(['0', '1', '', 'true', 'false', NULL]) AS x WITH OFFSET i ORDER BY i))
+=> "[null,null,null,true,false,null]"
+
+SELECT CAST(x AS BOOL) FROM UNNEST([CAST(NULL AS STRING)]) AS x
+=> null
+
+SELECT ARRAY_AGG(CAST(x AS INT64) ORDER BY i) FROM UNNEST([2.5, -2.5, 1.5, -1.5, 0.5, -0.5, 2.49, -2.49]) AS x WITH OFFSET i
+=> [{"v":"3"},{"v":"-3"},{"v":"2"},{"v":"-2"},{"v":"1"},{"v":"-1"},{"v":"2"},{"v":"-2"}]
+
+SELECT ARRAY_AGG(SAFE_CAST(x AS INT64) ORDER BY i) FROM UNNEST([2.5, -2.5]) AS x WITH OFFSET i
+=> [{"v":"3"},{"v":"-3"}]
+
+SELECT CAST(x AS INT64) FROM UNNEST([CAST(NULL AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(x AS INT64) FROM UNNEST([CAST('inf' AS FLOAT64)]) AS x
+=> error:
+
+SELECT CAST(x AS INT64) FROM UNNEST([CAST('nan' AS FLOAT64)]) AS x
+=> error:
+
+SELECT CAST(x AS INT64) FROM UNNEST([1e20]) AS x
+=> error:
+
+SELECT TO_JSON_STRING(ARRAY(SELECT SAFE_CAST(x AS INT64) FROM UNNEST([CAST('inf' AS FLOAT64), CAST('-inf' AS FLOAT64), CAST('nan' AS FLOAT64), 1e20, NULL]) AS x))
+=> "[null,null,null,null,null]"
+
+SELECT CAST(x AS TIME) FROM UNNEST([TIMESTAMP '2017-02-28 12:34:56+00']) AS x
+=> "12:34:56"
+
+SELECT CAST(x AS TIME) FROM UNNEST([TIMESTAMP '2016-09-01 04:03:02.123456+00']) AS x
+=> "04:03:02.123456"
+
+SELECT SAFE_CAST(x AS TIME) FROM UNNEST([TIMESTAMP '1969-12-31 23:59:59.999999+00']) AS x
+=> "23:59:59.999999"
+
+SELECT CAST(x AS TIME) FROM UNNEST([CAST(NULL AS TIMESTAMP)]) AS x
+=> null
+
+# Source: BigQuery answers to unverified/casts.txt (FLOAT64 values at the INT64 limits).
+SELECT CAST(x AS INT64) FROM UNNEST([CAST(9223372036854775807 AS FLOAT64)]) AS x
+=> error: int64 out of range: 9.22337e+18
+
+SELECT SAFE_CAST(x AS INT64) FROM UNNEST([CAST(9223372036854775807 AS FLOAT64)]) AS x
+=> null
+
+SELECT CAST(x AS INT64) FROM UNNEST([-9223372036854775808.0]) AS x
+=> "-9223372036854775808"
+
+SELECT CAST(x AS INT64) FROM UNNEST([9223372036854774784.0]) AS x
+=> "9223372036854774784"
+
+# Source: BigQuery answers to unverified/casts.txt (embedded NUL and non-ASCII strings).
+SELECT CAST(x AS BOOL) FROM UNNEST(['true\x00']) AS x
+=> error: Bad bool value: true\000
+
+SELECT SAFE_CAST(x AS BOOL) FROM UNNEST(['ＴＲＵＥ']) AS x
+=> null

@@ -1915,23 +1915,13 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR
-  reason: "Casts between TIMESTAMP and TIME fail in DuckDB"
-  label: "civil_time_test:datetime_timestamp_date_time_casts"
-}
-
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "Casts differ: FLOAT64 to INT64 rounds halves to even, large FLOAT64 values fail to cast to NUMERIC, and STRING to BOOL accepts '0' and '1'"
+  reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1e29"
 }
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casts differ: FLOAT64 to INT64 rounds halves to even, large FLOAT64 values fail to cast to NUMERIC, and STRING to BOOL accepts '0' and '1'"
-  label: "code:CastTo_BOOL_STRING_<0>"
-  label: "code:CastTo_BOOL_STRING_<1>"
-  label: "code:CastTo_INT64_FLOAT64_-2@5"
-  label: "code:CastTo_INT64_FLOAT64_2@5"
+  reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
 }
 
@@ -2199,11 +2189,7 @@ known_errors {
 
 known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "SAFE_CAST differs: FLOAT64 to INT64 rounds halves to even, large FLOAT64 values become NULL as NUMERIC, and STRING to BOOL accepts '0' and '1'"
-  label: "code:SafeCastTo_BOOL_STRING_<0>"
-  label: "code:SafeCastTo_BOOL_STRING_<1>"
-  label: "code:SafeCastTo_INT64_FLOAT64_-2@5"
-  label: "code:SafeCastTo_INT64_FLOAT64_2@5"
+  reason: "Large FLOAT64 values become NULL as NUMERIC or lose precision under SAFE_CAST"
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1@844674407370955e19"
   label: "code:SafeCastTo_NUMERIC_FLOAT64_1e29"
 }
