@@ -13,7 +13,7 @@
 // Ported to C++ from Guava's com/google/common/hash/Fingerprint2011Test.java, whose fingerprints
 // cover every branch of the hash; see README.md.
 
-#include "third_party/zetasketch/fingerprint2011.h"
+#include "src/zetasketch/fingerprint2011.h"
 
 #include <cstddef>
 #include <cstdint>

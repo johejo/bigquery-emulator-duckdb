@@ -12,7 +12,7 @@
 //
 // Ported to C++ from Guava's com/google/common/hash/Fingerprint2011.java; see README.md.
 
-#include "third_party/zetasketch/fingerprint2011.h"
+#include "src/zetasketch/fingerprint2011.h"
 
 #include <array>
 #include <bit>
