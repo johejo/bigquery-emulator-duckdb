@@ -18,6 +18,7 @@
 #include "src/backend_functions.h"
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
+#include "src/backend_functions/python.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/duckpgq.h"
@@ -156,7 +157,8 @@ struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
   Database(const std::optional<std::string>& session_user,
            const backend_functions::JavaScriptLimits& javascript,
-           const backend_functions::ObjectStorage& storage) {
+           const backend_functions::ObjectStorage& storage,
+           const backend_functions::PythonOptions& python) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -189,7 +191,7 @@ struct Backend::Database {
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
-    RegisterBackendFunctions(handle.get(), session_user, javascript, storage);
+    RegisterBackendFunctions(handle.get(), session_user, javascript, storage, python);
     RegisterPostgresScanner(handle.get());
     RegisterMySqlScanner(handle.get());
     RegisterDuckPGQ(handle.get());
@@ -232,8 +234,9 @@ Backend::CallConnection Backend::Connect() const {
 
 Backend::Backend(const std::optional<std::string>& session_user,
                  const backend_functions::JavaScriptLimits& javascript,
-                 const backend_functions::ObjectStorage& storage)
-    : db_(std::make_shared<Database>(session_user, javascript, storage)) {}
+                 const backend_functions::ObjectStorage& storage,
+                 const backend_functions::PythonOptions& python)
+    : db_(std::make_shared<Database>(session_user, javascript, storage, python)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)
     : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}

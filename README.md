@@ -141,6 +141,32 @@ integers. A call past either limit fails its query.
 just run --project='{"projectId":"test"}' --javascript-timeout-ms=1000
 ```
 
+## Python UDFs
+
+Persistent scalar Python UDFs run in a separate C++ worker linked to CPython 3.11's libpython.
+Bazel supplies the interpreter and standard library; no host Python installation is needed.
+Keep the binary's `.runfiles` directory alongside it when distributing the build. The worker
+and its Python runtime are runtime dependencies, so copying only the main binary is insufficient.
+
+```sql
+CREATE FUNCTION ds.multiply(x FLOAT64, y FLOAT64)
+RETURNS FLOAT64 LANGUAGE python
+OPTIONS(runtime_version='python-3.11', entry_point='multiply') AS r'''
+def multiply(x, y):
+    return x * y
+''';
+SELECT ds.multiply(2, 10);
+```
+
+The default timeout is 5 minutes per call, including initial worker startup, and the worker's
+address space limit is 256 MiB. `--python-timeout-ms MS` and `--python-memory-mib MIB` change
+these limits; both take positive integers. `--python-worker PATH` overrides the bundled worker.
+The same options work in `shell` mode. See [Python UDF limits](docs/compatibility.md#python-udfs).
+
+Workers run with the emulator user's filesystem and network permissions. Process separation
+contains interpreter crashes and lets the emulator stop timed-out calls; it is not a sandbox
+for untrusted Python code.
+
 ## External queries
 
 With `--connection PROJECT.LOCATION.CONNECTION=CONNINFO`, `EXTERNAL_QUERY` reaches the PostgreSQL,
@@ -251,6 +277,9 @@ Unsupported behavior is rejected, with these deliberate exceptions:
   partial response asked for.
 - `updateMode` of `datasets.patch` and `datasets.update` is ignored; they change the metadata
   that the emulator keeps, since it keeps no access controls.
+- Python UDFs run locally in CPython workers with the standard library, rather than BigQuery's
+  managed containers and pre-installed packages. Definitions are stored synchronously, with Python
+  compilation and entry-point validation on the first call. Worker stdout and stderr are discarded.
 - JavaScript UDFs run in QuickJS rather than V8, which BigQuery uses. The language is the same,
   but built-ins differ: QuickJS has no `Intl`, so `toLocaleString` and similar methods ignore
   locales, and nonstandard `Date.parse` formats differ. Errors omit BigQuery's line and column.

@@ -11,6 +11,7 @@
 #include "nlohmann/json.hpp"
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
+#include "src/backend_functions/python.h"
 #include "src/field_schema.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
@@ -33,7 +34,8 @@ class Backend {
   explicit Backend(
       const std::optional<std::string>& session_user = std::nullopt,
       const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
-      const backend_functions::ObjectStorage& storage = {});
+      const backend_functions::ObjectStorage& storage = backend_functions::ObjectStorage(),
+      const backend_functions::PythonOptions& python = {});
   ~Backend();
 
   Backend(const Backend&) = delete;

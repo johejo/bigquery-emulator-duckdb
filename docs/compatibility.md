@@ -253,10 +253,24 @@ allocation limit is 256 MiB per query per thread; see
 [JavaScript UDF limits](../README.md#javascript-udf-limits) for configuration and the
 [compatibility exceptions](../README.md#compatibility) for runtime differences.
 
+### Python UDFs
+
+Persistent scalar Python UDFs support BOOL, INT64, FLOAT64, STRING and BYTES arguments and
+results, with explicit result types. The runtime must be `python-3.11`; `runtime_version` and
+`entry_point` are required. Description metadata is supported through DDL and the Routine API.
+Other argument and result types, packages, external connections, libraries, container settings,
+vectorized entry points and `SAFE.` calls are unsupported. FLOAT64 results also accept Python
+integers; other non-NULL results require the declared Python type.
+
+Workers have per-call timeouts and per-process address space limits, and are discarded when
+their query execution state is released. There is no shared Python state between query jobs.
+The defaults, configuration and runtime differences are described in
+[Python UDFs](../README.md#python-udfs).
+
 ### Unsupported forms
 
 Persistent JavaScript UDFs, aggregate UDFs, conditional routine updates, `SAFE.` UDF calls,
-UDF options other than a persistent UDF's description, the `library` option, and views that call
+SQL UDF options other than description, JavaScript UDF options, the `library` option, and views that call
 temporary SQL UDFs are unsupported.
 Subquery bodies do not support volatile arguments. Queries with TEMP function declarations do
 not support dry runs, destination tables or positional parameters.

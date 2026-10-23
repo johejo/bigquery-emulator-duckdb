@@ -31,6 +31,7 @@
 #include "src/catalog_table.h"
 #include "src/language_options.h"
 #include "src/procedure_validation.h"
+#include "src/python_function.h"
 #include "src/references.h"
 #include "src/routine.h"
 #include "src/table_path.h"
@@ -190,6 +191,11 @@ absl::StatusOr<std::unique_ptr<googlesql::Function>> RoutineCatalog::Resolve(
                                                               reference.project_id, "", &catalog));
   const auto& create = *analyzed.statement().GetAs<googlesql::ResolvedCreateFunctionStmt>();
   std::unique_ptr<googlesql::Function> function;
+  if (routine.resource.value("language", "SQL") == "PYTHON") {
+    return std::unique_ptr<googlesql::Function>(std::make_unique<PythonFunction>(
+        key, create.signature(), create.code(),
+        routine.resource.at("pythonOptions").at("entryPoint").get<std::string>()));
+  }
   if (create.function_expression() != nullptr) {
     GOOGLESQL_ASSIGN_OR_RETURN(
         function,

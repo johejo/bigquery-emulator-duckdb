@@ -34,6 +34,9 @@ namespace {
 // Routine.definitionBody requires project-qualified references to other routines. Built-in
 // namespaces such as NET and SAFE are still allowed.
 void CheckApiRoutineBody(const Routine& routine, TableSource& source) {
+  if (routine.resource.value("language", "SQL") == "PYTHON") {
+    return;
+  }
   std::unique_ptr<googlesql::ParserOutput> parsed;
   const bool procedure = routine.resource.at("routineType") == "PROCEDURE";
   const bool tvf = routine.resource.at("routineType") == "TABLE_VALUED_FUNCTION";

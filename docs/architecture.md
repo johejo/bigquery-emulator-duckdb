@@ -145,3 +145,19 @@ template, so both stay Untested until someone adds samples that meet the referen
 
 See [compatibility.md](compatibility.md) for query and API limits and
 [storage-api.md](storage-api.md) for Storage client behavior.
+
+### Python UDF workers
+
+Python routine definitions are stored in the same macro comments as SQL routines, with their
+runtime and entry point. The catalog exposes them as volatile functions, and the translator
+calls typed `bq_py_*` scalar functions. Each DuckDB local function state starts a worker lazily,
+reuses its compiled functions across rows, and destroys it at query cleanup. Independent
+execution states use separate processes and Python globals.
+
+The `python_udf_worker` executable links the rules_python CPython 3.11 runtime; the main
+emulator does not link or initialize libpython. The worker uses the CPython C API for compilation,
+argument conversion and calls. A private Unix socket carries JSON records, with hex for BYTES
+and strings for floating-point values so nonfinite values survive transport. Standard input,
+output and error point to the null device, separately from the protocol socket. The parent polls
+nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
+waits for its child. Address space limits apply before Python initializes.

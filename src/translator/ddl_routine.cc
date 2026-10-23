@@ -13,6 +13,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
+#include "src/python_function.h"
 #include "src/references.h"
 #include "src/table_path.h"
 #include "src/translated_statement.h"
@@ -99,7 +100,8 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
   if (create.create_scope() == googlesql::ResolvedCreateStatement::CREATE_TEMP) {
     return Unsupported(scope, "temporary UDFs outside multi-statement queries");
   }
-  if (create.is_remote() || create.language() != "SQL") {
+  const bool python = ToLowerAscii(create.language()) == "python";
+  if (create.is_remote() || (!python && create.language() != "SQL")) {
     return Unsupported(scope, "persistent non-SQL UDFs");
   }
   if (create.is_aggregate() || !create.aggregate_expression_list().empty() ||
@@ -116,29 +118,45 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
   const std::string now = std::to_string(absl::ToUnixMillis(absl::Now()));
   nlohmann::json resource{
       {"routineType", "SCALAR_FUNCTION"},
-      {"language", "SQL"},
+      {"language", python ? "PYTHON" : "SQL"},
       {"arguments", nlohmann::json::array()},
       {"definitionBody", create.code()},
       {"creationTime", now},
       {"lastModifiedTime", now},
   };
-  // A function's only option is its description, which BigQuery keeps as metadata.
   for (const auto& option : create.option_list()) {
-    const std::optional<googlesql::Value> value = OptionValue(*option, "CREATE FUNCTION", scope);
-    std::string description;
-    if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
-        !StringOption(*value, description)) {
+    const auto value = OptionValue(*option, "CREATE FUNCTION", scope);
+    const std::string name = ToLowerAscii(option->name());
+    std::string text;
+    if (!value || !StringOption(*value, text)) {
       return Unsupported(scope, "CREATE FUNCTION option " + option->name());
     }
-    if (value->is_null()) {
-      resource.erase("description");
+    if (name == "description") {
+      if (!value->is_null()) {
+        resource["description"] = text;
+      }
+    } else if (python && !value->is_null() && name == "runtime_version") {
+      if (text != "python-3.11") {
+        return Unsupported(scope, "Python runtime " + text);
+      }
+      resource["runtimeVersion"] = text;
+    } else if (python && !value->is_null() && name == "entry_point" && !text.empty() &&
+               text.find('\0') == std::string::npos) {
+      resource["pythonOptions"]["entryPoint"] = text;
     } else {
-      resource["description"] = description;
+      return Unsupported(scope, "CREATE FUNCTION option " + option->name());
     }
+  }
+  if (python && (!resource.contains("runtimeVersion") || !resource.contains("pythonOptions"))) {
+    return Unsupported(scope, "Python UDFs without runtime_version and entry_point");
   }
   const googlesql::FunctionSignature& signature = create.signature();
   for (size_t i = 0; i < create.argument_name_list().size(); ++i) {
     const googlesql::Type* type = signature.argument(static_cast<int>(i)).type();
+    if (python && !PythonFunction::Supports(type)) {
+      return Unsupported(
+          scope, "Python UDF argument types other than BOOL, INT64, FLOAT64, STRING or BYTES");
+    }
     nlohmann::json argument{{"name", create.argument_name_list(static_cast<int>(i))}};
     if (type == nullptr) {
       argument["argumentKind"] = "ANY_TYPE";
@@ -148,6 +166,11 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
       return Unsupported(scope, "UDF arguments of type " + type->DebugString());
     }
     resource["arguments"].push_back(std::move(argument));
+  }
+  if (python && (!create.has_explicit_return_type() ||
+                 !PythonFunction::Supports(signature.result_type().type()))) {
+    return Unsupported(scope,
+                       "Python UDF result types other than BOOL, INT64, FLOAT64, STRING or BYTES");
   }
   if (create.has_explicit_return_type()) {
     const googlesql::Type* type = signature.result_type().type();

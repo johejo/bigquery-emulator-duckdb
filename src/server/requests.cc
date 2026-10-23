@@ -50,6 +50,8 @@ constexpr auto kRoutineFields = std::to_array<std::string_view>({
     "definitionBody",
     "description",
     "strictMode",
+    "runtimeVersion",
+    "pythonOptions",
 });
 
 constexpr auto kRoutineArgumentFields = std::to_array<std::string_view>({
@@ -718,11 +720,29 @@ Routine ParseRoutine(const DatasetReference& dataset, const json& body) {
   if (resource.contains("returnTableType") && !tvf) {
     throw ApiError::Invalid("Only table functions can have returnTableType");
   }
-  if (resource.contains("language") &&
-      StringField(resource, "language", "routine language") != "SQL") {
-    throw ApiError::Unsupported("non-SQL routines");
+  const std::string language =
+      resource.contains("language") ? StringField(resource, "language", "routine language") : "SQL";
+  if (language != "SQL" && language != "PYTHON") {
+    throw ApiError::Unsupported("non-SQL routines other than Python scalar functions");
   }
-  resource["language"] = "SQL";
+  resource["language"] = language;
+  if (language == "PYTHON") {
+    if (procedure || tvf ||
+        StringField(resource, "runtimeVersion", "runtimeVersion") != "python-3.11" ||
+        !resource.contains("returnType")) {
+      throw ApiError::Unsupported("Python routines without a fixed result and python-3.11 runtime");
+    }
+    const json python = resource.value("pythonOptions", json::object());
+    if (!python.is_object() || python.size() != 1 ||
+        StringField(python, "entryPoint", "Python entry point").empty()) {
+      throw ApiError::Unsupported("Python options other than entryPoint, or a missing entryPoint");
+    }
+    if (resource.contains("strictMode")) {
+      throw ApiError::Unsupported("Python strictMode");
+    }
+  } else if (resource.contains("runtimeVersion") || resource.contains("pythonOptions")) {
+    throw ApiError::Unsupported("Python options on SQL routines");
+  }
   if (StringField(resource, "definitionBody", "routine body").empty()) {
     throw ApiError::Invalid("Required parameter is missing: definitionBody");
   }

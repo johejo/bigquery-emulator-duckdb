@@ -182,6 +182,9 @@ std::string RoutineStatement(const Routine& routine) {
            " OPTIONS(strict_mode = " + (resource.value("strictMode", true) ? "TRUE" : "FALSE") +
            ") " + resource.at("definitionBody").get<std::string>();
   }
+  if (resource.value("language", "SQL") == "PYTHON") {
+    return RoutineDdl(routine);
+  }
   // On a line of its own, so that a comment at the end of the body cannot hide the parenthesis.
   return statement + " AS (" + resource.value("definitionBody", "") + "\n)";
 }
@@ -190,6 +193,15 @@ std::string RoutineDdl(const Routine& routine) {
   const json& resource = routine.resource;
   std::string ddl = RoutineHead(routine);
   std::vector<std::string> options;
+  const bool python = resource.value("language", "SQL") == "PYTHON";
+  if (python) {
+    ddl += "\nLANGUAGE python";
+    options.push_back("  runtime_version=" +
+                      googlesql::ToStringLiteral(resource.at("runtimeVersion").get<std::string>()));
+    options.push_back("  entry_point=" +
+                      googlesql::ToStringLiteral(
+                          resource.at("pythonOptions").at("entryPoint").get<std::string>()));
+  }
   if (resource.contains("description")) {
     options.push_back("  description=" +
                       googlesql::ToStringLiteral(resource.at("description").get<std::string>()));
@@ -202,6 +214,9 @@ std::string RoutineDdl(const Routine& routine) {
     ddl += "\nOPTIONS(\n" + Join(options, ",\n") + ")";
   }
   const std::string body = resource.at("definitionBody").get<std::string>();
+  if (python) {
+    return ddl + "\nAS " + googlesql::ToStringLiteral(body) + ";";
+  }
   if (resource.at("routineType") == "PROCEDURE") {
     return ddl + "\n" + body + ";";
   }

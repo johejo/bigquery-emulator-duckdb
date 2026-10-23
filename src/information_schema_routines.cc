@@ -33,10 +33,10 @@ absl::StatusOr<std::vector<Row>> RoutinesRows(const ViewContext& context) {
                      : resource.contains("returnType")
                          ? String(StandardSqlTypeName(resource.at("returnType")))
                          : kNull,
-                     String("SQL"),
+                     String(resource.value("language", "SQL") == "PYTHON" ? "EXTERNAL" : "SQL"),
                      String(resource.at("definitionBody").get<std::string>()),
-                     kNull,
-                     kNull,
+                     resource.value("language", "SQL") == "PYTHON" ? String("PYTHON") : kNull,
+                     resource.value("language", "SQL") == "PYTHON" ? String("NO") : kNull,
                      kNull,
                      CreationTime(std::stoll(resource.at("creationTime").get<std::string>())),
                      CreationTime(std::stoll(resource.at("lastModifiedTime").get<std::string>())),
