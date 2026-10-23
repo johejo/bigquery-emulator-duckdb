@@ -224,11 +224,14 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
     return Unsupported(scope, "optional, chained or multiple graph patterns");
   }
   const auto& path = *scan.input_scan_list(0);
+  const auto mode = path.path_mode() == nullptr ? googlesql::ResolvedGraphPathMode::WALK
+                                                : path.path_mode()->path_mode();
   if (path.quantifier() != nullptr || path.search_prefix() != nullptr ||
       path.path_cost() != nullptr || !path.hint_list().empty() || !path.path_hint_list().empty() ||
-      (path.path_mode() != nullptr &&
-       path.path_mode()->path_mode() != googlesql::ResolvedGraphPathMode::WALK &&
-       path.path_mode()->path_mode() != googlesql::ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED)) {
+      (mode != googlesql::ResolvedGraphPathMode::WALK &&
+       mode != googlesql::ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED &&
+       mode != googlesql::ResolvedGraphPathMode::TRAIL &&
+       mode != googlesql::ResolvedGraphPathMode::ACYCLIC)) {
     return Unsupported(scope, "quantified paths, search prefixes or path modes");
   }
   Relation result;
@@ -237,6 +240,7 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
   std::vector<std::string> filters;
   std::vector<std::string> path_nodes;
   std::vector<std::string> path_edges;
+  std::vector<std::string> mode_elements;
   std::vector<std::string> tables;
   std::vector<std::string> connections;
   std::vector<const googlesql::ResolvedGraphElementScan*> elements;
@@ -306,9 +310,13 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
              "], \"$properties\" := struct_pack(" + Join(properties, ", ") + "))";
     };
     projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
+    const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
+    if ((mode == googlesql::ResolvedGraphPathMode::TRAIL && is_edge) ||
+        (mode == googlesql::ResolvedGraphPathMode::ACYCLIC && !is_edge)) {
+      mode_elements.push_back("struct_extract(q." + ColumnName(column.column_id()) + ", '$id')");
+    }
     if (path.path() != nullptr) {
       const auto* path_type = path.path()->column().type()->AsGraphPath();
-      const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
       const auto* target = is_edge ? path_type->edge_type() : path_type->node_type();
       std::vector<std::string> path_properties;
       for (const auto& property : target->property_types()) {
@@ -371,6 +379,11 @@ std::optional<Relation> GraphScan(const googlesql::ResolvedGraphScan& scan, cons
   const auto rows = "SELECT " + Join(outputs, ", ") + " FROM " + Join(tables, " CROSS JOIN ") +
                     (connections.empty() ? "" : " WHERE " + Join(connections, " AND "));
   result.sql = "SELECT " + Join(projections, ", ") + " FROM (" + rows + ") AS q";
+  if (mode == googlesql::ResolvedGraphPathMode::TRAIL ||
+      mode == googlesql::ResolvedGraphPathMode::ACYCLIC) {
+    filters.push_back("list_unique([" + Join(mode_elements, ", ") +
+                      "]) = " + std::to_string(mode_elements.size()));
+  }
   for (const auto& part : path.input_scan_list()) {
     const auto* filter = part->GetAs<googlesql::ResolvedGraphElementScan>()->filter_expr();
     if (filter != nullptr) {
