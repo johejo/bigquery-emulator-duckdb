@@ -1,11 +1,16 @@
 #include "src/translator/functions.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
+#include <set>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "src/translator/functions_aggregate.h"
 #include "src/translator/functions_backend.h"
@@ -15,15 +20,20 @@
 namespace bigquery_emulator_duckdb::translator {
 namespace {
 
-// BigQuery functions that DuckDB has under another name, with the same arguments.
-const std::unordered_map<std::string_view, std::string_view>& FunctionNames() {
-  static const auto* const kNames = new std::unordered_map<std::string_view, std::string_view>{
-      {"GENERATE_UUID", "uuid"},
-      {"IS_INF", "isinf"},
-      {"IS_NAN", "isnan"},
-      {"RAND", "random"},
-      {"SESSION_USER", "bq_session_user"},
-      {"UNIX_MICROS", "epoch_us"},
+struct NamedFunction {
+  std::string_view target;
+  Implementation implementation = Implementation::kRenamed;
+};
+
+// Functions called by another name, with the same arguments.
+const std::unordered_map<std::string_view, NamedFunction>& FunctionNames() {
+  static const auto* const kNames = new std::unordered_map<std::string_view, NamedFunction>{
+      {"GENERATE_UUID", {.target = "uuid"}},
+      {"IS_INF", {.target = "isinf"}},
+      {"IS_NAN", {.target = "isnan"}},
+      {"RAND", {.target = "random"}},
+      {"SESSION_USER", {.target = "bq_session_user", .implementation = Implementation::kCustom}},
+      {"UNIX_MICROS", {.target = "epoch_us"}},
   };
   return *kNames;
 }
@@ -38,35 +48,49 @@ const std::unordered_set<std::string_view>& PlainFunctions() {
   return *kPlain;
 }
 
+struct HandledFunction {
+  Handler handler;
+  Implementation implementation = Implementation::kSQLInCode;
+};
+
 // Functions that src/translator/handlers.cc translates in code.
-const std::unordered_map<std::string_view, Handler>& Handlers() {
-  static const auto* const kHandlers = new std::unordered_map<std::string_view, Handler>{
-      {"$MAKE_ARRAY", MakeArray},
-      {"$AND", Logical},
-      {"$OR", Logical},
-      {"$IN", InList},
-      {"$CASE_NO_VALUE", Case},
-      {"$CASE_WITH_VALUE", Case},
-      {"DATE_BUCKET", Bucket},
-      {"DATETIME_BUCKET", Bucket},
-      {"TIMESTAMP_BUCKET", Bucket},
-      {"TO_JSON", ToJson},
-      {"TO_JSON_STRING", ToJson},
-      {"JSON_ARRAY", JsonArray},
-      {"JSON_REMOVE", JsonRemove},
-      {"JSON_SET", JsonSet},
-      {"JSON_ARRAY_APPEND", JsonArrayModify},
-      {"JSON_ARRAY_INSERT", JsonArrayModify},
-      {"JSON_OBJECT", JsonObject},
-      {"FORMAT", Format},
-      {"ARRAY_CONCAT", ArrayConcat},
-      {"CONCAT", ConcatStrings},
-      {"GREATEST", Extremum},
-      {"LEAST", Extremum},
-      {"KEYS.ADD_KEY_FROM_RAW_BYTES", AddKeyFromRawBytes},
-      {"TEXT_ANALYZE", TextAnalyze},
-      {"OBJ.MAKE_REF", MakeRef},
-      {"OBJ.FETCH_METADATA", FetchMetadata},
+const std::unordered_map<std::string_view, HandledFunction>& Handlers() {
+  static const auto* const kHandlers = new std::unordered_map<std::string_view, HandledFunction>{
+      {"$MAKE_ARRAY", {.handler = MakeArray}},
+      {"$AND", {.handler = Logical}},
+      {"$OR", {.handler = Logical}},
+      {"$IN", {.handler = InList}},
+      {"$CASE_NO_VALUE", {.handler = Case}},
+      {"$CASE_WITH_VALUE", {.handler = Case}},
+      {"DATE_BUCKET", {.handler = Bucket}},
+      {"DATETIME_BUCKET", {.handler = Bucket}},
+      {"TIMESTAMP_BUCKET", {.handler = Bucket}},
+      {"TO_JSON", {.handler = ToJson, .implementation = Implementation::kGoogleSQL}},
+      {"TO_JSON_STRING", {.handler = ToJson, .implementation = Implementation::kGoogleSQL}},
+      {"JSON_ARRAY", {.handler = JsonArray, .implementation = Implementation::kGoogleSQL}},
+      {"JSON_REMOVE", {.handler = JsonRemove, .implementation = Implementation::kGoogleSQL}},
+      {"JSON_SET", {.handler = JsonSet, .implementation = Implementation::kGoogleSQL}},
+      {
+          "JSON_ARRAY_APPEND",
+          {.handler = JsonArrayModify, .implementation = Implementation::kGoogleSQL},
+      },
+      {
+          "JSON_ARRAY_INSERT",
+          {.handler = JsonArrayModify, .implementation = Implementation::kGoogleSQL},
+      },
+      {"JSON_OBJECT", {.handler = JsonObject, .implementation = Implementation::kGoogleSQL}},
+      {"FORMAT", {.handler = Format, .implementation = Implementation::kGoogleSQL}},
+      {"ARRAY_CONCAT", {.handler = ArrayConcat}},
+      {"CONCAT", {.handler = ConcatStrings}},
+      {"GREATEST", {.handler = Extremum}},
+      {"LEAST", {.handler = Extremum}},
+      {
+          "KEYS.ADD_KEY_FROM_RAW_BYTES",
+          {.handler = AddKeyFromRawBytes, .implementation = Implementation::kGoogleSQL},
+      },
+      {"TEXT_ANALYZE", {.handler = TextAnalyze, .implementation = Implementation::kGoogleSQL}},
+      {"OBJ.MAKE_REF", {.handler = MakeRef, .implementation = Implementation::kCustom}},
+      {"OBJ.FETCH_METADATA", {.handler = FetchMetadata, .implementation = Implementation::kCustom}},
   };
   return *kHandlers;
 }
@@ -191,6 +215,15 @@ const std::unordered_set<std::string_view>& BigNumericFunctions() {
   return *kFunctions;
 }
 
+std::vector<Implementation> Implementations(const std::vector<Rule>& rules,
+                                            Implementation fallback) {
+  std::set<Implementation> implementations;
+  std::ranges::transform(
+      rules, std::inserter(implementations, implementations.end()),
+      [fallback](const Rule& rule) { return rule.implementation.value_or(fallback); });
+  return {implementations.begin(), implementations.end()};
+}
+
 // Every function, collected from the rule tables. A function is in one table only.
 const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
   static const auto* const kRegistry = [] {
@@ -202,38 +235,68 @@ const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
       }
     };
     for (const auto& [name, rules] : TemplateRules()) {
-      add(name, {.implementation = Implementation::kRules, .rules = rules});
+      add(name, {
+                    .translation = Translation::kRules,
+                    .implementations = Implementations(rules, Implementation::kSQL),
+                    .rules = rules,
+                });
     }
     for (const auto& [name, rules] : BackendRules()) {
-      add(name, {.implementation = Implementation::kBackend, .rules = rules});
+      add(name, {
+                    .translation = Translation::kBackend,
+                    .implementations = Implementations(rules, Implementation::kGoogleSQL),
+                    .rules = rules,
+                });
     }
     for (const auto& [name, rules] : S2Rules()) {
-      add(name, {.implementation = Implementation::kS2, .rules = rules});
+      add(name, {
+                    .translation = Translation::kS2,
+                    .implementations = Implementations(rules, Implementation::kS2),
+                    .rules = rules,
+                });
     }
-    for (const auto& [name, target] : FunctionNames()) {
-      add(name, {.implementation = Implementation::kRenamed, .target = target});
+    for (const auto& [name, function] : FunctionNames()) {
+      add(name, {
+                    .translation = Translation::kRenamed,
+                    .implementations = {function.implementation},
+                    .target = function.target,
+                });
     }
     for (const std::string_view name : PlainFunctions()) {
-      add(name, {.implementation = Implementation::kSame});
+      add(name, {.translation = Translation::kSame, .implementations = {Implementation::kSame}});
     }
-    for (const auto& [name, handler] : Handlers()) {
-      add(name, {.implementation = Implementation::kHandler, .handler = handler});
+    for (const auto& [name, function] : Handlers()) {
+      add(name, {
+                    .translation = Translation::kHandler,
+                    .implementations = {function.implementation},
+                    .handler = function.handler,
+                });
     }
     for (const auto& [name, target] : SafeFunctions()) {
-      add(name, {.implementation = Implementation::kSafe, .target = target});
+      add(name, {
+                    .translation = Translation::kSafe,
+                    .implementations = {Implementation::kSafe},
+                    .target = target,
+                });
     }
     for (const auto& [name, rules] : Aggregates()) {
-      add(name, {.implementation = Implementation::kAggregate, .aggregates = rules});
+      add(name, {
+                    .translation = Translation::kAggregate,
+                    .implementations = {Implementation::kAggregate},
+                    .aggregates = rules,
+                });
     }
     for (const auto& [name, rules] : Analytics()) {
-      add(name, {.implementation = Implementation::kAnalytic, .aggregates = rules});
+      add(name, {
+                    .translation = Translation::kAnalytic,
+                    .implementations = {Implementation::kAnalytic},
+                    .aggregates = rules,
+                });
     }
     return registry;
   }();
   return *kRegistry;
 }
-
-}  // namespace
 
 std::string_view Describe(Implementation implementation) {
   switch (implementation) {
@@ -241,14 +304,16 @@ std::string_view Describe(Implementation implementation) {
       return "DuckDB function";
     case Implementation::kRenamed:
       return "DuckDB function, renamed";
-    case Implementation::kRules:
+    case Implementation::kSQL:
       return "DuckDB SQL";
-    case Implementation::kBackend:
+    case Implementation::kGoogleSQL:
       return "GoogleSQL function";
     case Implementation::kS2:
       return "S2 function";
-    case Implementation::kHandler:
+    case Implementation::kSQLInCode:
       return "DuckDB SQL, in code";
+    case Implementation::kCustom:
+      return "Emulator function";
     case Implementation::kSafe:
       return "SAFE. operator";
     case Implementation::kAggregate:
@@ -257,6 +322,19 @@ std::string_view Describe(Implementation implementation) {
       return "DuckDB window function";
   }
   return "";
+}
+
+}  // namespace
+
+std::string Describe(const FunctionEntry& entry) {
+  std::string description;
+  for (const Implementation implementation : entry.implementations) {
+    if (!description.empty()) {
+      description += " / ";
+    }
+    description += Describe(implementation);
+  }
+  return description;
 }
 
 bool SupportsBigNumeric(std::string_view upper_name) {

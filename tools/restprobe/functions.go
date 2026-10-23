@@ -63,6 +63,14 @@ var categoryTitles = map[string]string{
 var acronyms = map[string]bool{"aead": true, "dlp": true, "hll": true, "json": true, "kll": true,
 	"sql": true}
 
+// implementation returns how the translator implements the function.
+func implementation(f *function, status string) string {
+	if status == "Unsupported" || status == "Untested" || status == "Broken" {
+		return ""
+	}
+	return f.Implementation
+}
+
 // category titles the page that documents the function, such as "String functions" for
 // string_functions.
 func category(f *function) string {
@@ -198,8 +206,9 @@ func probeFunctions(w io.Writer, binary, path string, args []string) error {
 			counts[c] = map[string]int{}
 		}
 		counts[c][st]++
+		impl := implementation(f, st)
 		rows[c] = append(rows[c], fmt.Sprintf("| [`%s`](%s/%s) | %s | %s | %s |\n", f.Name,
-			functionDocs, mainDoc(f), st, f.Implementation, probereport.Notes(f.Note, st, rejected, failures)))
+			functionDocs, mainDoc(f), st, impl, probereport.Notes(f.Note, st, rejected, failures)))
 	}
 	// Sort categories as words, so that "Date functions" precedes "DLP functions".
 	categories := probereport.SortedNames(rows)

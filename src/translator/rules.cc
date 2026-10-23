@@ -172,14 +172,14 @@ std::optional<std::string> TranslateFunction(std::string_view upper_name,
   if (entry == nullptr) {
     return std::nullopt;
   }
-  switch (entry->implementation) {
-    case Implementation::kSame:
+  switch (entry->translation) {
+    case Translation::kSame:
       return Invoke(upper_name, arguments);
-    case Implementation::kRenamed:
+    case Translation::kRenamed:
       return Invoke(entry->target, arguments);
-    case Implementation::kRules:
-    case Implementation::kBackend:
-    case Implementation::kS2:
+    case Translation::kRules:
+    case Translation::kBackend:
+    case Translation::kS2:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
       if (const auto rule = std::ranges::find_if(

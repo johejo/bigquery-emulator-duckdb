@@ -18,15 +18,17 @@ function list the forms the emulator rejected.
 - **Broken**: a call translates but fails on DuckDB, which is a bug.
 - **Untested**: the probe could not build a valid call.
 
-The Implementation column says how the translator implements the function; it is empty for
-syntax such as `CASE` and for functions the analyzer rewrites into others.
+The Implementation column names the implementations used by the function's overloads;
+multiple implementations are separated by `/`. It is empty for Unsupported, Untested and Broken
+functions.
 
 - **DuckDB function**: the DuckDB function of the same name.
 - **DuckDB function, renamed**: a DuckDB function of another name.
-- **DuckDB SQL**: DuckDB SQL templates, chosen by the arguments.
+- **DuckDB SQL**: DuckDB SQL templates or SQL produced by analyzer rewrites.
 - **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
 - **Table function**: DuckDB SQL for a table-valued call.
 - **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
+- **Emulator function**: a function implemented by the emulator and registered with DuckDB.
 - **S2 function**: the emulator's GEOGRAPHY implementation over the
   [S2 Geometry](https://s2geometry.io/) library, which GoogleSQL does not implement, registered
   with DuckDB.
@@ -82,7 +84,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`DETERMINISTIC_DECRYPT_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_bytes) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
 | [`DETERMINISTIC_DECRYPT_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_decrypt_string) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
 | [`DETERMINISTIC_ENCRYPT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#deterministic_encrypt) | Partial | GoogleSQL function | Unsupported: function KEYS.KEYSET_CHAIN. |
-| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Partial | DuckDB SQL, in code | Unsupported: function KEYS.ADD_KEY_FROM_RAW_BYTES. |
+| [`KEYS.ADD_KEY_FROM_RAW_BYTES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keysadd_key_from_raw_bytes) | Partial | GoogleSQL function | Unsupported: function KEYS.ADD_KEY_FROM_RAW_BYTES. |
 | [`KEYS.KEYSET_CHAIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_chain) | Unsupported |  |  |
 | [`KEYS.KEYSET_FROM_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_from_json) | Supported | GoogleSQL function |  |
 | [`KEYS.KEYSET_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aead_encryption_functions#keyskeyset_length) | Supported | GoogleSQL function |  |
@@ -107,7 +109,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`BIT_XOR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#bit_xor) | Supported | DuckDB aggregate |  |
 | [`COUNT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#count) | Supported | DuckDB aggregate |  |
 | [`COUNTIF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#countif) | Supported | DuckDB aggregate |  |
-| [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | Supported |  |  |
+| [`GROUPING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#grouping) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_AND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_and) | Supported | DuckDB aggregate |  |
 | [`LOGICAL_OR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#logical_or) | Supported | DuckDB aggregate |  |
 | [`MAX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/aggregate_functions#max) | Supported | DuckDB aggregate |  |
@@ -130,15 +132,15 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | Supported |  |  |
+| [`ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array) | Supported | DuckDB SQL, in code |  |
 | [`ARRAY_CONCAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_concat) | Supported | DuckDB SQL, in code |  |
-| [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | Supported |  |  |
-| [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | Supported |  |  |
+| [`ARRAY_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_first) | Supported | DuckDB SQL |  |
+| [`ARRAY_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_last) | Supported | DuckDB SQL |  |
 | [`ARRAY_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_length) | Supported | DuckDB function |  |
 | [`ARRAY_REVERSE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_reverse) | Supported | DuckDB SQL |  |
-| [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | Supported |  |  |
+| [`ARRAY_SLICE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_slice) | Supported | DuckDB SQL |  |
 | [`ARRAY_TO_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#array_to_string) | Supported | DuckDB SQL |  |
-| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | Supported | DuckDB SQL |  |
+| [`GENERATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_array) | Supported | DuckDB SQL / GoogleSQL function |  |
 | [`GENERATE_DATE_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_date_array) | Supported | GoogleSQL function |  |
 | [`GENERATE_TIMESTAMP_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/array_functions#generate_timestamp_array) | Supported | DuckDB SQL |  |
 
@@ -158,7 +160,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | Supported |  |  |
+| [`CASE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#case) | Supported | DuckDB SQL, in code |  |
 | [`COALESCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#coalesce) | Supported | DuckDB function |  |
 | [`IF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#if) | Supported | DuckDB SQL |  |
 | [`IFNULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conditional_expressions#ifnull) | Supported | DuckDB function |  |
@@ -168,10 +170,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | Supported |  |  |
+| [`CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast) | Supported | DuckDB SQL, in code |  |
 | [`PARSE_BIGNUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_bignumeric) | Supported | GoogleSQL function |  |
 | [`PARSE_NUMERIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#parse_numeric) | Supported | GoogleSQL function |  |
-| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | Supported |  |  |
+| [`SAFE_CAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#safe_casting) | Supported | DuckDB SQL, in code |  |
 
 ## Date functions
 
@@ -351,20 +353,20 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`BOOL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#bool_for_json) | Supported | GoogleSQL function |  |
 | [`FLOAT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#double_for_json) | Supported | GoogleSQL function |  |
 | [`INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#int64_for_json) | Supported | GoogleSQL function |  |
-| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Supported | DuckDB SQL, in code |  |
-| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Supported | DuckDB SQL, in code |  |
+| [`JSON_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array) | Supported | GoogleSQL function |  |
+| [`JSON_ARRAY_APPEND`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_append) | Supported | GoogleSQL function |  |
+| [`JSON_ARRAY_INSERT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_array_insert) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_array) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_SCALAR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_scalar) | Supported | GoogleSQL function |  |
 | [`JSON_EXTRACT_STRING_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_extract_string_array) | Supported | GoogleSQL function |  |
 | [`JSON_FLATTEN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_flatten) | Supported | GoogleSQL function |  |
 | [`JSON_KEYS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_keys) | Supported | GoogleSQL function |  |
-| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | Supported | DuckDB SQL, in code |  |
+| [`JSON_OBJECT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_object) | Supported | GoogleSQL function |  |
 | [`JSON_QUERY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query) | Supported | GoogleSQL function |  |
 | [`JSON_QUERY_ARRAY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_query_array) | Supported | GoogleSQL function |  |
-| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | Supported | DuckDB SQL, in code |  |
-| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | Supported | DuckDB SQL, in code |  |
+| [`JSON_REMOVE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_remove) | Supported | GoogleSQL function |  |
+| [`JSON_SET`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_set) | Supported | GoogleSQL function |  |
 | [`JSON_STRIP_NULLS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_strip_nulls) | Supported | GoogleSQL function |  |
 | [`JSON_TYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_type) | Supported | GoogleSQL function |  |
 | [`JSON_VALUE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#json_value) | Supported | GoogleSQL function |  |
@@ -374,8 +376,8 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`LAX_INT64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_int64) | Supported | GoogleSQL function |  |
 | [`LAX_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#lax_string) | Supported | GoogleSQL function |  |
 | [`PARSE_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#parse_json) | Supported | GoogleSQL function |  |
-| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | Supported | DuckDB SQL, in code |  |
-| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | Supported | DuckDB SQL, in code |  |
+| [`TO_JSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json) | Supported | GoogleSQL function |  |
+| [`TO_JSON_STRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions#to_json_string) | Supported | GoogleSQL function |  |
 
 ## KLL functions
 
@@ -490,10 +492,10 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | Supported | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. |
+| [`OBJ.FETCH_METADATA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objfetch_metadata) | Supported | Emulator function | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. |
 | [`OBJ.GET_ACCESS_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_access_url) | Unsupported |  |  |
 | [`OBJ.GET_READ_URL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objget_read_url) | Unsupported |  |  |
-| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Partial | DuckDB SQL, in code | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function OBJ.MAKE_REF. |
+| [`OBJ.MAKE_REF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/objectref_functions#objmake_ref) | Partial | Emulator function | See [ObjectRef functions](compatibility.md#objectref-functions) for limits. Unsupported: function OBJ.MAKE_REF. |
 
 ## Range functions
 
@@ -519,7 +521,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
-| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | Supported | DuckDB function, renamed | Requires --session-user; returns the configured identity for every client. |
+| [`SESSION_USER`](https://cloud.google.com/bigquery/docs/reference/standard-sql/security_functions#session_user) | Supported | Emulator function | Requires --session-user; returns the configured identity for every client. |
 
 ## Statistical aggregate functions
 
@@ -551,7 +553,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | [`CONTAINS_SUBSTR`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#contains_substr) | Supported | GoogleSQL function | Takes STRING only. |
 | [`EDIT_DISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#edit_distance) | Supported | GoogleSQL function |  |
 | [`ENDS_WITH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#ends_with) | Supported | GoogleSQL function |  |
-| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Supported | DuckDB SQL, in code |  |
+| [`FORMAT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#format_string) | Supported | GoogleSQL function |  |
 | [`FROM_BASE32`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base32) | Supported | GoogleSQL function |  |
 | [`FROM_BASE64`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_base64) | Supported | DuckDB SQL |  |
 | [`FROM_HEX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#from_hex) | Supported | DuckDB SQL |  |
@@ -598,7 +600,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`BAG_OF_WORDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#bag_of_words) | Supported | DuckDB SQL |  |
-| [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | Supported | DuckDB SQL, in code |  |
+| [`TEXT_ANALYZE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#text_analyze) | Supported | GoogleSQL function |  |
 | [`TF_IDF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/text-analysis-functions#tf_idf) | Supported | DuckDB window function |  |
 
 ## Time functions
@@ -650,7 +652,7 @@ syntax such as `CASE` and for functions the analyzer rewrites into others.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`GENERATE_UUID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#generate_uuid) | Supported | DuckDB function, renamed |  |
-| [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | Supported |  |  |
+| [`TYPEOF`](https://cloud.google.com/bigquery/docs/reference/standard-sql/utility-functions#typeof) | Supported | DuckDB SQL |  |
 
 ## Vector index functions
 
