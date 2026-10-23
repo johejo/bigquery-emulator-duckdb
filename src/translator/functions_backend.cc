@@ -814,6 +814,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
           },
       },
       {"ST_MAXDISTANCE", spheroid("bq_st_distance", {2, 3}, "ST_MAXDISTANCE")},
+      {"ST_CLOSESTPOINT", spheroid("bq_st_closestpoint", {2, 3}, "ST_CLOSESTPOINT")},
+      {"ST_INTERSECTSBOX", call("bq_st_intersectsbox", 5)},
       {"ST_DWITHIN", spheroid("bq_st_dwithin", {3, 4}, "ST_DWITHIN")},
       {"ST_EQUALS", call("bq_st_equals", 2)},
       {"ST_INTERSECTS", call("bq_st_intersects", 2)},
