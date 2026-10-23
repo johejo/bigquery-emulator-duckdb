@@ -13,7 +13,7 @@
 // Ported to C++ from zetasketch's java/com/google/zetasketch/internal/hllplus/Data.java; see
 // README.md. The tables are Data.java's, generated from it unchanged.
 
-#include "third_party/zetasketch/data.h"
+#include "src/zetasketch/data.h"
 
 #include <algorithm>
 #include <array>
@@ -37,6 +37,8 @@ constexpr std::size_t kNeighbors = 6;
 
 // Means of the raw estimates in a simulation of HLL++ on random input, by precision, and the
 // biases of those estimates at the same positions. Some values happen to be close to constants.
+// Preserve the upstream data table layout for comparison.
+// clang-format off
 // NOLINTBEGIN(modernize-use-std-numbers)
 constexpr auto kMeans4 = std::to_array<double>({
     11, 11.717, 12.207, 12.7896, 13.2882, 13.8204, 14.3772, 14.9342, 15.5202, 16.161, 16.7722,
@@ -893,6 +895,7 @@ constexpr auto kBiases18 = std::to_array<double>({
     -757.43200000003, -713.308999999892,
 });
 // NOLINTEND(modernize-use-std-numbers)
+// clang-format on
 
 constexpr std::array<std::span<const double>, 15> kMeans = {
     kMeans4,  kMeans5,  kMeans6,  kMeans7,  kMeans8,  kMeans9,  kMeans10, kMeans11,
@@ -943,8 +946,9 @@ double EstimateBias(double estimate, int precision) {
   // order of the means among equal distances.
   std::vector<std::pair<double, double>> nearest;
   for (std::size_t i = bottom; i < top; ++i) {
-    nearest.emplace_back(std::pow(*std::next(means.begin(), static_cast<std::ptrdiff_t>(i)) - estimate, 2),
-                         *std::next(biases.begin(), static_cast<std::ptrdiff_t>(i)));
+    nearest.emplace_back(
+        std::pow(*std::next(means.begin(), static_cast<std::ptrdiff_t>(i)) - estimate, 2),
+        *std::next(biases.begin(), static_cast<std::ptrdiff_t>(i)));
   }
   std::ranges::stable_sort(nearest, {}, &std::pair<double, double>::first);
   nearest.resize(kNeighbors);

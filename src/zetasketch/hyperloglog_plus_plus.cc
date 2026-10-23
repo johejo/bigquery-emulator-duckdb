@@ -14,7 +14,7 @@
 // java/com/google/zetasketch/internal/hllplus/, Encoding.java, NormalRepresentation.java,
 // SparseRepresentation.java and State.java; see README.md.
 
-#include "third_party/zetasketch/hyperloglog_plus_plus.h"
+#include "src/zetasketch/hyperloglog_plus_plus.h"
 
 #include <algorithm>
 #include <bit>
@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 
-#include "third_party/zetasketch/data.h"
+#include "src/zetasketch/data.h"
 
 namespace zetasketch {
 namespace {
@@ -356,8 +356,7 @@ std::optional<HyperLogLogPlusPlus> HyperLogLogPlusPlus::Parse(std::string_view s
   if (sparse_data) {
     result.has_sparse_data_ = true;
     result.sparse_data_bytes_ = sparse_data->size();
-    const uint64_t limit =
-        uint64_t{result.Encoding().Flag()} << 1U;
+    const uint64_t limit = uint64_t{result.Encoding().Flag()} << 1U;
     Reader values(*sparse_data);
     uint64_t value = 0;
     while (!values.AtEnd()) {

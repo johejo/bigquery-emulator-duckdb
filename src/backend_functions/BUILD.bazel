@@ -130,7 +130,7 @@ cc_library(
         "//:backend_error",
         "//:bignumeric",
         "//:duckdb_handle",
-        "//third_party/zetasketch",
+        "//src/zetasketch",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
     ],

@@ -16,8 +16,8 @@
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
-#include "third_party/zetasketch/fingerprint2011.h"
-#include "third_party/zetasketch/hyperloglog_plus_plus.h"
+#include "src/zetasketch/fingerprint2011.h"
+#include "src/zetasketch/hyperloglog_plus_plus.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
 namespace {

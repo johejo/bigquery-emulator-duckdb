@@ -74,7 +74,7 @@ schema. Results are encoded in BigQuery's REST row format.
 [src/backend_functions/](../src/backend_functions/) exposes GoogleSQL implementations through
 DuckDB functions, uses [S2 Geometry](https://s2geometry.io/) for GEOGRAPHY, and keeps the
 sketches of `HLL_COUNT` and `APPROX_COUNT_DISTINCT` with a
-[port of zetasketch](../third_party/zetasketch/README.md), whose sketches are BigQuery's.
+[port of zetasketch](../src/zetasketch/README.md), whose sketches are BigQuery's.
 
 BIGNUMERIC query values are BIGNUM integers in units of 10^-38; stored columns use the
 `bq_bignumeric_units` alias or a precision-and-scale alias. `Backend::NumericReadQuery` converts
