@@ -251,6 +251,48 @@ absl::StatusOr<bool> DWithin(const Arguments& args) {
                                                  S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
 
+// The discrete Hausdorff distance measures vertices of the first geography to the second's
+// edges and interiors; the undirected form takes the maximum in both directions.
+S1ChordAngle DiscreteHausdorffDistance(const Geography& a, const Geography& b, bool directed) {
+  MutableS2ShapeIndex index;
+  AddShapes(a, index);
+  MutableS2ShapeIndex other;
+  AddShapes(b, other);
+  const S2HausdorffDistanceQuery query;
+  return directed ? query.GetDirectedDistance(&index, &other) : query.GetDistance(&index, &other);
+}
+
+absl::StatusOr<std::optional<double>> HausdorffDistance(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  const S1ChordAngle distance = DiscreteHausdorffDistance(a, b, args.Bool(2));
+  // S2 returns infinity when no distance exists. BigQuery returns NULL, including where a
+  // full polygon has no vertices in a direction being measured.
+  if (distance.is_infinity()) {
+    return std::nullopt;
+  }
+  return Meters(distance);
+}
+
+// The first three arguments are those of HausdorffDistance; the last is the distance limit.
+absl::StatusOr<std::optional<bool>> HausdorffDWithin(const Arguments& args) {
+  const double limit = args.Double(3);
+  if (std::isnan(limit)) {
+    return absl::OutOfRangeError(
+        "ST_HausdorffDWithin: ST_HAUSDORFFDWITHIN argument distance cannot be NaN; error in "
+        "ST_HAUSDORFFDWITHIN expression");
+  }
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  if (a.Empty() || b.Empty()) {
+    return std::nullopt;
+  }
+  const S1ChordAngle distance = DiscreteHausdorffDistance(a, b, args.Bool(2));
+  // Unlike ST_HAUSDORFFDISTANCE, the predicate returns FALSE when a full polygon has no
+  // vertices in a direction being measured.
+  return !distance.is_infinity() && Meters(distance) <= limit;
+}
+
 // Whether each point of either of `a` and `b`, nonempty, is within a micrometer of the other, as
 // Same takes points.
 bool Near(const Geography& a, const Geography& b) {
@@ -1054,6 +1096,10 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
   Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble, EachRow<Azimuth>);
   Register(connection, "bq_st_distance", {kVarchar, kVarchar, kBoolean, kVarchar}, kDouble,
            EachRow<Distance>);
+  Register(connection, "bq_st_hausdorffdistance", {kVarchar, kVarchar, kBoolean}, kDouble,
+           EachRow<HausdorffDistance>);
+  Register(connection, "bq_st_hausdorffdwithin", {kVarchar, kVarchar, kBoolean, kDouble}, kBoolean,
+           EachRow<HausdorffDWithin>);
   Register(connection, "bq_st_dwithin", {kVarchar, kVarchar, kDouble, kBoolean, kVarchar}, kBoolean,
            EachRow<DWithin>);
   Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean, EachRow<Equals>);

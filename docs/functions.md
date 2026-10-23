@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 50 | 2 | 19 | 0 |
+| [Geography functions](#geography-functions) | 52 | 2 | 17 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 1 | 8 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -267,8 +267,8 @@ functions.
 | [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | Supported | S2 function |  |
 | [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | Supported | S2 function |  |
 | [`ST_GEOMETRYTYPE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geometrytype) | Supported | S2 function |  |
-| [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | Unsupported |  |  |
-| [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | Unsupported |  |  |
+| [`ST_HAUSDORFFDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdistance) | Supported | S2 function |  |
+| [`ST_HAUSDORFFDWITHIN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_hausdorffdwithin) | Supported | S2 function |  |
 | [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Supported | S2 function |  |
 | [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Supported | S2 function |  |
 | [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Supported | S2 function |  |
