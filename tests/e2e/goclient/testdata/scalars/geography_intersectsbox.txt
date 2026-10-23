@@ -1,0 +1,144 @@
+# Source: BigQuery's ST_INTERSECTSBOX example and definition: a closed longitude/latitude box.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(10, 10), -90, 0, 90, 20)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(10, 10), 90, 0, -90, 20)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(170, 10), -90, 0, 90, 20)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(170, 10), 90, 0, -90, 20)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(30, 30), -90, 0, 90, 20)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(30, 30), 90, 0, -90, 20)
+=> "false"
+
+SELECT TYPEOF(ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), -1, -1, 1, 1))
+=> "BOOL"
+
+SELECT ST_INTERSECTSBOX(NULL, -1, -1, 1, 1)
+=> null
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), NULL, -1, 1, 1)
+=> null
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), -1, NULL, 1, 1)
+=> null
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), -1, -1, NULL, 1)
+=> null
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), -1, -1, 1, NULL)
+=> null
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('POINT EMPTY'), -1, -1, 1, 1)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(-175, 0), 170, -1, 190, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(175, 0), -190, -1, -170, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 10, -1, 370, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('LINESTRING(-10 0, 10 0)'), -1, -1, 1, 1)
+=> "true"
+
+# Constant-latitude edges: a geodesic polygon between these corners would bow north.
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 11), -30, 0, 30, 10)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('LINESTRING(-20 30, 20 30)'), -1, 31, 1, 33)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('POLYGON((-10 -10, 10 -10, 10 10, -10 10, -10 -10))'), -1, -1, 1, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('POLYGON((-10 -10, 10 -10, 10 10, -10 10, -10 -10), (-5 -5, -5 5, 5 5, 5 -5, -5 -5))'), -1, -1, 1, 1)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('POLYGON((10 10, 20 10, 10 20, 10 10))'), -1, -1, 1, 1)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('fullglobe'), -1, -1, 1, 1)
+=> "true"
+
+SELECT SAFE.ST_INTERSECTSBOX(ST_GEOGPOINT(10, 10), -90, 0, 90, 20)
+=> "true"
+
+SELECT SAFE.ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, -91, 1, 1)
+=> null
+
+SELECT SAFE.ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, 0, 361, 1)
+=> null
+
+# Source: BigQuery answers collected by the maintainer.
+
+# BigQuery accepts reversed latitude bounds although the documentation describes lat1 as
+# the minimum and lat2 as the maximum. Observed with (0, 2, 2, 0).
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(1, 1), 0, 2, 2, 0)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('POINT EMPTY'), 0, -91, 1, 1)
+=> error: ST_IntersectsBox: Invalid bounding box (lng1:0, lat1:-91, lng2:1, lat2:1): coordinate out of range.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, -91, 1, 1)
+=> error: ST_IntersectsBox: Invalid bounding box (lng1:0, lat1:-91, lng2:1, lat2:1): coordinate out of range.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, 0, 361, 1)
+=> error: ST_IntersectsBox: Invalid bounding box (lng1:0, lat1:0, lng2:361, lat2:1): the longitude span should be less than or equal to 360 degrees.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), CAST('NaN' AS FLOAT64), 0, 1, 1)
+=> error: ST_IntersectsBox: Invalid bounding box (lng1:nan, lat1:0, lng2:1, lat2:1): coordinate out of range.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, 0, 1, CAST('+inf' AS FLOAT64))
+=> error: ST_IntersectsBox: Invalid bounding box (lng1:0, lat1:0, lng2:1, lat2:inf): coordinate out of range.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(90, 90), -1, 89, 1, 90)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 90), 170, 89, -170, 90)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(180, 0), -180, -1, -180, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 180, -1, -180, 1)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), -180, -1, 180, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(0, 0), 0, 0, 0, 0)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('LINESTRING(-1 0, 1 0)'), 0, 0, 0, 0)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(1, 1), 0, 0, 1, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(1.000000000001, 1), 0, 0, 1, 1)
+=> "false"
+
+# BigQuery observations: [180, -180] excludes a point on the meridian but intersects
+# crossing lines and the full globe, despite being S2's empty longitude interval.
+
+SELECT ST_INTERSECTSBOX(ST_GEOGPOINT(180, 0), 180, -1, -180, 1)
+=> "false"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('fullglobe'), 180, -1, -180, 1)
+=> "true"
+
+SELECT ST_INTERSECTSBOX(ST_GEOGFROMTEXT('LINESTRING(179 0, -179 0)'), 180, -1, -180, 1)
+=> "true"

@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 52 | 2 | 17 | 0 |
+| [Geography functions](#geography-functions) | 54 | 2 | 15 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 1 | 8 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -243,7 +243,7 @@ functions.
 | [`ST_BUFFERWITHTOLERANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_bufferwithtolerance) | Unsupported |  |  |
 | [`ST_CENTROID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid) | Supported | S2 function |  |
 | [`ST_CENTROID_AGG`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_centroid_agg) | Unsupported |  |  |
-| [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | Unsupported |  |  |
+| [`ST_CLOSESTPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_closestpoint) | Supported | S2 function |  |
 | [`ST_CLUSTERDBSCAN`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_clusterdbscan) | Unsupported |  |  |
 | [`ST_CONTAINS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_contains) | Supported | S2 function |  |
 | [`ST_CONVEXHULL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_convexhull) | Supported | S2 function |  |
@@ -272,7 +272,7 @@ functions.
 | [`ST_INTERIORRINGS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_interiorrings) | Supported | S2 function |  |
 | [`ST_INTERSECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersection) | Supported | S2 function |  |
 | [`ST_INTERSECTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersects) | Supported | S2 function |  |
-| [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | Unsupported |  |  |
+| [`ST_INTERSECTSBOX`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_intersectsbox) | Supported | S2 function |  |
 | [`ST_ISCLOSED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isclosed) | Supported | S2 function |  |
 | [`ST_ISCOLLECTION`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_iscollection) | Supported | S2 function |  |
 | [`ST_ISEMPTY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_isempty) | Supported | S2 function |  |

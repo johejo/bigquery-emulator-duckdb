@@ -24,8 +24,10 @@
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
+#include "s2/r1interval.h"
 #include "s2/s1angle.h"
 #include "s2/s1chord_angle.h"
+#include "s2/s1interval.h"
 #include "s2/s2boolean_operation.h"
 #include "s2/s2builder.h"
 #include "s2/s2builderutil_lax_polygon_layer.h"
@@ -37,6 +39,8 @@
 #include "s2/s2convex_hull_query.h"
 #include "s2/s2debug.h"
 #include "s2/s2earth.h"
+#include "s2/s2edge_crossings.h"
+#include "s2/s2edge_distances.h"
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
 #include "s2/s2hausdorff_distance_query.h"
@@ -49,6 +53,7 @@
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
+#include "s2/s2shape.h"
 #include "s2/s2shape_measures.h"
 #include "src/backend_functions/geography_value.h"
 #include "src/backend_functions/geography_wkt.h"
@@ -206,7 +211,9 @@ absl::Status CheckSphere(const Arguments& args, idx_t use_spheroid) {
   if (function == "ST_DISTANCE") {
     return absl::UnimplementedError("The emulator does not support use_spheroid");
   }
-  return absl::OutOfRangeError(function + " does not yet implement use_spheroid=true");
+  return absl::OutOfRangeError(
+      (function == "ST_CLOSESTPOINT" ? std::string("ST_ClosestPoint failed: ") : std::string()) +
+      function + " does not yet implement use_spheroid=true");
 }
 
 // ST_DISTANCE and ST_MAXDISTANCE, which the last argument names.
@@ -219,6 +226,104 @@ absl::StatusOr<std::optional<double>> Distance(const Arguments& args) {
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 2));
   return Meters(args.String(3) == "ST_MAXDISTANCE" ? MaxDistance(a, b) : MinDistance(a, b));
+}
+
+// Find the closest indexed edge, then the closest edge on the other geography to it.
+// Interior results carry a witness point supplied by S2's target visitor.
+absl::StatusOr<std::optional<std::string>> ClosestPoint(const Arguments& args) {
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  if (a.Empty() || b.Empty()) {
+    return std::nullopt;
+  }
+  GOOGLESQL_RETURN_IF_ERROR(CheckSphere(args, 2));
+  MutableS2ShapeIndex index;
+  AddShapes(a, index);
+  MutableS2ShapeIndex other;
+  AddShapes(b, other);
+  S2ClosestEdgeQuery query(&index);
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&other);
+  const auto result = query.FindClosestEdge(&target);
+  if (result.is_interior()) {
+    S2Point point;
+    target.VisitContainingShapeIds(index, [&](int, const S2Point& witness) {
+      point = witness;
+      return false;
+    });
+    return GeographyText(PointGeography(point));
+  }
+  const auto edge = query.GetEdge(result);
+  S2ClosestEdgeQuery reverse(&other);
+  S2ClosestEdgeQuery::EdgeTarget edge_target(edge.v0, edge.v1);
+  const auto opposite = reverse.FindClosestEdge(&edge_target);
+  if (opposite.is_interior()) {
+    return GeographyText(PointGeography((edge.v0 + edge.v1).Normalize()));
+  }
+  const auto other_edge = reverse.GetEdge(opposite);
+  return GeographyText(PointGeography(
+      S2::GetEdgePairClosestPoints(edge.v0, edge.v1, other_edge.v0, other_edge.v1).first));
+}
+
+// A latitude/longitude rectangle has small-circle latitude edges, unlike a WKT polygon.
+absl::StatusOr<bool> IntersectsBox(const Arguments& args) {
+  const double west = args.Double(1);
+  const double south = args.Double(2);
+  const double east = args.Double(3);
+  const double north = args.Double(4);
+  const auto longitude = [](double value) {
+    return std::isfinite(value) && std::abs(value) <= 180;
+  };
+  const bool valid_longitudes =
+      (longitude(west) && longitude(east)) ||
+      ((longitude(west) || longitude(east)) && east - west >= 0 && east - west <= 360);
+  const auto invalid = [&](std::string_view reason) {
+    return absl::OutOfRangeError(
+        "ST_IntersectsBox: Invalid bounding box (lng1:" + Coordinate(west) +
+        ", lat1:" + Coordinate(south) + ", lng2:" + Coordinate(east) +
+        ", lat2:" + Coordinate(north) + "): " + std::string(reason));
+  };
+  if (!std::isfinite(west) || !std::isfinite(east) || !std::isfinite(south) ||
+      !std::isfinite(north) || std::abs(south) > 90 || std::abs(north) > 90 ||
+      (!longitude(west) && !longitude(east))) {
+    return invalid("coordinate out of range.");
+  }
+  if (!valid_longitudes) {
+    return invalid("the longitude span should be less than or equal to 360 degrees.");
+  }
+  const S1Interval lng = east - west == 360
+                             ? S1Interval::Full()
+                             : S1Interval(S1Angle::Degrees(std::remainder(west, 360.0)).radians(),
+                                          S1Angle::Degrees(std::remainder(east, 360.0)).radians());
+  // BigQuery treats [180, -180] specially: it excludes points on the meridian but
+  // intersects crossing edges and polygons containing it. Use a valid thin rectangle for
+  // its corners, and test only the longitude edges in this case.
+  const S2LatLngRect box(R1Interval(S1Angle::Degrees(std::min(south, north)).radians(),
+                                    S1Angle::Degrees(std::max(south, north)).radians()),
+                         lng.is_empty() ? S1Interval::FromPoint(lng.lo()) : lng);
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  const auto boundary_intersects = [&](const S2Shape::Edge& edge) {
+    if (!lng.is_empty()) {
+      return box.BoundaryIntersects(edge.v0, edge.v1);
+    }
+    return std::ranges::any_of(std::array{lng.lo(), lng.hi()}, [&](double longitude) {
+      return S2::CrossingSign(edge.v0, edge.v1,
+                              S2LatLng::FromRadians(box.lat().lo(), longitude).ToPoint(),
+                              S2LatLng::FromRadians(box.lat().hi(), longitude).ToPoint()) > 0;
+    });
+  };
+  MutableS2ShapeIndex index;
+  AddShapes(geography, index);
+  for (const auto& shape : index) {
+    for (int i = 0; i < shape->num_edges(); ++i) {
+      const auto edge = shape->edge(i);
+      if ((!lng.is_empty() && (box.Contains(edge.v0) || box.Contains(edge.v1))) ||
+          boundary_intersects(edge)) {
+        return true;
+      }
+    }
+  }
+  // With no boundary crossing, an intersection can only be a polygon containing the box.
+  return ToS2Polygon(geography)->Contains(box.GetVertex(0).ToPoint());
 }
 
 // Between single points, the distance itself. Anything else is within the distance where it may be,
@@ -1100,6 +1205,10 @@ void RegisterGeographyFunctions(duckdb_connection connection) {
            EachRow<HausdorffDistance>);
   Register(connection, "bq_st_hausdorffdwithin", {kVarchar, kVarchar, kBoolean, kDouble}, kBoolean,
            EachRow<HausdorffDWithin>);
+  Register(connection, "bq_st_closestpoint", {kVarchar, kVarchar, kBoolean, kVarchar}, kVarchar,
+           EachRow<ClosestPoint>);
+  Register(connection, "bq_st_intersectsbox", {kVarchar, kDouble, kDouble, kDouble, kDouble},
+           kBoolean, EachRow<IntersectsBox>);
   Register(connection, "bq_st_dwithin", {kVarchar, kVarchar, kDouble, kBoolean, kVarchar}, kBoolean,
            EachRow<DWithin>);
   Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean, EachRow<Equals>);
