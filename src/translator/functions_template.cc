@@ -1239,12 +1239,14 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_generate_array_numeric($1, $2, $3)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
                   .defaults = {"1"},
+                  .implementation = Implementation::kGoogleSQL,
               },
               {
                   .arity = {2, 3},
                   .spelling = "bq_generate_array($1, $2, $3)",
                   .conditions = {Is(1, {TYPE_DOUBLE})},
                   .defaults = {"1"},
+                  .implementation = Implementation::kGoogleSQL,
               },
               {
                   .arity = {2, 3},
@@ -1254,6 +1256,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                       "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
                   .conditions = {Is(1, {TYPE_BIGNUMERIC})},
                   .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
+                  .implementation = Implementation::kGoogleSQL,
               },
               {
                   .arity = {2, 3},

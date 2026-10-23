@@ -383,6 +383,28 @@ std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name
   return calls;
 }
 
+// Syntax and analyzer rewrites have no function registry entry of their own.
+std::string Implementation(const std::string& name, const translator::FunctionEntry* entry,
+                           bool table_function) {
+  if (table_function) {
+    return "Table function";
+  }
+  if (name == "CASE") {
+    return translator::Describe(*translator::FindFunction("$CASE_NO_VALUE"));
+  }
+  if (name == "CAST" || name == "SAFE_CAST" || name == "ARRAY") {
+    return "DuckDB SQL, in code";
+  }
+  if (name == "GROUPING") {
+    return "DuckDB aggregate";
+  }
+  // GoogleSQL rewrites these SQL functions or folds them into literals before translation.
+  if (name == "ARRAY_FIRST" || name == "ARRAY_LAST" || name == "ARRAY_SLICE" || name == "TYPEOF") {
+    return "DuckDB SQL";
+  }
+  return entry == nullptr ? "" : translator::Describe(*entry);
+}
+
 int Main(int argc, char** argv) {
   std::vector<std::string> args(argv + 1, argv + argc);
   const bool list_signatures = std::erase(args, "--signatures") > 0;
@@ -414,10 +436,7 @@ int Main(int argc, char** argv) {
     // entries.
     const bool known_table_function = (name == "RANGE_SESSIONIZE" || name == "EXTERNAL_QUERY") &&
                                       catalog.FindTableValuedFunction(path, &table_function).ok();
-    const std::string implementation =
-        known_table_function ? "Table function"
-        : entry == nullptr   ? ""
-                             : std::string(translator::Describe(entry->implementation));
+    const std::string implementation = Implementation(name, entry, known_table_function);
     nlohmann::json line = {
         {"name", name},
         {"docs", docs},

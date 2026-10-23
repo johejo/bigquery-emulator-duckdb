@@ -60,8 +60,8 @@ struct ScalarCall {
 // Translates a call that templates cannot express, or returns nullopt when it is unsupported.
 using Handler = std::optional<std::string> (*)(const ScalarCall&);
 
-// How the emulator implements a BigQuery function.
-enum class Implementation : std::uint8_t {
+// How the translator dispatches a BigQuery function.
+enum class Translation : std::uint8_t {
   // The DuckDB function of the same name, with the same arguments.
   kSame,
   // A DuckDB function of another name, with the same arguments.
@@ -84,8 +84,19 @@ enum class Implementation : std::uint8_t {
   kAnalytic,
 };
 
-// How docs/functions.md names an implementation.
-std::string_view Describe(Implementation implementation);
+// The implementation shown in docs/functions.md, independent of how a call is translated.
+enum class Implementation : std::uint8_t {
+  kSame,
+  kRenamed,
+  kSQL,
+  kSQLInCode,
+  kGoogleSQL,
+  kS2,
+  kCustom,
+  kSafe,
+  kAggregate,
+  kAnalytic,
+};
 
 // The argument counts a rule accepts.
 struct Arity {
@@ -124,6 +135,8 @@ struct Rule {
   // The messages of the errors the spelling raises, as DuckDB string expressions that may use
   // the arguments. Under SAFE. the errors are NULL instead.
   std::vector<std::string> errors = {};
+  // Overrides the rule table's implementation when this overload uses another backend.
+  std::optional<Implementation> implementation = {};
 };
 
 // A DuckDB aggregate or window function that implements a BigQuery one.
@@ -189,7 +202,8 @@ struct AggregateRule {
 
 // A function in the registry.
 struct FunctionEntry {
-  Implementation implementation;
+  Translation translation;
+  std::vector<Implementation> implementations;
   // kRules, kBackend and kS2: the rules, the first that matches a call translating it.
   std::vector<Rule> rules = {};
   // kRenamed: the DuckDB function. kSafe: the function it is with SAFE.
@@ -199,6 +213,9 @@ struct FunctionEntry {
   // kAggregate and kAnalytic: the overloads, the first that matches a call translating it.
   std::vector<AggregateRule> aggregates = {};
 };
+
+// How docs/functions.md names the implementations used by a function's overloads.
+std::string Describe(const FunctionEntry& entry);
 
 // The registry entry of `upper_name`, the function name in upper case, or null when the
 // emulator does not support it. The operators have their internal names, such as $ADD.

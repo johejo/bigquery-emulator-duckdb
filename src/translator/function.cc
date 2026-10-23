@@ -49,7 +49,7 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
       HasTypeUse(name, TypeUse::kComparesStructs)) {
     return StructComparison(call);
   }
-  if (entry->implementation == Implementation::kHandler) {
+  if (entry->translation == Translation::kHandler) {
     return entry->handler(call);
   }
   return TranslateFunction(name, call.arguments, safe);
@@ -267,7 +267,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (entry == nullptr) {
     return Unsupported(scope, "function " + name);
   }
-  const bool alias = entry->implementation == Implementation::kSafe;
+  const bool alias = entry->translation == Translation::kSafe;
   const std::string function = alias ? std::string(entry->target) : name;
   const bool safe =
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE || alias;
@@ -332,7 +332,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&
-      entry->implementation != Implementation::kS2 && !HasTypeUse(function, TypeUse::kCarries)) {
+      entry->translation != Translation::kS2 && !HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
   }
   // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.

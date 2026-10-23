@@ -18,15 +18,17 @@ function list the forms the emulator rejected.
 - **Broken**: a call translates but fails on DuckDB, which is a bug.
 - **Untested**: the probe could not build a valid call.
 
-The Implementation column says how the translator implements the function; it is empty for
-syntax such as `CASE` and for functions the analyzer rewrites into others.
+The Implementation column names the implementations used by the function's overloads;
+multiple implementations are separated by `/`. It is empty for Unsupported, Untested and Broken
+functions.
 
 - **DuckDB function**: the DuckDB function of the same name.
 - **DuckDB function, renamed**: a DuckDB function of another name.
-- **DuckDB SQL**: DuckDB SQL templates, chosen by the arguments.
+- **DuckDB SQL**: DuckDB SQL templates or SQL produced by analyzer rewrites.
 - **DuckDB SQL, in code**: DuckDB SQL that the translator builds in code.
 - **Table function**: DuckDB SQL for a table-valued call.
 - **GoogleSQL function**: GoogleSQL's own implementation, registered with DuckDB.
+- **Emulator function**: a function implemented by the emulator and registered with DuckDB.
 - **S2 function**: the emulator's GEOGRAPHY implementation over the
   [S2 Geometry](https://s2geometry.io/) library, which GoogleSQL does not implement, registered
   with DuckDB.

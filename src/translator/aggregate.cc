@@ -51,9 +51,9 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   }
   const FunctionEntry* entry = FindFunction(name);
   if (entry == nullptr ||
-      (entry->implementation != Implementation::kAggregate &&
-       entry->implementation != Implementation::kAnalytic) ||
-      (entry->implementation == Implementation::kAnalytic && over.empty())) {
+      (entry->translation != Translation::kAggregate &&
+       entry->translation != Translation::kAnalytic) ||
+      (entry->translation == Translation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
   if ((name == "LAG" || name == "LEAD") && call.argument_list_size() == 3) {
