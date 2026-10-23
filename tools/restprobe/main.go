@@ -1,7 +1,7 @@
 // Command restprobe probes the emulator through its REST API and prints the Markdown reports
 // docs/sql.md, docs/options.md, docs/api.md and docs/functions.md. Each SQL, DDL option and API
 // probe starts a fresh emulator from the binary that -emulator names, so that probes neither see
-// nor disturb each other's data; function calls need no data and share a few emulators. Probes
+// nor disturb each other's data; function calls share a few emulators and their graph fixture. Probes
 // run in parallel.
 //
 //	restprobe -emulator BINARY sql FEATURES_FILE

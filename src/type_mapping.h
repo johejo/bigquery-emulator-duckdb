@@ -79,6 +79,9 @@ bool HasInterval(const googlesql::Type* type);
 // Whether a type contains GEOGRAPHY, including array elements and struct fields.
 bool HasGeography(const googlesql::Type* type);
 
+// Graph values are query intermediates, represented by structs with private metadata fields.
+bool HasGraph(const googlesql::Type* type);
+
 // Maps a BigQuery TableFieldSchema to the GoogleSQL type of the column.
 absl::StatusOr<const googlesql::Type*> GoogleSqlType(const FieldSchema& field,
                                                      googlesql::TypeFactory* type_factory);

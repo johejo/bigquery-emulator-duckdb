@@ -327,3 +327,38 @@ query OBJ.MAKE_REF SELECT OBJ.MAKE_REF(OBJ.MAKE_REF('gs://mybucket/flowers/12345
 query OBJ.MAKE_REF SELECT OBJ.MAKE_REF(JSON '{"uri": "gs://mybucket/flowers/12345.jpg"}')
 note OBJ.FETCH_METADATA See [ObjectRef functions](compatibility.md#objectref-functions) for limits.
 note OBJ.MAKE_REF See [ObjectRef functions](compatibility.md#objectref-functions) for limits.
+
+# Graph values come from the function probe worker fixture. Observe element-returning
+# functions through properties or lengths, since graph result serialization is unsupported.
+query LABELS SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN LABELS(a) AS result)
+note LABELS [Graph limits](compatibility.md#graphs).
+query ELEMENT_ID SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN ELEMENT_ID(a) AS result)
+note ELEMENT_ID [Graph limits](compatibility.md#graphs).
+query SOURCE_NODE_ID SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN SOURCE_NODE_ID(e) AS result)
+note SOURCE_NODE_ID [Graph limits](compatibility.md#graphs).
+query DESTINATION_NODE_ID SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN DESTINATION_NODE_ID(e) AS result)
+note DESTINATION_NODE_ID [Graph limits](compatibility.md#graphs).
+query PATH_LENGTH SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN PATH_LENGTH(p) AS result)
+query PATH_LENGTH SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN PATH_LENGTH(p) AS result)
+note PATH_LENGTH [Graph limits](compatibility.md#graphs).
+query PATH_FIRST SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN PATH_FIRST(p).id AS result)
+query PATH_FIRST SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN PATH_FIRST(p).id AS result)
+note PATH_FIRST [Graph limits](compatibility.md#graphs).
+query PATH_LAST SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN PATH_LAST(p).id AS result)
+query PATH_LAST SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN PATH_LAST(p).id AS result)
+note PATH_LAST [Graph limits](compatibility.md#graphs).
+query NODES SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN ARRAY_LENGTH(NODES(p)) AS result)
+query NODES SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN ARRAY_LENGTH(NODES(p)) AS result)
+note NODES [Graph limits](compatibility.md#graphs).
+query EDGES SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN ARRAY_LENGTH(EDGES(p)) AS result)
+query EDGES SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN ARRAY_LENGTH(EDGES(p)) AS result)
+note EDGES [Graph limits](compatibility.md#graphs).
+query IS_ACYCLIC SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN IS_ACYCLIC(p) AS result)
+query IS_ACYCLIC SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN IS_ACYCLIC(p) AS result)
+note IS_ACYCLIC [Graph limits](compatibility.md#graphs).
+query IS_SIMPLE SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN IS_SIMPLE(p) AS result)
+query IS_SIMPLE SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN IS_SIMPLE(p) AS result)
+note IS_SIMPLE [Graph limits](compatibility.md#graphs).
+query IS_TRAIL SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) RETURN IS_TRAIL(p) AS result)
+query IS_TRAIL SELECT * FROM GRAPH_TABLE(function_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{1,2}(b:Person) RETURN IS_TRAIL(p) AS result)
+note IS_TRAIL [Graph limits](compatibility.md#graphs).

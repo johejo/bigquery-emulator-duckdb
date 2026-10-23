@@ -328,8 +328,11 @@ EXISTS are unsupported.
 
 `GRAPH_TABLE` supports a single fixed path with explicit labels, directed edges,
 property projections through `RETURN`, and scalar filters. Each element must
-resolve to one table. Optional matching, quantified paths, path values, search
-prefixes, undirected edges and graph element results are unsupported. SQL/PGQ's
+resolve to one table. Fixed-length path variables support node and edge access and path
+predicates. Optional matching, quantified paths, search prefixes, undirected edges,
+graph element or path results, and graph values in comparisons, grouping or aggregate and
+analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
+SQL/PGQ's
 `COLUMNS` clause is unsupported; use BigQuery's `RETURN` syntax.
 
 `DROP PROPERTY GRAPH` does not support IF EXISTS. Property graph definitions are

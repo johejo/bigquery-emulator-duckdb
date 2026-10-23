@@ -276,6 +276,22 @@ class EmulatorTestDriver : public googlesql::TestDriver {
         LOG(WARNING) << "Cannot load table " << name << ": " << loaded;
       }
     }
+    for (const auto& [name, ddl] : test_db.property_graph_defs) {
+      // Keep unsupported definitions absent, just as unsupported tables above. Their queries
+      // remain known errors, but supported graphs exercise the translator and its functions.
+      const auto job = emulator_->RunQuery(QueryRequest{
+          .project_id = kProject,
+          .location = std::nullopt,
+          .query = ddl,
+          .default_dataset = DatasetReference{kProject, kDataset},
+          .job_id = {},
+          .parameters = {},
+          .destination_table = std::nullopt,
+      });
+      if (job->error.has_value()) {
+        LOG(WARNING) << "Cannot load property graph " << name << ": " << job->error->what();
+      }
+    }
     return absl::OkStatus();
   }
 

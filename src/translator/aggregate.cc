@@ -37,6 +37,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const Columns& columns, const std::string& having = "",
                                          std::vector<std::string>* intermediates = nullptr) {
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
+  if (HasGraph(call.type()) || std::ranges::any_of(call.argument_list(), [](const auto& argument) {
+        return HasGraph(argument->type());
+      })) {
+    return Unsupported(scope, "aggregate or analytic function " + name + " with graph values");
+  }
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty() ||
       call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE ||
@@ -276,6 +281,9 @@ std::optional<std::string> Window(const googlesql::ResolvedAnalyticFunctionGroup
     }
     std::vector<std::string> keys;
     for (const auto& ref : partition->partition_by_list()) {
+      if (HasGraph(ref->type())) {
+        return Unsupported(scope, "PARTITION BY with graph values");
+      }
       if (ref->type()->IsStruct()) {
         throw std::invalid_argument("Partitioning by expressions of type STRUCT is unsupported");
       }
@@ -516,6 +524,10 @@ Scope WithCorrelatedColumns(const googlesql::ResolvedAggregateScan& aggregate, c
 
 std::optional<Relation> AggregateScan(const googlesql::ResolvedAggregateScan& aggregate,
                                       const Scope& scope) {
+  if (std::ranges::any_of(aggregate.group_by_list(),
+                          [](const auto& key) { return HasGraph(key->expr()->type()); })) {
+    return Unsupported(scope, "GROUP BY with graph values");
+  }
   // Keys with INTERVAL values group by their lengths, and return the first of equal values in input
   // order, as BigQuery does.
   const bool grouping_sets =
