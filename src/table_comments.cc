@@ -56,6 +56,7 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   }
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
+    metadata.restored_from_snapshot = object.value("restoredFromSnapshot", false);
     metadata.clone = ParseBaseTableDefinition(object.value("cloneDefinition", json()), "cloneTime");
     metadata.snapshot =
         ParseBaseTableDefinition(object.value("snapshotDefinition", json()), "snapshotTime");
@@ -72,8 +73,12 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
                                   const std::vector<FieldSchema>& schema) {
   ValidateLabels(metadata.labels);
   ValidatePartitioning(metadata, schema);
+  json comment = metadata.ToJson();
+  if (metadata.restored_from_snapshot) {
+    comment["restoredFromSnapshot"] = true;
+  }
   return std::format("COMMENT ON TABLE {} IS {}", QualifiedName(table),
-                     metadata.empty() ? "NULL" : QuoteLiteral(metadata.ToJson().dump()));
+                     metadata.empty() ? "NULL" : QuoteLiteral(comment.dump()));
 }
 
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {

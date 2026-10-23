@@ -100,3 +100,11 @@ CREATE TEMP TABLE t (id INT64);
 CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_temporary.snap CLONE t;
 SELECT FORMAT('%t %t %s', base_table_catalog = @@project_id, STARTS_WITH(base_table_schema, '_script'), base_table_name) FROM scalars_snapshot_temporary.INFORMATION_SCHEMA.TABLE_SNAPSHOTS
 => "true true t"
+
+# A table restored from a snapshot lists even empty friendly_name and labels in TABLE_OPTIONS.
+CREATE SCHEMA IF NOT EXISTS scalars_snapshot_restored;
+CREATE OR REPLACE TABLE scalars_snapshot_restored.base (id INT64) OPTIONS (description = 'base');
+CREATE SNAPSHOT TABLE IF NOT EXISTS scalars_snapshot_restored.snap CLONE scalars_snapshot_restored.base OPTIONS (expiration_timestamp = TIMESTAMP '2100-01-01 00:00:00 UTC');
+CREATE OR REPLACE TABLE scalars_snapshot_restored.restored CLONE scalars_snapshot_restored.snap;
+SELECT TO_JSON_STRING(STRUCT(t.table_type, t.base_table_name, ARRAY(SELECT AS STRUCT option_name, option_value FROM scalars_snapshot_restored.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'restored' ORDER BY option_name) AS options)) FROM scalars_snapshot_restored.INFORMATION_SCHEMA.TABLES AS t WHERE t.table_name = 'restored'
+=> "{\"table_type\":\"BASE TABLE\",\"base_table_name\":null,\"options\":[{\"option_name\":\"description\",\"option_value\":\"\\\"base\\\"\"},{\"option_name\":\"friendly_name\",\"option_value\":\"\\\"\\\"\"},{\"option_name\":\"labels\",\"option_value\":\"[]\"}]}"

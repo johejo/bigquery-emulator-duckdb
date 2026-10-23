@@ -217,6 +217,15 @@ absl::StatusOr<std::vector<Row>> TableOptionsRows(const ViewContext& context) {
       std::vector<Option> options =
           CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
                         metadata->default_rounding_mode);
+      if (metadata->restored_from_snapshot) {
+        if (metadata->friendly_name.empty()) {
+          options.push_back({.name = "friendly_name", .type = "STRING", .value = "\"\""});
+        }
+        if (metadata->labels.empty()) {
+          options.push_back(
+              {.name = "labels", .type = "ARRAY<STRUCT<STRING, STRING>>", .value = "[]"});
+        }
+      }
       if (metadata->require_partition_filter) {
         options.push_back({.name = "require_partition_filter", .type = "BOOL", .value = "true"});
       }

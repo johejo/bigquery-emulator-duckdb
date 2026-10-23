@@ -181,6 +181,9 @@ TableMetadata CopiedMetadata(const CopyJob& copy, const TableReference& source,
   metadata.creation_time = 0;
   metadata.clone.reset();
   metadata.snapshot.reset();
+  if (copy.operation == CopyOperation::kRestore) {
+    metadata.restored_from_snapshot = true;
+  }
   if (copy.operation == CopyOperation::kSnapshot) {
     metadata.snapshot = BaseTableDefinition{.base_table = source};
   } else if (copy.operation == CopyOperation::kClone) {

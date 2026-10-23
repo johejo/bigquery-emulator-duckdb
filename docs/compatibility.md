@@ -98,8 +98,7 @@ forms.
 ### Table snapshots
 
 `FOR SYSTEM_TIME AS OF` has the limits of [time travel](#time-travel). `ALTER TABLE` actions other than `SET OPTIONS`, `ADD COLUMN` and `DROP COLUMN` are unsupported on a
-snapshot rather than rejected with BigQuery's message, and a table restored from a snapshot omits
-the empty `friendly_name` and `labels` that BigQuery lists in `TABLE_OPTIONS`.
+snapshot rather than rejected with BigQuery's message.
 
 ### Time travel
 

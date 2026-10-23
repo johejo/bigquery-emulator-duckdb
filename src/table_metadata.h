@@ -59,6 +59,8 @@ struct TableMetadata {
   std::optional<BaseTableDefinition> clone;
   // A table snapshot is read-only: only its metadata can change.
   std::optional<BaseTableDefinition> snapshot;
+  // Restored tables list friendly_name and labels in TABLE_OPTIONS even when empty.
+  bool restored_from_snapshot = false;
   std::optional<int64_t> expiration_time;  // Milliseconds since the Unix epoch.
   // Output only and persisted with the table; the Storage API's default stream uses it.
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old tables.
@@ -67,7 +69,7 @@ struct TableMetadata {
     return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
            !require_partition_filter && clustering.empty() && default_rounding_mode.empty() &&
            !clone.has_value() && !snapshot.has_value() && !expiration_time.has_value() &&
-           creation_time == 0;
+           !restored_from_snapshot && creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();

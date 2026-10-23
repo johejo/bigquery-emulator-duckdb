@@ -622,6 +622,7 @@ std::optional<std::string> CreateTableCopy(const googlesql::ResolvedCreateTableS
   const std::optional<TableReference> target = scope.context.statement.ddl_target_table;
   const bool restore = description->metadata.snapshot.has_value();
   if (restore) {
+    description->metadata.restored_from_snapshot = true;
     description->metadata.snapshot.reset();
     description->metadata.expiration_time.reset();
   }
