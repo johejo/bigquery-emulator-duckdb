@@ -38,6 +38,7 @@ cc_library(
         ":literal",
         ":resolved_access",
         "//:catalog_table",
+        "//:connection_id",
         "//:duckdb_sql",
         "//:external_query",
         "//:field_schema",

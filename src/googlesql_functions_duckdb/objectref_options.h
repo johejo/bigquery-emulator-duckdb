@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
 
 // What the OBJ functions reach outside the backend. Either is empty when the backend reaches none.
 struct ObjectStorage {
@@ -14,4 +14,4 @@ struct ObjectStorage {
   std::function<bool(const std::string& key)> has_connection;
 };
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

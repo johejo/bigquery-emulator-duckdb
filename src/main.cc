@@ -16,8 +16,6 @@
 #include <thread>
 #include <vector>
 
-#include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/python.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
 #include "src/googlesql_geography/options.h"
@@ -25,6 +23,8 @@
 #include "src/server.h"
 #include "src/shell.h"
 #include "src/shell/format.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
 
 namespace {
 
@@ -107,8 +107,8 @@ int Run(int argc, char* const* argv) {
   std::string data_dir;
   googlesql_geography::Options geography{.expand_bounding_box = true};
   std::optional<std::string> session_user;
-  bigquery_emulator_duckdb::backend_functions::JavaScriptLimits javascript;
-  bigquery_emulator_duckdb::backend_functions::PythonOptions python;
+  bigquery_emulator_duckdb::udf::JavaScriptLimits javascript;
+  bigquery_emulator_duckdb::udf::PythonOptions python;
   std::vector<bigquery_emulator_duckdb::Project> projects;
   std::vector<bigquery_emulator_duckdb::ExternalConnection> connections;
   for (int i = shell ? 2 : 1; i < argc; ++i) {

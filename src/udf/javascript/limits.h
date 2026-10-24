@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstddef>
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::udf {
 
 // What a JavaScript UDF may use: how long one call may run, and how much memory the calls of one
 // query may allocate on each DuckDB thread. BigQuery documents neither exactly; its timeouts "can
@@ -13,4 +13,4 @@ struct JavaScriptLimits {
   size_t memory = size_t{256} << 20U;
 };
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::udf

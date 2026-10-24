@@ -16,8 +16,6 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/python.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
@@ -26,6 +24,8 @@
 #include "src/project.h"
 #include "src/table_history.h"
 #include "src/table_metadata.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -55,10 +55,9 @@ std::string ProjectFileName(const std::string& project_id) {
 
 Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const std::optional<std::string>& session_user,
-                   const backend_functions::JavaScriptLimits& javascript,
+                   const udf::JavaScriptLimits& javascript,
                    const std::vector<ExternalConnection>& connections,
-                   const backend_functions::PythonOptions& python,
-                   const googlesql_geography::Options& geography)
+                   const udf::PythonOptions& python, const googlesql_geography::Options& geography)
     : backend_(
           session_user, javascript,
           {

@@ -1,0 +1,27 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+)
+
+cc_library(
+    name = "options",
+    hdrs = ["options.h"],
+    copts = ["-std=c++20"],
+    linkstatic = True,
+)
+
+cc_library(
+    name = "worker",
+    srcs = ["worker.cc"],
+    hdrs = ["worker.h"],
+    copts = ["-std=c++20"],
+    data = ["//:python_udf_worker"],
+    implementation_deps = ["@rules_cc//cc/runfiles"],
+    linkstatic = True,
+    deps = [
+        ":options",
+        "@nlohmann_json//:json",
+    ],
+)

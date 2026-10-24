@@ -92,8 +92,11 @@ These libraries own input validation, computation and compatibility errors witho
 DuckDB. Their `googlesql_<feature>_duckdb` adapters handle registration and DuckDB representations.
 The `googlesql_` prefix denotes GoogleSQL-compatible semantics, including emulator implementations.
 Shared DuckDB registration and vector helpers live in [duckdb_functions](../src/duckdb_functions/).
-JavaScript and Python UDF runtimes and ObjectRef functions over external connections remain in
-[src/backend_functions/](../src/backend_functions/).
+ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
+connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
+GCS-backed metadata fetch, and [connection_id.cc](../src/connection_id.cc) normalizes connection IDs
+for both ObjectRef and external queries. [backend_functions.cc](../src/backend_functions.cc)
+assembles registration of these function libraries and UDF adapters.
 
 HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
 the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
@@ -173,7 +176,13 @@ template, so both stay Untested until someone adds samples that meet the referen
 See [compatibility.md](compatibility.md) for query and API limits and
 [storage-api.md](storage-api.md) for Storage client behavior.
 
-### Python UDF workers
+### UDF runtimes
+
+[udf/javascript](../src/udf/javascript/) owns the QuickJS engine, compiled-source cache and
+execution limits. [udf/python](../src/udf/python/) owns Python worker discovery, process management,
+communication and limits. Neither runtime depends on DuckDB. [udf_duckdb](../src/udf_duckdb/)
+converts SQL values, registers the UDF calls and ties one runtime per thread to the query lifetime.
+The runtimes keep separate interfaces because their execution and ownership models differ.
 
 Python routine definitions are stored in the same macro comments as SQL routines, with their
 runtime and entry point. The catalog exposes them as volatile functions, and the translator

@@ -322,7 +322,7 @@ cc_library(
     hdrs = ["src/catalog.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":external_query",
+        ":connection_id",
         ":field_schema",
         ":information_schema",
         ":language_options",
@@ -564,8 +564,6 @@ cc_library(
         ":backend_error",
         ":duckdb_handle",
         ":spanner_query",
-        "//src/backend_functions:javascript",
-        "//src/backend_functions:objectref",
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_functions_duckdb:bignumeric",
         "//src/googlesql_functions_duckdb:cast",
@@ -573,19 +571,22 @@ cc_library(
         "//src/googlesql_functions_duckdb:interval",
         "//src/googlesql_functions_duckdb:json",
         "//src/googlesql_functions_duckdb:math",
+        "//src/googlesql_functions_duckdb:objectref",
         "//src/googlesql_functions_duckdb:percentile",
         "//src/googlesql_functions_duckdb:range",
         "//src/googlesql_functions_duckdb:string",
         "//src/googlesql_geography_duckdb",
         "//src/googlesql_hll_duckdb",
         "//src/googlesql_text_analysis_duckdb",
+        "//src/udf_duckdb:javascript",
+        "//src/udf_duckdb:python",
     ],
     linkstatic = True,
     deps = [
-        "//src/backend_functions:javascript_limits",
-        "//src/backend_functions:object_metadata",
-        "//src/backend_functions:python",
+        "//src/googlesql_functions_duckdb:objectref_options",
         "//src/googlesql_geography",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
         "//third_party/duckdb",
     ],
 )
@@ -596,6 +597,7 @@ cc_library(
     hdrs = ["src/external_query.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":connection_id",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
@@ -614,6 +616,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         ":api_error",
+        ":connection_id",
         ":external_query",
         ":gcs",
         "@abseil-cpp//absl/strings",
@@ -777,10 +780,10 @@ cc_library(
     deps = [
         ":field_schema",
         ":result_rows",
-        "//src/backend_functions:javascript_limits",
-        "//src/backend_functions:object_metadata",
-        "//src/backend_functions:python",
+        "//src/googlesql_functions_duckdb:objectref_options",
         "//src/googlesql_geography",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
         "@nlohmann_json//:json",
     ],
 )
@@ -965,9 +968,9 @@ cc_library(
         ":routine",
         ":system_variables",
         ":table_metadata",
-        "//src/backend_functions:javascript_limits",
-        "//src/backend_functions:python",
         "//src/googlesql_geography",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
         "@nlohmann_json//:json",
     ],
 )
@@ -1151,10 +1154,10 @@ cc_binary(
         ":project",
         ":server",
         ":shell",
-        "//src/backend_functions:javascript_limits",
-        "//src/backend_functions:python",
         "//src/googlesql_geography",
         "//src/shell:format",
+        "//src/udf/javascript:limits",
+        "//src/udf/python:options",
     ],
 )
 
@@ -1433,4 +1436,13 @@ cc_test(
         "@googlesql//googlesql/public/types",
         "@nlohmann_json//:json",
     ],
+)
+
+cc_library(
+    name = "connection_id",
+    srcs = ["src/connection_id.cc"],
+    hdrs = ["src/connection_id.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = ["@abseil-cpp//absl/strings"],
+    linkstatic = True,
 )

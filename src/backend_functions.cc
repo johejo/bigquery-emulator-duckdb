@@ -1,16 +1,10 @@
 #include "src/backend_functions.h"
 
-#include <cstdint>
 #include <optional>
 #include <string>
 
 #include "duckdb.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/javascript.h"
-#include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/object_metadata.h"
-#include "src/backend_functions/objectref.h"
-#include "src/backend_functions/python.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_aead_duckdb/aead.h"
 #include "src/googlesql_functions_duckdb/bignumeric.h"
@@ -19,6 +13,8 @@
 #include "src/googlesql_functions_duckdb/interval.h"
 #include "src/googlesql_functions_duckdb/json.h"
 #include "src/googlesql_functions_duckdb/math.h"
+#include "src/googlesql_functions_duckdb/objectref.h"
+#include "src/googlesql_functions_duckdb/objectref_options.h"
 #include "src/googlesql_functions_duckdb/percentile.h"
 #include "src/googlesql_functions_duckdb/range.h"
 #include "src/googlesql_functions_duckdb/string.h"
@@ -27,6 +23,10 @@
 #include "src/googlesql_hll_duckdb/hll.h"
 #include "src/googlesql_text_analysis_duckdb/text_analysis.h"
 #include "src/spanner_query.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
+#include "src/udf_duckdb/javascript.h"
+#include "src/udf_duckdb/python.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -73,61 +73,13 @@ void RegisterSessionUser(duckdb_connection connection,
   }
 }
 
-// bq_obj_fetch_metadata(objectref, project) over the JSON text of an ObjectRef. Volatile, since
-// the objects it reads change between calls.
-void FetchMetadata(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  const auto& fetch = *static_cast<const decltype(backend_functions::ObjectStorage::fetch)*>(
-      duckdb_scalar_function_get_extra_info(info));
-  duckdb_vector objectrefs = duckdb_data_chunk_get_vector(input, 0);
-  duckdb_vector projects = duckdb_data_chunk_get_vector(input, 1);
-  uint64_t* validity = duckdb_vector_get_validity(objectrefs);
-  duckdb_vector_ensure_validity_writable(output);
-  for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); ++row) {
-    if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
-      duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
-      continue;
-    }
-    const std::string fetched = fetch(VectorString(objectrefs, row), VectorString(projects, row));
-    duckdb_vector_assign_string_element_len(output, row, fetched.data(), fetched.size());
-  }
-}
-
-void DeleteFetchMetadata(void* data) {
-  delete static_cast<decltype(backend_functions::ObjectStorage::fetch)*>(data);
-}
-
-void RegisterFetchMetadata(duckdb_connection connection,
-                           const decltype(backend_functions::ObjectStorage::fetch)& fetch) {
-  if (!fetch) {
-    return;
-  }
-  Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
-      duckdb_create_scalar_function());
-  duckdb_scalar_function_set_name(scalar.get(), "bq_obj_fetch_metadata");
-  LogicalType const json(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
-  duckdb_logical_type_set_alias(json.get(), "JSON");
-  LogicalType const project(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR));
-  duckdb_scalar_function_add_parameter(scalar.get(), json.get());
-  duckdb_scalar_function_add_parameter(scalar.get(), project.get());
-  duckdb_scalar_function_set_return_type(scalar.get(), json.get());
-  duckdb_scalar_function_set_function(scalar.get(), FetchMetadata);
-  duckdb_scalar_function_set_special_handling(scalar.get());
-  duckdb_scalar_function_set_volatile(scalar.get());
-  duckdb_scalar_function_set_extra_info(
-      scalar.get(), new decltype(backend_functions::ObjectStorage::fetch)(fetch),
-      DeleteFetchMetadata);
-  if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
-    throw BackendError("DuckDB failed to register bq_obj_fetch_metadata");
-  }
-}
-
 }  // namespace
 
 void RegisterBackendFunctions(duckdb_database database,
                               const std::optional<std::string>& session_user,
-                              const backend_functions::JavaScriptLimits& javascript,
-                              const backend_functions::ObjectStorage& storage,
-                              const backend_functions::PythonOptions& python,
+                              const udf::JavaScriptLimits& javascript,
+                              const functions_duckdb::ObjectStorage& storage,
+                              const udf::PythonOptions& python,
                               const googlesql_geography::Options& geography) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
@@ -149,10 +101,9 @@ void RegisterBackendFunctions(duckdb_database database,
   geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
   aead_duckdb::RegisterAeadFunctions(connection.get());
   functions_duckdb::RegisterPercentileFunctions(connection.get());
-  backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);
-  backend_functions::RegisterPythonFunctions(connection.get(), python);
-  backend_functions::RegisterObjectRefFunctions(connection.get(), storage.has_connection);
-  RegisterFetchMetadata(connection.get(), storage.fetch);
+  udf_duckdb::RegisterJavaScriptFunctions(connection.get(), javascript);
+  udf_duckdb::RegisterPythonFunctions(connection.get(), python);
+  functions_duckdb::RegisterObjectRefFunctions(connection.get(), storage);
 }
 
 }  // namespace bigquery_emulator_duckdb

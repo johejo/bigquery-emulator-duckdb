@@ -1,15 +1,12 @@
-#include "src/backend_functions/javascript.h"
+#include "src/udf_duckdb/javascript.h"
 
 #include <charconv>
-#include <chrono>
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <system_error>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -18,9 +15,10 @@
 #include "duckdb.h"
 #include "quickjs.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/javascript_limits.h"
 #include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/udf/javascript/engine.h"
+#include "src/udf/javascript/limits.h"
 
 // JavaScript UDFs, run by QuickJS. The translator passes the UDF as the source of a function
 // expression, `(function(x, y) {body})`, followed by its arguments; see
@@ -28,144 +26,15 @@
 // its own, since a QuickJS runtime must not be used by two threads, and compiles each source once
 // in it; no state outlives the query.
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::udf_duckdb {
 using namespace duckdb_functions;
 namespace {
+using udf::JavaScriptLimits;
+using udf::javascript::Engine;
 
 // The results a JavaScript UDF can return, each registered as a function of its own since a
 // DuckDB function's result type is fixed.
 enum class Result : uint8_t { kBool, kDouble, kString, kInt64 };
-
-class Engine {
- public:
-  explicit Engine(const JavaScriptLimits& limits)
-      : limits_(limits), runtime_(NewRuntime(limits, this)), context_(JS_NewContext(runtime_)) {}
-  Engine(const Engine&) = delete;
-  Engine& operator=(const Engine&) = delete;
-  ~Engine() {
-    for (auto& [source, function] : functions_) {
-      JS_FreeValue(context_, function);
-    }
-    JS_FreeContext(context_);
-    JS_FreeRuntime(runtime_);
-  }
-
-  [[nodiscard]] JSContext* context() const { return context_; }
-
-  // The function `source` evaluates to, compiled on its first use.
-  absl::StatusOr<JSValue> Function(const std::string& source) {
-    if (const auto found = functions_.find(source); found != functions_.end()) {
-      return found->second;
-    }
-    Start();
-    JSValue function =
-        // QuickJS defines this flag as the signed expression (0 << 0).
-        // NOLINTNEXTLINE(bugprone-signed-bitwise)
-        JS_Eval(context_, source.data(), source.size(), "<udf>", JS_EVAL_TYPE_GLOBAL);
-    if (JS_IsException(function)) {
-      return Exception();
-    }
-    // A body that closes the function expression early, such as `}); (function() {`, makes the
-    // source evaluate to another function, or to something else; only the whole source is one.
-    if (!JS_IsFunction(context_, function) ||
-        String(function) != source.substr(1, source.size() - 2)) {
-      JS_FreeValue(context_, function);
-      return absl::InvalidArgumentError("JavaScript UDF body is not a function body");
-    }
-    functions_.emplace(source, function);
-    return function;
-  }
-
-  // Calls `function` with `arguments`, which it takes ownership of, and settles a returned
-  // Promise. The caller owns the result.
-  absl::StatusOr<JSValue> Call(JSValue function, std::vector<JSValue>& arguments) {
-    Start();
-    JSValue result = JS_Call(context_, function, JS_UNDEFINED, static_cast<int>(arguments.size()),
-                             arguments.data());
-    for (JSValue const argument : arguments) {
-      JS_FreeValue(context_, argument);
-    }
-    if (JS_IsException(result)) {
-      return Exception();
-    }
-    if (!JS_IsPromise(result)) {
-      return result;
-    }
-    JSContext* job_context = nullptr;
-    while (JS_PromiseState(context_, result) == JS_PROMISE_PENDING &&
-           JS_ExecutePendingJob(runtime_, &job_context) > 0) {
-    }
-    const JSPromiseStateEnum state = JS_PromiseState(context_, result);
-    JSValue settled = JS_PromiseResult(context_, result);
-    JS_FreeValue(context_, result);
-    if (state == JS_PROMISE_FULFILLED) {
-      return settled;
-    }
-    std::string const message = state == JS_PROMISE_PENDING ? "JavaScript UDF Promise never settled"
-                                                            : "JavaScript UDF Promise rejected: " +
-                                                                  String(settled).value_or("");
-    JS_FreeValue(context_, settled);
-    return absl::OutOfRangeError(message);
-  }
-
-  // Row `row` of `vector` as a JavaScript value. The caller owns the result.
-  absl::StatusOr<JSValue> Argument(duckdb_vector vector, idx_t row);
-
-  // The text of `value`, as String(value) spells it, or nullopt when that throws.
-  std::optional<std::string> String(JSValue value) {
-    size_t length = 0;
-    const char* text = JS_ToCStringLen(context_, &length, value);
-    if (text == nullptr) {
-      JS_FreeValue(context_, JS_GetException(context_));
-      return std::nullopt;
-    }
-    std::string result(text, length);
-    JS_FreeCString(context_, text);
-    return result;
-  }
-
- private:
-  // A runtime under `limits`, which interrupts calls of `engine` past their deadline.
-  static JSRuntime* NewRuntime(const JavaScriptLimits& limits, Engine* engine) {
-    JSRuntime* runtime = JS_NewRuntime();
-    JS_SetMemoryLimit(runtime, limits.memory);
-    JS_SetInterruptHandler(runtime, Interrupt, engine);
-    return runtime;
-  }
-
-  // Starts the time limit of evaluating or calling a UDF.
-  void Start() {
-    JS_UpdateStackTop(runtime_);
-    deadline_ = std::chrono::steady_clock::now() + limits_.call_time;
-    timed_out_ = false;
-  }
-
-  // Interrupts a UDF that runs past its deadline, with an exception it cannot catch.
-  static int Interrupt(JSRuntime* /*runtime*/, void* opaque) {
-    auto* engine = static_cast<Engine*>(opaque);
-    engine->timed_out_ = std::chrono::steady_clock::now() > engine->deadline_;
-    return engine->timed_out_ ? 1 : 0;
-  }
-
-  // The pending exception as an error.
-  absl::Status Exception() {
-    if (timed_out_) {
-      JS_FreeValue(context_, JS_GetException(context_));
-      return absl::OutOfRangeError("JavaScript UDF timed out");
-    }
-    JSValue const exception = JS_GetException(context_);
-    std::string const message = String(exception).value_or("JavaScript exception");
-    JS_FreeValue(context_, exception);
-    return absl::OutOfRangeError(message);
-  }
-
-  JavaScriptLimits limits_;
-  JSRuntime* runtime_;
-  JSContext* context_;
-  std::unordered_map<std::string, JSValue> functions_;
-  std::chrono::steady_clock::time_point deadline_;
-  bool timed_out_ = false;
-};
 
 // Gives each DuckDB thread that runs a call of a query an engine of its own, which DuckDB deletes
 // when the query ends.
@@ -179,7 +48,8 @@ void InitEngine(duckdb_init_info info) {
 // Row `row` of `vector` as a JavaScript value: NULL as null; BOOL, FLOAT64 and STRING as a
 // boolean, number and string; BYTES as its base64 string; ARRAY as an array; and STRUCT as an
 // object with a property per field, which the translator names as the UDF's signature does.
-absl::StatusOr<JSValue> Engine::Argument(duckdb_vector vector, idx_t row) {
+absl::StatusOr<JSValue> Argument(Engine& engine, duckdb_vector vector, idx_t row) {
+  JSContext* context = engine.context();
   uint64_t* validity = duckdb_vector_get_validity(vector);
   if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
     return JS_NULL;
@@ -188,50 +58,50 @@ absl::StatusOr<JSValue> Engine::Argument(duckdb_vector vector, idx_t row) {
   JSValue value = JS_UNDEFINED;
   switch (duckdb_get_type_id(type.get())) {
     case DUCKDB_TYPE_BOOLEAN:
-      return JS_NewBool(context_, VectorElement<bool>(vector, row));
+      return JS_NewBool(context, VectorElement<bool>(vector, row));
     case DUCKDB_TYPE_DOUBLE:
-      return JS_NewFloat64(context_, VectorElement<double>(vector, row));
+      return JS_NewFloat64(context, VectorElement<double>(vector, row));
     case DUCKDB_TYPE_VARCHAR: {
       const std::string text = VectorString(vector, row);
-      value = JS_NewStringLen(context_, text.data(), text.size());
+      value = JS_NewStringLen(context, text.data(), text.size());
       break;
     }
     case DUCKDB_TYPE_BLOB: {
       const std::string text = absl::Base64Escape(VectorString(vector, row));
-      value = JS_NewStringLen(context_, text.data(), text.size());
+      value = JS_NewStringLen(context, text.data(), text.size());
       break;
     }
     case DUCKDB_TYPE_LIST: {
       const auto entry = VectorElement<duckdb_list_entry>(vector, row);
       duckdb_vector child = duckdb_list_vector_get_child(vector);
-      value = JS_NewArray(context_);
+      value = JS_NewArray(context);
       for (idx_t i = 0; i < entry.length && !JS_IsException(value); ++i) {
-        auto element = Argument(child, entry.offset + i);
+        auto element = Argument(engine, child, entry.offset + i);
         if (!element.ok()) {
-          JS_FreeValue(context_, value);
+          JS_FreeValue(context, value);
           return element.status();
         }
-        if (JS_SetPropertyUint32(context_, value, static_cast<uint32_t>(i), *element) < 0) {
-          JS_FreeValue(context_, value);
+        if (JS_SetPropertyUint32(context, value, static_cast<uint32_t>(i), *element) < 0) {
+          JS_FreeValue(context, value);
           value = JS_EXCEPTION;
         }
       }
       break;
     }
     case DUCKDB_TYPE_STRUCT: {
-      value = JS_NewObject(context_);
+      value = JS_NewObject(context);
       const idx_t fields = duckdb_struct_type_child_count(type.get());
       for (idx_t i = 0; i < fields && !JS_IsException(value); ++i) {
-        auto field = Argument(duckdb_struct_vector_get_child(vector, i), row);
+        auto field = Argument(engine, duckdb_struct_vector_get_child(vector, i), row);
         if (!field.ok()) {
-          JS_FreeValue(context_, value);
+          JS_FreeValue(context, value);
           return field.status();
         }
         DuckString const name(duckdb_struct_type_child_name(type.get(), i));
         // Like BigQuery, set the property rather than define it, so that a field named __proto__
         // sets the prototype.
-        if (JS_SetPropertyStr(context_, value, name.get(), *field) < 0) {
-          JS_FreeValue(context_, value);
+        if (JS_SetPropertyStr(context, value, name.get(), *field) < 0) {
+          JS_FreeValue(context, value);
           value = JS_EXCEPTION;
         }
       }
@@ -241,7 +111,7 @@ absl::StatusOr<JSValue> Engine::Argument(duckdb_vector vector, idx_t row) {
       return absl::UnimplementedError("The emulator does not support this JavaScript UDF argument");
   }
   if (JS_IsException(value)) {
-    return Exception();
+    return engine.Exception();
   }
   return value;
 }
@@ -341,7 +211,7 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
         }
         std::vector<JSValue> values;
         for (idx_t column = 1; column < columns; ++column) {
-          auto value = engine.Argument(arguments.Vector(column), arguments.Row());
+          auto value = Argument(engine, arguments.Vector(column), arguments.Row());
           if (!value.ok()) {
             for (JSValue const converted : values) {
               JS_FreeValue(engine.context(), converted);
@@ -363,7 +233,8 @@ void JavaScriptCall(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 
 }  // namespace
 
-void RegisterJavaScriptFunctions(duckdb_connection connection, const JavaScriptLimits& limits) {
+void RegisterJavaScriptFunctions(duckdb_connection connection,
+                                 const udf::JavaScriptLimits& limits) {
   const auto add = [&](const char* name, duckdb_type result, duckdb_scalar_function_t function) {
     Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> const scalar(
         duckdb_create_scalar_function());
@@ -377,8 +248,8 @@ void RegisterJavaScriptFunctions(duckdb_connection connection, const JavaScriptL
     duckdb_scalar_function_set_function(scalar.get(), function);
     duckdb_scalar_function_set_init(scalar.get(), InitEngine);
     duckdb_scalar_function_set_extra_info(
-        scalar.get(), new JavaScriptLimits(limits),
-        [](void* limits) { delete static_cast<JavaScriptLimits*>(limits); });
+        scalar.get(), new udf::JavaScriptLimits(limits),
+        [](void* limits) { delete static_cast<udf::JavaScriptLimits*>(limits); });
     duckdb_scalar_function_set_special_handling(scalar.get());
     duckdb_scalar_function_set_volatile(scalar.get());
     if (duckdb_register_scalar_function(connection, scalar.get()) == DuckDBError) {
@@ -391,4 +262,4 @@ void RegisterJavaScriptFunctions(duckdb_connection connection, const JavaScriptL
   add("bq_js_int64", DUCKDB_TYPE_BIGINT, JavaScriptCall<Result::kInt64>);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::udf_duckdb
