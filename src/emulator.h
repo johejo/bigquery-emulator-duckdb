@@ -22,6 +22,7 @@
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/location.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
@@ -203,12 +204,14 @@ class Emulator {
   // With no data directory, registrations and data live in memory only. A nonempty
   // session_user enables SESSION_USER for every client; it and `connections`, which
   // EXTERNAL_QUERY reaches, are not persisted. JavaScript UDFs run under `javascript`.
+  // Geography bounds expand as in BigQuery unless geography.expand_bounding_box is false.
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
       const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
-      const backend_functions::PythonOptions& python = {});
+      const backend_functions::PythonOptions& python = backend_functions::PythonOptions(),
+      const googlesql_s2geometry::Options& geography = {.expand_bounding_box = true});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

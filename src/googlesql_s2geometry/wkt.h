@@ -3,9 +3,9 @@
 #include <string_view>
 
 #include "absl/status/statusor.h"
-#include "src/backend_functions/geography_value.h"
+#include "src/googlesql_s2geometry/value.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace googlesql_s2geometry {
 
 // The geography of WKT as ST_GEOGFROMTEXT reads it: points, linestrings, polygons, their
 // MULTIPOINT, MULTILINESTRING and MULTIPOLYGON, and GEOMETRYCOLLECTIONs of any of these, whose
@@ -17,4 +17,4 @@ namespace bigquery_emulator_duckdb::backend_functions {
 // it builds.
 absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented = false);
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace googlesql_s2geometry

@@ -77,6 +77,14 @@ bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' -e 'SE
 # {"x":"1"}
 ```
 
+For comparing geography bounds, `shell --expand-bounding-box=false` disables their outward
+expansion by one floating-point step. The default is `true`, matching BigQuery.
+
+```sh
+bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' \
+  --expand-bounding-box=false -e 'SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)) AS bounds'
+```
+
 Standard input that is not a terminal, or the `-e` argument, runs as one query job, so a
 multi-statement input is a script whose result is its last statement's. The shell exits with 1
 when the job fails.

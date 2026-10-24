@@ -14,13 +14,9 @@
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace googlesql_s2geometry {
 
-// A GEOGRAPHY holds S2Points, as BigQuery's do, written as WKT with each vertex as `x y z` with
-// the shortest digits that round-trip, a polygon's rings as S2Polygon holds them, or
-// GEOMETRYCOLLECTION EMPTY. Coordinates are those of S2LatLng, which gives
-// ST_X(ST_GEOGPOINT(0.1 + 0.2, 1)) 0.3000000000000001 as BigQuery does. The translator turns a
-// GEOGRAPHY into WKT with bq_st_astext wherever a query returns or stores one.
+// Coordinates obtained from S2LatLng, preserving its floating-point behavior.
 struct Point {
   double longitude;
   double latitude;
@@ -33,8 +29,8 @@ struct Point {
 using Polygon = std::vector<std::vector<S2Point>>;
 
 // A geography as BigQuery holds it, the union of its points, linestrings of two or more vertices
-// and polygons, which Combine makes of any parts; none of them makes the empty geography. EachRow
-// handles SQL NULLs.
+// and polygons, which Combine makes of any parts; none of them makes the empty geography. SQL NULLs
+// are handled by the caller.
 struct Geography {
   std::vector<S2Point> points;
   std::vector<std::vector<S2Point>> lines;
@@ -65,12 +61,6 @@ Point ToPoint(const S2Point& point);
 // and a GEOMETRYCOLLECTION of these where it has parts of more than one dimension. A polygon's
 // rings repeat their first vertex, and a hole's run clockwise, as S2Polygon's shape walks it.
 std::string Wkt(const Geography& geography);
-
-// The GEOGRAPHY of `geography`.
-std::string GeographyText(const Geography& geography);
-
-// Parses a GEOGRAPHY as GeographyText writes it.
-absl::StatusOr<Geography> ParseGeography(std::string_view text);
 
 // Adds the shapes of `geography` to `index`: its points, each linestring and its polygons.
 void AddShapes(const Geography& geography, MutableS2ShapeIndex& index);
@@ -129,4 +119,4 @@ absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
                                              const MutableS2ShapeIndex& b,
                                              S2BooleanOperation::OpType operation);
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace googlesql_s2geometry

@@ -84,6 +84,13 @@ DuckDB functions, uses [S2 Geometry](https://s2geometry.io/) for GEOGRAPHY, and 
 sketches of `HLL_COUNT` and `APPROX_COUNT_DISTINCT` with a
 [port of zetasketch](../src/zetasketch/README.md), whose sketches are BigQuery's.
 
+GEOGRAPHY operations live in [googlesql_s2geometry](../src/googlesql_s2geometry/), a typed
+function library over S2 with no DuckDB dependency. [googlesql_s2geometry_duckdb](../src/googlesql_s2geometry_duckdb/)
+registers those functions, converts DuckDB arguments and results, and encodes the internal XYZ
+text used in queries and stored columns. External WKT parsing and formatting belong to the
+function library. The emulator's backend composition selects compatibility options and passes
+them through the adapter; registered callbacks own their options independently for each database.
+
 BIGNUMERIC query values are BIGNUM integers in units of 10^-38; stored columns use the
 `bq_bignumeric_units` alias or a precision-and-scale alias. `Backend::NumericReadQuery` converts
 external integer and decimal columns to those units at the table boundary. Catalog scans, REST

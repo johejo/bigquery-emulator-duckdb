@@ -209,7 +209,7 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
                      : std::nullopt;
     }
     case googlesql::TYPE_GEOGRAPHY:
-      // See src/backend_functions/geography_value.h.
+      // See src/googlesql_s2geometry_duckdb/codec.h.
       return "VARCHAR";
     case googlesql::TYPE_ARRAY: {
       const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);

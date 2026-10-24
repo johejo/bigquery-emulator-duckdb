@@ -10,7 +10,6 @@
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/cast.h"
 #include "src/backend_functions/datetime.h"
-#include "src/backend_functions/geography.h"
 #include "src/backend_functions/hll_count.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
@@ -25,6 +24,8 @@
 #include "src/backend_functions/string.h"
 #include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_s2geometry_duckdb/geography.h"
 #include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
@@ -126,7 +127,8 @@ void RegisterBackendFunctions(duckdb_database database,
                               const std::optional<std::string>& session_user,
                               const backend_functions::JavaScriptLimits& javascript,
                               const backend_functions::ObjectStorage& storage,
-                              const backend_functions::PythonOptions& python) {
+                              const backend_functions::PythonOptions& python,
+                              const googlesql_s2geometry::Options& geography) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -143,7 +145,8 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());
   backend_functions::RegisterRangeFunctions(connection.get());
-  backend_functions::RegisterGeographyFunctions(connection.get());
+  // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.
+  geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);

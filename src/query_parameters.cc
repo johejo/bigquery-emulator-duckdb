@@ -16,11 +16,12 @@
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
-#include "src/backend_functions/geography_value.h"
-#include "src/backend_functions/geography_wkt.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_s2geometry/wkt.h"
+#include "src/googlesql_s2geometry_duckdb/codec.h"
 #include "src/interval.h"
 #include "src/type_mapping.h"
 
@@ -111,10 +112,10 @@ std::string ToDuckDbLiteral(const TypedValue& parameter);
 
 // The GEOGRAPHY of the WKT `text`, whose polygons are oriented, in the form queries hold it in.
 std::string GeographyLiteral(const std::string& text, const std::string& parameter) {
-  const absl::StatusOr<backend_functions::Geography> geography =
-      backend_functions::ReadWkt(text, /*oriented=*/true);
+  const absl::StatusOr<googlesql_s2geometry::Geography> geography =
+      googlesql_s2geometry::ReadWkt(text, /*oriented=*/true);
   if (geography.ok()) {
-    return QuoteLiteral(backend_functions::GeographyText(*geography));
+    return QuoteLiteral(geography_duckdb::GeographyText(*geography));
   }
   const std::string_view message = geography.status().message();
   if (geography.status().code() == absl::StatusCode::kUnimplemented) {
