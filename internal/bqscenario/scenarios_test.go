@@ -1,4 +1,4 @@
-package main
+package bqscenario
 
 import (
 	"context"
@@ -56,7 +56,7 @@ func TestJSONPointer(t *testing.T) {
 	}
 }
 
-func writeScenarioFixture(t *testing.T, file scenarioFile) string {
+func writeScenarioFixture(t *testing.T, file File) string {
 	t.Helper()
 	data, err := json.Marshal(file)
 	if err != nil {
@@ -69,8 +69,8 @@ func writeScenarioFixture(t *testing.T, file scenarioFile) string {
 	return path
 }
 
-func restStep(name string) scenarioStep {
-	return scenarioStep{Name: name, REST: &restRequest{Method: "GET", Path: "/bigquery/v2/projects/${project}"}}
+func restStep(name string) Step {
+	return Step{Name: name, REST: &RESTRequest{Method: "GET", Path: "/bigquery/v2/projects/${project}"}}
 }
 
 func TestScenarioResumeCleanupAndErrors(t *testing.T) {
@@ -79,32 +79,32 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 	observe := restStep("observe")
 	observe.Observe = map[string]string{"null": "/body/null", "missing": "/body/missing", "number": "/body/number"}
 	cleanup := restStep("cleanup")
-	path := writeScenarioFixture(t, scenarioFile{Version: 1, Cases: []scenarioCase{
-		{Name: "answered", Steps: []scenarioStep{observe}, Answer: json.RawMessage(`{"old":true}`)},
-		{Name: "success", Steps: []scenarioStep{setup, observe}, Cleanup: []scenarioStep{cleanup}},
-		{Name: "transport_failure", Steps: []scenarioStep{observe}, Cleanup: []scenarioStep{cleanup}},
-		{Name: "rejected", Steps: []scenarioStep{observe, restStep("never")}, Cleanup: []scenarioStep{cleanup}},
+	path := writeScenarioFixture(t, File{Version: 1, Cases: []Case{
+		{Name: "answered", Steps: []Step{observe}, Answer: json.RawMessage(`{"old":true}`)},
+		{Name: "success", Steps: []Step{setup, observe}, Cleanup: []Step{cleanup}},
+		{Name: "transport_failure", Steps: []Step{observe}, Cleanup: []Step{cleanup}},
+		{Name: "rejected", Steps: []Step{observe, restStep("never")}, Cleanup: []Step{cleanup}},
 	}})
 	failure := errors.New("network unavailable")
 	var calls []string
-	call := func(_ context.Context, step scenarioStep, vars map[string]any) (scenarioResponse, error) {
+	call := func(_ context.Context, step Step, vars map[string]any) (Response, error) {
 		name := vars["case"].(string)
 		calls = append(calls, name+"/"+step.Name)
 		if step.Name == "cleanup" {
-			return scenarioResponse{}, nil
+			return Response{}, nil
 		}
 		switch name {
 		case "transport_failure":
-			return scenarioResponse{}, failure
+			return Response{}, failure
 		case "rejected":
-			return scenarioResponse{Failed: true, Value: map[string]any{"status": 400, "body": "invalid"}}, nil
+			return Response{Failed: true, Value: map[string]any{"status": 400, "body": "invalid"}}, nil
 		}
 		if step.Name == "observe" && vars["resource"] != "captured" {
 			t.Fatalf("binding = %v", vars)
 		}
-		return scenarioResponse{Value: map[string]any{"body": map[string]any{"resource": "captured", "null": nil, "number": json.Number("9007199254740993")}}}, nil
+		return Response{Value: map[string]any{"body": map[string]any{"resource": "captured", "null": nil, "number": json.Number("9007199254740993")}}}, nil
 	}
-	err := fillScenarios(t.Context(), path, "project", "run", time.Second, call)
+	err := Collect(t.Context(), path, "project", "run", time.Second, call)
 	if !errors.Is(err, failure) {
 		t.Fatalf("error = %v", err)
 	}
@@ -112,7 +112,7 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
-	file, err := readScenarios(path)
+	file, err := Read(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 	if !old["old"] || answered(file.Cases[2].Answer) || !answered(file.Cases[3].Answer) {
 		t.Fatalf("answers = %+v", file.Cases)
 	}
-	var result observation
+	var result Observation
 	if err := json.Unmarshal(file.Cases[1].Answer, &result); err != nil {
 		t.Fatal(err)
 	}
@@ -142,9 +142,9 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 		t.Fatalf("file permissions: %v, %v", info, err)
 	}
 	calls = nil
-	if err := fillScenarios(t.Context(), path, "project", "newrun", time.Second, func(_ context.Context, step scenarioStep, vars map[string]any) (scenarioResponse, error) {
+	if err := Collect(t.Context(), path, "project", "newrun", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
 		calls = append(calls, vars["case"].(string)+"/"+step.Name)
-		return scenarioResponse{Value: map[string]any{}}, nil
+		return Response{Value: map[string]any{}}, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -156,19 +156,19 @@ func TestScenarioResumeCleanupAndErrors(t *testing.T) {
 func TestScenarioCleanupAfterCancellation(t *testing.T) {
 	observe := restStep("observe")
 	observe.Observe = map[string]string{"response": ""}
-	path := writeScenarioFixture(t, scenarioFile{Version: 1, Cases: []scenarioCase{{Name: "cancel", Steps: []scenarioStep{observe}, Cleanup: []scenarioStep{restStep("cleanup")}}}})
+	path := writeScenarioFixture(t, File{Version: 1, Cases: []Case{{Name: "cancel", Steps: []Step{observe}, Cleanup: []Step{restStep("cleanup")}}}})
 	ctx, cancel := context.WithCancel(t.Context())
 	cleaned := false
-	err := fillScenarios(ctx, path, "project", "run", time.Second, func(ctx context.Context, step scenarioStep, _ map[string]any) (scenarioResponse, error) {
+	err := Collect(ctx, path, "project", "run", time.Second, func(ctx context.Context, step Step, _ map[string]any) (Response, error) {
 		if step.Name == "observe" {
 			cancel()
-			return scenarioResponse{}, ctx.Err()
+			return Response{}, ctx.Err()
 		}
 		if ctx.Err() != nil {
 			t.Fatalf("cleanup inherited cancellation: %v", ctx.Err())
 		}
 		cleaned = true
-		return scenarioResponse{}, nil
+		return Response{}, nil
 	})
 	if !errors.Is(err, context.Canceled) || !cleaned {
 		t.Fatalf("error = %v, cleaned = %v", err, cleaned)
@@ -178,25 +178,25 @@ func TestScenarioCleanupAfterCancellation(t *testing.T) {
 func TestScenarioRejectsInvalidFilesBeforeCalls(t *testing.T) {
 	observe := restStep("observe")
 	observe.Observe = map[string]string{"response": ""}
-	for _, mutate := range []func(*scenarioFile){
-		func(f *scenarioFile) { f.Version = 99 },
-		func(f *scenarioFile) { f.Cases[0].Steps[0].Observe["invalid"] = "/missing/~2" },
-		func(f *scenarioFile) {
+	for _, mutate := range []func(*File){
+		func(f *File) { f.Version = 99 },
+		func(f *File) { f.Cases[0].Steps[0].Observe["invalid"] = "/missing/~2" },
+		func(f *File) {
 			f.Cases[0].Steps[0].REST.Method = "POST"
 			f.Cases[0].Steps[0].Until = map[string]any{"/state": "DONE"}
 		},
-		func(f *scenarioFile) { f.Cases[0].Steps[0].REST.Path = "https://another-host/" },
-		func(f *scenarioFile) { f.Cases[0].Vars = map[string]any{"project": "override"} },
+		func(f *File) { f.Cases[0].Steps[0].REST.Path = "https://another-host/" },
+		func(f *File) { f.Cases[0].Vars = map[string]any{"project": "override"} },
 	} {
 		step := observe
 		step.Observe = map[string]string{"response": ""}
-		step.REST = &restRequest{Method: "GET", Path: "/projects/${project}"}
-		file := scenarioFile{Version: 1, Cases: []scenarioCase{{Name: "test", Steps: []scenarioStep{step}}}}
+		step.REST = &RESTRequest{Method: "GET", Path: "/projects/${project}"}
+		file := File{Version: 1, Cases: []Case{{Name: "test", Steps: []Step{step}}}}
 		mutate(&file)
 		path := writeScenarioFixture(t, file)
-		if err := fillScenarios(t.Context(), path, "p", "r", time.Second, func(context.Context, scenarioStep, map[string]any) (scenarioResponse, error) {
+		if err := Collect(t.Context(), path, "p", "r", time.Second, func(context.Context, Step, map[string]any) (Response, error) {
 			t.Fatal("request sent for invalid file")
-			return scenarioResponse{}, nil
+			return Response{}, nil
 		}); err == nil {
 			t.Fatal("invalid file accepted")
 		}
@@ -208,39 +208,39 @@ func TestScenarioPollDeadline(t *testing.T) {
 	step.Until = map[string]any{"/body/state": "DONE"}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
-	_, err := pollScenario(ctx, step, nil, func(context.Context, scenarioStep, map[string]any) (scenarioResponse, error) {
-		return scenarioResponse{Value: map[string]any{"body": map[string]any{"state": "RUNNING"}}}, nil
+	_, err := pollScenario(ctx, step, nil, func(context.Context, Step, map[string]any) (Response, error) {
+		return Response{Value: map[string]any{"body": map[string]any{"state": "RUNNING"}}}, nil
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("poll = %v", err)
 	}
 }
 
-func TestScenarioTemplateAndOfflineValidation(t *testing.T) {
+func TestScenarioTemplateAndValidation(t *testing.T) {
 	step := restStep("observe")
 	step.REST.Path += "/${captured}"
 	step.Observe = map[string]string{"value": "/body/value"}
 	setup := restStep("setup")
 	setup.Bind = map[string]string{"captured": "/body/resource"}
-	path := writeScenarioFixture(t, scenarioFile{Version: 1,
-		Templates: map[string]scenarioTemplate{"read": {Steps: []scenarioStep{setup, step}}},
-		Cases:     []scenarioCase{{Name: "templated", Template: "read"}},
+	path := writeScenarioFixture(t, File{Version: 1,
+		Templates: map[string]Template{"read": {Steps: []Step{setup, step}}},
+		Cases:     []Case{{Name: "templated", Template: "read"}},
 	})
-	// No credentials or network are needed for validation, even when a template references a
+	// No requests are needed for validation, even when a template references a
 	// response binding whose value will only be known at runtime.
 	t.Setenv("PATH", t.TempDir())
-	if err := run("project", path, true, time.Second); err != nil {
+	if _, err := Read(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := fillScenarios(t.Context(), path, "project", "run", time.Second, func(_ context.Context, step scenarioStep, vars map[string]any) (scenarioResponse, error) {
+	if err := Collect(t.Context(), path, "project", "run", time.Second, func(_ context.Context, step Step, vars map[string]any) (Response, error) {
 		if step.Name == "observe" && vars["captured"] != "bound" {
 			t.Fatalf("binding = %v", vars)
 		}
-		return scenarioResponse{Value: map[string]any{"body": map[string]any{"resource": "bound", "value": "answer"}}}, nil
+		return Response{Value: map[string]any{"body": map[string]any{"resource": "bound", "value": "answer"}}}, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	file, err := readScenarios(path)
+	file, err := Read(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestScenarioTemplateAndOfflineValidation(t *testing.T) {
 	}
 	file.Cases[0].Template = "missing"
 	path = writeScenarioFixture(t, *file)
-	if err := run("project", path, true, time.Second); err == nil {
+	if _, err := Read(path); err == nil {
 		t.Fatal("unknown template accepted")
 	}
 }
@@ -259,8 +259,8 @@ func TestScenarioVariableScopes(t *testing.T) {
 		step := restStep("read")
 		step.REST.Body = "${value}"
 		step.Observe = map[string]string{"value": ""}
-		path := writeScenarioFixture(t, scenarioFile{Version: 1, Vars: vars, Cases: []scenarioCase{{Name: "bad", Steps: []scenarioStep{step}}}})
-		if _, err := readScenarios(path); err == nil {
+		path := writeScenarioFixture(t, File{Version: 1, Vars: vars, Cases: []Case{{Name: "bad", Steps: []Step{step}}}})
+		if _, err := Read(path); err == nil {
 			t.Fatal("invalid variable references accepted")
 		}
 	}
@@ -272,17 +272,17 @@ func TestCleanupFailureKeepsAnswer(t *testing.T) {
 		step.Observe = map[string]string{"value": "/body/value"}
 		cleanup := restStep("delete")
 		cleanup.REST.Method = "DELETE"
-		path := writeScenarioFixture(t, scenarioFile{Version: 1, Cases: []scenarioCase{{Name: "cleanup", Steps: []scenarioStep{step}, Cleanup: []scenarioStep{cleanup}}}})
-		err := fillScenarios(t.Context(), path, "p", "run", time.Second, func(_ context.Context, step scenarioStep, _ map[string]any) (scenarioResponse, error) {
+		path := writeScenarioFixture(t, File{Version: 1, Cases: []Case{{Name: "cleanup", Steps: []Step{step}, Cleanup: []Step{cleanup}}}})
+		err := Collect(t.Context(), path, "p", "run", time.Second, func(_ context.Context, step Step, _ map[string]any) (Response, error) {
 			if step.Name == "delete" {
-				return scenarioResponse{Failed: true, Value: map[string]any{"status": code}}, nil
+				return Response{Failed: true, Value: map[string]any{"status": code}}, nil
 			}
-			return scenarioResponse{Value: map[string]any{"body": map[string]any{"value": "answer"}}}, nil
+			return Response{Value: map[string]any{"body": map[string]any{"value": "answer"}}}, nil
 		})
 		if (err != nil) != (code == 500) {
 			t.Fatalf("cleanup HTTP %d: %v", code, err)
 		}
-		file, readErr := readScenarios(path)
+		file, readErr := Read(path)
 		if readErr != nil || !answered(file.Cases[0].Answer) {
 			t.Fatalf("answer lost: %v", readErr)
 		}
@@ -295,7 +295,7 @@ func TestRepositoryScenarios(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range paths {
-		if _, err := readScenarios(path); err != nil {
+		if _, err := Read(path); err != nil {
 			t.Error(err)
 		}
 	}

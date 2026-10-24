@@ -1,0 +1,29 @@
+# Runner fixture: tests collection and verification, not a compatibility inventory.
+version: 1
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: metadata
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            description: scenario runner fixture
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          status: /status
+          description: /body/description
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect: {
+      "read": {"status": 200, "description": "scenario runner fixture"}
+    }

@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/bigquery v1.84.0
 	github.com/apache/arrow-go/v18 v18.8.0
 	github.com/creack/pty v1.1.24
+	github.com/goccy/go-yaml v1.19.2
 	github.com/linkedin/goavro/v2 v2.14.1
 	golang.org/x/net v0.59.0
 	google.golang.org/api v0.299.0

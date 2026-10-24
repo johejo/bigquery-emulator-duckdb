@@ -3,8 +3,8 @@
 - `scalars/*.txt`: a query returning one cell, checked through `jobs.query` against its REST
   value. These cover SQL results without Go client type conversion.
 - `errors/*.txt`: independent SQL queries expected to fail, checked through the Go client's
-  `Query.Run` and `Job.Wait`. No default dataset is set. Keep cases that need request options,
-  shared state, typed decoding or metadata assertions in Go tests.
+  `Query.Run` and `Job.Wait`. No default dataset is set. Use API scenarios in `tests/e2e/scenarios/testdata/` for request options, shared state and
+  metadata assertions. Keep SDK behavior and typed decoding in Go tests.
 - `unverified/*.txt`: questions for maintainers to resolve against BigQuery; see
   [its README](unverified/README.md).
 

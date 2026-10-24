@@ -7,7 +7,7 @@
 // Lines starting with "param> " between a query and its "?>" line each give a named query
 // parameter, as JSON of an entry of the request's queryParameters.
 //
-// A directory processes each *.txt and *.api.json file. API scenarios can use REST, multipart
+// A directory processes each *.txt, *.api.yaml, *.api.yml and *.api.json file. API scenarios can use REST, multipart
 // uploads and BigQuery Storage gRPC; see README.md in this directory. -validate checks scenarios
 // without authenticating or sending requests.
 //
@@ -31,6 +31,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/johejo/bigquery-emulator-duckdb/internal/bqscenario"
 )
 
 type queryResponse struct {
@@ -113,13 +115,13 @@ func caseFiles(path string) ([]string, error) {
 		return nil, err
 	}
 	if !info.IsDir() {
-		if !strings.HasSuffix(path, ".txt") && !strings.HasSuffix(path, ".api.json") {
+		if !strings.HasSuffix(path, ".txt") && !bqscenario.IsFile(path) {
 			return nil, fmt.Errorf("unsupported case file %q", path)
 		}
 		return []string{path}, nil
 	}
 	var paths []string
-	for _, pattern := range []string{"*.txt", "*.api.json"} {
+	for _, pattern := range []string{"*.txt", "*.api.json", "*.api.yaml", "*.api.yml"} {
 		matches, err := filepath.Glob(filepath.Join(path, pattern))
 		if err != nil {
 			return nil, err
@@ -137,8 +139,8 @@ func run(project, path string, validate bool, timeout time.Duration) error {
 	}
 	// Validate every scenario before any mutations, including files that already have answers.
 	for _, file := range paths {
-		if strings.HasSuffix(file, ".api.json") {
-			if _, err := readScenarios(file); err != nil {
+		if bqscenario.IsFile(file) {
+			if err := bqscenario.ValidateCollection(file); err != nil {
 				return err
 			}
 		}
@@ -151,7 +153,7 @@ func run(project, path string, validate bool, timeout time.Duration) error {
 		return fmt.Errorf("gcloud auth print-access-token: %w", err)
 	}
 	accessToken := strings.TrimSpace(string(token))
-	transport := newScenarioTransport(accessToken)
+	transport := bqscenario.NewTransport(accessToken)
 	defer transport.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -160,7 +162,7 @@ func run(project, path string, validate bool, timeout time.Duration) error {
 		defer cancel()
 		return answer(queryCtx, accessToken, project, sql, parameters)
 	}, func(file string) error {
-		return fillScenarios(ctx, file, project, strings.ToLower(rand.Text()), timeout, transport.call)
+		return bqscenario.Collect(ctx, file, project, strings.ToLower(rand.Text()), timeout, transport.Call)
 	})
 }
 
@@ -175,7 +177,7 @@ func fillAnswers(ctx context.Context, path string, query func(string, []json.Raw
 			failures = append(failures, ctx.Err())
 			break
 		}
-		if strings.HasSuffix(file, ".api.json") {
+		if bqscenario.IsFile(file) {
 			if scenarios == nil {
 				err = fmt.Errorf("API scenario runner is not configured for %s", file)
 			} else {
