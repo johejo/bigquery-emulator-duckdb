@@ -3,6 +3,7 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//tools/clang_tidy:clang_tidy_test.bzl", "clang_tidy_test")
+load("//tools/heavy_includes:heavy_includes_test.bzl", "heavy_includes_test")
 
 # The emulator's libraries, shared with the packages under src/ that hold its components. Each
 # package checks that its sources include only headers of the targets they depend on directly.
@@ -36,6 +37,13 @@ clang_tidy_test(
     header_target = ":httplib",
     implementation_target = ":query_parameters",
     test_target = ":parquet_metadata_test",
+)
+
+heavy_includes_test(
+    name = "heavy_includes_test",
+    size = "small",
+    header_target = ":httplib",
+    source_target = ":parquet_metadata_test",
 )
 
 cc_library(
