@@ -1,10 +1,12 @@
 #pragma once
 
 // The registry of the BigQuery functions the translator supports. Each function is declared once,
-// in the functions_*.cc rule tables or functions.cc, with how it is implemented.
+// in the functions_*.cc rule tables or functions.cc, with its implementation and type behavior.
 
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -200,37 +202,18 @@ struct AggregateRule {
   bool finish_after_scan = false;
 };
 
-// A function in the registry.
-struct FunctionEntry {
-  Translation translation;
-  std::vector<Implementation> implementations;
-  // kRules, kBackend and kS2: the rules, the first that matches a call translating it.
-  std::vector<Rule> rules = {};
-  // kRenamed: the DuckDB function. kSafe: the function it is with SAFE.
-  std::string_view target = {};
-  // kHandler.
-  Handler handler = nullptr;
-  // kAggregate and kAnalytic: the overloads, the first that matches a call translating it.
-  std::vector<AggregateRule> aggregates = {};
-};
-
-// How docs/functions.md names the implementations used by a function's overloads.
-std::string Describe(const FunctionEntry& entry);
-
-// The registry entry of `upper_name`, the function name in upper case, or null when the
-// emulator does not support it. The operators have their internal names, such as $ADD.
-const FunctionEntry* FindFunction(std::string_view upper_name);
-
-// Whether `upper_name` handles BIGNUMERIC arguments and results as BigQuery does. DuckDB's own
-// functions would compute a BIGNUM as a DOUBLE or truncate it, so any other call that involves
-// a BIGNUMERIC is unsupported.
-bool SupportsBigNumeric(std::string_view upper_name);
-
 // What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a
 // STRUCT, and other per-function differences from GoogleSQL. A type takes the uses whose
 // operations DuckDB performs on its stand-in as BigQuery does on its values; other functions
 // would see the stand-in.
 enum class TypeUse : std::uint8_t {
+  // Handle graph values without exposing their private STRUCT metadata.
+  kGraphValues,
+  // Handle BIGNUMERIC arguments and results without loss of precision. Other DuckDB functions
+  // could compute BIGNUM values as DOUBLE or truncate them.
+  kBigNumeric,
+  // BigQuery rejects direct INTERVAL arguments although GoogleSQL accepts them.
+  kRejectsIntervalComparison,
   // Pass, select or count their values without reading them.
   kCarries,
   // Also compare or order their values.
@@ -257,6 +240,53 @@ enum class TypeUse : std::uint8_t {
   // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
   kRejectsSafe,
 };
+
+// A constexpr set of type attributes, also used by the plain and handler registrations.
+class TypeUses {
+ public:
+  constexpr TypeUses() = default;
+  constexpr TypeUses(std::initializer_list<TypeUse> uses)
+      : bits_(std::accumulate(uses.begin(), uses.end(), std::uint32_t{0},
+                              [](std::uint32_t bits, TypeUse use) {
+                                return bits | (std::uint32_t{1} << static_cast<unsigned>(use));
+                              })) {}
+
+  [[nodiscard]] constexpr bool Contains(TypeUse use) const {
+    return (bits_ & (std::uint32_t{1} << static_cast<unsigned>(use))) != 0;
+  }
+
+ private:
+  std::uint32_t bits_ = 0;
+};
+
+// A function's overloads and type behavior, declared together in its rule table.
+template <typename RuleType>
+struct FunctionDefinition {
+  std::vector<RuleType> rules;
+  TypeUses uses = {};
+};
+
+// A function in the registry.
+struct FunctionEntry {
+  Translation translation;
+  TypeUses uses = {};
+  std::vector<Implementation> implementations;
+  // kRules, kBackend and kS2: the rules, the first that matches a call translating it.
+  std::vector<Rule> rules = {};
+  // kRenamed: the DuckDB function. kSafe: the function it is with SAFE.
+  std::string_view target = {};
+  // kHandler.
+  Handler handler = nullptr;
+  // kAggregate and kAnalytic: the overloads, the first that matches a call translating it.
+  std::vector<AggregateRule> aggregates = {};
+};
+
+// How docs/functions.md names the implementations used by a function's overloads.
+std::string Describe(const FunctionEntry& entry);
+
+// The registry entry of `upper_name`, the function name in upper case, or null when the
+// emulator does not support it. The operators have their internal names, such as $ADD.
+const FunctionEntry* FindFunction(std::string_view upper_name);
 
 // Whether `upper_name`, the function name in upper case, has `use`.
 bool HasTypeUse(std::string_view upper_name, TypeUse use);

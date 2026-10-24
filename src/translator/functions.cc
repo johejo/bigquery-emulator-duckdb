@@ -23,6 +23,7 @@ namespace {
 struct NamedFunction {
   std::string_view target;
   Implementation implementation = Implementation::kRenamed;
+  TypeUses uses = {};
 };
 
 // Functions called by another name, with the same arguments.
@@ -31,66 +32,254 @@ constexpr auto kFunctionNames = std::to_array<std::pair<std::string_view, NamedF
     {"IS_INF", {.target = "isinf"}},
     {"IS_NAN", {.target = "isnan"}},
     {"RAND", {.target = "random"}},
-    {"SESSION_USER", {.target = "bq_session_user", .implementation = Implementation::kCustom}},
+    {
+        "SESSION_USER",
+        {
+            .target = "bq_session_user",
+            .implementation = Implementation::kCustom,
+            .uses = {TypeUse::kRejectsSafe},
+        },
+    },
     {"UNIX_MICROS", {.target = "epoch_us"}},
 });
 
 // BigQuery functions that DuckDB has under the same name, with the same arguments. Passing
 // arbitrary builtin names through would accidentally accept internal functions and overloads
 // with different semantics. Extend this list with execution coverage.
-constexpr auto kPlainFunctions = std::to_array<std::string_view>({
-    "IFNULL",
-    "COALESCE",
-    "CHAR_LENGTH",
-    "CHARACTER_LENGTH",
-    "ARRAY_LENGTH",
+struct PlainFunction {
+  std::string_view name;
+  TypeUses uses = {};
+};
+
+constexpr auto kPlainFunctions = std::to_array<PlainFunction>({
+    {.name = "IFNULL", .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric}},
+    {.name = "COALESCE", .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric}},
+    {.name = "CHAR_LENGTH"},
+    {.name = "CHARACTER_LENGTH"},
+    {
+        .name = "ARRAY_LENGTH",
+        .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+    },
 });
 
 struct HandledFunction {
   Handler handler;
   Implementation implementation = Implementation::kSQLInCode;
+  TypeUses uses = {};
 };
 
 // Functions that src/translator/handlers.cc translates in code.
-constexpr auto kHandlers = std::to_array<std::pair<std::string_view, HandledFunction>>({
-    {"$MAKE_ARRAY", {.handler = MakeArray}},
-    {"$AND", {.handler = Logical}},
-    {"$OR", {.handler = Logical}},
-    {"$IN", {.handler = InList}},
-    {"$CASE_NO_VALUE", {.handler = Case}},
-    {"$CASE_WITH_VALUE", {.handler = Case}},
-    {"SAME", {.handler = GraphIdentityPredicate}},
-    {"ALL_DIFFERENT", {.handler = GraphIdentityPredicate}},
-    {"DATE_BUCKET", {.handler = Bucket}},
-    {"DATETIME_BUCKET", {.handler = Bucket}},
-    {"TIMESTAMP_BUCKET", {.handler = Bucket}},
-    {"TO_JSON", {.handler = ToJson, .implementation = Implementation::kGoogleSQL}},
-    {"TO_JSON_STRING", {.handler = ToJson, .implementation = Implementation::kGoogleSQL}},
-    {"JSON_ARRAY", {.handler = JsonArray, .implementation = Implementation::kGoogleSQL}},
-    {"JSON_REMOVE", {.handler = JsonRemove, .implementation = Implementation::kGoogleSQL}},
-    {"JSON_SET", {.handler = JsonSet, .implementation = Implementation::kGoogleSQL}},
-    {
-        "JSON_ARRAY_APPEND",
-        {.handler = JsonArrayModify, .implementation = Implementation::kGoogleSQL},
-    },
-    {
-        "JSON_ARRAY_INSERT",
-        {.handler = JsonArrayModify, .implementation = Implementation::kGoogleSQL},
-    },
-    {"JSON_OBJECT", {.handler = JsonObject, .implementation = Implementation::kGoogleSQL}},
-    {"FORMAT", {.handler = Format, .implementation = Implementation::kGoogleSQL}},
-    {"ARRAY_CONCAT", {.handler = ArrayConcat}},
-    {"CONCAT", {.handler = ConcatStrings}},
-    {"GREATEST", {.handler = Extremum}},
-    {"LEAST", {.handler = Extremum}},
-    {
-        "KEYS.ADD_KEY_FROM_RAW_BYTES",
-        {.handler = AddKeyFromRawBytes, .implementation = Implementation::kGoogleSQL},
-    },
-    {"TEXT_ANALYZE", {.handler = TextAnalyze, .implementation = Implementation::kGoogleSQL}},
-    {"OBJ.MAKE_REF", {.handler = MakeRef, .implementation = Implementation::kCustom}},
-    {"OBJ.FETCH_METADATA", {.handler = FetchMetadata, .implementation = Implementation::kCustom}},
-});
+constexpr auto kHandlers =
+    std::to_array<std::pair<std::string_view, HandledFunction>>(
+        {
+            {
+                "$MAKE_ARRAY",
+                {
+                    .handler = MakeArray,
+                    .uses = {TypeUse::kCarries, TypeUse::kReadsEmptyStruct, TypeUse::kBigNumeric},
+                },
+            },
+            {"$AND", {.handler = Logical}},
+            {"$OR", {.handler = Logical}},
+            {
+                "$IN",
+                {
+                    .handler = InList,
+                    .uses =
+                        {
+                            TypeUse::kCompares,
+                            TypeUse::kComparesIntervalKeys,
+                            TypeUse::kComparesStructs,
+                            TypeUse::kComparesStructsWithInterval,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "$CASE_NO_VALUE",
+                {
+                    .handler = Case,
+                    .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+                },
+            },
+            {
+                "$CASE_WITH_VALUE",
+                {
+                    .handler = Case,
+                    .uses =
+                        {
+                            TypeUse::kCompares,
+                            TypeUse::kComparesStructs,
+                            TypeUse::kComparesStructsWithInterval,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
+            {"ALL_DIFFERENT", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
+            {"DATE_BUCKET", {.handler = Bucket}},
+            {"DATETIME_BUCKET", {.handler = Bucket}},
+            {"TIMESTAMP_BUCKET", {.handler = Bucket}},
+            {
+                "TO_JSON",
+                {
+                    .handler = ToJson,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "TO_JSON_STRING",
+                {
+                    .handler = ToJson,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "JSON_ARRAY",
+                {
+                    .handler = JsonArray,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {"JSON_REMOVE", {.handler = JsonRemove, .implementation = Implementation::kGoogleSQL}},
+            {
+                "JSON_SET",
+                {
+                    .handler = JsonSet,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "JSON_ARRAY_APPEND",
+                {
+                    .handler = JsonArrayModify,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "JSON_ARRAY_INSERT",
+                {
+                    .handler = JsonArrayModify,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "JSON_OBJECT",
+                {
+                    .handler = JsonObject,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "FORMAT",
+                {
+                    .handler = Format,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses =
+                        {
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "ARRAY_CONCAT",
+                {.handler = ArrayConcat, .uses = {TypeUse::kCarries, TypeUse::kBigNumeric}},
+            },
+            {"CONCAT", {.handler = ConcatStrings}},
+            {
+                "GREATEST",
+                {
+                    .handler = Extremum,
+                    .uses =
+                        {
+                            TypeUse::kCompares,
+                            TypeUse::kRejectsIntervalComparison,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "LEAST",
+                {
+                    .handler = Extremum,
+                    .uses =
+                        {
+                            TypeUse::kCompares,
+                            TypeUse::kRejectsIntervalComparison,
+                            TypeUse::kBigNumeric,
+                        },
+                },
+            },
+            {
+                "KEYS.ADD_KEY_FROM_RAW_BYTES",
+                {.handler = AddKeyFromRawBytes, .implementation = Implementation::kGoogleSQL},
+            },
+            {
+                "TEXT_ANALYZE",
+                {
+                    .handler = TextAnalyze,
+                    .implementation = Implementation::kGoogleSQL,
+                    .uses = {TypeUse::kRejectsSafe},
+                },
+            },
+            {"OBJ.MAKE_REF", {.handler = MakeRef, .implementation = Implementation::kCustom}},
+            {
+                "OBJ.FETCH_METADATA",
+                {.handler = FetchMetadata, .implementation = Implementation::kCustom},
+            },
+        });
 
 // SAFE_ADD and its siblings are the arithmetic operators with the SAFE. prefix.
 constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::string_view>>({
@@ -99,116 +288,6 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
     {"SAFE_MULTIPLY", "$MULTIPLY"},
     {"SAFE_NEGATE", "$UNARY_MINUS"},
 });
-
-// The functions that handle BIGNUMERIC, by carrying it as it is, by comparing BIGNUM, which
-// DuckDB does exactly, or by rules of their own.
-constexpr auto kBigNumericFunctions = [] {
-  auto functions = std::to_array<std::string_view>({
-      // Comparisons.
-      "$EQUAL",
-      "$NOT_EQUAL",
-      "$LESS",
-      "$LESS_OR_EQUAL",
-      "$GREATER",
-      "$GREATER_OR_EQUAL",
-      "$BETWEEN",
-      "$IS_DISTINCT_FROM",
-      "$IS_NOT_DISTINCT_FROM",
-      "$IS_NULL",
-      "$IN",
-      "$IN_ARRAY",
-      "GREATEST",
-      "LEAST",
-      "RANGE_BUCKET",
-      // Carrying values.
-      "$CASE_NO_VALUE",
-      "$CASE_WITH_VALUE",
-      "IF",
-      "IFNULL",
-      "COALESCE",
-      "NULLIF",
-      // ERROR returns no value; GoogleSQL calls it with the BIGNUMERIC type of ARRAY_FIRST and
-      // ARRAY_LAST.
-      "ERROR",
-      "$MAKE_ARRAY",
-      "$ARRAY_AT_OFFSET",
-      "$ARRAY_AT_ORDINAL",
-      "$SAFE_ARRAY_AT_OFFSET",
-      "$SAFE_ARRAY_AT_ORDINAL",
-      // Arithmetic.
-      "$ADD",
-      "$SUBTRACT",
-      "$UNARY_MINUS",
-      "$MULTIPLY",
-      "$DIVIDE",
-      "SAFE_DIVIDE",
-      "DIV",
-      "MOD",
-      "ABS",
-      "SIGN",
-      "ROUND",
-      "TRUNC",
-      "CEIL",
-      "CEILING",
-      "FLOOR",
-      "SQRT",
-      "CBRT",
-      "POW",
-      "POWER",
-      "EXP",
-      "LN",
-      "LOG",
-      "LOG10",
-      // Arrays, JSON and text.
-      "ARRAY_LENGTH",
-      "ARRAY_REVERSE",
-      "ARRAY_CONCAT",
-      "GENERATE_ARRAY",
-      "TO_JSON",
-      "TO_JSON_STRING",
-      "JSON_ARRAY",
-      "JSON_OBJECT",
-      "JSON_SET",
-      "JSON_ARRAY_APPEND",
-      "JSON_ARRAY_INSERT",
-      "FORMAT",
-      "PARSE_BIGNUMERIC",
-      // Aggregate and analytic functions.
-      "COUNT",
-      "MIN",
-      "MAX",
-      "ANY_VALUE",
-      "ARRAY_AGG",
-      "ARRAY_CONCAT_AGG",
-      "MAX_BY",
-      "MIN_BY",
-      "APPROX_COUNT_DISTINCT",
-      "HLL_COUNT.INIT",
-      "APPROX_QUANTILES",
-      "APPROX_TOP_COUNT",
-      "APPROX_TOP_SUM",
-      "SUM",
-      "AVG",
-      "STDDEV",
-      "STDDEV_SAMP",
-      "STDDEV_POP",
-      "VARIANCE",
-      "VAR_SAMP",
-      "VAR_POP",
-      "CORR",
-      "COVAR_POP",
-      "COVAR_SAMP",
-      "LAG",
-      "LEAD",
-      "FIRST_VALUE",
-      "LAST_VALUE",
-      "NTH_VALUE",
-      "PERCENTILE_CONT",
-      "PERCENTILE_DISC",
-  });
-  std::ranges::sort(functions);
-  return functions;
-}();
 
 std::vector<Implementation> Implementations(const std::vector<Rule>& rules,
                                             Implementation fallback) {
@@ -229,40 +308,50 @@ const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
         std::abort();
       }
     };
-    for (const auto& [name, rules] : TemplateRules()) {
+    for (const auto& [name, definition] : TemplateRules()) {
       add(name, {
                     .translation = Translation::kRules,
-                    .implementations = Implementations(rules, Implementation::kSQL),
-                    .rules = rules,
+                    .uses = definition.uses,
+                    .implementations = Implementations(definition.rules, Implementation::kSQL),
+                    .rules = definition.rules,
                 });
     }
-    for (const auto& [name, rules] : BackendRules()) {
-      add(name, {
-                    .translation = Translation::kBackend,
-                    .implementations = Implementations(rules, Implementation::kGoogleSQL),
-                    .rules = rules,
-                });
+    for (const auto& [name, definition] : BackendRules()) {
+      add(name,
+          {
+              .translation = Translation::kBackend,
+              .uses = definition.uses,
+              .implementations = Implementations(definition.rules, Implementation::kGoogleSQL),
+              .rules = definition.rules,
+          });
     }
-    for (const auto& [name, rules] : S2Rules()) {
+    for (const auto& [name, definition] : S2Rules()) {
       add(name, {
                     .translation = Translation::kS2,
-                    .implementations = Implementations(rules, Implementation::kS2),
-                    .rules = rules,
+                    .uses = definition.uses,
+                    .implementations = Implementations(definition.rules, Implementation::kS2),
+                    .rules = definition.rules,
                 });
     }
     for (const auto& [name, function] : kFunctionNames) {
       add(name, {
                     .translation = Translation::kRenamed,
+                    .uses = function.uses,
                     .implementations = {function.implementation},
                     .target = function.target,
                 });
     }
-    for (const std::string_view name : kPlainFunctions) {
-      add(name, {.translation = Translation::kSame, .implementations = {Implementation::kSame}});
+    for (const auto& function : kPlainFunctions) {
+      add(function.name, {
+                             .translation = Translation::kSame,
+                             .uses = function.uses,
+                             .implementations = {Implementation::kSame},
+                         });
     }
     for (const auto& [name, function] : kHandlers) {
       add(name, {
                     .translation = Translation::kHandler,
+                    .uses = function.uses,
                     .implementations = {function.implementation},
                     .handler = function.handler,
                 });
@@ -274,18 +363,20 @@ const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
                     .target = target,
                 });
     }
-    for (const auto& [name, rules] : Aggregates()) {
+    for (const auto& [name, definition] : Aggregates()) {
       add(name, {
                     .translation = Translation::kAggregate,
+                    .uses = definition.uses,
                     .implementations = {Implementation::kAggregate},
-                    .aggregates = rules,
+                    .aggregates = definition.rules,
                 });
     }
-    for (const auto& [name, rules] : Analytics()) {
+    for (const auto& [name, definition] : Analytics()) {
       add(name, {
                     .translation = Translation::kAnalytic,
+                    .uses = definition.uses,
                     .implementations = {Implementation::kAnalytic},
-                    .aggregates = rules,
+                    .aggregates = definition.rules,
                 });
     }
     return registry;
@@ -332,8 +423,9 @@ std::string Describe(const FunctionEntry& entry) {
   return description;
 }
 
-bool SupportsBigNumeric(std::string_view upper_name) {
-  return std::ranges::binary_search(kBigNumericFunctions, upper_name);
+bool HasTypeUse(std::string_view upper_name, TypeUse use) {
+  const FunctionEntry* entry = FindFunction(upper_name);
+  return entry != nullptr && entry->uses.Contains(use);
 }
 
 const FunctionEntry* FindFunction(std::string_view upper_name) {

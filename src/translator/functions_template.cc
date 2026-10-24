@@ -617,153 +617,222 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 }  // namespace
 
 // Functions implemented by DuckDB SQL templates.
-const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
-  static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
+const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRules() {
+  static const auto* const kRules = new std::unordered_map<std::string_view,
+                                                           FunctionDefinition<Rule>>{
       {
           "$IS_SOURCE_NODE",
           {
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                              "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
-                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                  .defaults = {},
-                  .errors =
+              .rules =
+                  {
                       {
-                          "'The emulator does not support graph endpoint predicates with NULL "
-                          "operands'",
+                          .arity = 2,
+                          .spelling =
+                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                              "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
+                          .defaults = {},
+                          .errors =
+                              {
+                                  "'The emulator does not support graph endpoint predicates with "
+                                  "NULL "
+                                  "operands'",
+                              },
                       },
-              },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "$IS_DEST_NODE",
           {
-              {
-                  .arity = 2,
-                  .spelling =
-                      "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
-                      "struct_extract($1, '$id') = struct_extract($2, '$destination_id') END",
-                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
-                  .defaults = {},
-                  .errors =
+              .rules =
+                  {
                       {
-                          "'The emulator does not support graph endpoint predicates with NULL "
-                          "operands'",
+                          .arity = 2,
+                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                                      "struct_extract($1, '$id') = struct_extract($2, "
+                                      "'$destination_id') END",
+                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
+                          .defaults = {},
+                          .errors =
+                              {
+                                  "'The emulator does not support graph endpoint predicates with "
+                                  "NULL "
+                                  "operands'",
+                              },
                       },
-              },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "LABELS",
           {
-              {
-                  .arity = 1,
-                  .spelling = "struct_extract($1, '$labels')",
-                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "struct_extract($1, '$labels')",
+                          .conditions = {Is(1, {TYPE_GRAPH_ELEMENT})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "NODES",
           {
-              {
-                  .arity = 1,
-                  .spelling = "struct_extract($1, '$nodes')",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "struct_extract($1, '$nodes')",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "EDGES",
           {
-              {
-                  .arity = 1,
-                  .spelling = "struct_extract($1, '$edges')",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "struct_extract($1, '$edges')",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "PATH_FIRST",
           {
-              {
-                  .arity = 1,
-                  .spelling = "struct_extract($1, '$nodes')[1]",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "struct_extract($1, '$nodes')[1]",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "PATH_LAST",
           {
-              {
-                  .arity = 1,
-                  .spelling = "struct_extract($1, '$nodes')[-1]",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "struct_extract($1, '$nodes')[-1]",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "PATH_LENGTH",
           {
-              {
-                  .arity = 1,
-                  .spelling = "len(struct_extract($1, '$edges'))",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "len(struct_extract($1, '$edges'))",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "IS_ACYCLIC",
           {
-              {
-                  .arity = 1,
-                  .spelling = "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
                               "struct_extract(n, '$id'))) = len(struct_extract($1, '$nodes'))",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "IS_TRAIL",
           {
-              {
-                  .arity = 1,
-                  .spelling = "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "list_unique(list_transform(struct_extract($1, '$edges'), lambda e: "
                               "struct_extract(e, '$id'))) = len(struct_extract($1, '$edges'))",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
       {
           "IS_SIMPLE",
           {
-              {
-                  .arity = 1,
-                  .spelling =
-                      "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
-                      "struct_extract(n, "
-                      "'$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
-                      "len(struct_extract($1, "
-                      "'$nodes')) > 1 AND struct_extract(struct_extract($1, '$nodes')[1], '$id') = "
-                      "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE 0 END",
-                  .conditions = {Is(1, {TYPE_GRAPH_PATH})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "list_unique(list_transform(struct_extract($1, '$nodes'), lambda n: "
+                              "struct_extract(n, "
+                              "'$id'))) = len(struct_extract($1, '$nodes')) - CASE WHEN "
+                              "len(struct_extract($1, "
+                              "'$nodes')) > 1 AND struct_extract(struct_extract($1, '$nodes')[1], "
+                              "'$id') = "
+                              "struct_extract(struct_extract($1, '$nodes')[-1], '$id') THEN 1 ELSE "
+                              "0 "
+                              "END",
+                          .conditions = {Is(1, {TYPE_GRAPH_PATH})},
+                      },
+                  },
+              .uses = {TypeUse::kGraphValues},
           },
       },
-      {"IF", {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}}},
+      {
+          "IF",
+          {
+              .rules = {{.arity = 3, .spelling = "CASE WHEN $1 THEN $2 ELSE $3 END"}},
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
       // Avoid DuckDB v2's NULLIF macro binder; repeated arguments are bound once by Expand.
       {
           "NULLIF",
           {
-              {
-                  .arity = 2,
-                  .spelling =
-                      "CASE WHEN " + FloatCompare("$1", "=", "$2") + " THEN NULL ELSE $1 END",
-                  .conditions = {Is(1, {TYPE_DOUBLE})},
-              },
-              {.arity = 2, .spelling = "CASE WHEN $1 = $2 THEN NULL ELSE $1 END"},
+              .rules =
+                  {
+                      {
+                          .arity = 2,
+                          .spelling = "CASE WHEN " + FloatCompare("$1", "=", "$2") +
+                                      " THEN NULL ELSE $1 END",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                      },
+                      {.arity = 2, .spelling = "CASE WHEN $1 = $2 THEN NULL ELSE $1 END"},
+                  },
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesStructs,
+                      TypeUse::kRejectsIntervalComparison,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
       // Operators. Division binds its operands once, as every rule does, and stays an
@@ -773,91 +842,99 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "$ADD",
           {
-              BigNumericOperator("bq_bignumeric_add", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_intervals($1, $2)",
-                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_date_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_date_interval($2, $1)",
-                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_DATE})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_datetime_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATETIME})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_datetime_interval($2, $1)",
-                  .conditions = {Is(2, {TYPE_DATETIME})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_timestamp_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_TIMESTAMP})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_add_timestamp_interval($2, $1)",
-                  .conditions = {Is(2, {TYPE_TIMESTAMP})},
-              },
-              {.arity = 2, .spelling = "($1 + $2)"},
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_add", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_intervals($1, $2)",
+                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_date_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_date_interval($2, $1)",
+                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_DATE})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_datetime_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATETIME})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_datetime_interval($2, $1)",
+                          .conditions = {Is(2, {TYPE_DATETIME})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_timestamp_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_add_timestamp_interval($2, $1)",
+                          .conditions = {Is(2, {TYPE_TIMESTAMP})},
+                      },
+                      {.arity = 2, .spelling = "($1 + $2)"},
+                  },
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
           },
       },
       // - subtracts an INTERVAL as + adds its negation.
       {
           "$SUBTRACT",
           {
-              BigNumericOperator("bq_bignumeric_subtract", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_intervals($1, $2)",
-                  .conditions = {Is(1, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_date_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_dates($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_DATE})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_datetime_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATETIME}), Is(2, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_datetimes($1, $2)",
-                  .conditions = {Is(1, {TYPE_DATETIME})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_timestamp_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_TIMESTAMP}), Is(2, {TYPE_INTERVAL})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_timestamps($1, $2)",
-                  .conditions = {Is(1, {TYPE_TIMESTAMP})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_subtract_times($1, $2)",
-                  .conditions = {Is(1, {TYPE_TIME})},
-              },
-              {.arity = 2, .spelling = "($1 - $2)"},
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_subtract", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_intervals($1, $2)",
+                          .conditions = {Is(1, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_date_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_dates($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_DATE})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_datetime_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATETIME}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_datetimes($1, $2)",
+                          .conditions = {Is(1, {TYPE_DATETIME})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_timestamp_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_TIMESTAMP}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_timestamps($1, $2)",
+                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_subtract_times($1, $2)",
+                          .conditions = {Is(1, {TYPE_TIME})},
+                      },
+                      {.arity = 2, .spelling = "($1 - $2)"},
+                  },
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
           },
       },
       // DuckDB multiplies DECIMAL(38, 9) values into a DECIMAL(38, 18), which overflows past 20
@@ -866,73 +943,143 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "$MULTIPLY",
           {
-              BigNumericOperator("bq_bignumeric_multiply", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_multiply_numeric($1, $2)",
-                  .conditions = {Is(1, {TYPE_NUMERIC})},
-              },
-              // See src/googlesql_functions_duckdb/interval.cc; src/translator/function.cc rejects
-              // FLOAT64 operands as BigQuery does.
-              {
-                  .arity = 2,
-                  .spelling = "bq_multiply_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_multiply_interval($2, $1)",
-                  .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INTERVAL})},
-              },
-              {.arity = 2, .spelling = "($1 * $2)"},
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_multiply", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_multiply_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                      },
+                      // See src/googlesql_functions_duckdb/interval.cc; src/translator/function.cc
+                      // rejects FLOAT64 operands as BigQuery does.
+                      {
+                          .arity = 2,
+                          .spelling = "bq_multiply_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_multiply_interval($2, $1)",
+                          .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INTERVAL})},
+                      },
+                      {.arity = 2, .spelling = "($1 * $2)"},
+                  },
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
           },
       },
       {
           "$DIVIDE",
           {
-              BigNumericOperator("bq_bignumeric_divide", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_divide_numeric($1, $2)",
-                  .conditions = {Is(1, {TYPE_NUMERIC})},
-              },
-              // See src/googlesql_functions_duckdb/interval.cc.
-              {
-                  .arity = 2,
-                  .spelling = "bq_divide_interval($1, $2)",
-                  .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_divide", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_divide_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                      },
+                      // See src/googlesql_functions_duckdb/interval.cc.
+                      {
+                          .arity = 2,
+                          .spelling = "bq_divide_interval($1, $2)",
+                          .conditions = {Is(1, {TYPE_INTERVAL}), Is(2, {TYPE_INT64})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling =
+                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
                               "ELSE $1 / $2 "
                               "END",
-                  .conditions = {},
-                  .defaults = {},
-                  .errors = {"'division by zero'"},
-              },
+                          .conditions = {},
+                          .defaults = {},
+                          .errors = {"'division by zero'"},
+                      },
+                  },
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
           },
       },
       {
           "$UNARY_MINUS",
-          {BigNumericOperator("bq_bignumeric_negate", 1), {.arity = 1, .spelling = "(-$1)"}},
+          {
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_negate", 1),
+                      {.arity = 1, .spelling = "(-$1)"},
+                  },
+              .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
+          },
       },
-      {"$EQUAL", Compare("=")},
-      {"$NOT_EQUAL", Compare("<>")},
-      {"$LESS", Compare("<")},
-      {"$LESS_OR_EQUAL", Compare("<=")},
-      {"$GREATER", Compare(">")},
-      {"$GREATER_OR_EQUAL", Compare(">=")},
+      {
+          "$EQUAL",
+          {
+              .rules = Compare("="),
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesStructs,
+                      TypeUse::kComparesStructsWithInterval,
+                      TypeUse::kBigNumeric,
+                  },
+          },
+      },
+      {
+          "$NOT_EQUAL",
+          {
+              .rules = Compare("<>"),
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesStructs,
+                      TypeUse::kComparesStructsWithInterval,
+                      TypeUse::kBigNumeric,
+                  },
+          },
+      },
+      {
+          "$LESS",
+          {
+              .rules = Compare("<"),
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$LESS_OR_EQUAL",
+          {
+              .rules = Compare("<="),
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$GREATER",
+          {
+              .rules = Compare(">"),
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$GREATER_OR_EQUAL",
+          {
+              .rules = Compare(">="),
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
       {
           "$BETWEEN",
           {
-              {
-                  .arity = 3,
-                  .spelling = "(" + FloatCompare("$1", ">=", "$2") + " AND " +
-                              FloatCompare("$1", "<=", "$3") + ")",
-                  .conditions = {Is(1, {TYPE_DOUBLE})},
-              },
-              {.arity = 3, .spelling = "($1 BETWEEN $2 AND $3)"},
+              .rules =
+                  {
+                      {
+                          .arity = 3,
+                          .spelling = "(" + FloatCompare("$1", ">=", "$2") + " AND " +
+                                      FloatCompare("$1", "<=", "$3") + ")",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                      },
+                      {.arity = 3, .spelling = "($1 BETWEEN $2 AND $3)"},
+                  },
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
           },
       },
       // A backslash escapes the character after it, and must not end the pattern. BYTES are
@@ -940,76 +1087,147 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "$LIKE",
           {
-              {
-                  .arity = 2,
-                  .spelling =
-                      "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') THEN !1 ELSE "
-                      "($1 LIKE $2 ESCAPE '\\') END",
-                  .conditions = {Is(1, {TYPE_STRING})},
-                  .defaults = {},
-                  .errors = {"'LIKE pattern ends with a backslash'"},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 2,
+                          .spelling = "CASE WHEN regexp_matches($2, '(^|[^\\\\])(\\\\\\\\)*\\\\$') "
+                                      "THEN !1 ELSE "
+                                      "($1 LIKE $2 ESCAPE '\\') END",
+                          .conditions = {Is(1, {TYPE_STRING})},
+                          .defaults = {},
+                          .errors = {"'LIKE pattern ends with a backslash'"},
+                      },
+                  },
           },
       },
-      {"$IS_DISTINCT_FROM", {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}}},
-      {"$IS_NOT_DISTINCT_FROM", {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}}},
-      {"$IS_NULL", {{.arity = 1, .spelling = "($1 IS NULL)"}}},
-      {"$IS_TRUE", {{.arity = 1, .spelling = "($1 IS TRUE)"}}},
-      {"$IS_FALSE", {{.arity = 1, .spelling = "($1 IS FALSE)"}}},
-      {"$NOT", {{.arity = 1, .spelling = "(NOT $1)"}}},
-      {"$BITWISE_NOT", {{.arity = 1, .spelling = "(~$1)"}}},
-      {"$BITWISE_AND", {{.arity = 2, .spelling = "($1 & $2)"}}},
-      {"$BITWISE_OR", {{.arity = 2, .spelling = "($1 | $2)"}}},
-      {"$BITWISE_XOR", {{.arity = 2, .spelling = "xor($1, $2)"}}},
-      {"$BITWISE_LEFT_SHIFT", Shift("<<")},
-      {"$BITWISE_RIGHT_SHIFT", Shift(">>")},
+      {
+          "$IS_DISTINCT_FROM",
+          {
+              .rules = {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}},
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$IS_NOT_DISTINCT_FROM",
+          {
+              .rules = {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}},
+              .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$IS_NULL",
+          {
+              .rules = {{.arity = 1, .spelling = "($1 IS NULL)"}},
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {"$IS_TRUE", {.rules = {{.arity = 1, .spelling = "($1 IS TRUE)"}}}},
+      {"$IS_FALSE", {.rules = {{.arity = 1, .spelling = "($1 IS FALSE)"}}}},
+      {"$NOT", {.rules = {{.arity = 1, .spelling = "(NOT $1)"}}}},
+      {"$BITWISE_NOT", {.rules = {{.arity = 1, .spelling = "(~$1)"}}}},
+      {"$BITWISE_AND", {.rules = {{.arity = 2, .spelling = "($1 & $2)"}}}},
+      {"$BITWISE_OR", {.rules = {{.arity = 2, .spelling = "($1 | $2)"}}}},
+      {"$BITWISE_XOR", {.rules = {{.arity = 2, .spelling = "xor($1, $2)"}}}},
+      {"$BITWISE_LEFT_SHIFT", {.rules = Shift("<<")}},
+      {"$BITWISE_RIGHT_SHIFT", {.rules = Shift(">>")}},
       // IN over the unnested elements has BigQuery's NULL handling, and is FALSE for a NULL array.
-      {"$IN_ARRAY", {{.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"}}},
-      {"$ARRAY_AT_OFFSET", ArrayAt(false, false)},
-      {"$ARRAY_AT_ORDINAL", ArrayAt(true, false)},
-      {"$SAFE_ARRAY_AT_OFFSET", ArrayAt(false, true)},
-      {"$SAFE_ARRAY_AT_ORDINAL", ArrayAt(true, true)},
+      {
+          "$IN_ARRAY",
+          {
+              .rules = {{.arity = 2, .spelling = "($1 IN (SELECT unnest($2)))"}},
+              .uses =
+                  {
+                      TypeUse::kCompares,
+                      TypeUse::kComparesIntervalKeys,
+                      TypeUse::kComparesStructs,
+                      TypeUse::kComparesStructsWithInterval,
+                      TypeUse::kBigNumeric,
+                  },
+          },
+      },
+      {
+          "$ARRAY_AT_OFFSET",
+          {
+              .rules = ArrayAt(false, false),
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$ARRAY_AT_ORDINAL",
+          {
+              .rules = ArrayAt(true, false),
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$SAFE_ARRAY_AT_OFFSET",
+          {
+              .rules = ArrayAt(false, true),
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "$SAFE_ARRAY_AT_ORDINAL",
+          {
+              .rules = ArrayAt(true, true),
+              .uses = {TypeUse::kCarries, TypeUse::kGraphValues, TypeUse::kBigNumeric},
+          },
+      },
 
       // A division by zero is an error in BigQuery and +Inf in DuckDB, so SAFE_DIVIDE has to
       // make the zero itself disappear.
       {
           "SAFE_DIVIDE",
           {
-              BigNumericOperator("bq_bignumeric_safe_divide", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_safe_divide_numeric($1, $2)",
-                  .conditions = {Is(1, {TYPE_NUMERIC})},
-              },
-              {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_safe_divide", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_safe_divide_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                      },
+                      {.arity = 2, .spelling = "($1 / NULLIF($2, 0))"},
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
       },
-      {"IEEE_DIVIDE", {{.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
+      {
+          "IEEE_DIVIDE",
+          {.rules = {{.arity = 2, .spelling = "(CAST($1 AS DOUBLE) / CAST($2 AS DOUBLE))"}}},
+      },
       // DuckDB returns NULL on a zero divisor, and MOD(x, -1) of the smallest INT64 overflows
       // in DuckDB where it is 0 in BigQuery.
       {
           "MOD",
           {
-              BigNumericOperator("bq_bignumeric_mod", 2),
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_mod", 2),
+                      {
+                          .arity = 2,
+                          .spelling =
+                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
                               "WHEN $2 = -1 "
                               "THEN 0 "
                               "ELSE mod($1, $2) END",
-                  .conditions = {Is(1, {TYPE_INT64})},
-                  .defaults = {},
-                  .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
+                          .conditions = {Is(1, {TYPE_INT64})},
+                          .defaults = {},
+                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling =
+                              "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 "
                               "ELSE mod($1, "
                               "$2) END",
-                  .conditions = {},
-                  .defaults = {},
-                  .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
-              },
+                          .conditions = {},
+                          .defaults = {},
+                          .errors = {"'division by zero: MOD(' || $1 || ', ' || $2 || ')'"},
+                      },
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
       },
       // DuckDB's divide() of DECIMAL values returns a DOUBLE; GoogleSQL computes the exact
@@ -1017,35 +1235,43 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "DIV",
           {
-              BigNumericOperator("bq_bignumeric_div", 2),
-              {
-                  .arity = 2,
-                  .spelling = "bq_div_numeric($1, $2)",
-                  .conditions = {Is(1, {TYPE_NUMERIC})},
-              },
-              {
-                  .arity = 2,
-                  .spelling =
-                      "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 THEN !1 ELSE "
-                      "divide($1, $2) "
-                      "END",
-                  .conditions = {Is(1, {TYPE_INT64})},
-                  .defaults = {},
-                  .errors = {"'division by zero: ' || $1 || ' / ' || $2"},
-              },
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_div", 2),
+                      {
+                          .arity = 2,
+                          .spelling = "bq_div_numeric($1, $2)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN NULL WHEN $2 = 0 "
+                                      "THEN !1 ELSE "
+                                      "divide($1, $2) "
+                                      "END",
+                          .conditions = {Is(1, {TYPE_INT64})},
+                          .defaults = {},
+                          .errors = {"'division by zero: ' || $1 || ' / ' || $2"},
+                      },
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
       },
       // DuckDB's sign() is 0 for NaN.
       {
           "SIGN",
           {
-              BigNumericOperator("bq_bignumeric_sign", 1),
-              {
-                  .arity = 1,
-                  .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
-                  .conditions = {Is(1, {TYPE_DOUBLE})},
-              },
-              {.arity = 1, .spelling = "sign($1)"},
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_sign", 1),
+                      {
+                          .arity = 1,
+                          .spelling = "CASE WHEN isnan($1) THEN $1 ELSE sign($1) END",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                      },
+                      {.arity = 1, .spelling = "sign($1)"},
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
       },
       // DuckDB takes the digits as an INTEGER.
@@ -1054,49 +1280,73 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // value is even. Only NUMERIC and BIGNUMERIC take a rounding mode.
       {
           "ROUND",
-          Concat({
-              BigNumericRounding("bq_bignumeric_round", true),
-              {
-                  {.arity = 1, .spelling = "round($1)"},
-                  {.arity = 2, .spelling = RoundWithDigits("round")},
+          {
+              .rules = Concat({
+                  BigNumericRounding("bq_bignumeric_round", true),
                   {
-                      .arity = 3,
-                      .spelling = RoundWithDigits("round"),
-                      .conditions = {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
+                      {.arity = 1, .spelling = "round($1)"},
+                      {.arity = 2, .spelling = RoundWithDigits("round")},
+                      {
+                          .arity = 3,
+                          .spelling = RoundWithDigits("round"),
+                          .conditions = {Mode(3, "ROUND_HALF_AWAY_FROM_ZERO")},
+                      },
+                      {
+                          .arity = 3,
+                          .spelling = RoundHalfEven(),
+                          .conditions = {Mode(3, "ROUND_HALF_EVEN")},
+                      },
                   },
-                  {
-                      .arity = 3,
-                      .spelling = RoundHalfEven(),
-                      .conditions = {Mode(3, "ROUND_HALF_EVEN")},
-                  },
-              },
-          }),
+              }),
+              .uses = {TypeUse::kBigNumeric},
+          },
       },
       {
           "TRUNC",
-          Concat({
-              BigNumericRounding("bq_bignumeric_trunc", false),
-              {
-                  {.arity = 1, .spelling = "trunc($1)"},
-                  {.arity = 2, .spelling = RoundWithDigits("trunc")},
-              },
-          }),
+          {
+              .rules = Concat({
+                  BigNumericRounding("bq_bignumeric_trunc", false),
+                  {
+                      {.arity = 1, .spelling = "trunc($1)"},
+                      {.arity = 2, .spelling = RoundWithDigits("trunc")},
+                  },
+              }),
+              .uses = {TypeUse::kBigNumeric},
+          },
       },
-      {"ABS", {BigNumericOperator("bq_bignumeric_abs", 1), {.arity = 1, .spelling = "abs($1)"}}},
-      {"CEIL", IntegralRound("ceil")},
-      {"CEILING", IntegralRound("ceil")},
-      {"FLOOR", IntegralRound("floor")},
+      {
+          "ABS",
+          {
+              .rules =
+                  {
+                      BigNumericOperator("bq_bignumeric_abs", 1),
+                      {.arity = 1, .spelling = "abs($1)"},
+                  },
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {"CEIL", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
+      {"CEILING", {.rules = IntegralRound("ceil"), .uses = {TypeUse::kBigNumeric}}},
+      {"FLOOR", {.rules = IntegralRound("floor"), .uses = {TypeUse::kBigNumeric}}},
       // DuckDB cannot cast an empty BLOB to BIT.
       {
           "BIT_COUNT",
           {
-              {.arity = 1, .spelling = "bit_count($1)", .conditions = {Is(1, {TYPE_INT64})}},
-              {
-                  .arity = 1,
-                  .spelling =
-                      "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 AS BIT)) END",
-                  .conditions = {Is(1, {TYPE_BYTES})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "bit_count($1)",
+                          .conditions = {Is(1, {TYPE_INT64})},
+                      },
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "CASE WHEN octet_length($1) = 0 THEN 0 ELSE bit_count(CAST($1 "
+                              "AS BIT)) END",
+                          .conditions = {Is(1, {TYPE_BYTES})},
+                      },
+                  },
           },
       },
 
@@ -1105,141 +1355,185 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // DATE_ADD and DATE_SUB also take a DATETIME or a TIMESTAMP, and return its type.
       {
           "DATE_ADD",
-          Concat({
-              WithInterval("CAST($1 + $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
-              WithInterval("($1 + $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
-              WithInterval("($1 + $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
-          }),
+          {
+              .rules = Concat({
+                  WithInterval("CAST($1 + $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
+                  WithInterval("($1 + $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
+                  WithInterval("($1 + $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
+              }),
+          },
       },
       {
           "DATE_SUB",
-          Concat({
-              WithInterval("CAST($1 - $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
-              WithInterval("($1 - $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
-              WithInterval("($1 - $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
-          }),
+          {
+              .rules = Concat({
+                  WithInterval("CAST($1 - $2 AS DATE)", kDateRange, {Is(1, {TYPE_DATE})}),
+                  WithInterval("($1 - $2)", kDatetimeRange, {Is(1, {TYPE_DATETIME})}),
+                  WithInterval("($1 - $2)", kTimestampRange, {Is(1, {TYPE_TIMESTAMP})}),
+              }),
+          },
       },
-      {"DATETIME_ADD", WithInterval("($1 + $2)", kDatetimeRange)},
-      {"DATETIME_SUB", WithInterval("($1 - $2)", kDatetimeRange)},
-      {"TIMESTAMP_ADD", WithInterval("($1 + $2)", kTimestampRange)},
-      {"TIMESTAMP_SUB", WithInterval("($1 - $2)", kTimestampRange)},
+      {"DATETIME_ADD", {.rules = WithInterval("($1 + $2)", kDatetimeRange)}},
+      {"DATETIME_SUB", {.rules = WithInterval("($1 - $2)", kDatetimeRange)}},
+      {"TIMESTAMP_ADD", {.rules = WithInterval("($1 + $2)", kTimestampRange)}},
+      {"TIMESTAMP_SUB", {.rules = WithInterval("($1 - $2)", kTimestampRange)}},
       // TIME wraps around midnight.
-      {"TIME_ADD", TimeArithmetic("+")},
-      {"TIME_SUB", TimeArithmetic("-")},
-      {"$EXTRACT", Extract()},
-      {"GENERATE_TIMESTAMP_ARRAY", GenerateTimestampArray()},
+      {"TIME_ADD", {.rules = TimeArithmetic("+")}},
+      {"TIME_SUB", {.rules = TimeArithmetic("-")}},
+      {"$EXTRACT", {.rules = Extract(), .uses = {TypeUse::kBuildsOrReadsInterval}}},
+      {"GENERATE_TIMESTAMP_ARRAY", {.rules = GenerateTimestampArray()}},
       // DATE and DATETIME differences count the boundaries crossed, which is DuckDB's date_diff,
       // while TIMESTAMP differences below a day count whole units, which is its date_sub. Its
       // date_sub of TIMESTAMPTZ goes through milliseconds, so TIMESTAMPs are compared as UTC
       // civil times.
       {
           "DATE_DIFF",
-          Concat({
-              WeekDiff(),
-              {
+          {
+              .rules = Concat({
+                  WeekDiff(),
                   {
-                      .arity = 3,
-                      .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
-                      .conditions = {Is(1, {TYPE_TIMESTAMP}), SubDay(3)},
+                      {
+                          .arity = 3,
+                          .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
+                          .conditions = {Is(1, {TYPE_TIMESTAMP}), SubDay(3)},
+                      },
                   },
-              },
-              {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}},
-          }),
+                  {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}},
+              }),
+          },
       },
-      {"DATETIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
+      {
+          "DATETIME_DIFF",
+          {.rules = Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
+      },
       // TIMESTAMP differences count whole units.
       {
           "TIMESTAMP_DIFF",
-          Concat({
-              WeekDiff(),
-              {
+          {
+              .rules = Concat({
+                  WeekDiff(),
                   {
-                      .arity = 3,
-                      .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
-                      .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                      {
+                          .arity = 3,
+                          .spelling = "date_sub(#3, CAST($2 AS TIMESTAMP), CAST($1 AS TIMESTAMP))",
+                          .conditions = {Is(1, {TYPE_TIMESTAMP})},
+                      },
+                      {.arity = 3, .spelling = "date_sub(#3, $2, $1)"},
                   },
-                  {.arity = 3, .spelling = "date_sub(#3, $2, $1)"},
-              },
-          }),
+              }),
+          },
       },
-      {"TIME_DIFF", Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
+      {
+          "TIME_DIFF",
+          {.rules = Concat({WeekDiff(), {{.arity = 3, .spelling = "date_diff(#3, $2, $1)"}}})},
+      },
       // date_trunc() widens a DATE to a TIMESTAMP, which DATE_TRUNC does not. DATE_TRUNC also
       // takes a DATETIME or a TIMESTAMP, and returns its type.
       {
           "DATE_TRUNC",
-          Concat({
-              WeekTrunc("DATE"),
-              WeekTrunc(),
-              {
+          {
+              .rules = Concat({
+                  WeekTrunc("DATE"),
+                  WeekTrunc(),
                   {
-                      .arity = 2,
-                      .spelling = "CAST(date_trunc(#2, $1) AS DATE)",
-                      .conditions = {Is(1, {TYPE_DATE})},
+                      {
+                          .arity = 2,
+                          .spelling = "CAST(date_trunc(#2, $1) AS DATE)",
+                          .conditions = {Is(1, {TYPE_DATE})},
+                      },
+                      {.arity = 2, .spelling = "date_trunc(#2, $1)"},
                   },
-                  {.arity = 2, .spelling = "date_trunc(#2, $1)"},
-              },
-              ZonedTrunc(),
-          }),
+                  ZonedTrunc(),
+              }),
+          },
       },
       {
           "DATETIME_TRUNC",
-          Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+          {
+              .rules = Concat(
+                  {WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+          },
       },
       {
           "TIMESTAMP_TRUNC",
-          Concat({WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+          {
+              .rules = Concat(
+                  {WeekTrunc(), {{.arity = 2, .spelling = "date_trunc(#2, $1)"}}, ZonedTrunc()}),
+          },
       },
       {
           "TIME_TRUNC",
-          {{.arity = 2, .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)"}},
+          {
+              .rules =
+                  {
+                      {
+                          .arity = 2,
+                          .spelling = "CAST(date_trunc(#2, DATE '1970-01-01' + $1) AS TIME)",
+                      },
+                  },
+          },
       },
-      {"LAST_DAY", LastDay()},
+      {"LAST_DAY", {.rules = LastDay()}},
 
       // Constructors and conversions between the civil types and TIMESTAMP.
-      {"CURRENT_DATE", {{.arity = 0, .spelling = "CURRENT_DATE"}}},
-      {"CURRENT_TIME", {{.arity = 0, .spelling = "CURRENT_TIME"}}},
-      {"CURRENT_TIMESTAMP", {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}},
-      {"CURRENT_DATETIME", {{.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"}}},
-      {"$EXTRACT_DATE", Civil("DATE")},
-      {"$EXTRACT_TIME", Civil("TIME")},
-      {"$EXTRACT_DATETIME", Civil("TIMESTAMP")},
-      {"DATE", Concat({{{.arity = 3, .spelling = "make_date($1, $2, $3)"}}, Civil("DATE")})},
-      {"TIME", Concat({{{.arity = 3, .spelling = "make_time($1, $2, $3)"}}, Civil("TIME")})},
+      {"CURRENT_DATE", {.rules = {{.arity = 0, .spelling = "CURRENT_DATE"}}}},
+      {"CURRENT_TIME", {.rules = {{.arity = 0, .spelling = "CURRENT_TIME"}}}},
+      {"CURRENT_TIMESTAMP", {.rules = {{.arity = 0, .spelling = "CURRENT_TIMESTAMP"}}}},
+      {
+          "CURRENT_DATETIME",
+          {.rules = {{.arity = 0, .spelling = "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)"}}},
+      },
+      {"$EXTRACT_DATE", {.rules = Civil("DATE")}},
+      {"$EXTRACT_TIME", {.rules = Civil("TIME")}},
+      {"$EXTRACT_DATETIME", {.rules = Civil("TIMESTAMP")}},
+      {
+          "DATE",
+          {.rules = Concat({{{.arity = 3, .spelling = "make_date($1, $2, $3)"}}, Civil("DATE")})},
+      },
+      {
+          "TIME",
+          {.rules = Concat({{{.arity = 3, .spelling = "make_time($1, $2, $3)"}}, Civil("TIME")})},
+      },
       {
           "DATETIME",
-          Concat({
-              {
-                  {.arity = 6, .spelling = "make_timestamp($1, $2, $3, $4, $5, $6)"},
+          {
+              .rules = Concat({
                   {
-                      .arity = 2,
-                      .spelling = "($1 + $2)",
-                      .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})},
+                      {.arity = 6, .spelling = "make_timestamp($1, $2, $3, $4, $5, $6)"},
+                      {
+                          .arity = 2,
+                          .spelling = "($1 + $2)",
+                          .conditions = {Is(1, {TYPE_DATE}), Is(2, {TYPE_TIME})},
+                      },
                   },
-              },
-              Civil("TIMESTAMP"),
-          }),
+                  Civil("TIMESTAMP"),
+              }),
+          },
       },
       // GoogleSQL reads a STRING, which has a time zone of its own only without the argument.
       {
           "TIMESTAMP",
           {
-              {
-                  .arity = 1,
-                  .spelling = "bq_string_to_timestamp($1, false)",
-                  .conditions = {Is(1, {TYPE_STRING})},
-              },
-              {
-                  .arity = 2,
-                  .spelling = "bq_string_to_timestamp_in($1, $2)",
-                  .conditions = {Is(1, {TYPE_STRING})},
-              },
-              {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
-              // A civil time in the given zone.
-              {
-                  .arity = 2,
-                  .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
-                  .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME})},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "bq_string_to_timestamp($1, false)",
+                          .conditions = {Is(1, {TYPE_STRING})},
+                      },
+                      {
+                          .arity = 2,
+                          .spelling = "bq_string_to_timestamp_in($1, $2)",
+                          .conditions = {Is(1, {TYPE_STRING})},
+                      },
+                      {.arity = 1, .spelling = "CAST($1 AS TIMESTAMPTZ)"},
+                      // A civil time in the given zone.
+                      {
+                          .arity = 2,
+                          .spelling = "bq_datetime_to_timestamp_in(CAST($1 AS TIMESTAMP), $2)",
+                          .conditions = {Is(1, {TYPE_DATE, TYPE_DATETIME})},
+                      },
+                  },
           },
       },
 
@@ -1249,24 +1543,35 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // truncates toward zero.
       {
           "UNIX_SECONDS",
-          {{.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"}},
+          {.rules = {{.arity = 1, .spelling = "CAST(epoch(date_trunc('second', $1)) AS BIGINT)"}}},
       },
-      {"UNIX_MILLIS", {{.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"}}},
-      {"UNIX_DATE", {{.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"}}},
-      {"TIMESTAMP_SECONDS", FromUnixTime("to_timestamp($1)", 1000000)},
-      {"TIMESTAMP_MILLIS", FromUnixTime("(epoch_ms($1) AT TIME ZONE 'UTC')", 1000)},
-      {"TIMESTAMP_MICROS", FromUnixTime("(make_timestamp($1) AT TIME ZONE 'UTC')", 1)},
+      {
+          "UNIX_MILLIS",
+          {.rules = {{.arity = 1, .spelling = "epoch_ms(date_trunc('millisecond', $1))"}}},
+      },
+      {
+          "UNIX_DATE",
+          {.rules = {{.arity = 1, .spelling = "date_diff('day', DATE '1970-01-01', $1)"}}},
+      },
+      {"TIMESTAMP_SECONDS", {.rules = FromUnixTime("to_timestamp($1)", 1000000)}},
+      {"TIMESTAMP_MILLIS", {.rules = FromUnixTime("(epoch_ms($1) AT TIME ZONE 'UTC')", 1000)}},
+      {"TIMESTAMP_MICROS", {.rules = FromUnixTime("(make_timestamp($1) AT TIME ZONE 'UTC')", 1)}},
       {
           "DATE_FROM_UNIX_DATE",
           {
-              {
-                  .arity = 1,
-                  .spelling = "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "CASE WHEN $1 NOT BETWEEN -719162 AND 2932896 THEN !1 ELSE "
                               "CAST(DATE '1970-01-01' + to_days(CAST($1 AS INTEGER)) AS DATE) END",
-                  .conditions = {},
-                  .defaults = {},
-                  .errors = {"'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1"},
-              },
+                          .conditions = {},
+                          .defaults = {},
+                          .errors =
+                              {"'DATE_FROM_UNIX_DATE range is -719162 to 2932896 but saw ' || $1"},
+                      },
+                  },
           },
       },
 
@@ -1275,104 +1580,166 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "LENGTH",
           {
-              {.arity = 1, .spelling = "octet_length($1)", .conditions = {Is(1, {TYPE_BYTES})}},
-              {.arity = 1, .spelling = "length($1)"},
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "octet_length($1)",
+                          .conditions = {Is(1, {TYPE_BYTES})},
+                      },
+                      {.arity = 1, .spelling = "length($1)"},
+                  },
           },
       },
       {
           "BYTE_LENGTH",
           {
-              {.arity = 1, .spelling = "strlen($1)", .conditions = {Is(1, {TYPE_STRING})}},
-              {.arity = 1, .spelling = "octet_length($1)", .conditions = {Is(1, {TYPE_BYTES})}},
+              .rules =
+                  {
+                      {.arity = 1, .spelling = "strlen($1)", .conditions = {Is(1, {TYPE_STRING})}},
+                      {
+                          .arity = 1,
+                          .spelling = "octet_length($1)",
+                          .conditions = {Is(1, {TYPE_BYTES})},
+                      },
+                  },
           },
       },
       // Hashes are BYTES in BigQuery and hexadecimal strings in DuckDB.
-      {"MD5", {{.arity = 1, .spelling = "unhex(md5($1))"}}},
-      {"SHA1", {{.arity = 1, .spelling = "unhex(sha1($1))"}}},
-      {"SHA256", {{.arity = 1, .spelling = "unhex(sha256($1))"}}},
-      {"TO_HEX", {{.arity = 1, .spelling = "lower(hex($1))"}}},
-      {"FROM_HEX", {{.arity = 1, .spelling = "unhex($1)", .conditions = {Is(1, {TYPE_STRING})}}}},
-      {"TO_BASE64", {{.arity = 1, .spelling = "to_base64($1)"}}},
+      {"MD5", {.rules = {{.arity = 1, .spelling = "unhex(md5($1))"}}}},
+      {"SHA1", {.rules = {{.arity = 1, .spelling = "unhex(sha1($1))"}}}},
+      {"SHA256", {.rules = {{.arity = 1, .spelling = "unhex(sha256($1))"}}}},
+      {"TO_HEX", {.rules = {{.arity = 1, .spelling = "lower(hex($1))"}}}},
+      {
+          "FROM_HEX",
+          {.rules = {{.arity = 1, .spelling = "unhex($1)", .conditions = {Is(1, {TYPE_STRING})}}}},
+      },
+      {"TO_BASE64", {.rules = {{.arity = 1, .spelling = "to_base64($1)"}}}},
       {
           "FROM_BASE64",
-          {{.arity = 1, .spelling = "from_base64($1)", .conditions = {Is(1, {TYPE_STRING})}}},
+          {
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "from_base64($1)",
+                          .conditions = {Is(1, {TYPE_STRING})},
+                      },
+                  },
+          },
       },
 
       {
           "ERROR",
           {
-              {
-                  .arity = 1,
-                  .spelling = "!1",
-                  .conditions = {},
-                  .defaults = {},
-                  .errors = {"coalesce($1, 'ERROR function called with NULL value')"},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling = "!1",
+                          .conditions = {},
+                          .defaults = {},
+                          .errors = {"coalesce($1, 'ERROR function called with NULL value')"},
+                      },
+                  },
+              .uses =
+                  {
+                      TypeUse::kBuildsOrReadsInterval,
+                      TypeUse::kBuildsOrReadsRange,
+                      TypeUse::kRejectsSafe,
+                      TypeUse::kBigNumeric,
+                  },
           },
       },
-      {"ARRAY_REVERSE", {{.arity = 1, .spelling = "list_reverse($1)"}}},
+      {
+          "ARRAY_REVERSE",
+          {
+              .rules = {{.arity = 1, .spelling = "list_reverse($1)"}},
+              .uses = {TypeUse::kCarries, TypeUse::kBigNumeric},
+          },
+      },
       // Each run of equal terms in the sorted document, NULL first, becomes a term and its count.
       {
           "BAG_OF_WORDS",
           {
-              {
-                  .arity = 1,
-                  .spelling =
-                      "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
-                      "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = 1 OR "
-                      "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, lambda "
-                      "_r, _k: "
-                      "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], len(_s) + 1) "
-                      "- "
-                      "_r)))[1])[1]",
-              },
+              .rules =
+                  {
+                      {
+                          .arity = 1,
+                          .spelling =
+                              "list_transform([list_sort($1, 'ASC', 'NULLS FIRST')], lambda _s: "
+                              "list_transform([list_filter(range(1, len(_s) + 1), lambda _i: _i = "
+                              "1 "
+                              "OR "
+                              "_s[_i] IS DISTINCT FROM _s[_i - 1])], lambda _b: list_transform(_b, "
+                              "lambda "
+                              "_r, _k: "
+                              "struct_pack(term := _s[_r], \"count\" := coalesce(_b[_k + 1], "
+                              "len(_s) "
+                              "+ 1) "
+                              "- "
+                              "_r)))[1])[1]",
+                      },
+                  },
           },
       },
-      {"RANGE_BUCKET", RangeBucket()},
-      {"RANGE", RangeConstructor()},
-      {"RANGE_START", BoundOrNull(kRangeStart)},
-      {"RANGE_END", BoundOrNull(kRangeEnd)},
-      {"RANGE_CONTAINS", RangeContains()},
-      {"RANGE_OVERLAPS", {{.arity = 2, .spelling = Overlap()}}},
-      {"RANGE_INTERSECT", RangeIntersect()},
+      {
+          "RANGE_BUCKET",
+          {.rules = RangeBucket(), .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric}},
+      },
+      {"RANGE", {.rules = RangeConstructor(), .uses = {TypeUse::kBuildsOrReadsRange}}},
+      {"RANGE_START", {.rules = BoundOrNull(kRangeStart), .uses = {TypeUse::kBuildsOrReadsRange}}},
+      {"RANGE_END", {.rules = BoundOrNull(kRangeEnd), .uses = {TypeUse::kBuildsOrReadsRange}}},
+      {"RANGE_CONTAINS", {.rules = RangeContains(), .uses = {TypeUse::kBuildsOrReadsRange}}},
+      {
+          "RANGE_OVERLAPS",
+          {.rules = {{.arity = 2, .spelling = Overlap()}}, .uses = {TypeUse::kBuildsOrReadsRange}},
+      },
+      {"RANGE_INTERSECT", {.rules = RangeIntersect(), .uses = {TypeUse::kBuildsOrReadsRange}}},
       // Use list_aggr directly: DuckDB v2 macros can mistake aliases on expanded arguments
       // for named parameters. Preserve array_to_string's empty-array result and NULL handling.
       {
           "ARRAY_TO_STRING",
           {
-              {
-                  .arity = 2,
-                  .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                              "ELSE list_aggr($1, 'string_agg', $2) END",
-                  .conditions = {Is(2, {TYPE_STRING})},
-              },
-              {
-                  .arity = 3,
-                  .spelling =
-                      "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
-                      "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
-                      "'string_agg', $2) END",
-                  .conditions = {Is(2, {TYPE_STRING})},
-              },
-              // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with ||,
-              // starting from NULL when the delimiter or NULL text is NULL.
-              {
-                  .arity = 2,
-                  .spelling =
-                      "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda _a, _e, _i: "
-                      "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
-                      "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
-                  .conditions = {Is(2, {TYPE_BYTES})},
-              },
-              {
-                  .arity = 3,
-                  .spelling = "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda "
+              .rules =
+                  {
+                      {
+                          .arity = 2,
+                          .spelling = "CASE WHEN $2 IS NULL THEN NULL WHEN len($1) = 0 THEN '' "
+                                      "ELSE list_aggr($1, 'string_agg', $2) END",
+                          .conditions = {Is(2, {TYPE_STRING})},
+                      },
+                      {
+                          .arity = 3,
+                          .spelling =
+                              "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL WHEN len($1) = 0 THEN "
+                              "'' "
+                              "ELSE list_aggr(list_transform($1, lambda _e: coalesce(_e, $3)), "
+                              "'string_agg', $2) END",
+                          .conditions = {Is(2, {TYPE_STRING})},
+                      },
+                      // DuckDB has no array_to_string() for BLOB, so BYTES are concatenated with
+                      // ||, starting from NULL when the delimiter or NULL text is NULL.
+                      {
+                          .arity = 2,
+                          .spelling =
+                              "list_reduce(list_filter($1, lambda _e: _e IS NOT NULL), lambda "
+                              "_a, _e, _i: "
+                              "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
+                              "CASE WHEN $2 IS NULL THEN NULL ELSE CAST('' AS BLOB) END)",
+                          .conditions = {Is(2, {TYPE_BYTES})},
+                      },
+                      {
+                          .arity = 3,
+                          .spelling =
+                              "list_reduce(list_transform($1, lambda _e: coalesce(_e, $3)), lambda "
                               "_a, _e, _i: "
                               "_a || CASE WHEN _i = 1 THEN _e ELSE $2 || _e END, "
                               "CASE WHEN $2 IS NULL OR $3 IS NULL THEN NULL "
                               "ELSE CAST('' AS BLOB) END)",
-                  .conditions = {Is(2, {TYPE_BYTES})},
-              },
+                          .conditions = {Is(2, {TYPE_BYTES})},
+                      },
+                  },
           },
       },
       // generate_series() has no floating point overload, and returns an empty list for a zero
@@ -1380,37 +1747,47 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       {
           "GENERATE_ARRAY",
           {
-              {
-                  .arity = {2, 3},
-                  .spelling = "bq_generate_array_numeric($1, $2, $3)",
-                  .conditions = {Is(1, {TYPE_NUMERIC})},
-                  .defaults = {"1"},
-                  .implementation = Implementation::kGoogleSQL,
-              },
-              {
-                  .arity = {2, 3},
-                  .spelling = "bq_generate_array($1, $2, $3)",
-                  .conditions = {Is(1, {TYPE_DOUBLE})},
-                  .defaults = {"1"},
-                  .implementation = Implementation::kGoogleSQL,
-              },
-              {
-                  .arity = {2, 3},
-                  .spelling =
-                      "list_transform(bq_bignumeric_generate_array(CAST($1 AS VARCHAR), CAST($2 AS "
-                      "VARCHAR), "
-                      "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
-                  .conditions = {Is(1, {TYPE_BIGNUMERIC})},
-                  .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
-                  .implementation = Implementation::kGoogleSQL,
-              },
-              {
-                  .arity = {2, 3},
-                  .spelling = "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
-                  .conditions = {Is(1, {TYPE_INT64}), Is(2, {TYPE_INT64}), Is(3, {TYPE_INT64})},
-                  .defaults = {"1"},
-                  .errors = {"'Sequence step cannot be 0.'"},
-              },
+              .rules =
+                  {
+                      {
+                          .arity = {2, 3},
+                          .spelling = "bq_generate_array_numeric($1, $2, $3)",
+                          .conditions = {Is(1, {TYPE_NUMERIC})},
+                          .defaults = {"1"},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
+                      {
+                          .arity = {2, 3},
+                          .spelling = "bq_generate_array($1, $2, $3)",
+                          .conditions = {Is(1, {TYPE_DOUBLE})},
+                          .defaults = {"1"},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
+                      {
+                          .arity = {2, 3},
+                          .spelling = "list_transform(bq_bignumeric_generate_array(CAST($1 AS "
+                                      "VARCHAR), CAST($2 AS "
+                                      "VARCHAR), "
+                                      "CAST($3 AS VARCHAR)), lambda _e: CAST(_e AS BIGNUM))",
+                          .conditions = {Is(1, {TYPE_BIGNUMERIC})},
+                          .defaults = {"CAST('100000000000000000000000000000000000000' AS BIGNUM)"},
+                          .implementation = Implementation::kGoogleSQL,
+                      },
+                      {
+                          .arity = {2, 3},
+                          .spelling =
+                              "CASE WHEN $3 = 0 THEN !1 ELSE generate_series($1, $2, $3) END",
+                          .conditions =
+                              {
+                                  Is(1, {TYPE_INT64}),
+                                  Is(2, {TYPE_INT64}),
+                                  Is(3, {TYPE_INT64}),
+                              },
+                          .defaults = {"1"},
+                          .errors = {"'Sequence step cannot be 0.'"},
+                      },
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
       },
   };

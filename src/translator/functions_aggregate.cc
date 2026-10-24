@@ -190,224 +190,341 @@ AggregateRule ApproxCountDistinct(googlesql::TypeKind type) {
 // Aggregate functions, which also take a window.
 }  // namespace
 
-const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Aggregates() {
+const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Aggregates() {
   using enum AggregateRule::Nulls;
   using enum AggregateRule::Limit;
-  static const auto* const kAggregates =
-      new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
-          // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
-          // first, as BigQuery does.
+  static const auto* const kAggregates = new std::unordered_map<std::string_view,
+                                                                FunctionDefinition<AggregateRule>>{
+      // INTERVAL values compare by their keys; among equal values, MIN and MAX return the
+      // first, as BigQuery does.
+      {
+          "COUNT",
           {
-              "COUNT",
-              {
+              .rules =
                   {
-                      .function = "count",
-                      .type = googlesql::TYPE_INTERVAL,
-                      .arguments = {"bq_interval_key($1)"},
+                      {
+                          .function = "count",
+                          .type = googlesql::TYPE_INTERVAL,
+                          .arguments = {"bq_interval_key($1)"},
+                      },
+                      {.function = "count"},
                   },
-                  {.function = "count"},
-              },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
-          {"$COUNT_STAR", {{.function = "count", .arguments = {"*"}}}},
+      },
+      {"$COUNT_STAR", {.rules = {{.function = "count", .arguments = {"*"}}}}},
+      {
+          "SUM",
           {
-              "SUM",
-              {
-                  {.function = "sum", .type = googlesql::TYPE_BIGNUMERIC, .finish = BigNumericSum},
-                  IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
-                  IntervalAggregate<kIntervalSum>(),
-                  {.function = "sum"},
-              },
-          },
-          {
-              "AVG",
-              {
-                  BigNumericAggregate<kBigNumericAvg>(1),
-                  IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
-                  IntervalAggregate<kIntervalAvg>(),
-                  {.function = "avg"},
-              },
-          },
-          {
-              "MIN",
-              {
+              .rules =
                   {
-                      .function = "arg_min",
-                      .type = googlesql::TYPE_INTERVAL,
-                      .arguments = {"$1", "bq_interval_key($1)"},
+                      {
+                          .function = "sum",
+                          .type = googlesql::TYPE_BIGNUMERIC,
+                          .finish = BigNumericSum,
+                      },
+                      IntervalAggregate<kIntervalSumDistinct>(AggregateRule::Distinct::kRequired),
+                      IntervalAggregate<kIntervalSum>(),
+                      {.function = "sum"},
                   },
-                  {.function = "min"},
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
+      },
+      {
+          "AVG",
           {
-              "MAX",
-              {
+              .rules =
                   {
-                      .function = "arg_max",
-                      .type = googlesql::TYPE_INTERVAL,
-                      .arguments = {"$1", "bq_interval_key($1)"},
+                      BigNumericAggregate<kBigNumericAvg>(1),
+                      IntervalAggregate<kIntervalAvgDistinct>(AggregateRule::Distinct::kRequired),
+                      IntervalAggregate<kIntervalAvg>(),
+                      {.function = "avg"},
                   },
-                  {.function = "max"},
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
-          {"ANY_VALUE", {{.function = "any_value", .carries = true}}},
-          // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
-          // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
-          // STRUCT values with INTERVAL fields are collected as they are.
+      },
+      {
+          "MIN",
           {
-              "ARRAY_AGG",
-              {
+              .rules =
                   {
-                      .function = "list",
-                      .type = googlesql::TYPE_INTERVAL,
-                      .nulls = kFilter,
-                      .distinct = AggregateRule::Distinct::kRequired,
-                      .limit = kSliceFinished,
-                      .finish = IntervalDistinct,
+                      {
+                          .function = "arg_min",
+                          .type = googlesql::TYPE_INTERVAL,
+                          .arguments = {"$1", "bq_interval_key($1)"},
+                      },
+                      {.function = "min"},
                   },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "MAX",
+          {
+              .rules =
                   {
-                      .function = "list",
-                      .type = googlesql::TYPE_INTERVAL,
-                      .nulls = kFilter,
-                      .limit = kSlice,
+                      {
+                          .function = "arg_max",
+                          .type = googlesql::TYPE_INTERVAL,
+                          .arguments = {"$1", "bq_interval_key($1)"},
+                      },
+                      {.function = "max"},
                   },
-                  {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
-              },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
-          // ARRAY_CONCAT_AGG skips NULL arrays.
+      },
+      {
+          "ANY_VALUE",
           {
-              "ARRAY_CONCAT_AGG",
-              {
+              .rules = {{.function = "any_value", .carries = true}},
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+          },
+      },
+      // DuckDB's DISTINCT would keep any of equal INTERVAL values, such as a month and 30
+      // days, so the INTERVAL function keeps the first of them, and LIMIT then slices them.
+      // STRUCT values with INTERVAL fields are collected as they are.
+      {
+          "ARRAY_AGG",
+          {
+              .rules =
                   {
-                      .function = "list",
-                      .limit = kSlice,
-                      .skip_nulls = true,
-                      .carries = true,
-                      .finish = Flatten,
+                      {
+                          .function = "list",
+                          .type = googlesql::TYPE_INTERVAL,
+                          .nulls = kFilter,
+                          .distinct = AggregateRule::Distinct::kRequired,
+                          .limit = kSliceFinished,
+                          .finish = IntervalDistinct,
+                      },
+                      {
+                          .function = "list",
+                          .type = googlesql::TYPE_INTERVAL,
+                          .nulls = kFilter,
+                          .limit = kSlice,
+                      },
+                      {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
                   },
-              },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
+      },
+      // ARRAY_CONCAT_AGG skips NULL arrays.
+      {
+          "ARRAY_CONCAT_AGG",
           {
-              "HLL_COUNT.INIT",
-              {HllCountInit(googlesql::TYPE_BIGNUMERIC), HllCountInit(googlesql::TYPE_UNKNOWN)},
-          },
-          {"HLL_COUNT.MERGE_PARTIAL", {{.function = "bq_hll_count_merge_partial"}}},
-          {
-              "HLL_COUNT.MERGE",
-              {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}},
-          },
-          // Other types count exactly, which is within any approximation error.
-          {
-              "APPROX_COUNT_DISTINCT",
-              {
-                  ApproxCountDistinct(googlesql::TYPE_INT64),
-                  ApproxCountDistinct(googlesql::TYPE_STRING),
-                  ApproxCountDistinct(googlesql::TYPE_BYTES),
-                  ApproxCountDistinct(googlesql::TYPE_NUMERIC),
-                  ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
-                  {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
-              },
-          },
-          // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
-          // skips NULLs, as APPROX_QUANTILES does by default.
-          {
-              "APPROX_QUANTILES",
-              {
+              .rules =
                   {
-                      .function = "quantile_disc",
-                      .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
-                      .nulls = kIgnore,
+                      {
+                          .function = "list",
+                          .limit = kSlice,
+                          .skip_nulls = true,
+                          .carries = true,
+                          .finish = Flatten,
+                      },
                   },
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
-          // histogram() takes only the values; TopCount() applies the count afterwards.
+      },
+      {
+          "HLL_COUNT.INIT",
           {
-              "APPROX_TOP_COUNT",
-              {
+              .rules =
                   {
-                      .function = "histogram",
-                      .arguments = {"$1"},
-                      .distinct = AggregateRule::Distinct::kUnsupported,
-                      .finish = TopCount,
+                      HllCountInit(googlesql::TYPE_BIGNUMERIC),
+                      HllCountInit(googlesql::TYPE_UNKNOWN),
                   },
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
+      },
+      {"HLL_COUNT.MERGE_PARTIAL", {.rules = {{.function = "bq_hll_count_merge_partial"}}}},
+      {
+          "HLL_COUNT.MERGE",
+          {.rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}}},
+      },
+      // Other types count exactly, which is within any approximation error.
+      {
+          "APPROX_COUNT_DISTINCT",
           {
-              "APPROX_TOP_SUM",
-              {
-                  TopSumRule<googlesql::TYPE_INT64>(),
-                  TopSumRule<googlesql::TYPE_NUMERIC>(),
-                  TopSumRule<googlesql::TYPE_BIGNUMERIC>(),
-                  TopSumRule<googlesql::TYPE_DOUBLE>(),
-              },
-          },
-          // The _null variants return a NULL x instead of skipping its row. INTERVAL values of y
-          // compare by their keys.
-          {
-              "MAX_BY",
-              {
+              .rules =
                   {
-                      .function = "arg_max_null",
-                      .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
-                      .arguments = {"$1", "bq_interval_key($2)"},
-                      .carries = true,
+                      ApproxCountDistinct(googlesql::TYPE_INT64),
+                      ApproxCountDistinct(googlesql::TYPE_STRING),
+                      ApproxCountDistinct(googlesql::TYPE_BYTES),
+                      ApproxCountDistinct(googlesql::TYPE_NUMERIC),
+                      ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
+                      {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
                   },
-                  {.function = "arg_max_null", .carries = true},
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
+      },
+      // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
+      // skips NULLs, as APPROX_QUANTILES does by default.
+      {
+          "APPROX_QUANTILES",
           {
-              "MIN_BY",
-              {
+              .rules =
                   {
-                      .function = "arg_min_null",
-                      .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
-                      .arguments = {"$1", "bq_interval_key($2)"},
-                      .carries = true,
+                      {
+                          .function = "quantile_disc",
+                          .arguments = {"$1", "list_transform(range($2 + 1), lambda i: i / $2)"},
+                          .nulls = kIgnore,
+                      },
                   },
-                  {.function = "arg_min_null", .carries = true},
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
-          // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
-          // hexadecimal digits; the default delimiter is b','.
+      },
+      // histogram() takes only the values; TopCount() applies the count afterwards.
+      {
+          "APPROX_TOP_COUNT",
           {
-              "STRING_AGG",
-              {
-                  {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+              .rules =
                   {
-                      .function = "string_agg",
-                      .type = googlesql::TYPE_BYTES,
-                      .arguments = {"hex($1)", "hex($2)"},
-                      .defaults = {"", "unhex('2C')"},
-                      .limit = kJoin,
-                      .finish = Unhex,
+                      {
+                          .function = "histogram",
+                          .arguments = {"$1"},
+                          .distinct = AggregateRule::Distinct::kUnsupported,
+                          .finish = TopCount,
+                      },
                   },
-              },
+              .uses = {TypeUse::kBigNumeric},
           },
-          // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
-          // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
-          {"COUNTIF", {{.function = "count", .arguments = {"CASE WHEN $1 THEN TRUE END"}}}},
-          {"LOGICAL_AND", {{.function = "bool_and"}}},
-          {"LOGICAL_OR", {{.function = "bool_or"}}},
-          {"BIT_AND", {{.function = "bit_and"}}},
-          {"BIT_OR", {{.function = "bit_or"}}},
-          {"BIT_XOR", {{.function = "bit_xor"}}},
-          {"STDDEV", {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}}},
+      },
+      {
+          "APPROX_TOP_SUM",
           {
-              "STDDEV_SAMP",
-              {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+              .rules =
+                  {
+                      TopSumRule<googlesql::TYPE_INT64>(),
+                      TopSumRule<googlesql::TYPE_NUMERIC>(),
+                      TopSumRule<googlesql::TYPE_BIGNUMERIC>(),
+                      TopSumRule<googlesql::TYPE_DOUBLE>(),
+                  },
+              .uses = {TypeUse::kBigNumeric},
           },
+      },
+      // The _null variants return a NULL x instead of skipping its row. INTERVAL values of y
+      // compare by their keys.
+      {
+          "MAX_BY",
           {
-              "STDDEV_POP",
-              {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}},
+              .rules =
+                  {
+                      {
+                          .function = "arg_max_null",
+                          .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
+                          .arguments = {"$1", "bq_interval_key($2)"},
+                          .carries = true,
+                      },
+                      {.function = "arg_max_null", .carries = true},
+                  },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
-          {"VARIANCE", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
-          {"VAR_SAMP", {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}}},
-          {"VAR_POP", {BigNumericAggregate<kBigNumericVarPop>(1), {.function = "var_pop"}}},
-          {"CORR", {BigNumericAggregate<kBigNumericCorr>(2), {.function = "corr"}}},
-          {"COVAR_POP", {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}}},
+      },
+      {
+          "MIN_BY",
           {
-              "COVAR_SAMP",
-              {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}},
+              .rules =
+                  {
+                      {
+                          .function = "arg_min_null",
+                          .conditions = {{.argument = 2, .types = {googlesql::TYPE_INTERVAL}}},
+                          .arguments = {"$1", "bq_interval_key($2)"},
+                          .carries = true,
+                      },
+                      {.function = "arg_min_null", .carries = true},
+                  },
+              .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
           },
+      },
+      // DuckDB's string_agg() only joins strings, so STRING_AGG over BYTES joins their
+      // hexadecimal digits; the default delimiter is b','.
+      {
+          "STRING_AGG",
+          {
+              .rules =
+                  {
+                      {.function = "string_agg", .type = googlesql::TYPE_STRING, .limit = kJoin},
+                      {
+                          .function = "string_agg",
+                          .type = googlesql::TYPE_BYTES,
+                          .arguments = {"hex($1)", "hex($2)"},
+                          .defaults = {"", "unhex('2C')"},
+                          .limit = kJoin,
+                          .finish = Unhex,
+                      },
+                  },
+          },
+      },
+      // COUNT counts only TRUE after converting FALSE and NULL to NULL, and returns 0
+      // for empty inputs and window frames. DISTINCT still counts TRUE at most once.
+      {"COUNTIF", {.rules = {{.function = "count", .arguments = {"CASE WHEN $1 THEN TRUE END"}}}}},
+      {"LOGICAL_AND", {.rules = {{.function = "bool_and"}}}},
+      {"LOGICAL_OR", {.rules = {{.function = "bool_or"}}}},
+      {"BIT_AND", {.rules = {{.function = "bit_and"}}}},
+      {"BIT_OR", {.rules = {{.function = "bit_or"}}}},
+      {"BIT_XOR", {.rules = {{.function = "bit_xor"}}}},
+      {
+          "STDDEV",
+          {
+              .rules = {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "STDDEV_SAMP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericStdDevSamp>(1), {.function = "stddev_samp"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "STDDEV_POP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericStdDevPop>(1), {.function = "stddev_pop"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "VARIANCE",
+          {
+              .rules = {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "VAR_SAMP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericVarSamp>(1), {.function = "var_samp"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "VAR_POP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericVarPop>(1), {.function = "var_pop"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "CORR",
+          {
+              .rules = {BigNumericAggregate<kBigNumericCorr>(2), {.function = "corr"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "COVAR_POP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericCovarPop>(2), {.function = "covar_pop"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
+      {
+          "COVAR_SAMP",
+          {
+              .rules = {BigNumericAggregate<kBigNumericCovarSamp>(2), {.function = "covar_samp"}},
+              .uses = {TypeUse::kBigNumeric},
+          },
+      },
   };
   return *kAggregates;
 }
@@ -474,70 +591,111 @@ std::string TfIdf(const std::string& sql, const std::vector<std::string>& argume
 // Functions that only take a window.
 }  // namespace
 
-const std::unordered_map<std::string_view, std::vector<AggregateRule>>& Analytics() {
+const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Analytics() {
   using enum AggregateRule::Nulls;
   static const auto* const kAnalytics =
-      new std::unordered_map<std::string_view, std::vector<AggregateRule>>{
-          {"ROW_NUMBER", {{.function = "row_number"}}},
-          {"RANK", {{.function = "rank"}}},
-          {"DENSE_RANK", {{.function = "dense_rank"}}},
-          {"PERCENT_RANK", {{.function = "percent_rank"}}},
-          {"CUME_DIST", {{.function = "cume_dist"}}},
-          {"NTILE", {{.function = "ntile"}}},
-          {"LAG", {{.function = "lag", .carries = true}}},
-          {"LEAD", {{.function = "lead", .carries = true}}},
-          {"FIRST_VALUE", {{.function = "first_value", .nulls = kModifier, .carries = true}}},
-          {"LAST_VALUE", {{.function = "last_value", .nulls = kModifier, .carries = true}}},
-          {"NTH_VALUE", {{.function = "nth_value", .nulls = kModifier, .carries = true}}},
+      new std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>{
+          {"ROW_NUMBER", {.rules = {{.function = "row_number"}}}},
+          {"RANK", {.rules = {{.function = "rank"}}}},
+          {"DENSE_RANK", {.rules = {{.function = "dense_rank"}}}},
+          {"PERCENT_RANK", {.rules = {{.function = "percent_rank"}}}},
+          {"CUME_DIST", {.rules = {{.function = "cume_dist"}}}},
+          {"NTILE", {.rules = {{.function = "ntile"}}}},
+          {
+              "LAG",
+              {
+                  .rules = {{.function = "lag", .carries = true}},
+                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+              },
+          },
+          {
+              "LEAD",
+              {
+                  .rules = {{.function = "lead", .carries = true}},
+                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+              },
+          },
+          {
+              "FIRST_VALUE",
+              {
+                  .rules = {{.function = "first_value", .nulls = kModifier, .carries = true}},
+                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+              },
+          },
+          {
+              "LAST_VALUE",
+              {
+                  .rules = {{.function = "last_value", .nulls = kModifier, .carries = true}},
+                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+              },
+          },
+          {
+              "NTH_VALUE",
+              {
+                  .rules = {{.function = "nth_value", .nulls = kModifier, .carries = true}},
+                  .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
+              },
+          },
           {
               "PERCENTILE_CONT",
               {
-                  {
-                      .function = "list",
-                      .type = googlesql::TYPE_DOUBLE,
-                      .arguments = {"$1"},
-                      .order = kFloatPercentileOrder,
-                      .nulls = kFilterUnlessRespected,
-                      .finish = PercentileCont<googlesql::TYPE_DOUBLE>,
-                  },
-                  {
-                      .function = "list",
-                      .type = googlesql::TYPE_NUMERIC,
-                      .arguments = {"$1"},
-                      .order = kPercentileOrder,
-                      .nulls = kFilterUnlessRespected,
-                      .finish = PercentileCont<googlesql::TYPE_NUMERIC>,
-                  },
-                  {
-                      .function = "list",
-                      .type = googlesql::TYPE_BIGNUMERIC,
-                      .arguments = {"CAST($1 AS VARCHAR)"},
-                      .order = kPercentileOrder,
-                      .nulls = kFilterUnlessRespected,
-                      .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
-                  },
+                  .rules =
+                      {
+                          {
+                              .function = "list",
+                              .type = googlesql::TYPE_DOUBLE,
+                              .arguments = {"$1"},
+                              .order = kFloatPercentileOrder,
+                              .nulls = kFilterUnlessRespected,
+                              .finish = PercentileCont<googlesql::TYPE_DOUBLE>,
+                          },
+                          {
+                              .function = "list",
+                              .type = googlesql::TYPE_NUMERIC,
+                              .arguments = {"$1"},
+                              .order = kPercentileOrder,
+                              .nulls = kFilterUnlessRespected,
+                              .finish = PercentileCont<googlesql::TYPE_NUMERIC>,
+                          },
+                          {
+                              .function = "list",
+                              .type = googlesql::TYPE_BIGNUMERIC,
+                              .arguments = {"CAST($1 AS VARCHAR)"},
+                              .order = kPercentileOrder,
+                              .nulls = kFilterUnlessRespected,
+                              .finish = PercentileCont<googlesql::TYPE_BIGNUMERIC>,
+                          },
+                      },
+                  .uses = {TypeUse::kBigNumeric},
               },
           },
           {
               "TF_IDF",
               {
-                  {
-                      .function = "bq_tf_idf_dictionary",
-                      .arguments = {"$1", "$2", "$3"},
-                      .defaults = {"", "32000", "5"},
-                      .finish = TfIdf,
-                  },
+                  .rules =
+                      {
+                          {
+                              .function = "bq_tf_idf_dictionary",
+                              .arguments = {"$1", "$2", "$3"},
+                              .defaults = {"", "32000", "5"},
+                              .finish = TfIdf,
+                          },
+                      },
               },
           },
           {
               "PERCENTILE_DISC",
               {
-                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
-                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
-                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
-                  PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
-                  PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
-                  PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
+                  .rules =
+                      {
+                          PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_DOUBLE),
+                          PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_DOUBLE),
+                          PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_DOUBLE),
+                          PercentileDiscRule<googlesql::TYPE_DOUBLE>(googlesql::TYPE_UNKNOWN),
+                          PercentileDiscRule<googlesql::TYPE_NUMERIC>(googlesql::TYPE_UNKNOWN),
+                          PercentileDiscRule<googlesql::TYPE_BIGNUMERIC>(googlesql::TYPE_UNKNOWN),
+                      },
+                  .uses = {TypeUse::kBigNumeric},
               },
           },
   };
