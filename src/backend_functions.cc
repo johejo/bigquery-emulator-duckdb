@@ -10,7 +10,6 @@
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/cast.h"
 #include "src/backend_functions/datetime.h"
-#include "src/backend_functions/geography.h"
 #include "src/backend_functions/hll_count.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
@@ -25,6 +24,8 @@
 #include "src/backend_functions/string.h"
 #include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_s2geometry/geography.h"
+#include "src/googlesql_s2geometry_duckdb/geography.h"
 #include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
@@ -143,7 +144,10 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());
   backend_functions::RegisterRangeFunctions(connection.get());
-  backend_functions::RegisterGeographyFunctions(connection.get());
+  // BigQuery expands bounding boxes outward by one representable degree. Keep this
+  // policy here, above the DuckDB adapter and the S2 function implementation.
+  geography_duckdb::RegisterGeographyFunctions(
+      connection.get(), googlesql_s2geometry::Options{.expand_bounding_box = true});
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);

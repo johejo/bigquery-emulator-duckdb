@@ -72,7 +72,7 @@ enum class Translation : std::uint8_t {
   // with DuckDB as a bq_* function.
   kBackend,
   // Templates calling the emulator's GEOGRAPHY functions over the S2 Geometry library, which
-  // src/backend_functions/geography.cc registers with DuckDB as bq_* functions.
+  // src/googlesql_s2geometry_duckdb/geography.cc registers with DuckDB as bq_* functions.
   kS2,
   // Code in src/translator/handlers.cc.
   kHandler,

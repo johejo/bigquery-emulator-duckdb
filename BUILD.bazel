@@ -69,8 +69,8 @@ cc_library(
         ":duckdb_sql",
         ":interval",
         ":type_mapping",
-        "//src/backend_functions:geography_value",
-        "//src/backend_functions:geography_wkt",
+        "//src/googlesql_s2geometry",
+        "//src/googlesql_s2geometry_duckdb:codec",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@googlesql//googlesql/public:interval_value",
@@ -566,7 +566,6 @@ cc_library(
         "//src/backend_functions:bignumeric",
         "//src/backend_functions:cast",
         "//src/backend_functions:datetime",
-        "//src/backend_functions:geography",
         "//src/backend_functions:hll_count",
         "//src/backend_functions:interval",
         "//src/backend_functions:javascript",
@@ -577,6 +576,8 @@ cc_library(
         "//src/backend_functions:range",
         "//src/backend_functions:string",
         "//src/backend_functions:text_analysis",
+        "//src/googlesql_s2geometry",
+        "//src/googlesql_s2geometry_duckdb",
     ],
     linkstatic = True,
     deps = [
@@ -1168,6 +1169,20 @@ cc_binary(
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public/types",
         "@nlohmann_json//:json",
+    ],
+)
+
+cc_test(
+    name = "geography_adapter_test",
+    srcs = ["tests/geography_adapter_test.cc"],
+    copts = ["-std=c++20"],
+    deps = [
+        ":duckdb_handle",
+        "//src/googlesql_s2geometry",
+        "//src/googlesql_s2geometry_duckdb",
+        "//third_party/duckdb",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
