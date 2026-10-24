@@ -1,0 +1,282 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "CREATE TABLE LIKE inheritance, AS SELECT validation, defaults and replacement atomicity. Typed civil.Date/NUMERIC/record decoding remains in Go. https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_table_like"
+vars:
+  dataset: "e2e_${run}_${case}"
+  inherited_schema:
+    "$schema":
+      - name: "id"
+        type: "INTEGER"
+        mode: "REQUIRED"
+        description: "key"
+      - name: "day"
+        type: "DATE"
+      - name: "amount"
+        type: "NUMERIC"
+        precision: "10"
+        scale: "2"
+      - name: "tags"
+        type: "STRING"
+        mode: "REPEATED"
+      - name: "point"
+        type: "RECORD"
+        fields: [{"name": "x", "type": "INTEGER", "description": "across"}]
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "like_lifecycle"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "setup"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE source (
+              id INT64 NOT NULL OPTIONS (description = 'key'), day DATE, amount NUMERIC(10, 2),
+              tags ARRAY<STRING>, point STRUCT<x INT64 OPTIONS (description = 'across')>)
+            PARTITION BY day CLUSTER BY id
+            OPTIONS (description = 'the source', friendly_name = 'Source', labels = [('env', 'dev')]);
+            INSERT source (id, day) VALUES (1, DATE '2024-01-02');
+            CREATE TABLE copy LIKE source;
+            CREATE TABLE custom LIKE source PARTITION BY DATE_TRUNC(day, MONTH) CLUSTER BY day OPTIONS (description = 'custom');
+            CREATE TABLE filled LIKE source AS SELECT 7 AS query_id, DATE '2024-02-03' AS query_day, NUMERIC '12.34' AS query_amount, ['query'] AS query_tags, STRUCT(9 AS x) AS query_point;
+            CREATE TABLE filled_custom LIKE source PARTITION BY DATE_TRUNC(day, MONTH) CLUSTER BY day OPTIONS (description = 'custom') AS SELECT * FROM filled;
+            CREATE TABLE empty LIKE source AS SELECT * FROM source WHERE FALSE;
+            CREATE TABLE text_source (s STRING(3) OPTIONS (description = 'short'));
+            CREATE TABLE IF NOT EXISTS filled LIKE source OPTIONS (description = 'ignored') AS SELECT ERROR('must not run'), day, amount, tags, point FROM source;
+            ALTER TABLE source ADD COLUMN later STRING;
+            CREATE VIEW v AS SELECT id FROM source;
+            CREATE TABLE defaulted (id INT64, a INT64 DEFAULT 1);
+      - name: "copy_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          description: "the source"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "custom_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/custom"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          description: "custom"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "MONTH", "field": "day"}
+          clustering: {"fields": ["day"]}
+      - name: "filled_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/filled"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          description: "the source"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "filled_custom_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/filled_custom"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          description: "custom"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "MONTH", "field": "day"}
+          clustering: {"fields": ["day"]}
+      - name: "copy_empty"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*) FROM copy"}
+      - name: "copy_required"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "INSERT copy (day) VALUES (DATE '2024-01-02')"}
+      - name: "filled_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "7"}, {"v": "2024-02-03"}, {"v": "12.34"}, {"v": "query"}, {"v": "9"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT id, CAST(day AS STRING), CAST(amount AS STRING), ARRAY_TO_STRING(tags, ','), point.x FROM filled
+      - name: "filled_custom_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "7"}, {"v": "2024-02-03"}, {"v": "12.34"}, {"v": "query"}, {"v": "9"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT id, CAST(day AS STRING), CAST(amount AS STRING), ARRAY_TO_STRING(tags, ','), point.x FROM filled_custom
+      - name: "invalid_0"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "INSERT filled (day) VALUES (DATE '2024-01-02')"}
+      - name: "invalid_1"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE invalid LIKE copy AS SELECT NULL, day, amount, tags, point FROM filled"}
+      - name: "invalid_2"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE OR REPLACE TABLE filled LIKE copy AS SELECT NULL, day, amount, tags, point FROM filled"}
+      - name: "invalid_3"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE invalid LIKE copy AS SELECT id, day, NUMERIC '100000000', tags, point FROM filled
+      - name: "invalid_4"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE invalid LIKE copy AS SELECT id FROM filled"}
+      - name: "invalid_5"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE invalid LIKE copy AS SELECT 'wrong type', day, amount, tags, point FROM filled"}
+      - name: "failed_table_absent"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/invalid"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "empty_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/empty"}
+        observe: {"schema": "/body/schema", "numRows": "/body/numRows"}
+        expect: {"schema": {"fields": "${inherited_schema}"}, "numRows": {"$oneOf": [{"$missing": true}, null, "0"]}}
+      - name: "replace_itself"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE OR REPLACE TABLE filled LIKE filled AS SELECT * FROM filled"}
+      - name: "replaced_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/filled"}
+        observe: {"numRows": "/body/numRows", "description": "/body/description", "schema": "/body/schema"}
+        expect: {"numRows": "1", "description": "the source", "schema": {"fields": "${inherited_schema}"}}
+      - name: "reject_form_0"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Invalid value: Cannot CREATE TABLE LIKE `${dataset}.v`, which is VIEW."}}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE n LIKE ${dataset}.v"}
+      - name: "reject_form_1"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Invalid value: Cannot CREATE TABLE LIKE `${dataset}.v`, which is VIEW."}}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE n LIKE ${dataset}.v AS SELECT id FROM v"}
+      - name: "reject_form_2"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table."
+        use: "sql"
+        vars: {"sql": "CREATE TEMP TABLE n LIKE source; SELECT 1"}
+      - name: "reject_form_3"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "CREATE TEMPORARY TABLE ... LIKE is only allowed if the source table is a temporary table."
+        use: "sql"
+        vars: {"sql": "CREATE TEMP TABLE n LIKE text_source AS SELECT 'a' AS s; SELECT 1"}
+      - name: "copy_defaults"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE defaulted_like LIKE defaulted; INSERT defaulted_like (id) VALUES (1); CREATE TABLE defaulted_like_select LIKE defaulted AS SELECT 1 AS id, 2 AS a; INSERT defaulted_like_select (id) VALUES (3)
+      - name: "defaulted_like_default"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT a FROM defaulted_like WHERE id = 1"}
+      - name: "defaulted_like_default_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/defaulted_like"}
+        observe: {"default": "/body/schema/fields/1/defaultValueExpression"}
+        expect: {"default": "1"}
+      - name: "defaulted_like_select_default"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT a FROM defaulted_like_select WHERE id = 3"}
+      - name: "defaulted_like_select_default_metadata"
+        rest:
+          method: "GET"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/defaulted_like_select"
+        observe: {"default": "/body/schema/fields/1/defaultValueExpression"}
+        expect: {"default": "1"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}

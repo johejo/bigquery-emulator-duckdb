@@ -1,0 +1,302 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "COPY/CLONE inheritance and independence, clone definitions, defaults and rejected replacements. SDK clone timestamp bounds remain in Go."
+vars:
+  dataset: "e2e_${run}_${case}"
+  inherited_schema:
+    "$schema":
+      - name: "id"
+        type: "INTEGER"
+        mode: "REQUIRED"
+        description: "key"
+      - name: "day"
+        type: "DATE"
+      - name: "tags"
+        type: "STRING"
+        mode: "REPEATED"
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "copy_clone_lifecycle"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "setup"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE source (id INT64 NOT NULL OPTIONS (description = 'key'), day DATE, tags ARRAY<STRING>)
+            PARTITION BY day CLUSTER BY id OPTIONS (description = 'the source', friendly_name = 'Source', labels = [('env', 'dev')]);
+            INSERT source (id, day, tags) VALUES (1, DATE '2024-01-02', ['a']), (2, NULL, []);
+            CREATE TABLE copied COPY source;
+            CREATE TABLE custom COPY source OPTIONS (description = 'custom');
+            CREATE TABLE cloned CLONE source;
+            CREATE TABLE clone_of_clone CLONE cloned OPTIONS (labels = [('env', 'test')]);
+            CREATE TABLE copy_of_clone COPY cloned;
+            INSERT source (id) VALUES (3);
+            CREATE VIEW v AS SELECT id FROM source;
+            CREATE TABLE defaulted (id INT64, a INT64 DEFAULT 1);
+      - name: "copied_inheritance"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copied"}
+        observe:
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "copied_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM copied ORDER BY id"}
+      - name: "cloned_inheritance"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/cloned"}
+        observe:
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "cloned_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM cloned ORDER BY id"}
+      - name: "clone_of_clone_inheritance"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/clone_of_clone"}
+        observe:
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "clone_of_clone_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM clone_of_clone ORDER BY id"}
+      - name: "copy_of_clone_inheritance"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy_of_clone"}
+        observe:
+          schema: "/body/schema"
+          timePartitioning: "/body/timePartitioning"
+          clustering: "/body/clustering"
+        expect:
+          schema: {"fields": "${inherited_schema}"}
+          timePartitioning: {"type": "DAY", "field": "day"}
+          clustering: {"fields": ["id"]}
+      - name: "copy_of_clone_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM copy_of_clone ORDER BY id"}
+      - name: "copied_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copied"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          cloneDefinition: "/body/cloneDefinition"
+        expect:
+          description: "the source"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          cloneDefinition: {"$oneOf": [{"$missing": true}, null]}
+      - name: "copy_required"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "INSERT copied (day) VALUES (DATE '2024-01-02')"}
+      - name: "custom_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/custom"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "custom", "friendlyName": "Source", "labels": {"env": "dev"}}
+      - name: "cloned_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/cloned"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          type: "/body/type"
+          cloneDefinition: "/body/cloneDefinition"
+        expect:
+          description: "the source"
+          friendlyName: "Source"
+          labels: {"env": "dev"}
+          type: "TABLE"
+          cloneDefinition:
+            "$subset": {"baseTableReference": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "source"}}
+        bind: {"clone": "/body/cloneDefinition", "clone_time": "/body/cloneDefinition/cloneTime"}
+      - name: "clone_of_clone_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/clone_of_clone"}
+        observe: {"cloneDefinition": "/body/cloneDefinition", "labels": "/body/labels"}
+        expect:
+          cloneDefinition: {"$subset": {"baseTableReference": {"$subset": {"tableId": "cloned"}}}}
+          labels: {"env": "test"}
+      - name: "copy_of_clone_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy_of_clone"}
+        observe: {"cloneDefinition": "/body/cloneDefinition"}
+        expect: {"cloneDefinition": {"$oneOf": [{"$missing": true}, null]}}
+      - name: "update_clone"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/cloned"
+          body: {"description": "updated"}
+        observe: {"description": "/body/description", "clone": "/body/cloneDefinition"}
+        expect: {"description": "updated", "clone": "${clone}"}
+      - name: "information_schema"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f:
+                - v: "cloned"
+                - v: "CLONE"
+                - v: "${project}"
+                - v: "${dataset}"
+                - v: "source"
+                - v: "true"
+            - f: [{"v": "copied"}, {"v": "BASE TABLE"}, {"v": null}, {"v": null}, {"v": null}, {"v": null}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT table_name, table_type, base_table_catalog, base_table_schema, base_table_name,
+            IF(snapshot_time_ms IS NULL, NULL, snapshot_time_ms = TIMESTAMP('${clone_time}'))
+            FROM INFORMATION_SCHEMA.TABLES WHERE table_name IN ('copied', 'cloned') ORDER BY table_name
+      - name: "default_copies"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE defaulted_copy COPY defaulted; CREATE TABLE defaulted_clone CLONE defaulted"}
+      - name: "defaulted_copy_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT defaulted_copy (id) VALUES (1)"}
+      - name: "defaulted_copy_row"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT a FROM defaulted_copy"}
+      - name: "defaulted_copy_default"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/defaulted_copy"}
+        observe: {"default": "/body/schema/fields/1/defaultValueExpression"}
+        expect: {"default": "1"}
+      - name: "defaulted_clone_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT defaulted_clone (id) VALUES (1)"}
+      - name: "defaulted_clone_row"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT a FROM defaulted_clone"}
+      - name: "defaulted_clone_default"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/defaulted_clone"}
+        observe: {"default": "/body/schema/fields/1/defaultValueExpression"}
+        expect: {"default": "1"}
+      - name: "reject_form_0"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "Invalid value: Cannot clone ${project}:${dataset}.v which has type VIEW. Allowed types: [TABLE]"
+        use: "sql"
+        vars: {"sql": "CREATE TABLE n COPY v"}
+      - name: "reject_form_1"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "Invalid value: Cannot clone ${project}:${dataset}.v which has type VIEW. Allowed types: [TABLE, SNAPSHOT]"
+        use: "sql"
+        vars: {"sql": "CREATE TABLE n CLONE v"}
+      - name: "reject_form_2"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "CREATE OR REPLACE TABLE COPY of itself"}}
+        use: "sql"
+        vars: {"sql": "CREATE OR REPLACE TABLE copied COPY copied"}
+      - name: "reject_form_3"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "CREATE TEMPORARY TABLE ... COPY is only allowed if the source table is a temporary table."
+        use: "sql"
+        vars: {"sql": "CREATE TEMP TABLE n COPY source; SELECT 1"}
+      - name: "reject_form_4"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "CREATE TEMPORARY TABLE ... CLONE is only allowed if the source table is a temporary table."
+        use: "sql"
+        vars: {"sql": "CREATE TEMP TABLE n CLONE source; SELECT 1"}
+      - name: "rejected_replacement_preserved_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM copied ORDER BY id"}
+      - name: "replace_clone"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE replaced_clone CLONE copied; INSERT copied (id) VALUES (5); CREATE OR REPLACE TABLE replaced_clone CLONE copied
+      - name: "replaced_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}]}, {"f": [{"v": "2"}]}, {"f": [{"v": "5"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT id FROM replaced_clone ORDER BY id"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}

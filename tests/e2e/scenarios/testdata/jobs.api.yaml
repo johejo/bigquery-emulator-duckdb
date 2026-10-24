@@ -1,0 +1,335 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "Job table creation, destinations and lifecycle. SDK timestamp decoding, Query.Read with a destination and iterator pagination remain in Go."
+vars:
+  dataset: "e2e_${run}_${case}"
+  creation_schema: {"$schema": [{"name": "id", "type": "INTEGER"}, {"name": "tags", "type": "STRING", "mode": "REPEATED"}]}
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "table_creation"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create_api"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}
+            schema: {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "tags", "type": "STRING", "mode": "REPEATED"}]}
+      - name: "api_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${creation_schema}"}}
+      - name: "api_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT api (id) VALUES (1)"}
+      - name: "api_omitted_array"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT ARRAY_LENGTH(tags) FROM api WHERE id = 1"}
+      - name: "create_ddl"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE ddl (id INT64, tags ARRAY<STRING>)"}
+      - name: "ddl_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ddl"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${creation_schema}"}}
+      - name: "ddl_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT ddl (id) VALUES (1)"}
+      - name: "ddl_omitted_array"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT ARRAY_LENGTH(tags) FROM ddl WHERE id = 1"}
+      - name: "create_query"
+        sql: |-
+          SELECT 0 AS id, ['a'] AS tags
+        queryOptions: {"destinationTable": {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "query"}}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "query_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/query"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${creation_schema}"}}
+      - name: "query_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT query (id) VALUES (1)"}
+      - name: "query_omitted_array"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT ARRAY_LENGTH(tags) FROM query WHERE id = 1"}
+      - name: "create_load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "load"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema: {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "tags", "type": "STRING", "mode": "REPEATED"}]}
+          upload: |
+            {"id":0,"tags":["a"]}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "load_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/load"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${creation_schema}"}}
+      - name: "load_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT load (id) VALUES (1)"}
+      - name: "load_omitted_array"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT ARRAY_LENGTH(tags) FROM load WHERE id = 1"}
+      - name: "create_copy"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "copy"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}]
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "copy_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${creation_schema}"}}
+      - name: "copy_insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT copy (id) VALUES (2)"}
+      - name: "copy_omitted_array"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "0"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT ARRAY_LENGTH(tags) FROM copy WHERE id = 2"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "destination_table"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "empty"
+        sql: |-
+          SELECT 1 AS n
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "results"}
+          writeDisposition: "WRITE_EMPTY"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "empty_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/results"}
+        observe: {"creationTime": "/body/creationTime"}
+        expect: {"creationTime": {"$gt": "0"}}
+      - name: "truncate"
+        sql: |-
+          SELECT 1 AS n
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "results"}
+          writeDisposition: "WRITE_TRUNCATE"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "truncate_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/results"}
+        observe: {"creationTime": "/body/creationTime"}
+        expect: {"creationTime": {"$gt": "0"}}
+        bind: {"truncated_created": "/body/creationTime"}
+      - name: "append"
+        sql: |-
+          SELECT 1 AS n
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "results"}
+          writeDisposition: "WRITE_APPEND"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "append_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/results"}
+        observe: {"creationTime": "/body/creationTime"}
+        expect: {"creationTime": "${truncated_created}"}
+      - name: "two_rows"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/results"}
+        observe: {"numRows": "/body/numRows"}
+        expect: {"numRows": "2"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "destination_edges"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create_never"
+        sql: |-
+          SELECT 1 AS a
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dest"}
+          createDisposition: "CREATE_NEVER"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Not found: Table"}}
+      - name: "create"
+        sql: |-
+          SELECT 1 AS a, SUM(x) FROM UNNEST([2]) AS x
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dest"}
+          writeDisposition: "WRITE_EMPTY"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "result_names"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/dest"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema: {"fields": {"$schema": [{"name": "a", "type": "INTEGER"}, {"name": "f0_", "type": "INTEGER"}]}}
+      - name: "self_read"
+        sql: |-
+          SELECT a * 10 AS a, f0_ FROM `${project}.${dataset}.dest`
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dest"}
+          writeDisposition: "WRITE_TRUNCATE"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "self_read_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "10"}, {"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT * FROM dest"}
+      - name: "duplicate_destination"
+        sql: |-
+          SELECT 1 AS a, 2 AS A
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dest"}
+          writeDisposition: "WRITE_TRUNCATE"
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "ddl_destination"
+        sql: |-
+          CREATE TABLE other (a INT64)
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dest"}
+          writeDisposition: "WRITE_TRUNCATE"
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "failed_writes_preserved_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "10"}, {"v": "2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT * FROM dest"}
+      - name: "duplicate_table_names"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE duplicates AS (SELECT 1 AS a, 2 AS a)"}
+      - name: "duplicate_view_names"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "CREATE VIEW duplicates AS (SELECT 1 AS a, 2 AS a)"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "job_lifecycle"
+    steps:
+      - name: "create"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/jobs"
+          body:
+            jobReference: {"projectId": "${project}", "jobId": "${job_id}", "location": "US"}
+            configuration: {"query": {"query": "SELECT 1 AS n", "useLegacySql": false}}
+      - name: "completed"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}?location=US"}
+        observe: {"state": "/body/status/state", "error": "/body/status/errorResult"}
+        expect: {"state": "DONE"}
+        until: {"/body/status/state": "DONE"}
+      - name: "cancel_completed"
+        rest: {"method": "POST", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}/cancel?location=US"}
+      - name: "after_cancel"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}?location=US"}
+        observe: {"state": "/body/status/state", "error": "/body/status/errorResult"}
+        expect: {"state": "DONE"}
+      - name: "duplicate"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/jobs"
+          body:
+            jobReference: {"projectId": "${project}", "jobId": "${job_id}", "location": "US"}
+            configuration: {"query": {"query": "SELECT 2 AS n", "useLegacySql": false}}
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "delete"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}/delete?location=US"}
+      - name: "deleted"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}?location=US"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "reuse"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/jobs"
+          body:
+            jobReference: {"projectId": "${project}", "jobId": "${job_id}", "location": "US"}
+            configuration: {"query": {"query": "SELECT 2 AS n", "useLegacySql": false}}
+      - name: "reused_result"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/queries/${job_id}?location=US"}
+        observe: {"complete": "/body/jobComplete", "rows": "/body/rows", "errors": "/body/errors"}
+        expect: {"complete": true, "rows": [{"f": [{"v": "2"}]}]}
+        until: {"/body/jobComplete": true}
+    cleanup:
+      - name: "delete_job"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/jobs/${job_id}/delete?location=US"}
+    vars: {"job_id": "e2e_${run}_${case}"}

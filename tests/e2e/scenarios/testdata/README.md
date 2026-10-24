@@ -35,3 +35,11 @@ job completion and errors rather than assume that submitting a job finishes it.
   additions, REQUIRED relaxation, existing rows, all six rejected schema changes,
   and preservation of the view definition after a rejected replacement. `$schema`
   compares the same schema properties the Go SDK previously exposed.
+
+- `jobs.api.yaml` replaces creation/default semantics, destination metadata and
+  failures, and cancellation/deletion/ID reuse. Go retains timestamp decoding and
+  clock bounds, Query.Read with a destination, and SDK pagination.
+- `create_table_like.api.yaml` and `create_table_copy.api.yaml` replace metadata,
+  constraints, defaults, row independence, clone definitions and rejected
+  replacements. Go retains typed DATE/NUMERIC/array/record reads and clone-time
+  decoding against local-clock bounds.
