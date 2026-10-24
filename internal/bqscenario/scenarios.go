@@ -1,4 +1,4 @@
-package main
+package bqscenario
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,40 +17,42 @@ import (
 
 // Scenarios keep requests and observations together. Each case has its own resources and cleanup,
 // so an unanswered case can be rerun without replaying a case whose answer is already recorded.
-type scenarioFile struct {
-	Version     int                         `json:"version"`
-	Description string                      `json:"description,omitempty"`
-	Vars        map[string]any              `json:"vars,omitempty"`
-	Templates   map[string]scenarioTemplate `json:"templates,omitempty"`
-	Cases       []scenarioCase              `json:"cases"`
+type File struct {
+	Version     int                 `json:"version"`
+	Description string              `json:"description,omitempty"`
+	Vars        map[string]any      `json:"vars,omitempty"`
+	Templates   map[string]Template `json:"templates,omitempty"`
+	Cases       []Case              `json:"cases"`
 }
 
-type scenarioTemplate struct {
-	Steps   []scenarioStep `json:"steps"`
-	Cleanup []scenarioStep `json:"cleanup,omitempty"`
+type Template struct {
+	Steps   []Step `json:"steps"`
+	Cleanup []Step `json:"cleanup,omitempty"`
 }
 
-type scenarioCase struct {
+type Case struct {
 	Name        string          `json:"name"`
 	Template    string          `json:"template,omitempty"`
 	Description string          `json:"description,omitempty"`
 	Vars        map[string]any  `json:"vars,omitempty"`
-	Steps       []scenarioStep  `json:"steps,omitempty"`
-	Cleanup     []scenarioStep  `json:"cleanup,omitempty"`
+	Steps       []Step          `json:"steps,omitempty"`
+	Cleanup     []Step          `json:"cleanup,omitempty"`
+	Expect      json.RawMessage `json:"expect,omitempty"`
 	Answer      json.RawMessage `json:"answer,omitempty"`
 }
 
-type scenarioStep struct {
-	Name    string            `json:"name"`
-	REST    *restRequest      `json:"rest,omitempty"`
-	GRPC    *grpcRequest      `json:"grpc,omitempty"`
-	Bind    map[string]string `json:"bind,omitempty"`
-	Observe map[string]string `json:"observe,omitempty"`
+type Step struct {
+	Name          string            `json:"name"`
+	ExpectFailure bool              `json:"expectFailure,omitempty"`
+	REST          *RESTRequest      `json:"rest,omitempty"`
+	GRPC          *GRPCRequest      `json:"grpc,omitempty"`
+	Bind          map[string]string `json:"bind,omitempty"`
+	Observe       map[string]string `json:"observe,omitempty"`
 	// Poll only GET requests: retrying a mutation could duplicate jobs or writes.
 	Until map[string]any `json:"until,omitempty"`
 }
 
-type restRequest struct {
+type RESTRequest struct {
 	Method  string            `json:"method"`
 	Path    string            `json:"path"`
 	Headers map[string]string `json:"headers,omitempty"`
@@ -60,24 +61,24 @@ type restRequest struct {
 	Upload *string `json:"upload,omitempty"`
 }
 
-type grpcRequest struct {
+type GRPCRequest struct {
 	Method   string            `json:"method"`
 	Headers  map[string]string `json:"headers,omitempty"`
 	Requests []any             `json:"requests"`
 }
 
-type observation struct {
+type Observation struct {
 	Project string         `json:"project"`
 	Run     string         `json:"run"`
 	Steps   map[string]any `json:"steps"`
 }
 
-type scenarioResponse struct {
+type Response struct {
 	Value  any
 	Failed bool
 }
 
-type scenarioCall func(context.Context, scenarioStep, map[string]any) (scenarioResponse, error)
+type Call func(context.Context, Step, map[string]any) (Response, error)
 
 var variablePattern = regexp.MustCompile(`\$\{([a-zA-Z_][a-zA-Z_0-9]*)\}`)
 var caseNamePattern = regexp.MustCompile(`^[a-zA-Z][a-zA-Z_0-9]*$`)
@@ -201,20 +202,27 @@ func pointer(value any, path string) (any, bool, error) {
 	return value, true, nil
 }
 
-func readScenarios(path string) (*scenarioFile, error) {
+func Read(path string) (*File, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var file scenarioFile
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&file); err != nil {
+	if isYAML(path) {
+		data, err = yamlJSON(data)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	var file File
+	if err := decodeJSON(data, &file); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return nil, fmt.Errorf("%s: expected one JSON document", path)
+	if isYAML(path) {
+		for _, c := range file.Cases {
+			if len(c.Answer) != 0 {
+				return nil, fmt.Errorf("%s: YAML observations belong in the answers sidecar", path)
+			}
+		}
 	}
 	if err := file.validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -222,7 +230,7 @@ func readScenarios(path string) (*scenarioFile, error) {
 	return &file, nil
 }
 
-func (file *scenarioFile) validate() error {
+func (file *File) validate() error {
 	if file.Version != 1 {
 		return fmt.Errorf("unsupported scenario version %d", file.Version)
 	}
@@ -312,14 +320,26 @@ func (file *scenarioFile) validate() error {
 				}
 			}
 		}
+		if answered(c.Expect) {
+			var expected map[string]any
+			if err := decodeJSON(c.Expect, &expected); err != nil || expected == nil {
+				return fmt.Errorf("%s: expect must be an observation object", c.Name)
+			}
+			if err := checkReferences(expected, vars, nil); err != nil {
+				return fmt.Errorf("%s: expect: %w", c.Name, err)
+			}
+		}
 		for _, step := range c.Steps {
+			if step.ExpectFailure && (step.Observe == nil || len(step.Until) != 0) {
+				return fmt.Errorf("%s/%s: expectFailure requires observe and cannot poll", c.Name, step.Name)
+			}
 			observed = observed || step.Observe != nil
 		}
 		if !observed {
 			return fmt.Errorf("%s: no observations", c.Name)
 		}
 		for _, step := range c.Cleanup {
-			if step.Observe != nil || len(step.Bind) > 0 {
+			if step.Observe != nil || len(step.Bind) > 0 || step.ExpectFailure {
 				return fmt.Errorf("%s: cleanup cannot observe or bind", c.Name)
 			}
 		}
@@ -327,7 +347,7 @@ func (file *scenarioFile) validate() error {
 	return nil
 }
 
-func (file *scenarioFile) resolveCase(c scenarioCase) (scenarioCase, error) {
+func (file *File) resolveCase(c Case) (Case, error) {
 	if c.Template == "" {
 		return c, nil
 	}
@@ -371,10 +391,18 @@ func answered(answer json.RawMessage) bool {
 	return len(answer) != 0 && !bytes.Equal(bytes.TrimSpace(answer), []byte("null"))
 }
 
-func fillScenarios(ctx context.Context, path, project, run string, timeout time.Duration, call scenarioCall) error {
-	file, err := readScenarios(path)
+func Collect(ctx context.Context, path, project, run string, timeout time.Duration, call Call) error {
+	if timeout <= 0 {
+		return errors.New("scenario timeout must be positive")
+	}
+	file, err := Read(path)
 	if err != nil {
 		return err
+	}
+	if isYAML(path) {
+		if err := loadAnswers(path, file); err != nil {
+			return err
+		}
 	}
 	var failures []error
 	for i := range file.Cases {
@@ -382,53 +410,26 @@ func fillScenarios(ctx context.Context, path, project, run string, timeout time.
 		if answered(c.Answer) {
 			continue
 		}
-		vars := map[string]any{"project": project, "run": run, "case": c.Name}
-		for key, value := range file.Vars {
-			vars[key] = value
-		}
-		for key, value := range c.Vars {
-			vars[key] = value
-		}
+		vars := file.variables(*c, project, run)
 		resolved, err := file.resolveCase(*c)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "%s/%s (project=%s, run=%s)\n", path, c.Name, project, run)
-		result, runErr := runScenario(ctx, resolved, vars, timeout, call)
-		// A canceled or failed operation leaves the case unanswered, but cleanup still runs with an
-		// independent deadline. API rejections of observed operations are answers, not tool failures.
-		var cleanupErrors []error
-		for _, step := range resolved.Cleanup {
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-			response, err := call(cleanupCtx, step, vars)
-			cancel()
-			if err == nil && response.Failed {
-				missing := false
-				if step.REST != nil && step.REST.Method == "DELETE" {
-					code, _, _ := pointer(response.Value, "/status")
-					missing = code == 404
-				}
-				if !missing {
-					err = fmt.Errorf("cleanup rejected: %v", response.Value)
-				}
-			}
-			if err != nil {
-				cleanupErrors = append(cleanupErrors, fmt.Errorf("%s/%s cleanup %s (run=%s): %w", path, c.Name, step.Name, run, err))
-			}
-		}
+		result, runErr, cleanupErr := execute(ctx, resolved, vars, timeout, call)
 		if runErr == nil {
-			c.Answer, err = json.Marshal(observation{Project: project, Run: run, Steps: result})
+			c.Answer, err = json.Marshal(Observation{Project: project, Run: run, Steps: result})
 			if err != nil {
 				return err
 			}
 			// Save after each completed case, so a later timeout cannot discard collected answers.
-			if err := writeScenarios(path, file); err != nil {
+			if err := saveAnswers(path, file); err != nil {
 				return err
 			}
 		} else {
 			failures = append(failures, fmt.Errorf("%s/%s: %w", path, c.Name, runErr))
 		}
-		failures = append(failures, cleanupErrors...)
+		failures = append(failures, cleanupErr)
 		if ctx.Err() != nil {
 			break
 		}
@@ -436,7 +437,7 @@ func fillScenarios(ctx context.Context, path, project, run string, timeout time.
 	return errors.Join(failures...)
 }
 
-func runScenario(ctx context.Context, c scenarioCase, vars map[string]any, timeout time.Duration, call scenarioCall) (map[string]any, error) {
+func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call) (map[string]any, error) {
 	results := map[string]any{}
 	for _, step := range c.Steps {
 		fmt.Fprintf(os.Stderr, "%s/%s\n", c.Name, step.Name)
@@ -446,7 +447,10 @@ func runScenario(ctx context.Context, c scenarioCase, vars map[string]any, timeo
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", step.Name, err)
 		}
-		if response.Failed {
+		if step.ExpectFailure && !response.Failed {
+			return nil, fmt.Errorf("%s: expected API rejection", step.Name)
+		}
+		if response.Failed && !step.ExpectFailure {
 			if step.Observe == nil {
 				return nil, fmt.Errorf("%s: setup request rejected: %v", step.Name, response.Value)
 			}
@@ -480,10 +484,10 @@ func runScenario(ctx context.Context, c scenarioCase, vars map[string]any, timeo
 	return results, nil
 }
 
-func pollScenario(ctx context.Context, step scenarioStep, vars map[string]any, call scenarioCall) (scenarioResponse, error) {
+func pollScenario(ctx context.Context, step Step, vars map[string]any, call Call) (Response, error) {
 	untilValue, err := expand(step.Until, vars)
 	if err != nil {
-		return scenarioResponse{}, err
+		return Response{}, err
 	}
 	until, _ := untilValue.(map[string]any)
 	for {
@@ -495,7 +499,7 @@ func pollScenario(ctx context.Context, step scenarioStep, vars map[string]any, c
 		for path, want := range until {
 			got, found, err := pointer(response.Value, path)
 			if err != nil {
-				return scenarioResponse{}, err
+				return Response{}, err
 			}
 			gotJSON, _ := json.Marshal(got)
 			wantJSON, _ := json.Marshal(want)
@@ -506,19 +510,26 @@ func pollScenario(ctx context.Context, step scenarioStep, vars map[string]any, c
 		}
 		select {
 		case <-ctx.Done():
-			return scenarioResponse{}, ctx.Err()
+			return Response{}, ctx.Err()
 		case <-time.After(500 * time.Millisecond):
 		}
 	}
 }
 
-func writeScenarios(path string, file *scenarioFile) error {
-	data, err := json.MarshalIndent(file, "", "  ")
+func writeScenarios(path string, file *File) error {
+	return writeJSON(path, file)
+}
+
+func writeJSON(path string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
+	mode := os.FileMode(0o600)
 	info, err := os.Stat(path)
-	if err != nil {
+	if err == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	temp, err := os.CreateTemp(filepath.Dir(path), ".bqanswers-*")
@@ -526,7 +537,7 @@ func writeScenarios(path string, file *scenarioFile) error {
 		return err
 	}
 	defer os.Remove(temp.Name())
-	if err := temp.Chmod(info.Mode().Perm()); err != nil {
+	if err := temp.Chmod(mode); err != nil {
 		temp.Close()
 		return err
 	}
@@ -538,4 +549,31 @@ func writeScenarios(path string, file *scenarioFile) error {
 		return err
 	}
 	return os.Rename(temp.Name(), path)
+}
+
+// execute keeps cleanup independent of cancellation and preserves observations even
+// when cleanup fails, so collection can persist an answer before reporting failure.
+func execute(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call) (map[string]any, error, error) {
+	result, runErr := runScenario(ctx, c, vars, timeout, call)
+	var cleanupErrors []error
+	for _, step := range c.Cleanup {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+		response, err := call(cleanupCtx, step, vars)
+		cancel()
+		if err == nil && response.Failed {
+			missing := false
+			if step.REST != nil && step.REST.Method == "DELETE" {
+				code, _, _ := pointer(response.Value, "/status")
+				encoded, _ := json.Marshal(code)
+				missing = string(encoded) == "404"
+			}
+			if !missing {
+				err = fmt.Errorf("cleanup rejected: %v", response.Value)
+			}
+		}
+		if err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("%s/%s cleanup %s (run=%s): %w", "scenario", c.Name, step.Name, vars["run"], err))
+		}
+	}
+	return result, runErr, errors.Join(cleanupErrors...)
 }

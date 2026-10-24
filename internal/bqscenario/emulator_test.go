@@ -1,4 +1,4 @@
-package main
+package bqscenario
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/johejo/bigquery-emulator-duckdb/internal/emulatorprocess"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Exercise the complete workflows locally, including upload, job polling and gRPC streams. All
@@ -29,12 +27,9 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = process.Stop() })
-	transport := newScenarioTransport("")
-	transport.restEndpoint = process.URL
-	transport.grpcEndpoint = process.GRPC
-	transport.grpcOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	transport := NewEmulatorTransport(process.URL, process.GRPC)
 	t.Cleanup(func() { _ = transport.Close() })
-	paths, err := filepath.Glob("testdata/*.api.json")
+	paths, err := filepath.Glob("testdata/*.api.*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,12 +42,23 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := fillScenarios(t.Context(), path, "test", "smoke", 20*time.Second, transport.call); err != nil {
+		if err := Collect(t.Context(), path, "test", "smoke", 20*time.Second, transport.Call); err != nil {
 			t.Fatal(err)
 		}
-		file, err := readScenarios(path)
+		file, err := Read(path)
 		if err != nil {
 			t.Fatal(err)
+		}
+
+		if isYAML(path) {
+			for _, c := range file.Cases {
+				if err := file.Verify(t.Context(), c, "test", "verify", 20*time.Second, transport.Call); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := loadAnswers(path, file); err != nil {
+				t.Fatal(err)
+			}
 		}
 		for _, c := range file.Cases {
 			if !answered(c.Answer) {
@@ -60,7 +66,7 @@ func TestScenarioFixturesAgainstEmulator(t *testing.T) {
 			}
 		}
 	}
-	response, err := transport.rest(t.Context(), restRequest{Method: http.MethodGet, Path: "/bigquery/v2/projects/test/datasets"}, nil)
+	response, err := transport.rest(t.Context(), RESTRequest{Method: http.MethodGet, Path: "/bigquery/v2/projects/test/datasets"}, nil)
 	if err != nil || response.Failed {
 		t.Fatalf("list datasets: %+v, %v", response, err)
 	}

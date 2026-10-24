@@ -1,4 +1,4 @@
-package main
+package bqscenario
 
 import (
 	"context"
@@ -66,10 +66,10 @@ func TestRESTScenarioUploadAndResponse(t *testing.T) {
 		_, _ = io.WriteString(w, `{"number":9007199254740993,"jobReference":{"jobId":"job"}}`)
 	}))
 	defer server.Close()
-	transport := newScenarioTransport("token")
-	transport.restEndpoint = server.URL
+	transport := NewTransport("token")
+	transport.RESTEndpoint = server.URL
 	media := "${data}"
-	response, err := transport.call(t.Context(), scenarioStep{REST: &restRequest{
+	response, err := transport.Call(t.Context(), Step{REST: &RESTRequest{
 		Method: "POST", Path: "/upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart",
 		Body: map[string]any{"number": "${number}", "text": "${text}"}, Upload: &media,
 	}}, map[string]any{"project": "project", "number": json.Number("9007199254740993"), "text": "quoted\"\\value", "data": "2.25,2.5\n"})
@@ -96,9 +96,9 @@ func TestRESTScenarioErrorClassification(t *testing.T) {
 				_, _ = io.WriteString(w, `{"error":{"message":"result"}}`)
 			}
 		}))
-		transport := newScenarioTransport("")
-		transport.restEndpoint = server.URL
-		got, err := transport.rest(t.Context(), restRequest{Method: "GET", Path: "/result"}, nil)
+		transport := NewTransport("")
+		transport.RESTEndpoint = server.URL
+		got, err := transport.rest(t.Context(), RESTRequest{Method: "GET", Path: "/result"}, nil)
 		server.Close()
 		if (err != nil) != tc.operational || got.Failed != tc.failed {
 			t.Errorf("status %d = %+v, %v", tc.status, got, err)
@@ -160,7 +160,7 @@ func (answerReadServer) ReadRows(request *storagepb.ReadRowsRequest, stream stor
 	return nil
 }
 
-func mockGRPC(t *testing.T) *scenarioTransport {
+func mockGRPC(t *testing.T) *Transport {
 	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
@@ -168,7 +168,7 @@ func mockGRPC(t *testing.T) *scenarioTransport {
 	storagepb.RegisterBigQueryReadServer(server, answerReadServer{})
 	go func() { _ = server.Serve(listener) }()
 	t.Cleanup(server.Stop)
-	transport := &scenarioTransport{grpcEndpoint: "passthrough:///local", grpcOptions: []grpc.DialOption{
+	transport := &Transport{Collecting: true, GRPCEndpoint: "passthrough:///local", GRPCOptions: []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() }),
 	}}
@@ -184,7 +184,7 @@ func TestGRPCScenarioUnaryAndErrors(t *testing.T) {
 	}{
 		{"parent", false, false}, {"invalid", true, false}, {"unavailable", false, true},
 	} {
-		response, err := transport.rpc(t.Context(), grpcRequest{
+		response, err := transport.rpc(t.Context(), GRPCRequest{
 			Method:   "google.cloud.bigquery.storage.v1.BigQueryWrite/CreateWriteStream",
 			Headers:  map[string]string{"x-goog-request-params": "parent=${parent}"},
 			Requests: []any{map[string]any{"parent": "${parent}", "writeStream": map[string]any{"type": "PENDING"}}},
@@ -206,7 +206,7 @@ func TestGRPCScenarioUnaryAndErrors(t *testing.T) {
 		}
 	}
 	// Malformed protobuf JSON is a tool error; it must not become an answer about BigQuery.
-	if _, err := transport.rpc(t.Context(), grpcRequest{
+	if _, err := transport.rpc(t.Context(), GRPCRequest{
 		Method:   "google.cloud.bigquery.storage.v1.BigQueryWrite/CreateWriteStream",
 		Requests: []any{map[string]any{"typo": true}},
 	}, nil); err == nil {
@@ -216,7 +216,7 @@ func TestGRPCScenarioUnaryAndErrors(t *testing.T) {
 
 func TestGRPCScenarioStreams(t *testing.T) {
 	transport := mockGRPC(t)
-	response, err := transport.rpc(t.Context(), grpcRequest{
+	response, err := transport.rpc(t.Context(), GRPCRequest{
 		Method: "google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows",
 		Requests: []any{
 			map[string]any{"writeStream": "stream", "offset": "9007199254740993"},
@@ -232,14 +232,14 @@ func TestGRPCScenarioStreams(t *testing.T) {
 			t.Errorf("offset = %v, %v", got, err)
 		}
 	}
-	response, err = transport.rpc(t.Context(), grpcRequest{
+	response, err = transport.rpc(t.Context(), GRPCRequest{
 		Method:   "google.cloud.bigquery.storage.v1.BigQueryWrite/AppendRows",
 		Requests: []any{map[string]any{"writeStream": "invalid"}},
 	}, nil)
 	if err != nil || !response.Failed {
 		t.Fatalf("stream error = %+v, %v", response, err)
 	}
-	response, err = transport.rpc(t.Context(), grpcRequest{
+	response, err = transport.rpc(t.Context(), GRPCRequest{
 		Method: "google.cloud.bigquery.storage.v1.BigQueryRead/ReadRows", Requests: []any{map[string]any{"readStream": "stream"}},
 	}, nil)
 	if err != nil || response.Failed {
@@ -249,5 +249,17 @@ func TestGRPCScenarioStreams(t *testing.T) {
 	want := []any{map[string]any{"rowCount": "1"}, map[string]any{"rowCount": "2"}}
 	if !reflect.DeepEqual(messages, want) {
 		t.Fatalf("server stream = %v", messages)
+	}
+}
+
+func TestEmulatorTransportRetainsOperationalResponses(t *testing.T) {
+	transport := mockGRPC(t)
+	transport.Collecting = false
+	response, err := transport.rpc(t.Context(), GRPCRequest{
+		Method:   "google.cloud.bigquery.storage.v1.BigQueryWrite/CreateWriteStream",
+		Requests: []any{map[string]any{"parent": "unavailable"}},
+	}, nil)
+	if err != nil || !response.Failed {
+		t.Fatalf("emulator response: %+v, %v", response, err)
 	}
 }
