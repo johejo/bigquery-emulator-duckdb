@@ -140,7 +140,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       !HasTypeUse(name, TypeUse::kAggregatesRange)) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with RANGE");
   }
-  if (!SupportsBigNumeric(name) && InvolvesBigNumeric(call)) {
+  if (!HasTypeUse(name, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
   if (rule == entry->aggregates.end()) {

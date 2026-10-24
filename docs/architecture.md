@@ -56,7 +56,11 @@ Internal column IDs avoid alias collisions; translation preserves GoogleSQL sema
 DuckDB differs, including NULL ordering and STRUCT comparisons.
 
 [functions.cc](../src/translator/functions.cc) assembles function rules. Calls use DuckDB,
-GoogleSQL backend functions or S2 according to their semantics. See
+GoogleSQL backend functions or S2 according to their semantics. Each registration keeps its
+translation and `TypeUse` attributes together; rule tables use `FunctionDefinition` to attach
+the attributes to a function's overloads. Calls consult the resulting registry entry to reject
+unsupported uses of physical representations such as graph STRUCTs or BIGNUMERIC values.
+Overload-specific argument restrictions stay in the rules. See
 [AGENTS.md](../AGENTS.md#implementing-functions) for backend selection and registration.
 
 Graph definitions use [DuckPGQ](https://github.com/cwida/duckpgq-extension), linked
