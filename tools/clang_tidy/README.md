@@ -38,7 +38,19 @@ clang-tidy discovers each file's nearest `.clang-tidy` and any inherited configu
 new configuration to `//:clang_tidy_config`, so sandboxed actions can read it. Each action includes
 only the configurations in the source file's ancestor directories, so changes invalidate the
 affected files' cache. `WarningsAsErrors: '*'` makes findings fail the action; failed actions cannot
-produce the success marker.
+produce a successful output.
+
+Each successful action records the headers read by clang-tidy's own preprocessor, including
+system headers, using `-Wp,-MD`. This adds no second preprocessing pass. The output is Bazel's
+`unused_inputs_list`: compilation headers that were available but not read. After the first run,
+Bazel can reuse the result when only those headers change. The source and configurations remain
+inputs, and changes to include paths, defines, candidate headers or the tool still invalidate the
+action. All candidate headers are available whenever the action executes, so newly added includes
+are checked normally. Dependency generation or parsing failures fail the action too.
+
+This primarily improves incremental builds with Bazel's local action cache. The disk cache saved
+by CI does not carry that local dependency-discovery state to a fresh Bazel output base; do not
+expect the same reduction in cache misses between CI machines.
 
 ## Tests
 
@@ -47,3 +59,5 @@ targets. It checks configuration and executable inputs, collection of implementa
 lint outputs, and exclusion of external targets. These checks protect caching and lint coverage
 without fixing individual compiler flags or dependency filenames. It is included in `just test`;
 `just tidy` executes the actual lint actions with the targets' parsing settings.
+`//tools/clang_tidy:runner_test` checks dependency-file escaping and rejects missing dependency
+rules, which must never produce a cached success.

@@ -1,0 +1,16 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+py_binary(
+    name = "runner",
+    srcs = ["runner.py"],
+)
+
+py_test(
+    name = "runner_test",
+    size = "small",
+    srcs = [
+        "runner.py",
+        "runner_test.py",
+    ],
+)

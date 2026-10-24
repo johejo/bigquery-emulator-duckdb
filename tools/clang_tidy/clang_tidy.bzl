@@ -46,6 +46,14 @@ def _clang_tidy_impl(target, ctx):
     inputs = depset(
         transitive = [compilation_context.headers, cc_toolchain.all_files],
     )
+
+    # Share the candidate list between this target's actions without flattening the headers
+    # separately for every source. Only headers are eligible for unused-input pruning.
+    candidates = ctx.actions.declare_file(ctx.label.name + ".clang-tidy/headers")
+    header_args = ctx.actions.args()
+    header_args.add_all(compilation_context.headers)
+    header_args.set_param_file_format("multiline")
+    ctx.actions.write(candidates, header_args)
     outputs = []
     for src in srcs:
         # Let clang-tidy discover its configuration as outside Bazel. Only ancestor configs can
@@ -59,14 +67,15 @@ def _clang_tidy_impl(target, ctx):
         args = ctx.actions.args()
         args.add(ctx.file._clang_tidy)
         args.add(out)
-        args.add_all(["--quiet", src, "--"])
+        args.add_all([candidates, src])
         args.add_all(flags)
-        ctx.actions.run_shell(
-            command = 'tool=$1; out=$2; shift 2; "$tool" "$@" && touch "$out"',
+        ctx.actions.run(
+            executable = ctx.executable._runner,
             arguments = [args],
             tools = [ctx.file._clang_tidy],
-            inputs = depset([src] + configs, transitive = [inputs]),
+            inputs = depset([src, candidates] + configs, transitive = [inputs]),
             outputs = [out],
+            unused_inputs_list = out,
             mnemonic = "ClangTidy",
             progress_message = "Run clang-tidy on " + src.short_path,
             # Nix wrappers and the C++ toolchain use the development shell's environment.
@@ -80,6 +89,7 @@ clang_tidy = aspect(
     implementation = _clang_tidy_impl,
     attr_aspects = ["deps", "implementation_deps"],
     attrs = {
+        "_runner": attr.label(default = Label("//tools/clang_tidy:runner"), executable = True, cfg = "exec"),
         "_clang_tidy": attr.label(default = Label("@clang_tidy_tool//:clang-tidy"), allow_single_file = True, cfg = "exec"),
         # Lists every .clang-tidy in the repository.
         "_configs": attr.label(default = Label("//:clang_tidy_config")),
