@@ -32,26 +32,32 @@ Builtin include directories stay `-isystem`, with C++ directories placed ahead o
 and the order preserved within each group. Apple's SDK reports C headers before libc++, which
 breaks libc++'s `#include_next`. Using `-idirafter` instead mixes Nix and Apple headers.
 
-## Heavy GoogleSQL headers
-
-GoogleSQL's resolved AST, analyzer and script executor headers take about 30s each to parse at
--O0, and a header that includes one passes that time to every file that includes it, also when it
-gets there through another GoogleSQL header such as `analyzer_options.h`. Each header is therefore
-also preprocessed with the stand-ins in `heavy_headers/` found first, whose `#error` makes clang
-show the chain of includes that reached one.
-
 ## Configuration and caching
 
 clang-tidy discovers each file's nearest `.clang-tidy` and any inherited configuration. Add every
 new configuration to `//:clang_tidy_config`, so sandboxed actions can read it. Each action includes
 only the configurations in the source file's ancestor directories, so changes invalidate the
 affected files' cache. `WarningsAsErrors: '*'` makes findings fail the action; failed actions cannot
-produce the success marker.
+produce a successful output.
+
+Each successful action records the headers read by clang-tidy's own preprocessor, including
+system headers, using `-Wp,-MD`. This adds no second preprocessing pass. The output is Bazel's
+`unused_inputs_list`: compilation headers that were available but not read. After the first run,
+Bazel can reuse the result when only those headers change. The source and configurations remain
+inputs, and changes to include paths, defines, candidate headers or the tool still invalidate the
+action. All candidate headers are available whenever the action executes, so newly added includes
+are checked normally. Dependency generation or parsing failures fail the action too.
+
+This primarily improves incremental builds with Bazel's local action cache. The disk cache saved
+by CI does not carry that local dependency-discovery state to a fresh Bazel output base; do not
+expect the same reduction in cache misses between CI machines.
 
 ## Tests
 
 `//:clang_tidy_test` inspects the real `parquet_metadata_test`, `query_parameters` and `httplib`
-targets. It checks configuration and executable inputs, C++20 flags, httplib's public settings
-and private-define isolation, that only headers get the heavy include check, and implementation
-dependencies' lint outputs. It is included in
-`just test`; `just tidy` executes the actual lint actions.
+targets. It checks configuration and executable inputs, collection of implementation dependencies'
+lint outputs, and exclusion of external targets. These checks protect caching and lint coverage
+without fixing individual compiler flags or dependency filenames. It is included in `just test`;
+`just tidy` executes the actual lint actions with the targets' parsing settings.
+`//tools/clang_tidy:runner_test` checks dependency-file escaping and rejects missing dependency
+rules, which must never produce a cached success.

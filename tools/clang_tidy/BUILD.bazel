@@ -1,6 +1,16 @@
-# Stand-ins that the clang-tidy aspect finds before GoogleSQL's slowest headers; see README.md.
-filegroup(
-    name = "heavy_headers",
-    srcs = glob(["heavy_headers/**/*.h"]),
-    visibility = ["//visibility:public"],
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+py_binary(
+    name = "runner",
+    srcs = ["runner.py"],
+)
+
+py_test(
+    name = "runner_test",
+    size = "small",
+    srcs = [
+        "runner.py",
+        "runner_test.py",
+    ],
 )

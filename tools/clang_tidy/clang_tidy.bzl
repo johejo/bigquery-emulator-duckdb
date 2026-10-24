@@ -2,61 +2,13 @@
 
 Each checked-in file is its own action, so results are cached and checked in parallel. Generated
 and external files are omitted. Headers are checked as their own translation units too, since
-checks such as misc-include-cleaner look only at the main file. Each header is also preprocessed
-with stand-ins for GoogleSQL's slowest headers, so that it cannot pass their parsing time on to
-every file that includes it.
+checks such as misc-include-cleaner look only at the main file.
 """
 
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cpp_toolchain", "use_cc_toolchain")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-
-def _compile_flags(ctx, cc_toolchain, compilation_context, local_defines):
-    feature_configuration = cc_common.configure_features(
-        ctx = ctx,
-        cc_toolchain = cc_toolchain,
-        requested_features = ctx.features,
-        # Standalone headers do not have the compiler's module-map action. Dependency layering
-        # is checked by the real build, not by clang-tidy.
-        unsupported_features = ctx.disabled_features + ["layering_check", "module_maps", "header_modules"],
-    )
-
-    variables = cc_common.create_compile_variables(
-        feature_configuration = feature_configuration,
-        cc_toolchain = cc_toolchain,
-        user_compile_flags = ctx.fragments.cpp.copts + ctx.fragments.cpp.cxxopts +
-                             getattr(ctx.rule.attr, "copts", []),
-        include_directories = compilation_context.includes,
-        quote_include_directories = compilation_context.quote_includes,
-        system_include_directories = depset(transitive = [
-            compilation_context.system_includes,
-            compilation_context.external_includes,
-        ]),
-        framework_include_directories = compilation_context.framework_includes,
-        preprocessor_defines = depset(transitive = [local_defines, compilation_context.defines]),
-    )
-    flags = cc_common.get_memory_inefficient_command_line(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.cpp_compile,
-        variables = variables,
-    )
-    env = cc_common.get_environment_variables(
-        feature_configuration = feature_configuration,
-        action_name = ACTION_NAMES.cpp_compile,
-        variables = variables,
-    )
-
-    # clang-tidy is not the toolchain's compiler, so name its builtin include directories. Apple's
-    # toolchain lists the SDK's C headers ahead of libc++'s, which libc++ rejects, so keep the C++
-    # ones first.
-    builtin = cc_toolchain.built_in_include_directories
-    cxx = [d for d in builtin if "/c++/" in d or d.endswith("/c++")]
-    return flags + [
-        flag
-        for d in cxx + [d for d in builtin if d not in cxx]
-        for flag in ("-isystem", d)
-    ] + ["-xc++"], env
+load("//tools/cc_checks:compile_flags.bzl", "compile_flags")
 
 def _clang_tidy_impl(target, ctx):
     if CcInfo not in target or target.label.workspace_name:
@@ -83,16 +35,25 @@ def _clang_tidy_impl(target, ctx):
         for dep in [target] + getattr(ctx.rule.attr, "implementation_deps", [])
     ])
     cc_toolchain = find_cpp_toolchain(ctx)
-    flags, env = _compile_flags(
+    flags, env = compile_flags(
         ctx,
         cc_toolchain,
         compilation_context,
         target[CcInfo].compilation_context.local_defines,
+        builtin_includes = True,
     )
 
     inputs = depset(
         transitive = [compilation_context.headers, cc_toolchain.all_files],
     )
+
+    # Share the candidate list between this target's actions without flattening the headers
+    # separately for every source. Only headers are eligible for unused-input pruning.
+    candidates = ctx.actions.declare_file(ctx.label.name + ".clang-tidy/headers")
+    header_args = ctx.actions.args()
+    header_args.add_all(compilation_context.headers)
+    header_args.set_param_file_format("multiline")
+    ctx.actions.write(candidates, header_args)
     outputs = []
     for src in srcs:
         # Let clang-tidy discover its configuration as outside Bazel. Only ancestor configs can
@@ -106,14 +67,15 @@ def _clang_tidy_impl(target, ctx):
         args = ctx.actions.args()
         args.add(ctx.file._clang_tidy)
         args.add(out)
-        args.add_all(["--quiet", src, "--"])
+        args.add_all([candidates, src])
         args.add_all(flags)
-        ctx.actions.run_shell(
-            command = 'tool=$1; out=$2; shift 2; "$tool" "$@" && touch "$out"',
+        ctx.actions.run(
+            executable = ctx.executable._runner,
             arguments = [args],
             tools = [ctx.file._clang_tidy],
-            inputs = depset([src] + configs, transitive = [inputs]),
+            inputs = depset([src, candidates] + configs, transitive = [inputs]),
             outputs = [out],
+            unused_inputs_list = out,
             mnemonic = "ClangTidy",
             progress_message = "Run clang-tidy on " + src.short_path,
             # Nix wrappers and the C++ toolchain use the development shell's environment.
@@ -121,40 +83,14 @@ def _clang_tidy_impl(target, ctx):
             env = env,
         )
         outputs.append(out)
-        if src.extension == "h":
-            outputs.append(_check_heavy_includes(ctx, cc_toolchain, src, flags, env, inputs))
     return [OutputGroupInfo(clang_tidy = depset(outputs, transitive = inherited))]
-
-def _check_heavy_includes(ctx, cc_toolchain, header, flags, env, inputs):
-    out = ctx.actions.declare_file("{}.heavy-includes/{}".format(ctx.label.name, header.short_path))
-    stand_ins = ctx.files._heavy_headers
-    root = stand_ins[0].path[:stand_ins[0].path.index("/googlesql/")]
-    args = ctx.actions.args()
-    args.add(cc_toolchain.compiler_executable)
-    args.add(out)
-
-    # Quoted includes search -iquote directories in order, so the stand-ins come first.
-    args.add_all(["-iquote", root])
-    args.add_all(flags)
-    args.add_all(["-Wno-pragma-once-outside-header", "-E", "-o", "/dev/null", header])
-    ctx.actions.run_shell(
-        command = 'tool=$1; out=$2; shift 2; "$tool" "$@" && touch "$out"',
-        arguments = [args],
-        inputs = depset([header] + stand_ins, transitive = [inputs]),
-        outputs = [out],
-        mnemonic = "HeavyIncludes",
-        progress_message = "Check the GoogleSQL headers " + header.short_path + " includes",
-        use_default_shell_env = True,
-        env = env,
-    )
-    return out
 
 clang_tidy = aspect(
     implementation = _clang_tidy_impl,
     attr_aspects = ["deps", "implementation_deps"],
     attrs = {
+        "_runner": attr.label(default = Label("//tools/clang_tidy:runner"), executable = True, cfg = "exec"),
         "_clang_tidy": attr.label(default = Label("@clang_tidy_tool//:clang-tidy"), allow_single_file = True, cfg = "exec"),
-        "_heavy_headers": attr.label(default = Label("//tools/clang_tidy:heavy_headers")),
         # Lists every .clang-tidy in the repository.
         "_configs": attr.label(default = Label("//:clang_tidy_config")),
     },

@@ -60,6 +60,11 @@ jobs:
         run: |
           echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/clang-tidy.bep.json --profile=$RUNNER_TEMP/bazel-reports/clang-tidy.profile.json.gz" >> .bazelrc.local
           nix run .#clang-tidy
+      - name: Heavy includes
+        if: success() || failure()
+        run: |
+          echo "build --build_event_json_file=$RUNNER_TEMP/bazel-reports/heavy-includes.bep.json --profile=$RUNNER_TEMP/bazel-reports/heavy-includes.profile.json.gz" >> .bazelrc.local
+          nix run .#heavy-includes
       - name: Upload Bazel reports
         if: success() || failure()
         continue-on-error: true
