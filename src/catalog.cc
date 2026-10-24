@@ -28,7 +28,7 @@
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
 #include "src/catalog_table.h"
-#include "src/external_query.h"
+#include "src/connection_id.h"
 #include "src/field_schema.h"
 #include "src/information_schema.h"
 #include "src/language_options.h"

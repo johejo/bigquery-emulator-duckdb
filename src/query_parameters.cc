@@ -20,9 +20,9 @@
 #include "src/bignumeric.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
-#include "src/googlesql_s2geometry/value.h"
-#include "src/googlesql_s2geometry/wkt.h"
-#include "src/googlesql_s2geometry_duckdb/codec.h"
+#include "src/googlesql_geography/value.h"
+#include "src/googlesql_geography/wkt.h"
+#include "src/googlesql_geography_duckdb/codec.h"
 #include "src/interval.h"
 #include "src/type_mapping.h"
 
@@ -113,8 +113,8 @@ std::string ToDuckDbLiteral(const TypedValue& parameter);
 
 // The GEOGRAPHY of the WKT `text`, whose polygons are oriented, in the form queries hold it in.
 std::string GeographyLiteral(const std::string& text, const std::string& parameter) {
-  const absl::StatusOr<googlesql_s2geometry::Geography> geography =
-      googlesql_s2geometry::ReadWkt(text, /*oriented=*/true);
+  const absl::StatusOr<googlesql_geography::Geography> geography =
+      googlesql_geography::ReadWkt(text, /*oriented=*/true);
   if (geography.ok()) {
     return "from_hex(" +
            QuoteLiteral(absl::BytesToHexString(geography_duckdb::EncodeGeography(*geography))) +

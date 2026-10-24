@@ -12,6 +12,7 @@
 #include "absl/strings/escaping.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/connection_id.h"
 #include "src/external_query.h"
 #include "src/gcs.h"
 

@@ -76,9 +76,9 @@ backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
   semantics.
 - **A template** (`TemplateRules`): a DuckDB function plus guards and errors, or a small fixed
   difference such as argument order, a default or a date part.
-- **A backend rule** (`BackendRules`, registered in `src/backend_functions/`): a call to
+- **A backend rule** (`BackendRules`, registered in `src/googlesql_functions_duckdb/`): a call to
   GoogleSQL's implementation.
-- **An S2 rule** (`S2Rules`, registered in `src/googlesql_s2geometry_duckdb/geography.cc`): a GEOGRAPHY
+- **An S2 rule** (`S2Rules`, registered in `src/googlesql_geography_duckdb/geography.cc`): a GEOGRAPHY
   function, which GoogleSQL does not implement, over the S2 Geometry library.
 - **A handler** (`Handlers`, `src/translator/handlers.cc`): when the spelling depends on more of
   the resolved AST than a rule sees, such as a variable number of arguments or a literal pattern

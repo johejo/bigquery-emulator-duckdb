@@ -27,6 +27,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
+#include "src/connection_id.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
 #include "src/table_source.h"

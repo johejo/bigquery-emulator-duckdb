@@ -30,7 +30,7 @@ bool InvolvesBigNumeric(const googlesql::ResolvedFunctionCallBase& call);
 // `stored` as a table stores it: an ARRAY with a NULL element fails, as in BigQuery, and unless
 // `stored`, each GEOGRAPHY in it, at any depth, is turned into the WKT BigQuery returns for it.
 // Until then, an ARRAY may hold NULL, and a GEOGRAPHY, also in tables, keeps the form queries hold
-// it in (see src/googlesql_s2geometry_duckdb/codec.h).
+// it in (see src/googlesql_geography_duckdb/codec.h).
 std::string ResultValue(const std::string& value, const googlesql::Type* type,
                         std::string_view column, bool stored = false);
 

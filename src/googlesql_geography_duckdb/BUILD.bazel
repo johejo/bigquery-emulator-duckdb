@@ -1,0 +1,44 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+cc_library(
+    name = "codec",
+    srcs = ["codec.cc"],
+    hdrs = ["codec.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@s2geometry//:s2",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//src/googlesql_geography",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "googlesql_geography_duckdb",
+    srcs = ["geography.cc"],
+    hdrs = ["geography.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":codec",
+        "//:backend_error",
+        "//:duckdb_handle",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/base:status",
+        "@s2geometry//:s2",
+    ],
+    linkstatic = True,
+    visibility = ["//:__pkg__"],
+    deps = [
+        "//src/googlesql_geography",
+        "//third_party/duckdb",
+    ],
+)

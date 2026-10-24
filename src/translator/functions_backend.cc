@@ -403,7 +403,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& BackendRules() {
               {.arity = 1, .spelling = "bq_sha512($1)", .conditions = {Is(1, {TYPE_BYTES})}},
           },
       },
-      // GoogleSQL leaves base32 out of its open source; src/backend_functions/string.cc
+      // GoogleSQL leaves base32 out of its open source; src/googlesql_functions_duckdb/string.cc
       // implements RFC 4648's.
       {"TO_BASE32", {{.arity = 1, .spelling = "bq_to_base32($1)"}}},
       {"FROM_BASE32", {{.arity = 1, .spelling = "bq_from_base32($1)"}}},

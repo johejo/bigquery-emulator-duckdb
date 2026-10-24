@@ -769,7 +769,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
       // Operators. Division binds its operands once, as every rule does, and stays an
       // expression that CASE and IF can short-circuit; DuckDB would return infinity on zero.
       // GoogleSQL adds an INTERVAL's months, days and time in turn, and fails where a step leaves
-      // the range; see src/backend_functions/interval.cc.
+      // the range; see src/googlesql_functions_duckdb/interval.cc.
       {
           "$ADD",
           {
@@ -872,8 +872,8 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_multiply_numeric($1, $2)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
               },
-              // See src/backend_functions/interval.cc; src/translator/function.cc rejects FLOAT64
-              // operands as BigQuery does.
+              // See src/googlesql_functions_duckdb/interval.cc; src/translator/function.cc rejects
+              // FLOAT64 operands as BigQuery does.
               {
                   .arity = 2,
                   .spelling = "bq_multiply_interval($1, $2)",
@@ -896,7 +896,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
                   .spelling = "bq_divide_numeric($1, $2)",
                   .conditions = {Is(1, {TYPE_NUMERIC})},
               },
-              // See src/backend_functions/interval.cc.
+              // See src/googlesql_functions_duckdb/interval.cc.
               {
                   .arity = 2,
                   .spelling = "bq_divide_interval($1, $2)",

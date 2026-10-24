@@ -17,12 +17,10 @@
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
 #include "src/backend.h"
-#include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/python.h"
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/location.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
@@ -31,6 +29,8 @@
 #include "src/storage_snapshot.h"
 #include "src/system_variables.h"
 #include "src/table_metadata.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -208,10 +208,10 @@ class Emulator {
   explicit Emulator(
       std::string data_dir = "", const std::vector<Project>& projects = {},
       const std::optional<std::string>& session_user = std::nullopt,
-      const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
+      const udf::JavaScriptLimits& javascript = udf::JavaScriptLimits(),
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
-      const backend_functions::PythonOptions& python = backend_functions::PythonOptions(),
-      const googlesql_s2geometry::Options& geography = {.expand_bounding_box = true});
+      const udf::PythonOptions& python = udf::PythonOptions(),
+      const googlesql_geography::Options& geography = {.expand_bounding_box = true});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

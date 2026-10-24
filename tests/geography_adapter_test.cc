@@ -5,8 +5,8 @@
 
 #include "duckdb.h"
 #include "src/duckdb_handle.h"
-#include "src/googlesql_s2geometry/options.h"
-#include "src/googlesql_s2geometry_duckdb/geography.h"
+#include "src/googlesql_geography/options.h"
+#include "src/googlesql_geography_duckdb/geography.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -21,7 +21,7 @@ TEST(GeographyAdapterTest, OwnsOptionsIndependentlyForEachDatabase) {
   ASSERT_EQ(duckdb_connect(first.get(), first_connection.out()), DuckDBSuccess);
   ASSERT_EQ(duckdb_connect(second.get(), second_connection.out()), DuckDBSuccess);
   {
-    googlesql_s2geometry::Options options;
+    googlesql_geography::Options options;
     geography_duckdb::RegisterGeographyFunctions(first_connection.get(), options);
     options.expand_bounding_box = true;
     geography_duckdb::RegisterGeographyFunctions(second_connection.get(), options);

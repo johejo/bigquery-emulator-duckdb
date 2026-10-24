@@ -100,9 +100,10 @@ std::string BigNumericSum(const std::string& sql, const std::vector<std::string>
   return "CAST(bq_bignumeric_sum(CAST(" + sql + " AS VARCHAR)) AS BIGNUM)";
 }
 
-// A BIGNUMERIC aggregate that `kFunction`, of src/backend_functions/bignumeric.cc, computes as
-// GoogleSQL does from the units of the non-NULL values that list() collects. A pair of arguments
-// is collected as the units of both joined by a comma, which is NULL where either is NULL.
+// A BIGNUMERIC aggregate that `kFunction`, of src/googlesql_functions_duckdb/bignumeric.cc,
+// computes as GoogleSQL does from the units of the non-NULL values that list() collects. A pair of
+// arguments is collected as the units of both joined by a comma, which is NULL where either is
+// NULL.
 template <const char* kFunction>
 AggregateRule BigNumericAggregate(std::size_t arity) {
   return {
@@ -129,9 +130,9 @@ constexpr char kBigNumericCorr[] = "bq_bignumeric_corr";
 constexpr char kBigNumericCovarPop[] = "bq_bignumeric_covar_pop";
 constexpr char kBigNumericCovarSamp[] = "bq_bignumeric_covar_samp";
 
-// An INTERVAL aggregate that `kFunction`, of src/backend_functions/interval.cc, computes as
-// GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would keep any of
-// equal values, such as a month and 30 days, so the DISTINCT functions keep the first of them.
+// An INTERVAL aggregate that `kFunction`, of src/googlesql_functions_duckdb/interval.cc, computes
+// as GoogleSQL does from the non-NULL values that list() collects. DuckDB's DISTINCT would keep any
+// of equal values, such as a month and 30 days, so the DISTINCT functions keep the first of them.
 template <const char* kFunction>
 AggregateRule IntervalAggregate(
     AggregateRule::Distinct distinct = AggregateRule::Distinct::kAllowed) {

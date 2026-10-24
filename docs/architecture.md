@@ -79,13 +79,32 @@ functions use this representation; it is never returned as an ordinary STRUCT to
 
 DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a
 schema. Results are encoded in BigQuery's REST row format.
-[src/backend_functions/](../src/backend_functions/) exposes GoogleSQL implementations through
-DuckDB functions, uses [S2 Geometry](https://s2geometry.io/) for GEOGRAPHY, and keeps the
-sketches of `HLL_COUNT` and `APPROX_COUNT_DISTINCT` with a
-[port of zetasketch](../src/zetasketch/README.md), whose sketches are BigQuery's.
+[googlesql_functions](../src/googlesql_functions/) owns scalar function compatibility logic,
+including string validation, casts, date and time parsing and formatting, without depending on
+DuckDB. [googlesql_functions_duckdb](../src/googlesql_functions_duckdb/) registers those functions
+and upstream GoogleSQL functions, converts vectors and storage representations, and manages
+aggregate callbacks. Upstream functions can be registered directly without an extra semantic wrapper.
 
-GEOGRAPHY operations live in [googlesql_s2geometry](../src/googlesql_s2geometry/), a typed
-function library over S2 with no DuckDB dependency. [googlesql_s2geometry_duckdb](../src/googlesql_s2geometry_duckdb/)
+Emulator implementations are also grouped by SQL feature in `src/googlesql_<feature>/`:
+[geography](../src/googlesql_geography/), [AEAD and keysets](../src/googlesql_aead/),
+[text analysis](../src/googlesql_text_analysis/) and [HLL sketches](../src/googlesql_hll/).
+These libraries own input validation, computation and compatibility errors without depending on
+DuckDB. Their `googlesql_<feature>_duckdb` adapters handle registration and DuckDB representations.
+The `googlesql_` prefix denotes GoogleSQL-compatible semantics, including emulator implementations.
+Shared DuckDB registration and vector helpers live in [duckdb_functions](../src/duckdb_functions/).
+ObjectRef validation lives in `googlesql_functions/objectref`; its DuckDB adapter receives
+connection lookup and metadata fetch callbacks. [object_ref.cc](../src/object_ref.cc) owns the
+GCS-backed metadata fetch, and [connection_id.cc](../src/connection_id.cc) normalizes connection IDs
+for both ObjectRef and external queries. [backend_functions.cc](../src/backend_functions.cc)
+assembles registration of these function libraries and UDF adapters.
+
+HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
+the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
+Text analysis keeps tokenization, document counts and scores in the library; its adapter encodes
+the intermediate window dictionary and caches parsed analyzers and dictionaries.
+
+GEOGRAPHY operations live in [googlesql_geography](../src/googlesql_geography/), a typed
+function library over S2 with no DuckDB dependency. [googlesql_geography_duckdb](../src/googlesql_geography_duckdb/)
 registers those functions and converts DuckDB arguments and results. Query values and stored
 columns are BLOBs, under the `bq_geography` alias in columns, that hold the exact S2 vertices and
 the encoded S2ShapeIndex of a geography's shapes; distance functions query that index without
@@ -157,7 +176,13 @@ template, so both stay Untested until someone adds samples that meet the referen
 See [compatibility.md](compatibility.md) for query and API limits and
 [storage-api.md](storage-api.md) for Storage client behavior.
 
-### Python UDF workers
+### UDF runtimes
+
+[udf/javascript](../src/udf/javascript/) owns the QuickJS engine, compiled-source cache and
+execution limits. [udf/python](../src/udf/python/) owns Python worker discovery, process management,
+communication and limits. Neither runtime depends on DuckDB. [udf_duckdb](../src/udf_duckdb/)
+converts SQL values, registers the UDF calls and ties one runtime per thread to the query lifetime.
+The runtimes keep separate interfaces because their execution and ownership models differ.
 
 Python routine definitions are stored in the same macro comments as SQL routines, with their
 runtime and entry point. The catalog exposes them as volatile functions, and the translator

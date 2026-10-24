@@ -16,20 +16,20 @@
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
 #include "src/backend_functions.h"
-#include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/object_metadata.h"
-#include "src/backend_functions/python.h"
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/duckpgq.h"
 #include "src/field_schema.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_functions_duckdb/objectref_options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
 #include "src/result_chunks.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 #include "src/type_mapping.h"
+#include "src/udf/javascript/limits.h"
+#include "src/udf/python/options.h"
 
 // DuckDB v2 requires explicit registration of statically linked extensions before opening a
 // database. Keep using duckdb.h's V1 C API for database access.
@@ -156,11 +156,9 @@ json QueryResult::SchemaToJson() const {
 
 struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
-  Database(const std::optional<std::string>& session_user,
-           const backend_functions::JavaScriptLimits& javascript,
-           const backend_functions::ObjectStorage& storage,
-           const backend_functions::PythonOptions& python,
-           const googlesql_s2geometry::Options& geography) {
+  Database(const std::optional<std::string>& session_user, const udf::JavaScriptLimits& javascript,
+           const functions_duckdb::ObjectStorage& storage, const udf::PythonOptions& python,
+           const googlesql_geography::Options& geography) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -235,10 +233,9 @@ Backend::CallConnection Backend::Connect() const {
 }
 
 Backend::Backend(const std::optional<std::string>& session_user,
-                 const backend_functions::JavaScriptLimits& javascript,
-                 const backend_functions::ObjectStorage& storage,
-                 const backend_functions::PythonOptions& python,
-                 const googlesql_s2geometry::Options& geography)
+                 const udf::JavaScriptLimits& javascript,
+                 const functions_duckdb::ObjectStorage& storage, const udf::PythonOptions& python,
+                 const googlesql_geography::Options& geography)
     : db_(std::make_shared<Database>(session_user, javascript, storage, python, geography)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)

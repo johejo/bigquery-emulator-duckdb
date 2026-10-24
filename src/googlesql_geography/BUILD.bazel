@@ -1,0 +1,31 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+cc_library(
+    name = "googlesql_geography",
+    srcs = [
+        "geography.cc",
+        "value.cc",
+        "wkt.cc",
+    ],
+    hdrs = [
+        "geography.h",
+        "options.h",
+        "value.h",
+        "wkt.h",
+    ],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/types:span",
+        "@googlesql//googlesql/base:status",
+    ],
+    linkstatic = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@s2geometry//:s2",
+    ],
+)
