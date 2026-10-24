@@ -22,6 +22,7 @@ type File struct {
 	Description   string              `json:"description,omitempty"`
 	Vars          map[string]any      `json:"vars,omitempty"`
 	StepTemplates map[string]Step     `json:"stepTemplates,omitempty"`
+	StepGroups    map[string][]Step   `json:"stepGroups,omitempty"`
 	Templates     map[string]Template `json:"templates,omitempty"`
 	Cases         []Case              `json:"cases"`
 }
@@ -45,6 +46,7 @@ type Case struct {
 type Step struct {
 	Name          string            `json:"name"`
 	Use           string            `json:"use,omitempty"`
+	Group         string            `json:"group,omitempty"`
 	Vars          map[string]any    `json:"vars,omitempty"`
 	SQL           string            `json:"sql,omitempty"`
 	QueryOptions  map[string]any    `json:"queryOptions,omitempty"`
@@ -414,13 +416,16 @@ func (file *File) resolveCase(c Case) (Case, error) {
 }
 
 func (file *File) resolveSteps(steps []Step) ([]Step, error) {
-	result := slices.Clone(steps)
+	result, err := file.expandGroups(steps)
+	if err != nil {
+		return nil, err
+	}
 	for i, step := range result {
 		if step.Use == "" {
 			continue
 		}
 		base, ok := file.StepTemplates[step.Use]
-		if !ok || base.Use != "" {
+		if !ok || base.Use != "" || base.Group != "" {
 			return nil, fmt.Errorf("%s: unknown or nested step template %q", step.Name, step.Use)
 		}
 		if step.REST != nil || step.GRPC != nil || step.Job != nil || step.SQL != "" || len(step.QueryOptions) != 0 || len(step.Until) != 0 {
@@ -669,7 +674,14 @@ func execute(ctx context.Context, c Case, vars map[string]any, timeout time.Dura
 	var cleanupErrors []error
 	for _, step := range c.Cleanup {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-		response, err := call(cleanupCtx, step, vars)
+		localVars := map[string]any{}
+		for key, value := range vars {
+			localVars[key] = value
+		}
+		for key, value := range step.Vars {
+			localVars[key] = value
+		}
+		response, err := call(cleanupCtx, step, localVars)
 		cancel()
 		if err == nil && response.Failed {
 			missing := false

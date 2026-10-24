@@ -44,10 +44,14 @@ Migrated cases include:
   modes, query/load/streaming writes, dataset and table inheritance, LIKE/COPY/CLONE,
   copy jobs, unparameterized values, PATCH/PUT, create/truncate load combinations,
   nested numeric/string input and overflow atomicity. Go retains PutMultiError decoding.
+  Case templates share the update/load workflows; each combination lists its inputs
+  and expected modes/rows explicitly.
 - `table_creation_paths.api.yaml` replaces all three creation/write/replacement tests.
   Every metadata snapshot still checks schema, creation time, columns and field paths
   against INFORMATION_SCHEMA; failed replacements also preserve rows and defaults.
   Shared Go helpers remain for the other SDK tests that use them.
+  Step groups share metadata/INFORMATION_SCHEMA snapshots, including the checks
+  after every rejected replacement.
 
 Query jobs are polled to completion; job errors are included in observations so an
 HTTP-success response cannot hide a failed query. New cases should likewise observe

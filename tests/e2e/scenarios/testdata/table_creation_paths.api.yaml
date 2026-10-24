@@ -1,131 +1,163 @@
-# Migrated expectations are from the original Go E2E tests, not emulator output.
+# Expectations are preserved from the original Go E2E tests and recorded BigQuery answers.
 version: 1
 description: "All three creation-path workflows: REST/DDL/query/load/copy schemas and defaults, INFORMATION_SCHEMA agreement, append/truncate semantics and atomic rejected replacements."
-vars: {"dataset": "e2e_${run}_${case}"}
+vars:
+  dataset: "e2e_${run}_${case}"
+  declared_metadata:
+    description: "the table"
+    friendlyName: "Paths"
+    labels: {"env": "dev"}
+    schema:
+      fields:
+        "$schema":
+          - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+          - {"defaultValueExpression": "'none'", "name": "name", "type": "STRING"}
+          - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+  unchanged_target_metadata:
+    creationTime: "${before_created}"
+    description: "the table"
+    friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+    labels: {"env": "dev"}
+    schema: {"fields": {"$schema": "${before_fields}"}}
+  unchanged_keep_metadata:
+    creationTime: "${before_created}"
+    description: "the table"
+    friendlyName: "Keep"
+    labels: {"env": "dev"}
+    numRows: "1"
+    schema: {"fields": {"$schema": "${before_fields}"}}
+  declared_columns:
+    rows: [{"f": [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]}, {"f": [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]}]
+    state: "DONE"
+  query_columns:
+    rows: [{"f": [{"v": "id"}, {"v": "YES"}, {"v": "INT64"}, {"v": "NULL"}]}, {"f": [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]}]
+    state: "DONE"
+  load_columns:
+    rows: [{"f": [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]}, {"f": [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]}]
+    state: "DONE"
+  unchanged_columns: {"columns": "${before_columns}", "state": "DONE"}
+  declared_paths: {"rows": [{"f": [{"v": "id"}, {"v": "key"}]}, {"f": [{"v": "name"}, {"v": ""}]}, {"f": [{"v": "tags"}, {"v": ""}]}], "state": "DONE"}
+  unchanged_paths: {"paths": "${before_paths}", "state": "DONE"}
+  dataset_body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
 stepTemplates:
-  sql:
+  sql: {"sql": "${sql}", "observe": {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}, "expect": {"state": "DONE"}}
+  rows:
     sql: |-
       ${sql}
-    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors", "rows": "/result/rows"}
+    expect: {"state": "DONE", "rows": "${rows}"}
+  snapshot_metadata:
+    expect: "${metadata_expect}"
+    rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}"}
+    bind: {"created": "/body/creationTime", "fields": "/body/schema/fields"}
+    observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels", "schema": "/body/schema"}
+  snapshot_creation_time:
+    sql: |-
+      SELECT creation_time = TIMESTAMP_MILLIS(${created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = '${table}'
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors", "rows": "/result/rows"}
+    expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+  snapshot_columns:
+    expect: "${columns_expect}"
+    bind: {"columns": "/result/rows"}
+    observe: {"error": "/error", "errors": "/body/status/errors", "rows": "/result/rows", "state": "/body/status/state"}
+    sql: |-
+      SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '${table}' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
+  snapshot_paths:
+    expect: "${paths_expect}"
+    bind: {"paths": "/result/rows"}
+    observe: {"error": "/error", "errors": "/body/status/errors", "rows": "/result/rows", "state": "/body/status/state"}
+    sql: |-
+      SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = '${table}' ORDER BY field_path
+  create_dataset: {"rest": {"method": "POST", "path": "/bigquery/v2/projects/${project}/datasets", "body": "${dataset_body}"}}
+  delete_dataset: {"rest": {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}}
+stepGroups:
+  table_snapshot:
+    - {"name": "metadata", "use": "snapshot_metadata"}
+    - {"name": "creation_time", "use": "snapshot_creation_time"}
+    - {"name": "columns", "use": "snapshot_columns"}
+    - {"name": "paths", "use": "snapshot_paths"}
+  schema_snapshot:
+    - {"name": "metadata", "use": "snapshot_metadata", "observe": {"schema": "/body/schema"}}
+    - {"name": "creation_time", "use": "snapshot_creation_time"}
+    - {"name": "columns", "use": "snapshot_columns"}
+    - {"name": "paths", "use": "snapshot_paths"}
+  unchanged_table:
+    - name: "metadata"
+      use: "snapshot_metadata"
+      observe:
+        creationTime: "/body/creationTime"
+        description: "/body/description"
+        friendlyName: "/body/friendlyName"
+        labels: "/body/labels"
+        schema: "/body/schema"
+    - {"name": "creation_time", "use": "snapshot_creation_time"}
+    - name: "columns"
+      use: "snapshot_columns"
+      observe: {"columns": "/result/rows", "error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
+    - name: "paths"
+      use: "snapshot_paths"
+      observe: {"error": "/error", "errors": "/body/status/errors", "paths": "/result/rows", "state": "/body/status/state"}
+  table_with_rows:
+    - name: "metadata"
+      use: "snapshot_metadata"
+      observe:
+        description: "/body/description"
+        friendlyName: "/body/friendlyName"
+        labels: "/body/labels"
+        numRows: "/body/numRows"
+        schema: "/body/schema"
+    - {"name": "creation_time", "use": "snapshot_creation_time"}
+    - {"name": "columns", "use": "snapshot_columns"}
+    - {"name": "paths", "use": "snapshot_paths"}
+  unchanged_table_with_rows:
+    - name: "metadata"
+      use: "snapshot_metadata"
+      observe:
+        creationTime: "/body/creationTime"
+        description: "/body/description"
+        friendlyName: "/body/friendlyName"
+        labels: "/body/labels"
+        numRows: "/body/numRows"
+        schema: "/body/schema"
+    - {"name": "creation_time", "use": "snapshot_creation_time"}
+    - name: "columns"
+      use: "snapshot_columns"
+      observe: {"columns": "/result/rows", "error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
+    - name: "paths"
+      use: "snapshot_paths"
+      observe: {"error": "/error", "errors": "/body/status/errors", "paths": "/result/rows", "state": "/body/status/state"}
 cases:
   - name: "creation_paths"
     steps:
-      - name: "create_dataset"
-        rest:
-          method: "POST"
-          path: "/bigquery/v2/projects/${project}/datasets"
-          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - {"name": "create_dataset", "use": "create_dataset"}
       - name: "create_rest"
         rest:
           method: "POST"
           path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
           body:
-            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "rest"}
-            schema:
-              fields:
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
             description: "the table"
             friendlyName: "Paths"
             labels: {"env": "dev"}
+            schema:
+              fields:
+                - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                - {"defaultValueExpression": "'none'", "name": "name", "type": "STRING"}
+                - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+            tableReference: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "rest"}
       - name: "rest_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/rest"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-          description: "the table"
-          friendlyName: "Paths"
-          labels: {"env": "dev"}
-        bind: {"rest_metadata_created": "/body/creationTime", "rest_metadata_fields": "/body/schema/fields"}
-      - name: "rest_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${rest_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'rest'
-      - name: "rest_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]
-        bind: {"rest_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'rest' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "rest_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"rest_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'rest' ORDER BY field_path
-      - name: "rest_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT rest (id) VALUES (10)"}
+        group: "table_snapshot"
+        vars: {"table": "rest", "metadata_expect": "${declared_metadata}", "columns_expect": "${declared_columns}", "paths_expect": "${declared_paths}"}
+      - {"name": "rest_insert", "use": "sql", "vars": {"sql": "INSERT rest (id) VALUES (10)"}}
       - name: "rest_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM rest WHERE id = 10"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM rest WHERE id = 10", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
       - name: "rest_required"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "INSERT rest (name) VALUES ('no id')"}
+        expect: {}
+        expectFailure: true
+        observe: {}
       - name: "create_ddl"
-        expect: {"state": "DONE"}
         use: "sql"
         vars:
           sql: |-
@@ -133,1609 +165,476 @@ cases:
                     id INT64 NOT NULL OPTIONS (description = 'key'), name STRING DEFAULT 'none', tags ARRAY<STRING>)
                     OPTIONS (description = 'the table', friendly_name = 'Paths', labels = [('env', 'dev')])
       - name: "ddl_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ddl"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-          description: "the table"
-          friendlyName: "Paths"
-          labels: {"env": "dev"}
-        bind: {"ddl_metadata_created": "/body/creationTime", "ddl_metadata_fields": "/body/schema/fields"}
-      - name: "ddl_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${ddl_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'ddl'
-      - name: "ddl_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]
-        bind: {"ddl_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'ddl' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "ddl_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"ddl_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'ddl' ORDER BY field_path
-      - name: "ddl_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT ddl (id) VALUES (11)"}
+        group: "table_snapshot"
+        vars: {"table": "ddl", "metadata_expect": "${declared_metadata}", "columns_expect": "${declared_columns}", "paths_expect": "${declared_paths}"}
+      - {"name": "ddl_insert", "use": "sql", "vars": {"sql": "INSERT ddl (id) VALUES (11)"}}
       - name: "ddl_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM ddl WHERE id = 11"}
-      - name: "ddl_required"
-        expectFailure: true
-        observe: {}
-        expect: {}
-        use: "sql"
-        vars: {"sql": "INSERT ddl (name) VALUES ('no id')"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM ddl WHERE id = 11", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
+      - {"name": "ddl_required", "use": "sql", "vars": {"sql": "INSERT ddl (name) VALUES ('no id')"}, "expect": {}, "expectFailure": true, "observe": {}}
       - name: "create_query"
         sql: |-
           SELECT 0 AS id, 'a' AS name, ['x'] AS tags
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "query"}
-          writeDisposition: "WRITE_EMPTY"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "query"}, "writeDisposition": "WRITE_EMPTY"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "query_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/query"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                - name: "name"
-                  type: "STRING"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-          description: {"$oneOf": [{"$missing": true}, null, ""]}
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"$oneOf": [{"$missing": true}, null, {}]}
-        bind: {"query_metadata_created": "/body/creationTime", "query_metadata_fields": "/body/schema/fields"}
-      - name: "query_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "table_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${query_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'query'
-      - name: "query_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "YES"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]
-        bind: {"query_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'query' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "query_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows: [{"f": [{"v": "id"}, {"v": ""}]}, {"f": [{"v": "name"}, {"v": ""}]}, {"f": [{"v": "tags"}, {"v": ""}]}]
-        bind: {"query_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'query' ORDER BY field_path
-      - name: "query_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT query (id) VALUES (12)"}
+          table: "query"
+          metadata_expect:
+            description: {"$oneOf": [{"$missing": true}, null, ""]}
+            friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+            labels: {"$oneOf": [{"$missing": true}, null, {}]}
+            schema:
+              fields: {"$schema": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}, {"mode": "REPEATED", "name": "tags", "type": "STRING"}]}
+          columns_expect: "${query_columns}"
+          paths_expect: {"rows": [{"f": [{"v": "id"}, {"v": ""}]}, {"f": [{"v": "name"}, {"v": ""}]}, {"f": [{"v": "tags"}, {"v": ""}]}], "state": "DONE"}
+      - {"name": "query_insert", "use": "sql", "vars": {"sql": "INSERT query (id) VALUES (12)"}}
       - name: "query_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM query WHERE id = 12"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM query WHERE id = 12", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
       - name: "create_load"
         job:
           configuration:
             load:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "load"}
-              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "load"}
               schema:
                 fields:
-                  - name: "id"
-                    type: "INTEGER"
-                    mode: "REQUIRED"
-                    description: "key"
-                  - name: "name"
-                    type: "STRING"
-                  - name: "tags"
-                    type: "STRING"
-                    mode: "REPEATED"
+                  - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                  - {"name": "name", "type": "STRING"}
+                  - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
               writeDisposition: "WRITE_EMPTY"
           upload: "{\"id\":0,\"name\":\"a\",\"tags\":[\"x\"]}"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "load_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/load"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-          description: {"$oneOf": [{"$missing": true}, null, ""]}
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"$oneOf": [{"$missing": true}, null, {}]}
-        bind: {"load_metadata_created": "/body/creationTime", "load_metadata_fields": "/body/schema/fields"}
-      - name: "load_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "table_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${load_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'load'
-      - name: "load_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]
-        bind: {"load_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'load' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "load_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"load_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'load' ORDER BY field_path
-      - name: "load_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT load (id) VALUES (13)"}
+          table: "load"
+          metadata_expect:
+            description: {"$oneOf": [{"$missing": true}, null, ""]}
+            friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+            labels: {"$oneOf": [{"$missing": true}, null, {}]}
+            schema:
+              fields:
+                "$schema":
+                  - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                  - {"name": "name", "type": "STRING"}
+                  - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+          columns_expect: "${load_columns}"
+          paths_expect: "${declared_paths}"
+      - {"name": "load_insert", "use": "sql", "vars": {"sql": "INSERT load (id) VALUES (13)"}}
       - name: "load_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM load WHERE id = 13"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM load WHERE id = 13", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
       - name: "load_required"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "INSERT load (name) VALUES ('no id')"}
+        expect: {}
+        expectFailure: true
+        observe: {}
       - name: "create_copy"
         job:
           configuration:
             copy:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "copy"}
-              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "load"}]
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "copy"}
+              sourceTables: [{"datasetId": "${dataset}", "projectId": "${project}", "tableId": "load"}]
               writeDisposition: "WRITE_EMPTY"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "copy_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy"}
-        observe: {"schema": "/body/schema"}
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-        bind: {"copy_metadata_created": "/body/creationTime", "copy_metadata_fields": "/body/schema/fields"}
-      - name: "copy_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "schema_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${copy_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'copy'
-      - name: "copy_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]
-        bind: {"copy_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'copy' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "copy_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"copy_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'copy' ORDER BY field_path
-      - name: "copy_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT copy (id) VALUES (14)"}
+          table: "copy"
+          metadata_expect:
+            schema:
+              fields:
+                "$schema":
+                  - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                  - {"name": "name", "type": "STRING"}
+                  - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+          columns_expect: "${load_columns}"
+          paths_expect: "${declared_paths}"
+      - {"name": "copy_insert", "use": "sql", "vars": {"sql": "INSERT copy (id) VALUES (14)"}}
       - name: "copy_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM copy WHERE id = 14"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM copy WHERE id = 14", "rows": [{"f": [{"v": null}, {"v": "0"}]}]}
       - name: "copy_required"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "INSERT copy (name) VALUES ('no id')"}
+        expect: {}
+        expectFailure: true
+        observe: {}
       - name: "create_copy_defaults"
         job:
           configuration:
             copy:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "copy_defaults"}
-              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "ddl"}]
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "copy_defaults"}
+              sourceTables: [{"datasetId": "${dataset}", "projectId": "${project}", "tableId": "ddl"}]
               writeDisposition: "WRITE_EMPTY"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "copy_defaults_metadata"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy_defaults"}
-        observe: {"schema": "/body/schema"}
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-        bind:
-          copy_defaults_metadata_created: "/body/creationTime"
-          copy_defaults_metadata_fields: "/body/schema/fields"
-      - name: "copy_defaults_metadata_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "schema_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${copy_defaults_metadata_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'copy_defaults'
-      - name: "copy_defaults_metadata_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]
-        bind: {"copy_defaults_metadata_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'copy_defaults' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "copy_defaults_metadata_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"copy_defaults_metadata_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'copy_defaults' ORDER BY field_path
-      - name: "copy_defaults_insert"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT copy_defaults (id) VALUES (15)"}
+          table: "copy_defaults"
+          metadata_expect:
+            schema:
+              fields:
+                "$schema":
+                  - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                  - {"defaultValueExpression": "'none'", "name": "name", "type": "STRING"}
+                  - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+          columns_expect: "${declared_columns}"
+          paths_expect: "${declared_paths}"
+      - {"name": "copy_defaults_insert", "use": "sql", "vars": {"sql": "INSERT copy_defaults (id) VALUES (15)"}}
       - name: "copy_defaults_defaults"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM copy_defaults WHERE id = 15"}
+        use: "rows"
+        vars: {"sql": "SELECT name,ARRAY_LENGTH(tags) FROM copy_defaults WHERE id = 15", "rows": [{"f": [{"v": "none"}, {"v": "0"}]}]}
       - name: "copy_defaults_required"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "INSERT copy_defaults (name) VALUES ('no id')"}
+        expect: {}
+        expectFailure: true
+        observe: {}
       - name: "invalid_default"
+        expect: {}
+        expectFailure: true
         rest:
           method: "POST"
           path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
           body:
-            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "bad_default"}
-            schema: {"fields": [{"name": "id", "type": "INTEGER", "defaultValueExpression": "'one'"}]}
-        expectFailure: true
+            schema: {"fields": [{"defaultValueExpression": "'one'", "name": "id", "type": "INTEGER"}]}
+            tableReference: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "bad_default"}
         observe: {}
-        expect: {}
       - name: "failed_ddl"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "CREATE TABLE failed_ddl AS SELECT ERROR('boom') AS id"}
-      - name: "failed_ddl_absent"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_ddl"}
+        expect: {}
         expectFailure: true
         observe: {}
+      - name: "failed_ddl_absent"
         expect: {}
+        expectFailure: true
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_ddl"}
+        observe: {}
       - name: "failed_query"
         sql: |-
           SELECT ERROR('boom') AS id
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "failed_query"}
-          writeDisposition: "WRITE_EMPTY"
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "failed_query"}, "writeDisposition": "WRITE_EMPTY"}
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "failed_query_absent"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_query"}
-        expectFailure: true
-        observe: {}
         expect: {}
+        expectFailure: true
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_query"}
+        observe: {}
       - name: "failed_load"
         job:
           configuration:
             load:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "failed_load"}
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "failed_load"}
+              schema: {"fields": [{"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}]}
               sourceFormat: "NEWLINE_DELIMITED_JSON"
-              schema: {"fields": [{"name": "id", "type": "INTEGER", "mode": "REQUIRED", "description": "key"}]}
               writeDisposition: "WRITE_TRUNCATE"
           upload: "{\"id\":null}"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "failed_load_absent"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_load"}
-        expectFailure: true
-        observe: {}
         expect: {}
-    cleanup:
-      - name: "delete_0"
-        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+        expectFailure: true
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/failed_load"}
+        observe: {}
+    cleanup: [{"name": "delete_0", "use": "delete_dataset"}]
   - name: "writes_to_existing_tables"
     steps:
-      - name: "create_dataset"
-        rest:
-          method: "POST"
-          path: "/bigquery/v2/projects/${project}/datasets"
-          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - {"name": "create_dataset", "use": "create_dataset"}
       - name: "setup"
-        expect: {"state": "DONE"}
         use: "sql"
         vars:
           sql: |-
             CREATE TABLE target (id INT64 OPTIONS (description = 'key'), name STRING DEFAULT 'none', tags ARRAY<STRING>)
                 OPTIONS (description = 'the table', labels = [('env', 'dev')]);CREATE TABLE narrow (id INT64, tags ARRAY<STRING>);INSERT narrow (id) VALUES (9)
       - name: "before"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/target"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-                - name: "tags"
-                  type: "STRING"
-                  mode: "REPEATED"
-          description: "the table"
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"env": "dev"}
-        bind: {"before_created": "/body/creationTime", "before_fields": "/body/schema/fields"}
-      - name: "before_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "table_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${before_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'target'
-      - name: "before_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "YES"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]
-        bind: {"before_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'target' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "before_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "key"}]
-            - f: [{"v": "name"}, {"v": ""}]
-            - f: [{"v": "tags"}, {"v": ""}]
-        bind: {"before_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'target' ORDER BY field_path
+          table: "target"
+          metadata_expect:
+            description: "the table"
+            friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+            labels: {"env": "dev"}
+            schema:
+              fields:
+                "$schema":
+                  - {"description": "key", "name": "id", "type": "INTEGER"}
+                  - {"defaultValueExpression": "'none'", "name": "name", "type": "STRING"}
+                  - {"mode": "REPEATED", "name": "tags", "type": "STRING"}
+          columns_expect:
+            rows: [{"f": [{"v": "id"}, {"v": "YES"}, {"v": "INT64"}, {"v": "NULL"}]}, {"f": [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]}]
+            state: "DONE"
+          paths_expect: "${declared_paths}"
       - name: "query_append"
         sql: |-
           SELECT 1 AS id
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-          writeDisposition: "WRITE_APPEND"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}, "writeDisposition": "WRITE_APPEND"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "after_query_append"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/target"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"env": "dev"}
-        bind: {"after_query_append_created": "/body/creationTime", "after_query_append_fields": "/body/schema/fields"}
-      - name: "after_query_append_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_query_append_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'target'
-      - name: "after_query_append_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'target' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_query_append_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'target' ORDER BY field_path
+          table: "target"
+          metadata_expect: "${unchanged_target_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
       - name: "load_omitted"
         job:
           configuration:
             load:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}
               schema: {"fields": [{"name": "id", "type": "INTEGER"}]}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
               writeDisposition: "WRITE_APPEND"
           upload: "{\"id\":2}"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "load_null"
         job:
           configuration:
             load:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}
               schema: {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
               writeDisposition: "WRITE_APPEND"
           upload: "{\"id\":3,\"name\":null}"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "appended_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "1"}, {"v": "none"}]
-            - f: [{"v": "2"}, {"v": "none"}]
-            - f: [{"v": "3"}, {"v": null}]
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM target ORDER BY id"}
+        use: "rows"
+        vars:
+          sql: |-
+            SELECT id,name FROM target ORDER BY id
+          rows: [{"f": [{"v": "1"}, {"v": "none"}]}, {"f": [{"v": "2"}, {"v": "none"}]}, {"f": [{"v": "3"}, {"v": null}]}]
       - name: "rejected_copy"
         job:
           configuration:
             copy:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "narrow"}]
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}
+              sourceTables: [{"datasetId": "${dataset}", "projectId": "${project}", "tableId": "narrow"}]
               writeDisposition: "WRITE_APPEND"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
-      - name: "copy_kept_three_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "3"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT COUNT(*) FROM target"}
+      - {"name": "copy_kept_three_rows", "use": "rows", "vars": {"sql": "SELECT COUNT(*) FROM target", "rows": [{"f": [{"v": "3"}]}]}}
       - name: "after_rejected_copy"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/target"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"env": "dev"}
-        bind:
-          after_rejected_copy_created: "/body/creationTime"
-          after_rejected_copy_fields: "/body/schema/fields"
-      - name: "after_rejected_copy_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_rejected_copy_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'target'
-      - name: "after_rejected_copy_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'target' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_rejected_copy_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'target' ORDER BY field_path
+          table: "target"
+          metadata_expect: "${unchanged_target_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
       - name: "truncate_data"
         sql: |-
           SELECT 4 AS id
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-          writeDisposition: "WRITE_TRUNCATE_DATA"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}, "writeDisposition": "WRITE_TRUNCATE_DATA"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "truncate_data_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "4"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM target ORDER BY id"}
+        use: "rows"
+        vars: {"sql": "SELECT id,name FROM target ORDER BY id", "rows": [{"f": [{"v": "4"}, {"v": "none"}]}]}
       - name: "after_truncate_data"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/target"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
-          labels: {"env": "dev"}
-        bind:
-          after_truncate_data_created: "/body/creationTime"
-          after_truncate_data_fields: "/body/schema/fields"
-      - name: "after_truncate_data_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_truncate_data_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'target'
-      - name: "after_truncate_data_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'target' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_truncate_data_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'target' ORDER BY field_path
+          table: "target"
+          metadata_expect: "${unchanged_target_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
       - name: "truncate"
         sql: |-
           SELECT 5 AS id,'five' AS name
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "target"}
-          writeDisposition: "WRITE_TRUNCATE"
-        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "target"}, "writeDisposition": "WRITE_TRUNCATE"}
         expect: {"state": "DONE"}
+        observe: {"error": "/error", "errors": "/body/status/errors", "state": "/body/status/state"}
       - name: "replaced"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/target"}
-        observe: {"schema": "/body/schema"}
-        expect:
-          schema: {"fields": {"$schema": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
-        bind: {"replaced_created": "/body/creationTime", "replaced_fields": "/body/schema/fields"}
-      - name: "replaced_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "schema_snapshot"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${replaced_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'target'
-      - name: "replaced_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "YES"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "NULL"}]
-        bind: {"replaced_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'target' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "replaced_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "id"}, {"v": ""}]}, {"f": [{"v": "name"}, {"v": ""}]}]}
-        bind: {"replaced_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'target' ORDER BY field_path
-      - name: "truncate_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "5"}, {"v": "five"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM target ORDER BY id"}
-    cleanup:
-      - name: "delete_0"
-        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+          table: "target"
+          metadata_expect: {"schema": {"fields": {"$schema": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}}
+          columns_expect: "${query_columns}"
+          paths_expect: {"rows": [{"f": [{"v": "id"}, {"v": ""}]}, {"f": [{"v": "name"}, {"v": ""}]}], "state": "DONE"}
+      - {"name": "truncate_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM target ORDER BY id", "rows": [{"f": [{"v": "5"}, {"v": "five"}]}]}}
+    cleanup: [{"name": "delete_0", "use": "delete_dataset"}]
   - name: "failed_replacements"
     steps:
-      - name: "create_dataset"
-        rest:
-          method: "POST"
-          path: "/bigquery/v2/projects/${project}/datasets"
-          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - {"name": "create_dataset", "use": "create_dataset"}
       - name: "setup"
-        expect: {"state": "DONE"}
         use: "sql"
         vars:
           sql: |-
             CREATE TABLE keep (id INT64 NOT NULL OPTIONS (description = 'key'), name STRING DEFAULT 'none')
                 OPTIONS (description = 'the table', friendly_name = 'Keep', labels = [('env', 'dev')]);INSERT keep (id) VALUES (1);CREATE TABLE other (id INT64)
       - name: "before"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema:
-            fields:
-              "$schema":
-                - name: "id"
-                  type: "INTEGER"
-                  mode: "REQUIRED"
-                  description: "key"
-                - name: "name"
-                  type: "STRING"
-                  defaultValueExpression: "'none'"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"before_created": "/body/creationTime", "before_fields": "/body/schema/fields"}
-      - name: "before_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${before_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "before_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect:
-          state: "DONE"
-          rows:
-            - f: [{"v": "id"}, {"v": "NO"}, {"v": "INT64"}, {"v": "NULL"}]
-            - f: [{"v": "name"}, {"v": "YES"}, {"v": "STRING"}, {"v": "'none'"}]
-        bind: {"before_columns": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "before_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "id"}, {"v": "key"}]}, {"f": [{"v": "name"}, {"v": ""}]}]}
-        bind: {"before_paths": "/result/rows"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "existing_ddl"
-        expectFailure: true
-        observe: {}
-        expect: {}
-        use: "sql"
-        vars: {"sql": "CREATE TABLE keep (id INT64)"}
+          table: "keep"
+          metadata_expect:
+            description: "the table"
+            friendlyName: "Keep"
+            labels: {"env": "dev"}
+            numRows: "1"
+            schema:
+              fields:
+                "$schema":
+                  - {"description": "key", "mode": "REQUIRED", "name": "id", "type": "INTEGER"}
+                  - {"defaultValueExpression": "'none'", "name": "name", "type": "STRING"}
+          columns_expect: "${declared_columns}"
+          paths_expect: {"rows": [{"f": [{"v": "id"}, {"v": "key"}]}, {"f": [{"v": "name"}, {"v": ""}]}], "state": "DONE"}
+      - {"name": "existing_ddl", "use": "sql", "vars": {"sql": "CREATE TABLE keep (id INT64)"}, "expect": {}, "expectFailure": true, "observe": {}}
       - name: "after_existing_ddl"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"after_existing_ddl_created": "/body/creationTime", "after_existing_ddl_fields": "/body/schema/fields"}
-      - name: "after_existing_ddl_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_existing_ddl_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_existing_ddl_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_existing_ddl_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "existing_ddl_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "existing_ddl_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "error_ctas"
-        expectFailure: true
-        observe: {}
-        expect: {}
         use: "sql"
         vars: {"sql": "CREATE OR REPLACE TABLE keep AS SELECT ERROR('boom') AS id"}
-      - name: "after_error_ctas"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"after_error_ctas_created": "/body/creationTime", "after_error_ctas_fields": "/body/schema/fields"}
-      - name: "after_error_ctas_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_error_ctas_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_error_ctas_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_error_ctas_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "error_ctas_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
-      - name: "violated_constraint"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
+      - name: "after_error_ctas"
+        group: "unchanged_table_with_rows"
+        vars:
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "error_ctas_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
+      - name: "violated_constraint"
         use: "sql"
         vars: {"sql": "CREATE OR REPLACE TABLE keep (id INT64 NOT NULL) AS SELECT CAST(NULL AS INT64) AS id"}
+        expect: {}
+        expectFailure: true
+        observe: {}
       - name: "after_violated_constraint"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind:
-          after_violated_constraint_created: "/body/creationTime"
-          after_violated_constraint_fields: "/body/schema/fields"
-      - name: "after_violated_constraint_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_violated_constraint_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_violated_constraint_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_violated_constraint_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "violated_constraint_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "violated_constraint_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "rest_insert"
+        expect: {}
+        expectFailure: true
         rest:
           method: "POST"
           path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
           body:
-            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
-            schema: {"fields": [{"name": "id", "type": "INTEGER", "mode": "REQUIRED"}]}
-        expectFailure: true
+            schema: {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}]}
+            tableReference: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}
         observe: {}
-        expect: {}
       - name: "after_rest_insert"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"after_rest_insert_created": "/body/creationTime", "after_rest_insert_fields": "/body/schema/fields"}
-      - name: "after_rest_insert_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_rest_insert_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_rest_insert_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_rest_insert_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "rest_insert_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "rest_insert_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "query_truncate"
         sql: |-
           SELECT ERROR('boom') AS id
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
-          writeDisposition: "WRITE_TRUNCATE"
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}, "writeDisposition": "WRITE_TRUNCATE"}
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "after_query_truncate"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind:
-          after_query_truncate_created: "/body/creationTime"
-          after_query_truncate_fields: "/body/schema/fields"
-      - name: "after_query_truncate_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_query_truncate_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_query_truncate_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_query_truncate_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "query_truncate_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "query_truncate_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "query_empty"
         sql: |-
           SELECT 2 AS id
-        queryOptions:
-          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
-          writeDisposition: "WRITE_EMPTY"
+        queryOptions: {"destinationTable": {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}, "writeDisposition": "WRITE_EMPTY"}
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "after_query_empty"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"after_query_empty_created": "/body/creationTime", "after_query_empty_fields": "/body/schema/fields"}
-      - name: "after_query_empty_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_query_empty_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_query_empty_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_query_empty_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "query_empty_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "query_empty_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "load_truncate"
         job:
           configuration:
             load:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}
+              schema: {"fields": [{"mode": "REQUIRED", "name": "id", "type": "INTEGER"}]}
               sourceFormat: "NEWLINE_DELIMITED_JSON"
-              schema: {"fields": [{"name": "id", "type": "INTEGER", "mode": "REQUIRED"}]}
               writeDisposition: "WRITE_TRUNCATE"
           upload: "{\"id\":null}"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "after_load_truncate"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind:
-          after_load_truncate_created: "/body/creationTime"
-          after_load_truncate_fields: "/body/schema/fields"
-      - name: "after_load_truncate_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_load_truncate_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_load_truncate_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_load_truncate_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "load_truncate_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "load_truncate_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "copy_truncate"
         job:
           configuration:
             copy:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}
               sourceTables:
-                - projectId: "${project}"
-                  datasetId: "${dataset}"
-                  tableId: "keep"
-                - projectId: "${project}"
-                  datasetId: "${dataset}"
-                  tableId: "other"
+                - {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}
+                - {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "other"}
               writeDisposition: "WRITE_TRUNCATE"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "after_copy_truncate"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind:
-          after_copy_truncate_created: "/body/creationTime"
-          after_copy_truncate_fields: "/body/schema/fields"
-      - name: "after_copy_truncate_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_copy_truncate_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_copy_truncate_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_copy_truncate_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "copy_truncate_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "copy_truncate_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
       - name: "copy_empty"
         job:
           configuration:
             copy:
-              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "keep"}
-              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "other"}]
+              destinationTable: {"datasetId": "${dataset}", "projectId": "${project}", "tableId": "keep"}
+              sourceTables: [{"datasetId": "${dataset}", "projectId": "${project}", "tableId": "other"}]
               writeDisposition: "WRITE_EMPTY"
+        expect: {}
         expectFailure: true
         observe: {}
-        expect: {}
       - name: "after_copy_empty"
-        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/keep"}
-        observe:
-          schema: "/body/schema"
-          creationTime: "/body/creationTime"
-          description: "/body/description"
-          friendlyName: "/body/friendlyName"
-          labels: "/body/labels"
-          numRows: "/body/numRows"
-        expect:
-          schema: {"fields": {"$schema": "${before_fields}"}}
-          creationTime: "${before_created}"
-          description: "the table"
-          friendlyName: "Keep"
-          labels: {"env": "dev"}
-          numRows: "1"
-        bind: {"after_copy_empty_created": "/body/creationTime", "after_copy_empty_fields": "/body/schema/fields"}
-      - name: "after_copy_empty_creation_time"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
-        use: "sql"
+        group: "unchanged_table_with_rows"
         vars:
-          sql: |-
-            SELECT creation_time = TIMESTAMP_MILLIS(${after_copy_empty_created}) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = 'keep'
-      - name: "after_copy_empty_columns"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          columns: "/result/rows"
-        expect: {"state": "DONE", "columns": "${before_columns}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT column_name,is_nullable,data_type,IFNULL(column_default,'NULL') FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = 'keep' AND data_type NOT LIKE 'ARRAY%' ORDER BY ordinal_position
-      - name: "after_copy_empty_paths"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          paths: "/result/rows"
-        expect: {"state": "DONE", "paths": "${before_paths}"}
-        use: "sql"
-        vars:
-          sql: |-
-            SELECT field_path,IFNULL(description,'') FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'keep' ORDER BY field_path
-      - name: "copy_empty_rows"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT id,name FROM keep"}
-      - name: "insert_after_failures"
-        expect: {"state": "DONE"}
-        use: "sql"
-        vars: {"sql": "INSERT keep (id) VALUES (2)"}
-      - name: "default_after_failures"
-        observe:
-          state: "/body/status/state"
-          error: "/error"
-          errors: "/body/status/errors"
-          rows: "/result/rows"
-        expect: {"state": "DONE", "rows": [{"f": [{"v": "none"}]}]}
-        use: "sql"
-        vars: {"sql": "SELECT name FROM keep WHERE id = 2"}
-    cleanup:
-      - name: "delete_0"
-        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+          table: "keep"
+          metadata_expect: "${unchanged_keep_metadata}"
+          columns_expect: "${unchanged_columns}"
+          paths_expect: "${unchanged_paths}"
+      - {"name": "copy_empty_rows", "use": "rows", "vars": {"sql": "SELECT id,name FROM keep", "rows": [{"f": [{"v": "1"}, {"v": "none"}]}]}}
+      - {"name": "insert_after_failures", "use": "sql", "vars": {"sql": "INSERT keep (id) VALUES (2)"}}
+      - {"name": "default_after_failures", "use": "rows", "vars": {"sql": "SELECT name FROM keep WHERE id = 2", "rows": [{"f": [{"v": "none"}]}]}}
+    cleanup: [{"name": "delete_0", "use": "delete_dataset"}]

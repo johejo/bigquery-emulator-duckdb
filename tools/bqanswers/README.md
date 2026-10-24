@@ -284,6 +284,43 @@ on a step are scoped to it, while response bindings remain available to later st
 A template step may override `observe`, `bind`, `expect` and `expectFailure`, but not its
 request. Templates cannot reference other step templates.
 
+For repeated sequences within a case, define a flat `stepGroups` entry and invoke it
+with `group`. This keeps intermediate snapshots together without introducing loops
+or conditionals:
+
+```yaml
+stepGroups:
+  snapshot:
+    - name: metadata
+      rest: {method: GET, path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/${table}"}
+      bind: {created: /body/creationTime}
+      observe: {schema: /body/schema}
+      expect: {schema: "${expected_schema}"}
+    - name: creation_time
+      sql: |
+        SELECT creation_time = TIMESTAMP_MILLIS(${created})
+        FROM INFORMATION_SCHEMA.TABLES WHERE table_name = '${table}'
+      observe: {rows: /result/rows}
+      expect: {rows: [{f: [{v: "true"}]}]}
+cases:
+  - name: example
+    steps:
+      # Table setup goes here.
+      - name: before
+        group: snapshot
+        vars: {table: t, expected_schema: {fields: [{name: id, type: INTEGER}]}}
+```
+
+A group call accepts only `name`, `group` and `vars`. Its name follows the same
+identifier rules as case names. Members may use `stepTemplates`, but cannot call
+another group. Arguments are scoped to the member steps; member variables take
+precedence. Step names and response bindings receive the call's name as a prefix:
+the example produces `before_metadata`, `before_creation_time` and `${before_created}`.
+Inside the group, `${created}` refers to that call's binding. Later steps outside
+the group can refer to `${before_created}`. Cleanup can also invoke groups, subject
+to the usual cleanup restrictions. Execution, assertions, failure handling and
+answer collection operate on the expanded steps in their original order.
+
 Comparison defaults to exact JSON equality. A single-key matcher object allows the
 comparisons previously expressed in Go without silently changing their meaning:
 
