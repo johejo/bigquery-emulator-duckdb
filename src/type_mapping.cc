@@ -165,8 +165,11 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
       if (properties.empty()) {
         properties.emplace_back("\"$empty\" BOOLEAN");
       }
-      return R"(STRUCT("$id" VARCHAR, "$labels" VARCHAR[], "$properties" STRUCT()" +
-             Join(properties, ", ") + "))";
+      const std::string endpoints = type->AsGraphElement()->IsEdge()
+                                        ? R"(, "$source_id" VARCHAR, "$destination_id" VARCHAR)"
+                                        : "";
+      return R"(STRUCT("$id" VARCHAR)" + endpoints +
+             R"(, "$labels" VARCHAR[], "$properties" STRUCT()" + Join(properties, ", ") + "))";
     }
     case googlesql::TYPE_GRAPH_PATH: {
       if (use != TypeUse::kQuery) {

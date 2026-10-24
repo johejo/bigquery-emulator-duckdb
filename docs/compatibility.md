@@ -346,7 +346,9 @@ EXISTS are unsupported.
 directed or undirected edges, property projections through `RETURN`, and scalar filters. Each
 element, including shared variables, must resolve to one table within its MATCH; shared variables
 join by element identity. Fixed paths support WALK, TRAIL and ACYCLIC modes; path variables support
-node and edge access and path predicates. Quantified or nested paths, search prefixes,
+node and edge access and path predicates. `IS [NOT] SOURCE [OF]` and
+`IS [NOT] DESTINATION [OF]` support non-NULL operands; NULL operands are rejected until
+their BigQuery behavior is verified. Quantified or nested paths, search prefixes,
 graph element or path results, and graph values in comparisons, grouping or aggregate and
 analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
 SQL/PGQ's

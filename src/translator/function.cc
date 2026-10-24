@@ -39,6 +39,8 @@ constexpr auto kGraphValueFunctions = std::to_array<std::string_view>({
     "IS_ACYCLIC",
     "IS_SIMPLE",
     "IS_TRAIL",
+    "$IS_SOURCE_NODE",
+    "$IS_DEST_NODE",
     "IF",
     "IFNULL",
     "COALESCE",

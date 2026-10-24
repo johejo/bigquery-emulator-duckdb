@@ -69,7 +69,9 @@ dataset and graph name, since DuckPGQ's registry is shared across catalogs. Each
 `main._property_graphs` table keeps canonical GoogleSQL DDL for catalog resolution
 and native DDL for restoring DuckPGQ's registry on startup.
 Query intermediates keep graph elements as structs containing a private identity from the
-element table and its keys, labels, and a nested property struct. Fixed paths contain separate
+element table and its keys, labels, and a nested property struct. Edges also carry the identities
+of their source and destination nodes, preserving the stored orientation through path construction
+and later MATCH stages. Fixed paths contain separate
 node and edge lists, with property types widened to the resolved path's element types. Graph
 functions use this representation; it is never returned as an ordinary STRUCT to clients.
 
