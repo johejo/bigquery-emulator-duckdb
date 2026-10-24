@@ -1,0 +1,282 @@
+{
+  "version": 1,
+  "cases": {
+    "copy_snapshot": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "state": "RUNNING"
+          }
+        },
+        "get_copied": {
+          "description": "base",
+          "friendlyName": "Base",
+          "labels": {
+            "env": "dev"
+          },
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "snapshotDefinition": {
+            "baseTableReference": {
+              "datasetId": "bqa_qaa6diohlezne7r4fq4qb3qji2_copy_snapshot",
+              "projectId": "johejo-sandbox",
+              "tableId": "base"
+            },
+            "snapshotTime": "2026-10-21T07:10:02.221Z"
+          },
+          "type": "SNAPSHOT"
+        },
+        "wait": {
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_snapshot_truncate": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "errorResult": {
+              "message": "Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try again with WRITE_EMPTY.",
+              "reason": "invalid"
+            },
+            "errors": [
+              {
+                "message": "Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try again with WRITE_EMPTY.",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "wait": {
+          "status": {
+            "errorResult": {
+              "message": "Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try again with WRITE_EMPTY.",
+              "reason": "invalid"
+            },
+            "errors": [
+              {
+                "message": "Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try again with WRITE_EMPTY.",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_snapshot_of_snapshot": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "state": "RUNNING"
+          }
+        },
+        "get_copied": {
+          "description": "base",
+          "friendlyName": "Base",
+          "labels": {
+            "env": "dev"
+          },
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "snapshotDefinition": {
+            "baseTableReference": {
+              "datasetId": "bqa_qaa6diohlezne7r4fq4qb3qji2_copy_snapshot_of_snapshot",
+              "projectId": "johejo-sandbox",
+              "tableId": "snap"
+            },
+            "snapshotTime": "2026-10-21T07:10:21.942Z"
+          },
+          "type": "SNAPSHOT"
+        },
+        "wait": {
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_restore": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "state": "RUNNING"
+          }
+        },
+        "get_restored": {
+          "description": "base",
+          "friendlyName": "Base",
+          "labels": {
+            "env": "dev"
+          },
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "type": "TABLE"
+        },
+        "wait": {
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_restore_truncate": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "state": "RUNNING"
+          }
+        },
+        "get_existing": {
+          "description": "existing",
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "type": "TABLE"
+        },
+        "wait": {
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_restore_from_table": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "errorResult": {
+              "message": "johejo-sandbox:bqa_qaa6diohlezne7r4fq4qb3qji2_copy_restore_from_table.base is not allowed for this operation because it is currently a TABLE.",
+              "reason": "invalid"
+            },
+            "errors": [
+              {
+                "message": "johejo-sandbox:bqa_qaa6diohlezne7r4fq4qb3qji2_copy_restore_from_table.base is not allowed for this operation because it is currently a TABLE.",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        },
+        "wait": {
+          "status": {
+            "errorResult": {
+              "message": "johejo-sandbox:bqa_qaa6diohlezne7r4fq4qb3qji2_copy_restore_from_table.base is not allowed for this operation because it is currently a TABLE.",
+              "reason": "invalid"
+            },
+            "errors": [
+              {
+                "message": "johejo-sandbox:bqa_qaa6diohlezne7r4fq4qb3qji2_copy_restore_from_table.base is not allowed for this operation because it is currently a TABLE.",
+                "reason": "invalid"
+              }
+            ],
+            "state": "DONE"
+          }
+        }
+      }
+    },
+    "copy_clone": {
+      "project": "johejo-sandbox",
+      "run": "qaa6diohlezne7r4fq4qb3qji2",
+      "steps": {
+        "copy": {
+          "status": {
+            "state": "RUNNING"
+          }
+        },
+        "get_cloned": {
+          "cloneDefinition": {
+            "baseTableReference": {
+              "datasetId": "bqa_qaa6diohlezne7r4fq4qb3qji2_copy_clone",
+              "projectId": "johejo-sandbox",
+              "tableId": "base"
+            },
+            "cloneTime": "2026-10-21T07:11:16.914Z"
+          },
+          "description": "base",
+          "friendlyName": "Base",
+          "labels": {
+            "env": "dev"
+          },
+          "numRows": "1",
+          "schema": {
+            "fields": [
+              {
+                "name": "id",
+                "type": "INTEGER"
+              },
+              {
+                "name": "name",
+                "type": "STRING"
+              }
+            ]
+          },
+          "type": "TABLE"
+        },
+        "wait": {
+          "status": {
+            "state": "DONE"
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,6 +19,13 @@ The initial migrated cases are:
 
 - `label_order.api.yaml`: label ordering after REST patches, preserving the recorded
   BigQuery expectations and the sequence of updates.
+- `copy_operations.api.yaml`: seven answered workflows from the former
+  `snapshot_tables.api.json` (introduced in #355 and replaced with Go tests in #356).
+  Selected expectations cover completed jobs, copied metadata and rows, and rejected
+  SNAPSHOT/RESTORE combinations. The answers sidecar preserves the original BigQuery
+  observations and project/run context; transient submission states and timestamps
+  are not assertions. Destination expiration remains in `rest_snapshots.yml`, and
+  the emulator-only rejection of COPY from a snapshot remains in Go.
 
 Query jobs are polled to completion; job errors are included in observations so an
 HTTP-success response cannot hide a failed query. New cases should likewise observe
