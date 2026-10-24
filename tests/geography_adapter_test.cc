@@ -5,7 +5,7 @@
 
 #include "duckdb.h"
 #include "src/duckdb_handle.h"
-#include "src/googlesql_s2geometry/geography.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry_duckdb/geography.h"
 
 namespace bigquery_emulator_duckdb {

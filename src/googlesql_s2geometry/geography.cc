@@ -54,6 +54,7 @@
 #include "s2/s2polyline.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_measures.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry/value.h"
 
 namespace googlesql_s2geometry {

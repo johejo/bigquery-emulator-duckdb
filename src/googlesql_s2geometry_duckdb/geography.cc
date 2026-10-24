@@ -23,6 +23,7 @@
 #include "src/backend_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_s2geometry/geography.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry/value.h"
 #include "src/googlesql_s2geometry/wkt.h"
 #include "src/googlesql_s2geometry_duckdb/codec.h"

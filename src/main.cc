@@ -20,6 +20,7 @@
 #include "src/backend_functions/python.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/project.h"
 #include "src/server.h"
 #include "src/shell.h"
@@ -35,7 +36,7 @@ void PrintUsage() {
          "       [--connection ID=CONNINFO]...\n"
          "       bigquery-emulator-duckdb shell [--project-id ID] [--dataset-id DATASET] "
          "[--format FORMAT] [-e SQL] [--data-dir DIR] [--project JSON|@FILE]... "
-         "[--session-user ID] [UDF OPTIONS]\n"
+         "[--session-user ID] [UDF OPTIONS] [--expand-bounding-box true|false]\n"
          "       [--connection ID=CONNINFO]...\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
@@ -63,6 +64,8 @@ void PrintUsage() {
          "  --dataset-id DATASET  Default dataset\n"
          "  --format FORMAT  pretty, json, jsonl or csv (default: pretty on a terminal, otherwise\n"
          "                   jsonl)\n"
+         "  --expand-bounding-box true|false  Round geography bounds outward as BigQuery does\n"
+         "                                    (default: true; shell only)\n"
          "  -e SQL           Run SQL as one job instead of reading standard input\n";
 }
 
@@ -100,6 +103,7 @@ int Run(int argc, char* const* argv) {
   bigquery_emulator_duckdb::ServerOptions options;
   bigquery_emulator_duckdb::ShellOptions shell_options;
   std::string data_dir;
+  googlesql_s2geometry::Options geography{.expand_bounding_box = true};
   std::optional<std::string> session_user;
   bigquery_emulator_duckdb::backend_functions::JavaScriptLimits javascript;
   bigquery_emulator_duckdb::backend_functions::PythonOptions python;
@@ -146,6 +150,19 @@ int Run(int argc, char* const* argv) {
       } else {
         javascript.memory = size_t{*value} << 20U;
       }
+    } else if (const std::string_view option_name = arg.substr(0, arg.find('='));
+               shell && option_name == "--expand-bounding-box") {
+      std::string_view value;
+      if (option_name.size() < arg.size()) {
+        value = arg.substr(option_name.size() + 1);
+      } else if (has_value) {
+        value = argv[++i];
+      }
+      if (value != "true" && value != "false") {
+        PrintUsage();
+        return 2;
+      }
+      geography.expand_bounding_box = value == "true";
     } else if (shell && arg == "--project-id" && has_value) {
       shell_options.project_id = argv[++i];
     } else if (shell && arg == "--dataset-id" && has_value) {
@@ -181,13 +198,13 @@ int Run(int argc, char* const* argv) {
 
   if (shell) {
     bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                                connections, python);
+                                                connections, python, geography);
     return bigquery_emulator_duckdb::RunShell(emulator, shell_options);
   }
 
   const sigset_t signals = BlockShutdownSignals();
   bigquery_emulator_duckdb::Emulator emulator(data_dir, projects, session_user, javascript,
-                                              connections, python);
+                                              connections, python, geography);
   bigquery_emulator_duckdb::Server server(emulator, options);
   if (!server.Start()) {
     std::cerr << "Failed to bind REST " << options.host << ":" << options.port << " or gRPC "

@@ -24,7 +24,7 @@
 #include "src/backend_functions/string.h"
 #include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
-#include "src/googlesql_s2geometry/geography.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry_duckdb/geography.h"
 #include "src/spanner_query.h"
 
@@ -127,7 +127,8 @@ void RegisterBackendFunctions(duckdb_database database,
                               const std::optional<std::string>& session_user,
                               const backend_functions::JavaScriptLimits& javascript,
                               const backend_functions::ObjectStorage& storage,
-                              const backend_functions::PythonOptions& python) {
+                              const backend_functions::PythonOptions& python,
+                              const googlesql_s2geometry::Options& geography) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -144,10 +145,8 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterJsonFunctions(connection.get());
   backend_functions::RegisterIntervalFunctions(connection.get());
   backend_functions::RegisterRangeFunctions(connection.get());
-  // BigQuery expands bounding boxes outward by one representable degree. Keep this
-  // policy here, above the DuckDB adapter and the S2 function implementation.
-  geography_duckdb::RegisterGeographyFunctions(
-      connection.get(), googlesql_s2geometry::Options{.expand_bounding_box = true});
+  // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.
+  geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
   backend_functions::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);

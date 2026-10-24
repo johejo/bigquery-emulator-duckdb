@@ -153,6 +153,43 @@ steps:
           -e 'CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT 1 AS x'
         "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --dataset-id ds -e 'SELECT x FROM t'
     test: current.exit_code == 0 && current.stdout == '{"x":"1"}' + "\n"
+  # This switch compares expanded bounds with the underlying S2 bounds; the default
+  # retains BigQuery behavior. Function results themselves are covered by geography scalars.
+  geography_bounds_default:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+      stdin: &bounds |
+        SELECT IF(ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)).xmin < 0,
+                  'expanded', 'unexpanded') AS bounds;
+    test: current.exit_code == 0 && current.stdout == '{"bounds":"expanded"}' + "\n"
+  geography_bounds_disabled:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --expand-bounding-box=false
+      stdin: *bounds
+    test: current.exit_code == 0 && current.stdout == '{"bounds":"unexpanded"}' + "\n"
+  geography_bounds_enabled:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --expand-bounding-box true
+      stdin: *bounds
+    test: current.exit_code == 0 && current.stdout == '{"bounds":"expanded"}' + "\n"
+  geography_bounds_invalid:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --expand-bounding-box=invalid
+    test: current.exit_code == 2 && current.stdout == ""
+  geography_bounds_missing_value:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --expand-bounding-box
+    test: current.exit_code == 2 && current.stdout == ""
+  geography_bounds_shell_only:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" --expand-bounding-box=false
+    test: current.exit_code == 2 && current.stdout == ""
   # runn cannot give the shell a terminal, so a Go test drives it through a pty.
   terminal:
     exec:

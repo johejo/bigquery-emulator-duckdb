@@ -7,16 +7,10 @@
 
 #include "absl/status/statusor.h"
 #include "s2/s2boolean_operation.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry/value.h"
 
 namespace googlesql_s2geometry {
-
-// Execution-independent choices; the embedding application selects its compatibility policy.
-struct Options {
-  // Expand finite bounds outward by one representable degree, keeping poles and full
-  // longitude intervals in range. BigQuery does this even for zero (into subnormal values).
-  bool expand_bounding_box = false;
-};
 
 struct BoundingBox {
   double xmin;

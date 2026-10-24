@@ -13,6 +13,7 @@
 #include "src/backend_functions/object_metadata.h"
 #include "src/backend_functions/python.h"
 #include "src/field_schema.h"
+#include "src/googlesql_s2geometry/options.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
 
@@ -29,13 +30,15 @@ struct QueryResult {
 };
 
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
+// Geography bounds expand outward as in BigQuery unless geography.expand_bounding_box is false.
 class Backend {
  public:
   explicit Backend(
       const std::optional<std::string>& session_user = std::nullopt,
       const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
       const backend_functions::ObjectStorage& storage = backend_functions::ObjectStorage(),
-      const backend_functions::PythonOptions& python = {});
+      const backend_functions::PythonOptions& python = backend_functions::PythonOptions(),
+      const googlesql_s2geometry::Options& geography = {.expand_bounding_box = true});
   ~Backend();
 
   Backend(const Backend&) = delete;
