@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Graph SQL identity encoding, result serialization and NULL behavior. The recorded attempt returned HTTP 412 because Graph queries require an Enterprise or Enterprise Plus reservation; semantic results remain unverified. Remove answer before retrying in an eligible project. Fixture is isolated and removed after observations.",
+  "description": "Graph SQL identity encoding, result serialization and NULL behavior. Both recorded scenarios returned HTTP 412 on their first observed query because Graph queries require an Enterprise or Enterprise Plus reservation; semantic results remain unverified. Remove each answer before retrying in an eligible project. Fixtures are isolated and removed after observations.",
   "vars": {
     "dataset": "bqa_${run}_${case}"
   },
@@ -264,7 +264,34 @@
             "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
           }
         }
-      ]
+      ],
+      "answer": {
+        "project": "johejo-sandbox",
+        "run": "6wxsb23m53zajdxmza5jhpo22y",
+        "steps": {
+          "null_source_node": {
+            "error": {
+              "body": {
+                "error": {
+                  "code": 412,
+                  "errors": [
+                    {
+                      "domain": "global",
+                      "location": "If-Match",
+                      "locationType": "header",
+                      "message": "BigQuery Graph queries require a reservation with Enterprise or Enterprise Plus edition. See https://cloud.google.com/bigquery/docs/editions-intro for more information.",
+                      "reason": "conditionNotMet"
+                    }
+                  ],
+                  "message": "BigQuery Graph queries require a reservation with Enterprise or Enterprise Plus edition. See https://cloud.google.com/bigquery/docs/editions-intro for more information.",
+                  "status": "FAILED_PRECONDITION"
+                }
+              },
+              "status": 412
+            }
+          }
+        }
+      }
     }
   ]
 }
