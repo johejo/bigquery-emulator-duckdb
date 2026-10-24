@@ -1,0 +1,62 @@
+version: 1
+description: >-
+  Record the exact NULL error messages and SAFE. support for SAME and ALL_DIFFERENT.
+  The ordinary NULL errors are documented; SAFE. support is not specified in the
+  graph predicate reference. Requires an Enterprise or Enterprise Plus reservation.
+vars:
+  dataset: bqa_${run}_${case}
+templates:
+  predicate:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            location: US
+      - name: fixture
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              CREATE TABLE `${project}.${dataset}.Person` (id INT64);
+              INSERT `${project}.${dataset}.Person` VALUES (1);
+              CREATE PROPERTY GRAPH `${project}.${dataset}.g`
+              NODE TABLES (`${project}.${dataset}.Person` AS Person KEY (id));
+            useLegacySql: false
+            timeoutMs: 200000
+      - name: predicate
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/queries
+          body:
+            query: |
+              SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.g`
+                MATCH (a:Person)
+                RETURN ${predicate}(a, IF(FALSE, a, NULL)) AS result)
+            useLegacySql: false
+        observe:
+          error: /body/error
+          errors: /body/errors
+          rows: /body/rows
+          schema: /body/schema
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: same_null
+    template: predicate
+    vars: {predicate: SAME}
+  - name: all_different_null
+    template: predicate
+    vars: {predicate: ALL_DIFFERENT}
+  - name: safe_same_null
+    template: predicate
+    vars: {predicate: SAFE.SAME}
+  - name: safe_all_different_null
+    template: predicate
+    vars: {predicate: SAFE.ALL_DIFFERENT}

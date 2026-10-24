@@ -36,6 +36,8 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = ACYCLIC (a:Person)-[
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.name)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e RETURN b IS DESTINATION OF e AS is_destination)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person) RETURN a IS NOT DESTINATION e AS is_not_destination)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person), (b:Person), (c:Person) WHERE SAME(a, b, c) RETURN ALL_DIFFERENT(a, b, c) AS different)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person), (b)-[f:Knows]->(c:Person) WHERE ALL_DIFFERENT(e, f) RETURN SAME(e, f) AS same_edge)
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
 

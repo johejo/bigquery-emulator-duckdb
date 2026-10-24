@@ -351,6 +351,7 @@ node and edge access and path predicates. `IS [NOT] SOURCE [OF]` and
 their BigQuery behavior is verified. Quantified or nested paths, search prefixes,
 graph element or path results, and graph values in comparisons, grouping or aggregate and
 analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
+`SAME` and `ALL_DIFFERENT` do not support `SAFE.` calls or mixing nodes and edges in one call.
 SQL/PGQ's
 `COLUMNS` clause is unsupported; use BigQuery's `RETURN` syntax.
 
