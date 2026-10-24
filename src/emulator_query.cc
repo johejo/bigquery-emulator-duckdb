@@ -330,6 +330,8 @@ std::unique_ptr<TableSource> Emulator::NewTableSource(Backend* session, bool exp
   return NewDuckDbTableSource(backend, connections_, project_ids_, location);
 }
 
+QueryResult Emulator::ExecuteDuckDb(const std::string& sql) { return Execute(sql); }
+
 QueryResult Emulator::Execute(const std::string& sql, const std::vector<std::string>& setup,
                               bool null_arrays) {
   try {

@@ -190,6 +190,30 @@ steps:
       command: >-
         "$BQ_EMULATOR_BINARY" --expand-bounding-box=false
     test: current.exit_code == 2 && current.stdout == ""
+  # --duckdb runs DuckDB SQL on the emulator's database, where each project is a catalog and
+  # bq_geography_text shows the S2 vertices of a stored GEOGRAPHY: POINT(0 0) is the x axis.
+  duckdb_reads_stored_geography:
+    exec:
+      command: |
+        dir=$(mktemp -d)
+        trap 'rm -rf "$dir"' EXIT
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}' --data-dir "$dir" \
+          -e 'CREATE SCHEMA ds; CREATE TABLE ds.t AS SELECT ST_GEOGPOINT(0, 0) AS g'
+        "$BQ_EMULATOR_BINARY" shell --data-dir "$dir" --duckdb \
+          -e 'SELECT bq_geography_text(g) AS g FROM test.ds.t'
+    test: current.exit_code == 0 && current.stderr == "" && current.stdout == '{"g":"POINT(1 0 0)"}' + "\n"
+  # Queries cannot call the debugging function, which BigQuery does not have.
+  geography_text_is_duckdb_only:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" shell --project='{"projectId":"test"}'
+        -e 'SELECT bq_geography_text(ST_GEOGPOINT(0, 0))'
+    test: current.exit_code == 1 && current.stdout == ""
+  duckdb_shell_only:
+    exec:
+      command: >-
+        "$BQ_EMULATOR_BINARY" --duckdb
+    test: current.exit_code == 2 && current.stdout == ""
   # runn cannot give the shell a terminal, so a Go test drives it through a pty.
   terminal:
     exec:

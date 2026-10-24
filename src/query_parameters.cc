@@ -12,6 +12,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/escaping.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
 #include "nlohmann/json.hpp"
@@ -115,7 +116,9 @@ std::string GeographyLiteral(const std::string& text, const std::string& paramet
   const absl::StatusOr<googlesql_s2geometry::Geography> geography =
       googlesql_s2geometry::ReadWkt(text, /*oriented=*/true);
   if (geography.ok()) {
-    return QuoteLiteral(geography_duckdb::GeographyText(*geography));
+    return "from_hex(" +
+           QuoteLiteral(absl::BytesToHexString(geography_duckdb::EncodeGeography(*geography))) +
+           ")";
   }
   const std::string_view message = geography.status().message();
   if (geography.status().code() == absl::StatusCode::kUnimplemented) {

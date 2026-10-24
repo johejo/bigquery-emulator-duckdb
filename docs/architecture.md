@@ -86,9 +86,11 @@ sketches of `HLL_COUNT` and `APPROX_COUNT_DISTINCT` with a
 
 GEOGRAPHY operations live in [googlesql_s2geometry](../src/googlesql_s2geometry/), a typed
 function library over S2 with no DuckDB dependency. [googlesql_s2geometry_duckdb](../src/googlesql_s2geometry_duckdb/)
-registers those functions, converts DuckDB arguments and results, and encodes the internal XYZ
-text used in queries and stored columns. External WKT parsing and formatting belong to the
-function library. The emulator's backend composition selects compatibility options and passes
+registers those functions and converts DuckDB arguments and results. Query values and stored
+columns are BLOBs, under the `bq_geography` alias in columns, that hold the exact S2 vertices and
+the encoded S2ShapeIndex of a geography's shapes; distance functions query that index without
+rebuilding it, while predicates and set operations snap their inputs together first and build
+their own. External WKT parsing and formatting belong to the function library. The emulator's backend composition selects compatibility options and passes
 them through the adapter; registered callbacks own their options independently for each database.
 
 BIGNUMERIC query values are BIGNUM integers in units of 10^-38; stored columns use the

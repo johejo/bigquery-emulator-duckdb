@@ -857,7 +857,7 @@ const std::unordered_map<std::string_view, std::vector<Rule>>& S2Rules() {
               {
                   .arity = 2,
                   .spelling = "CASE WHEN $2 IS NULL THEN CASE WHEN $1 IS NULL THEN NULL ELSE "
-                              "[]::VARCHAR[] END ELSE bq_st_dump($1, $2) END",
+                              "[]::BLOB[] END ELSE bq_st_dump($1, $2) END",
               },
           },
       },

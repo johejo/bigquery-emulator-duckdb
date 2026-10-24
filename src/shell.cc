@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <iostream>
@@ -23,9 +24,11 @@
 #include "googlesql/public/parse_tokens.h"
 #include "nlohmann/json.hpp"
 #include "src/api_error.h"
+#include "src/backend.h"
 #include "src/emulator.h"
 #include "src/language_options.h"
 #include "src/references.h"
+#include "src/result_rows.h"
 #include "src/server/requests.h"
 #include "src/server/resources.h"
 #include "src/shell/format.h"
@@ -73,14 +76,18 @@ bool IsCompleteEntry(std::string_view input) {
 class Shell {
  public:
   Shell(Emulator& emulator, std::string project_id, std::string dataset_id,
-        shell::OutputFormat format)
+        shell::OutputFormat format, bool duckdb)
       : emulator_(emulator),
         project_id_(std::move(project_id)),
         dataset_id_(std::move(dataset_id)),
-        format_(format) {}
+        format_(format),
+        duckdb_(duckdb) {}
 
   // Runs `query` as one job and prints its result; returns whether the job succeeded.
   bool Run(const std::string& query) {
+    if (duckdb_) {
+      return RunDuckDb(query);
+    }
     QueryRequest request;
     request.project_id = project_id_;
     request.query = query;
@@ -104,6 +111,29 @@ class Shell {
     }
     if (response.contains("numDmlAffectedRows")) {
       std::cerr << response["numDmlAffectedRows"].get<std::string>() << " rows affected\n";
+    }
+    return true;
+  }
+
+  // Runs `sql` as DuckDB statements and prints the last one's result as a job's.
+  bool RunDuckDb(const std::string& sql) {
+    json response;
+    try {
+      const QueryResult result = emulator_.ExecuteDuckDb(sql);
+      if (result.has_rows) {
+        response["schema"] = result.SchemaToJson();
+        response["rows"] = json::array();
+        for (size_t i = 0; i < result.rows.size(); ++i) {
+          response["rows"].push_back(result.rows.at(i, TimestampEncoding::kSeconds));
+        }
+      }
+    } catch (const std::exception& error) {
+      std::cerr << "Error: " << error.what() << '\n';
+      return false;
+    }
+    if (response.contains("schema")) {
+      shell::WriteRows(response, format_, std::cout);
+      std::cout.flush();
     }
     return true;
   }
@@ -175,6 +205,7 @@ class Shell {
   std::string project_id_;
   std::string dataset_id_;
   shell::OutputFormat format_;
+  bool duckdb_;
 };
 
 }  // namespace
@@ -198,7 +229,7 @@ int RunShell(Emulator& emulator, const ShellOptions& options) {
   }
   const shell::OutputFormat format = options.format.value_or(
       isatty(STDOUT_FILENO) != 0 ? shell::OutputFormat::kPretty : shell::OutputFormat::kJsonl);
-  Shell shell(emulator, project_id, options.dataset_id, format);
+  Shell shell(emulator, project_id, options.dataset_id, format, options.duckdb);
   if (options.execute.has_value()) {
     return shell.Run(*options.execute) ? 0 : 1;
   }

@@ -116,8 +116,9 @@ absl::StatusOr<googlesql::TypeParameters> FieldTypeParameters(const FieldSchema&
                                                               bool include_lengths = false);
 
 // The DuckDB type of a column described by a BigQuery TableFieldSchema, as DuckDbType maps its
-// GoogleSQL type and the precision and scale the schema gives. A GEOGRAPHY is stored as the text
-// queries hold it as. Stored structs still require distinct nonempty field names.
+// GoogleSQL type and the precision and scale the schema gives. A GEOGRAPHY is stored as the BLOB
+// queries hold it as, under an alias of its own; see src/googlesql_s2geometry_duckdb/codec.h.
+// Stored structs still require distinct nonempty field names.
 absl::StatusOr<std::string> DuckDbColumnType(const FieldSchema& field);
 
 // The same storage mapping for a resolved SQL column definition.

@@ -8,9 +8,23 @@
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
 
-// DuckDB query values and stored columns use XYZ text with round-trippable doubles,
-// S2 polygon rings, GEOMETRYCOLLECTION EMPTY, and fullglobe. This is not external WKT.
+// The DuckDB type of stored GEOGRAPHY columns: a BLOB under an alias of its own, which casts to
+// and from the plain BLOB that query values are.
+inline constexpr char kGeographyStorageType[] = "bq_geography";
+
+// DuckDB query values and stored columns hold a GEOGRAPHY as a BLOB of its points, linestrings
+// and polygon rings, each vertex as the exact coordinates of its S2Point, followed for a nonempty
+// geography by the encoded S2ShapeIndex of the shapes AddShapes adds for it.
+std::string EncodeGeography(const googlesql_s2geometry::Geography& geography);
+
+// The geography of `encoded`, without its index.
+absl::StatusOr<googlesql_s2geometry::Geography> DecodeGeography(std::string_view encoded);
+
+// The geography of `encoded` with the index it encodes, which reads `encoded` as it is used.
+absl::StatusOr<googlesql_s2geometry::IndexedGeography> DecodeIndexedGeography(std::string encoded);
+
+// For debugging: `geography` as WKT of the XYZ coordinates of its S2Points, which round-trip, with
+// polygon rings as S2 holds them, GEOMETRYCOLLECTION EMPTY and fullglobe. This is not external WKT.
 std::string GeographyText(const googlesql_s2geometry::Geography& geography);
-absl::StatusOr<googlesql_s2geometry::Geography> ParseGeography(std::string_view text);
 
 }  // namespace bigquery_emulator_duckdb::geography_duckdb

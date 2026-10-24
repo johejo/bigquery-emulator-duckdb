@@ -22,6 +22,7 @@
 #include "src/duckdb_handle.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/googlesql_s2geometry_duckdb/codec.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -210,7 +211,9 @@ std::optional<std::string> MapToDuckDb(const googlesql::Type* type,
     }
     case googlesql::TYPE_GEOGRAPHY:
       // See src/googlesql_s2geometry_duckdb/codec.h.
-      return "VARCHAR";
+      return use == TypeUse::kColumn || use == TypeUse::kDefinition
+                 ? geography_duckdb::kGeographyStorageType
+                 : "BLOB";
     case googlesql::TYPE_ARRAY: {
       const auto element = MapToDuckDb(type->AsArray()->element_type(), child(0), use);
       return element ? std::optional<std::string>(*element + "[]") : std::nullopt;

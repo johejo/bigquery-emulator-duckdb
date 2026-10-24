@@ -36,7 +36,7 @@ void PrintUsage() {
          "       [--connection ID=CONNINFO]...\n"
          "       bigquery-emulator-duckdb shell [--project-id ID] [--dataset-id DATASET] "
          "[--format FORMAT] [-e SQL] [--data-dir DIR] [--project JSON|@FILE]... "
-         "[--session-user ID] [UDF OPTIONS] [--expand-bounding-box true|false]\n"
+         "[--session-user ID] [UDF OPTIONS] [--expand-bounding-box true|false] [--duckdb]\n"
          "       [--connection ID=CONNINFO]...\n"
          "  --project JSON|@FILE  Register a project (repeatable); @ reads a JSON file\n"
          "  --session-user ID  Identity returned by SESSION_USER() (default: unsupported)\n"
@@ -66,7 +66,9 @@ void PrintUsage() {
          "                   jsonl)\n"
          "  --expand-bounding-box true|false  Round geography bounds outward as BigQuery does\n"
          "                                    (default: true; shell only)\n"
-         "  -e SQL           Run SQL as one job instead of reading standard input\n";
+         "  -e SQL           Run SQL as one job instead of reading standard input\n"
+         "  --duckdb         Run SQL as DuckDB statements on the emulator's database, where\n"
+         "                   bq_geography_text(column) shows a stored GEOGRAPHY (for debugging)\n";
 }
 
 // Blocks SIGINT and SIGTERM in the calling thread and every thread it starts afterwards, so that
@@ -175,6 +177,8 @@ int Run(int argc, char* const* argv) {
       }
     } else if (shell && arg == "-e" && has_value) {
       shell_options.execute = argv[++i];
+    } else if (shell && arg == "--duckdb") {
+      shell_options.duckdb = true;
     } else if (!shell && arg == "--host" && has_value) {
       options.host = argv[++i];
     } else if (!shell && (arg == "--port" || arg == "--grpc-port") && has_value) {

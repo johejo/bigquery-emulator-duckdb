@@ -262,6 +262,18 @@ std::string ReadMaybeGzip(const std::string& path) {
   return contents;
 }
 
+// `field` with each GEOGRAPHY in it, at any depth, a STRING: a load reads a GEOGRAPHY as its
+// text, which StoredValue converts.
+FieldSchema TextGeographies(FieldSchema field) {
+  if (field.type == FieldType::kGeography) {
+    field.type = FieldType::kString;
+  }
+  for (FieldSchema& child : field.fields) {
+    child = TextGeographies(std::move(child));
+  }
+  return field;
+}
+
 // The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
 // most columns itself, but StageParquetDecimals makes it read a wide DECIMAL as its bytes, and
 // it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A
@@ -578,9 +590,10 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
         const bool interval = field.type == FieldType::kInterval;
         const bool bytes = field.type == FieldType::kBytes;
         const std::string name = QuoteIdentifier(field.name);
-        columns.push_back(
-            QuoteLiteral(field.name) + ": " +
-            QuoteLiteral(big || range || interval || bytes ? "VARCHAR" : ToDuckDbType(field)));
+        columns.push_back(QuoteLiteral(field.name) + ": " +
+                          QuoteLiteral(big || range || interval || bytes
+                                           ? "VARCHAR"
+                                           : ToDuckDbType(TextGeographies(field))));
         conversions.push_back(
             big     ? std::format("CAST(bq_bignumeric_from_string({0}, false) AS {1}) AS {0}", name,
                                   ToDuckDbType(field))
@@ -625,8 +638,9 @@ std::string LoadQuery(const std::string& format, const std::vector<std::string>&
       const std::string name = QuoteIdentifier(field.name);
       columns.push_back(std::format(
           "{} AS {}",
-          StoredValue(format == "PARQUET" ? ParquetValue(name, field, parquet.Child(field.name), 0)
-                                          : JsonValue(name, field),
+          StoredValue(format == "PARQUET"
+                          ? ParquetValue(name, TextGeographies(field), parquet.Child(field.name), 0)
+                          : JsonValue(name, TextGeographies(field)),
                       field),
           name));
     }

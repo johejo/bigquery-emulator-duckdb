@@ -25,7 +25,8 @@ std::optional<std::string> TimeTravelRows(const googlesql::ResolvedTableScan& sc
 
 // Reads `column`, a table column of `type`, as the translator's other expressions of `type` are
 // typed. A BIGNUMERIC(P, S) column, at any depth, has a DuckDB type of its own, which DuckDB
-// casts to BIGNUM but not to another BIGNUMERIC(P, S) column's type.
+// casts to BIGNUM but not to another BIGNUMERIC(P, S) column's type. A GEOGRAPHY column also has
+// a type of its own, which DuckDB casts to BLOB.
 std::string StoredColumn(const std::string& column, const googlesql::Type* type);
 
 }  // namespace bigquery_emulator_duckdb::translator

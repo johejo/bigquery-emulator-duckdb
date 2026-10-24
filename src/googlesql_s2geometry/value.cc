@@ -43,6 +43,7 @@
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
 #include "s2/s2shape.h"
+#include "s2/s2shape_index.h"
 
 namespace googlesql_s2geometry {
 namespace {
@@ -163,15 +164,41 @@ std::string Wkt(const Geography& geography) {
 }
 
 void AddShapes(const Geography& geography, MutableS2ShapeIndex& index) {
-  if (!geography.points.empty()) {
-    index.Add(std::make_unique<S2PointVectorShape>(geography.points));
+  for (int id = 0; id < ShapeCount(geography); ++id) {
+    index.Add(Shape(geography, id));
   }
-  for (const std::vector<S2Point>& line : geography.lines) {
-    index.Add(std::make_unique<S2LaxPolylineShape>(line));
+}
+
+int ShapeCount(const Geography& geography) {
+  return static_cast<int>(geography.lines.size()) + (geography.points.empty() ? 0 : 1) +
+         (geography.polygons.empty() ? 0 : 1);
+}
+
+std::unique_ptr<S2Shape> Shape(const Geography& geography, int id) {
+  const int lines = id - (geography.points.empty() ? 0 : 1);
+  if (lines < 0) {
+    return std::make_unique<S2PointVectorShape>(geography.points);
   }
-  if (!geography.polygons.empty()) {
-    index.Add(std::make_unique<S2Polygon::OwningShape>(ToS2Polygon(geography)));
+  if (std::cmp_less(lines, geography.lines.size())) {
+    return std::make_unique<S2LaxPolylineShape>(geography.lines.at(lines));
   }
+  return std::make_unique<S2Polygon::OwningShape>(ToS2Polygon(geography));
+}
+
+IndexedGeography::IndexedGeography(Geography geography)
+    : geography_(std::make_shared<const Geography>(std::move(geography))) {}
+
+IndexedGeography::IndexedGeography(std::shared_ptr<const Geography> geography,
+                                   std::shared_ptr<const S2ShapeIndex> index)
+    : geography_(std::move(geography)), index_(std::move(index)) {}
+
+const S2ShapeIndex& IndexedGeography::index() const {
+  if (index_ == nullptr) {
+    auto built = std::make_shared<MutableS2ShapeIndex>();
+    AddShapes(*geography_, *built);
+    index_ = std::move(built);
+  }
+  return *index_;
 }
 
 std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& geography) {
