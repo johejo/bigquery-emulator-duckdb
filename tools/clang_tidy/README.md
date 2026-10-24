@@ -43,6 +43,7 @@ produce the success marker.
 ## Tests
 
 `//:clang_tidy_test` inspects the real `parquet_metadata_test`, `query_parameters` and `httplib`
-targets. It checks configuration and executable inputs, C++20 flags, httplib's public settings
-and private-define isolation, and implementation dependencies' lint outputs. It is included in
-`just test`; `just tidy` executes the actual lint actions.
+targets. It checks configuration and executable inputs, collection of implementation dependencies'
+lint outputs, and exclusion of external targets. These checks protect caching and lint coverage
+without fixing individual compiler flags or dependency filenames. It is included in `just test`;
+`just tidy` executes the actual lint actions with the targets' parsing settings.
