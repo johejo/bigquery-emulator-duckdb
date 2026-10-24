@@ -22,7 +22,7 @@
 #include "src/external_query.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/location.h"
 #include "src/project.h"
 #include "src/query_parameters.h"
@@ -211,7 +211,7 @@ class Emulator {
       const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
       const std::vector<ExternalConnection>& connections = std::vector<ExternalConnection>(),
       const backend_functions::PythonOptions& python = backend_functions::PythonOptions(),
-      const googlesql_s2geometry::Options& geography = {.expand_bounding_box = true});
+      const googlesql_geography::Options& geography = {.expand_bounding_box = true});
   const std::vector<Project>& ListProjects() const;
   std::string ResolveProject(const std::string& project_id) const;
 

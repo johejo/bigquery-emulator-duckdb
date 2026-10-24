@@ -20,7 +20,7 @@
 #include "src/backend_functions/python.h"
 #include "src/emulator.h"
 #include "src/external_query.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/project.h"
 #include "src/server.h"
 #include "src/shell.h"
@@ -105,7 +105,7 @@ int Run(int argc, char* const* argv) {
   bigquery_emulator_duckdb::ServerOptions options;
   bigquery_emulator_duckdb::ShellOptions shell_options;
   std::string data_dir;
-  googlesql_s2geometry::Options geography{.expand_bounding_box = true};
+  googlesql_geography::Options geography{.expand_bounding_box = true};
   std::optional<std::string> session_user;
   bigquery_emulator_duckdb::backend_functions::JavaScriptLimits javascript;
   bigquery_emulator_duckdb::backend_functions::PythonOptions python;

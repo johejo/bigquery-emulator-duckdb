@@ -16,7 +16,7 @@
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 
 // Coordinates obtained from S2LatLng, preserving its floating-point behavior.
 struct Point {
@@ -141,4 +141,4 @@ absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
                                              const MutableS2ShapeIndex& b,
                                              S2BooleanOperation::OpType operation);
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

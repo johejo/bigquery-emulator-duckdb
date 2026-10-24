@@ -1,4 +1,4 @@
-#include "src/googlesql_s2geometry/geography.h"
+#include "src/googlesql_geography/geography.h"
 
 #include <algorithm>
 #include <array>
@@ -55,10 +55,10 @@
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 #include "s2/s2shape_measures.h"
-#include "src/googlesql_s2geometry/options.h"
-#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_geography/options.h"
+#include "src/googlesql_geography/value.h"
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 
 // The point of a single-point geography, or else an error that `context` starts and that says
 // what the geography is, unless `say` is false.
@@ -1117,4 +1117,4 @@ absl::StatusOr<std::vector<Geography>> InteriorRings(const Geography& geography)
   return *std::move(rings);
 }
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

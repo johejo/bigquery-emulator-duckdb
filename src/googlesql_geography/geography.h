@@ -7,10 +7,10 @@
 
 #include "absl/status/statusor.h"
 #include "s2/s2boolean_operation.h"
-#include "src/googlesql_s2geometry/options.h"
-#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_geography/options.h"
+#include "src/googlesql_geography/value.h"
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 
 struct BoundingBox {
   double xmin;
@@ -79,4 +79,4 @@ bool IsRing(const Geography& geography);
 absl::StatusOr<Geography> ExteriorRing(const Geography& geography);
 absl::StatusOr<std::vector<Geography>> InteriorRings(const Geography& geography);
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

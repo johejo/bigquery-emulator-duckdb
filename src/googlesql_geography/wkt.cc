@@ -1,4 +1,4 @@
-#include "src/googlesql_s2geometry/wkt.h"
+#include "src/googlesql_geography/wkt.h"
 
 #include <algorithm>
 #include <cctype>
@@ -18,9 +18,9 @@
 #include "googlesql/base/status_macros.h"
 #include "s2/s2loop_measures.h"
 #include "s2/s2point.h"
-#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_geography/value.h"
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 namespace {
 
 // Reads the WKT of a point, a linestring or a polygon as ST_GEOGFROMTEXT does, with any case and
@@ -350,4 +350,4 @@ absl::StatusOr<Geography> ReadWkt(std::string_view text, bool oriented) {
   return Combine(built);
 }
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

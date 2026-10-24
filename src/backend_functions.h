@@ -7,7 +7,7 @@
 #include "src/backend_functions/javascript_limits.h"
 #include "src/backend_functions/object_metadata.h"
 #include "src/backend_functions/python.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 
 namespace bigquery_emulator_duckdb {
 
@@ -20,6 +20,6 @@ void RegisterBackendFunctions(
     const backend_functions::JavaScriptLimits& javascript = backend_functions::JavaScriptLimits(),
     const backend_functions::ObjectStorage& storage = backend_functions::ObjectStorage(),
     const backend_functions::PythonOptions& python = backend_functions::PythonOptions(),
-    const googlesql_s2geometry::Options& geography = {.expand_bounding_box = true});
+    const googlesql_geography::Options& geography = {.expand_bounding_box = true});
 
 }  // namespace bigquery_emulator_duckdb

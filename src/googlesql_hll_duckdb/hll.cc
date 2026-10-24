@@ -1,11 +1,8 @@
-#include "src/backend_functions/hll_count.h"
+#include "src/googlesql_hll_duckdb/hll.h"
 
-#include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -16,38 +13,15 @@
 #include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
 #include "src/duckdb_handle.h"
-#include "src/zetasketch/fingerprint2011.h"
+#include "src/googlesql_hll/hll.h"
 #include "src/zetasketch/hyperloglog_plus_plus.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::hll_duckdb {
 namespace {
 
-using zetasketch::HyperLogLogPlusPlus;
-
-// The value types BigQuery's sketches carry: DefaultOpsType UINT64 for INT64,
-// BYTES_OR_UTF8_STRING for STRING and BYTES, and custom types for NUMERIC and BIGNUMERIC.
-enum class ValueType : int32_t {
-  kInt64 = 8,
-  kBytes = 11,
-  kNumeric = 188553293,
-  kBigNumeric = 188553294,
-};
-
-constexpr int kDefaultSparsePrecisionDelta = 5;
-
-constexpr char kInvalidSketch[] = "Invalid or incompatible sketch in HLL_COUNT.MERGE_PARTIAL";
-
-// The little-endian two's complement bytes of `value`, in `size` bytes.
-template <typename Integer>
-std::string LittleEndian(Integer value, std::size_t size) {
-  auto bits = static_cast<std::make_unsigned_t<Integer>>(value);
-  std::string bytes(size, '\0');
-  for (char& byte : bytes) {
-    byte = static_cast<char>(bits & 0xFFU);
-    bits >>= 8U;
-  }
-  return bytes;
-}
+using namespace backend_functions;
+using googlesql_hll::Sketch;
+using googlesql_hll::ValueType;
 
 // The hash of row `row` of `vector`, a value of `type`: Fingerprint2011 of its bytes, of an INT64's
 // 8 little-endian bytes, and of the little-endian two's complement of a NUMERIC's or BIGNUMERIC's
@@ -55,29 +29,23 @@ std::string LittleEndian(Integer value, std::size_t size) {
 absl::StatusOr<uint64_t> Hash(ValueType type, duckdb_vector vector, idx_t row) {
   switch (type) {
     case ValueType::kInt64:
-      return zetasketch::Fingerprint2011(LittleEndian(VectorElement<int64_t>(vector, row), 8));
+      return googlesql_hll::HashInt64(VectorElement<int64_t>(vector, row));
     case ValueType::kBytes:
-      return zetasketch::Fingerprint2011(VectorString(vector, row));
+      return googlesql_hll::HashBytes(VectorString(vector, row));
     case ValueType::kNumeric: {
       const auto value = VectorElement<duckdb_hugeint>(vector, row);
-      std::string bytes = LittleEndian(value.lower, 8);
-      bytes += LittleEndian(value.upper, 8);
-      return zetasketch::Fingerprint2011(bytes);
+      return googlesql_hll::HashNumeric(value.lower, value.upper);
     }
     case ValueType::kBigNumeric: {
       const auto value = BigNumericFromUnits(VectorString(vector, row));
       if (!value.ok()) {
         return value.status();
       }
-      std::string bytes = BigNumericDecimalBytes(*value);
-      std::ranges::reverse(bytes);
-      return zetasketch::Fingerprint2011(bytes);
+      return googlesql_hll::HashBigNumeric(BigNumericDecimalBytes(*value));
     }
   }
   return 0;
 }
-
-using Sketch = std::optional<HyperLogLogPlusPlus>;
 
 Sketch*& State(duckdb_aggregate_state state) { return *reinterpret_cast<Sketch**>(state); }
 
@@ -93,23 +61,6 @@ void DestroyStates(duckdb_aggregate_state* states, idx_t count) {
   }
 }
 
-// Merges `source` into `target`, or returns the error MERGE_PARTIAL fails with.
-const char* MergeInto(Sketch& target, const HyperLogLogPlusPlus& source) {
-  if (!target) {
-    target = source;
-    return nullptr;
-  }
-  switch (target->Merge(source)) {
-    case HyperLogLogPlusPlus::MergeResult::kMerged:
-      return nullptr;
-    case HyperLogLogPlusPlus::MergeResult::kIncompatibleTypes:
-      return "HLL_COUNT.MERGE_PARTIAL failed to compute.";
-    case HyperLogLogPlusPlus::MergeResult::kIncompatiblePrecisions:
-      return kInvalidSketch;
-  }
-  return nullptr;
-}
-
 // HLL_COUNT.INIT adds each non-NULL value, argument 0, to a sketch of the precision in argument
 // 1, which the first value sets.
 template <ValueType kType>
@@ -119,26 +70,18 @@ void AddValues(duckdb_function_info info, duckdb_data_chunk input, duckdb_aggreg
     if (arguments.IsNull(0)) {
       continue;
     }
-    Sketch& sketch = *State(states[row]);
-    if (!sketch) {
-      const int64_t precision = arguments.IsNull(1) ? 0 : arguments.Int(1);
-      if (precision < 10 || precision > 24) {
-        duckdb_aggregate_function_set_error(
-            info, "Argument 2 to HLL_COUNT.INIT must be between 10 and 24");
-        return;
-      }
-      const auto normal = static_cast<int>(precision);
-      sketch.emplace(normal,
-                     std::min(normal + kDefaultSparsePrecisionDelta,
-                              HyperLogLogPlusPlus::kMaximumSparsePrecision),
-                     static_cast<int32_t>(kType));
+    const auto sketch = googlesql_hll::Initialize(*State(states[row]), kType,
+                                                  arguments.IsNull(1) ? 0 : arguments.Int(1));
+    if (!sketch.ok()) {
+      duckdb_aggregate_function_set_error(info, std::string(sketch.status().message()).c_str());
+      return;
     }
     const auto hash = Hash(kType, arguments.Vector(0), row);
     if (!hash.ok()) {
       duckdb_aggregate_function_set_error(info, std::string(hash.status().message()).c_str());
       return;
     }
-    sketch->AddHash(*hash);
+    (*sketch)->AddHash(*hash);
   }
 }
 
@@ -150,8 +93,7 @@ void MergeSketches(duckdb_function_info info, duckdb_data_chunk input,
     if (arguments.IsNull(0)) {
       continue;
     }
-    const auto sketch = HyperLogLogPlusPlus::Parse(arguments.String(0));
-    const char* error = sketch ? MergeInto(*State(states[row]), *sketch) : kInvalidSketch;
+    const char* error = googlesql_hll::MergeSerialized(*State(states[row]), arguments.String(0));
     if (error != nullptr) {
       duckdb_aggregate_function_set_error(info, error);
       return;
@@ -168,7 +110,7 @@ void CombineStates(duckdb_function_info info, duckdb_aggregate_state* source,
     if (!from) {
       continue;
     }
-    if (const char* error = MergeInto(*State(target[i]), *from); error != nullptr) {
+    if (const char* error = googlesql_hll::MergeInto(*State(target[i]), *from); error != nullptr) {
       duckdb_aggregate_function_set_error(info, error);
       return;
     }
@@ -218,13 +160,9 @@ void RegisterAggregate(duckdb_connection connection, const char* name,
 // HLL_COUNT.EXTRACT, which estimates 0 for a NULL sketch.
 absl::StatusOr<int64_t> Extract(const Arguments& arguments) {
   if (arguments.IsNull(0)) {
-    return 0;
+    return googlesql_hll::Extract(std::nullopt);
   }
-  auto sketch = HyperLogLogPlusPlus::Parse(arguments.String(0));
-  if (!sketch) {
-    return absl::OutOfRangeError("Invalid input bytes to HLL_COUNT.EXTRACT");
-  }
-  return sketch->Estimate();
+  return googlesql_hll::Extract(arguments.String(0));
 }
 
 }  // namespace
@@ -266,4 +204,4 @@ void RegisterHllCountFunctions(duckdb_connection connection) {
            /*nulls=*/false);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::hll_duckdb

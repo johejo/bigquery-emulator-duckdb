@@ -3,7 +3,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 package(features = ["layering_check"])
 
 cc_library(
-    name = "googlesql_s2geometry",
+    name = "googlesql_geography",
     srcs = [
         "geography.cc",
         "value.cc",

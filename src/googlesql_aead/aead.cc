@@ -17,7 +17,6 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "duckdb.h"
 #include "nlohmann/json.hpp"
 #include "utf8_validity.h"
 
@@ -27,11 +26,9 @@
 // DETERMINISTIC_ENCRYPT uses AES-SIV keys (RFC 5297), which make a 16-byte synthetic IV followed
 // by the encrypted data. The KEYS functions make and change keysets of these keys.
 
-#include "src/backend_functions/aead.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/googlesql_aead/aead.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace googlesql_aead {
 namespace {
 
 constexpr std::string_view kAesGcmKey = "type.googleapis.com/google.crypto.tink.AesGcmKey";
@@ -489,8 +486,8 @@ absl::Status Failed(std::string_view function, std::string_view message) {
 
 // The keys of the first argument.
 absl::StatusOr<Keys> KeysOf(std::string_view function, const Primitive& primitive,
-                            const Arguments& arguments) {
-  auto keys = ParseKeys(primitive, arguments.String(0));
+                            std::string_view keyset_bytes) {
+  auto keys = ParseKeys(primitive, keyset_bytes);
   if (!keys.ok()) {
     return Failed(function, "Creation of " + std::string(primitive.name) +
                                 " primitive failed: " + std::string(keys.status().message()));
@@ -498,16 +495,20 @@ absl::StatusOr<Keys> KeysOf(std::string_view function, const Primitive& primitiv
   return keys;
 }
 
+}  // namespace
+
 // AEAD.ENCRYPT(keyset, plaintext, additional_data).
-absl::StatusOr<std::string> Encrypt(const Arguments& arguments) {
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): AEAD.ENCRYPT's SQL argument order.
+absl::StatusOr<std::string> Encrypt(std::string_view keyset_bytes, std::string_view input,
+                                    std::string_view aad) {
   constexpr std::string_view kFunction = "AEAD.ENCRYPT";
-  const auto keys = KeysOf(kFunction, kAead, arguments);
+  const auto keys = KeysOf(kFunction, kAead, keyset_bytes);
   if (!keys.ok()) {
     return keys.status();
   }
   std::string iv(kIvSize, '\0');
   RAND_bytes(reinterpret_cast<uint8_t*>(iv.data()), iv.size());
-  const auto sealed = Seal(keys->primary, iv, arguments.String(1), arguments.String(2), false);
+  const auto sealed = Seal(keys->primary, iv, input, aad, false);
   if (!sealed) {
     return Failed(kFunction, "encryption failed");
   }
@@ -515,24 +516,30 @@ absl::StatusOr<std::string> Encrypt(const Arguments& arguments) {
 }
 
 // DETERMINISTIC_ENCRYPT(keyset, plaintext, additional_data).
-absl::StatusOr<std::string> DeterministicEncrypt(const Arguments& arguments) {
-  const auto keys = KeysOf("DETERMINISTIC_ENCRYPT", kDeterministicAead, arguments);
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): DETERMINISTIC_ENCRYPT's SQL argument order.
+absl::StatusOr<std::string> DeterministicEncrypt(std::string_view keyset_bytes,
+                                                 std::string_view input, std::string_view aad) {
+  const auto keys = KeysOf("DETERMINISTIC_ENCRYPT", kDeterministicAead, keyset_bytes);
   if (!keys.ok()) {
     return keys.status();
   }
-  return keys->primary.prefix + SivEncrypt(keys->primary, arguments.String(1), arguments.String(2));
+  return keys->primary.prefix + SivEncrypt(keys->primary, input, aad);
 }
+
+namespace {
 
 // AEAD.DECRYPT_* and DETERMINISTIC_DECRYPT_*(keyset, ciphertext, additional_data). Tries the
 // keys whose prefix the ciphertext starts with, then the RAW keys, as Tink does.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): decryption arguments.
 absl::StatusOr<std::string> Decrypt(std::string_view function, const Primitive& primitive,
-                                    const Arguments& arguments) {
-  const auto keys = KeysOf(function, primitive, arguments);
+                                    std::string_view keyset_bytes, std::string_view input,
+                                    std::string_view aad) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  const auto keys = KeysOf(function, primitive, keyset_bytes);
   if (!keys.ok()) {
     return keys.status();
   }
-  const std::string ciphertext = arguments.String(1);
-  const std::string aad = arguments.String(2);
+  const std::string_view ciphertext = input;
   for (const bool raw : {false, true}) {
     for (const Key& key : keys->keys) {
       if (key.prefix.empty() != raw || !ciphertext.starts_with(key.prefix)) {
@@ -555,8 +562,9 @@ absl::StatusOr<std::string> Decrypt(std::string_view function, const Primitive& 
 
 // A decryption to STRING, which fails for plaintext that is not UTF-8.
 absl::StatusOr<std::string> DecryptString(std::string_view function, std::string_view bytes,
-                                          const Primitive& primitive, const Arguments& arguments) {
-  auto plaintext = Decrypt(function, primitive, arguments);
+                                          const Primitive& primitive, std::string_view keyset_bytes,
+                                          std::string_view input, std::string_view aad) {
+  auto plaintext = Decrypt(function, primitive, keyset_bytes, input, aad);
   if (plaintext.ok() && !utf8_range::IsStructurallyValid(*plaintext)) {
     return Failed(function,
                   "Decrypted plaintext is not a valid UTF-8 string. To decrypt to "
@@ -603,8 +611,9 @@ absl::StatusOr<KeysetKey> NewKey(std::string_view function, std::string_view key
 }
 
 // The keyset of the first argument of `function`, which may have no keys.
-absl::StatusOr<Keyset> KeysetOf(std::string_view function, const Arguments& arguments) {
-  auto keyset = ParseKeyset(arguments.String(0));
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): function and keyset.
+absl::StatusOr<Keyset> KeysetOf(std::string_view function, std::string_view keyset_bytes) {
+  auto keyset = ParseKeyset(keyset_bytes);
   if (!keyset.ok()) {
     return Error(function,
                  "Keyset deserialization failed: Error reading keyset data: " +
@@ -634,11 +643,13 @@ std::string AddKey(Keyset keyset, KeysetKey key, bool primary) {
   return Serialize(keyset);
 }
 
+}  // namespace
+
 // KEYS.NEW_KEYSET(key_type), where key_type can't be NULL.
-absl::StatusOr<std::string> NewKeyset(const Arguments& arguments) {
+absl::StatusOr<std::string> NewKeyset(std::string_view key_type) {
   constexpr std::string_view kFunction = "KEYS.NEW_KEYSET";
   Keyset keyset;
-  auto key = NewKey(kFunction, arguments.IsNull(0) ? "" : arguments.String(0), keyset);
+  auto key = NewKey(kFunction, key_type, keyset);
   if (!key.ok()) {
     return key.status();
   }
@@ -646,16 +657,17 @@ absl::StatusOr<std::string> NewKeyset(const Arguments& arguments) {
 }
 
 // KEYS.ROTATE_KEYSET(keyset, key_type): a new primary key of the type of the keyset's keys.
-absl::StatusOr<std::optional<std::string>> RotateKeyset(const Arguments& arguments) {
+absl::StatusOr<std::optional<std::string>> RotateKeyset(
+    std::optional<std::string_view> keyset_bytes, std::string_view key_type) {
   constexpr std::string_view kFunction = "KEYS.ROTATE_KEYSET";
-  if (arguments.IsNull(0)) {
+  if (!keyset_bytes) {
     return std::nullopt;
   }
-  auto keyset = KeysetOf(kFunction, arguments);
+  auto keyset = KeysetOf(kFunction, *keyset_bytes);
   if (!keyset.ok()) {
     return keyset.status();
   }
-  auto key = NewKey(kFunction, arguments.IsNull(1) ? "" : arguments.String(1), *keyset);
+  auto key = NewKey(kFunction, key_type, *keyset);
   if (!key.ok()) {
     return key.status();
   }
@@ -672,13 +684,13 @@ absl::StatusOr<std::optional<std::string>> RotateKeyset(const Arguments& argumen
 
 // KEYS.ADD_KEY_FROM_RAW_BYTES(keyset, 'AES_GCM', raw_key_bytes): a RAW AES-GCM key, which is
 // primary only in a keyset that had no keys.
-absl::StatusOr<std::string> AddAesGcmKey(const Arguments& arguments) {
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): SQL argument order.
+absl::StatusOr<std::string> AddAesGcmKey(std::string_view keyset_bytes, std::string_view raw) {
   constexpr std::string_view kFunction = "KEYS.ADD_KEY_FROM_RAW_BYTES";
-  auto keyset = KeysetOf(kFunction, arguments);
+  auto keyset = KeysetOf(kFunction, keyset_bytes);
   if (!keyset.ok()) {
     return keyset.status();
   }
-  const std::string raw = arguments.String(1);
   if (raw.size() != 16 && raw.size() != 32) {
     return Error(kFunction,
                  "Failed to add a key from raw bytes: Unsupported key size: " +
@@ -699,13 +711,15 @@ absl::StatusOr<std::string> AddAesGcmKey(const Arguments& arguments) {
 }
 
 // KEYS.KEYSET_LENGTH(keyset): the number of keys, whatever their status.
-absl::StatusOr<int64_t> KeysetLength(const Arguments& arguments) {
-  const auto keyset = KeysetOf("KEYS.KEYSET_LENGTH", arguments);
+absl::StatusOr<int64_t> KeysetLength(std::string_view keyset_bytes) {
+  const auto keyset = KeysetOf("KEYS.KEYSET_LENGTH", keyset_bytes);
   if (!keyset.ok()) {
     return keyset.status();
   }
   return static_cast<int64_t>(keyset->keys.size());
 }
+
+namespace {
 
 template <std::size_t N>
 nlohmann::json EnumName(const std::array<std::string_view, N>& names, uint64_t value) {
@@ -755,11 +769,13 @@ std::string FromBase64(std::string_view data) {
   return out;
 }
 
+}  // namespace
+
 // KEYS.KEYSET_TO_JSON(keyset): the keyset in Tink's JSON format, without spaces and with the
 // fields of each object in alphabetical order, as nlohmann::json orders them.
-absl::StatusOr<std::string> KeysetToJson(const Arguments& arguments) {
+absl::StatusOr<std::string> KeysetToJson(std::string_view keyset_bytes) {
   constexpr std::string_view kFunction = "KEYS.KEYSET_TO_JSON";
-  const auto keyset = ParseKeyset(arguments.String(0));
+  const auto keyset = ParseKeyset(keyset_bytes);
   if (!keyset.ok()) {
     return Error(kFunction, keyset.status().message(), " Error in ");
   }
@@ -787,12 +803,12 @@ absl::StatusOr<std::string> KeysetToJson(const Arguments& arguments) {
 }
 
 // KEYS.KEYSET_FROM_JSON(json_keyset): a keyset in Tink's JSON format, serialized.
-absl::StatusOr<std::string> KeysetFromJson(const Arguments& arguments) {
+absl::StatusOr<std::string> KeysetFromJson(std::string_view keyset_bytes) {
   const auto invalid = [] {
     return Error("KEYS.KEYSET_FROM_JSON", "Failed to parse JSON string as a Tink keyset-proto.",
                  " Error in ");
   };
-  const auto json = nlohmann::json::parse(arguments.String(0), nullptr, false);
+  const auto json = nlohmann::json::parse(keyset_bytes, nullptr, false);
   if (!json.is_object()) {
     return invalid();
   }
@@ -857,49 +873,28 @@ absl::StatusOr<std::string> KeysetFromJson(const Arguments& arguments) {
   return Serialize(keyset);
 }
 
-absl::StatusOr<std::string> AeadDecryptBytes(const Arguments& arguments) {
-  return Decrypt("AEAD.DECRYPT_BYTES", kAead, arguments);
+absl::StatusOr<std::string> AeadDecryptBytes(std::string_view keyset_bytes, std::string_view input,
+                                             std::string_view aad) {
+  return Decrypt("AEAD.DECRYPT_BYTES", kAead, keyset_bytes, input, aad);
 }
 
-absl::StatusOr<std::string> AeadDecryptString(const Arguments& arguments) {
-  return DecryptString("AEAD.DECRYPT_STRING", "AEAD.DECRYPT_BYTES", kAead, arguments);
+absl::StatusOr<std::string> AeadDecryptString(std::string_view keyset_bytes, std::string_view input,
+                                              std::string_view aad) {
+  return DecryptString("AEAD.DECRYPT_STRING", "AEAD.DECRYPT_BYTES", kAead, keyset_bytes, input,
+                       aad);
 }
 
-absl::StatusOr<std::string> DeterministicDecryptBytes(const Arguments& arguments) {
-  return Decrypt("DETERMINISTIC_DECRYPT_BYTES", kDeterministicAead, arguments);
+absl::StatusOr<std::string> DeterministicDecryptBytes(std::string_view keyset_bytes,
+                                                      std::string_view input,
+                                                      std::string_view aad) {
+  return Decrypt("DETERMINISTIC_DECRYPT_BYTES", kDeterministicAead, keyset_bytes, input, aad);
 }
 
-absl::StatusOr<std::string> DeterministicDecryptString(const Arguments& arguments) {
+absl::StatusOr<std::string> DeterministicDecryptString(std::string_view keyset_bytes,
+                                                       std::string_view input,
+                                                       std::string_view aad) {
   return DecryptString("DETERMINISTIC_DECRYPT_STRING", "DETERMINISTIC_DECRYPT_BYTES",
-                       kDeterministicAead, arguments);
+                       kDeterministicAead, keyset_bytes, input, aad);
 }
 
-}  // namespace
-
-void RegisterAeadFunctions(duckdb_connection connection) {
-  // A new random IV makes each call's ciphertext differ.
-  Register(connection, "bq_aead_encrypt", {kBlob, kBlob, kBlob}, kBlob, EachRow<Encrypt>, true,
-           std::nullopt, true);
-  Register(connection, "bq_aead_decrypt_bytes", {kBlob, kBlob, kBlob}, kBlob,
-           EachRow<AeadDecryptBytes>);
-  Register(connection, "bq_aead_decrypt_string", {kBlob, kBlob, kBlob}, kVarchar,
-           EachRow<AeadDecryptString>);
-  Register(connection, "bq_deterministic_encrypt", {kBlob, kBlob, kBlob}, kBlob,
-           EachRow<DeterministicEncrypt>);
-  Register(connection, "bq_deterministic_decrypt_bytes", {kBlob, kBlob, kBlob}, kBlob,
-           EachRow<DeterministicDecryptBytes>);
-  Register(connection, "bq_deterministic_decrypt_string", {kBlob, kBlob, kBlob}, kVarchar,
-           EachRow<DeterministicDecryptString>);
-  // New random keys make each call's keyset differ. A NULL key type is an error.
-  Register(connection, "bq_keys_new_keyset", {kVarchar}, kBlob, EachRow<NewKeyset, false>, false,
-           std::nullopt, true);
-  Register(connection, "bq_keys_rotate_keyset", {kBlob, kVarchar}, kBlob,
-           EachRow<RotateKeyset, false>, false, std::nullopt, true);
-  // GoogleSQL takes this as immutable, which lets SAFE. take it, although the key ID is random.
-  Register(connection, "bq_keys_add_aes_gcm_key", {kBlob, kBlob}, kBlob, EachRow<AddAesGcmKey>);
-  Register(connection, "bq_keys_keyset_length", {kBlob}, kBigint, EachRow<KeysetLength>);
-  Register(connection, "bq_keys_keyset_to_json", {kBlob}, kVarchar, EachRow<KeysetToJson>);
-  Register(connection, "bq_keys_keyset_from_json", {kVarchar}, kBlob, EachRow<KeysetFromJson>);
-}
-
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace googlesql_aead

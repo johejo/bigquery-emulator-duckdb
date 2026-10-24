@@ -23,7 +23,7 @@
 #include "src/duckdb_sql.h"
 #include "src/duckpgq.h"
 #include "src/field_schema.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
 #include "src/result_chunks.h"
@@ -160,7 +160,7 @@ struct Backend::Database {
            const backend_functions::JavaScriptLimits& javascript,
            const backend_functions::ObjectStorage& storage,
            const backend_functions::PythonOptions& python,
-           const googlesql_s2geometry::Options& geography) {
+           const googlesql_geography::Options& geography) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -238,7 +238,7 @@ Backend::Backend(const std::optional<std::string>& session_user,
                  const backend_functions::JavaScriptLimits& javascript,
                  const backend_functions::ObjectStorage& storage,
                  const backend_functions::PythonOptions& python,
-                 const googlesql_s2geometry::Options& geography)
+                 const googlesql_geography::Options& geography)
     : db_(std::make_shared<Database>(session_user, javascript, storage, python, geography)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 
 // Execution-independent choices; the embedding application selects its compatibility policy.
 struct Options {
@@ -9,4 +9,4 @@ struct Options {
   bool expand_bounding_box = false;
 };
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

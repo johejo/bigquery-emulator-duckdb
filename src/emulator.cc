@@ -21,7 +21,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/external_query.h"
-#include "src/googlesql_s2geometry/options.h"
+#include "src/googlesql_geography/options.h"
 #include "src/object_ref.h"
 #include "src/project.h"
 #include "src/table_history.h"
@@ -58,7 +58,7 @@ Emulator::Emulator(std::string data_dir, const std::vector<Project>& projects,
                    const backend_functions::JavaScriptLimits& javascript,
                    const std::vector<ExternalConnection>& connections,
                    const backend_functions::PythonOptions& python,
-                   const googlesql_s2geometry::Options& geography)
+                   const googlesql_geography::Options& geography)
     : backend_(
           session_user, javascript,
           {

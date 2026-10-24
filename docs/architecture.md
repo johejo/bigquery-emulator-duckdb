@@ -80,12 +80,22 @@ functions use this representation; it is never returned as an ordinary STRUCT to
 DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a
 schema. Results are encoded in BigQuery's REST row format.
 [src/backend_functions/](../src/backend_functions/) exposes GoogleSQL implementations through
-DuckDB functions, uses [S2 Geometry](https://s2geometry.io/) for GEOGRAPHY, and keeps the
-sketches of `HLL_COUNT` and `APPROX_COUNT_DISTINCT` with a
-[port of zetasketch](../src/zetasketch/README.md), whose sketches are BigQuery's.
+DuckDB functions. Emulator implementations are grouped by SQL feature in `src/googlesql_<feature>/`:
+[geography](../src/googlesql_geography/), [AEAD and keysets](../src/googlesql_aead/),
+[text analysis](../src/googlesql_text_analysis/) and [HLL sketches](../src/googlesql_hll/).
+These libraries own input validation, computation and compatibility errors without depending on
+DuckDB. Their `googlesql_<feature>_duckdb` adapters register functions, convert vectors and storage
+representations, and manage aggregate callbacks. The `googlesql_` prefix denotes GoogleSQL-compatible
+semantics, including emulator implementations. Shared DuckDB registration and vector helpers remain
+in `src/backend_functions/`.
 
-GEOGRAPHY operations live in [googlesql_s2geometry](../src/googlesql_s2geometry/), a typed
-function library over S2 with no DuckDB dependency. [googlesql_s2geometry_duckdb](../src/googlesql_s2geometry_duckdb/)
+HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
+the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.
+Text analysis keeps tokenization, document counts and scores in the library; its adapter encodes
+the intermediate window dictionary and caches parsed analyzers and dictionaries.
+
+GEOGRAPHY operations live in [googlesql_geography](../src/googlesql_geography/), a typed
+function library over S2 with no DuckDB dependency. [googlesql_geography_duckdb](../src/googlesql_geography_duckdb/)
 registers those functions and converts DuckDB arguments and results. Query values and stored
 columns are BLOBs, under the `bq_geography` alias in columns, that hold the exact S2 vertices and
 the encoded S2ShapeIndex of a geography's shapes; distance functions query that index without

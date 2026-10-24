@@ -6,11 +6,9 @@
 
 #include "duckdb.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/aead.h"
 #include "src/backend_functions/bignumeric.h"
 #include "src/backend_functions/cast.h"
 #include "src/backend_functions/datetime.h"
-#include "src/backend_functions/hll_count.h"
 #include "src/backend_functions/interval.h"
 #include "src/backend_functions/javascript.h"
 #include "src/backend_functions/javascript_limits.h"
@@ -22,10 +20,12 @@
 #include "src/backend_functions/python.h"
 #include "src/backend_functions/range.h"
 #include "src/backend_functions/string.h"
-#include "src/backend_functions/text_analysis.h"
 #include "src/duckdb_handle.h"
-#include "src/googlesql_s2geometry/options.h"
-#include "src/googlesql_s2geometry_duckdb/geography.h"
+#include "src/googlesql_aead_duckdb/aead.h"
+#include "src/googlesql_geography/options.h"
+#include "src/googlesql_geography_duckdb/geography.h"
+#include "src/googlesql_hll_duckdb/hll.h"
+#include "src/googlesql_text_analysis_duckdb/text_analysis.h"
 #include "src/spanner_query.h"
 
 namespace bigquery_emulator_duckdb {
@@ -128,7 +128,7 @@ void RegisterBackendFunctions(duckdb_database database,
                               const backend_functions::JavaScriptLimits& javascript,
                               const backend_functions::ObjectStorage& storage,
                               const backend_functions::PythonOptions& python,
-                              const googlesql_s2geometry::Options& geography) {
+                              const googlesql_geography::Options& geography) {
   Connection connection;
   if (duckdb_connect(database, connection.out()) == DuckDBError) {
     throw BackendError("DuckDB failed to connect");
@@ -138,8 +138,8 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterBigNumericFunctions(connection.get());
   backend_functions::RegisterMathFunctions(connection.get());
   backend_functions::RegisterStringFunctions(connection.get());
-  backend_functions::RegisterTextAnalysisFunctions(connection.get());
-  backend_functions::RegisterHllCountFunctions(connection.get());
+  text_analysis_duckdb::RegisterTextAnalysisFunctions(connection.get());
+  hll_duckdb::RegisterHllCountFunctions(connection.get());
   backend_functions::RegisterDatetimeFunctions(connection.get());
   backend_functions::RegisterCastFunctions(connection.get());
   backend_functions::RegisterJsonFunctions(connection.get());
@@ -147,7 +147,7 @@ void RegisterBackendFunctions(duckdb_database database,
   backend_functions::RegisterRangeFunctions(connection.get());
   // GEOGRAPHY behavior is selected by the caller, above the DuckDB adapter.
   geography_duckdb::RegisterGeographyFunctions(connection.get(), geography);
-  backend_functions::RegisterAeadFunctions(connection.get());
+  aead_duckdb::RegisterAeadFunctions(connection.get());
   backend_functions::RegisterPercentileFunctions(connection.get());
   backend_functions::RegisterJavaScriptFunctions(connection.get(), javascript);
   backend_functions::RegisterPythonFunctions(connection.get(), python);

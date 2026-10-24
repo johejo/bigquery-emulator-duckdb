@@ -1,4 +1,4 @@
-#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_geography/value.h"
 
 #include <algorithm>
 #include <charconv>
@@ -45,7 +45,7 @@
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 
-namespace googlesql_s2geometry {
+namespace googlesql_geography {
 namespace {
 
 constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
@@ -653,4 +653,4 @@ absl::StatusOr<Geography> ClosedSetOperation(const MutableS2ShapeIndex& a,
   return Read(output);
 }
 
-}  // namespace googlesql_s2geometry
+}  // namespace googlesql_geography

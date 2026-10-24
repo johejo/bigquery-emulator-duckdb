@@ -1,4 +1,4 @@
-#include "src/googlesql_s2geometry_duckdb/codec.h"
+#include "src/googlesql_geography_duckdb/codec.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -19,13 +19,13 @@
 #include "s2/s2point.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
-#include "src/googlesql_s2geometry/value.h"
+#include "src/googlesql_geography/value.h"
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
-using googlesql_s2geometry::Coordinate;
-using googlesql_s2geometry::Geography;
-using googlesql_s2geometry::IndexedGeography;
-using googlesql_s2geometry::Polygon;
+using googlesql_geography::Coordinate;
+using googlesql_geography::Geography;
+using googlesql_geography::IndexedGeography;
+using googlesql_geography::Polygon;
 namespace {
 constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
 
