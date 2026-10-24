@@ -16,6 +16,7 @@ std::optional<std::string> MakeArray(const ScalarCall& call);
 std::optional<std::string> Logical(const ScalarCall& call);
 std::optional<std::string> InList(const ScalarCall& call);
 std::optional<std::string> Case(const ScalarCall& call);
+std::optional<std::string> GraphIdentityPredicate(const ScalarCall& call);
 std::optional<std::string> Bucket(const ScalarCall& call);
 std::optional<std::string> ToJson(const ScalarCall& call);
 std::optional<std::string> JsonRemove(const ScalarCall& call);

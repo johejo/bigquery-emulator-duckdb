@@ -116,6 +116,34 @@ std::string Bound(size_t i) { return "_sc.a" + std::to_string(i + 1); }
 
 }  // namespace
 
+std::optional<std::string> GraphIdentityPredicate(const ScalarCall& call) {
+  if (call.safe || call.arguments.size() < 2 ||
+      std::ranges::any_of(call.arguments, [](const auto& argument) {
+        return argument.type != googlesql::TYPE_GRAPH_ELEMENT;
+      })) {
+    return std::nullopt;
+  }
+  std::vector<std::string> identities;
+  std::vector<size_t> indexes;
+  std::vector<std::string> values;
+  std::vector<std::string> nulls;
+  for (size_t i = 0; i < call.arguments.size(); ++i) {
+    // Compare element identity, including the element table and every key component,
+    // without comparing labels or properties. Bind each argument's identity once.
+    identities.push_back("struct_extract(" + call.arguments.at(i).sql + ", '$id')");
+    indexes.push_back(i);
+    values.push_back(Bound(i));
+    nulls.push_back(Bound(i) + " IS NULL");
+  }
+  const auto count = call.name == "SAME" ? 1 : values.size();
+  return Bind(identities, indexes,
+              "CASE WHEN " + Join(nulls, " OR ") + " THEN " +
+                  call.Raise(QuoteLiteral("Input to the function " + std::string(call.name) +
+                                          " must not be null")) +
+                  " ELSE list_unique([" + Join(values, ", ") + "]) = " + std::to_string(count) +
+                  " END");
+}
+
 std::string StructInArray(const googlesql::Type* type, const std::string& value,
                           const std::string& array) {
   // TRUE when an element is equal, otherwise NULL when a comparison is NULL; FALSE for an empty

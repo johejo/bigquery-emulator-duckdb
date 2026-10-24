@@ -1,0 +1,82 @@
+# SAME and ALL_DIFFERENT compare element identity, not property values.
+# NULL arguments raise an error, even when other arguments already decide the result.
+# Sources: https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#same_predicate
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#all_different_predicate
+# FinGraph's Knows edges are 10:1->2, 11:2->1, 12:1->1, 13:1->2.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) WHERE SAME(a, b) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person) FILTER ALL_DIFFERENT(a, b) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) RETURN SAME(a, a) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) RETURN ALL_DIFFERENT(a, a) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->(b:Person) WHERE SAME(a, b) RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]-(b:Person) WHERE NOT SAME(a, b) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[f:Knows]->(d:Person) WHERE SAME(e, f) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person), (a)-[f:Knows]->(b) WHERE ALL_DIFFERENT(e, f) RETURN COUNT(*) AS result)
+=> "2"
+
+# The third argument must participate; ALL_DIFFERENT is stronger than NOT SAME.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person), (c:Person) WHERE SAME(a, b, c) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person), (b:Person), (c:Person) WHERE ALL_DIFFERENT(a, b, c) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) RETURN SAME(a, a, b) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) RETURN ALL_DIFFERENT(a, b, a) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) RETURN ALL_DIFFERENT(a, b, a, b) AS result)
+=> "false"
+
+# Element-returning functions and conditional expressions can supply the operands.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN SAME(PATH_FIRST(p), PATH_LAST(p), a) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN ALL_DIFFERENT(PATH_FIRST(p), PATH_LAST(p)) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) RETURN SAME(IF(TRUE, a, b), a) AS result)
+=> "true"
+
+# All properties are identical (empty) in HiddenKeys. Every component of a composite key
+# participates, and aliases of a base table are distinct graph element tables.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person), (b:Person) WHERE SAME(a, b) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person)-[e:Knows]->(b:Person), (c:Person)-[f:Knows]->(d:Person) WHERE ALL_DIFFERENT(e, f) RETURN COUNT(*) AS result)
+=> "12"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound), (b:Compound) WHERE SAME(a, b) RETURN COUNT(*) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound WHERE a.tenant = 'a' AND a.id = 1), (b:Compound WHERE b.tenant = 'b' AND b.id = 1) RETURN ALL_DIFFERENT(a, b) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author), (b:Reader) WHERE a.id = b.id RETURN COUNTIF(SAME(a, b)) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Account) RETURN ALL_DIFFERENT(a, b) AS result)
+=> "true"
+
+# OPTIONAL MATCH supplies NULL graph elements. Test either position and a later NULL even
+# when the first pair differs (SAME) or repeats (ALL_DIFFERENT).
+# Only the documented error behavior is asserted; BigQuery's exact message is unverified.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN SAME(a, b) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN SAME(b, a) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1), (b:Person WHERE b.id = 2) OPTIONAL MATCH (c:Person WHERE c.id = 999) RETURN SAME(a, b, c) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN ALL_DIFFERENT(a, b) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN ALL_DIFFERENT(b, a) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN ALL_DIFFERENT(a, a, b) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN SAME(b, b) AS result)
+=> error:
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN ALL_DIFFERENT(b, b) AS result)
+=> error:
+
+# Conditional expressions must still short-circuit around an erroneous predicate.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN IF(b IS NULL, TRUE, SAME(a, b)) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 3) OPTIONAL MATCH (b:Person WHERE b.id = 999) RETURN CASE WHEN b IS NULL THEN FALSE ELSE ALL_DIFFERENT(a, b) END AS result)
+=> "false"

@@ -41,6 +41,8 @@ constexpr auto kGraphValueFunctions = std::to_array<std::string_view>({
     "IS_TRAIL",
     "$IS_SOURCE_NODE",
     "$IS_DEST_NODE",
+    "SAME",
+    "ALL_DIFFERENT",
     "IF",
     "IFNULL",
     "COALESCE",
