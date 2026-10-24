@@ -20,24 +20,26 @@ struct BoundingBox {
 };
 
 // SQL NULL arguments are handled by the caller. Optional results express NULL produced
-// by the function itself, for example the distance to an empty geography.
+// by the function itself, for example the distance to an empty geography. Functions that query
+// their arguments' shapes as they are, such as the distances, take an IndexedGeography.
 absl::StatusOr<Geography> GeogPoint(double longitude, double latitude);
 absl::StatusOr<std::optional<double>> Azimuth(const Geography& a, const Geography& b);
 absl::StatusOr<std::optional<double>> Angle(const Geography& a, const Geography& b,
                                             const Geography& c);
-absl::StatusOr<std::optional<double>> Distance(const Geography& a, const Geography& b,
+absl::StatusOr<std::optional<double>> Distance(const IndexedGeography& a, const IndexedGeography& b,
                                                bool use_spheroid, const std::string& function);
-absl::StatusOr<std::optional<Geography>> ClosestPoint(const Geography& a, const Geography& b,
-                                                      bool use_spheroid,
+absl::StatusOr<std::optional<Geography>> ClosestPoint(const IndexedGeography& a,
+                                                      const IndexedGeography& b, bool use_spheroid,
                                                       const std::string& function);
 absl::StatusOr<bool> IntersectsBox(const Geography& geography, double west, double south,
                                    double east, double north);
-absl::StatusOr<bool> DWithin(const Geography& a, const Geography& b, double limit,
+absl::StatusOr<bool> DWithin(const IndexedGeography& a, const IndexedGeography& b, double limit,
                              bool use_spheroid, const std::string& function);
-absl::StatusOr<std::optional<double>> HausdorffDistance(const Geography& a, const Geography& b,
-                                                        bool directed);
-absl::StatusOr<std::optional<bool>> HausdorffDWithin(const Geography& a, const Geography& b,
-                                                     bool directed, double limit);
+absl::StatusOr<std::optional<double>> HausdorffDistance(const IndexedGeography& a,
+                                                        const IndexedGeography& b, bool directed);
+absl::StatusOr<std::optional<bool>> HausdorffDWithin(const IndexedGeography& a,
+                                                     const IndexedGeography& b, bool directed,
+                                                     double limit);
 absl::StatusOr<bool> Equals(const Geography& a, const Geography& b);
 absl::StatusOr<std::optional<Geography>> ConvexHull(const Geography& geography);
 absl::StatusOr<double> X(const Geography& geography);

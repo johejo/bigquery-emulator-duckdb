@@ -85,6 +85,15 @@ bazel-bin/bigquery-emulator-duckdb shell --project='{"projectId":"test"}' \
   --expand-bounding-box=false -e 'SELECT ST_BOUNDINGBOX(ST_GEOGPOINT(0, 0)) AS bounds'
 ```
 
+For debugging the emulator itself, `shell --duckdb` runs the input as DuckDB SQL on the
+emulator's database instead of as query jobs. Each project is a catalog, and
+`bq_geography_text` shows the S2 vertices of a stored GEOGRAPHY, which DuckDB keeps as a BLOB.
+
+```sh
+bazel-bin/bigquery-emulator-duckdb shell --data-dir DIR --duckdb \
+  -e 'SELECT bq_geography_text(g) AS g FROM test.ds.t'
+```
+
 Standard input that is not a terminal, or the `-e` argument, runs as one query job, so a
 multi-statement input is a script whose result is its last statement's. The shell exits with 1
 when the job fails.

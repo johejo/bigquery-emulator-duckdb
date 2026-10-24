@@ -53,6 +53,7 @@
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
 #include "s2/s2shape.h"
+#include "s2/s2shape_index.h"
 #include "s2/s2shape_measures.h"
 #include "src/googlesql_s2geometry/options.h"
 #include "src/googlesql_s2geometry/value.h"
@@ -153,13 +154,9 @@ double Meters(S1ChordAngle distance) { return S2Earth::ToMeters(distance.ToAngle
 
 // The shortest distance between nonempty geographies, which is 0 where they meet.
 namespace {
-S1ChordAngle MinDistance(const Geography& a, const Geography& b) {
-  MutableS2ShapeIndex index;
-  AddShapes(a, index);
-  MutableS2ShapeIndex target_index;
-  AddShapes(b, target_index);
-  S2ClosestEdgeQuery query(&index);
-  S2ClosestEdgeQuery::ShapeIndexTarget target(&target_index);
+S1ChordAngle MinDistance(const IndexedGeography& a, const IndexedGeography& b) {
+  S2ClosestEdgeQuery query(&a.index());
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&b.index());
   return query.GetDistance(&target);
 }
 }  // namespace
@@ -167,13 +164,9 @@ S1ChordAngle MinDistance(const Geography& a, const Geography& b) {
 // The longest distance between nonempty geographies, which BigQuery measures over the edges,
 // though ST_MAXDISTANCE describes vertices.
 namespace {
-S1ChordAngle MaxDistance(const Geography& a, const Geography& b) {
-  MutableS2ShapeIndex index;
-  AddShapes(a, index);
-  MutableS2ShapeIndex target_index;
-  AddShapes(b, target_index);
-  S2FurthestEdgeQuery query(&index);
-  S2FurthestEdgeQuery::ShapeIndexTarget target(&target_index);
+S1ChordAngle MaxDistance(const IndexedGeography& a, const IndexedGeography& b) {
+  S2FurthestEdgeQuery query(&a.index());
+  S2FurthestEdgeQuery::ShapeIndexTarget target(&b.index());
   return query.GetDistance(&target);
 }
 }  // namespace
@@ -195,10 +188,10 @@ absl::Status CheckSphere(bool use_spheroid, const std::string& function) {
 }  // namespace
 
 // ST_DISTANCE and ST_MAXDISTANCE, which the last argument names.
-absl::StatusOr<std::optional<double>> Distance(const Geography& a, const Geography& b,
+absl::StatusOr<std::optional<double>> Distance(const IndexedGeography& a, const IndexedGeography& b,
                                                bool use_spheroid, const std::string& function) {
   // Unlike ST_DWITHIN, both distance functions return NULL before checking use_spheroid.
-  if (a.Empty() || b.Empty()) {
+  if (a.geography().Empty() || b.geography().Empty()) {
     return std::nullopt;
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(use_spheroid, function));
@@ -207,17 +200,15 @@ absl::StatusOr<std::optional<double>> Distance(const Geography& a, const Geograp
 
 // Find the closest indexed edge, then the closest edge on the other geography to it.
 // Interior results carry a witness point supplied by S2's target visitor.
-absl::StatusOr<std::optional<Geography>> ClosestPoint(const Geography& a, const Geography& b,
-                                                      bool use_spheroid,
+absl::StatusOr<std::optional<Geography>> ClosestPoint(const IndexedGeography& a,
+                                                      const IndexedGeography& b, bool use_spheroid,
                                                       const std::string& function) {
-  if (a.Empty() || b.Empty()) {
+  if (a.geography().Empty() || b.geography().Empty()) {
     return std::nullopt;
   }
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(use_spheroid, function));
-  MutableS2ShapeIndex index;
-  AddShapes(a, index);
-  MutableS2ShapeIndex other;
-  AddShapes(b, other);
+  const S2ShapeIndex& index = a.index();
+  const S2ShapeIndex& other = b.index();
   S2ClosestEdgeQuery query(&index);
   S2ClosestEdgeQuery::ShapeIndexTarget target(&other);
   const auto result = query.FindClosestEdge(&target);
@@ -302,27 +293,23 @@ absl::StatusOr<bool> IntersectsBox(const Geography& geography, double west, doub
 // Between single points, the distance itself. Anything else is within the distance where it may be,
 // allowing for the error in measuring it: BigQuery takes a point on an edge, a few nanometers
 // away as S2 measures it, as within 0 meters, and points that far apart as not.
-absl::StatusOr<bool> DWithin(const Geography& a, const Geography& b, double limit,
+absl::StatusOr<bool> DWithin(const IndexedGeography& a, const IndexedGeography& b, double limit,
                              bool use_spheroid, const std::string& function) {
   GOOGLESQL_RETURN_IF_ERROR(CheckSphere(use_spheroid, function));
-  if (a.Empty() || b.Empty()) {
+  if (a.geography().Empty() || b.geography().Empty()) {
     return false;
   }
   const auto point = [](const Geography& geography) {
     return geography.Count() == 1 && geography.points.size() == 1;
   };
-  if (point(a) && point(b)) {
+  if (point(a.geography()) && point(b.geography())) {
     return Meters(MinDistance(a, b)) <= limit;
   }
   if (!(limit >= 0)) {
     return false;
   }
-  MutableS2ShapeIndex index;
-  AddShapes(a, index);
-  MutableS2ShapeIndex target_index;
-  AddShapes(b, target_index);
-  S2ClosestEdgeQuery query(&index);
-  S2ClosestEdgeQuery::ShapeIndexTarget target(&target_index);
+  S2ClosestEdgeQuery query(&a.index());
+  S2ClosestEdgeQuery::ShapeIndexTarget target(&b.index());
   return query.IsConservativeDistanceLessOrEqual(&target,
                                                  S1ChordAngle(S2Earth::MetersToAngle(limit)));
 }
@@ -330,18 +317,16 @@ absl::StatusOr<bool> DWithin(const Geography& a, const Geography& b, double limi
 // The discrete Hausdorff distance measures vertices of the first geography to the second's
 // edges and interiors; the undirected form takes the maximum in both directions.
 namespace {
-S1ChordAngle DiscreteHausdorffDistance(const Geography& a, const Geography& b, bool directed) {
-  MutableS2ShapeIndex index;
-  AddShapes(a, index);
-  MutableS2ShapeIndex other;
-  AddShapes(b, other);
+S1ChordAngle DiscreteHausdorffDistance(const IndexedGeography& a, const IndexedGeography& b,
+                                       bool directed) {
   const S2HausdorffDistanceQuery query;
-  return directed ? query.GetDirectedDistance(&index, &other) : query.GetDistance(&index, &other);
+  return directed ? query.GetDirectedDistance(&a.index(), &b.index())
+                  : query.GetDistance(&a.index(), &b.index());
 }
 }  // namespace
 
-absl::StatusOr<std::optional<double>> HausdorffDistance(const Geography& a, const Geography& b,
-                                                        bool directed) {
+absl::StatusOr<std::optional<double>> HausdorffDistance(const IndexedGeography& a,
+                                                        const IndexedGeography& b, bool directed) {
   const S1ChordAngle distance = DiscreteHausdorffDistance(a, b, directed);
   // S2 returns infinity when no distance exists. BigQuery returns NULL, including where a
   // full polygon has no vertices in a direction being measured.
@@ -352,14 +337,15 @@ absl::StatusOr<std::optional<double>> HausdorffDistance(const Geography& a, cons
 }
 
 // The first three arguments are those of HausdorffDistance; the last is the distance limit.
-absl::StatusOr<std::optional<bool>> HausdorffDWithin(const Geography& a, const Geography& b,
-                                                     bool directed, double limit) {
+absl::StatusOr<std::optional<bool>> HausdorffDWithin(const IndexedGeography& a,
+                                                     const IndexedGeography& b, bool directed,
+                                                     double limit) {
   if (std::isnan(limit)) {
     return absl::OutOfRangeError(
         "ST_HausdorffDWithin: ST_HAUSDORFFDWITHIN argument distance cannot be NaN; error in "
         "ST_HAUSDORFFDWITHIN expression");
   }
-  if (a.Empty() || b.Empty()) {
+  if (a.geography().Empty() || b.geography().Empty()) {
     return std::nullopt;
   }
   const S1ChordAngle distance = DiscreteHausdorffDistance(a, b, directed);

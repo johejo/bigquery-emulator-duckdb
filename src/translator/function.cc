@@ -374,8 +374,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
-  // A GEOGRAPHY is text in DuckDB, which the S2 functions build and read, and which DuckDB
-  // carries as BigQuery does; others, such as TO_JSON, would see a STRING.
+  // A GEOGRAPHY is a BLOB in DuckDB, which the S2 functions build and read, and which DuckDB
+  // carries as BigQuery does; others, such as TO_JSON, would see a BYTES.
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&

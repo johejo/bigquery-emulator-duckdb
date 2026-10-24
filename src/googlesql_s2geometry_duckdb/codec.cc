@@ -1,25 +1,30 @@
 #include "src/googlesql_s2geometry_duckdb/codec.h"
 
 #include <algorithm>
-#include <array>
-#include <charconv>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+// The index headers declare Encoder, Decoder and Varint in their API; @s2geometry keeps
+// s2/util/coding, which defines them, private.
+#include "s2/encoded_s2shape_index.h"
+#include "s2/mutable_s2shape_index.h"
 #include "s2/s2point.h"
+#include "s2/s2shape.h"
+#include "s2/s2shape_index.h"
 #include "src/googlesql_s2geometry/value.h"
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
 using googlesql_s2geometry::Coordinate;
-using googlesql_s2geometry::FullGeography;
 using googlesql_s2geometry::Geography;
+using googlesql_s2geometry::IndexedGeography;
 using googlesql_s2geometry::Polygon;
 namespace {
 constexpr std::string_view kEmpty = "GEOMETRYCOLLECTION EMPTY";
@@ -91,175 +96,166 @@ std::string Text(const Geography& geography, Vertex vertex) {
   return parts.size() == 1 ? parts.front() : "GEOMETRYCOLLECTION(" + Join(parts) + ")";
 }
 
-// Parses `x y z`, a vertex as GeographyText writes it.
-std::optional<S2Point> ReadVertex(std::string_view text) {
-  std::array<double, 3> coordinates{};
-  const char* position = text.data();
-  const char* const end = position + text.size();
-  for (double& coordinate : coordinates) {
-    if (&coordinate != coordinates.data()) {
-      if (position == end || *position != ' ') {
-        return std::nullopt;
-      }
-      ++position;
-    }
-    const auto result = std::from_chars(position, end, coordinate);
-    if (result.ec != std::errc()) {
-      return std::nullopt;
-    }
-    position = result.ptr;
+// The first byte of every encoding, which a change of the format changes.
+constexpr unsigned char kVersion = 1;
+
+void PutVertices(const std::vector<S2Point>& vertices, Encoder& encoder) {
+  encoder.Ensure(Varint::kMax64 + (vertices.size() * 3 * sizeof(double)));
+  encoder.put_varint64(vertices.size());
+  for (const S2Point& vertex : vertices) {
+    encoder.putdouble(vertex.x());
+    encoder.putdouble(vertex.y());
+    encoder.putdouble(vertex.z());
   }
-  if (position != end) {
-    return std::nullopt;
-  }
-  return S2Point(coordinates.at(0), coordinates.at(1), coordinates.at(2));
 }
 
-// The items of `text` that commas outside parentheses separate.
-std::vector<std::string_view> Items(std::string_view text) {
-  std::vector<std::string_view> items;
-  size_t depth = 0;
-  size_t start = 0;
-  for (size_t i = 0; i < text.size(); ++i) {
-    if (text.at(i) == '(') {
-      ++depth;
-    } else if (text.at(i) == ')') {
-      --depth;
-    } else if (text.at(i) == ',' && depth == 0) {
-      items.push_back(text.substr(start, i - start));
-      start = i + 2;
-    }
-  }
-  items.push_back(text.substr(start));
-  return items;
+void PutCount(size_t count, Encoder& encoder) {
+  encoder.Ensure(Varint::kMax64);
+  encoder.put_varint64(count);
 }
 
-// What `text` holds in the parentheses after `name`.
-std::optional<std::string_view> Inside(std::string_view text, std::string_view name) {
-  if (!text.starts_with(name) || text.size() < name.size() + 2 || text.at(name.size()) != '(' ||
-      !text.ends_with(')')) {
+std::optional<size_t> GetCount(Decoder& decoder) {
+  uint64_t count = 0;
+  if (!decoder.get_varint64(&count)) {
     return std::nullopt;
   }
-  return text.substr(name.size() + 1, text.size() - name.size() - 2);
+  return count;
 }
 
-// Parses `(x y z, ...)`, vertices as GeographyText writes them.
-std::optional<std::vector<S2Point>> ReadVertices(std::string_view text) {
-  const std::optional<std::string_view> inside = Inside(text, "");
-  if (!inside) {
+std::optional<std::vector<S2Point>> GetVertices(Decoder& decoder) {
+  const std::optional<size_t> count = GetCount(decoder);
+  if (!count || *count > decoder.avail() / (3 * sizeof(double))) {
     return std::nullopt;
   }
-  std::vector<S2Point> vertices;
-  for (const std::string_view item : Items(*inside)) {
-    const std::optional<S2Point> vertex = ReadVertex(item);
-    if (!vertex) {
-      return std::nullopt;
-    }
-    vertices.push_back(*vertex);
+  std::vector<S2Point> vertices(*count);
+  for (S2Point& vertex : vertices) {
+    const double x = decoder.getdouble();
+    const double y = decoder.getdouble();
+    vertex = S2Point(x, y, decoder.getdouble());
   }
   return vertices;
 }
 
-// Parses `((x y z, ...), ...)`, the rings of a polygon as GeographyText writes them.
-std::optional<Polygon> ReadPolygon(std::string_view text) {
-  const std::optional<std::string_view> inside = Inside(text, "");
-  if (!inside) {
-    return std::nullopt;
-  }
-  Polygon polygon;
-  for (const std::string_view item : Items(*inside)) {
-    std::optional<std::vector<S2Point>> loop = ReadVertices(item);
-    if (!loop) {
-      return std::nullopt;
-    }
-    polygon.push_back(*std::move(loop));
-  }
-  return polygon;
-}
+absl::Status Invalid() { return absl::InvalidArgumentError("Invalid GEOGRAPHY value"); }
 
-// Adds the part of a geography `text` holds to `geography`, returning whether it was one.
-bool ReadPart(std::string_view text, Geography& geography) {
-  if (const auto point = Inside(text, "POINT")) {
-    const std::optional<S2Point> vertex = ReadVertex(*point);
-    if (vertex) {
-      geography.points.push_back(*vertex);
-    }
-    return vertex.has_value();
+// Reads the geography at the start of `decoder`, leaving it at the index.
+absl::StatusOr<Geography> GetGeography(Decoder& decoder) {
+  if (decoder.avail() == 0 || decoder.get8() != kVersion) {
+    return Invalid();
   }
-  if (const auto points = Inside(text, "MULTIPOINT")) {
-    for (const std::string_view item : Items(*points)) {
-      const std::optional<S2Point> vertex = ReadVertex(item);
-      if (!vertex) {
-        return false;
-      }
-      geography.points.push_back(*vertex);
-    }
-    return true;
+  Geography geography;
+  std::optional<std::vector<S2Point>> points = GetVertices(decoder);
+  const std::optional<size_t> lines = points ? GetCount(decoder) : std::nullopt;
+  if (!lines || *lines > decoder.avail()) {
+    return Invalid();
   }
-  if (text.starts_with("LINESTRING(")) {
-    std::optional<std::vector<S2Point>> line = ReadVertices(text.substr(10));
+  geography.points = *std::move(points);
+  for (size_t i = 0; i < *lines; ++i) {
+    std::optional<std::vector<S2Point>> line = GetVertices(decoder);
     if (!line) {
-      return false;
+      return Invalid();
     }
     geography.lines.push_back(*std::move(line));
-    return true;
   }
-  if (const auto lines = Inside(text, "MULTILINESTRING")) {
-    for (const std::string_view item : Items(*lines)) {
-      std::optional<std::vector<S2Point>> line = ReadVertices(item);
-      if (!line) {
-        return false;
+  const std::optional<size_t> polygons = GetCount(decoder);
+  if (!polygons || *polygons > decoder.avail()) {
+    return Invalid();
+  }
+  for (size_t i = 0; i < *polygons; ++i) {
+    const std::optional<size_t> rings = GetCount(decoder);
+    if (!rings || *rings > decoder.avail()) {
+      return Invalid();
+    }
+    Polygon& polygon = geography.polygons.emplace_back();
+    for (size_t j = 0; j < *rings; ++j) {
+      std::optional<std::vector<S2Point>> ring = GetVertices(decoder);
+      if (!ring) {
+        return Invalid();
       }
-      geography.lines.push_back(*std::move(line));
+      polygon.push_back(*std::move(ring));
     }
-    return true;
   }
-  if (text.starts_with("POLYGON(")) {
-    std::optional<Polygon> polygon = ReadPolygon(text.substr(7));
-    if (!polygon) {
-      return false;
-    }
-    geography.polygons.push_back(*std::move(polygon));
-    return true;
-  }
-  if (const auto polygons = Inside(text, "MULTIPOLYGON")) {
-    for (const std::string_view item : Items(*polygons)) {
-      std::optional<Polygon> polygon = ReadPolygon(item);
-      if (!polygon) {
-        return false;
-      }
-      geography.polygons.push_back(*std::move(polygon));
-    }
-    return true;
-  }
-  return false;
+  return geography;
 }
 
+// The shapes of a decoded geography, which its encoded index refers to by id.
+class Shapes final : public S2ShapeIndex::ShapeFactory {
+ public:
+  explicit Shapes(std::shared_ptr<const Geography> geography) : geography_(std::move(geography)) {}
+
+  [[nodiscard]] int size() const override { return ShapeCount(*geography_); }
+  std::unique_ptr<S2Shape> operator[](int shape_id) const override {
+    return Shape(*geography_, shape_id);
+  }
+  [[nodiscard]] std::unique_ptr<ShapeFactory> Clone() const override {
+    return std::make_unique<Shapes>(geography_);
+  }
+
+ private:
+  std::shared_ptr<const Geography> geography_;
+};
+
+// An encoded index and the encoding it reads.
+struct EncodedIndex {
+  std::string encoded;
+  EncodedS2ShapeIndex index;
+};
+
 }  // namespace
+
+std::string EncodeGeography(const Geography& geography) {
+  Encoder encoder;
+  encoder.Ensure(1);
+  encoder.put8(kVersion);
+  PutVertices(geography.points, encoder);
+  PutCount(geography.lines.size(), encoder);
+  for (const std::vector<S2Point>& line : geography.lines) {
+    PutVertices(line, encoder);
+  }
+  PutCount(geography.polygons.size(), encoder);
+  for (const Polygon& polygon : geography.polygons) {
+    PutCount(polygon.size(), encoder);
+    for (const std::vector<S2Point>& ring : polygon) {
+      PutVertices(ring, encoder);
+    }
+  }
+  if (!geography.Empty()) {
+    MutableS2ShapeIndex index;
+    AddShapes(geography, index);
+    index.Encode(&encoder);
+  }
+  return {encoder.base(), encoder.length()};
+}
+
+absl::StatusOr<Geography> DecodeGeography(std::string_view encoded) {
+  Decoder decoder(encoded.data(), encoded.size());
+  return GetGeography(decoder);
+}
+
+absl::StatusOr<IndexedGeography> DecodeIndexedGeography(std::string encoded) {
+  const auto owner = std::make_shared<EncodedIndex>();
+  owner->encoded = std::move(encoded);
+  Decoder decoder(owner->encoded.data(), owner->encoded.size());
+  absl::StatusOr<Geography> geography = GetGeography(decoder);
+  if (!geography.ok()) {
+    return geography.status();
+  }
+  if (geography->Empty()) {
+    return IndexedGeography(*std::move(geography));
+  }
+  auto shared = std::make_shared<const Geography>(*std::move(geography));
+  if (!owner->index.Init(&decoder, Shapes(shared))) {
+    return Invalid();
+  }
+  return IndexedGeography(std::move(shared),
+                          std::shared_ptr<const S2ShapeIndex>(owner, &owner->index));
+}
 
 std::string GeographyText(const Geography& geography) {
   return Text(geography, [](const S2Point& vertex) {
     return Coordinate(vertex.x(), std::nullopt) + " " + Coordinate(vertex.y(), std::nullopt) + " " +
            Coordinate(vertex.z(), std::nullopt);
   });
-}
-
-absl::StatusOr<Geography> ParseGeography(std::string_view text) {
-  Geography geography;
-  if (text == "fullglobe") {
-    return FullGeography();
-  }
-  if (text == kEmpty) {
-    return geography;
-  }
-  const std::optional<std::string_view> collection = Inside(text, "GEOMETRYCOLLECTION");
-  const std::vector<std::string_view> parts =
-      collection ? Items(*collection) : std::vector<std::string_view>{text};
-  if (!std::ranges::all_of(parts,
-                           [&](std::string_view part) { return ReadPart(part, geography); })) {
-    return absl::InvalidArgumentError("Invalid GEOGRAPHY value: " + std::string(text));
-  }
-  return geography;
 }
 
 }  // namespace bigquery_emulator_duckdb::geography_duckdb

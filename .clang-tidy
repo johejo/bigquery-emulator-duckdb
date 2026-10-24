@@ -75,7 +75,9 @@ CheckOptions:
   # Darwin also attributes fcntl.h and spawn.h declarations to sys/fcntl.h and sys/spawn.h.
   # MariaDB's mariadb_com.h requires types from the public mysql.h. CPython requires the
   # Python.h umbrella rather than direct includes of its nested public and internal headers.
-  misc-include-cleaner.IgnoreHeaders: '(googlesql|nlohmann)/.*|python3[.][0-9]+/.*|bits/types/sigset_t\.h|sys/_types/_sigset_t\.h|sys/(signal|fcntl|spawn)\.h|mariadb_com\.h'
+  # S2's encoded index API takes Encoder and Decoder from s2/util/coding, which @s2geometry
+  # does not export, so they come through its public index headers.
+  misc-include-cleaner.IgnoreHeaders: '(googlesql|nlohmann)/.*|python3[.][0-9]+/.*|s2/util/coding/.*|bits/types/sigset_t\.h|sys/_types/_sigset_t\.h|sys/(signal|fcntl|spawn)\.h|mariadb_com\.h'
   # JSON's subscript inserts missing object keys and grows arrays, just as map's inserts keys.
   # at() would change that behavior. Keep the standard map exclusions as well.
   cppcoreguidelines-pro-bounds-avoid-unchecked-container-access.ExcludeClasses: '::std::map;::std::unordered_map;::std::flat_map;::nlohmann::.*basic_json'

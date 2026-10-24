@@ -868,7 +868,7 @@ std::optional<Relation> Scan(const googlesql::ResolvedScan& scan, const Scope& s
 }
 
 std::string StoredColumn(const std::string& column, const googlesql::Type* type) {
-  if (!HasBigNumeric(type)) {
+  if (!HasBigNumeric(type) && !HasGeography(type)) {
     return column;
   }
   return "CAST(" + column + " AS " + DuckDbType(type).value_or("") + ")";

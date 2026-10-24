@@ -17,11 +17,14 @@ struct ShellOptions {
   std::optional<shell::OutputFormat> format;
   // Runs this query instead of reading standard input.
   std::optional<std::string> execute;
+  // Runs the input as DuckDB SQL on the emulator's database instead of as query jobs.
+  bool duckdb = false;
 };
 
 // Runs queries from `options.execute` or standard input as query jobs and prints their results to
 // standard output. An interactive input runs as one job per entry, ended by a semicolon after a
-// complete script; other input runs as one job. Returns the process's exit code.
+// complete script; other input runs as one job. With `options.duckdb`, each of these runs as
+// DuckDB statements instead. Returns the process's exit code.
 int RunShell(Emulator& emulator, const ShellOptions& options);
 
 }  // namespace bigquery_emulator_duckdb

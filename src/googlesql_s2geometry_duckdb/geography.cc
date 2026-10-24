@@ -32,21 +32,26 @@ namespace bigquery_emulator_duckdb::geography_duckdb {
 using backend_functions::Arguments;
 using backend_functions::EachRow;
 using backend_functions::kBigint;
+using backend_functions::kBlob;
 using backend_functions::kBoolean;
 using backend_functions::kDouble;
 using backend_functions::kVarchar;
 using backend_functions::Register;
 using googlesql_s2geometry::BoundingBox;
 using googlesql_s2geometry::Geography;
+using googlesql_s2geometry::IndexedGeography;
 using googlesql_s2geometry::Options;
 
 namespace {
+
+// A GEOGRAPHY query value; see codec.h.
+constexpr duckdb_type kGeography = kBlob;
 
 absl::StatusOr<std::vector<Geography>> Decode(const std::vector<std::string>& values) {
   std::vector<Geography> result;
   result.reserve(values.size());
   for (const std::string& value : values) {
-    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, ParseGeography(value));
+    GOOGLESQL_ASSIGN_OR_RETURN(Geography geography, DecodeGeography(value));
     result.push_back(std::move(geography));
   }
   return result;
@@ -56,7 +61,9 @@ template <typename T>
 absl::StatusOr<std::remove_cvref_t<T>> ReadArgument(const Arguments& args, idx_t column) {
   using Value = std::remove_cvref_t<T>;
   if constexpr (std::is_same_v<Value, Geography>) {
-    return ParseGeography(args.String(column));
+    return DecodeGeography(args.String(column));
+  } else if constexpr (std::is_same_v<Value, IndexedGeography>) {
+    return DecodeIndexedGeography(args.String(column));
   } else if constexpr (std::is_same_v<Value, double>) {
     return args.Double(column);
   } else if constexpr (std::is_same_v<Value, int64_t>) {
@@ -74,12 +81,12 @@ T Encode(T value) {
   return value;
 }
 
-std::string Encode(const Geography& geography) { return GeographyText(geography); }
+std::string Encode(const Geography& geography) { return EncodeGeography(geography); }
 
 std::vector<std::string> Encode(const std::vector<Geography>& geographies) {
   std::vector<std::string> result;
   result.reserve(geographies.size());
-  std::ranges::transform(geographies, std::back_inserter(result), GeographyText);
+  std::ranges::transform(geographies, std::back_inserter(result), EncodeGeography);
   return result;
 }
 
@@ -124,23 +131,23 @@ auto Call(const Arguments& args) {
 // Functions with plain results, rather than StatusOr, still decode a GEOGRAPHY input.
 template <auto kFunction>
 absl::StatusOr<decltype(kFunction(Geography{}))> OfGeography(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, DecodeGeography(args.String(0)));
   return kFunction(geography);
 }
 
 template <S2BooleanOperation::OpType kOperation>
 absl::StatusOr<std::string> SetOperation(const Arguments& args) {
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, ParseGeography(args.String(0)));
-  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, ParseGeography(args.String(1)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography a, DecodeGeography(args.String(0)));
+  GOOGLESQL_ASSIGN_OR_RETURN(const Geography b, DecodeGeography(args.String(1)));
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography result,
                              googlesql_s2geometry::SetOperation(a, b, kOperation));
-  return GeographyText(result);
+  return EncodeGeography(result);
 }
 
 absl::StatusOr<std::string> GeogFromText(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
                              googlesql_s2geometry::ReadWkt(args.String(0)));
-  return GeographyText(geography);
+  return EncodeGeography(geography);
 }
 // A GEOGRAPHY that a load or tabledata.insertAll writes, given as WKT whose polygons are oriented.
 // BigQuery also takes GeoJSON and WKB, hex-encoded or, from Parquet, binary, which DuckDB casts to
@@ -158,7 +165,7 @@ absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
   }
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
                              googlesql_s2geometry::ReadWkt(text, /*oriented=*/true));
-  return GeographyText(geography);
+  return EncodeGeography(geography);
 }
 
 absl::StatusOr<std::optional<std::string>> UnionGeographies(
@@ -205,7 +212,7 @@ void Bounds(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
   const auto& options = *static_cast<const Options*>(duckdb_scalar_function_get_extra_info(info));
   EachRow(info, input, output,
           [&](const Arguments& args) -> absl::StatusOr<std::optional<BoxResult>> {
-            GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, ParseGeography(args.String(0)));
+            GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography, DecodeGeography(args.String(0)));
             const auto box = googlesql_s2geometry::Bounds(geography, options);
             if (!box) {
               return std::nullopt;
@@ -217,7 +224,7 @@ void Bounds(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
 // The registered function owns a copy, so caller options may be temporary and different
 // databases can use different policies without sharing mutable state.
 void RegisterBounds(duckdb_connection connection, const Options& options) {
-  const LogicalType varchar(duckdb_create_logical_type(kVarchar));
+  const LogicalType geography(duckdb_create_logical_type(kGeography));
   const LogicalType dbl(duckdb_create_logical_type(kDouble));
   std::array<duckdb_logical_type, 4> fields = {dbl.get(), dbl.get(), dbl.get(), dbl.get()};
   std::array<const char*, 4> names = {"xmin", "ymin", "xmax", "ymax"};
@@ -225,7 +232,7 @@ void RegisterBounds(duckdb_connection connection, const Options& options) {
   const Handle<duckdb_scalar_function, duckdb_destroy_scalar_function> scalar(
       duckdb_create_scalar_function());
   duckdb_scalar_function_set_name(scalar.get(), "bq_st_boundingbox");
-  duckdb_scalar_function_add_parameter(scalar.get(), varchar.get());
+  duckdb_scalar_function_add_parameter(scalar.get(), geography.get());
   duckdb_scalar_function_set_return_type(scalar.get(), box.get());
   duckdb_scalar_function_set_function(scalar.get(), Bounds);
   duckdb_scalar_function_set_extra_info(scalar.get(), new Options(options),
@@ -235,111 +242,159 @@ void RegisterBounds(duckdb_connection connection, const Options& options) {
   }
 }
 
+// Copies each value between a stored GEOGRAPHY column and a query value, which hold the same
+// encoding.
+bool CopyGeographies(duckdb_function_info /*info*/, idx_t count, duckdb_vector input,
+                     duckdb_vector output) {
+  uint64_t* validity = duckdb_vector_get_validity(input);
+  duckdb_vector_ensure_validity_writable(output);
+  for (idx_t row = 0; row < count; ++row) {
+    if (validity != nullptr && !duckdb_validity_row_is_valid(validity, row)) {
+      duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+      continue;
+    }
+    backend_functions::SetResult(output, row, VectorString(input, row));
+  }
+  return true;
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): a cast's source and target types.
+void RegisterCopy(duckdb_connection connection, duckdb_logical_type source,
+                  duckdb_logical_type target, int64_t implicit_cost) {
+  const Handle<duckdb_cast_function, duckdb_destroy_cast_function> cast(
+      duckdb_create_cast_function());
+  duckdb_cast_function_set_source_type(cast.get(), source);
+  duckdb_cast_function_set_target_type(cast.get(), target);
+  duckdb_cast_function_set_function(cast.get(), CopyGeographies);
+  if (implicit_cost >= 0) {
+    duckdb_cast_function_set_implicit_cast_cost(cast.get(), implicit_cost);
+  }
+  if (duckdb_register_cast_function(connection, cast.get()) == DuckDBError) {
+    throw BackendError("DuckDB failed to register a cast for stored GEOGRAPHY");
+  }
+}
+
+// Stored columns read as query values wherever DuckDB expects one, and take them when written.
+void RegisterGeographyStorage(duckdb_connection connection) {
+  const LogicalType value(duckdb_create_logical_type(kGeography));
+  const LogicalType stored(duckdb_create_logical_type(kGeography));
+  duckdb_logical_type_set_alias(stored.get(), kGeographyStorageType);
+  if (duckdb_register_logical_type(connection, stored.get(), nullptr) == DuckDBError) {
+    throw BackendError("DuckDB failed to register GEOGRAPHY storage type");
+  }
+  RegisterCopy(connection, value.get(), stored.get(), -1);
+  RegisterCopy(connection, stored.get(), value.get(), 0);
+}
+
 }  // namespace
 
 void RegisterGeographyFunctions(duckdb_connection connection,
                                 const googlesql_s2geometry::Options& options) {
-  Register(connection, "bq_st_geogpoint", {kDouble, kDouble}, kVarchar,
+  RegisterGeographyStorage(connection);
+  // For debugging DuckDB SQL; GoogleSQL's catalog has no such function.
+  Register(connection, "bq_geography_text", {kGeography}, kVarchar,
+           EachRow<OfGeography<GeographyText>>);
+  Register(connection, "bq_st_geogpoint", {kDouble, kDouble}, kGeography,
            EachRow<Call<googlesql_s2geometry::GeogPoint>>);
-  Register(connection, "bq_st_geogfromtext", {kVarchar}, kVarchar, EachRow<GeogFromText>);
-  Register(connection, "bq_geography_input", {kVarchar}, kVarchar, EachRow<GeographyInput>);
-  Register(connection, "bq_st_geogpointfromgeohash", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_geogfromtext", {kVarchar}, kGeography, EachRow<GeogFromText>);
+  Register(connection, "bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
+  Register(connection, "bq_st_geogpointfromgeohash", {kVarchar}, kGeography,
            EachRow<Call<googlesql_s2geometry::PointFromGeohash>>);
-  Register(connection, "bq_st_astext", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_astext", {kGeography}, kVarchar,
            EachRow<OfGeography<[](const Geography& geography) {
              return googlesql_s2geometry::Wkt(geography);
            }>>);
-  Register(connection, "bq_st_asgeojson", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_asgeojson", {kGeography}, kVarchar,
            EachRow<Call<googlesql_s2geometry::AsGeoJson>>);
-  Register(connection, "bq_st_angle", {kVarchar, kVarchar, kVarchar}, kDouble,
+  Register(connection, "bq_st_angle", {kGeography, kGeography, kGeography}, kDouble,
            EachRow<Call<googlesql_s2geometry::Angle>>);
-  Register(connection, "bq_st_centroid", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_centroid", {kGeography}, kGeography,
            EachRow<Call<googlesql_s2geometry::Centroid>>);
-  Register(connection, "bq_st_convexhull", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_convexhull", {kGeography}, kGeography,
            EachRow<Call<googlesql_s2geometry::ConvexHull>>);
-  Register(connection, "bq_st_lineinterpolatepoint", {kVarchar, kDouble}, kVarchar,
+  Register(connection, "bq_st_lineinterpolatepoint", {kGeography, kDouble}, kGeography,
            EachRow<Call<googlesql_s2geometry::LineInterpolatePoint>>);
-  Register(connection, "bq_st_linelocatepoint", {kVarchar, kVarchar}, kDouble,
+  Register(connection, "bq_st_linelocatepoint", {kGeography, kGeography}, kDouble,
            EachRow<Call<googlesql_s2geometry::LineLocatePoint>>);
-  Register(connection, "bq_st_linesubstring", {kVarchar, kDouble, kDouble}, kVarchar,
+  Register(connection, "bq_st_linesubstring", {kGeography, kDouble, kDouble}, kGeography,
            EachRow<Call<googlesql_s2geometry::LineSubstring>>);
-  Register(connection, "bq_st_azimuth", {kVarchar, kVarchar}, kDouble,
+  Register(connection, "bq_st_azimuth", {kGeography, kGeography}, kDouble,
            EachRow<Call<googlesql_s2geometry::Azimuth>>);
-  Register(connection, "bq_st_distance", {kVarchar, kVarchar, kBoolean, kVarchar}, kDouble,
+  Register(connection, "bq_st_distance", {kGeography, kGeography, kBoolean, kVarchar}, kDouble,
            EachRow<Call<googlesql_s2geometry::Distance>>);
-  Register(connection, "bq_st_hausdorffdistance", {kVarchar, kVarchar, kBoolean}, kDouble,
+  Register(connection, "bq_st_hausdorffdistance", {kGeography, kGeography, kBoolean}, kDouble,
            EachRow<Call<googlesql_s2geometry::HausdorffDistance>>);
-  Register(connection, "bq_st_hausdorffdwithin", {kVarchar, kVarchar, kBoolean, kDouble}, kBoolean,
-           EachRow<Call<googlesql_s2geometry::HausdorffDWithin>>);
-  Register(connection, "bq_st_closestpoint", {kVarchar, kVarchar, kBoolean, kVarchar}, kVarchar,
-           EachRow<Call<googlesql_s2geometry::ClosestPoint>>);
-  Register(connection, "bq_st_intersectsbox", {kVarchar, kDouble, kDouble, kDouble, kDouble},
+  Register(connection, "bq_st_hausdorffdwithin", {kGeography, kGeography, kBoolean, kDouble},
+           kBoolean, EachRow<Call<googlesql_s2geometry::HausdorffDWithin>>);
+  Register(connection, "bq_st_closestpoint", {kGeography, kGeography, kBoolean, kVarchar},
+           kGeography, EachRow<Call<googlesql_s2geometry::ClosestPoint>>);
+  Register(connection, "bq_st_intersectsbox", {kGeography, kDouble, kDouble, kDouble, kDouble},
            kBoolean, EachRow<Call<googlesql_s2geometry::IntersectsBox>>);
-  Register(connection, "bq_st_dwithin", {kVarchar, kVarchar, kDouble, kBoolean, kVarchar}, kBoolean,
-           EachRow<Call<googlesql_s2geometry::DWithin>>);
-  Register(connection, "bq_st_equals", {kVarchar, kVarchar}, kBoolean,
+  Register(connection, "bq_st_dwithin", {kGeography, kGeography, kDouble, kBoolean, kVarchar},
+           kBoolean, EachRow<Call<googlesql_s2geometry::DWithin>>);
+  Register(connection, "bq_st_equals", {kGeography, kGeography}, kBoolean,
            EachRow<Call<googlesql_s2geometry::Equals>>);
-  Register(connection, "bq_st_intersects", {kVarchar, kVarchar}, kBoolean,
+  Register(connection, "bq_st_intersects", {kGeography, kGeography}, kBoolean,
            EachRow<Call<googlesql_s2geometry::Intersects>>);
-  Register(connection, "bq_st_intersection", {kVarchar, kVarchar}, kVarchar,
+  Register(connection, "bq_st_intersection", {kGeography, kGeography}, kGeography,
            EachRow<SetOperation<S2BooleanOperation::OpType::INTERSECTION>>);
-  Register(connection, "bq_st_difference", {kVarchar, kVarchar}, kVarchar,
+  Register(connection, "bq_st_difference", {kGeography, kGeography}, kGeography,
            EachRow<SetOperation<S2BooleanOperation::OpType::DIFFERENCE>>);
-  Register(connection, "bq_st_boundary", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_boundary", {kGeography}, kGeography,
            EachRow<Call<googlesql_s2geometry::Boundary>>);
   RegisterBounds(connection, options);
-  Register(connection, "bq_st_touches", {kVarchar, kVarchar}, kBoolean,
+  Register(connection, "bq_st_touches", {kGeography, kGeography}, kBoolean,
            EachRow<Call<googlesql_s2geometry::Touches>>);
-  Register(connection, "bq_st_covers", {kVarchar, kVarchar}, kBoolean,
+  Register(connection, "bq_st_covers", {kGeography, kGeography}, kBoolean,
            EachRow<Call<googlesql_s2geometry::Covers>>);
-  Register(connection, "bq_st_contains", {kVarchar, kVarchar}, kBoolean,
+  Register(connection, "bq_st_contains", {kGeography, kGeography}, kBoolean,
            EachRow<Call<googlesql_s2geometry::Contains>>);
-  Register(connection, "bq_st_x", {kVarchar}, kDouble, EachRow<Call<googlesql_s2geometry::X>>);
-  Register(connection, "bq_st_y", {kVarchar}, kDouble, EachRow<Call<googlesql_s2geometry::Y>>);
-  Register(connection, "bq_st_geometrytype", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_x", {kGeography}, kDouble, EachRow<Call<googlesql_s2geometry::X>>);
+  Register(connection, "bq_st_y", {kGeography}, kDouble, EachRow<Call<googlesql_s2geometry::Y>>);
+  Register(connection, "bq_st_geometrytype", {kGeography}, kVarchar,
            EachRow<OfGeography<googlesql_s2geometry::GeometryType>>);
-  Register(connection, "bq_st_dimension", {kVarchar}, kBigint,
+  Register(connection, "bq_st_dimension", {kGeography}, kBigint,
            EachRow<OfGeography<googlesql_s2geometry::Dimension>>);
-  Register(connection, "bq_st_numpoints", {kVarchar}, kBigint,
+  Register(connection, "bq_st_numpoints", {kGeography}, kBigint,
            EachRow<OfGeography<googlesql_s2geometry::NumPoints>>);
-  Register(connection, "bq_st_isempty", {kVarchar}, kBoolean,
+  Register(connection, "bq_st_isempty", {kGeography}, kBoolean,
            EachRow<OfGeography<[](const Geography& geography) { return geography.Empty(); }>>);
-  Register(connection, "bq_st_iscollection", {kVarchar}, kBoolean,
+  Register(connection, "bq_st_iscollection", {kGeography}, kBoolean,
            EachRow<OfGeography<[](const Geography& geography) { return geography.Count() > 1; }>>);
-  Register(connection, "bq_st_numgeometries", {kVarchar}, kBigint,
+  Register(connection, "bq_st_numgeometries", {kGeography}, kBigint,
            EachRow<OfGeography<[](const Geography& geography) {
              return static_cast<int64_t>(geography.Count());
            }>>);
-  Register(connection, "bq_st_isclosed", {kVarchar}, kBoolean,
+  Register(connection, "bq_st_isclosed", {kGeography}, kBoolean,
            EachRow<OfGeography<googlesql_s2geometry::IsClosed>>);
-  Register(connection, "bq_st_isring", {kVarchar}, kBoolean,
+  Register(connection, "bq_st_isring", {kGeography}, kBoolean,
            EachRow<OfGeography<googlesql_s2geometry::IsRing>>);
-  Register(connection, "bq_st_length", {kVarchar, kBoolean, kVarchar}, kDouble,
+  Register(connection, "bq_st_length", {kGeography, kBoolean, kVarchar}, kDouble,
            EachRow<Call<googlesql_s2geometry::Length>>);
-  Register(connection, "bq_st_measure", {kVarchar, kBoolean, kVarchar}, kDouble,
+  Register(connection, "bq_st_measure", {kGeography, kBoolean, kVarchar}, kDouble,
            EachRow<Call<googlesql_s2geometry::Measure>>);
-  Register(connection, "bq_st_exteriorring", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_exteriorring", {kGeography}, kGeography,
            EachRow<Call<googlesql_s2geometry::ExteriorRing>>);
-  Register(connection, "bq_st_makepolygon", {kVarchar}, kVarchar,
+  Register(connection, "bq_st_makepolygon", {kGeography}, kGeography,
            EachRow<[](const Arguments& args) { return MakePolygon({args.String(0)}); }>);
-  Register(connection, "bq_st_pointn", {kVarchar, kBigint}, kVarchar,
+  Register(connection, "bq_st_pointn", {kGeography, kBigint}, kGeography,
            EachRow<Call<googlesql_s2geometry::PointN>>);
   Register(
-      connection, "bq_st_makeline", {kVarchar, kVarchar}, kVarchar,
+      connection, "bq_st_makeline", {kGeography, kGeography}, kGeography,
       EachRow<[](const Arguments& args) { return MakeLine({args.String(0), args.String(1)}); }>);
-  Register(connection, "bq_st_union", {kVarchar, kVarchar}, kVarchar,
+  Register(connection, "bq_st_union", {kGeography, kGeography}, kGeography,
            EachRow<[](const Arguments& args) {
              return UnionGeographies({args.String(0), args.String(1)});
            }>);
   {
-    const LogicalType varchar(duckdb_create_logical_type(kVarchar));
-    const LogicalType list(duckdb_create_list_type(varchar.get()));
-    Register(connection, "bq_st_union_array", {list.get()}, varchar.get(),
+    const LogicalType geography(duckdb_create_logical_type(kGeography));
+    const LogicalType list(duckdb_create_list_type(geography.get()));
+    Register(connection, "bq_st_union_array", {list.get()}, geography.get(),
              EachRow<[](const Arguments& args) { return UnionGeographies(args.Strings(0)); }>);
-    Register(connection, "bq_st_makeline_array", {list.get()}, varchar.get(),
+    Register(connection, "bq_st_makeline_array", {list.get()}, geography.get(),
              EachRow<[](const Arguments& args) { return MakeLine(args.Strings(0)); }>);
     Register(connection, "bq_st_makepolygon_holes",
-             std::vector<duckdb_logical_type>{varchar.get(), list.get()}, varchar.get(),
+             std::vector<duckdb_logical_type>{geography.get(), list.get()}, geography.get(),
              EachRow<[](const Arguments& args) {
                std::vector<std::string> rings = args.Strings(1);
                rings.insert(rings.begin(), args.String(0));
@@ -347,14 +402,14 @@ void RegisterGeographyFunctions(duckdb_connection connection,
              }>);
     const LogicalType bigint(duckdb_create_logical_type(kBigint));
     Register(connection, "bq_st_dump",
-             std::vector<duckdb_logical_type>{varchar.get(), bigint.get()}, list.get(),
+             std::vector<duckdb_logical_type>{geography.get(), bigint.get()}, list.get(),
              EachRow<Call<googlesql_s2geometry::Dump>>);
-    Register(connection, "bq_st_interiorrings", {varchar.get()}, list.get(),
+    Register(connection, "bq_st_interiorrings", {geography.get()}, list.get(),
              EachRow<Call<googlesql_s2geometry::InteriorRings>>);
   }
-  Register(connection, "bq_st_geohash", {kVarchar, kBigint}, kVarchar,
+  Register(connection, "bq_st_geohash", {kGeography, kBigint}, kVarchar,
            EachRow<Call<googlesql_s2geometry::Geohash>>);
-  Register(connection, "bq_s2_cellidfrompoint", {kVarchar, kBigint}, kBigint,
+  Register(connection, "bq_s2_cellidfrompoint", {kGeography, kBigint}, kBigint,
            EachRow<Call<googlesql_s2geometry::CellIdFromPoint>>);
 }
 

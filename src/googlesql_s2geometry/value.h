@@ -13,6 +13,8 @@
 #include "s2/s2boolean_operation.h"
 #include "s2/s2point.h"
 #include "s2/s2polygon.h"
+#include "s2/s2shape.h"
+#include "s2/s2shape_index.h"
 
 namespace googlesql_s2geometry {
 
@@ -64,6 +66,26 @@ std::string Wkt(const Geography& geography);
 
 // Adds the shapes of `geography` to `index`: its points, each linestring and its polygons.
 void AddShapes(const Geography& geography, MutableS2ShapeIndex& index);
+
+// The number of shapes AddShapes adds for `geography`, and the one of them it adds with `id`.
+int ShapeCount(const Geography& geography);
+std::unique_ptr<S2Shape> Shape(const Geography& geography, int id);
+
+// A geography with an index of the shapes AddShapes adds for it. An encoding of the geography can
+// supply the index, so that it is not rebuilt; otherwise it is built when first used.
+class IndexedGeography {
+ public:
+  explicit IndexedGeography(Geography geography);
+  IndexedGeography(std::shared_ptr<const Geography> geography,
+                   std::shared_ptr<const S2ShapeIndex> index);
+
+  [[nodiscard]] const Geography& geography() const { return *geography_; }
+  [[nodiscard]] const S2ShapeIndex& index() const;
+
+ private:
+  std::shared_ptr<const Geography> geography_;
+  mutable std::shared_ptr<const S2ShapeIndex> index_;
+};
 
 // The S2Polygon of the polygons of `geography`.
 std::unique_ptr<S2Polygon> ToS2Polygon(const Geography& geography);

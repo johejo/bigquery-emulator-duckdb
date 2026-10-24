@@ -221,6 +221,9 @@ class Emulator {
   // Runs `request` as a job and returns it. A failed query is reported through the job's
   // error rather than thrown, which is how BigQuery reports it too.
   std::shared_ptr<const Job> RunQuery(QueryRequest request);
+  // Runs `sql`, DuckDB statements rather than a query job, on the emulator's database, where
+  // each project is a catalog, and returns the last statement's result. For debugging.
+  QueryResult ExecuteDuckDb(const std::string& sql);
   std::shared_ptr<const Job> RunLoad(LoadRequest request);
   std::shared_ptr<const Job> RunCopy(CopyRequest request);
   std::shared_ptr<const Job> RunExtract(ExtractRequest request);
