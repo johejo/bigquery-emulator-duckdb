@@ -15,4 +15,13 @@ Do not copy the emulator's output into `expect` or automatically promote every
 collected answer into an assertion. Deliberate emulator limitations can be tested
 here, but must not be collected as expected BigQuery behavior.
 
-No existing compatibility cases have been migrated as part of introducing the runner.
+The initial migrated cases are:
+
+- `ddl_statistics.api.yaml`: statement types and DDL target tables, with independent
+  fixtures for each statement and a shared execution template.
+- `label_order.api.yaml`: label ordering after REST patches, preserving the recorded
+  BigQuery expectations and the sequence of updates.
+
+Query jobs are polled to completion; job errors are included in observations so an
+HTTP-success response cannot hide a failed query. New cases should likewise observe
+job completion and errors rather than assume that submitting a job finishes it.

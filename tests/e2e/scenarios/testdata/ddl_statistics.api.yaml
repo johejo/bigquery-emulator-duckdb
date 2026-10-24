@@ -1,0 +1,158 @@
+version: 1
+# Migrated from TestJobStatisticsDescribeTheStatement. Statement types and DDL targets:
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2
+description: Query job statistics identify the statement and its target table.
+vars:
+  dataset: e2e_${run}_${case}
+  setup: SELECT 1
+  target: {projectId: "${project}", datasetId: "${dataset}", tableId: "${table}"}
+templates:
+  statement:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: "${dataset}"}, location: US}
+      - name: setup_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: ${setup}
+                useLegacySql: false
+                defaultDataset: {projectId: "${project}", datasetId: "${dataset}"}
+        bind: {setup_job: /body/jobReference/jobId}
+      - name: setup
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${setup_job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors}
+      - name: query
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: ${sql}
+                useLegacySql: false
+                defaultDataset: {projectId: "${project}", datasetId: "${dataset}"}
+        bind: {job: /body/jobReference/jobId}
+      - name: result
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/jobs/${job}?location=US
+        until: {/body/status/state: DONE}
+        observe:
+          state: /body/status/state
+          error: /body/status/errorResult
+          errors: /body/status/errors
+          statementType: /body/statistics/query/statementType
+          ddlTargetTable: /body/statistics/query/ddlTargetTable
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+cases:
+  - name: create_table_as_select
+    template: statement
+    vars: {sql: "CREATE TABLE t AS SELECT 1 AS id", table: t}
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: CREATE_TABLE_AS_SELECT, ddlTargetTable: "${target}"}
+  - name: create_table
+    template: statement
+    vars: {sql: "CREATE TABLE u (id INT64)", table: u}
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: CREATE_TABLE, ddlTargetTable: "${target}"}
+  - name: create_table_like_as_select
+    template: statement
+    vars:
+      setup: CREATE TABLE t AS SELECT 1 AS id; CREATE TABLE u (id INT64)
+      sql: CREATE TABLE w LIKE u AS SELECT id FROM t
+      table: w
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: CREATE_TABLE_AS_SELECT, ddlTargetTable: "${target}"}
+  - name: alter_table_add_column
+    template: statement
+    vars:
+      setup: CREATE TABLE u (id INT64)
+      sql: ALTER TABLE u ADD COLUMN name STRING
+      table: u
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: ALTER_TABLE, ddlTargetTable: "${target}"}
+  - name: alter_table_options
+    template: statement
+    vars:
+      setup: CREATE TABLE u (id INT64)
+      sql: ALTER TABLE u SET OPTIONS (description = 'users')
+      table: u
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: ALTER_TABLE, ddlTargetTable: "${target}"}
+  - name: alter_schema
+    template: statement
+    vars:
+      sql: ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (description = 'types')
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: ALTER_SCHEMA}
+  - name: create_view
+    template: statement
+    vars:
+      setup: CREATE TABLE t AS SELECT 1 AS id
+      sql: CREATE VIEW v AS SELECT id FROM t
+      table: v
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: CREATE_VIEW, ddlTargetTable: "${target}"}
+  - name: insert
+    template: statement
+    vars:
+      setup: CREATE TABLE u (id INT64)
+      sql: INSERT u (id) VALUES (1)
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: INSERT}
+  - name: truncate
+    template: statement
+    vars:
+      setup: CREATE TABLE u AS SELECT 1 AS id
+      sql: TRUNCATE TABLE u
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: TRUNCATE_TABLE}
+  - name: select
+    template: statement
+    vars: {sql: "WITH x AS (SELECT 1 AS n) SELECT n FROM x"}
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: SELECT}
+  - name: drop_view
+    template: statement
+    vars:
+      setup: CREATE TABLE t AS SELECT 1 AS id; CREATE VIEW v AS SELECT id FROM t
+      sql: DROP VIEW v
+      table: v
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: DROP_VIEW, ddlTargetTable: "${target}"}
+  - name: drop_table
+    template: statement
+    vars:
+      setup: CREATE TABLE u (id INT64)
+      sql: DROP TABLE u
+      table: u
+    expect:
+      setup: {complete: true}
+      result: {state: DONE, statementType: DROP_TABLE, ddlTargetTable: "${target}"}

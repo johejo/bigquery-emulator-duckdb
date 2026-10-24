@@ -1,0 +1,124 @@
+version: 1
+# Migrated from TestTableLabelOrderAfterPatch. Expectations are the recorded BigQuery
+# answers to labels.api.json: patches sort existing labels, then append new labels
+# in key order, including when only the description changes.
+description: Label order in INFORMATION_SCHEMA follows REST patches.
+vars:
+  dataset: e2e_${run}_${case}
+  # Reuse the job body as a structured value; keep SQL literal and multiline.
+  labels_query:
+    jobReference: {location: US}
+    configuration:
+      query:
+        useLegacySql: false
+        query: |
+          SELECT option_value
+          FROM `${project}.${dataset}.INFORMATION_SCHEMA.TABLE_OPTIONS`
+          WHERE table_name = 't' AND option_name = 'labels'
+
+cases:
+  - name: table_label_order_after_patch
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: "${dataset}"}, location: US}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                useLegacySql: false
+                query: |
+                  CREATE TABLE `${project}.${dataset}.t` (x INT64)
+                  OPTIONS (labels = [('org', 'dev'), ('a', 'b')])
+        bind: {job: /body/jobReference/jobId}
+      - name: created
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors}
+      - name: patch_description
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {description: updated}
+      - name: query_description
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body: ${labels_query}
+        bind: {job: /body/jobReference/jobId}
+      - name: description
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, labels: /body/rows/0/f/0/v}
+      - name: patch_existing_label
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {labels: {org: prod}}
+      - name: query_existing_label
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body: ${labels_query}
+        bind: {job: /body/jobReference/jobId}
+      - name: existing_label
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, labels: /body/rows/0/f/0/v}
+      - name: patch_new_labels
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {labels: {b: middle, z: last}}
+      - name: query_new_labels
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body: ${labels_query}
+        bind: {job: /body/jobReference/jobId}
+      - name: new_labels
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, labels: /body/rows/0/f/0/v}
+      - name: patch_delete_label
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {labels: {a: null}}
+      - name: query_delete_label
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body: ${labels_query}
+        bind: {job: /body/jobReference/jobId}
+      - name: delete_label
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}?location=US
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, labels: /body/rows/0/f/0/v}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      created: {complete: true}
+      description: {"complete": true, "labels": "[STRUCT(\"a\", \"b\"), STRUCT(\"org\", \"dev\")]"}
+      existing_label: {"complete": true, "labels": "[STRUCT(\"a\", \"b\"), STRUCT(\"org\", \"prod\")]"}
+      new_labels: {"complete": true, "labels": "[STRUCT(\"a\", \"b\"), STRUCT(\"org\", \"prod\"), STRUCT(\"b\", \"middle\"), STRUCT(\"z\", \"last\")]"}
+      delete_label: {"complete": true, "labels": "[STRUCT(\"b\", \"middle\"), STRUCT(\"org\", \"prod\"), STRUCT(\"z\", \"last\")]"}

@@ -25,7 +25,7 @@ func TestScenarios(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(paths) == 0 {
-		t.Skip("no compatibility scenarios have been migrated yet")
+		t.Fatal("no API compatibility scenarios found")
 	}
 	for _, path := range paths {
 		file, err := bqscenario.Read(path)
