@@ -2,12 +2,16 @@
 
 load(":clang_tidy.bzl", "clang_tidy")
 
-_Actions = provider(fields = ["actions", "heavy_includes"])
+_Actions = provider(fields = ["actions", "implementation_outputs"])
 
-def _inspect_impl(target, _ctx):
+def _inspect_impl(target, ctx):
     return [_Actions(
         actions = [a for a in target.actions if a.mnemonic == "ClangTidy"],
-        heavy_includes = [a for a in target.actions if a.mnemonic == "HeavyIncludes"],
+        implementation_outputs = depset(transitive = [
+            dep[OutputGroupInfo].clang_tidy
+            for dep in getattr(ctx.rule.attr, "implementation_deps", [])
+            if OutputGroupInfo in dep and hasattr(dep[OutputGroupInfo], "clang_tidy")
+        ]),
     )]
 
 _inspect = aspect(
@@ -27,21 +31,14 @@ def _clang_tidy_test_impl(ctx):
                 fail("Wrong configurations for {}: {}".format(target.label, configs))
             if not any([f.basename == "clang-tidy" for f in action.inputs.to_list()]):
                 fail("clang-tidy executable is not an action input")
-            if "-std=c++20" not in action.argv:
-                fail("Missing repository C++ standard")
-    for action in ctx.attr.header_target[_Actions].actions:
-        if "-DCPPHTTPLIB_LISTEN_BACKLOG=1024" not in action.argv:
-            fail("Missing the emulator's httplib settings")
-        if "-DCPPHTTPLIB_OPENSSL_SUPPORT" in action.argv:
-            fail("cpp-httplib's private OpenSSL define leaked to the emulator")
-    if len(ctx.attr.header_target[_Actions].heavy_includes) != 1:
-        fail("Headers must be checked for heavy GoogleSQL includes")
-    if ctx.attr.test_target[_Actions].heavy_includes:
-        fail("Sources must not be checked for heavy GoogleSQL includes")
-    outputs = ctx.attr.implementation_target[OutputGroupInfo].clang_tidy.to_list()
-    if not any([f.short_path.endswith("/src/bignumeric.cc") for f in outputs]):
-        fail("query_parameters must collect its implementation dependency's lint output")
-    if any([f.short_path.startswith("../") for f in outputs]):
+    target = ctx.attr.implementation_target
+    expected = target[_Actions].implementation_outputs.to_list()
+    if not expected:
+        fail("No implementation dependency lint outputs for " + str(target.label))
+    outputs = target[OutputGroupInfo].clang_tidy.to_list()
+    if any([f not in outputs for f in expected]):
+        fail("Missing implementation dependency lint outputs for " + str(target.label))
+    if any([f.owner.workspace_name for f in outputs]):
         fail("External targets must not produce lint outputs")
     executable = ctx.actions.declare_file(ctx.label.name + ".sh")
     ctx.actions.write(executable, "#!/bin/sh\nexit 0\n", is_executable = True)

@@ -17,6 +17,9 @@ refresh-compile-commands:
 tidy:
     bazelisk build --config=clang-tidy //...
 
+heavy-includes:
+    bazelisk build --config=heavy-includes //...
+
 # Supplement clang-tidy with local checks. Dependency headers are deliberately
 # omitted: Cppcheck cannot reliably parse all of them, so whole-program unused
 # function checks would produce false positives.
@@ -56,7 +59,7 @@ go-test *args:
 go-tidy:
     go mod tidy
 
-lint: fmt-check duckdb-version-check go-vet go-staticcheck cppcheck tidy
+lint: fmt-check duckdb-version-check go-vet go-staticcheck cppcheck tidy heavy-includes
 
 test: go-test
     bazelisk test //...

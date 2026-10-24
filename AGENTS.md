@@ -9,7 +9,7 @@ Move what causes it, such as a type or an error class, to a lower target, or bui
 call each other, such as expressions and scans, as one target.
 
 A header passes its includes' parsing time to every file that includes it. Include GoogleSQL's
-resolved AST, analyzer and script executor headers, about 30s each, only from sources (`just tidy`
+resolved AST, analyzer and script executor headers, about 30s each, only from sources (`just heavy-includes`
 checks), and declare a GoogleSQL type that a header only names, as `src/system_variables.h` does.
 
 ## Partial support

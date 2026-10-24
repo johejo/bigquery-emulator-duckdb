@@ -99,6 +99,7 @@
             docs-check = [ ];
             e2e = [ ];
             clang-tidy = [ ];
+            heavy-includes = [ ];
             check = formatPackages ++ [ gitMinimal cppcheck go-tools ];
           };
         in

@@ -325,6 +325,7 @@ one file with `just bigquery-answers PROJECT PATH`. SQL, REST and BigQuery Stora
 scenarios locally without authentication or requests.
 
 Clang-tidy runs through the repository's [Bazel aspect](tools/clang_tidy/README.md).
+`just heavy-includes` checks [expensive GoogleSQL includes](tools/heavy_includes/README.md) separately.
 
 ## License
 

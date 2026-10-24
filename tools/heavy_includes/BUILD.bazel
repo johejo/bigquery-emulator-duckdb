@@ -1,0 +1,5 @@
+# Stand-ins found before GoogleSQL's slowest headers; see README.md.
+filegroup(
+    name = "heavy_headers",
+    srcs = glob(["heavy_headers/**/*.h"]),
+)
