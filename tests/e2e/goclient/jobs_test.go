@@ -260,7 +260,7 @@ func TestJobLifecycle(t *testing.T) {
 func TestJobListAndResultPagination(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	client := newClient(t)
+	client := newClientForProject(t, "go-job-list-pages")
 	query := client.Query("SELECT x FROM UNNEST([1, 2, 3]) AS x ORDER BY x")
 	query.JobID = "go_paginated_job"
 	job, err := query.Run(ctx)
@@ -288,12 +288,20 @@ func TestJobListAndResultPagination(t *testing.T) {
 	if _, err := second.Run(ctx); err != nil {
 		t.Fatalf("run second job: %v", err)
 	}
+	// Reproduce the concurrent lifecycle test's deletion between list pages. Make its job
+	// newer than ours so that sharing its project again would skip a job after deletion.
+	other := newClient(t).Query("SELECT 1")
+	other.JobID = "go_paginated_job_unrelated"
+	otherJob, err := other.Run(ctx)
+	if err != nil {
+		t.Fatalf("run job in shared project: %v", err)
+	}
 
 	jobs := client.Jobs(ctx)
 	jobs.State = bigquery.Done
 	jobs.PageInfo().MaxSize = 1
 	found := map[string]bool{query.JobID: false, second.JobID: false}
-	for {
+	for page := 0; ; page++ {
 		listed, err := jobs.Next()
 		if err == iterator.Done {
 			break
@@ -303,6 +311,11 @@ func TestJobListAndResultPagination(t *testing.T) {
 		}
 		if _, ok := found[listed.ID()]; ok {
 			found[listed.ID()] = true
+		}
+		if page == 0 {
+			if err := otherJob.Delete(ctx); err != nil {
+				t.Fatalf("delete job in shared project between pages: %v", err)
+			}
 		}
 	}
 	if !found[query.JobID] || !found[second.JobID] {
