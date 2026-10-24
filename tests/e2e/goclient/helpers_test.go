@@ -50,3 +50,25 @@ func newClientForProject(t *testing.T, project string) *bigquery.Client {
 	t.Cleanup(func() { client.Close() })
 	return client
 }
+
+// jsonRow is a tabledata.insertAll row the client sends as it is.
+type jsonRow map[string]bigquery.Value
+
+func (r jsonRow) Save() (map[string]bigquery.Value, string, error) {
+	return r, bigquery.NoDedupeID, nil
+}
+
+// wait runs a job and returns its error.
+func wait(ctx context.Context, runner interface {
+	Run(context.Context) (*bigquery.Job, error)
+}) error {
+	job, err := runner.Run(ctx)
+	if err != nil {
+		return err
+	}
+	status, err := job.Wait(ctx)
+	if err != nil {
+		return err
+	}
+	return status.Err()
+}

@@ -22,7 +22,11 @@ func (transport *Transport) job(ctx context.Context, step Step, vars map[string]
 			query["defaultDataset"] = map[string]any{"projectId": "${project}", "datasetId": dataset}
 		}
 		for key, value := range step.QueryOptions {
-			query[key] = value
+			if value == nil {
+				delete(query, key)
+			} else {
+				query[key] = value
+			}
 		}
 		request = &JobRequest{Configuration: map[string]any{"query": query}}
 	}

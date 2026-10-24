@@ -1,7 +1,7 @@
 # API compatibility scenarios
 
-Put verified `*.api.yaml` (or `*.api.yml`) cases here. Each case requires `expect`,
-whose keys are step names and whose values are the objects selected by `observe`.
+Put verified `*.api.yaml` (or `*.api.yml`) cases here. Each case requires case-level or step-level `expect` values. Case expectations map
+step names to the objects selected by `observe`; step expectations compare that step's selection.
 See [the scenario format](../../../../tools/bqanswers/README.md).
 
 `just e2e` runs cases in parallel. Use `${run}` and `${case}` in dataset names and
@@ -22,10 +22,6 @@ Migrated cases include:
 - `label_order.api.yaml`: label ordering after REST patches, preserving the recorded
   BigQuery expectations and the sequence of updates.
 
-Query jobs are polled to completion; job errors are included in observations so an
-HTTP-success response cannot hide a failed query. New cases should likewise observe
-job completion and errors rather than assume that submitting a job finishes it.
-
 - `table_metadata.api.yaml` and `dataset_metadata.api.yaml` replace the table,
   partitioning and dataset metadata lifecycle tests, including creation-time agreement
   with INFORMATION_SCHEMA and rejected operations. Optional scalar expectations list
@@ -43,3 +39,16 @@ job completion and errors rather than assume that submitting a job finishes it.
   constraints, defaults, row independence, clone definitions and rejected
   replacements. Go retains typed DATE/NUMERIC/array/record reads and clone-time
   decoding against local-clock bounds.
+
+- `rounding_modes.api.yaml` replaces all ten rounding workflow tests: column/DML
+  modes, query/load/streaming writes, dataset and table inheritance, LIKE/COPY/CLONE,
+  copy jobs, unparameterized values, PATCH/PUT, create/truncate load combinations,
+  nested numeric/string input and overflow atomicity. Go retains PutMultiError decoding.
+- `table_creation_paths.api.yaml` replaces all three creation/write/replacement tests.
+  Every metadata snapshot still checks schema, creation time, columns and field paths
+  against INFORMATION_SCHEMA; failed replacements also preserve rows and defaults.
+  Shared Go helpers remain for the other SDK tests that use them.
+
+Query jobs are polled to completion; job errors are included in observations so an
+HTTP-success response cannot hide a failed query. New cases should likewise observe
+job completion and errors rather than assume that submitting a job finishes it.

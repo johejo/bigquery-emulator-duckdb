@@ -2,6 +2,7 @@ package bqscenario
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,13 +12,28 @@ import (
 )
 
 func TestSQLJobPollingAndFailures(t *testing.T) {
-	for _, mode := range []string{"success", "submission_error", "job_error", "pages", "deadline"} {
+	for _, mode := range []string{"success", "without_default", "submission_error", "job_error", "pages", "deadline"} {
 		t.Run(mode, func(t *testing.T) {
 			polls := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				switch {
 				case r.Method == "POST":
+					if mode == "without_default" {
+						var body struct {
+							Configuration struct {
+								Query map[string]any `json:"query"`
+							} `json:"configuration"`
+						}
+						if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+							t.Error(err)
+						}
+						if _, exists := body.Configuration.Query["defaultDataset"]; exists {
+							w.WriteHeader(400)
+							fmt.Fprint(w, `{"error":{"message":"Invalid default dataset"}}`)
+							return
+						}
+					}
 					if mode == "submission_error" {
 						w.WriteHeader(400)
 						fmt.Fprint(w, `{"error":{"message":"bad submission"}}`)
@@ -52,7 +68,13 @@ func TestSQLJobPollingAndFailures(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), limit)
 			defer cancel()
-			response, err := transport.Call(ctx, Step{SQL: "SELECT 9007199254740993"}, map[string]any{"project": "project"})
+			step := Step{SQL: "SELECT 9007199254740993"}
+			vars := map[string]any{"project": "project"}
+			if mode == "without_default" {
+				step.QueryOptions = map[string]any{"defaultDataset": nil}
+				vars["dataset"] = "not_created"
+			}
+			response, err := transport.Call(ctx, step, vars)
 			switch mode {
 			case "pages", "deadline":
 				if err == nil {

@@ -1,0 +1,3658 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "Migrated from all ten rounding_mode tests. Values come from documented rounding examples and previously collected BigQuery answers; emulator-only rejections remain explicit. SDK PutMultiError decoding remains in Go."
+vars: {"dataset": "e2e_${run}_${case}", "even": "ROUND_HALF_EVEN", "away": "ROUND_HALF_AWAY_FROM_ZERO"}
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "column_modes"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "dml"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t (id INT64,
+                 even NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'),
+                 away NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'),
+                 unset NUMERIC(5, 1),
+                 big BIGNUMERIC(10, 0) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'),
+                 s STRUCT<n NUMERIC OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')>);
+            INSERT t (id, even, away, unset, big) VALUES (1, 2.25, 2.25, 2.25, 1.5), (2, -2.25, -2.25, -2.25, 2.5);
+            INSERT t (id, even, away, unset, big) SELECT 3, even, away, unset, big FROM t WHERE id = 1;
+            UPDATE t SET even = -even, big = 2.5 WHERE id = 3;
+            MERGE t USING (SELECT 4 AS id, NUMERIC '2.25' AS v) AS s ON t.id = s.id
+                 WHEN NOT MATCHED THEN INSERT (id, even, big) VALUES (s.id, s.v, 1.5);
+            CREATE TABLE ctas (even NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')) AS SELECT NUMERIC '2.25' AS even
+      - name: "rounded_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "1"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2.3"}, {"v": "2"}]
+            - f: [{"v": "2"}, {"v": "-2.2"}, {"v": "-2.3"}, {"v": "-2.3"}, {"v": "2"}]
+            - f: [{"v": "3"}, {"v": "-2.2"}, {"v": "2.3"}, {"v": "2.3"}, {"v": "2"}]
+            - f: [{"v": "4"}, {"v": "2.2"}, {"v": null}, {"v": null}, {"v": "2"}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(unset AS STRING), CAST(big AS STRING) FROM t ORDER BY id
+      - name: "ctas"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(even AS STRING) FROM ctas"}
+      - name: "column_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "id"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "even"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "unset"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset": {"name": "big", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "s"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "alter_columns"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            ALTER TABLE t ALTER COLUMN even SET OPTIONS (rounding_mode = NULL), ALTER COLUMN unset SET OPTIONS (rounding_mode = 'ROUND_HALF_EVEN')
+      - name: "field_paths"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "away"}, {"v": "ROUND_HALF_AWAY_FROM_ZERO"}]
+            - f: [{"v": "big"}, {"v": "ROUND_HALF_EVEN"}]
+            - f: [{"v": "s.n"}, {"v": "ROUND_HALF_EVEN"}]
+            - f: [{"v": "unset"}, {"v": "ROUND_HALF_EVEN"}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT field_path, rounding_mode FROM INFORMATION_SCHEMA.COLUMN_FIELD_PATHS
+                WHERE table_name = 't' AND rounding_mode IS NOT NULL ORDER BY field_path
+      - name: "insert_after_alter"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t (id, even, unset) VALUES (5, 2.25, 2.25)"}
+      - name: "after_alter"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(even AS STRING), CAST(unset AS STRING) FROM t WHERE id = 5"}
+      - name: "api"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}
+            schema:
+              fields:
+                - name: "even"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "away"
+                  type: "BIGNUMERIC"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+      - name: "api_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "even"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+      - name: "information_schema"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "even"}, {"v": "ROUND_HALF_EVEN"}]
+            - f: [{"v": "away"}, {"v": "ROUND_HALF_AWAY_FROM_ZERO"}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT column_name, rounding_mode FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE table_name = 'api' ORDER BY ordinal_position
+      - name: "additional_form_0"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t (s) VALUES (STRUCT(NUMERIC '1'))"}
+      - name: "additional_form_1"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE r (n NUMERIC(5, 1) DEFAULT 1 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))"}
+      - name: "additional_form_2"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "rounding modes on INTEGER fields"}}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE r (n INT64 OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'))"}
+      - name: "additional_form_3"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT api (even) SELECT NUMERIC '2.25'"}
+      - name: "copy_already_rounded"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "copied"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}]
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "appended_modes"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "flat"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "flat"}
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                - name: "even"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "away"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "big_away"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+      - name: "nested"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "nested"}
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                - name: "even"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "away"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "big_away"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "s"
+                  type: "RECORD"
+                  fields: [{"name": "n", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]
+                - name: "a"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                  mode: "REPEATED"
+      - name: "query_append"
+        sql: |-
+          SELECT 1 AS id, NUMERIC '2.25' AS even, NUMERIC '2.25' AS away,
+              BIGNUMERIC '2.5' AS big, STRUCT(NUMERIC '2.25' AS n) AS s,
+              [NUMERIC '2.25', NUMERIC '-2.25', NUMERIC '2.35'] AS a
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "nested"}
+          writeDisposition: "WRITE_APPEND"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "json_load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "nested"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+          upload: |
+            {"id": 2, "even": 2.25, "away": 2.25, "big": 2.5, "big_away": 2.5, "s": {"n": 2.25}, "a": [2.25, -2.25, 2.35]}
+            {"id": 3, "even": "-2.25", "away": "2.25"}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "csv_load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "flat"}
+              sourceFormat: "CSV"
+          upload: |
+            4,2.25,2.25,2.5,2.5
+            5,-2.25,,,
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "streaming_insert"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/nested/insertAll"
+          body:
+            rows:
+              - json:
+                  id: 6
+                  even: 2.25
+                  away: 2.25
+                  big: 2.5
+                  big_away: 2.5
+                  s: {"n": 2.25}
+                  a: [2.25, -2.25, 2.35]
+              - json: {"id": 7, "even": "-2.25", "away": "2.25", "a": ["2.35"]}
+        observe: {"errors": "/body/insertErrors"}
+        expect: {"errors": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "appended_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "1"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2"}, {"v": null}, {"v": "2.2"}, {"v": "2.2,-2.2,2.4"}]
+            - f: [{"v": "2"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2"}, {"v": "3"}, {"v": "2.2"}, {"v": "2.2,-2.2,2.4"}]
+            - f: [{"v": "3"}, {"v": "-2.2"}, {"v": "2.3"}, {"v": null}, {"v": null}, {"v": null}, {"v": ""}]
+            - f: [{"v": "4"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2"}, {"v": "3"}, {"v": null}, {"v": null}]
+            - f: [{"v": "5"}, {"v": "-2.2"}, {"v": null}, {"v": null}, {"v": null}, {"v": null}, {"v": null}]
+            - f: [{"v": "6"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2"}, {"v": "3"}, {"v": "2.2"}, {"v": "2.2,-2.2,2.4"}]
+            - f: [{"v": "7"}, {"v": "-2.2"}, {"v": "2.3"}, {"v": null}, {"v": null}, {"v": null}, {"v": "2.4"}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(big AS STRING),
+                CAST(big_away AS STRING), CAST(s.n AS STRING),
+                ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset), ',')
+                FROM ${dataset}.nested
+                UNION ALL
+                SELECT id, CAST(even AS STRING), CAST(away AS STRING), CAST(big AS STRING),
+                CAST(big_away AS STRING), NULL, NULL FROM ${dataset}.flat
+                ORDER BY id
+      - name: "query_overflow"
+        sql: |-
+          SELECT NUMERIC '9999.95' AS even
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "flat"}
+          writeDisposition: "WRITE_APPEND"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "NUMERIC(5, 1) has precision 5 and scale 1 but got a value that is not in range of [-9999.9, 9999.9]"
+      - name: "csv_overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "flat"}
+              sourceFormat: "CSV"
+          upload: |
+            6,9999.95,,,
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "NUMERIC(5, 1) has precision 5 and scale 1 but got a value that is not in range of [-9999.9, 9999.9]"
+      - name: "json_overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "flat"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+          upload: |
+            {"id":6,"even":9999.95,"away":1,"big":1,"big_away":1}
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect:
+          message:
+            "$contains": "NUMERIC(5, 1) has precision 5 and scale 1 but got a value that is not in range of [-9999.9, 9999.9]"
+      - name: "streaming_overflow"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/nested/insertAll"
+          body: {"rows": [{"json": {"id": 8, "even": 9999.95}}]}
+        observe: {"errors": "/body/insertErrors"}
+        expect:
+          errors:
+            - "$subset":
+                index: 0
+                errors:
+                  - "$subset":
+                      message:
+                        "$contains": "NUMERIC(5, 1) has precision 5 and scale 1 but got a value that is not in range of [-9999.9, 9999.9]"
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "dataset_defaults"
+    steps:
+      - name: "create_schema"
+        sql: |-
+          CREATE SCHEMA `${project}.${dataset}` OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')
+        queryOptions: {"defaultDataset": null}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "create_tables"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t (n NUMERIC(5, 1),
+                 away NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'),
+                 s STRUCT<b BIGNUMERIC>, i INT64);
+            CREATE TABLE own (n NUMERIC(5, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO');
+            CREATE TABLE q AS SELECT NUMERIC '2.25' AS n;
+            CREATE TABLE ctas (n NUMERIC(5, 1)) OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN')
+                 AS SELECT NUMERIC '2.25' AS n
+      - name: "api"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}
+            schema: {"fields": [{"name": "n", "type": "NUMERIC"}]}
+      - name: "unsupported_view_option"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "CREATE VIEW option default_rounding_mode"}}
+        use: "sql"
+        vars: {"sql": "CREATE VIEW v OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN') AS SELECT 1 AS x"}
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "loaded"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema: {"fields": [{"name": "n", "type": "NUMERIC"}]}
+          upload: |
+            {"n":2.25}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "alter_defaults"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (default_rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO');
+            ALTER TABLE t ADD COLUMN added NUMERIC(5, 1);
+            CREATE TABLE later (n NUMERIC(5, 1));
+            ALTER TABLE own SET OPTIONS (default_rounding_mode = 'ROUND_HALF_EVEN');
+            ALTER TABLE own ADD COLUMN m NUMERIC(5, 1)
+      - name: "before_patch"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        bind: {"etag": "/body/etag"}
+      - name: "add_field"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "n"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "away"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                - name: "s"
+                  type: "RECORD"
+                  fields: [{"name": "b", "type": "BIGNUMERIC", "roundingMode": "ROUND_HALF_EVEN"}]
+                - name: "i"
+                  type: "INTEGER"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "patched"
+                  type: "BIGNUMERIC"
+          headers: {"If-Match": "${etag}"}
+      - name: "t_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "s"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "i"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "added"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "patched"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+      - name: "own_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/own"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset": {"name": "m", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "q_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/q"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "ctas_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ctas"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "api_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "loaded_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/loaded"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+      - name: "later_modes"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/later"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t (n, away, added) VALUES (2.25, 2.25, 2.25); INSERT own (n, m) VALUES (2.25, 2.25)"}
+      - name: "rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "1"}, {"v": "2.2"}, {"v": "2.3"}, {"v": "2.2"}]
+            - f: [{"v": "2"}, {"v": "2.3"}, {"v": "2.2"}, {"v": null}]
+            - f: [{"v": "3"}, {"v": "2.2"}, {"v": null}, {"v": null}]
+            - f: [{"v": "4"}, {"v": "2.25"}, {"v": null}, {"v": null}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT 1 AS k, CAST(n AS STRING), CAST(away AS STRING), CAST(added AS STRING) FROM t
+                UNION ALL SELECT 2, CAST(n AS STRING), CAST(m AS STRING), NULL FROM own
+                UNION ALL SELECT 3, CAST(n AS STRING), NULL, NULL FROM ctas
+                UNION ALL SELECT 4, CAST(n AS STRING), NULL, NULL FROM loaded ORDER BY k
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "copied_defaults_like"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "even_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${even_dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "sources"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE src (n NUMERIC(5,1)); CREATE TABLE default_src (i INT64) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')
+      - name: "copy_without_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE `${project}.${even_dataset}.dst` LIKE src; ALTER TABLE `${project}.${even_dataset}.dst` ADD COLUMN m NUMERIC(5,1); INSERT `${project}.${even_dataset}.dst` (n,m) VALUES(2.25,2.25)
+      - name: "inherited_dataset_default"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM `${project}.${even_dataset}.dst`"}
+      - name: "copy_source_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE copied_default LIKE default_src; ALTER TABLE copied_default ADD COLUMN n NUMERIC(5,1); INSERT copied_default(n) VALUES(2.25)
+      - name: "source_default_value"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING) FROM copied_default"}
+      - name: "copy_with_options"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE options LIKE src OPTIONS(default_rounding_mode='ROUND_HALF_EVEN'); ALTER TABLE options ADD COLUMN m NUMERIC(5,1); INSERT options(n,m) VALUES(2.25,2.25)
+      - name: "options_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM options"}
+      - name: "replace_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE replaced LIKE default_src OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO'); ALTER TABLE replaced ADD COLUMN n NUMERIC(5,1); INSERT replaced(n) VALUES(2.25)
+      - name: "replaced_default_value"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING) FROM replaced"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+      - name: "delete_1"
+        rest:
+          method: "DELETE"
+          path: "/bigquery/v2/projects/${project}/datasets/${even_dataset}?deleteContents=true"
+    vars: {"even_dataset": "${dataset}_even"}
+  - name: "copied_defaults_copy"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "even_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${even_dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "sources"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE src (n NUMERIC(5,1)); CREATE TABLE default_src (i INT64) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')
+      - name: "copy_without_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE `${project}.${even_dataset}.dst` COPY src; ALTER TABLE `${project}.${even_dataset}.dst` ADD COLUMN m NUMERIC(5,1); INSERT `${project}.${even_dataset}.dst` (n,m) VALUES(2.25,2.25)
+      - name: "inherited_dataset_default"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM `${project}.${even_dataset}.dst`"}
+      - name: "copy_source_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE copied_default COPY default_src; ALTER TABLE copied_default ADD COLUMN n NUMERIC(5,1); INSERT copied_default(n) VALUES(2.25)
+      - name: "source_default_value"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING) FROM copied_default"}
+      - name: "copy_with_options"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE options COPY src OPTIONS(default_rounding_mode='ROUND_HALF_EVEN'); ALTER TABLE options ADD COLUMN m NUMERIC(5,1); INSERT options(n,m) VALUES(2.25,2.25)
+      - name: "options_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM options"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+      - name: "delete_1"
+        rest:
+          method: "DELETE"
+          path: "/bigquery/v2/projects/${project}/datasets/${even_dataset}?deleteContents=true"
+    vars: {"even_dataset": "${dataset}_even"}
+  - name: "copied_defaults_clone"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "even_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${even_dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "sources"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE src (n NUMERIC(5,1)); CREATE TABLE default_src (i INT64) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')
+      - name: "copy_without_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE `${project}.${even_dataset}.dst` CLONE src; ALTER TABLE `${project}.${even_dataset}.dst` ADD COLUMN m NUMERIC(5,1); INSERT `${project}.${even_dataset}.dst` (n,m) VALUES(2.25,2.25)
+      - name: "inherited_dataset_default"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM `${project}.${even_dataset}.dst`"}
+      - name: "copy_source_default"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE copied_default CLONE default_src; ALTER TABLE copied_default ADD COLUMN n NUMERIC(5,1); INSERT copied_default(n) VALUES(2.25)
+      - name: "source_default_value"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING) FROM copied_default"}
+      - name: "copy_with_options"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE options CLONE src OPTIONS(default_rounding_mode='ROUND_HALF_EVEN'); ALTER TABLE options ADD COLUMN m NUMERIC(5,1); INSERT options(n,m) VALUES(2.25,2.25)
+      - name: "options_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(m AS STRING) FROM options"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+      - name: "delete_1"
+        rest:
+          method: "DELETE"
+          path: "/bigquery/v2/projects/${project}/datasets/${even_dataset}?deleteContents=true"
+    vars: {"even_dataset": "${dataset}_even"}
+  - name: "job_defaults"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "even_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${even_dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "sources"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE src(n NUMERIC(5,1));
+            CREATE TABLE default_src(n NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO');
+            CREATE TABLE copy_truncated(n NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN');
+            CREATE TABLE query_truncated(n NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN');
+            CREATE TABLE load_truncated(n NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN');
+            CREATE TABLE appended(n NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO'))
+      - name: "copy_plain"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "default_copy"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "default_src"}]
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "copy_even_copy"
+        job:
+          configuration:
+            copy:
+              sourceTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "src"}
+              destinationTable: {"projectId": "${project}", "datasetId": "${even_dataset}", "tableId": "copy"}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "copy_even_default_copy"
+        job:
+          configuration:
+            copy:
+              sourceTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "default_src"}
+              destinationTable: {"projectId": "${project}", "datasetId": "${even_dataset}", "tableId": "default_copy"}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "copy_truncate"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "copy_truncated"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "src"}]
+              writeDisposition: "WRITE_TRUNCATE"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "copy_append"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "appended"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "default_src"}]
+              writeDisposition: "WRITE_APPEND"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "query_truncate"
+        sql: |-
+          SELECT NUMERIC '1' AS n
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "query_truncated"}
+          writeDisposition: "WRITE_TRUNCATE"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "load_truncate"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "load_truncated"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema: {"fields": [{"name": "n", "type": "NUMERIC"}]}
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":1}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "plain_copy"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/default_copy"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+      - name: "even_copy"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${even_dataset}/tables/copy"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+      - name: "even_default_copy"
+        rest:
+          method: "GET"
+          path: "/bigquery/v2/projects/${project}/datasets/${even_dataset}/tables/default_copy"
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+      - name: "copy_truncated"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/copy_truncated"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "query_truncated"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/query_truncated"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load_truncated"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/load_truncated"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "appended"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/appended"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+      - name: "delete_1"
+        rest:
+          method: "DELETE"
+          path: "/bigquery/v2/projects/${project}/datasets/${even_dataset}?deleteContents=true"
+    vars: {"even_dataset": "${dataset}_even"}
+  - name: "copy_schema_modes"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "setup"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+
+               CREATE TABLE src (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+               INSERT src VALUES (NUMERIC '2.25');
+               CREATE TABLE dst LIKE src;
+               CREATE TABLE different_precision (n NUMERIC(6, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
+               CREATE TABLE different_mode (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_AWAY_FROM_ZERO'));
+               INSERT different_precision VALUES (1);
+               INSERT different_mode VALUES (1)
+      - name: "same_schema"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dst"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "src"}]
+              writeDisposition: "WRITE_APPEND"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "reject_different_precision"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dst"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "different_precision"}]
+              writeDisposition: "WRITE_APPEND"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$allOf": [{"$contains": ""}, {"$not": {"$contains": "The emulator does not support"}}]}}
+      - name: "reject_different_mode"
+        job:
+          configuration:
+            copy:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "dst"}
+              sourceTables: [{"projectId": "${project}", "datasetId": "${dataset}", "tableId": "different_mode"}]
+              writeDisposition: "WRITE_APPEND"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$allOf": [{"$contains": ""}, {"$not": {"$contains": "The emulator does not support"}}]}}
+      - name: "copied_value"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*),CAST(MAX(n) AS STRING) FROM dst"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "unparameterized_csv"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+              writeDisposition: "WRITE_EMPTY"
+          upload: |
+            2.250000001,2.50000000000000000000000000000000000001
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "create_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            fields:
+              "$schema":
+                - name: "n"
+                  type: "NUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "b"
+                  type: "BIGNUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+      - name: "create_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "1"}, {"v": "2.250000001"}, {"v": "2.50000000000000000000000000000000000001"}]}]
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING) FROM t"}
+      - name: "replace"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.250000001,2.50000000000000000000000000000000000001
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "replace_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            fields:
+              "$schema":
+                - name: "n"
+                  type: "NUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "b"
+                  type: "BIGNUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+      - name: "replace_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "1"}, {"v": "2.250000001"}, {"v": "2.50000000000000000000000000000000000001"}]}]
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING) FROM t"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "unparameterized_json"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+              writeDisposition: "WRITE_EMPTY"
+          upload: "{\"n\":\"2.250000001\",\"b\":\"2.50000000000000000000000000000000000001\"}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "create_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            fields:
+              "$schema":
+                - name: "n"
+                  type: "NUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "b"
+                  type: "BIGNUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+      - name: "create_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "1"}, {"v": "2.250000001"}, {"v": "2.50000000000000000000000000000000000001"}]}]
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING) FROM t"}
+      - name: "replace"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    roundingMode: "ROUND_HALF_EVEN"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: "{\"n\":\"2.250000001\",\"b\":\"2.50000000000000000000000000000000000001\"}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "replace_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect:
+          schema:
+            fields:
+              "$schema":
+                - name: "n"
+                  type: "NUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "b"
+                  type: "BIGNUMERIC"
+                  roundingMode: "ROUND_HALF_EVEN"
+      - name: "replace_values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "1"}, {"v": "2.250000001"}, {"v": "2.50000000000000000000000000000000000001"}]}]
+        use: "sql"
+        vars: {"sql": "SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING) FROM t"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_patch_0"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')"}
+      - name: "update"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "old"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "added"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset": {"name": "big", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: "ROUND_HALF_EVEN"
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}, {"v": "2"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_patch_1"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"}
+      - name: "update"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "old", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "added"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_patch_2"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"}
+      - name: "update"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUNDING_MODE_UNSPECIFIED"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "old", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "added"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_patch_3"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')"}
+      - name: "update"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUNDING_MODE_UNSPECIFIED"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "old"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "added"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_put_0"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')"}
+      - name: "update"
+        rest:
+          method: "PUT"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "old"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "added"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset": {"name": "big", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: "ROUND_HALF_EVEN"
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.2"}, {"v": "2"}, {"v": "2.2"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_put_1"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"}
+      - name: "update"
+        rest:
+          method: "PUT"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "old", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "added"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_put_2"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_EVEN')"}
+      - name: "update"
+        rest:
+          method: "PUT"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUNDING_MODE_UNSPECIFIED"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_EVEN"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "old", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "added"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.2"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "updated_default_put_3"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(old NUMERIC(5,1)) OPTIONS(default_rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')"}
+      - name: "update"
+        rest:
+          method: "PUT"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            defaultRoundingMode: "ROUNDING_MODE_UNSPECIFIED"
+            schema:
+              fields:
+                - name: "old"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                  roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                - name: "added"
+                  type: "NUMERIC"
+                  precision: "5"
+                  scale: "1"
+                - name: "big"
+                  type: "BIGNUMERIC"
+                  precision: "10"
+                - name: "record"
+                  type: "RECORD"
+                  fields: [{"name": "nested", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema", "defaultRoundingMode": "/body/defaultRoundingMode"}
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "old"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "added"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "big"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "record"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields:
+                      - "$subset":
+                          name: "nested"
+                          roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                          fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+      - name: "insert"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t VALUES(2.25,2.25,2.5,STRUCT(NUMERIC '2.25'))"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "2.3"}, {"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(old AS STRING),CAST(added AS STRING),CAST(big AS STRING),CAST(record.nested AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_true_create"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.2"}, {"v": "-2"}, {"v": "-2.3"}]
+            - f: [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_true_unchanged"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.2"}, {"v": "-2"}, {"v": "-2.3"}]
+            - f: [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_false_create"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_false_unchanged"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_false_changed_precision"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(6,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_false_different_column_mode"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO'),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_csv_false_removed_parameters"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                  - name: "away"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            2.25,2.5,2.25
+            -2.25,-2.5,-2.25
+            2.35,1.5,2.35
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: {"$oneOf": [{"$missing": true}, null, "0"]}
+          scale: {"$oneOf": [{"$missing": true}, null, "0"]}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.25"}, {"v": "-2.5"}, {"v": "-2.25"}]
+            - f: [{"v": "2.25"}, {"v": "2.5"}, {"v": "2.25"}]
+            - f: [{"v": "2.35"}, {"v": "1.5"}, {"v": "2.35"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_true_create"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.2"}, {"v": "-2"}, {"v": "-2.3"}]
+            - f: [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_true_unchanged"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.2"}, {"v": "-2"}, {"v": "-2.3"}]
+            - f: [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_false_create"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_false_unchanged"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset": {"name": "n", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset": {"name": "b", "roundingMode": "ROUND_HALF_EVEN", "fields": {"$oneOf": [{"$missing": true}, null, []]}}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_false_changed_precision"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(6,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_false_different_column_mode"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO'),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: "5"
+          scale: "1"
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.3"}, {"v": "-3"}, {"v": "-2.3"}]
+            - f: [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}]
+            - f: [{"v": "2.4"}, {"v": "2"}, {"v": "2.4"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "created_load_json_false_removed_parameters"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1) OPTIONS(rounding_mode='ROUND_HALF_AWAY_FROM_ZERO')); INSERT t VALUES(7,7,7)
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                  - name: "away"
+                    type: "NUMERIC"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            {"n":2.25,"b":2.5,"away":2.25}
+            {"n":-2.25,"b":-2.5,"away":-2.25}
+            {"n":2.35,"b":1.5,"away":2.35}
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe:
+          schema: "/body/schema"
+          defaultRoundingMode: "/body/defaultRoundingMode"
+          precision: "/body/schema/fields/0/precision"
+          scale: "/body/schema/fields/0/scale"
+        expect:
+          schema:
+            "$subset":
+              fields:
+                - "$subset":
+                    name: "n"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "b"
+                    roundingMode: {"$oneOf": [{"$missing": true}, null, ""]}
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+                - "$subset":
+                    name: "away"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                    fields: {"$oneOf": [{"$missing": true}, null, []]}
+          defaultRoundingMode: "ROUND_HALF_EVEN"
+          precision: {"$oneOf": [{"$missing": true}, null, "0"]}
+          scale: {"$oneOf": [{"$missing": true}, null, "0"]}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": "-2.25"}, {"v": "-2.5"}, {"v": "-2.25"}]
+            - f: [{"v": "2.25"}, {"v": "2.5"}, {"v": "2.25"}]
+            - f: [{"v": "2.35"}, {"v": "1.5"}, {"v": "2.35"}]
+        use: "sql"
+        vars: {"sql": "SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING) FROM t ORDER BY n"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "nested_load_true_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                  - name: "s"
+                    type: "RECORD"
+                    fields: [{"name": "n", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]
+                  - name: "a"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    mode: "REPEATED"
+          upload: "{\"n\": 2.25, \"b\": 2.5, \"away\": 2.25, \"s\": {\"n\": -2.25}, \"a\": [2.25, -2.25, 2.35]}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}, {"v": "-2.2"}, {"v": "2.2,-2.2,2.4"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING),CAST(s.n AS STRING),ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset),',') FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "nested_load_true_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                  - name: "s"
+                    type: "RECORD"
+                    fields: [{"name": "n", "type": "NUMERIC", "precision": "5", "scale": "1", "roundingMode": "ROUND_HALF_EVEN"}]
+                  - name: "a"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                    mode: "REPEATED"
+          upload: "{\"n\": \"2.25\", \"b\": \"2.5\", \"away\": \"2.25\", \"s\": {\"n\": \"-2.25\"}, \"a\": [\"2.25\", \"-2.25\", \"2.35\"]}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "2.2"}, {"v": "2"}, {"v": "2.3"}, {"v": "-2.2"}, {"v": "2.2,-2.2,2.4"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING),CAST(s.n AS STRING),ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset),',') FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "nested_load_false_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                  - name: "s"
+                    type: "RECORD"
+                    fields: [{"name": "n", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+                  - name: "a"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    mode: "REPEATED"
+          upload: "{\"n\": 2.25, \"b\": 2.5, \"away\": 2.25, \"s\": {\"n\": -2.25}, \"a\": [2.25, -2.25, 2.35]}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}, {"v": "-2.3"}, {"v": "2.3,-2.3,2.4"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING),CAST(s.n AS STRING),ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset),',') FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "nested_load_false_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "load"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+                  - name: "s"
+                    type: "RECORD"
+                    fields: [{"name": "n", "type": "NUMERIC", "precision": "5", "scale": "1"}]
+                  - name: "a"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    mode: "REPEATED"
+          upload: "{\"n\": \"2.25\", \"b\": \"2.5\", \"away\": \"2.25\", \"s\": {\"n\": \"-2.25\"}, \"a\": [\"2.25\", \"-2.25\", \"2.35\"]}"
+        observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+        expect: {"state": "DONE"}
+      - name: "values"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows: [{"f": [{"v": "2.3"}, {"v": "3"}, {"v": "2.3"}, {"v": "-2.3"}, {"v": "2.3,-2.3,2.4"}]}]
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT CAST(n AS STRING),CAST(b AS STRING),CAST(away AS STRING),CAST(s.n AS STRING),ARRAY_TO_STRING(ARRAY(SELECT CAST(x AS STRING) FROM UNNEST(a) AS x WITH OFFSET ORDER BY offset),',') FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_csv_false_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            9999.95,1,1
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "absent"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_csv_false_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1)); INSERT t VALUES(7,7,7)"}
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            9999.95,1,1
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "unchanged"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "7"}, {"v": "7"}, {"v": "7"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING),CAST(MAX(away) AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_csv_true_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: |
+            1,9999999999.5,1
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "absent"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_csv_true_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1)); INSERT t VALUES(7,7,7)"}
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "CSV"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: |
+            1,9999999999.5,1
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "unchanged"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "7"}, {"v": "7"}, {"v": "7"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING),CAST(MAX(away) AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_json_false_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: "{\"n\":9999.95,\"b\":1,\"away\":1}"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "absent"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_json_false_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1)); INSERT t VALUES(7,7,7)"}
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: "{\"n\":9999.95,\"b\":1,\"away\":1}"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "unchanged"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "7"}, {"v": "7"}, {"v": "7"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING),CAST(MAX(away) AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_json_true_false"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+          upload: "{\"n\":1,\"b\":9999999999.5,\"away\":1}"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "absent"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "load_overflow_json_true_true"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            defaultRoundingMode: "ROUND_HALF_EVEN"
+      - name: "existing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE t(n NUMERIC(5,1),b BIGNUMERIC(10,0),away NUMERIC(5,1)); INSERT t VALUES(7,7,7)"}
+      - name: "overflow"
+        job:
+          configuration:
+            load:
+              destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+              sourceFormat: "NEWLINE_DELIMITED_JSON"
+              schema:
+                fields:
+                  - name: "n"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "b"
+                    type: "BIGNUMERIC"
+                    precision: "10"
+                    roundingMode: "ROUND_HALF_EVEN"
+                  - name: "away"
+                    type: "NUMERIC"
+                    precision: "5"
+                    scale: "1"
+                    roundingMode: "ROUND_HALF_AWAY_FROM_ZERO"
+              writeDisposition: "WRITE_TRUNCATE"
+          upload: "{\"n\":1,\"b\":9999999999.5,\"away\":1}"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "not in range"}}
+      - name: "unchanged"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "1"}, {"v": "7"}, {"v": "7"}, {"v": "7"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT COUNT(*),CAST(MAX(n) AS STRING),CAST(MAX(b) AS STRING),CAST(MAX(away) AS STRING) FROM t
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
