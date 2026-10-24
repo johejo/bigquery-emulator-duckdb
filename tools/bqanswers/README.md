@@ -299,3 +299,11 @@ comparisons previously expressed in Go without silently changing their meaning:
 
 Match failures identify the step and JSON path. Keep absent/default alternatives explicit;
 ordinary equality continues to distinguish missing, null and empty values.
+
+`{"$schema": [...]}` compares a TableFieldSchema array using the defaults the Go SDK
+previously applied. It checks every SDK-exposed schema property (including nested fields,
+constraints, descriptions, parameters, modes and defaults), preserves field order and length,
+and treats omitted/null optional properties as their SDK defaults. This avoids expanding every
+nullable column into a list of default-valued REST properties. Other resource fields are not
+part of schema comparison. `$allOf` combines comparisons and `$not` negates one; when requiring
+an error string without a substring, combine `$contains: ""` with a negated `$contains`.

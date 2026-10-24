@@ -13,6 +13,31 @@ func match(got any, present bool, want any, path string) error {
 	if object, ok := want.(map[string]any); ok && len(object) == 1 {
 		for op, value := range object {
 			switch op {
+			case "$schema":
+				actual, err := canonicalSchema(got)
+				if err != nil || !present {
+					break
+				}
+				expected, err := canonicalSchema(value)
+				if err != nil {
+					return err
+				}
+				return match(actual, true, expected, path)
+			case "$not":
+				if match(got, present, value, path) != nil {
+					return nil
+				}
+			case "$allOf":
+				choices, ok := value.([]any)
+				if !ok || len(choices) == 0 {
+					return fmt.Errorf("%s: $allOf requires choices", path)
+				}
+				for _, choice := range choices {
+					if err := match(got, present, choice, path); err != nil {
+						return err
+					}
+				}
+				return nil
 			case "$missing":
 				if value != true {
 					return fmt.Errorf("%s: $missing requires true", path)

@@ -1,0 +1,303 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "Schema and view updates preserve the original state when rejected. Expectations migrated from TestTableUpdateSchema and TestTableUpdateViewQuery."
+vars:
+  dataset: "e2e_${run}_${case}"
+  updated_schema:
+    "$schema":
+      - name: "id"
+        type: "INTEGER"
+        description: "the key"
+      - name: "point"
+        type: "RECORD"
+        fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+      - name: "items"
+        type: "RECORD"
+        mode: "REPEATED"
+        fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+      - name: "doc"
+        type: "JSON"
+      - name: "tags"
+        type: "STRING"
+        mode: "REPEATED"
+  view_schema: {"$schema": [{"name": "b", "type": "STRING"}]}
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "schema_update"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "t"}
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  mode: "REQUIRED"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}]
+      - name: "insert"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t/insertAll"
+          body: {"rows": [{"json": {"id": "1", "point": {"x": "2"}, "items": [{"sku": "a"}]}}]}
+        observe: {"insertErrors": "/body/insertErrors"}
+        expect: {}
+      - name: "update"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "JSON"
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+        observe: {"schema": "/body/schema/fields"}
+        expect: {"schema": "${updated_schema}"}
+      - name: "read_updated"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${updated_schema}"}}
+      - name: "insert_after_relaxing"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "INSERT t (point, doc) VALUES (STRUCT(3, 4), JSON '{}')"}
+      - name: "read_rows"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect:
+          state: "DONE"
+          rows:
+            - f: [{"v": null}, {"v": "4"}, {"v": null}, {"v": "{}"}, {"v": "0"}]
+            - f: [{"v": "1"}, {"v": null}, {"v": null}, {"v": null}, {"v": "0"}]
+        use: "sql"
+        vars: {"sql": "SELECT id, point.y, items[SAFE_OFFSET(0)].count, doc, ARRAY_LENGTH(tags) FROM t ORDER BY id"}
+      - name: "dropped_column"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "JSON"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Field tags is missing in new schema"}}
+        expectFailure: true
+      - name: "dropped_record_field"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "JSON"
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Field point.y is missing in new schema"}}
+        expectFailure: true
+      - name: "changed_type"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "STRING"
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Field doc has changed type from JSON to STRING"}}
+        expectFailure: true
+      - name: "tightened_mode"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                  mode: "REQUIRED"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "JSON"
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Field id has changed mode from NULLABLE to REQUIRED"}}
+        expectFailure: true
+      - name: "added_required"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "doc"
+                  type: "JSON"
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+                - name: "r"
+                  type: "STRING"
+                  mode: "REQUIRED"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Cannot add required fields"}}
+        expectFailure: true
+      - name: "reordered_columns"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"
+          body:
+            schema:
+              fields:
+                - name: "id"
+                  type: "INTEGER"
+                  description: "the key"
+                - name: "point"
+                  type: "RECORD"
+                  fields: [{"name": "x", "type": "INTEGER"}, {"name": "y", "type": "INTEGER"}]
+                - name: "items"
+                  type: "RECORD"
+                  mode: "REPEATED"
+                  fields: [{"name": "sku", "type": "STRING"}, {"name": "count", "type": "INTEGER"}]
+                - name: "tags"
+                  type: "STRING"
+                  mode: "REPEATED"
+                - name: "doc"
+                  type: "JSON"
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Field doc has changed position"}}
+        expectFailure: true
+      - name: "rejections_preserved_schema"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/t"}
+        observe: {"schema": "/body/schema"}
+        expect: {"schema": {"fields": "${updated_schema}"}}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "view_update"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "v"}
+            view: {"query": "SELECT 1 AS a", "useLegacySql": false}
+      - name: "replace_query"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/v"
+          body: {"view": {"query": "SELECT 'x' AS b"}}
+        observe: {"query": "/body/view/query", "legacy": "/body/view/useLegacySql", "schema": "/body/schema/fields"}
+        expect:
+          query: "SELECT 'x' AS b"
+          legacy: {"$oneOf": [{"$missing": true}, null, false]}
+          schema: "${view_schema}"
+      - name: "invalid_query"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/v"
+          body: {"view": {"query": "SELECT missing"}}
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "query_unchanged"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/v"}
+        observe: {"view": "/body/view"}
+        expect: {"view": {"$subset": {"query": "SELECT 'x' AS b"}}}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}

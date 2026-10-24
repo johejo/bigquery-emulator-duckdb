@@ -545,7 +545,7 @@ func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.
 			return nil, fmt.Errorf("%s: expected API rejection", step.Name)
 		}
 		if response.Failed && !step.ExpectFailure {
-			if verify {
+			if verify && (step.Expect != nil || !answered(c.Expect)) {
 				return nil, fmt.Errorf("%s: unexpected API or job rejection: %s", step.Name, encoded(response.Value))
 			}
 			if step.Observe == nil {

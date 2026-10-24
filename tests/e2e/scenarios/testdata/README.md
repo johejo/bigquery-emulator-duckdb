@@ -30,3 +30,8 @@ job completion and errors rather than assume that submitting a job finishes it.
   partitioning and dataset metadata lifecycle tests, including creation-time agreement
   with INFORMATION_SCHEMA and rejected operations. Optional scalar expectations list
   the representations the Go SDK previously decoded to the same value.
+
+- `table_update.api.yaml` replaces schema and view updates, including nested field
+  additions, REQUIRED relaxation, existing rows, all six rejected schema changes,
+  and preservation of the view definition after a rejected replacement. `$schema`
+  compares the same schema properties the Go SDK previously exposed.
