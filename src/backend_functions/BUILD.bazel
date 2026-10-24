@@ -241,6 +241,7 @@ cc_library(
 cc_library(
     name = "apply",
     hdrs = ["apply.h"],
+    visibility = ["//src/googlesql_aead_duckdb:__pkg__"],
     deps = [
         ":scalar",
         "//:bignumeric",

@@ -8,6 +8,7 @@ cc_library(
     hdrs = ["aead.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        "//src/backend_functions:apply",
         "//src/backend_functions:register",
         "//src/backend_functions:scalar",
         "//src/googlesql_aead",
