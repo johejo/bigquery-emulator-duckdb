@@ -13,15 +13,89 @@ just bigquery-answers-validate PATH
 
 Authentication uses `gcloud auth print-access-token`. REST requests go to `bigquery.googleapis.com`;
 gRPC requests go to `bigquerystorage.googleapis.com`. The account needs the permissions for the
-resources, jobs and streams in the cases. Directory arguments process `*.txt` and `*.api.json`.
+resources, jobs and streams in the cases. Directory arguments process `*.txt`, `*.api.yaml`,
+`*.api.yml` and legacy `*.api.json`. Observation sidecars are excluded.
 
 SQL files keep the existing query / `?>` format described in
 [the unverified cases README](../../tests/e2e/goclient/testdata/unverified/README.md).
-API files use JSON scenarios. Observations are collected from BigQuery; they are not assertions
-against guessed results. Filled answers are skipped on subsequent runs. Remove a case's `answer`
-only when deliberately collecting that case again.
+API scenarios use YAML with JSON-compatible values; JSON objects can be embedded directly.
+Legacy JSON scenarios remain supported. Observations are collected from BigQuery; they are not
+assertions against guessed results. Filled answers are skipped on subsequent runs. For YAML,
+observations live in a separate JSON sidecar; remove its case entry only when deliberately
+collecting that case again. Legacy JSON files retain inline `answer` fields.
 
-## API scenarios
+## YAML scenarios and E2E verification
+
+The same scenario executes through `internal/bqscenario` for answer collection and E2E
+verification. Write new scenarios as `*.api.yaml` or `*.api.yml`. YAML must contain one document,
+unique string mapping keys and JSON-compatible values. Anchors, aliases, tags and merge keys are
+not supported; use `templates` and `vars` for reuse. Numbers use JSON syntax and retain their
+literal precision without passing through float64. Quote numeric-looking strings such as protobuf
+int64 values. Plain `on`, `off` and date-like text remain strings.
+
+```yaml
+version: 1
+vars:
+  dataset: bqa_${run}_${case}
+cases:
+  - name: description
+    steps:
+      - name: create
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: "${dataset}"}
+            description: example
+      - name: read
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe:
+          description: /body/description
+    cleanup:
+      - name: delete
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect: {"read": {"description": "example"}}
+```
+
+`body` and `expect` are structured values, whether written with YAML indentation or JSON syntax.
+Use `query: |` for multiline SQL and `upload: |` for inline media. Do not put structured JSON in a
+block scalar: that creates a string rather than an object.
+
+Collecting `example.api.yaml` writes `example.api.answers.json`, with `version: 1` and a `cases`
+object mapping case names to `{project, run, steps}` observations. The YAML file, comments and
+formatting are never rewritten. Existing answers are skipped; unknown case names or malformed
+sidecars fail collection. Changing a case does not invalidate its old answer automatically;
+remove its sidecar entry when deliberately recollecting it. Both formats persist each completed
+case atomically, including when cleanup fails.
+
+Collection ignores `expect`. E2E verification ignores collected answers and requires `expect`
+for each case. It compares the entire selected observation object: object key order is irrelevant,
+array order and missing versus null matter, and numeric literals are compared exactly without
+float rounding. Expected strings may reference scenario variables and response bindings.
+Keep timestamps, generated IDs and etags out of observations unless they are under test.
+The runner reports the file, case, actual observations and expectations on failure, and runs
+cleanup independently of cancellation. Cases run in parallel with separate transports.
+
+To check an API rejection and continue to inspect its effects, set `expectFailure: true` on the
+step and select its error fields with `observe`. An unexpected success fails the case. This form
+requires `observe` and cannot use `until`. A rejected observed step without `expectFailure`
+retains the original collection behavior described below: record its entire error and stop.
+Errors returned inside an HTTP-success body or gRPC-success message must be observed explicitly.
+Collection treats authentication, quota and server failures as operational failures; the emulator
+transport exposes these responses for E2E assertions.
+
+After independent verification, move the YAML into `tests/e2e/scenarios/testdata/`, add `expect`
+from documentation or BigQuery observations and run `just e2e`. Retain the sidecar if it supplies
+the expectation's provenance; E2E never writes or loads it. Review collected answers before
+promotion: a resource or account restriction may have prevented the intended operation.
+Keep SDK behavior, binary decoding, concurrency and process lifecycle tests in Go, and one-cell
+SQL checks in `scalars/*.txt`.
+
+## API scenario fields
 
 A file contains `version: 1`, optional `description` and `vars`, and a `cases` array. Each case has
 a unique `name`, optional `description` and `vars`, `steps`, and optional `cleanup`. Case names
@@ -143,7 +217,7 @@ with sends and are recorded in arrival order. The response envelope is
 `BatchCommitWriteStreamsResponse.streamErrors`, stays inside `messages`: observe those fields
 or the messages themselves, as well as the success fields.
 
-The [workflow fixture](testdata/workflow.api.json) combines a REST load job, streaming writes
+The [workflow fixture](../../internal/bqscenario/testdata/workflow.api.json) combines a REST load job, streaming writes
 and a query of stored values.
 
 ## Reuse, failures and cleanup
@@ -175,12 +249,12 @@ independent cases continue. Job errors returned inside a successful response mus
 for example with `/body/status` after a load completes.
 
 Cleanup runs in its listed order, even on failure or Ctrl-C, with an independent deadline per
-step. Deleting an already absent REST resource is successful cleanup. Answers are written
+step. Deleting an already absent REST resource is successful cleanup. Observations are written
 atomically after each completed case, including when cleanup fails; a later failure does not
 discard earlier answers. A cleanup error is reported and must be resolved separately: rerunning
 the tool skips the answered case. The answer records the project and run ID, and stderr also
 prints the run ID for unanswered cases, so remaining resources can be identified.
 
-Once a behavior is confirmed, use the observations in the appropriate E2E test and remove the
-resolved cases from the unverified directory. Do not replace BigQuery observations with an
+Once a behavior is confirmed, promote the scenario with explicit expectations or use the
+observations in the appropriate SDK E2E test, then remove the resolved unverified cases. Do not replace BigQuery observations with an
 emulator run.

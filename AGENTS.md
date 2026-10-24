@@ -118,8 +118,11 @@ expected result from one layer to another.
   client. A query that returns one value goes in `tests/e2e/goclient/testdata/scalars/`. Use `bq`
   only for what depends on it, such as its flags and output formats. Runbooks run concurrently, and
   so do Go client tests, which each call `t.Parallel()`; each uses datasets of its own, and a
-  project of its own where it lists a whole project. REST
-  details no client surfaces are checked with runn's HTTP runner in `tests/e2e/rest_*.yml`.
+  project of its own where it lists a whole project. API workflows with verified expectations go
+  in `tests/e2e/scenarios/testdata/*.api.yaml`,
+  using the shared bqanswers scenario format; keep SDK type conversion, iterators, binary decoding
+  and process or concurrency behavior in Go. REST details can also be checked with runn's HTTP
+  runner in `tests/e2e/rest_*.yml`.
 - **Probes** (`tools/`, `just docs`) check only that a form translates and runs, and generate
   `docs/api.md`, `docs/storage.md`, `docs/sql.md` and `docs/functions.md`; never edit those by
   hand, and commit them regenerated when their inputs change. `//:function_probe` builds calls
@@ -150,7 +153,7 @@ emulator's output. Agents do not run queries on BigQuery: a case no source settl
 `tests/e2e/goclient/testdata/unverified/*.txt`, split by feature, whose answers maintainers fill in with
 `just bigquery-answers`. `just reference` shows what the reference implementation answers, as a
 lead for what to check, never as an expected value. REST and BigQuery Storage gRPC cases go in
-`tests/e2e/goclient/testdata/unverified/*.api.json`, using the
+`tests/e2e/goclient/testdata/unverified/*.api.yaml` (legacy `*.api.json` is also supported), using the
 [bqanswers scenario format](tools/bqanswers/README.md); the same `just bigquery-answers` command
 records their selected responses. Validate these files locally with `just bigquery-answers-validate`.
 

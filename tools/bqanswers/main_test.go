@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFillAnswers(t *testing.T) {
@@ -130,7 +131,7 @@ func TestParseAnswerWritesOneLine(t *testing.T) {
 
 func TestFillMixedAnswerFiles(t *testing.T) {
 	dir := t.TempDir()
-	for _, name := range []string{"a.api.json", "b.txt", "README.md"} {
+	for _, name := range []string{"a.api.json", "b.txt", "c.api.yaml", "d.api.yml", "c.api.answers.json", "README.md"} {
 		data := "ignored\n"
 		if name == "b.txt" {
 			data = "SELECT 1\n?>\n"
@@ -149,7 +150,19 @@ func TestFillMixedAnswerFiles(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(calls, []string{"a.api.json", "SELECT 1"}) {
+	if !reflect.DeepEqual(calls, []string{"a.api.json", "SELECT 1", "c.api.yaml", "d.api.yml"}) {
 		t.Fatalf("dispatch = %v", calls)
+	}
+}
+
+func TestValidateYAMLWithoutCredentials(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	path := filepath.Join(t.TempDir(), "case.api.yaml")
+	data := "version: 1\ncases:\n  - name: example\n    steps:\n      - name: read\n        rest: {method: GET, path: \"/projects/${project}\"}\n        observe: {status: /status}\n"
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run("project", path, true, time.Second); err != nil {
+		t.Fatal(err)
 	}
 }

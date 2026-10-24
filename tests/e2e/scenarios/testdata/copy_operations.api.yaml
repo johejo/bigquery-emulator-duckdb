@@ -1,0 +1,182 @@
+version: 1
+# Requests and metadata/error expectations come from the recorded BigQuery answers in:
+# https://github.com/johejo/bigquery-emulator-duckdb/blob/afbed1e/tests/e2e/goclient/testdata/unverified/snapshot_tables.api.json
+# Original project/run context and observations are preserved in the answers sidecar.
+# Row expectations retain TestCopyJobOperationTypes from #356. Observe completed jobs,
+# not the timing-dependent RUNNING state returned by BigQuery's jobs.insert.
+description: Copy jobs create snapshots, restore snapshots, and clone tables.
+vars:
+  dataset: e2e_${run}_${case}
+  source: base
+  destination: copied
+  disposition: WRITE_EMPTY
+  setup: >-
+    CREATE TABLE `${project}.${dataset}.base` (id INT64, name STRING)
+    OPTIONS (description = 'base', friendly_name = 'Base', labels = [('env', 'dev')]);
+    INSERT `${project}.${dataset}.base` VALUES (1, 'a');
+    CREATE SNAPSHOT TABLE `${project}.${dataset}.snap` CLONE `${project}.${dataset}.base`;
+    CREATE TABLE `${project}.${dataset}.existing` (id INT64, name STRING)
+    OPTIONS (description = 'existing')
+  base_metadata: {type: SNAPSHOT, description: base, friendlyName: Base, labels: {env: dev}, snapshotBase: base}
+templates:
+  copied_table:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: "${dataset}"}, location: US}
+      - name: setup_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration: {query: {query: "${setup}", useLegacySql: false}}
+        bind: {setup_job: /body/jobReference/jobId}
+      - name: setup
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/jobs/${setup_job}?location=US"}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: copy
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              copy:
+                sourceTable: {projectId: "${project}", datasetId: "${dataset}", tableId: "${source}"}
+                destinationTable: {projectId: "${project}", datasetId: "${dataset}", tableId: "${destination}"}
+                operationType: ${operation}
+                writeDisposition: ${disposition}
+        bind: {job: /body/jobReference/jobId}
+      - name: wait
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/jobs/${job}?location=US"}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: metadata
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/${destination}"}
+        observe:
+          type: /body/type
+          description: /body/description
+          friendlyName: /body/friendlyName
+          labels: /body/labels
+          snapshotBase: /body/snapshotDefinition/baseTableReference/tableId
+          cloneBase: /body/cloneDefinition/baseTableReference/tableId
+      - name: rows_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              query:
+                query: SELECT id FROM `${project}.${dataset}.${destination}` ORDER BY id
+                useLegacySql: false
+        bind: {rows_job: /body/jobReference/jobId}
+      - name: rows
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/queries/${rows_job}?location=US"}
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors, rows: /body/rows}
+    cleanup:
+      - name: delete_dataset
+        rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  rejected_copy:
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body: {datasetReference: {datasetId: "${dataset}"}, location: US}
+      - name: setup_job
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration: {query: {query: "${setup}", useLegacySql: false}}
+        bind: {setup_job: /body/jobReference/jobId}
+      - name: setup
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/jobs/${setup_job}?location=US"}
+        until: {/body/status/state: DONE}
+        observe: {status: /body/status}
+      - name: copy
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            jobReference: {location: US}
+            configuration:
+              copy:
+                sourceTable: {projectId: "${project}", datasetId: "${dataset}", tableId: "${source}"}
+                destinationTable: {projectId: "${project}", datasetId: "${dataset}", tableId: "${destination}"}
+                operationType: ${operation}
+                writeDisposition: ${disposition}
+        bind: {job: /body/jobReference/jobId}
+      - name: wait
+        rest: {method: GET, path: "/bigquery/v2/projects/${project}/jobs/${job}?location=US"}
+        until: {/body/status/state: DONE}
+        observe: {state: /body/status/state, reason: /body/status/errorResult/reason, message: /body/status/errorResult/message}
+    cleanup:
+      - name: delete_dataset
+        rest: {method: DELETE, path: "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+cases:
+  - name: copy_snapshot
+    template: copied_table
+    vars: {operation: SNAPSHOT}
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {status: {state: DONE}}
+      metadata: ${base_metadata}
+      rows: {complete: true, rows: [{f: [{v: "1"}]}]}
+  - name: copy_snapshot_of_snapshot
+    template: copied_table
+    vars: {operation: SNAPSHOT, source: snap}
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {status: {state: DONE}}
+      metadata: {type: SNAPSHOT, description: base, friendlyName: Base, labels: {env: dev}, snapshotBase: snap}
+      rows: {complete: true, rows: [{f: [{v: "1"}]}]}
+  - name: copy_restore
+    template: copied_table
+    vars: {operation: RESTORE, source: snap}
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {status: {state: DONE}}
+      metadata: {type: TABLE, description: base, friendlyName: Base, labels: {env: dev}}
+      rows: {complete: true, rows: [{f: [{v: "1"}]}]}
+  - name: copy_restore_truncate
+    template: copied_table
+    vars: {operation: RESTORE, source: snap, destination: existing, disposition: WRITE_TRUNCATE}
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {status: {state: DONE}}
+      metadata: {type: TABLE, description: existing}
+      rows: {complete: true, rows: [{f: [{v: "1"}]}]}
+  - name: copy_clone
+    template: copied_table
+    vars: {operation: CLONE}
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {status: {state: DONE}}
+      metadata: {type: TABLE, description: base, friendlyName: Base, labels: {env: dev}, cloneBase: base}
+      rows: {complete: true, rows: [{f: [{v: "1"}]}]}
+  - name: copy_snapshot_truncate
+    template: rejected_copy
+    vars:
+      operation: SNAPSHOT
+      destination: existing
+      disposition: WRITE_TRUNCATE
+      message: Snapshot operation with write disposition WRITE_TRUNCATE is not supported. Please try again with WRITE_EMPTY.
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {state: DONE, reason: invalid, message: "${message}"}
+  - name: copy_restore_from_table
+    template: rejected_copy
+    vars:
+      operation: RESTORE
+      message: ${project}:${dataset}.base is not allowed for this operation because it is currently a TABLE.
+    expect:
+      setup: {status: {state: DONE}}
+      wait: {state: DONE, reason: invalid, message: "${message}"}
