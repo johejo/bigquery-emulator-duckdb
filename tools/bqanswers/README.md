@@ -258,3 +258,44 @@ prints the run ID for unanswered cases, so remaining resources can be identified
 Once a behavior is confirmed, promote the scenario with explicit expectations or use the
 observations in the appropriate SDK E2E test, then remove the resolved unverified cases. Do not replace BigQuery observations with an
 emulator run.
+
+## Stateful SQL and job workflows
+
+`sql: |` submits a GoogleSQL query job, waits for it to finish and reads its results.
+It uses `${project}` and, when supplied, `${dataset}` as the default dataset.
+`queryOptions` supplies native JobConfigurationQuery fields such as `destinationTable`,
+`writeDisposition` and `queryParameters`; `defaultDataset: null` disables the default.
+`job: {configuration: ..., upload: ...}` handles native load/copy job configurations
+and optional multipart media. `location` defaults to `US` for these shorthands.
+Explicit REST steps remain available when testing submission, polling or pagination itself.
+
+Successful SQL/job envelopes contain the completed jobs.get response in `body` and query
+results in `result`. `/error` selects the effective job error, whether submission was
+rejected or a completed job failed. Failed jobs require `expectFailure`, just like REST
+rejections. Result sets exceeding one 10,000-row page are rejected by the shorthand;
+use explicit REST steps or SDK tests for pagination. Transport and deadline failures
+remain failures, not job observations.
+
+A step may have its own `expect`, compared with that step's selected observations before
+executing the next step. It can refer to bindings captured by that step. Collection ignores
+these expectations. A case requires either case-level expectations or step expectations.
+File-level `stepTemplates` define reusable single requests, selected with `use`; `vars`
+on a step are scoped to it, while response bindings remain available to later steps.
+A template step may override `observe`, `bind`, `expect` and `expectFailure`, but not its
+request. Templates cannot reference other step templates.
+
+Comparison defaults to exact JSON equality. A single-key matcher object allows the
+comparisons previously expressed in Go without silently changing their meaning:
+
+- `{"$contains": "text"}`: a string contains the given literal substring.
+- `{"$missing": true}`: the observation path is absent, distinct from JSON null.
+- `{"$oneOf": [...]}`: one explicitly listed representation matches. For example,
+  `{"$oneOf": [{"$missing": true}, null, ""]}` reproduces SDK decoding of an optional string.
+- `{"$gt": "0"}`, `$gte`, `$lt`, `$lte`: exact numeric comparison of JSON numbers or numeric
+  strings, including millisecond timestamps and values above 2^53.
+- `{"$subset": {...}}`: compare the listed object fields and permit other fields. Arrays
+  still compare their complete lengths and order. Use this only for fields the former test
+  did not assert, such as generated metadata next to a schema.
+
+Match failures identify the step and JSON path. Keep absent/default alternatives explicit;
+ordinary equality continues to distinguish missing, null and empty values.

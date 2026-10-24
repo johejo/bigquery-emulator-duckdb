@@ -18,11 +18,12 @@ import (
 // Scenarios keep requests and observations together. Each case has its own resources and cleanup,
 // so an unanswered case can be rerun without replaying a case whose answer is already recorded.
 type File struct {
-	Version     int                 `json:"version"`
-	Description string              `json:"description,omitempty"`
-	Vars        map[string]any      `json:"vars,omitempty"`
-	Templates   map[string]Template `json:"templates,omitempty"`
-	Cases       []Case              `json:"cases"`
+	Version       int                 `json:"version"`
+	Description   string              `json:"description,omitempty"`
+	Vars          map[string]any      `json:"vars,omitempty"`
+	StepTemplates map[string]Step     `json:"stepTemplates,omitempty"`
+	Templates     map[string]Template `json:"templates,omitempty"`
+	Cases         []Case              `json:"cases"`
 }
 
 type Template struct {
@@ -43,6 +44,12 @@ type Case struct {
 
 type Step struct {
 	Name          string            `json:"name"`
+	Use           string            `json:"use,omitempty"`
+	Vars          map[string]any    `json:"vars,omitempty"`
+	SQL           string            `json:"sql,omitempty"`
+	QueryOptions  map[string]any    `json:"queryOptions,omitempty"`
+	Job           *JobRequest       `json:"job,omitempty"`
+	Expect        json.RawMessage   `json:"expect,omitempty"`
 	ExpectFailure bool              `json:"expectFailure,omitempty"`
 	REST          *RESTRequest      `json:"rest,omitempty"`
 	GRPC          *GRPCRequest      `json:"grpc,omitempty"`
@@ -271,8 +278,37 @@ func (file *File) validate() error {
 				return fmt.Errorf("%s: empty or duplicate step name %q", c.Name, step.Name)
 			}
 			stepNames[step.Name] = true
-			if (step.REST == nil) == (step.GRPC == nil) {
-				return fmt.Errorf("%s/%s: specify exactly one of rest and grpc", c.Name, step.Name)
+			requests := 0
+			if step.REST != nil {
+				requests++
+			}
+			if step.GRPC != nil {
+				requests++
+			}
+			if step.Job != nil {
+				requests++
+			}
+			if step.SQL != "" {
+				requests++
+			}
+			if requests != 1 {
+				return fmt.Errorf("%s/%s: specify exactly one request", c.Name, step.Name)
+			}
+			if len(step.QueryOptions) > 0 && step.SQL == "" {
+				return fmt.Errorf("%s/%s: queryOptions requires sql", c.Name, step.Name)
+			}
+			localVars := map[string]any{}
+			for k, v := range vars {
+				localVars[k] = v
+			}
+			for k, v := range step.Vars {
+				if reservedVariable(k) {
+					return fmt.Errorf("reserved variable %q", k)
+				}
+				localVars[k] = v
+			}
+			if len(step.Until) != 0 && (step.REST == nil || step.REST.Method != "GET") {
+				return fmt.Errorf("%s/%s: until requires a REST GET", c.Name, step.Name)
 			}
 			if step.REST != nil {
 				if step.REST.Method == "" || !strings.HasPrefix(step.REST.Path, "/") || strings.HasPrefix(step.REST.Path, "//") {
@@ -281,7 +317,7 @@ func (file *File) validate() error {
 				if len(step.Until) != 0 && step.REST.Method != "GET" {
 					return fmt.Errorf("%s/%s: until requires a REST GET", c.Name, step.Name)
 				}
-			} else {
+			} else if step.GRPC != nil {
 				method, err := storageMethod(step.GRPC.Method)
 				if err != nil {
 					return fmt.Errorf("%s/%s: %w", c.Name, step.Name, err)
@@ -293,8 +329,8 @@ func (file *File) validate() error {
 					return fmt.Errorf("%s/%s: invalid request count", c.Name, step.Name)
 				}
 			}
-			for _, request := range []any{step.REST, step.GRPC, step.Until} {
-				if err := checkReferences(request, vars, nil); err != nil {
+			for _, request := range []any{step.REST, step.GRPC, step.Job, step.SQL, step.QueryOptions, step.Until} {
+				if err := checkReferences(request, localVars, nil); err != nil {
 					return fmt.Errorf("%s/%s: %w", c.Name, step.Name, err)
 				}
 			}
@@ -308,6 +344,16 @@ func (file *File) validate() error {
 			}
 			for name := range step.Bind {
 				vars[name] = nil
+				localVars[name] = nil
+			}
+			if len(step.Expect) != 0 {
+				var expected any
+				if err := decodeJSON(step.Expect, &expected); err != nil {
+					return err
+				}
+				if err := checkReferences(expected, localVars, nil); err != nil {
+					return err
+				}
 			}
 			for _, path := range step.Observe {
 				if _, _, err := pointer(nil, path); err != nil {
@@ -333,13 +379,13 @@ func (file *File) validate() error {
 			if step.ExpectFailure && (step.Observe == nil || len(step.Until) != 0) {
 				return fmt.Errorf("%s/%s: expectFailure requires observe and cannot poll", c.Name, step.Name)
 			}
-			observed = observed || step.Observe != nil
+			observed = observed || step.Observe != nil || step.Expect != nil
 		}
 		if !observed {
 			return fmt.Errorf("%s: no observations", c.Name)
 		}
 		for _, step := range c.Cleanup {
-			if step.Observe != nil || len(step.Bind) > 0 || step.ExpectFailure {
+			if step.Observe != nil || len(step.Bind) > 0 || step.ExpectFailure || step.Expect != nil {
 				return fmt.Errorf("%s: cleanup cannot observe or bind", c.Name)
 			}
 		}
@@ -348,18 +394,59 @@ func (file *File) validate() error {
 }
 
 func (file *File) resolveCase(c Case) (Case, error) {
-	if c.Template == "" {
-		return c, nil
+	if c.Template != "" {
+		plan, ok := file.Templates[c.Template]
+		if !ok {
+			return c, fmt.Errorf("%s: unknown template %q", c.Name, c.Template)
+		}
+		if c.Steps != nil || c.Cleanup != nil {
+			return c, fmt.Errorf("%s: a template case cannot also define steps or cleanup", c.Name)
+		}
+		c.Steps, c.Cleanup = plan.Steps, plan.Cleanup
 	}
-	plan, ok := file.Templates[c.Template]
-	if !ok {
-		return c, fmt.Errorf("%s: unknown template %q", c.Name, c.Template)
+	var err error
+	c.Steps, err = file.resolveSteps(c.Steps)
+	if err != nil {
+		return c, err
 	}
-	if c.Steps != nil || c.Cleanup != nil {
-		return c, fmt.Errorf("%s: a template case cannot also define steps or cleanup", c.Name)
+	c.Cleanup, err = file.resolveSteps(c.Cleanup)
+	return c, err
+}
+
+func (file *File) resolveSteps(steps []Step) ([]Step, error) {
+	result := slices.Clone(steps)
+	for i, step := range result {
+		if step.Use == "" {
+			continue
+		}
+		base, ok := file.StepTemplates[step.Use]
+		if !ok || base.Use != "" {
+			return nil, fmt.Errorf("%s: unknown or nested step template %q", step.Name, step.Use)
+		}
+		if step.REST != nil || step.GRPC != nil || step.Job != nil || step.SQL != "" || len(step.QueryOptions) != 0 || len(step.Until) != 0 {
+			return nil, fmt.Errorf("%s: template step cannot override request", step.Name)
+		}
+		vars := map[string]any{}
+		for k, v := range base.Vars {
+			vars[k] = v
+		}
+		for k, v := range step.Vars {
+			vars[k] = v
+		}
+		base.Name, base.Vars = step.Name, vars
+		if step.Observe != nil {
+			base.Observe = step.Observe
+		}
+		if step.Bind != nil {
+			base.Bind = step.Bind
+		}
+		if step.Expect != nil {
+			base.Expect = step.Expect
+		}
+		base.ExpectFailure = base.ExpectFailure || step.ExpectFailure
+		result[i] = base
 	}
-	c.Steps, c.Cleanup = plan.Steps, plan.Cleanup
-	return c, nil
+	return result, nil
 }
 
 // Check scopes without substituting unknown response values. Request payload validation still
@@ -416,7 +503,7 @@ func Collect(ctx context.Context, path, project, run string, timeout time.Durati
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "%s/%s (project=%s, run=%s)\n", path, c.Name, project, run)
-		result, runErr, cleanupErr := execute(ctx, resolved, vars, timeout, call)
+		result, runErr, cleanupErr := execute(ctx, resolved, vars, timeout, call, false)
 		if runErr == nil {
 			c.Answer, err = json.Marshal(Observation{Project: project, Run: run, Steps: result})
 			if err != nil {
@@ -437,12 +524,19 @@ func Collect(ctx context.Context, path, project, run string, timeout time.Durati
 	return errors.Join(failures...)
 }
 
-func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call) (map[string]any, error) {
+func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call, verify bool) (map[string]any, error) {
 	results := map[string]any{}
 	for _, step := range c.Steps {
 		fmt.Fprintf(os.Stderr, "%s/%s\n", c.Name, step.Name)
+		localVars := map[string]any{}
+		for k, v := range vars {
+			localVars[k] = v
+		}
+		for k, v := range step.Vars {
+			localVars[k] = v
+		}
 		stepCtx, cancel := context.WithTimeout(ctx, timeout)
-		response, err := pollScenario(stepCtx, step, vars, call)
+		response, err := pollScenario(stepCtx, step, localVars, call)
 		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", step.Name, err)
@@ -451,13 +545,16 @@ func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.
 			return nil, fmt.Errorf("%s: expected API rejection", step.Name)
 		}
 		if response.Failed && !step.ExpectFailure {
+			if verify {
+				return nil, fmt.Errorf("%s: unexpected API or job rejection: %s", step.Name, encoded(response.Value))
+			}
 			if step.Observe == nil {
 				return nil, fmt.Errorf("%s: setup request rejected: %v", step.Name, response.Value)
 			}
 			results[step.Name] = map[string]any{"error": response.Value}
 			break
 		}
-		if step.Observe != nil {
+		if step.Observe != nil || step.Expect != nil {
 			selected := map[string]any{}
 			for name, path := range step.Observe {
 				value, found, err := pointer(response.Value, path)
@@ -479,6 +576,20 @@ func runScenario(ctx context.Context, c Case, vars map[string]any, timeout time.
 				return nil, fmt.Errorf("%s: bind %s: missing %s", step.Name, name, path)
 			}
 			vars[name] = value
+			localVars[name] = value
+		}
+		if verify && step.Expect != nil {
+			var expected any
+			if err := decodeJSON(step.Expect, &expected); err != nil {
+				return nil, err
+			}
+			expected, err = expand(expected, localVars)
+			if err != nil {
+				return nil, err
+			}
+			if err := match(results[step.Name], true, expected, c.Name+"/"+step.Name); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return results, nil
@@ -553,8 +664,8 @@ func writeJSON(path string, value any) error {
 
 // execute keeps cleanup independent of cancellation and preserves observations even
 // when cleanup fails, so collection can persist an answer before reporting failure.
-func execute(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call) (map[string]any, error, error) {
-	result, runErr := runScenario(ctx, c, vars, timeout, call)
+func execute(ctx context.Context, c Case, vars map[string]any, timeout time.Duration, call Call, verify bool) (map[string]any, error, error) {
+	result, runErr := runScenario(ctx, c, vars, timeout, call, verify)
 	var cleanupErrors []error
 	for _, step := range c.Cleanup {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)

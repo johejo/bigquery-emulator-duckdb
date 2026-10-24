@@ -1,0 +1,310 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "Dataset metadata lifecycle, creation-time agreement with SCHEMATA, and inaccessible internal schemas."
+vars: {"dataset": "e2e_${run}_${case}"}
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "dataset_metadata"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body:
+            datasetReference: {"datasetId": "${dataset}"}
+            location: "US"
+            description: "from the API"
+            friendlyName: "API"
+            labels: {"env": "dev", "team": "data"}
+      - name: "api"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "from the API"
+          friendlyName: "API"
+          labels: {"env": "dev", "team": "data"}
+          creationTime: {"$gt": "0"}
+        bind: {"api_created": "/body/creationTime"}
+      - name: "api_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${api_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${dataset}'
+      - name: "patch"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}"
+          body: {"description": "patched", "labels": {"tier": "1", "env": null}}
+      - name: "patched"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "patched"
+          friendlyName: "API"
+          labels: {"team": "data", "tier": "1"}
+          creationTime: "${api_created}"
+        bind: {"patched_created": "/body/creationTime"}
+      - name: "patched_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${patched_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${dataset}'
+      - name: "create_ddl"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE SCHEMA `${project}.${ddl}` OPTIONS (description = 'from DDL', friendly_name = 'DDL', labels = [('env', 'prod')], location = 'us')
+      - name: "ddl"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "from DDL"
+          friendlyName: "DDL"
+          labels: {"env": "prod"}
+          creationTime: {"$gt": "0"}
+        bind: {"ddl_created": "/body/creationTime"}
+      - name: "ddl_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${ddl_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "if_not_exists"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE SCHEMA IF NOT EXISTS `${project}.${ddl}` OPTIONS (description = 'other')"}
+      - name: "unchanged"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "from DDL"
+          friendlyName: "DDL"
+          labels: {"env": "prod"}
+          creationTime: "${ddl_created}"
+        bind: {"unchanged_created": "/body/creationTime"}
+      - name: "unchanged_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${unchanged_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "alter"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            ALTER SCHEMA `${project}.${ddl}` SET OPTIONS (description = 'altered', labels = [('tier', '1')])
+      - name: "altered"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "altered"
+          friendlyName: "DDL"
+          labels: {"tier": "1"}
+          creationTime: "${ddl_created}"
+        bind: {"altered_created": "/body/creationTime"}
+      - name: "altered_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${altered_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "clear_name"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "ALTER SCHEMA `${project}.${ddl}` SET OPTIONS (friendly_name = NULL)"}
+      - name: "name_cleared"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "altered"
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"tier": "1"}
+          creationTime: "${ddl_created}"
+        bind: {"name_cleared_created": "/body/creationTime"}
+      - name: "name_cleared_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${name_cleared_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "clear_labels"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "ALTER SCHEMA `${project}.${ddl}` SET OPTIONS (labels = [])"}
+      - name: "labels_cleared"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: "altered"
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+          creationTime: "${ddl_created}"
+        bind: {"labels_cleared_created": "/body/creationTime"}
+      - name: "labels_cleared_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${labels_cleared_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "alter_missing_if_exists"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "ALTER SCHEMA IF EXISTS `${project}.${missing}` SET OPTIONS (description = 'x')"}
+      - name: "recreate"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "DROP SCHEMA `${project}.${ddl}`; CREATE SCHEMA `${project}.${ddl}` OPTIONS (labels = [])"}
+      - name: "recreated"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        observe:
+          description: "/body/description"
+          friendlyName: "/body/friendlyName"
+          labels: "/body/labels"
+          creationTime: "/body/creationTime"
+        expect:
+          description: {"$oneOf": [{"$missing": true}, null, ""]}
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+          creationTime: {"$gt": "0"}
+        bind: {"recreated_created": "/body/creationTime"}
+      - name: "recreated_schemata"
+        observe:
+          state: "/body/status/state"
+          error: "/error"
+          errors: "/body/status/errors"
+          rows: "/result/rows"
+        expect: {"state": "DONE", "rows": [{"f": [{"v": "true"}]}]}
+        use: "sql"
+        vars:
+          sql: |-
+            SELECT creation_time = TIMESTAMP_MILLIS(${recreated_created}) FROM INFORMATION_SCHEMA.SCHEMATA WHERE schema_name = '${ddl}'
+      - name: "create_table"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE `${project}.${ddl}.t` (x INT64)"}
+      - name: "drop_nonempty"
+        expectFailure: true
+        observe: {}
+        expect: {}
+        use: "sql"
+        vars: {"sql": "DROP SCHEMA `${project}.${ddl}`"}
+      - name: "drop_cascade"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "DROP SCHEMA `${project}.${ddl}` CASCADE"}
+      - name: "dropped"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}"}
+        expectFailure: true
+        observe: {}
+        expect: {}
+      - name: "invalid_label"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}_labeled"}, "labels": {"Env": "prod"}}
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "must start with a lowercase letter"}}
+        expectFailure: true
+      - name: "alter_missing"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Not found: Dataset ${project}:${missing}"}}
+        use: "sql"
+        vars: {"sql": "ALTER SCHEMA `${project}.${missing}` SET OPTIONS (description = 'x')"}
+      - name: "patch_missing"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${patched}"
+          body: {"description": "x"}
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Not found: Dataset ${project}:${patched}"}}
+        expectFailure: true
+      - name: "hidden_catalog"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Table not found: main.emulator_datasets"}}
+        use: "sql"
+        vars: {"sql": "SELECT * FROM main.emulator_datasets"}
+      - name: "hidden_drop"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "Not found: Dataset ${project}:main"}}
+        use: "sql"
+        vars: {"sql": "DROP TABLE main.emulator_datasets"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+      - name: "delete_1"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${ddl}?deleteContents=true"}
+    vars: {"ddl": "${dataset}_ddl", "missing": "${dataset}_missing", "patched": "${dataset}_patched"}

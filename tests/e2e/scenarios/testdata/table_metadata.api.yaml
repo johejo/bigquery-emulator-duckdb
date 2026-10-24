@@ -1,0 +1,220 @@
+# Migrated expectations are from the original Go E2E tests, not emulator output.
+version: 1
+description: "Metadata and partitioning round trips through REST and DDL; includes deliberate emulator partitioning limits."
+vars: {"dataset": "e2e_${run}_${case}"}
+stepTemplates:
+  sql:
+    sql: |-
+      ${sql}
+    observe: {"state": "/body/status/state", "error": "/error", "errors": "/body/status/errors"}
+cases:
+  - name: "table_metadata"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "api_create"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}
+            schema: {"fields": [{"name": "id", "type": "INTEGER"}]}
+            description: "from the API"
+            friendlyName: "API"
+            labels: {"env": "dev", "team": "data"}
+      - name: "api_created"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "from the API", "friendlyName": "API", "labels": {"env": "dev", "team": "data"}}
+      - name: "api_patch"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"
+          body: {"description": "patched", "labels": {"tier": "1", "env": null}}
+      - name: "api_patched"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "patched", "friendlyName": "API", "labels": {"team": "data", "tier": "1"}}
+      - name: "ddl_create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE ddl (id INT64 OPTIONS (description = 'key')) OPTIONS (description = 'from DDL', friendly_name = 'DDL', labels = [('env', 'prod')]); CREATE VIEW v OPTIONS (description = 'a view', labels = [('kind', 'view')]) AS SELECT id FROM ddl
+      - name: "ddl_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ddl"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "from DDL", "friendlyName": "DDL", "labels": {"env": "prod"}}
+      - name: "view_metadata"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/v"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect:
+          description: "a view"
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"kind": "view"}
+      - name: "create_empty_table"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE empty_table (id INT64) OPTIONS (labels = [])"}
+      - name: "empty_table"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/empty_table"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect:
+          description: {"$oneOf": [{"$missing": true}, null, ""]}
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+      - name: "create_empty_view"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE VIEW empty_view OPTIONS (labels = []) AS SELECT id FROM ddl"}
+      - name: "empty_view"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/empty_view"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect:
+          description: {"$oneOf": [{"$missing": true}, null, ""]}
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+      - name: "create_empty_mv"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE MATERIALIZED VIEW empty_mv OPTIONS (labels = []) AS SELECT id, COUNT(*) AS n FROM ddl GROUP BY id
+      - name: "empty_mv"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/empty_mv"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect:
+          description: {"$oneOf": [{"$missing": true}, null, ""]}
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+      - name: "create_empty_snapshot"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE SNAPSHOT TABLE empty_snapshot CLONE ddl OPTIONS (labels = [])"}
+      - name: "empty_snapshot"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/empty_snapshot"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "from DDL", "friendlyName": "DDL", "labels": {"$oneOf": [{"$missing": true}, null]}}
+      - name: "remove_labels"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "ALTER TABLE ddl SET OPTIONS (labels = [])"}
+      - name: "labels_removed"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ddl"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect: {"description": "from DDL", "friendlyName": "DDL", "labels": {"$oneOf": [{"$missing": true}, null]}}
+      - name: "replace"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars: {"sql": "CREATE OR REPLACE TABLE ddl AS SELECT 1 AS id"}
+      - name: "replaced"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ddl"}
+        observe: {"description": "/body/description", "friendlyName": "/body/friendlyName", "labels": "/body/labels"}
+        expect:
+          description: {"$oneOf": [{"$missing": true}, null, ""]}
+          friendlyName: {"$oneOf": [{"$missing": true}, null, ""]}
+          labels: {"$oneOf": [{"$missing": true}, null]}
+      - name: "invalid_label"
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "must start with a lowercase letter"}}
+        use: "sql"
+        vars: {"sql": "CREATE TABLE labeled (id INT64) OPTIONS (labels = [('Env', 'prod')])"}
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}
+  - name: "partitioning"
+    steps:
+      - name: "create_dataset"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets"
+          body: {"datasetReference": {"datasetId": "${dataset}"}, "location": "US"}
+      - name: "create"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "api"}
+            schema:
+              fields: [{"name": "id", "type": "INTEGER"}, {"name": "day", "type": "DATE"}, {"name": "name", "type": "STRING"}]
+            timePartitioning: {"type": "MONTH", "field": "day"}
+            clustering: {"fields": ["name", "id"]}
+      - name: "patch"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"
+          body: {"clustering": {"fields": ["id"]}}
+        observe: {"timePartitioning": "/body/timePartitioning", "clustering": "/body/clustering"}
+        expect: {"timePartitioning": {"type": "MONTH", "field": "day"}, "clustering": {"fields": ["id"]}}
+      - name: "range_create"
+        expect: {"state": "DONE"}
+        use: "sql"
+        vars:
+          sql: |-
+            CREATE TABLE ranged (id INT64, name STRING) PARTITION BY RANGE_BUCKET(id, GENERATE_ARRAY(0, 100, 10)) CLUSTER BY name
+      - name: "range"
+        rest: {"method": "GET", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/ranged"}
+        observe: {"rangePartitioning": "/body/rangePartitioning", "clustering": "/body/clustering"}
+        expect:
+          rangePartitioning: {"field": "id", "range": {"start": "0", "end": "100", "interval": "10"}}
+          clustering: {"fields": ["name"]}
+      - name: "reject_ingestion"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "ingestion"}
+            schema:
+              fields: [{"name": "id", "type": "INTEGER"}, {"name": "day", "type": "DATE"}, {"name": "name", "type": "STRING"}]
+            timePartitioning: {"type": "DAY"}
+        expectFailure: true
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "ingestion-time partitioning"}}
+      - name: "reject_expiring"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "expiring"}
+            schema:
+              fields: [{"name": "id", "type": "INTEGER"}, {"name": "day", "type": "DATE"}, {"name": "name", "type": "STRING"}]
+            timePartitioning: {"type": "DAY", "field": "day", "expirationMs": "3600000"}
+        expectFailure: true
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "partition expiration"}}
+      - name: "reject_missing"
+        rest:
+          method: "POST"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables"
+          body:
+            tableReference: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "missing"}
+            schema:
+              fields: [{"name": "id", "type": "INTEGER"}, {"name": "day", "type": "DATE"}, {"name": "name", "type": "STRING"}]
+            clustering: {"fields": ["missing"]}
+        expectFailure: true
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "cannot be found in the schema"}}
+      - name: "destination_clustering"
+        sql: |-
+          SELECT 1 AS id
+        queryOptions:
+          destinationTable: {"projectId": "${project}", "datasetId": "${dataset}", "tableId": "clustered"}
+          clustering: {"fields": ["id"]}
+        expectFailure: true
+        observe: {"message": "/error/message"}
+        expect: {"message": {"$contains": "clustering for a destination table"}}
+      - name: "change_partitioning"
+        rest:
+          method: "PATCH"
+          path: "/bigquery/v2/projects/${project}/datasets/${dataset}/tables/api"
+          body: {"timePartitioning": {"type": "DAY", "field": "day"}}
+        observe: {"message": "/body/error/message"}
+        expect: {"message": {"$contains": "Cannot change the partitioning"}}
+        expectFailure: true
+    cleanup:
+      - name: "delete_0"
+        rest: {"method": "DELETE", "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"}

@@ -42,36 +42,35 @@ func (file *File) Verify(ctx context.Context, c Case, project, run string, timeo
 	if timeout <= 0 {
 		return errors.New("scenario timeout must be positive")
 	}
-	if !answered(c.Expect) {
-		return fmt.Errorf("%s: missing expect", c.Name)
-	}
-	var want any
-	if err := decodeJSON(c.Expect, &want); err != nil {
-		return err
-	}
 	c, err := file.resolveCase(c)
 	if err != nil {
 		return err
 	}
+	hasExpect := answered(c.Expect)
+	for _, step := range c.Steps {
+		hasExpect = hasExpect || step.Expect != nil
+	}
+	if !hasExpect {
+		return fmt.Errorf("%s: missing expect", c.Name)
+	}
 	vars := file.variables(c, project, run)
-	got, runErr, cleanupErr := execute(ctx, c, vars, timeout, call)
+	got, runErr, cleanupErr := execute(ctx, c, vars, timeout, call, true)
 	if runErr != nil {
 		return errors.Join(runErr, cleanupErr)
+	}
+	if !answered(c.Expect) {
+		return cleanupErr
+	}
+	var want any
+	if err := decodeJSON(c.Expect, &want); err != nil {
+		return errors.Join(err, cleanupErr)
 	}
 	want, err = expand(want, vars)
 	if err != nil {
 		return errors.Join(err, cleanupErr)
 	}
-	actual, err := json.Marshal(got)
-	if err != nil {
-		return errors.Join(err, cleanupErr)
-	}
-	expected, err := json.Marshal(want)
-	if err != nil {
-		return errors.Join(err, cleanupErr)
-	}
-	if !bytes.Equal(actual, expected) {
-		return errors.Join(fmt.Errorf("%s: observations differ\n got: %s\nwant: %s", c.Name, actual, expected), cleanupErr)
+	if err := match(got, true, want, c.Name); err != nil {
+		return errors.Join(fmt.Errorf("%s: observations differ: %w", c.Name, err), cleanupErr)
 	}
 	return cleanupErr
 }

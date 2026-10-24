@@ -15,7 +15,7 @@ Do not copy the emulator's output into `expect` or automatically promote every
 collected answer into an assertion. Deliberate emulator limitations can be tested
 here, but must not be collected as expected BigQuery behavior.
 
-The initial migrated cases are:
+Migrated cases include:
 
 - `ddl_statistics.api.yaml`: statement types and DDL target tables, with independent
   fixtures for each statement and a shared execution template.
@@ -25,3 +25,8 @@ The initial migrated cases are:
 Query jobs are polled to completion; job errors are included in observations so an
 HTTP-success response cannot hide a failed query. New cases should likewise observe
 job completion and errors rather than assume that submitting a job finishes it.
+
+- `table_metadata.api.yaml` and `dataset_metadata.api.yaml` replace the table,
+  partitioning and dataset metadata lifecycle tests, including creation-time agreement
+  with INFORMATION_SCHEMA and rejected operations. Optional scalar expectations list
+  the representations the Go SDK previously decoded to the same value.

@@ -71,6 +71,9 @@ func (transport *Transport) Close() error {
 }
 
 func (transport *Transport) Call(ctx context.Context, step Step, vars map[string]any) (Response, error) {
+	if step.SQL != "" || step.Job != nil {
+		return transport.job(ctx, step, vars)
+	}
 	if step.REST != nil {
 		return transport.rest(ctx, *step.REST, vars)
 	}
