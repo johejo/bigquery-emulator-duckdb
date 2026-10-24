@@ -1,0 +1,99 @@
+# Endpoint predicates describe the stored edge orientation, independent of traversal.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#is_source_predicate
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-operators#is_destination_predicate
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE OF e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS SOURCE OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS DESTINATION OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS DESTINATION OF e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS NOT SOURCE OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS NOT SOURCE e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS NOT DESTINATION e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS NOT DESTINATION OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS DESTINATION e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)<-[e:Knows]-(b:Person) WHERE e.id = 10 RETURN a IS DESTINATION OF e AND b IS SOURCE OF e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE e.id = 10 AND a.id = 2 RETURN a IS NOT SOURCE OF e AND a IS DESTINATION OF e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e RETURN COUNT(*) AS result)
+=> "4"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS DESTINATION OF e RETURN COUNT(*) AS result)
+=> "4"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 12 RETURN a IS SOURCE OF e AND a IS DESTINATION OF e AS result)
+=> "true"
+
+# Identity uses hidden keys, all composite key components, and element table aliases.
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e RETURN COUNT(*) AS result)
+=> "4"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e AND a IS DESTINATION OF e RETURN COUNT(*) AS result)
+=> "1"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]->(b:Compound) WHERE e.edge_id = 'y' RETURN b IS SOURCE OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[e:CompoundEdge]-(b:Compound) WHERE a IS DESTINATION OF e RETURN COUNT(*) AS result)
+=> "3"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author)-[e:Knows]->(b:Reader) WHERE e.id = 12 RETURN b IS SOURCE OF e OR a IS DESTINATION OF e AS result)
+=> "false"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.AliasedNodes MATCH (a:Author)-[e:Knows]->(b:Reader) WHERE e.id = 12 RETURN a IS SOURCE OF e AND b IS DESTINATION OF e AS result)
+=> "true"
+
+# Endpoint metadata survives path construction, property-set casts, and MATCH stages.
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN PATH_FIRST(p) IS SOURCE OF EDGES(p)[OFFSET(0)] AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->(b:Person)-[o:Owns]->(c:Account) WHERE e.id = 11 RETURN PATH_LAST(p) IS DESTINATION OF EDGES(p)[OFFSET(1)] AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 MATCH (b:Person) RETURN b IS DESTINATION OF e AS result)
+=> "true"
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person WHERE a.id = 1) OPTIONAL MATCH (a:Person)-[e:Owns]->(b:Account) RETURN b IS DESTINATION OF e AS result)
+=> "true"
+
+# Until BigQuery NULL behavior is verified, reject NULL operands explicitly.
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, a, NULL) IS SOURCE OF e AS result)
+=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE OF IF(FALSE, e, NULL) AS result)
+=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, a, NULL) IS DESTINATION OF e AS result)
+=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS DESTINATION OF IF(FALSE, e, NULL) AS result)
+=> error contains: The emulator does not support graph endpoint predicates with NULL operands
+
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, IF(FALSE, a, NULL) IS SOURCE OF e, TRUE) AS result)
+=> "true"

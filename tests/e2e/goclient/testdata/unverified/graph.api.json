@@ -150,6 +150,121 @@
           }
         }
       }
+    },
+    {
+      "name": "graph_endpoint_nulls",
+      "steps": [
+        {
+          "name": "create_dataset",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/datasets",
+            "body": {
+              "datasetReference": {
+                "datasetId": "${dataset}"
+              },
+              "location": "US"
+            }
+          }
+        },
+        {
+          "name": "fixture",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "CREATE TABLE `${project}.${dataset}.Person` (id INT64, name STRING);\nINSERT `${project}.${dataset}.Person` VALUES (1, 'Alex'), (2, 'Dana'), (3, 'Lee');\nCREATE TABLE `${project}.${dataset}.Knows` (id INT64, src INT64, dst INT64);\nINSERT `${project}.${dataset}.Knows` VALUES (10, 1, 2), (11, 2, 1), (12, 1, 1), (13, 1, 2);\nCREATE PROPERTY GRAPH `${project}.${dataset}.FinGraph`\nNODE TABLES (`${project}.${dataset}.Person` AS Person KEY(id))\nEDGE TABLES (`${project}.${dataset}.Knows` AS Knows KEY(id) SOURCE KEY(src) REFERENCES Person(id) DESTINATION KEY(dst) REFERENCES Person(id));",
+              "timeoutMs": 200000,
+              "useLegacySql": false
+            }
+          }
+        },
+        {
+          "name": "null_source_node",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph` MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, a, NULL) IS SOURCE OF e AS result)",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "null_source_edge",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph` MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN a IS SOURCE OF IF(FALSE, e, NULL) AS result)",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "null_destination_node",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph` MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN IF(FALSE, b, NULL) IS DESTINATION OF e AS result)",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        },
+        {
+          "name": "null_destination_edge",
+          "rest": {
+            "method": "POST",
+            "path": "/bigquery/v2/projects/${project}/queries",
+            "body": {
+              "query": "SELECT * FROM GRAPH_TABLE(`${project}.${dataset}.FinGraph` MATCH (a:Person)-[e:Knows]->(b:Person) WHERE e.id = 10 RETURN b IS DESTINATION OF IF(FALSE, e, NULL) AS result)",
+              "useLegacySql": false
+            }
+          },
+          "observe": {
+            "error": "/body/error",
+            "errors": "/body/errors",
+            "httpStatus": "/status",
+            "jobComplete": "/body/jobComplete",
+            "rows": "/body/rows",
+            "schema": "/body/schema"
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "name": "delete_dataset",
+          "rest": {
+            "method": "DELETE",
+            "path": "/bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true"
+          }
+        }
+      ]
     }
   ]
 }

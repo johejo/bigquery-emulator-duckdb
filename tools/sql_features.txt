@@ -34,6 +34,8 @@ query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person) OPTIONAL MATC
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH TRAIL (a:Person)-[:Knows]-(b:Person)-[:Knows]-(c:Person) RETURN a.name)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH p = ACYCLIC (a:Person)-[:Knows]->(b:Person) RETURN PATH_LENGTH(p) AS length)
 query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[:Knows]->{1,2}(b:Person) RETURN a.name)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]-(b:Person) WHERE a IS SOURCE OF e RETURN b IS DESTINATION OF e AS is_destination)
+query `GRAPH_TABLE` | SELECT * FROM GRAPH_TABLE(g MATCH (a:Person)-[e:Knows]->(b:Person) RETURN a IS NOT DESTINATION e AS is_not_destination)
 note `CREATE PROPERTY GRAPH` | [Graph limits](compatibility.md#graphs).
 note `GRAPH_TABLE` | [Graph limits](compatibility.md#graphs).
 

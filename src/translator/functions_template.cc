@@ -620,6 +620,41 @@ std::vector<Rule> FromUnixTime(std::string_view timestamp, std::int64_t scale) {
 const std::unordered_map<std::string_view, std::vector<Rule>>& TemplateRules() {
   static const auto* const kRules = new std::unordered_map<std::string_view, std::vector<Rule>>{
       {
+          "$IS_SOURCE_NODE",
+          {
+              {
+                  .arity = 2,
+                  .spelling = "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                              "struct_extract($1, '$id') = struct_extract($2, '$source_id') END",
+                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
+                  .defaults = {},
+                  .errors =
+                      {
+                          "'The emulator does not support graph endpoint predicates with NULL "
+                          "operands'",
+                      },
+              },
+          },
+      },
+      {
+          "$IS_DEST_NODE",
+          {
+              {
+                  .arity = 2,
+                  .spelling =
+                      "CASE WHEN $1 IS NULL OR $2 IS NULL THEN !1 ELSE "
+                      "struct_extract($1, '$id') = struct_extract($2, '$destination_id') END",
+                  .conditions = {Is(1, {TYPE_GRAPH_ELEMENT}), Is(2, {TYPE_GRAPH_ELEMENT})},
+                  .defaults = {},
+                  .errors =
+                      {
+                          "'The emulator does not support graph endpoint predicates with NULL "
+                          "operands'",
+                      },
+              },
+          },
+      },
+      {
           "LABELS",
           {
               {

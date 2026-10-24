@@ -68,6 +68,12 @@ std::string ElementAlias(const googlesql::ResolvedGraphElementScan& element) {
   return QuoteIdentifier("g" + std::to_string(element.column_list(0).column_id()));
 }
 
+std::string ElementIdentity(const googlesql::GraphElementTable& table,
+                            const std::vector<std::string>& keys) {
+  return "CAST(to_json(struct_pack(\"$table\" := " + QuoteLiteral(table.FullName()) +
+         ", \"$keys\" := [" + Join(keys, ", ") + "])) AS VARCHAR)";
+}
+
 std::string EndpointMatch(const googlesql::ResolvedGraphElementScan& node,
                           const googlesql::ResolvedGraphElementScan& edge,
                           const googlesql::GraphNodeTableReference& reference) {
@@ -87,6 +93,31 @@ std::string EndpointMatch(const googlesql::ResolvedGraphElementScan& node,
             node_table->GetTable()->GetColumn(reference.GetNodeTableColumns().at(i))->Name())));
   }
   return "(" + Join(keys, " AND ") + ")";
+}
+
+// Read identities from the matched node rows, including when an endpoint references
+// columns other than the node's element key. Traversal direction does not change them.
+std::string EndpointIdentity(const googlesql::ResolvedGraphEdgeScan& edge,
+                             const googlesql::ResolvedGraphElementScan& left,
+                             const googlesql::ResolvedGraphElementScan& right, bool source) {
+  const auto identity = [](const googlesql::ResolvedGraphElementScan& node) {
+    const auto* table = node.target_element_table_list(0);
+    std::vector<std::string> keys;
+    std::ranges::transform(table->GetKeyColumns(), std::back_inserter(keys), [&](int key) {
+      return "CAST(" + ElementAlias(node) + "." +
+             QuoteIdentifier(table->GetTable()->GetColumn(key)->Name()) + " AS VARCHAR)";
+    });
+    return ElementIdentity(*table, keys);
+  };
+  const auto lhs = identity(source ? left : right);
+  const auto rhs = identity(source ? right : left);
+  if (edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY) {
+    const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
+    const auto forward = EndpointMatch(left, edge, *table->GetSourceNodeTable()) + " AND " +
+                         EndpointMatch(right, edge, *table->GetDestNodeTable());
+    return "CASE WHEN " + forward + " THEN " + lhs + " ELSE " + rhs + " END";
+  }
+  return edge.orientation() == googlesql::ResolvedGraphEdgeScan::LEFT ? rhs : lhs;
 }
 
 const googlesql::ResolvedColumnRef* GraphColumn(const googlesql::ResolvedExpr& expr) {
@@ -293,10 +324,13 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
   std::vector<std::string> tables;
   std::vector<std::string> connections;
   std::vector<const googlesql::ResolvedGraphElementScan*> elements;
-  for (const auto& part : path.input_scan_list()) {
-    if (!part->Is<googlesql::ResolvedGraphElementScan>()) {
-      return Unsupported(scope, "nested graph paths");
-    }
+  if (std::ranges::any_of(path.input_scan_list(), [](const auto& part) {
+        return !part->template Is<googlesql::ResolvedGraphElementScan>();
+      })) {
+    return Unsupported(scope, "nested graph paths");
+  }
+  for (size_t index = 0; index < path.input_scan_list().size(); ++index) {
+    const auto& part = path.input_scan_list().at(index);
     const auto& element = *part->GetAs<googlesql::ResolvedGraphElementScan>();
     if (element.target_element_table_list_size() != 1 || !element.hint_list().empty() ||
         element.column_list_size() != 1) {
@@ -326,9 +360,22 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
                                     QuoteIdentifier(key->Name()), output));
       keys.push_back("q." + output);
     }
-    const auto identity =
-        "CAST(to_json(struct_pack(\"$table\" := " + QuoteLiteral(element_table->FullName()) +
-        ", \"$keys\" := [" + Join(keys, ", ") + "])) AS VARCHAR)";
+    const auto identity = ElementIdentity(*element_table, keys);
+    std::string endpoints;
+    if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
+      const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
+      const auto& left =
+          *path.input_scan_list().at(index - 1)->GetAs<googlesql::ResolvedGraphElementScan>();
+      const auto& right =
+          *path.input_scan_list().at(index + 1)->GetAs<googlesql::ResolvedGraphElementScan>();
+      for (const bool source : {true, false}) {
+        const auto endpoint = EndpointIdentity(edge, left, right, source);
+        const std::string field = source ? "$source_id" : "$destination_id";
+        const auto output = QuoteIdentifier(field + "_" + std::to_string(column.column_id()));
+        outputs.push_back(std::format("{} AS {}", endpoint, output));
+        endpoints += ", " + QuoteIdentifier(field) + " := q." + output;
+      }
+    }
     absl::flat_hash_set<const googlesql::GraphElementLabel*> labels;
     if (!element_table->GetLabels(labels).ok() || labels.size() != 1) {
       return Unsupported(scope, "graph element tables without one static label");
@@ -357,8 +404,10 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
       fields.emplace_back("\"$empty\" := TRUE");
     }
     const auto pack = [&](const std::vector<std::string>& properties) {
-      return "struct_pack(\"$id\" := " + identity + ", \"$labels\" := [" + QuoteLiteral(label) +
-             "], \"$properties\" := struct_pack(" + Join(properties, ", ") + "))";
+      return std::format(
+          "struct_pack(\"$id\" := {}{}, \"$labels\" := [{}], "
+          "\"$properties\" := struct_pack({}))",
+          identity, endpoints, QuoteLiteral(label), Join(properties, ", "));
     };
     projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
     const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
