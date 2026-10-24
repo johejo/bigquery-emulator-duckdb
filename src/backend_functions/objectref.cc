@@ -10,12 +10,13 @@
 #include "duckdb.h"
 #include "nlohmann/json.hpp"
 #include "src/backend_error.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/external_query.h"
 
 namespace bigquery_emulator_duckdb::backend_functions {
+using namespace duckdb_functions;
 namespace {
 
 // bq_obj_authorizer(authorizer, project): OBJ.MAKE_REF's authorizer as PROJECT.LOCATION.CONNECTION,

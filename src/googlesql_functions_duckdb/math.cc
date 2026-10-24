@@ -16,13 +16,14 @@
 #include "googlesql/public/numeric_value.h"
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
-#include "src/backend_functions/apply.h"
-#include "src/backend_functions/math.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/apply.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_functions_duckdb/math.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
+using namespace duckdb_functions;
 namespace {
 
 // Read only the vector types the distance signatures resolve: DOUBLE arrays and
@@ -223,4 +224,4 @@ void RegisterMathFunctions(duckdb_connection connection) {
   Register(connection, "bq_euclidean_distance", {kAny, kAny}, kDouble, Distance<false>);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

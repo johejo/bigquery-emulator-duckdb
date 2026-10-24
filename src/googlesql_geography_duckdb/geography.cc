@@ -19,8 +19,8 @@
 #include "googlesql/base/status_macros.h"
 #include "s2/s2boolean_operation.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_geography/geography.h"
 #include "src/googlesql_geography/options.h"
@@ -29,14 +29,14 @@
 #include "src/googlesql_geography_duckdb/codec.h"
 
 namespace bigquery_emulator_duckdb::geography_duckdb {
-using backend_functions::Arguments;
-using backend_functions::EachRow;
-using backend_functions::kBigint;
-using backend_functions::kBlob;
-using backend_functions::kBoolean;
-using backend_functions::kDouble;
-using backend_functions::kVarchar;
-using backend_functions::Register;
+using duckdb_functions::Arguments;
+using duckdb_functions::EachRow;
+using duckdb_functions::kBigint;
+using duckdb_functions::kBlob;
+using duckdb_functions::kBoolean;
+using duckdb_functions::kDouble;
+using duckdb_functions::kVarchar;
+using duckdb_functions::Register;
 using googlesql_geography::BoundingBox;
 using googlesql_geography::Geography;
 using googlesql_geography::IndexedGeography;
@@ -204,7 +204,7 @@ void SetResult(duckdb_vector output, idx_t row, const BoxResult& result) {
   const BoundingBox& box = result.box;
   const std::array<double, 4> values = {box.xmin, box.ymin, box.xmax, box.ymax};
   for (idx_t i = 0; i < values.size(); ++i) {
-    backend_functions::SetResult(duckdb_struct_vector_get_child(output, i), row, values.at(i));
+    duckdb_functions::SetResult(duckdb_struct_vector_get_child(output, i), row, values.at(i));
   }
 }
 
@@ -253,7 +253,7 @@ bool CopyGeographies(duckdb_function_info /*info*/, idx_t count, duckdb_vector i
       duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
       continue;
     }
-    backend_functions::SetResult(output, row, VectorString(input, row));
+    duckdb_functions::SetResult(output, row, VectorString(input, row));
   }
   return true;
 }

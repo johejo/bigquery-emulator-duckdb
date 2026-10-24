@@ -9,9 +9,9 @@
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_hll/hll.h"
 #include "src/zetasketch/hyperloglog_plus_plus.h"
@@ -19,7 +19,7 @@
 namespace bigquery_emulator_duckdb::hll_duckdb {
 namespace {
 
-using namespace backend_functions;
+using namespace duckdb_functions;
 using googlesql_hll::Sketch;
 using googlesql_hll::ValueType;
 

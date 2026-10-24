@@ -1,0 +1,106 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+)
+
+cc_library(
+    name = "string",
+    srcs = ["string.cc"],
+    hdrs = ["string.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/strings",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:numeric_value",
+        "@googlesql//googlesql/public:type_cc_proto",
+        "@googlesql//googlesql/public:type_parameters_cc_proto",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/functions:convert_string",
+        "@googlesql//googlesql/public/functions:normalize_mode_cc_proto",
+        "@googlesql//googlesql/public/functions:string",
+        "@googlesql//googlesql/public/types",
+        "@googlesql//googlesql/reference_impl:type_parameter_constraints",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "datetime",
+    srcs = ["datetime.cc"],
+    hdrs = ["datetime.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public/functions:date_time_util",
+        "@googlesql//googlesql/public/functions:datetime_cc_proto",
+        "@googlesql//googlesql/public/functions:generate_array",
+        "@googlesql//googlesql/public/functions:parse_date_time",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:civil_time",
+    ],
+)
+
+cc_library(
+    name = "cast",
+    srcs = ["cast.cc"],
+    hdrs = ["cast.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":datetime",
+        "//:language_options",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:coercer",
+        "@googlesql//googlesql/public:timestamp_picos_value",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@googlesql//googlesql/public:numeric_value",
+    ],
+)
+
+cc_library(
+    name = "format",
+    srcs = ["format.cc"],
+    hdrs = ["format.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@googlesql//googlesql/public:options_cc_proto",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/functions:string_format",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "bignumeric",
+    srcs = ["bignumeric.cc"],
+    hdrs = ["bignumeric.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "@abseil-cpp//absl/status",
+        "@googlesql//googlesql/public:numeric_value",
+    ],
+    linkstatic = True,
+    deps = ["@abseil-cpp//absl/status:statusor"],
+)

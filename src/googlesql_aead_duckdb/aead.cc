@@ -5,14 +5,14 @@
 #include <string_view>
 
 #include "duckdb.h"
-#include "src/backend_functions/apply.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/apply.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/googlesql_aead/aead.h"
 
 namespace bigquery_emulator_duckdb::aead_duckdb {
 namespace {
-using namespace backend_functions;
+using namespace duckdb_functions;
 
 auto NewKeyset(const Arguments& arguments) {
   return googlesql_aead::NewKeyset(arguments.IsNull(0) ? "" : arguments.String(0));

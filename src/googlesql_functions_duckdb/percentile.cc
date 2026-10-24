@@ -21,11 +21,12 @@
 // list(), sorted as GoogleSQL sorts them: NULLs first, then NaNs, then the other values in
 // ascending order. GoogleSQL's PercentileEvaluator then reads the result off the sorted list.
 
-#include "src/backend_functions/percentile.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
+#include "src/googlesql_functions_duckdb/percentile.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
+using namespace duckdb_functions;
 namespace {
 
 using googlesql::BigNumericValue;
@@ -197,4 +198,4 @@ void RegisterPercentileFunctions(duckdb_connection connection) {
            /*nulls=*/false);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

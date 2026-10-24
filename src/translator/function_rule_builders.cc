@@ -44,7 +44,7 @@ std::vector<Rule> Concat(std::initializer_list<std::vector<Rule>> groups) {
   return rules;
 }
 
-// A call to `function`, a BIGNUMERIC function that src/backend_functions/bignumeric.cc
+// A call to `function`, a BIGNUMERIC function that src/googlesql_functions_duckdb/bignumeric.cc
 // implements, which takes and returns the units of a BIGNUM as text. `bignumerics` arguments are
 // BIGNUMERIC, and the `others` after them, such as ROUND's digits, go as they are.
 std::string BigNumericCall(std::string_view function, std::size_t bignumerics, std::size_t others) {

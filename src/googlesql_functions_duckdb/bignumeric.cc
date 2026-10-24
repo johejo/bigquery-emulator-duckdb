@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <format>
 #include <initializer_list>
 #include <limits>
 #include <optional>
@@ -25,21 +24,24 @@
 #include "googlesql/public/numeric_value.h"
 #include "src/backend_error.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_functions/bignumeric.h"
 
 // BIGNUMERIC arithmetic and conversions. The translator passes a BIGNUM to these functions, and
 // takes one back, as the VARCHAR of its units; see src/bignumeric.h. A conversion's last argument
 // is true under SAFE_CAST, which makes its errors NULL.
 
-#include "src/backend_functions/apply.h"
-#include "src/backend_functions/bignumeric.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/apply.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
+#include "src/googlesql_functions_duckdb/bignumeric.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
+using namespace duckdb_functions;
 namespace {
 
 namespace fn = googlesql::functions;
 using googlesql::BigNumericValue;
+using googlesql_functions::PrecisionScale;
 
 // The BIGNUMERIC of argument `column`, which holds the units of a BIGNUM.
 absl::StatusOr<BigNumericValue> Units(const Arguments& arguments, idx_t column) {
@@ -205,37 +207,6 @@ bool ToNumeric(BigNumericValue value, std::string* out, absl::Status* error) {
   *out = numeric.ToString();
   return true;
 }
-
-// The precision and scale of a BIGNUMERIC(P, S) column, as GoogleSQL's reference implementation
-// applies them: a value is rounded half away from zero to the scale, then must have no more
-// digits than the precision.
-struct PrecisionScale {
-  int64_t precision;
-  int64_t scale;
-
-  [[nodiscard]] absl::StatusOr<BigNumericValue> Apply(BigNumericValue value) const {
-    const auto rounded = value.Round(scale);
-    if (!rounded.ok()) {
-      return rounded.status();
-    }
-    std::string nines(precision, '9');
-    if (scale > 0) {
-      nines.insert(nines.size() - scale, ".");
-    }
-    const auto upper = BigNumericValue::FromString(nines);
-    if (!upper.ok()) {
-      return upper.status();
-    }
-    if (*rounded <= *upper && *rounded >= upper->Negate().value()) {
-      return *rounded;
-    }
-    const std::string type = scale == 0 ? std::format("BIGNUMERIC({})", precision)
-                                        : std::format("BIGNUMERIC({}, {})", precision, scale);
-    return absl::OutOfRangeError(std::format(
-        "{} has precision {} and scale {} but got a value that is not in range of [-{}, {}]", type,
-        precision, scale, upper->ToString(), upper->ToString()));
-  }
-};
 
 // The cast to a stored BIGNUMERIC type from a BIGNUM or, with `kUnits`, from the VARCHAR
 // of its units, which loads write. Extra parameters enforce a declared precision and scale.
@@ -426,4 +397,4 @@ void RegisterBigNumericFunctions(duckdb_connection connection) {
   RegisterBigNumericTypes(connection);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

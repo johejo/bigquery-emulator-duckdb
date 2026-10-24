@@ -5,7 +5,7 @@
 
 #include "duckdb.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::duckdb_functions {
 
 // Registers `function` under `name`, taking `parameters` and returning `result`. Unless `nulls`
 // is false, DuckDB makes the result NULL for a NULL argument without calling `function`. A
@@ -24,4 +24,4 @@ void Register(duckdb_connection connection, const char* name,
               duckdb_scalar_function_t function, bool nulls = true,
               std::optional<duckdb_type> varargs = std::nullopt, bool volatile_result = false);
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::duckdb_functions

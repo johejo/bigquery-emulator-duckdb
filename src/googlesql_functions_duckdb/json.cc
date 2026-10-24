@@ -35,17 +35,19 @@
 #include "googlesql/public/types/type_factory.h"
 #include "googlesql/public/value.h"
 #include "nlohmann/json.hpp"
-#include "src/backend_functions/datetime.h"
-#include "src/backend_functions/json.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_functions/datetime.h"
+#include "src/googlesql_functions_duckdb/json.h"
 #include "src/interval.h"
 #include "src/language_options.h"
 #include "src/type_mapping.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
+using namespace duckdb_functions;
+using namespace googlesql_functions;
 namespace {
 
 // How GoogleSQL reads JSON values under the analyzer's language options, which round wide numbers
@@ -961,4 +963,4 @@ void RegisterJsonFunctions(duckdb_connection connection) {
            JsonStripNulls, /*nulls=*/false);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

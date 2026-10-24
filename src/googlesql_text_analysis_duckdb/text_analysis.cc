@@ -13,14 +13,14 @@
 #include "absl/status/statusor.h"
 #include "duckdb.h"
 #include "src/backend_error.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/googlesql_text_analysis/text_analysis.h"
 
 namespace bigquery_emulator_duckdb::text_analysis_duckdb {
 namespace {
-using namespace backend_functions;
+using namespace duckdb_functions;
 using googlesql_text_analysis::Analyzer;
 using googlesql_text_analysis::Dictionary;
 using googlesql_text_analysis::DocumentCounts;
@@ -163,9 +163,8 @@ void SetResult(duckdb_vector output, idx_t row, const Scores& scores) {
   duckdb_vector_ensure_validity_writable(term);
   for (idx_t i = 0; i < scores.values.size(); ++i) {
     const Score& score = scores.values.at(i);
-    backend_functions::SetResult(term, offset + i, score.term);
-    backend_functions::SetResult(duckdb_struct_vector_get_child(child, 1), offset + i,
-                                 score.tf_idf);
+    duckdb_functions::SetResult(term, offset + i, score.term);
+    duckdb_functions::SetResult(duckdb_struct_vector_get_child(child, 1), offset + i, score.tf_idf);
   }
   duckdb_list_vector_set_size(output, offset + scores.values.size());
   static_cast<duckdb_list_entry*>(duckdb_vector_get_data(output))[row] = {

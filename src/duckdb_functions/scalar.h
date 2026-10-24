@@ -11,7 +11,7 @@
 #include "duckdb.h"
 #include "src/duckdb_handle.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::duckdb_functions {
 
 inline constexpr duckdb_type kAny = DUCKDB_TYPE_ANY;
 inline constexpr duckdb_type kBigint = DUCKDB_TYPE_BIGINT;
@@ -202,4 +202,4 @@ absl::StatusOr<T> ToStatusOr(bool ok, T value, const absl::Status& error) {
   return value;
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::duckdb_functions

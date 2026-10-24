@@ -19,7 +19,7 @@
 #include "quickjs.h"
 #include "src/backend_error.h"
 #include "src/backend_functions/javascript_limits.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 
 // JavaScript UDFs, run by QuickJS. The translator passes the UDF as the source of a function
@@ -29,6 +29,7 @@
 // in it; no state outlives the query.
 
 namespace bigquery_emulator_duckdb::backend_functions {
+using namespace duckdb_functions;
 namespace {
 
 // The results a JavaScript UDF can return, each registered as a function of its own since a

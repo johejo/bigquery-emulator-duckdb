@@ -10,8 +10,8 @@ cc_library(
     implementation_deps = [
         "//:backend_error",
         "//:duckdb_handle",
-        "//src/backend_functions:register",
-        "//src/backend_functions:scalar",
+        "//src/duckdb_functions:register",
+        "//src/duckdb_functions:scalar",
         "//src/googlesql_text_analysis",
         "@abseil-cpp//absl/status:statusor",
     ],

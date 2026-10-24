@@ -17,8 +17,8 @@
 #include "duckdb.h"
 #include "googlesql/public/interval_value.h"
 #include "googlesql/public/numeric_value.h"
-#include "src/backend_functions/scalar.h"
 #include "src/bignumeric.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
 #include "src/interval.h"
 
@@ -35,7 +35,7 @@
 // A captureless lambda converted to a function pointer, such as Apply<+[](...) {...}>, adapts a
 // function that takes fixed arguments or another convention.
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::duckdb_functions {
 
 // How a function's T argument is read from a column, and how a T result is written. A Codec
 // that has no Read supports T only as a result.
@@ -261,4 +261,4 @@ void Apply(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector out
   });
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::duckdb_functions

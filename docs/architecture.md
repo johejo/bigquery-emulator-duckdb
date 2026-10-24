@@ -79,15 +79,21 @@ functions use this representation; it is never returned as an ordinary STRUCT to
 
 DuckDB executes translated SQL through its C++ API. Each project is a catalog and each dataset a
 schema. Results are encoded in BigQuery's REST row format.
-[src/backend_functions/](../src/backend_functions/) exposes GoogleSQL implementations through
-DuckDB functions. Emulator implementations are grouped by SQL feature in `src/googlesql_<feature>/`:
+[googlesql_functions](../src/googlesql_functions/) owns scalar function compatibility logic,
+including string validation, casts, date and time parsing and formatting, without depending on
+DuckDB. [googlesql_functions_duckdb](../src/googlesql_functions_duckdb/) registers those functions
+and upstream GoogleSQL functions, converts vectors and storage representations, and manages
+aggregate callbacks. Upstream functions can be registered directly without an extra semantic wrapper.
+
+Emulator implementations are also grouped by SQL feature in `src/googlesql_<feature>/`:
 [geography](../src/googlesql_geography/), [AEAD and keysets](../src/googlesql_aead/),
 [text analysis](../src/googlesql_text_analysis/) and [HLL sketches](../src/googlesql_hll/).
 These libraries own input validation, computation and compatibility errors without depending on
-DuckDB. Their `googlesql_<feature>_duckdb` adapters register functions, convert vectors and storage
-representations, and manage aggregate callbacks. The `googlesql_` prefix denotes GoogleSQL-compatible
-semantics, including emulator implementations. Shared DuckDB registration and vector helpers remain
-in `src/backend_functions/`.
+DuckDB. Their `googlesql_<feature>_duckdb` adapters handle registration and DuckDB representations.
+The `googlesql_` prefix denotes GoogleSQL-compatible semantics, including emulator implementations.
+Shared DuckDB registration and vector helpers live in [duckdb_functions](../src/duckdb_functions/).
+JavaScript and Python UDF runtimes and ObjectRef functions over external connections remain in
+[src/backend_functions/](../src/backend_functions/).
 
 HLL uses a [port of zetasketch](../src/zetasketch/README.md) for BigQuery-compatible sketches;
 the HLL library supplies BigQuery's input hashing, value type identifiers and precision and merge rules.

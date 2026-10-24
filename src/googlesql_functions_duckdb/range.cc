@@ -1,4 +1,4 @@
-#include "src/backend_functions/range.h"
+#include "src/googlesql_functions_duckdb/range.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,13 +17,15 @@
 #include "googlesql/public/functions/date_time_util.h"
 #include "googlesql/public/functions/range.h"
 #include "googlesql/public/interval_value.h"
-#include "src/backend_functions/apply.h"
-#include "src/backend_functions/datetime.h"
-#include "src/backend_functions/register.h"
-#include "src/backend_functions/scalar.h"
+#include "src/duckdb_functions/apply.h"
+#include "src/duckdb_functions/register.h"
+#include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/googlesql_functions/datetime.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::functions_duckdb {
+using namespace duckdb_functions;
+using namespace googlesql_functions;
 namespace {
 
 namespace fn = googlesql::functions;
@@ -156,4 +158,4 @@ void RegisterRangeFunctions(duckdb_connection connection) {
   }
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::functions_duckdb

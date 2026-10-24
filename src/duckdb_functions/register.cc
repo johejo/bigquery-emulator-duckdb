@@ -1,4 +1,4 @@
-#include "src/backend_functions/register.h"
+#include "src/duckdb_functions/register.h"
 
 #include <optional>
 #include <string>
@@ -8,7 +8,7 @@
 #include "src/backend_error.h"
 #include "src/duckdb_handle.h"
 
-namespace bigquery_emulator_duckdb::backend_functions {
+namespace bigquery_emulator_duckdb::duckdb_functions {
 
 void Register(duckdb_connection connection, const char* name,
               const std::vector<duckdb_logical_type>& parameters, duckdb_logical_type result,
@@ -61,4 +61,4 @@ void Register(duckdb_connection connection, const char* name,
   Register(connection, name, parameters, type.get(), function, nulls, varargs, volatile_result);
 }
 
-}  // namespace bigquery_emulator_duckdb::backend_functions
+}  // namespace bigquery_emulator_duckdb::duckdb_functions
