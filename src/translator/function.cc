@@ -28,6 +28,7 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::ArgumentMode;
 using function_catalog::BucketWidthOf;
 using function_catalog::Catalog;
 using function_catalog::DatePart;
@@ -292,6 +293,16 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   const bool alias = entry->translation == Translation::kSafe;
   const std::string function = alias ? std::string(entry->target) : name;
+  if (alias) {
+    entry = functions.Find(function);
+    if (entry == nullptr) {
+      return Unsupported(scope, "function " + name);
+    }
+  }
+  const auto argument_mode = [&](size_t i) {
+    return i < entry->argument_modes.size() ? entry->argument_modes.at(i)
+                                            : ArgumentMode::kExpression;
+  };
   const bool safe =
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE || alias;
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
@@ -352,9 +363,19 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   // CASE with a value carries its results when it compares no INTERVAL values.
   const bool carries_results =
       function == "$CASE_WITH_VALUE" && !HasInterval(call.argument_list(0)->type());
+  // A declared conversion permits INTERVAL only in the argument it converts, not in the
+  // result or nested inside another argument's ARRAY or STRUCT.
+  bool converts_intervals = !HasInterval(call.type());
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto* type = call.argument_list(static_cast<int>(i))->type();
+    if (HasInterval(type) &&
+        (!type->IsInterval() || argument_mode(i) != ArgumentMode::kBucketWidth)) {
+      converts_intervals = false;
+    }
+  }
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && !carries_results &&
-      entry->handler != Bucket && !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !converts_intervals && !functions.HasTypeUse(function, TypeUse::kCarries) &&
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
@@ -388,12 +409,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !functions.HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
     return Unsupported(scope, "function " + name + " with STRUCT<>");
   }
-  const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;
-  for (const auto& argument : call.argument_list()) {
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto& argument = call.argument_list(static_cast<int>(i));
     // The bucket width INTERVAL becomes a plain count, since DuckDB intervals keep no single
     // part to count in.
-    if (bucket && argument->type()->IsInterval()) {
+    if (argument_mode(i) == ArgumentMode::kBucketWidth) {
       const auto width = BucketWidthOf(*argument);
       if (!width) {
         return Unsupported(scope, "function " + name + " bucket width");

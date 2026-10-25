@@ -1,6 +1,7 @@
 #include "src/translator/functions.h"
 
 #include <array>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -13,6 +14,7 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::ArgumentMode;
 using function_catalog::Handler;
 using function_catalog::Implementation;
 using function_catalog::Translation;
@@ -67,7 +69,11 @@ struct HandledFunction {
   Handler handler;
   Implementation implementation = Implementation::kSQLInCode;
   TypeUses uses = {};
+  std::span<const ArgumentMode> argument_modes = {};
 };
+
+constexpr auto kBucketArgumentModes =
+    std::to_array<ArgumentMode>({ArgumentMode::kExpression, ArgumentMode::kBucketWidth});
 
 // Functions that src/translator/handlers.cc translates in code.
 constexpr auto kHandlers =
@@ -118,9 +124,9 @@ constexpr auto kHandlers =
             },
             {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
             {"ALL_DIFFERENT", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
-            {"DATE_BUCKET", {.handler = Bucket}},
-            {"DATETIME_BUCKET", {.handler = Bucket}},
-            {"TIMESTAMP_BUCKET", {.handler = Bucket}},
+            {"DATE_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
+            {"DATETIME_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
+            {"TIMESTAMP_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
             {
                 "TO_JSON",
                 {
@@ -320,6 +326,11 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .uses = function.uses,
                             .implementations = {function.implementation},
                             .handler = function.handler,
+                            .argument_modes =
+                                {
+                                    function.argument_modes.begin(),
+                                    function.argument_modes.end(),
+                                },
                         });
   }
   for (const auto& [name, target] : kSafeFunctions) {
