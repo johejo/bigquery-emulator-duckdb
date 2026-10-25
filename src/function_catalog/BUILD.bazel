@@ -7,12 +7,14 @@ cc_library(
     name = "function_catalog",
     srcs = [
         "catalog.cc",
+        "comparison.cc",
         "resolved_access.cc",
         "rule_builders.cc",
         "rules.cc",
     ],
     hdrs = [
         "catalog.h",
+        "comparison.h",
         "resolved_access.h",
         "rule_builders.h",
         "rules.h",

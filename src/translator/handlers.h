@@ -5,10 +5,6 @@
 
 #include "src/function_catalog/catalog.h"
 
-namespace googlesql {
-class Type;
-}  // namespace googlesql
-
 namespace bigquery_emulator_duckdb::translator {
 
 // The handlers that the registry in functions.cc names.
@@ -36,8 +32,5 @@ std::optional<std::string> FetchMetadata(const function_catalog::ScalarCall& cal
 // Equality, IN, CASE with a value and NULLIF over STRUCTs, which BigQuery compares field by field
 // with NULL fields propagating NULL; registrations select this for a STRUCT first argument.
 std::optional<std::string> StructComparison(const function_catalog::ScalarCall& call);
-// `value` IN UNNEST(`array`) for a STRUCT `type`.
-std::string StructInArray(const googlesql::Type* type, const std::string& value,
-                          const std::string& array);
 
 }  // namespace bigquery_emulator_duckdb::translator

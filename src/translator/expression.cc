@@ -17,14 +17,17 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/comparison.h"
 #include "src/translator/context.h"
 #include "src/translator/function.h"
-#include "src/translator/handlers.h"
 #include "src/translator/literal.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::StructInArray;
+
 namespace {
 
 // A cast of `sql` between scalar types `from` and `to` by GoogleSQL's conversion, where DuckDB's

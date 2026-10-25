@@ -34,7 +34,6 @@ cc_library(
     ],
     copts = ["-std=c++20"],
     implementation_deps = [
-        ":functions",
         ":literal",
         "//:catalog_table",
         "//:connection_id",
