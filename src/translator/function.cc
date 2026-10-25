@@ -360,7 +360,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&
-      entry->translation != Translation::kS2 &&
+      !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsGeography) &&
       !functions.HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
   }

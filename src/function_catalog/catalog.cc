@@ -69,9 +69,9 @@ void Catalog::Add(std::string_view name, FunctionEntry entry) {
 }
 
 void Catalog::AddRules(std::string_view name, const FunctionDefinition<Rule>& definition,
-                       Translation translation, Implementation fallback) {
+                       Implementation fallback) {
   Add(name, {
-                .translation = translation,
+                .translation = Translation::kRules,
                 .uses = definition.uses,
                 .implementations = Implementations(definition.rules, fallback),
                 .rules = definition.rules,

@@ -179,8 +179,6 @@ std::optional<std::string> Catalog::Translate(std::string_view upper_name,
     case Translation::kRenamed:
       return Invoke(entry->target, arguments);
     case Translation::kRules:
-    case Translation::kBackend:
-    case Translation::kS2:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
       if (const auto rule = std::ranges::find_if(

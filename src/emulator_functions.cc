@@ -12,8 +12,7 @@ const function_catalog::Catalog& EmulatorFunctionCatalog() {
     auto* functions = new function_catalog::Catalog();
     translator::AddBuiltinFunctions(*functions);
     for (const auto& [name, definition] : geography_duckdb::GeographyFunctions()) {
-      functions->AddRules(name, definition, function_catalog::Translation::kS2,
-                          function_catalog::Implementation::kS2);
+      functions->AddRules(name, definition, function_catalog::Implementation::kS2);
     }
     return functions;
   }();

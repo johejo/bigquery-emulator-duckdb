@@ -180,6 +180,8 @@ enum class TypeUse : std::uint8_t {
   // Aggregate or analytic functions that order, compare or carry a RANGE's STRUCT as BigQuery
   // does its RANGE.
   kAggregatesRange,
+  // Build or read the BLOB that holds a GEOGRAPHY without treating it as BYTES.
+  kBuildsOrReadsGeography,
   // Read the placeholder field of a STRUCT<> as an empty STRUCT, as the JSON and FORMAT backends
   // do, or carry it.
   kReadsEmptyStruct,

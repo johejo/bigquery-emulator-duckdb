@@ -59,7 +59,9 @@ The translator receives a read-only [function catalog](../src/function_catalog/c
 caller. The catalog owns registry entries and expands rules into SQL; it does not select feature
 adapters. Each registration keeps its translation and `TypeUse` attributes together, with
 argument restrictions in the overload rules. Calls use these attributes to reject unsupported
-uses of physical representations such as graph STRUCTs or BIGNUMERIC values.
+uses of physical representations such as graph STRUCTs or BIGNUMERIC values. Rule expansion
+is the same for all backends; GEOGRAPHY support is a type attribute, independent of the backend
+reported in the function support table.
 
 [emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
 [builtin definitions](../src/translator/functions.cc) and feature providers. The emulator and

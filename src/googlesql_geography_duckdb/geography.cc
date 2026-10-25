@@ -308,6 +308,7 @@ struct BackendDefinition {
   }
 
   BackendDefinition& Sql(std::string_view function, std::vector<Rule> rules, TypeUses uses = {}) {
+    uses |= {TypeUse::kBuildsOrReadsGeography};
     functions.emplace_back(function,
                            FunctionDefinition<Rule>{.rules = std::move(rules), .uses = uses});
     return *this;

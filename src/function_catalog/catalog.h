@@ -49,12 +49,6 @@ enum class Translation : std::uint8_t {
   kRenamed,
   // DuckDB SQL templates, chosen by the arguments.
   kRules,
-  // Templates calling GoogleSQL's own implementation, which src/backend_functions.cc registers
-  // with DuckDB as a bq_* function.
-  kBackend,
-  // Templates calling the emulator's GEOGRAPHY functions over the S2 Geometry library, which
-  // src/googlesql_geography_duckdb/geography.cc registers with DuckDB as bq_* functions.
-  kS2,
   // Code in src/translator/handlers.cc.
   kHandler,
   // Another function with the SAFE. prefix, as SAFE_ADD is SAFE.$ADD.
@@ -70,7 +64,7 @@ struct FunctionEntry {
   Translation translation;
   TypeUses uses = {};
   std::vector<Implementation> implementations;
-  // kRules, kBackend and kS2: the rules, the first that matches a call translating it.
+  // kRules: the rules, the first that matches a call translating it.
   std::vector<Rule> rules = {};
   // kRenamed: the DuckDB function. kSafe: the function it is with SAFE.
   std::string_view target = {};
@@ -86,7 +80,7 @@ class Catalog {
  public:
   void Add(std::string_view name, FunctionEntry entry);
   void AddRules(std::string_view name, const FunctionDefinition<Rule>& definition,
-                Translation translation, Implementation fallback);
+                Implementation fallback);
   [[nodiscard]] const FunctionEntry* Find(std::string_view upper_name) const;
   [[nodiscard]] bool HasTypeUse(std::string_view upper_name, TypeUse use) const;
   [[nodiscard]] std::optional<std::string> Translate(std::string_view upper_name,

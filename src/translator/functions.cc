@@ -294,10 +294,10 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
 
 void AddBuiltinFunctions(function_catalog::Catalog& functions) {
   for (const auto& [name, definition] : TemplateRules()) {
-    functions.AddRules(name, definition, Translation::kRules, Implementation::kSQL);
+    functions.AddRules(name, definition, Implementation::kSQL);
   }
   for (const auto& [name, definition] : BackendRules()) {
-    functions.AddRules(name, definition, Translation::kBackend, Implementation::kGoogleSQL);
+    functions.AddRules(name, definition, Implementation::kGoogleSQL);
   }
   for (const auto& [name, function] : kFunctionNames) {
     functions.Add(name, {
