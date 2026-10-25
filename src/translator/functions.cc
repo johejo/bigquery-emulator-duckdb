@@ -379,6 +379,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .translation = Translation::kAggregate,
                             .uses = definition.uses,
                             .implementations = {Implementation::kAggregate},
+                            .type_rejections = definition.type_rejections,
                             .aggregates = definition.rules,
                         });
   }
@@ -387,6 +388,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .translation = Translation::kAnalytic,
                             .uses = definition.uses,
                             .implementations = {Implementation::kAnalytic},
+                            .type_rejections = definition.type_rejections,
                             .aggregates = definition.rules,
                         });
   }

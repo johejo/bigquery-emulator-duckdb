@@ -4,12 +4,14 @@
 // literals. The registry and its handlers do not depend on the AST definitions, so this is the
 // only place they reach the AST from.
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
 
 namespace googlesql {
+class ResolvedAggregateFunctionCall;
 class ResolvedExpr;
 class ResolvedFunctionCallBase;
 }  // namespace googlesql
@@ -21,6 +23,9 @@ struct TypeRejection;
 // Raise the registered BigQuery error when the resolved argument types match a rejection.
 void RejectArgumentTypes(const googlesql::ResolvedFunctionCallBase& call,
                          std::span<const TypeRejection> rejections);
+
+// Whether an aggregate orders solely by its argument, which must be a column reference.
+bool OrdersOnlyArgument(const googlesql::ResolvedAggregateFunctionCall& call, std::size_t argument);
 
 // Whether `expr` is a literal or a query parameter, as BigQuery requires of some arguments.
 bool IsConstant(const googlesql::ResolvedExpr& expr);

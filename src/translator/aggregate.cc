@@ -19,6 +19,7 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
 #include "src/language_options.h"
 #include "src/translator/context.h"
@@ -34,6 +35,8 @@ using function_catalog::AggregateOrder;
 using function_catalog::AggregateRule;
 using function_catalog::Condition;
 using function_catalog::FunctionEntry;
+using function_catalog::OrdersOnlyArgument;
+using function_catalog::RejectArgumentTypes;
 using function_catalog::Translation;
 using function_catalog::TypeUse;
 
@@ -95,28 +98,11 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                     condition.types.end();
            });
   });
-  // GoogleSQL accepts INTERVAL values in these, but BigQuery rejects them after analysis.
-  static const std::map<std::string_view, std::string_view> interval_rejections = {
-      {"APPROX_COUNT_DISTINCT", "Unsupported type INTERVAL for hll_count.init."},
-      {"APPROX_QUANTILES", "Unsupported type INTERVAL for aggregate function approx_quantiles"},
-      {"APPROX_TOP_COUNT", "Unsupported type INTERVAL for approx_top_count_shard."},
-      {"APPROX_TOP_SUM", "Unsupported type INTERVAL for approx_top_sum_shard."},
-  };
-  if (const auto rejection = interval_rejections.find(name);
-      rejection != interval_rejections.end() && type_of(0) == googlesql::TYPE_INTERVAL) {
-    throw std::invalid_argument(std::string(rejection->second));
-  }
-  // BigQuery rejects ARRAY_AGG over INTERVAL values ordered by themselves alone after analysis,
-  // as it must with DISTINCT, but orders them by other keys, also with themselves.
-  if (name == "ARRAY_AGG" && type_of(0) == googlesql::TYPE_INTERVAL && aggregate != nullptr &&
-      !aggregate->order_by_item_list().empty()) {
-    const auto& items = aggregate->order_by_item_list();
-    if (call.distinct() ||
-        (items.size() == 1 && call.argument_list(0)->Is<googlesql::ResolvedColumnRef>() &&
-         call.argument_list(0)->GetAs<googlesql::ResolvedColumnRef>()->column() ==
-             items.at(0)->column_ref()->column())) {
-      throw std::invalid_argument("Unsupported type INTERVAL for array_agg.");
-    }
+  RejectArgumentTypes(call, entry->type_rejections);
+  if (rule != entry->aggregates.end() && !rule->order_by_argument_error.empty() &&
+      aggregate != nullptr && !aggregate->order_by_item_list().empty() &&
+      (call.distinct() || OrdersOnlyArgument(*aggregate, 0))) {
+    throw std::invalid_argument(std::string(rule->order_by_argument_error));
   }
   // Only an INTERVAL overload takes INTERVAL values, and one that carries them takes them in
   // other values; the others would add or compare them as DuckDB does.
@@ -131,19 +117,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       std::ranges::any_of(call.argument_list(),
                           [](const auto& argument) { return HasEmptyStruct(argument->type()); })) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with STRUCT<>");
-  }
-  // BigQuery rejects these over RANGE values although GoogleSQL accepts them, naming the
-  // functions it implements them with.
-  static const std::map<std::string_view, std::string_view> range_rejections = {
-      {"APPROX_COUNT_DISTINCT", "hll_count.init"},
-      {"APPROX_TOP_COUNT", "approx_top_count_shard"},
-      {"APPROX_TOP_SUM", "approx_top_sum_shard"},
-  };
-  if (const auto rejection = range_rejections.find(name);
-      rejection != range_rejections.end() && !call.argument_list().empty() &&
-      call.argument_list(0)->type()->IsRange()) {
-    throw std::invalid_argument("Unsupported type RANGE for " + std::string(rejection->second) +
-                                ".");
   }
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),

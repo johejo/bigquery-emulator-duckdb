@@ -42,6 +42,16 @@ void RejectArgumentTypes(const googlesql::ResolvedFunctionCallBase& call,
   }
 }
 
+bool OrdersOnlyArgument(const googlesql::ResolvedAggregateFunctionCall& call, size_t argument) {
+  if (argument >= call.argument_list().size() || call.order_by_item_list().size() != 1) {
+    return false;
+  }
+  const auto* expression = call.argument_list(static_cast<int>(argument));
+  return expression->Is<googlesql::ResolvedColumnRef>() &&
+         expression->GetAs<googlesql::ResolvedColumnRef>()->column() ==
+             call.order_by_item_list(0)->column_ref()->column();
+}
+
 bool IsConstant(const googlesql::ResolvedExpr& expr) {
   return expr.Is<googlesql::ResolvedLiteral>() || expr.Is<googlesql::ResolvedParameter>();
 }

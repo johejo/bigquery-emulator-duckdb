@@ -147,6 +147,9 @@ struct AggregateRule {
   // A finish containing a subquery needs its aggregate result in a preceding SELECT.
   // DuckDB cannot bind constant aggregates or correlated windows inside that subquery.
   bool finish_after_scan = false;
+  // Reject ORDER BY of the first argument alone, or any ORDER BY with DISTINCT, with this
+  // error. Other order keys, including ones combined with the first argument, remain allowed.
+  std::string_view order_by_argument_error = {};
 };
 
 // What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a
