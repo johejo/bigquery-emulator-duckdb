@@ -196,9 +196,15 @@ execution states use separate processes and Python globals.
 
 The `python_udf_worker` executable links the rules_python CPython 3.11 runtime; the main
 emulator does not link or initialize libpython. The worker uses the CPython C API for compilation,
-argument conversion and calls. A private Unix socket carries JSON records, with hex for BYTES
-and strings for floating-point values so nonfinite values survive transport. Standard input,
-output and error point to the null device, separately from the protocol socket. The parent polls
-nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
+argument conversion and calls. A private Unix socket carries newline-delimited JSON batches,
+with hex for BYTES and strings for floating-point values so nonfinite values survive transport.
+Definitions and argument schemas are sent once per worker, then referenced by worker-local IDs.
+Requests group up to 256 rows within a DuckDB chunk, targeting at most 1 MiB of encoded rows;
+a single larger row is allowed within the 64 MiB frame limit. Results use separate frames,
+targeting 1 MiB, so the frame limit does not cap a batch's combined results. An empty line
+acknowledges each completed scalar call; the parent renews the call deadline on progress without
+requiring a round trip before the next row. An error stops the batch and fails the query.
+Standard input, output and error point to the null device, separately from the protocol socket.
+The parent polls nonblocking I/O against a call deadline and kills the worker process group on cleanup, then
 waits for its child. On Linux, address space limits apply before Python initializes. On macOS,
 where Darwin rejects `RLIMIT_AS`, the parent samples the worker's resident memory while polling.

@@ -2,17 +2,15 @@
 
 #include <charconv>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <system_error>
 #include <type_traits>
-#include <utility>
+#include <vector>
 
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
 #include "absl/strings/escaping.h"
 #include "duckdb.h"
 #include "nlohmann/json.hpp"
@@ -29,28 +27,43 @@ using nlohmann::json;
 using udf::PythonOptions;
 using udf::python::Worker;
 
-json Argument(const Arguments& arguments, idx_t column) {
+const char* TypeName(duckdb_type type) {
+  switch (type) {
+    case DUCKDB_TYPE_BOOLEAN:
+      return "BOOL";
+    case DUCKDB_TYPE_BIGINT:
+      return "INT64";
+    case DUCKDB_TYPE_DOUBLE:
+      return "FLOAT64";
+    case DUCKDB_TYPE_VARCHAR:
+      return "STRING";
+    case DUCKDB_TYPE_BLOB:
+      return "BYTES";
+    default:
+      throw std::runtime_error("Unsupported Python UDF argument type");
+  }
+}
+
+json Argument(const Arguments& arguments, idx_t column, duckdb_type type) {
   if (arguments.IsNull(column)) {
     return nullptr;
   }
-  const LogicalType type(duckdb_vector_get_column_type(arguments.Vector(column)));
-  switch (duckdb_get_type_id(type.get())) {
+  switch (type) {
     case DUCKDB_TYPE_BOOLEAN:
-      return json::array({"BOOL", arguments.Bool(column)});
+      return arguments.Bool(column);
     case DUCKDB_TYPE_BIGINT:
-      return json::array({"INT64", arguments.Int(column)});
+      return arguments.Int(column);
     case DUCKDB_TYPE_DOUBLE: {
       const double value = arguments.Double(column);
-      const std::string encoded = std::isfinite(value) ? json(value).dump()
-                                  : std::isnan(value)  ? "nan"
-                                  : value < 0          ? "-inf"
-                                                       : "inf";
-      return json::array({"FLOAT64", encoded});
+      return std::isfinite(value) ? json(value).dump()
+             : std::isnan(value)  ? "nan"
+             : value < 0          ? "-inf"
+                                  : "inf";
     }
     case DUCKDB_TYPE_VARCHAR:
-      return json::array({"STRING", arguments.String(column)});
+      return arguments.String(column);
     case DUCKDB_TYPE_BLOB:
-      return json::array({"BYTES", absl::BytesToHexString(arguments.String(column))});
+      return absl::BytesToHexString(arguments.String(column));
     default:
       throw std::runtime_error("Unsupported Python UDF argument type");
   }
@@ -63,37 +76,69 @@ void Call(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector outp
     if (worker == nullptr) {
       throw std::runtime_error("Python UDF called without a worker");
     }
-    EachRow(
-        info, input, output,
-        [&](const Arguments& arguments) -> absl::StatusOr<std::optional<T>> {
-          json cells = json::array();
-          for (idx_t column = 1; column < duckdb_data_chunk_get_column_count(input); ++column) {
-            cells.push_back(Argument(arguments, column));
+    const idx_t columns = duckdb_data_chunk_get_column_count(input);
+    std::vector<duckdb_type> types;
+    std::vector<std::string> schema;
+    for (idx_t column = 1; column < columns; ++column) {
+      const LogicalType type(
+          duckdb_vector_get_column_type(duckdb_data_chunk_get_vector(input, column)));
+      types.push_back(duckdb_get_type_id(type.get()));
+      schema.emplace_back(TypeName(types.back()));
+    }
+    duckdb_vector_ensure_validity_writable(output);
+    const idx_t count = duckdb_data_chunk_get_size(input);
+    idx_t row = 0;
+    while (row < count) {
+      const idx_t first = row;
+      const std::string definition = Arguments(input, row).String(0);
+      std::string rows = "[";
+      // Bound temporary JSON storage as well as the number of scalar calls in flight.
+      // A single large row still uses the worker's existing 64 MiB message limit.
+      while (row < count && row - first < 256) {
+        const Arguments arguments(input, row);
+        if (arguments.String(0) != definition) {
+          break;
+        }
+        json cells = json::array();
+        for (idx_t column = 1; column < columns; ++column) {
+          cells.push_back(Argument(arguments, column, types.at(column - 1)));
+        }
+        const std::string encoded = cells.dump();
+        if (row != first && rows.size() + encoded.size() + 2 > (size_t{1} << 20U)) {
+          break;
+        }
+        if (row != first) {
+          rows += ',';
+        }
+        rows += encoded;
+        ++row;
+      }
+      rows += ']';
+      const json values = worker->Call(definition, schema, rows, row - first);
+      for (size_t i = 0; i < values.size(); ++i) {
+        const json& value = values.at(i);
+        const idx_t destination = first + i;
+        if (value.is_null()) {
+          duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), destination);
+        } else if constexpr (std::is_same_v<T, double>) {
+          const std::string text = value.get<std::string>();
+          double result = 0;
+          const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), result);
+          if (error != std::errc() || end != text.data() + text.size()) {
+            throw std::runtime_error("Invalid Python FLOAT64 result");
           }
-          const json value = worker->Call(arguments.String(0), std::move(cells));
-          if (value.is_null()) {
-            return std::nullopt;
+          SetResult(output, destination, result);
+        } else if constexpr (kBytes) {
+          std::string decoded;
+          if (!absl::HexStringToBytes(value.get<std::string>(), &decoded)) {
+            throw std::runtime_error("Invalid Python BYTES result");
           }
-          if constexpr (std::is_same_v<T, double>) {
-            const std::string text = value.get<std::string>();
-            double result = 0;
-            const auto [end, error] =
-                std::from_chars(text.data(), text.data() + text.size(), result);
-            if (error != std::errc() || end != text.data() + text.size()) {
-              return absl::InvalidArgumentError("Invalid Python FLOAT64 result");
-            }
-            return result;
-          } else if constexpr (kBytes) {
-            std::string decoded;
-            if (!absl::HexStringToBytes(value.get<std::string>(), &decoded)) {
-              return absl::InvalidArgumentError("Invalid Python BYTES result");
-            }
-            return decoded;
-          } else {
-            return value.get<T>();
-          }
-        },
-        /*nulls=*/false);
+          SetResult(output, destination, decoded);
+        } else {
+          SetResult(output, destination, value.get<T>());
+        }
+      }
+    }
   } catch (const std::exception& error) {
     duckdb_scalar_function_set_error(info, error.what());
   }

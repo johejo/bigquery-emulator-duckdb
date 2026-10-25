@@ -38,8 +38,6 @@ cc_library(
         "//:duckdb_handle",
         "//src/duckdb_functions:scalar",
         "//src/udf/python:worker",
-        "@abseil-cpp//absl/status",
-        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
     ],

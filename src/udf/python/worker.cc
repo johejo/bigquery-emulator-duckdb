@@ -28,6 +28,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -80,13 +81,25 @@ Worker::~Worker() {
   }
 }
 
-json Worker::Call(const std::string& definition, json arguments) {
-  const auto deadline = Clock::now() + options_.call_time;
+json Worker::Call(const std::string& definition, const std::vector<std::string>& types,
+                  std::string_view rows, size_t row_count) {
+  auto deadline = Clock::now() + options_.call_time;
   if (pid_ < 0) {
     Start();
   }
-  const std::string request =
-      json{{"definition", definition}, {"arguments", std::move(arguments)}}.dump() + "\n";
+  const auto [function, inserted] = functions_.try_emplace(definition, functions_.size());
+  json message{{"function", function->second}};
+  if (inserted) {
+    message["definition"] = definition;
+    message["types"] = types;
+  }
+  // The caller encodes each row once while sizing the batch. Append that JSON
+  // directly rather than parsing or serializing the potentially large cells again.
+  std::string request = message.dump();
+  request.pop_back();
+  request += ",\"rows\":";
+  request.append(rows);
+  request += "}\n";
   if (request.size() > kMessageLimit) {
     throw std::runtime_error("Python UDF request exceeds 64 MiB");
   }
@@ -108,8 +121,11 @@ json Worker::Call(const std::string& definition, json arguments) {
     offset += static_cast<size_t>(count);
   }
   std::string response;
+  json values = json::array();
+  size_t completed = 0;
+  size_t searched = 0;
   char buffer[8192];
-  while (response.empty() || response.back() != '\n') {
+  while (true) {
     Wait(POLLIN, deadline);
     const auto count = recv(socket_, buffer, sizeof(buffer), 0);
     if (count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) {
@@ -123,12 +139,41 @@ json Worker::Call(const std::string& definition, json arguments) {
     if (response.size() > kMessageLimit) {
       throw std::runtime_error("Python UDF response exceeds 64 MiB");
     }
+    size_t consumed = 0;
+    size_t end = 0;
+    while ((end = response.find('\n', std::max(consumed, searched))) != std::string::npos) {
+      // An empty record acknowledges one completed scalar call, without a round trip.
+      // Nonempty records carry batched results. Keep progress separate so a
+      // batch of individually fast calls cannot exhaust one call's deadline.
+      if (end == consumed) {
+        if (++completed > row_count) {
+          throw std::runtime_error("Invalid Python UDF worker progress");
+        }
+        deadline = Clock::now() + options_.call_time;
+      } else {
+        json result = json::parse(response.substr(consumed, end - consumed));
+        if (result.contains("error")) {
+          throw std::runtime_error(result.at("error").get<std::string>());
+        }
+        if (result.contains("done")) {
+          if (result.at("done") != true || completed != row_count || values.size() != row_count) {
+            throw std::runtime_error("Invalid Python UDF worker results");
+          }
+          return values;
+        }
+        auto& batch = result.at("values");
+        if (!batch.is_array() || values.size() + batch.size() > row_count) {
+          throw std::runtime_error("Invalid Python UDF worker results");
+        }
+        for (auto& value : batch) {
+          values.push_back(std::move(value));
+        }
+      }
+      consumed = end + 1;
+    }
+    response.erase(0, consumed);
+    searched = response.size();
   }
-  const json result = json::parse(response);
-  if (result.contains("error")) {
-    throw std::runtime_error(result.at("error").get<std::string>());
-  }
-  return result.at("value");
 }
 
 void Worker::Wait(int16_t events, Clock::time_point deadline) const {

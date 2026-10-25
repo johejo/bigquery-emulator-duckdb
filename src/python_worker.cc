@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "absl/strings/escaping.h"
 #include "nlohmann/json.hpp"
@@ -25,6 +26,7 @@
 
 namespace {
 using nlohmann::json;
+constexpr size_t kMessageLimit = size_t{64} << 20U;
 struct DeleteObject {
   void operator()(PyObject* object) const { Py_XDECREF(object); }
 };
@@ -59,12 +61,11 @@ Object Checked(PyObject* value) {
   return Object(value);
 }
 
-Object Argument(const json& cell) {
+Object Argument(const json& cell, const std::string& type) {
   if (cell.is_null()) {
     return Checked(Py_NewRef(Py_None));
   }
-  const std::string type = cell.at(0);
-  const auto& value = cell.at(1);
+  const auto& value = cell;
   if (type == "BOOL") {
     return Checked(PyBool_FromLong(value.get<bool>() ? 1 : 0));
   }
@@ -141,15 +142,19 @@ json Result(PyObject* value, const std::string& type) {
 struct Function {
   Object callable;
   std::string result_type;
+  std::vector<std::string> argument_types;
 };
+
+void Write(std::string_view encoded);
+void Reply(const json& value);
 
 class Interpreter {
  public:
-  json Call(const json& request) {
-    const std::string key = request.at("definition");
+  void Call(const json& request) {
+    const size_t key = request.at("function");
     auto found = functions_.find(key);
     if (found == functions_.end()) {
-      const json definition = json::parse(key);
+      const json definition = json::parse(request.at("definition").get<std::string>());
       Object const globals = Checked(PyDict_New());
       if (PyDict_SetItemString(globals.get(), "__builtins__", PyEval_GetBuiltins()) < 0) {
         throw PythonError();
@@ -170,26 +175,59 @@ class Interpreter {
       if (callable == nullptr || PyCallable_Check(callable) == 0) {
         throw std::runtime_error("Python UDF entry_point is not a callable: " + entry);
       }
-      found = functions_
-                  .emplace(key,
-                           Function{
-                               .callable = Checked(Py_NewRef(callable)),
-                               .result_type = definition.at("result_type").get<std::string>(),
-                           })
-                  .first;
+      found =
+          functions_
+              .emplace(key,
+                       Function{
+                           .callable = Checked(Py_NewRef(callable)),
+                           .result_type = definition.at("result_type").get<std::string>(),
+                           .argument_types = request.at("types").get<std::vector<std::string>>(),
+                       })
+              .first;
     }
-    const auto& arguments = request.at("arguments");
-    Object const values = Checked(PyTuple_New(static_cast<Py_ssize_t>(arguments.size())));
-    for (size_t i = 0; i < arguments.size(); ++i) {
-      Object value = Argument(arguments.at(i));
-      PyTuple_SET_ITEM(values.get(), static_cast<Py_ssize_t>(i), value.release());
+    std::string results;
+    const auto flush = [&] {
+      if (!results.empty()) {
+        Write("{\"values\":[");
+        Write(results);
+        Write("]}\n");
+        results.clear();
+      }
+    };
+    for (const auto& arguments : request.at("rows")) {
+      if (arguments.size() != found->second.argument_types.size()) {
+        throw std::runtime_error("Invalid Python UDF argument count");
+      }
+      Object const values = Checked(PyTuple_New(static_cast<Py_ssize_t>(arguments.size())));
+      for (size_t i = 0; i < arguments.size(); ++i) {
+        Object value = Argument(arguments.at(i), found->second.argument_types.at(i));
+        PyTuple_SET_ITEM(values.get(), static_cast<Py_ssize_t>(i), value.release());
+      }
+      Object const result =
+          Checked(PyObject_CallObject(found->second.callable.get(), values.get()));
+      const std::string value = Result(result.get(), found->second.result_type).dump();
+      if (value.size() > kMessageLimit - 32) {
+        throw std::runtime_error("Python UDF response exceeds 64 MiB");
+      }
+      // Output sizes are not known from the input. Flush bounded frames rather
+      // than rejecting a batch whose individual results fit the message limit.
+      if (results.size() + value.size() + 1 > (size_t{1} << 20U)) {
+        flush();
+      }
+      if (!results.empty()) {
+        results += ',';
+      }
+      results += value;
+      // One-way progress: the parent can enforce each row's deadline without
+      // making the next Python call wait for a socket round trip.
+      Write("\n");
     }
-    Object const result = Checked(PyObject_CallObject(found->second.callable.get(), values.get()));
-    return Result(result.get(), found->second.result_type);
+    flush();
+    Reply({{"done", true}});
   }
 
  private:
-  std::map<std::string, Function> functions_;
+  std::map<size_t, Function> functions_;
 };
 
 void Initialize(const char* executable) {
@@ -225,8 +263,7 @@ void Initialize(const char* executable) {
 
 // fd 3 is a private protocol socket; stdin/stdout/stderr are /dev/null, so print(), native
 // writes and input() in a UDF cannot consume or corrupt the request stream.
-void Reply(const json& value) {
-  const std::string encoded = value.dump() + "\n";
+void Write(std::string_view encoded) {
   size_t offset = 0;
   while (offset < encoded.size()) {
     const auto count = write(3, encoded.data() + offset, encoded.size() - offset);
@@ -238,6 +275,14 @@ void Reply(const json& value) {
     }
     offset += static_cast<size_t>(count);
   }
+}
+
+void Reply(const json& value) {
+  const std::string encoded = value.dump() + "\n";
+  if (encoded.size() > kMessageLimit) {
+    throw std::runtime_error("Python UDF response exceeds 64 MiB");
+  }
+  Write(encoded);
 }
 
 int Run(int argc, char** argv) {
@@ -260,6 +305,7 @@ int Run(int argc, char** argv) {
   {
     Interpreter interpreter;
     std::string pending;
+    size_t searched = 0;
     char buffer[8192];
     while (true) {
       const auto count = read(3, buffer, sizeof(buffer));
@@ -270,16 +316,21 @@ int Run(int argc, char** argv) {
         break;
       }
       pending.append(buffer, static_cast<size_t>(count));
+      if (pending.size() > kMessageLimit) {
+        throw std::runtime_error("Python UDF request exceeds 64 MiB");
+      }
       size_t end = 0;
-      while ((end = pending.find('\n')) != std::string::npos) {
+      while ((end = pending.find('\n', searched)) != std::string::npos) {
         const std::string line = pending.substr(0, end);
         pending.erase(0, end + 1);
+        searched = 0;
         try {
-          Reply({{"value", interpreter.Call(json::parse(line))}});
+          interpreter.Call(json::parse(line));
         } catch (const std::exception& error) {
           Reply({{"error", error.what()}});
         }
       }
+      searched = pending.size();
     }
   }
   return Py_FinalizeEx() < 0 ? 1 : 0;
