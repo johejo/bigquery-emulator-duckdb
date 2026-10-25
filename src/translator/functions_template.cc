@@ -13,6 +13,7 @@
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
+#include "src/translator/handlers.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
@@ -845,10 +846,10 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .uses =
                   {
                       TypeUse::kCompares,
-                      TypeUse::kComparesStructs,
                       TypeUse::kRejectsIntervalComparison,
                       TypeUse::kBigNumeric,
                   },
+              .struct_handler = StructComparison,
           },
       },
       // Operators. Division binds its operands once, as every rule does, and stays an
@@ -1034,10 +1035,10 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .struct_handler = StructComparison,
           },
       },
       {
@@ -1048,10 +1049,10 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .struct_handler = StructComparison,
           },
       },
       {
@@ -1156,11 +1157,11 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
               .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
+              .struct_handler = StructComparison,
           },
       },
       {

@@ -168,9 +168,7 @@ enum class TypeUse : std::uint8_t {
   kBuildsOrReadsInterval,
   // Only compare their INTERVAL arguments or ARRAY elements, so they compare the values' keys.
   kComparesIntervalKeys,
-  // Compare a STRUCT first argument field by field, as StructComparison does.
-  kComparesStructs,
-  // Of kComparesStructs, those that also compare INTERVAL fields, by their keys. BigQuery
+  // STRUCT handlers that also compare INTERVAL fields, by their keys. BigQuery
   // compares no ARRAYs, also in STRUCT fields.
   kComparesStructsWithInterval,
   // Build or read the STRUCT that holds a RANGE, whose unbounded ends are infinite, or read it as
@@ -221,12 +219,19 @@ enum class ArgumentMode : std::uint8_t {
   kIntervalArrayKeys,
 };
 
+struct ScalarCall;
+
+// Translates a call that templates cannot express, or returns nullopt when it is unsupported.
+using Handler = std::optional<std::string> (*)(const ScalarCall&);
+
 // A function's overloads and type behavior, declared together in its rule table.
 template <typename RuleType>
 struct FunctionDefinition {
   std::vector<RuleType> rules;
   TypeUses uses = {};
   std::vector<ArgumentMode> argument_modes = {};
+  // Overrides the usual translation when the first argument is a STRUCT.
+  Handler struct_handler = nullptr;
 };
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

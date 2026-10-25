@@ -70,6 +70,7 @@ struct HandledFunction {
   Implementation implementation = Implementation::kSQLInCode;
   TypeUses uses = {};
   std::span<const ArgumentMode> argument_modes = {};
+  Handler struct_handler = nullptr;
 };
 
 constexpr auto kBucketArgumentModes =
@@ -96,10 +97,10 @@ constexpr auto kHandlers =
                         {
                             TypeUse::kCompares,
                             TypeUse::kComparesIntervalKeys,
-                            TypeUse::kComparesStructs,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
+                    .struct_handler = StructComparison,
                 },
             },
             {
@@ -116,10 +117,10 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kComparesStructs,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
+                    .struct_handler = StructComparison,
                 },
             },
             {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
@@ -331,6 +332,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                                     function.argument_modes.begin(),
                                     function.argument_modes.end(),
                                 },
+                            .struct_handler = function.struct_handler,
                         });
   }
   for (const auto& [name, target] : kSafeFunctions) {

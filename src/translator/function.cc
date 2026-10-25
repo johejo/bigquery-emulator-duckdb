@@ -61,8 +61,8 @@ std::optional<std::string> Call(const Catalog& functions,
     });
   }
   if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
-      functions.HasTypeUse(name, TypeUse::kComparesStructs)) {
-    return StructComparison(call);
+      entry->struct_handler != nullptr) {
+    return entry->struct_handler(call);
   }
   if (entry->translation == Translation::kHandler) {
     return entry->handler(call);
