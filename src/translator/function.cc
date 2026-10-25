@@ -348,15 +348,18 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                           [](const auto& argument) { return argument->type()->IsDouble(); })) {
     throw std::invalid_argument("No matching signature for operator *");
   }
-  const auto keyed = [&](const googlesql::Type* type) {
-    return type->IsInterval() || ((function == "$IN_ARRAY" || function == "RANGE_BUCKET") &&
+  const auto keyed = [&](const googlesql::Type* type, size_t i) {
+    return type->IsInterval() || (argument_mode(i) == ArgumentMode::kIntervalArrayKeys &&
                                   type->IsArray() && type->AsArray()->element_type()->IsInterval());
   };
-  const bool compares_intervals =
-      interval && functions.HasTypeUse(function, TypeUse::kComparesIntervalKeys) &&
-      std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
-        return !HasInterval(argument->type()) || keyed(argument->type());
-      });
+  bool compares_intervals =
+      interval && functions.HasTypeUse(function, TypeUse::kComparesIntervalKeys);
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto* type = call.argument_list(static_cast<int>(i))->type();
+    if (HasInterval(type) && !keyed(type, i)) {
+      compares_intervals = false;
+    }
+  }
   const bool compares_structs =
       interval && functions.HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
       call.argument_list(0)->type()->IsStruct();
@@ -452,7 +455,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
     if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
-    } else if (compares_intervals && keyed(argument->type())) {
+    } else if (compares_intervals && keyed(argument->type(), i)) {
       args.push_back("list_transform(" + *sql + ", lambda _ik: " + IntervalKey("_ik") + ")");
     } else {
       args.push_back(*sql);

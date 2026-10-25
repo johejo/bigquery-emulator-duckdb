@@ -212,11 +212,21 @@ class TypeUses {
   std::uint32_t bits_ = 0;
 };
 
+// How an argument is translated before the function's implementation receives it.
+enum class ArgumentMode : std::uint8_t {
+  kExpression,
+  // Accept a single-part INTERVAL width and pass its count of months, days or microseconds.
+  kBucketWidth,
+  // Compare INTERVAL array elements by their keys, leaving other element types unchanged.
+  kIntervalArrayKeys,
+};
+
 // A function's overloads and type behavior, declared together in its rule table.
 template <typename RuleType>
 struct FunctionDefinition {
   std::vector<RuleType> rules;
   TypeUses uses = {};
+  std::vector<ArgumentMode> argument_modes = {};
 };
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

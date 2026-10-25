@@ -59,13 +59,6 @@ enum class Translation : std::uint8_t {
   kAnalytic,
 };
 
-// How an argument is translated before the function's implementation receives it.
-enum class ArgumentMode : std::uint8_t {
-  kExpression,
-  // Accept a single-part INTERVAL width and pass its count of months, days or microseconds.
-  kBucketWidth,
-};
-
 // A function in the registry.
 struct FunctionEntry {
   Translation translation;

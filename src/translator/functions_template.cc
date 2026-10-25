@@ -19,6 +19,7 @@ namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::Rule;
 
+using function_catalog::ArgumentMode;
 using function_catalog::Arity;
 using function_catalog::BigNumericCall;
 using function_catalog::BigNumericOperator;
@@ -1159,6 +1160,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
           },
       },
       {
@@ -1700,7 +1702,11 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
       },
       {
           "RANGE_BUCKET",
-          {.rules = RangeBucket(), .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric}},
+          {
+              .rules = RangeBucket(),
+              .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
+          },
       },
       {"RANGE", {.rules = RangeConstructor(), .uses = {TypeUse::kBuildsOrReadsRange}}},
       {"RANGE_START", {.rules = BoundOrNull(kRangeStart), .uses = {TypeUse::kBuildsOrReadsRange}}},
