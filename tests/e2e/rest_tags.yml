@@ -1,0 +1,81 @@
+desc: resourceTags enforces its REST map type and local tag limits
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#Table.FIELDS.resource_tags
+# https://cloud.google.com/bigquery/docs/tags#limitations
+# Synthetic tag definitions deliberately use the emulator's IAM exception.
+runners:
+  req: ${BQ_EMULATOR_API}
+steps:
+  dataset:
+    req:
+      /projects/test/datasets:
+        post:
+          body:
+            application/json:
+              datasetReference: {datasetId: rest_tags}
+              resourceTags: {"123456789012/env": "test"}
+    test: current.res.status == 200
+  wrong_map_type:
+    req:
+      /projects/test/datasets/rest_tags/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: wrong_map}
+              schema: {fields: [{name: x, type: INT64}]}
+              resourceTags: ["123456789012/env", "test"]
+    test: current.res.status == 400
+  wrong_value_type:
+    req:
+      /projects/test/datasets/rest_tags/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: wrong_value}
+              schema: {fields: [{name: x, type: INT64}]}
+              resourceTags: {"123456789012/env": 1}
+    test: current.res.status == 400
+  # A type error in a tag PATCH must not commit another field from that request.
+  rejected_patch:
+    req:
+      /projects/test/datasets/rest_tags:
+        patch:
+          body:
+            application/json:
+              description: must not be written
+              resourceTags: {"123456789012/env": 1}
+    test: current.res.status == 400
+  unchanged_after_rejection:
+    req:
+      /projects/test/datasets/rest_tags:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 &&
+      current.res.body.resourceTags == {"123456789012/env": "test"} &&
+      !("description" in current.res.body)
+  tags_50:
+    req:
+      /projects/test/datasets/rest_tags/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: tags_50}
+              schema: {fields: [{name: x, type: INT64}]}
+              resourceTags: {"123456789012/key0": "test", "123456789012/key1": "test", "123456789012/key2": "test", "123456789012/key3": "test", "123456789012/key4": "test", "123456789012/key5": "test", "123456789012/key6": "test", "123456789012/key7": "test", "123456789012/key8": "test", "123456789012/key9": "test", "123456789012/key10": "test", "123456789012/key11": "test", "123456789012/key12": "test", "123456789012/key13": "test", "123456789012/key14": "test", "123456789012/key15": "test", "123456789012/key16": "test", "123456789012/key17": "test", "123456789012/key18": "test", "123456789012/key19": "test", "123456789012/key20": "test", "123456789012/key21": "test", "123456789012/key22": "test", "123456789012/key23": "test", "123456789012/key24": "test", "123456789012/key25": "test", "123456789012/key26": "test", "123456789012/key27": "test", "123456789012/key28": "test", "123456789012/key29": "test", "123456789012/key30": "test", "123456789012/key31": "test", "123456789012/key32": "test", "123456789012/key33": "test", "123456789012/key34": "test", "123456789012/key35": "test", "123456789012/key36": "test", "123456789012/key37": "test", "123456789012/key38": "test", "123456789012/key39": "test", "123456789012/key40": "test", "123456789012/key41": "test", "123456789012/key42": "test", "123456789012/key43": "test", "123456789012/key44": "test", "123456789012/key45": "test", "123456789012/key46": "test", "123456789012/key47": "test", "123456789012/key48": "test", "123456789012/key49": "test"}
+    test: current.res.status == 200
+  tags_51:
+    req:
+      /projects/test/datasets/rest_tags/tables:
+        post:
+          body:
+            application/json:
+              tableReference: {tableId: tags_51}
+              schema: {fields: [{name: x, type: INT64}]}
+              resourceTags: {"123456789012/key0": "test", "123456789012/key1": "test", "123456789012/key2": "test", "123456789012/key3": "test", "123456789012/key4": "test", "123456789012/key5": "test", "123456789012/key6": "test", "123456789012/key7": "test", "123456789012/key8": "test", "123456789012/key9": "test", "123456789012/key10": "test", "123456789012/key11": "test", "123456789012/key12": "test", "123456789012/key13": "test", "123456789012/key14": "test", "123456789012/key15": "test", "123456789012/key16": "test", "123456789012/key17": "test", "123456789012/key18": "test", "123456789012/key19": "test", "123456789012/key20": "test", "123456789012/key21": "test", "123456789012/key22": "test", "123456789012/key23": "test", "123456789012/key24": "test", "123456789012/key25": "test", "123456789012/key26": "test", "123456789012/key27": "test", "123456789012/key28": "test", "123456789012/key29": "test", "123456789012/key30": "test", "123456789012/key31": "test", "123456789012/key32": "test", "123456789012/key33": "test", "123456789012/key34": "test", "123456789012/key35": "test", "123456789012/key36": "test", "123456789012/key37": "test", "123456789012/key38": "test", "123456789012/key39": "test", "123456789012/key40": "test", "123456789012/key41": "test", "123456789012/key42": "test", "123456789012/key43": "test", "123456789012/key44": "test", "123456789012/key45": "test", "123456789012/key46": "test", "123456789012/key47": "test", "123456789012/key48": "test", "123456789012/key49": "test", "123456789012/key50": "test"}
+    test: current.res.status == 400
+  cleanup:
+    req:
+      /projects/test/datasets/rest_tags?deleteContents=true:
+        delete:
+          body: null
+    test: current.res.status == 204

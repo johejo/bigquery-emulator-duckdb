@@ -72,7 +72,8 @@ absl::StatusOr<std::vector<Row>> SchemataOptionsRows(const ViewContext& context)
     }
     std::vector<Option> options =
         CommonOptions(metadata->description, metadata->friendly_name, metadata->labels,
-                      metadata->default_rounding_mode, metadata->label_order);
+                      metadata->default_rounding_mode, metadata->label_order,
+                      metadata->resource_tags, metadata->tag_order);
     // Every dataset lists its location, in lower case as SCHEMATA's DDL spells it.
     options.push_back({
         .name = "location",

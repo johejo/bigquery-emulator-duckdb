@@ -276,7 +276,10 @@ void AddQueryResults(const Job& job, const ResultPage& page, json& response) {
   const auto total = static_cast<int64_t>(result.rows.size());
   const int64_t begin = std::clamp<int64_t>(page.start_index, 0, total);
   const int64_t end = std::min(total, begin + std::max<int64_t>(page.max_results, 0));
-  response["rows"] = RowsForResponse(result, begin, end, page.int64_timestamps);
+  // BigQuery omits rows for an empty query result.
+  if (total != 0) {
+    response["rows"] = RowsForResponse(result, begin, end, page.int64_timestamps);
+  }
   if (end < total) {
     response["pageToken"] = std::to_string(end);
   }

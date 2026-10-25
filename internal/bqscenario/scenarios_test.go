@@ -25,6 +25,10 @@ func TestExpandJSON(t *testing.T) {
 	}{
 		{"typed body", "${body}", map[string]any{"value": json.Number("9007199254740993")}, false},
 		{"inline", []any{"projects/${project}", "number ${n}"}, []any{"projects/quoted\"\\project", "number 9007199254740993"}, false},
+		{"object key", map[string]any{"${project}/env": "test"}, map[string]any{"quoted\"\\project/env": "test"}, false},
+		{"typed key", map[string]any{"${n}": "test"}, nil, true},
+		{"duplicate keys", map[string]any{"${project}": 1, "quoted\"\\project": 2}, nil, true},
+		{"unknown key", map[string]any{"${missing}": "test"}, nil, true},
 		{"unknown", "${missing}", nil, true},
 		{"object in string", "prefix${body}", nil, true},
 		{"cycle", "${recursive}", nil, true},

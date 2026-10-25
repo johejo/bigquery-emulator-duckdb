@@ -286,7 +286,9 @@ Unsupported behavior is rejected, with these deliberate exceptions:
   and ObjectRef functions authorize with the Cloud resource connections it declares, rather than
   connections that the Connection API creates.
 - Authentication and IAM are not checked. Every registered project is visible and accessible to
-  every client, and is treated as having the BigQuery API enabled.
+  every client, and is treated as having the BigQuery API enabled. Resource tags are stored as
+  metadata; Cloud Resource Manager tag definitions and tag-based access controls are not checked,
+  and tags inherited from parent resources are not modeled. See [tag limits](docs/compatibility.md#resource-tags).
 - A query that leaves `useLegacySql` unset runs as GoogleSQL, although BigQuery runs it as legacy
   SQL.
 - `formatOptions.timestampOutputFormat` of `jobs.getQueryResults` and `tabledata.list` is ignored;

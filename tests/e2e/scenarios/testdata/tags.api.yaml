@@ -1,0 +1,108 @@
+version: 1
+# Expectations follow the DDL tags / REST resourceTags representations:
+# https://cloud.google.com/bigquery/docs/tags
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/tables#Table.FIELDS.resource_tags
+# https://cloud.google.com/bigquery/docs/reference/rest/v2/datasets#Dataset.FIELDS.resource_tags
+# Synthetic keys deliberately use the emulator's IAM exception: no Cloud tag definitions.
+# Do not collect this local exception as an expected BigQuery response.
+description: DDL and REST share resource tag metadata, preserving it across unrelated patches.
+vars:
+  dataset: e2e_${run}_${case}
+cases:
+  - name: resource_tags_round_trip
+    steps:
+      - name: create_dataset
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets
+          body:
+            datasetReference: {datasetId: '${dataset}'}
+            resourceTags: {'123456789012/env': test}
+        observe: {tags: /body/resourceTags}
+      - name: create_table
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables
+          body:
+            tableReference: {tableId: t}
+            schema: {fields: [{name: x, type: INT64}]}
+            resourceTags: {'123456789012/env': test}
+        observe: {tags: /body/resourceTags}
+      - name: ddl
+        rest:
+          method: POST
+          path: /bigquery/v2/projects/${project}/jobs
+          body:
+            configuration:
+              query:
+                useLegacySql: false
+                query: |
+                  ALTER SCHEMA `${project}.${dataset}` SET OPTIONS (tags = [('123456789012/team', 'sales')]);
+                  ALTER TABLE `${project}.${dataset}.t` SET OPTIONS (tags = [('123456789012/env', 'Production')]);
+                  CREATE VIEW `${project}.${dataset}.v` OPTIONS (tags = [('123456789012/env', 'test')]) AS SELECT x FROM `${project}.${dataset}.t`;
+        bind: {job: /body/jobReference/jobId}
+      - name: completed
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/queries/${job}
+        until: {/body/jobComplete: true}
+        observe: {complete: /body/jobComplete, errors: /body/errors}
+      - name: dataset
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+        observe: {tags: /body/resourceTags}
+      - name: table
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body: {description: preserves tags}
+        observe: {tags: /body/resourceTags}
+      - name: view
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/v
+        observe: {tags: /body/resourceTags}
+      - name: replace_dataset
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body:
+            datasetReference: {projectId: '${project}', datasetId: '${dataset}'}
+            resourceTags: {'123456789012/env': Production}
+        observe: {tags: /body/resourceTags}
+      - name: replace_table
+        rest:
+          method: PUT
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+          body:
+            tableReference: {projectId: '${project}', datasetId: '${dataset}', tableId: t}
+            resourceTags: {'123456789012/team': sales}
+        observe: {tags: /body/resourceTags}
+      - name: patch_dataset_description
+        rest:
+          method: PATCH
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}
+          body: {description: preserves tags}
+        observe: {tags: /body/resourceTags}
+      - name: reread_table
+        rest:
+          method: GET
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}/tables/t
+        observe: {tags: /body/resourceTags}
+    cleanup:
+      - name: delete_dataset
+        rest:
+          method: DELETE
+          path: /bigquery/v2/projects/${project}/datasets/${dataset}?deleteContents=true
+    expect:
+      create_dataset: {tags: {'123456789012/env': test}}
+      create_table: {tags: {'123456789012/env': test}}
+      completed: {complete: true}
+      dataset: {tags: {'123456789012/team': sales}}
+      table: {tags: {'123456789012/env': Production}}
+      view: {tags: {'123456789012/env': test}}
+      replace_dataset: {tags: {'123456789012/env': Production}}
+      replace_table: {tags: {'123456789012/team': sales}}
+      patch_dataset_description: {tags: {'123456789012/env': Production}}
+      reread_table: {tags: {'123456789012/team': sales}}

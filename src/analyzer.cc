@@ -378,6 +378,7 @@ absl::StatusOr<googlesql::AnalyzerOptions> AnalyzerOptions(const AnalyzerSetting
   allowed.AddOption("expiration_timestamp", googlesql::types::TimestampType());
   // Give an untyped empty array the labels type rather than the default ARRAY<INT64>.
   allowed.AddOption("labels", DdlOptionSqlType(DdlOptionType::kLabels));
+  allowed.AddOption("tags", DdlOptionSqlType(DdlOptionType::kLabels), /*allow_alter_array=*/true);
   options.set_allowed_hints_and_options(allowed);
   // BigQuery interprets civil times without an explicit zone as UTC.
   options.set_default_time_zone(absl::UTCTimeZone());

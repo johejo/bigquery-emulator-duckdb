@@ -147,3 +147,16 @@ steps:
               query: "CREATE FUNCTION persist.py(x STRING) RETURNS STRING LANGUAGE python OPTIONS(runtime_version='python-3.11', entry_point='f') AS 'def f(x): return x'"
               useLegacySql: false
     test: current.res.status == 200
+  # Synthetic Cloud tag definitions use the documented IAM exception.
+  resource_tags:
+    req:
+      /projects/test/queries:
+        post:
+          body:
+            application/json:
+              useLegacySql: false
+              query: >-
+                CREATE SCHEMA persist_tags OPTIONS (tags = [('123456789012/env', 'test')]);
+                CREATE TABLE persist_tags.t (x INT64) OPTIONS (tags = [('123456789012/env', 'test')]);
+                CREATE VIEW persist_tags.v OPTIONS (tags = [('123456789012/env', 'test')]) AS SELECT x FROM persist_tags.t
+    test: current.res.status == 200 && !("errors" in current.res.body)

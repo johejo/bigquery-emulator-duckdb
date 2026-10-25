@@ -52,6 +52,21 @@ in `datasets.get`, and NULL creation times in `SCHEMATA`.
 
 ## Tables
 
+### Resource tags
+
+DDL `tags` and REST `resourceTags` share stored metadata for datasets, tables and views,
+including materialized views and table snapshots. Tags do not enforce access controls or
+require Cloud Resource Manager tag definitions; see the [IAM exception](../README.md#compatibility).
+
+Incremental additions (`+=`), schema tag removals (`-=`), empty tag patches on tagged
+datasets, NULL dataset tags, NULL `resourceTags` in full REST updates, and copying tagged
+tables through copy jobs are unsupported until their metadata behavior is verified. Use DDL `SET OPTIONS (tags = ...)` or a full REST update to replace tags.
+
+BigQuery returns no tag option row after clearing tags, although its
+[tag documentation](https://cloud.google.com/bigquery/docs/tags) says that untagged resources
+return an empty array. The recorded BigQuery cases retain the project and run that established
+this behavior.
+
 ### Options and expiration
 
 [options.md](options.md) lists the DDL options the emulator accepts. Partition expiration is
@@ -119,7 +134,8 @@ window, which datasets cannot change. It is unsupported:
 
 `tables.patch` and `tables.update` change schema, view definition, description, friendly name,
 labels, clustering, default rounding mode and expiration, and ignore other fields. Partitioning and
-a view's schema cannot change. `tables.update` keeps a schema or view definition omitted from the request.
+a view's schema cannot change. For resource tags, see [Resource tags](#resource-tags).
+`tables.update` keeps a schema or view definition omitted from the request.
 
 ### Views
 

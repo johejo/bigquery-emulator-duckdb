@@ -57,6 +57,7 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
   try {
     TableMetadata metadata = TableMetadataFromJson(object);
     metadata.label_order = object.value("labelOrder", std::vector<std::string>{});
+    metadata.tag_order = object.value("tagOrder", std::vector<std::string>{});
     metadata.restored_from_snapshot = object.value("restoredFromSnapshot", false);
     metadata.clone = ParseBaseTableDefinition(object.value("cloneDefinition", json()), "cloneTime");
     metadata.snapshot =
@@ -73,8 +74,12 @@ TableMetadata CommentMetadata(const std::optional<std::string>& comment) {
 std::string TableCommentStatement(const TableReference& table, const TableMetadata& metadata,
                                   const std::vector<FieldSchema>& schema) {
   ValidateLabels(metadata.labels);
+  ValidateResourceTags(metadata.resource_tags);
   ValidatePartitioning(metadata, schema);
   json comment = metadata.ToJson();
+  if (!metadata.tag_order.empty()) {
+    comment["tagOrder"] = metadata.tag_order;
+  }
   if (!metadata.label_order.empty()) {
     comment["labelOrder"] = metadata.label_order;
   }
@@ -87,6 +92,7 @@ std::string TableCommentStatement(const TableReference& table, const TableMetada
 
 std::string ViewCommentStatement(const TableReference& table, const ViewMetadata& view) {
   ValidateLabels(view.metadata.labels);
+  ValidateResourceTags(view.metadata.resource_tags);
   if (view.metadata.require_partition_filter) {
     throw ApiError::Unsupported("requirePartitionFilter on views");
   }
@@ -102,6 +108,9 @@ std::string ViewCommentStatement(const TableReference& table, const ViewMetadata
     throw ApiError::Unsupported("defaultRoundingMode on views");
   }
   json comment = view.metadata.ToJson();
+  if (!view.metadata.tag_order.empty()) {
+    comment["tagOrder"] = view.metadata.tag_order;
+  }
   if (!view.metadata.label_order.empty()) {
     comment["labelOrder"] = view.metadata.label_order;
   }

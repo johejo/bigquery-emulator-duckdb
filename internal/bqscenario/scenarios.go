@@ -140,6 +140,17 @@ func expandDepth(value any, vars map[string]any, depth int) (any, error) {
 	case map[string]any:
 		result := make(map[string]any, len(value))
 		for key, element := range value {
+			expandedKey, err := expandDepth(key, vars, depth+1)
+			if err != nil {
+				return nil, err
+			}
+			key, ok := expandedKey.(string)
+			if !ok {
+				return nil, errors.New("expanded object key must be a string")
+			}
+			if _, duplicate := result[key]; duplicate {
+				return nil, fmt.Errorf("duplicate expanded object key %q", key)
+			}
 			expanded, err := expandDepth(element, vars, depth+1)
 			if err != nil {
 				return nil, err

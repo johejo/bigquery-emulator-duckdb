@@ -16,10 +16,11 @@ import (
 // Option is one row of an option list: its name, its GoogleSQL type and SQL sample values.
 // Source is the anchor of the reference section that describes it, when that is not its group.
 type Option struct {
-	Name   string   `json:"name"`
-	Type   string   `json:"type"`
-	Values []string `json:"values,omitempty"`
-	Source string   `json:"source,omitempty"`
+	Name      string   `json:"name"`
+	Type      string   `json:"type"`
+	Values    []string `json:"values,omitempty"`
+	Source    string   `json:"source,omitempty"`
+	Operators []string `json:"operators,omitempty"`
 }
 
 // Context is a statement that takes the options of Group. Template holds {option} where a case
@@ -93,6 +94,13 @@ func (c *Catalog) Validate() error {
 				return fmt.Errorf("%s: duplicate option %s", group, option.Name)
 			}
 			names[option.Name] = true
+			operators := map[string]bool{}
+			for _, op := range option.Operators {
+				if (op != "=" && op != "+=" && op != "-=") || operators[op] {
+					return fmt.Errorf("%s.%s: invalid or duplicate operator %s", group, option.Name, op)
+				}
+				operators[op] = true
+			}
 			values := map[string]bool{}
 			for _, value := range option.Values {
 				if values[value] {
@@ -169,9 +177,15 @@ func (c *Catalog) Cases() []Case {
 			}
 			k := Case{Context: context, Option: option, Source: c.Source + "#" + source}
 			if context.Template != "" {
-				for _, value := range option.Values {
-					k.Queries = append(k.Queries,
-						strings.Replace(context.Template, "{option}", option.Name+" = "+value, 1))
+				operators := option.Operators
+				if len(operators) == 0 {
+					operators = []string{"="}
+				}
+				for _, op := range operators {
+					for _, value := range option.Values {
+						k.Queries = append(k.Queries,
+							strings.Replace(context.Template, "{option}", option.Name+" "+op+" "+value, 1))
+					}
 				}
 			}
 			cases = append(cases, k)
