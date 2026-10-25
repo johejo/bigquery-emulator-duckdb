@@ -180,8 +180,7 @@ counterclockwise and its holes clockwise, since BigQuery takes the region on the
 ring. Additional limits are:
 
 - `ST_DISTANCE` with `use_spheroid = TRUE` is unsupported for nonempty inputs.
-- `ST_ASGEOJSON` is unsupported for anything but a single point, the empty geography and the
-  full polygon.
+- `ST_ASGEOJSON` is unsupported for shapes that cross the antimeridian or touch a pole.
 - Polygons that require edge snapping, rings that cross or touch at an edge, and shells with
   holes that collapse are unsupported.
 - `ST_GEOGFROMTEXT`'s `oriented`, `planar` and `make_valid` arguments are unsupported.

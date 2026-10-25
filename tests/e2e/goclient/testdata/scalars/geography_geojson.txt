@@ -1,0 +1,47 @@
+## ST_ASGEOJSON
+# Source: https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson
+# The documentation requires RFC 7946 GeoJSON whose planar edges stay within 10 meters of the
+# geodesic ones. Formatting, the order of rings and parts, and the vertices added come from
+# BigQuery's answers to unverified cases. Points, the empty geography and the full polygon are in
+# geography.txt, geography_empty.txt and geography_full.txt.
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(1 2, 3 4)'))
+=> "{ \"type\": \"LineString\", \"coordinates\": [ [1, 2], [1.49935211656563, 2.50032298430222], [1.99908512591253, 3.00045614878547], [2.49927553736666, 3.50036126939258], [3, 4] ] } "
+
+# A meridian needs no added vertices.
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 10)'))
+=> "{ \"type\": \"LineString\", \"coordinates\": [ [0, 0], [0, 10] ] } "
+
+# BigQuery's answer has 29 vertices, one of which differs in its 15th digit with macOS's atan2.
+SELECT ARRAY_LENGTH(JSON_QUERY_ARRAY(ST_ASGEOJSON(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 10)')), '$.coordinates'))
+=> "29"
+
+# Rings start and run as in WKT, holes clockwise.
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((0 0, 1 0, 0 1, 0 0))'))
+=> "{ \"type\": \"Polygon\", \"coordinates\": [ [ [0, 0], [1, 0], [0, 1], [0, 0] ] ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('POLYGON((1 1, 1 10, 5 10, 5 1, 1 1), (2 2, 3 4, 2 4, 2 2))'))
+=> "{ \"type\": \"Polygon\", \"coordinates\": [ [ [5, 1], [5, 10], [4.75000502706376, 10.0013996424104], [4.50000804372425, 10.0026127229758], [4.25000933688037, 10.0036392172081], [4.00000919357017, 10.0044791043851], [3.75000790094769, 10.0051323675517], [3.5000057462598, 10.0055989935197], [3.25000301682294, 10.0058789728687], [3, 10.0059722999464], [2.74999698317706, 10.0058789728687], [2.4999942537402, 10.0055989935197], [2.24999209905231, 10.0051323675517], [1.99999080642983, 10.0044791043851], [1.74999066311963, 10.0036392172081], [1.49999195627575, 10.0026127229758], [1.24999497293624, 10.0013996424104], [1, 10], [1, 1], [1.99999990713282, 1.00045705369582], [3, 1.00060942040799], [4.00000009286718, 1.00045705369582], [5, 1] ], [ [2, 4], [2.5, 4.00015181909186], [3, 4], [2.74963774950131, 3.50009030952386], [2.49954259779383, 3.00011402637623], [2.24967611658968, 2.50008073848721], [2, 2], [2, 4] ] ] } "
+
+# Points follow the order of their WKT.
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('MULTIPOINT(3 4, 1 2)'))
+=> "{ \"type\": \"MultiPoint\", \"coordinates\": [ [1, 2], [3, 4] ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('MULTILINESTRING((0 0, 1 1), (2 2, 3 2))'))
+=> "{ \"type\": \"MultiLineString\", \"coordinates\": [ [ [0, 0], [1, 1] ], [ [2, 2], [3, 2] ] ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('MULTIPOLYGON(((0 0, 1 0, 0 1, 0 0)), ((5 5, 6 5, 5 6, 5 5)))'))
+=> "{ \"type\": \"MultiPolygon\", \"coordinates\": [ [ [ [0, 0], [1, 0], [0, 1], [0, 0] ] ], [ [ [5, 5], [5.5, 5.00018942673343], [6, 5], [5.75031027478082, 5.25015368825097], [5.50042016156242, 5.50020814671064], [5.25031997160035, 5.75015853532852], [5, 6], [5, 5] ] ] ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(9 9), LINESTRING(0 0, 1 1))'))
+=> "{ \"type\": \"GeometryCollection\", \"geometries\": [ { \"type\": \"Point\", \"coordinates\": [9, 9] }, { \"type\": \"LineString\", \"coordinates\": [ [0, 0], [1, 1] ] } ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(9 9), POLYGON((0 0, 1 0, 0 1, 0 0)))'))
+=> "{ \"type\": \"GeometryCollection\", \"geometries\": [ { \"type\": \"Point\", \"coordinates\": [9, 9] }, { \"type\": \"Polygon\", \"coordinates\": [ [ [0, 0], [1, 0], [0, 1], [0, 0] ] ] } ] } "
+
+# A collection writes several points, linestrings or polygons as one member, as WKT does.
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(POINT(9 9), POINT(8 8), LINESTRING(0 0, 1 1))'))
+=> "{ \"type\": \"GeometryCollection\", \"geometries\": [ { \"type\": \"MultiPoint\", \"coordinates\": [ [8, 8], [9, 9] ] }, { \"type\": \"LineString\", \"coordinates\": [ [0, 0], [1, 1] ] } ] } "
+
+SELECT ST_ASGEOJSON(ST_GEOGFROMTEXT('GEOMETRYCOLLECTION(LINESTRING(0 0, 1 1), POLYGON((5 5, 6 5, 5 6, 5 5)), POLYGON((7 7, 8 7, 7 8, 7 7)))'))
+=> "{ \"type\": \"GeometryCollection\", \"geometries\": [ { \"type\": \"LineString\", \"coordinates\": [ [0, 0], [1, 1] ] }, { \"type\": \"MultiPolygon\", \"coordinates\": [ [ [ [5, 5], [5.5, 5.00018942673343], [6, 5], [5.75031027478082, 5.25015368825097], [5.50042016156242, 5.50020814671064], [5.25031997160035, 5.75015853532852], [5, 6], [5, 5] ] ], [ [ [7, 7], [7.5, 7.00026390407536], [8, 7], [7.75042593029853, 7.25020929364123], [7.50057447155328, 7.50028233618444], [7.25043578259815, 7.75021421545573], [7, 8], [7, 7] ] ] ] } ] } "
