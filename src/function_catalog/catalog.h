@@ -38,9 +38,6 @@ struct ScalarCall {
   }
 };
 
-// Translates a call that templates cannot express, or returns nullopt when it is unsupported.
-using Handler = std::optional<std::string> (*)(const ScalarCall&);
-
 // How the translator dispatches a BigQuery function.
 enum class Translation : std::uint8_t {
   // The DuckDB function of the same name, with the same arguments.
@@ -70,6 +67,11 @@ struct FunctionEntry {
   std::string_view target = {};
   // kHandler.
   Handler handler = nullptr;
+  // By argument position; positions past the end use kExpression.
+  std::vector<ArgumentMode> argument_modes = {};
+  // Overrides the usual translation when the first argument is a STRUCT.
+  Handler struct_handler = nullptr;
+  std::vector<TypeRejection> type_rejections = {};
   // kAggregate and kAnalytic: the overloads, the first that matches a call translating it.
   std::vector<AggregateRule> aggregates = {};
 };

@@ -75,6 +75,9 @@ void Catalog::AddRules(std::string_view name, const FunctionDefinition<Rule>& de
                 .uses = definition.uses,
                 .implementations = Implementations(definition.rules, fallback),
                 .rules = definition.rules,
+                .argument_modes = definition.argument_modes,
+                .struct_handler = definition.struct_handler,
+                .type_rejections = definition.type_rejections,
             });
 }
 

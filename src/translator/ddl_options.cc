@@ -105,7 +105,7 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
 }
 
 // The scalar functions that BigQuery's DDL reference excludes from option values.
-constexpr std::array<std::string_view, 11> kExcludedOptionFunctions = {
+constexpr auto kExcludedOptionFunctions = std::to_array<std::string_view>({
     "ARRAY_TO_STRING",
     "REPLACE",
     "REGEXP_REPLACE",
@@ -117,7 +117,7 @@ constexpr std::array<std::string_view, 11> kExcludedOptionFunctions = {
     "SESSION_USER",
     "GENERATE_ARRAY",
     "GENERATE_DATE_ARRAY",
-};
+});
 
 // Whether `expression`, the value of `option` of `object` such as a table, is what BigQuery's DDL
 // reference allows as an option value: "a constant expression containing only literals, query

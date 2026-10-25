@@ -1,5 +1,6 @@
 #include "src/translator/functions_template.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -13,12 +14,14 @@
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
+#include "src/translator/handlers.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
 using function_catalog::Rule;
 
+using function_catalog::ArgumentMode;
 using function_catalog::Arity;
 using function_catalog::BigNumericCall;
 using function_catalog::BigNumericOperator;
@@ -34,6 +37,12 @@ using function_catalog::TypeUse;
 namespace {
 
 using enum googlesql::TypeKind;
+
+constexpr std::array kIntervalTypes = {TYPE_INTERVAL};
+constexpr std::array kStructTypes = {TYPE_STRUCT};
+constexpr std::array kRangeTypes = {TYPE_RANGE};
+constexpr std::array kIntervalDoubleTypes = {TYPE_INTERVAL, TYPE_DOUBLE};
+constexpr std::array kDoubleIntervalTypes = {TYPE_DOUBLE, TYPE_INTERVAL};
 
 Condition Mode(std::size_t argument, std::string_view rounding_mode) {
   return {.argument = argument, .rounding_mode = rounding_mode};
@@ -68,13 +77,16 @@ std::vector<Rule> IntegralRound(std::string_view function) {
 }
 
 // Shift the requested weekday to Monday, DuckDB's week boundary, then shift back.
-const std::vector<std::pair<std::string_view, int>>& WeekParts() {
-  static const std::vector<std::pair<std::string_view, int>> parts = {
-      {"week", 1},           {"isoweek", 0},       {"week_monday", 0}, {"week_tuesday", 6},
-      {"week_wednesday", 5}, {"week_thursday", 4}, {"week_friday", 3}, {"week_saturday", 2},
-  };
-  return parts;
-}
+constexpr auto kWeekParts = std::to_array<std::pair<std::string_view, int>>({
+    {"week", 1},
+    {"isoweek", 0},
+    {"week_monday", 0},
+    {"week_tuesday", 6},
+    {"week_wednesday", 5},
+    {"week_thursday", 4},
+    {"week_friday", 3},
+    {"week_saturday", 2},
+});
 
 std::string WeekStart(const std::string& value, int shift) {
   if (shift == 0) {
@@ -87,7 +99,8 @@ std::string WeekStart(const std::string& value, int shift) {
 // *_TRUNC to a week, with the result cast to `target` when date_trunc() would widen it.
 std::vector<Rule> WeekTrunc(std::string_view target = "") {
   std::vector<Rule> rules;
-  for (const auto& [part, shift] : WeekParts()) {
+  rules.reserve(kWeekParts.size());
+  for (const auto& [part, shift] : kWeekParts) {
     const std::string start = WeekStart("$1", shift);
     rules.push_back({
         .arity = 2,
@@ -119,7 +132,8 @@ std::vector<Rule> ZonedTrunc() {
 // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
 std::vector<Rule> WeekDiff() {
   std::vector<Rule> rules;
-  for (const auto& [part, shift] : WeekParts()) {
+  rules.reserve(kWeekParts.size());
+  for (const auto& [part, shift] : kWeekParts) {
     rules.push_back({
         .arity = 3,
         .spelling = "(date_diff('day', " + WeekStart("$2", shift) + ", " + WeekStart("$1", shift) +
@@ -155,7 +169,7 @@ std::vector<Rule> LastDay() {
         .errors = {"'LAST_DAY produces an out-of-range date'"},
     });
   };
-  for (const auto& [part, shift] : WeekParts()) {
+  for (const auto& [part, shift] : kWeekParts) {
     append("CAST(" + WeekStart("$1", shift) + " + INTERVAL 6 DAY AS DATE)", Part(2, {part}));
   }
   // January 4 always belongs to its calendar year's ISO year. Truncating January 4
@@ -844,9 +858,15 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .uses =
                   {
                       TypeUse::kCompares,
-                      TypeUse::kComparesStructs,
-                      TypeUse::kRejectsIntervalComparison,
                       TypeUse::kBigNumeric,
+                  },
+              .struct_handler = StructComparison,
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message = "Unsupported type in function NULL_IF",
+                      },
                   },
           },
       },
@@ -966,8 +986,8 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                           .spelling = "bq_multiply_numeric($1, $2)",
                           .conditions = {Is(1, {TYPE_NUMERIC})},
                       },
-                      // See src/googlesql_functions_duckdb/interval.cc; src/translator/function.cc
-                      // rejects FLOAT64 operands as BigQuery does.
+                      // See src/googlesql_functions_duckdb/interval.cc; the registered type
+                      // rejections reject FLOAT64 operands as BigQuery does.
                       {
                           .arity = 2,
                           .spelling = "bq_multiply_interval($1, $2)",
@@ -981,6 +1001,17 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                       {.arity = 2, .spelling = "($1 * $2)"},
                   },
               .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalDoubleTypes,
+                          .message = "No matching signature for operator *",
+                      },
+                      {
+                          .types = kDoubleIntervalTypes,
+                          .message = "No matching signature for operator *",
+                      },
+                  },
           },
       },
       {
@@ -1033,10 +1064,10 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .struct_handler = StructComparison,
           },
       },
       {
@@ -1047,10 +1078,10 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .struct_handler = StructComparison,
           },
       },
       {
@@ -1121,6 +1152,13 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           {
               .rules = {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}},
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kStructTypes,
+                          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
+                      },
+                  },
           },
       },
       {
@@ -1128,6 +1166,14 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           {
               .rules = {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}},
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kStructTypes,
+                          .message =
+                              "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
+                      },
+                  },
           },
       },
       {
@@ -1155,10 +1201,11 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                   {
                       TypeUse::kCompares,
                       TypeUse::kComparesIntervalKeys,
-                      TypeUse::kComparesStructs,
                       TypeUse::kComparesStructsWithInterval,
                       TypeUse::kBigNumeric,
                   },
+              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
+              .struct_handler = StructComparison,
           },
       },
       {
@@ -1700,7 +1747,18 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
       },
       {
           "RANGE_BUCKET",
-          {.rules = RangeBucket(), .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric}},
+          {
+              .rules = RangeBucket(),
+              .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
+              .type_rejections =
+                  {
+                      {
+                          .types = kRangeTypes,
+                          .message = "Unsupported type RANGE for function RANGE_BUCKET",
+                      },
+                  },
+          },
       },
       {"RANGE", {.rules = RangeConstructor(), .uses = {TypeUse::kBuildsOrReadsRange}}},
       {"RANGE_START", {.rules = BoundOrNull(kRangeStart), .uses = {TypeUse::kBuildsOrReadsRange}}},

@@ -23,16 +23,17 @@
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
-#include "src/translator/handlers.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::ArgumentMode;
 using function_catalog::BucketWidthOf;
 using function_catalog::Catalog;
 using function_catalog::DatePart;
 using function_catalog::FunctionEntry;
 using function_catalog::NormalizeMode;
+using function_catalog::RejectArgumentTypes;
 using function_catalog::RoundingMode;
 using function_catalog::ScalarCall;
 using function_catalog::Translation;
@@ -60,8 +61,8 @@ std::optional<std::string> Call(const Catalog& functions,
     });
   }
   if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
-      functions.HasTypeUse(name, TypeUse::kComparesStructs)) {
-    return StructComparison(call);
+      entry->struct_handler != nullptr) {
+    return entry->struct_handler(call);
   }
   if (entry->translation == Translation::kHandler) {
     return entry->handler(call);
@@ -292,6 +293,16 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   }
   const bool alias = entry->translation == Translation::kSafe;
   const std::string function = alias ? std::string(entry->target) : name;
+  if (alias) {
+    entry = functions.Find(function);
+    if (entry == nullptr) {
+      return Unsupported(scope, "function " + name);
+    }
+  }
+  const auto argument_mode = [&](size_t i) {
+    return i < entry->argument_modes.size() ? entry->argument_modes.at(i)
+                                            : ArgumentMode::kExpression;
+  };
   const bool safe =
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE || alias;
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
@@ -312,49 +323,38 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         std::ranges::any_of(call.argument_list(), [](const auto& argument) {
                           return HasInterval(argument->type());
                         });
-  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. CASE compares
-  // its first argument with its WHEN values.
-  if ((functions.HasTypeUse(function, TypeUse::kRejectsIntervalComparison) &&
-       std::ranges::any_of(call.argument_list(),
-                           [](const auto& argument) { return argument->type()->IsInterval(); })) ||
-      (function == "$CASE_WITH_VALUE" && call.argument_list(0)->type()->IsInterval())) {
-    throw std::invalid_argument("Unsupported type in function " +
-                                (function == "NULLIF"             ? std::string("NULL_IF")
-                                 : function == "$CASE_WITH_VALUE" ? std::string("CASE_WITH_VALUE")
-                                                                  : function));
-  }
-  // BigQuery compares only the fields of a STRUCT with IS DISTINCT FROM, although GoogleSQL
-  // compares the STRUCT.
-  if ((function == "$IS_DISTINCT_FROM" || function == "$IS_NOT_DISTINCT_FROM") &&
-      call.argument_list(0)->type()->IsStruct()) {
-    throw std::invalid_argument(
-        std::string(function == "$IS_DISTINCT_FROM" ? "IS DISTINCT FROM" : "IS NOT DISTINCT FROM") +
-        " can't be used with arguments of type STRUCT");
-  }
-  // BigQuery multiplies INTERVAL values only by INT64 values, although GoogleSQL takes FLOAT64.
-  if (function == "$MULTIPLY" && interval &&
-      std::ranges::any_of(call.argument_list(),
-                          [](const auto& argument) { return argument->type()->IsDouble(); })) {
-    throw std::invalid_argument("No matching signature for operator *");
-  }
-  const auto keyed = [&](const googlesql::Type* type) {
-    return type->IsInterval() || ((function == "$IN_ARRAY" || function == "RANGE_BUCKET") &&
+  RejectArgumentTypes(call, entry->type_rejections);
+  const auto keyed = [&](const googlesql::Type* type, size_t i) {
+    return type->IsInterval() || (argument_mode(i) == ArgumentMode::kIntervalArrayKeys &&
                                   type->IsArray() && type->AsArray()->element_type()->IsInterval());
   };
-  const bool compares_intervals =
-      interval && functions.HasTypeUse(function, TypeUse::kComparesIntervalKeys) &&
-      std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
-        return !HasInterval(argument->type()) || keyed(argument->type());
-      });
+  bool compares_intervals =
+      interval && functions.HasTypeUse(function, TypeUse::kComparesIntervalKeys);
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto* type = call.argument_list(static_cast<int>(i))->type();
+    if (HasInterval(type) && !keyed(type, i)) {
+      compares_intervals = false;
+    }
+  }
   const bool compares_structs =
       interval && functions.HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
       call.argument_list(0)->type()->IsStruct();
   // CASE with a value carries its results when it compares no INTERVAL values.
-  const bool carries_results =
-      function == "$CASE_WITH_VALUE" && !HasInterval(call.argument_list(0)->type());
+  const bool carries_results = functions.HasTypeUse(function, TypeUse::kCarriesResults) &&
+                               !HasInterval(call.argument_list(0)->type());
+  // A declared conversion permits INTERVAL only in the argument it converts, not in the
+  // result or nested inside another argument's ARRAY or STRUCT.
+  bool converts_intervals = !HasInterval(call.type());
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto* type = call.argument_list(static_cast<int>(i))->type();
+    if (HasInterval(type) &&
+        (!type->IsInterval() || argument_mode(i) != ArgumentMode::kBucketWidth)) {
+      converts_intervals = false;
+    }
+  }
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && !carries_results &&
-      entry->handler != Bucket && !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !converts_intervals && !functions.HasTypeUse(function, TypeUse::kCarries) &&
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
@@ -366,10 +366,6 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsGeography) &&
       !functions.HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
-  }
-  // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.
-  if (function == "RANGE_BUCKET" && call.argument_list(0)->type()->IsRange()) {
-    throw std::invalid_argument("Unsupported type RANGE for function RANGE_BUCKET");
   }
   // A RANGE is a STRUCT in DuckDB, which only these read as a RANGE.
   if ((HasRange(call.type()) ||
@@ -388,12 +384,12 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !functions.HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
     return Unsupported(scope, "function " + name + " with STRUCT<>");
   }
-  const bool bucket = entry->handler == Bucket;
   std::vector<std::string> args;
-  for (const auto& argument : call.argument_list()) {
+  for (size_t i = 0; i < call.argument_list().size(); ++i) {
+    const auto& argument = call.argument_list(static_cast<int>(i));
     // The bucket width INTERVAL becomes a plain count, since DuckDB intervals keep no single
     // part to count in.
-    if (bucket && argument->type()->IsInterval()) {
+    if (argument_mode(i) == ArgumentMode::kBucketWidth) {
       const auto width = BucketWidthOf(*argument);
       if (!width) {
         return Unsupported(scope, "function " + name + " bucket width");
@@ -431,7 +427,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
     if (compares_intervals && argument->type()->IsInterval()) {
       args.push_back(IntervalKey(*sql));
-    } else if (compares_intervals && keyed(argument->type())) {
+    } else if (compares_intervals && keyed(argument->type(), i)) {
       args.push_back("list_transform(" + *sql + ", lambda _ik: " + IntervalKey("_ik") + ")");
     } else {
       args.push_back(*sql);

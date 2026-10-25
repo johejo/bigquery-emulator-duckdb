@@ -1,6 +1,7 @@
 #include "src/translator/functions.h"
 
 #include <array>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -13,9 +14,11 @@
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::ArgumentMode;
 using function_catalog::Handler;
 using function_catalog::Implementation;
 using function_catalog::Translation;
+using function_catalog::TypeRejection;
 using function_catalog::TypeUse;
 using function_catalog::TypeUses;
 
@@ -67,7 +70,36 @@ struct HandledFunction {
   Handler handler;
   Implementation implementation = Implementation::kSQLInCode;
   TypeUses uses = {};
+  std::span<const ArgumentMode> argument_modes = {};
+  Handler struct_handler = nullptr;
+  std::span<const TypeRejection> type_rejections = {};
 };
+
+constexpr auto kBucketArgumentModes =
+    std::to_array<ArgumentMode>({ArgumentMode::kExpression, ArgumentMode::kBucketWidth});
+
+constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
+
+constexpr auto kCaseTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function CASE_WITH_VALUE",
+    },
+});
+
+constexpr auto kGreatestTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function GREATEST",
+    },
+});
+
+constexpr auto kLeastTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function LEAST",
+    },
+});
 
 // Functions that src/translator/handlers.cc translates in code.
 constexpr auto kHandlers =
@@ -90,10 +122,10 @@ constexpr auto kHandlers =
                         {
                             TypeUse::kCompares,
                             TypeUse::kComparesIntervalKeys,
-                            TypeUse::kComparesStructs,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
+                    .struct_handler = StructComparison,
                 },
             },
             {
@@ -110,17 +142,19 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kComparesStructs,
+                            TypeUse::kCarriesResults,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
+                    .struct_handler = StructComparison,
+                    .type_rejections = kCaseTypeRejections,
                 },
             },
             {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
             {"ALL_DIFFERENT", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
-            {"DATE_BUCKET", {.handler = Bucket}},
-            {"DATETIME_BUCKET", {.handler = Bucket}},
-            {"TIMESTAMP_BUCKET", {.handler = Bucket}},
+            {"DATE_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
+            {"DATETIME_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
+            {"TIMESTAMP_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
             {
                 "TO_JSON",
                 {
@@ -246,9 +280,9 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kRejectsIntervalComparison,
                             TypeUse::kBigNumeric,
                         },
+                    .type_rejections = kGreatestTypeRejections,
                 },
             },
             {
@@ -258,9 +292,9 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kRejectsIntervalComparison,
                             TypeUse::kBigNumeric,
                         },
+                    .type_rejections = kLeastTypeRejections,
                 },
             },
             {
@@ -320,6 +354,17 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .uses = function.uses,
                             .implementations = {function.implementation},
                             .handler = function.handler,
+                            .argument_modes =
+                                {
+                                    function.argument_modes.begin(),
+                                    function.argument_modes.end(),
+                                },
+                            .struct_handler = function.struct_handler,
+                            .type_rejections =
+                                {
+                                    function.type_rejections.begin(),
+                                    function.type_rejections.end(),
+                                },
                         });
   }
   for (const auto& [name, target] : kSafeFunctions) {
@@ -334,6 +379,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .translation = Translation::kAggregate,
                             .uses = definition.uses,
                             .implementations = {Implementation::kAggregate},
+                            .type_rejections = definition.type_rejections,
                             .aggregates = definition.rules,
                         });
   }
@@ -342,6 +388,7 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                             .translation = Translation::kAnalytic,
                             .uses = definition.uses,
                             .implementations = {Implementation::kAnalytic},
+                            .type_rejections = definition.type_rejections,
                             .aggregates = definition.rules,
                         });
   }

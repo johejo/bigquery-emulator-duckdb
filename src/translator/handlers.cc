@@ -13,19 +13,22 @@
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/comparison.h"
 #include "src/function_catalog/resolved_access.h"
-#include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::BindComparison;
+using function_catalog::BoundComparison;
 using function_catalog::BucketWidthOf;
-using function_catalog::FloatCompare;
+using function_catalog::Equal;
 using function_catalog::FunctionArgument;
 using function_catalog::IsConstant;
 using function_catalog::ScalarCall;
 using function_catalog::StringLiteral;
+using function_catalog::StructInArray;
 
 namespace {
 
@@ -76,46 +79,6 @@ std::optional<std::string> Case(const ScalarCall& call) {
   return "(" + sql + "ELSE " + args.back() + " END)";
 }
 
-namespace {
-
-// Whether `left` = `right`, two values of `type`. BigQuery compares STRUCTs field by field by
-// position: FALSE when a pair of fields differs, otherwise NULL when a field is NULL. DuckDB's
-// composite equality takes NULL fields, and NaN, as equal values. INTERVAL fields compare their
-// lengths, as bq_interval_key computes them.
-std::string Equal(const googlesql::Type* type, const std::string& left, const std::string& right) {
-  if (type->IsStruct()) {
-    std::vector<std::string> fields;
-    for (int i = 0; i < type->AsStruct()->num_fields(); ++i) {
-      const auto field = [&](const std::string& value) {
-        return "struct_extract_at(" + value + ", " + std::to_string(i + 1) + ")";
-      };
-      fields.push_back(Equal(type->AsStruct()->field(i).type, field(left), field(right)));
-    }
-    return "(" + Join(fields, " AND ") + ")";
-  }
-  if (type->IsDouble()) {
-    return FloatCompare(left, "=", right);
-  }
-  if (type->IsInterval()) {
-    return "(bq_interval_key(" + left + ") = bq_interval_key(" + right + "))";
-  }
-  return "(" + left + " = " + right + ")";
-}
-
-// `body` over the arguments `args` that `indexes` name, each bound once as _sc.aN.
-std::string Bind(const std::vector<std::string>& args, const std::vector<size_t>& indexes,
-                 const std::string& body) {
-  std::vector<std::string> fields;
-  std::ranges::transform(indexes, std::back_inserter(fields), [&](size_t i) {
-    return "a" + std::to_string(i + 1) + " := " + args.at(i);
-  });
-  return "list_transform([struct_pack(" + Join(fields, ", ") + ")], lambda _sc: " + body + ")[1]";
-}
-
-std::string Bound(size_t i) { return "_sc.a" + std::to_string(i + 1); }
-
-}  // namespace
-
 std::optional<std::string> GraphIdentityPredicate(const ScalarCall& call) {
   if (call.safe || call.arguments.size() < 2 ||
       std::ranges::any_of(call.arguments, [](const auto& argument) {
@@ -132,26 +95,16 @@ std::optional<std::string> GraphIdentityPredicate(const ScalarCall& call) {
     // without comparing labels or properties. Bind each argument's identity once.
     identities.push_back("struct_extract(" + call.arguments.at(i).sql + ", '$id')");
     indexes.push_back(i);
-    values.push_back(Bound(i));
-    nulls.push_back(Bound(i) + " IS NULL");
+    values.push_back(BoundComparison(i));
+    nulls.push_back(BoundComparison(i) + " IS NULL");
   }
   const auto count = call.name == "SAME" ? 1 : values.size();
-  return Bind(identities, indexes,
-              "CASE WHEN " + Join(nulls, " OR ") + " THEN " +
-                  call.Raise(QuoteLiteral("Input to the function " + std::string(call.name) +
-                                          " must not be null")) +
-                  " ELSE list_unique([" + Join(values, ", ") + "]) = " + std::to_string(count) +
-                  " END");
-}
-
-std::string StructInArray(const googlesql::Type* type, const std::string& value,
-                          const std::string& array) {
-  // TRUE when an element is equal, otherwise NULL when a comparison is NULL; FALSE for an empty
-  // or NULL array.
-  return Bind({value, array}, {0, 1},
-              "list_transform([list_transform(_sc.a2, lambda _e: " + Equal(type, "_sc.a1", "_e") +
-                  ")], lambda _b: CASE WHEN list_contains(_b, true) THEN true WHEN len(_b) > "
-                  "list_count(_b) THEN NULL ELSE false END)[1]");
+  return BindComparison(identities, indexes,
+                        "CASE WHEN " + Join(nulls, " OR ") + " THEN " +
+                            call.Raise(QuoteLiteral("Input to the function " +
+                                                    std::string(call.name) + " must not be null")) +
+                            " ELSE list_unique([" + Join(values, ", ") +
+                            "]) = " + std::to_string(count) + " END");
 }
 
 std::optional<std::string> StructComparison(const ScalarCall& call) {
@@ -159,13 +112,13 @@ std::optional<std::string> StructComparison(const ScalarCall& call) {
   const googlesql::Type* type = call.ArgumentType(0);
   const size_t n = args.size();
   if (call.name == "$EQUAL" || call.name == "$NOT_EQUAL") {
-    const std::string equal = Equal(type, Bound(0), Bound(1));
-    return Bind(args, {0, 1}, call.name == "$EQUAL" ? equal : "(NOT " + equal + ")");
+    const std::string equal = Equal(type, BoundComparison(0), BoundComparison(1));
+    return BindComparison(args, {0, 1}, call.name == "$EQUAL" ? equal : "(NOT " + equal + ")");
   }
   if (call.name == "NULLIF") {
-    return Bind(
-        args, {0, 1},
-        "CASE WHEN " + Equal(type, Bound(0), Bound(1)) + " THEN NULL ELSE " + Bound(0) + " END");
+    return BindComparison(args, {0, 1},
+                          "CASE WHEN " + Equal(type, BoundComparison(0), BoundComparison(1)) +
+                              " THEN NULL ELSE " + BoundComparison(0) + " END");
   }
   if (call.name == "$IN") {
     std::vector<size_t> indexes;
@@ -173,10 +126,10 @@ std::optional<std::string> StructComparison(const ScalarCall& call) {
     for (size_t i = 0; i < n; ++i) {
       indexes.push_back(i);
       if (i > 0) {
-        equals.push_back(Equal(type, Bound(0), Bound(i)));
+        equals.push_back(Equal(type, BoundComparison(0), BoundComparison(i)));
       }
     }
-    return Bind(args, indexes, "(" + Join(equals, " OR ") + ")");
+    return BindComparison(args, indexes, "(" + Join(equals, " OR ") + ")");
   }
   if (call.name == "$IN_ARRAY") {
     return StructInArray(type, args.at(0), args.at(1));
@@ -190,11 +143,12 @@ std::optional<std::string> StructComparison(const ScalarCall& call) {
     for (size_t i = 1; i + 1 < n; i += 2) {
       const std::string when = std::to_string(indexes.size());
       indexes.push_back(i);
-      match += "WHEN " + Equal(type, Bound(0), Bound(i)) + " THEN " + when + " ";
+      match +=
+          "WHEN " + Equal(type, BoundComparison(0), BoundComparison(i)) + " THEN " + when + " ";
       results += "WHEN " + when + " THEN " + args.at(i + 1) + " ";
     }
-    return "(CASE " + Bind(args, indexes, "CASE " + match + "ELSE 0 END") + " " + results +
-           "ELSE " + args.back() + " END)";
+    return "(CASE " + BindComparison(args, indexes, "CASE " + match + "ELSE 0 END") + " " +
+           results + "ELSE " + args.back() + " END)";
   }
   return std::nullopt;
 }

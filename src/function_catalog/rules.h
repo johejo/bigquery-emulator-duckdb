@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -87,6 +88,14 @@ struct Rule {
   std::optional<Implementation> implementation = {};
 };
 
+// An aggregate or analytic argument that BigQuery requires to be a constant expression.
+struct ConstantArgument {
+  // Counted from 1; a call that leaves this optional argument out satisfies the requirement.
+  std::size_t argument;
+  std::string_view description;
+  std::string_view message;
+};
+
 // A DuckDB aggregate or window function that implements a BigQuery one.
 struct AggregateRule {
   // How the function treats IGNORE NULLS and RESPECT NULLS.
@@ -146,6 +155,10 @@ struct AggregateRule {
   // A finish containing a subquery needs its aggregate result in a preceding SELECT.
   // DuckDB cannot bind constant aggregates or correlated windows inside that subquery.
   bool finish_after_scan = false;
+  // Reject ORDER BY of the first argument alone, or any ORDER BY with DISTINCT, with this
+  // error. Other order keys, including ones combined with the first argument, remain allowed.
+  std::string_view order_by_argument_error = {};
+  std::vector<ConstantArgument> constant_arguments = {};
 };
 
 // What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a
@@ -158,19 +171,17 @@ enum class TypeUse : std::uint8_t {
   // Handle BIGNUMERIC arguments and results without loss of precision. Other DuckDB functions
   // could compute BIGNUM values as DOUBLE or truncate them.
   kBigNumeric,
-  // BigQuery rejects direct INTERVAL arguments although GoogleSQL accepts them.
-  kRejectsIntervalComparison,
   // Pass, select or count their values without reading them.
   kCarries,
+  // Carry result arguments when the first, compared argument contains no INTERVAL values.
+  kCarriesResults,
   // Also compare or order their values.
   kCompares,
   // Build or read DuckDB intervals, which hold INTERVAL values.
   kBuildsOrReadsInterval,
   // Only compare their INTERVAL arguments or ARRAY elements, so they compare the values' keys.
   kComparesIntervalKeys,
-  // Compare a STRUCT first argument field by field, as StructComparison does.
-  kComparesStructs,
-  // Of kComparesStructs, those that also compare INTERVAL fields, by their keys. BigQuery
+  // STRUCT handlers that also compare INTERVAL fields, by their keys. BigQuery
   // compares no ARRAYs, also in STRUCT fields.
   kComparesStructsWithInterval,
   // Build or read the STRUCT that holds a RANGE, whose unbounded ends are infinite, or read it as
@@ -187,6 +198,8 @@ enum class TypeUse : std::uint8_t {
   kReadsEmptyStruct,
   // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
   kRejectsSafe,
+  // BigQuery rejects OVER on these aggregate functions although GoogleSQL accepts it.
+  kRejectsOver,
 };
 
 // A constexpr set of type attributes, also used by the plain and handler registrations.
@@ -212,11 +225,36 @@ class TypeUses {
   std::uint32_t bits_ = 0;
 };
 
+// How an argument is translated before the function's implementation receives it.
+enum class ArgumentMode : std::uint8_t {
+  kExpression,
+  // Accept a single-part INTERVAL width and pass its count of months, days or microseconds.
+  kBucketWidth,
+  // Compare INTERVAL array elements by their keys, leaving other element types unchanged.
+  kIntervalArrayKeys,
+};
+
+// A type combination BigQuery rejects after GoogleSQL analysis. All listed argument positions
+// must be present and match; TYPE_UNKNOWN accepts any type. The type list must outlive the catalog.
+struct TypeRejection {
+  std::span<const googlesql::TypeKind> types;
+  std::string_view message;
+};
+
+struct ScalarCall;
+
+// Translates a call that templates cannot express, or returns nullopt when it is unsupported.
+using Handler = std::optional<std::string> (*)(const ScalarCall&);
+
 // A function's overloads and type behavior, declared together in its rule table.
 template <typename RuleType>
 struct FunctionDefinition {
   std::vector<RuleType> rules;
   TypeUses uses = {};
+  std::vector<ArgumentMode> argument_modes = {};
+  // Overrides the usual translation when the first argument is a STRUCT.
+  Handler struct_handler = nullptr;
+  std::vector<TypeRejection> type_rejections = {};
 };
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

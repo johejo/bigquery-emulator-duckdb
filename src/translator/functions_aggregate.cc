@@ -1,5 +1,6 @@
 #include "src/translator/functions_aggregate.h"
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -16,6 +17,9 @@ using function_catalog::Raise;
 using function_catalog::TypeUse;
 
 namespace {
+
+constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
+constexpr std::array kRangeTypes = {googlesql::TYPE_RANGE};
 
 // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting the
 // (count, value) structs descending puts the most frequent first, and no rows give NULL.
@@ -301,12 +305,14 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                           .distinct = AggregateRule::Distinct::kRequired,
                           .limit = kSliceFinished,
                           .finish = IntervalDistinct,
+                          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
                       },
                       {
                           .function = "list",
                           .type = googlesql::TYPE_INTERVAL,
                           .nulls = kFilter,
                           .limit = kSlice,
+                          .order_by_argument_error = "Unsupported type INTERVAL for array_agg.",
                       },
                       {.function = "list", .nulls = kFilter, .limit = kSlice, .carries = true},
                   },
@@ -338,13 +344,22 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       HllCountInit(googlesql::TYPE_BIGNUMERIC),
                       HllCountInit(googlesql::TYPE_UNKNOWN),
                   },
-              .uses = {TypeUse::kBigNumeric},
+              .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
           },
       },
-      {"HLL_COUNT.MERGE_PARTIAL", {.rules = {{.function = "bq_hll_count_merge_partial"}}}},
+      {
+          "HLL_COUNT.MERGE_PARTIAL",
+          {
+              .rules = {{.function = "bq_hll_count_merge_partial"}},
+              .uses = {TypeUse::kRejectsOver},
+          },
+      },
       {
           "HLL_COUNT.MERGE",
-          {.rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}}},
+          {
+              .rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}},
+              .uses = {TypeUse::kRejectsOver},
+          },
       },
       // Other types count exactly, which is within any approximation error.
       {
@@ -359,7 +374,18 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
                       {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
                   },
-              .uses = {TypeUse::kBigNumeric},
+              .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message = "Unsupported type INTERVAL for hll_count.init.",
+                      },
+                      {
+                          .types = kRangeTypes,
+                          .message = "Unsupported type RANGE for hll_count.init.",
+                      },
+                  },
           },
       },
       // APPROX_QUANTILES(x, n) takes the n + 1 quantiles 0, 1/n, ..., 1. quantile_disc()
@@ -376,6 +402,14 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       },
                   },
               .uses = {TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message =
+                              "Unsupported type INTERVAL for aggregate function approx_quantiles",
+                      },
+                  },
           },
       },
       // histogram() takes only the values; TopCount() applies the count afterwards.
@@ -392,6 +426,17 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       },
                   },
               .uses = {TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message = "Unsupported type INTERVAL for approx_top_count_shard.",
+                      },
+                      {
+                          .types = kRangeTypes,
+                          .message = "Unsupported type RANGE for approx_top_count_shard.",
+                      },
+                  },
           },
       },
       {
@@ -405,6 +450,17 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       TopSumRule<googlesql::TYPE_DOUBLE>(),
                   },
               .uses = {TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message = "Unsupported type INTERVAL for approx_top_sum_shard.",
+                      },
+                      {
+                          .types = kRangeTypes,
+                          .message = "Unsupported type RANGE for approx_top_sum_shard.",
+                      },
+                  },
           },
       },
       // The _null variants return a NULL x instead of skipping its row. INTERVAL values of y
@@ -610,14 +666,44 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
           {
               "LAG",
               {
-                  .rules = {{.function = "lag", .carries = true}},
+                  .rules =
+                      {
+                          {
+                              .function = "lag",
+                              .carries = true,
+                              .constant_arguments =
+                                  {
+                                      {
+                                          .argument = 3,
+                                          .description = "default expression",
+                                          .message = "The third argument (the default expression) "
+                                                     "to LAG must be constant",
+                                      },
+                                  },
+                          },
+                      },
                   .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
               },
           },
           {
               "LEAD",
               {
-                  .rules = {{.function = "lead", .carries = true}},
+                  .rules =
+                      {
+                          {
+                              .function = "lead",
+                              .carries = true,
+                              .constant_arguments =
+                                  {
+                                      {
+                                          .argument = 3,
+                                          .description = "default expression",
+                                          .message = "The third argument (the default expression) "
+                                                     "to LEAD must be constant",
+                                      },
+                                  },
+                          },
+                      },
                   .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
               },
           },
