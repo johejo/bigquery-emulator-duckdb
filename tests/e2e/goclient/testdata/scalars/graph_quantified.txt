@@ -1,0 +1,101 @@
+# BigQuery's documented FinGraph rows and quantified-path examples.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#quantified_path_pattern
+# The documented six (hops, dst_account_id) rows, sorted into one scalar.
+SELECT STRING_AGG(CONCAT(CAST(hops AS STRING), ':', CAST(dst_account_id AS STRING)), ',' ORDER BY hops, dst_account_id) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (src:Account WHERE src.id = 7)-[e:Transfers]->{1,3}(dst:Account) WHERE src.id != dst.id RETURN ARRAY_LENGTH(e) AS hops, dst.id AS dst_account_id)
+=> "1:16,1:16,2:20,2:20,3:16,3:16"
+
+# Repeated subpaths with a filter inside each iteration: the documented three rows.
+SELECT STRING_AGG(CONCAT(CAST(src AS STRING), ':', CAST(dst AS STRING)), ',' ORDER BY src, dst) FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH (src:Account)((:Account)-[:Transfers]->(mid:Account WHERE mid.is_blocked)){1,2}-[:Transfers]->(dst:Account) RETURN src.id AS src, dst.id AS dst)
+=> "7:20,7:20,20:20"
+
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-patterns#path_mode
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH TRAIL (a:Account)-[:Transfers]->{4}(b:Account) RETURN COUNT(*) AS result)
+=> "6"
+SELECT result FROM GRAPH_TABLE(scalar_graph.TransferGraph MATCH TRAIL (WALK (a:Account)-[:Transfers]->{4}(b:Account)) RETURN COUNT(*) AS result)
+=> "6"
+
+# The following cases use the existing graph fixtures. Expected results follow the
+# documented UNION ALL, group-variable ordering, path composition and mode rules.
+# FinGraph edges: 10:1->2, 11:2->1, 12:1->1, 13:1->2. Node 3 is isolated.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "12"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((a:Person)-[e:Knows]->(b:Person)){2} RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((a:Person)-[e:Knows]->(b:Person)-[f:Knows]->(c:Person)){1,2} RETURN COUNT(*) AS result)
+=> "40"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->{1}(b:Person)-[:Knows]->{1}(c:Person) RETURN COUNT(*) AS result)
+=> "8"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]->{1,2}(b:Person) WHERE a.id = 3 RETURN COUNT(*) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)<-[:Knows]-{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "12"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Knows]-{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "32"
+
+# Group arrays contain each iteration's binding, in traversal order.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((a:Person)-[e:Knows]->(b:Person)){2} WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN a[OFFSET(1)].id AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((a:Person)-[e:Knows]->(b:Person)){2} WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN b[OFFSET(1)].id AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows WHERE e.id = 12]->{1,3}(b:Person) RETURN MAX(ARRAY_LENGTH(e)) AS result)
+=> "3"
+
+# Whole-path values concatenate iterations and share each boundary node once.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN PATH_LENGTH(p) AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN ARRAY_LENGTH(NODES(p)) AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN NODES(p)[OFFSET(1)].id AS result)
+=> "2"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN EDGES(p)[OFFSET(1)].id AS result)
+=> "11"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN IS_ACYCLIC(p) AS result)
+=> "false"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN IS_SIMPLE(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{2}(b:Person) WHERE e[OFFSET(0)].id = 10 AND e[OFFSET(1)].id = 11 RETURN IS_TRAIL(p) AS result)
+=> "true"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH TRAIL (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "11"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ACYCLIC (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "3"
+
+# Zero repetitions produce empty group arrays, retain isolated nodes, and do not
+# impose labels or predicates from inside the quantified part.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->{0,1}(b:Person) RETURN COUNT(*) AS result)
+=> "7"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[e:Knows]->{,1}(b:Person) WHERE a.id = 3 RETURN ARRAY_LENGTH(e) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows WHERE e.id = -1]->{0,1}(b:Person) WHERE a.id = 3 RETURN PATH_LENGTH(p) AS result)
+=> "0"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[e:Knows]->{0,1}(b:Person) WHERE a.id = 3 RETURN PATH_FIRST(p).id AS result)
+=> "3"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Account)((x:Person)-[e:Owns]->(y:Account)){0,1}(b:Account) RETURN COUNT(*) AS result)
+=> "1"
+
+# Hidden and composite keys, multiple MATCH stages and optional matches.
+SELECT result FROM GRAPH_TABLE(scalar_graph.HiddenKeys MATCH TRAIL (a:Person)-[:Knows]->{1,2}(b:Person) RETURN COUNT(*) AS result)
+=> "11"
+SELECT result FROM GRAPH_TABLE(scalar_graph.CompoundGraph MATCH (a:Compound)-[:CompoundEdge]->{1,2}(b:Compound) RETURN COUNT(*) AS result)
+=> "5"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person) OPTIONAL MATCH (a:Person)-[e:Knows]->{1,2}(b:Person) WHERE b.id = 999 RETURN COUNT(*) AS result)
+=> "3"
+
+# Different endpoint element tables cannot be stitched by coincident keys.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Owns]->{1,2}(b:Account) RETURN a.name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->{1,2}(b:Account) RETURN PATH_FIRST(p).name AS result)
+=> "Alex"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->{1,2}(b:Account) RETURN PATH_LAST(p).kind AS result)
+=> "checking"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = (a:Person)-[:Owns]->{1,2}(b:Account) RETURN PATH_FIRST(p).kind AS result)
+=> null
+
+# A zero-length subpath can connect directly to an edge even when its inner
+# endpoint labels differ from that edge's endpoint table.
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH (a:Person)-[:Owns]->((x:Person)-[e:Knows]->(y:Person)){0,1} RETURN COUNT(*) AS result)
+=> "1"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH ((x:Person)-[e:Owns]->(y:Account)){0,1}-[:Knows]->(a:Person) RETURN COUNT(*) AS result)
+=> "4"
+SELECT result FROM GRAPH_TABLE(scalar_graph.FinGraph MATCH p = ((x:Person)-[e:Knows]->(y:Person)){0,1}(a:Account) RETURN PATH_FIRST(p).kind AS result)
+=> "checking"

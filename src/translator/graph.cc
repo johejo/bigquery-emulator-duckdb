@@ -302,17 +302,54 @@ std::optional<std::string> CreatePropertyGraph(
 
 namespace {
 
-std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
-                                  const Scope& scope) {
-  const auto mode = path.path_mode() == nullptr ? googlesql::ResolvedGraphPathMode::WALK
-                                                : path.path_mode()->path_mode();
-  if (path.quantifier() != nullptr || path.search_prefix() != nullptr ||
-      path.path_cost() != nullptr || !path.hint_list().empty() || !path.path_hint_list().empty() ||
-      (mode != googlesql::ResolvedGraphPathMode::WALK &&
-       mode != googlesql::ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED &&
-       mode != googlesql::ResolvedGraphPathMode::TRAIL &&
-       mode != googlesql::ResolvedGraphPathMode::ACYCLIC)) {
-    return Unsupported(scope, "quantified paths, search prefixes or path modes");
+// A flat path also exposes private traversal columns used to compose and repeat paths.
+std::optional<Relation> FlatGraphPath(
+    const std::vector<const googlesql::ResolvedGraphElementScan*>& input,
+    const googlesql::GraphPathType* path_type, const Scope& scope) {
+  auto elements = input;
+  std::vector<std::unique_ptr<googlesql::ResolvedGraphNodeScan>> inferred;
+  for (size_t i = 0; i < elements.size(); ++i) {
+    const auto& element = *elements.at(i);
+    if (!element.Is<googlesql::ResolvedGraphNodeScan>() ||
+        element.target_element_table_list_size() == 1) {
+      continue;
+    }
+    if (!element.hint_list().empty()) {
+      return Unsupported(scope, "graph node hints");
+    }
+    auto candidates = element.target_element_table_list();
+    for (const int offset : {-1, 1}) {
+      const auto adjacent = static_cast<int>(i) + offset;
+      if (adjacent < 0 || std::cmp_greater_equal(adjacent, elements.size()) ||
+          !elements.at(adjacent)->Is<googlesql::ResolvedGraphEdgeScan>()) {
+        continue;
+      }
+      const auto& edge = *elements.at(adjacent)->GetAs<googlesql::ResolvedGraphEdgeScan>();
+      if (edge.target_element_table_list_size() != 1) {
+        continue;
+      }
+      const auto* table = edge.target_element_table_list(0)->AsEdgeTable();
+      const auto* source = table->GetSourceNodeTable()->GetReferencedNodeTable();
+      const auto* destination = table->GetDestNodeTable()->GetReferencedNodeTable();
+      const auto* endpoint =
+          (offset == 1) == (edge.orientation() != googlesql::ResolvedGraphEdgeScan::LEFT)
+              ? source
+              : destination;
+      std::erase_if(candidates, [&](const auto* candidate) {
+        return edge.orientation() == googlesql::ResolvedGraphEdgeScan::ANY
+                   ? candidate != source && candidate != destination
+                   : candidate != endpoint;
+      });
+    }
+    if (candidates.size() != 1) {
+      return Unsupported(scope, "graph patterns without a single table and label");
+    }
+    auto node = googlesql::MakeResolvedGraphNodeScan();
+    node->set_column_list(element.column_list());
+    node->set_target_element_table_list(candidates);
+    // Keep the original filter: the inferred table only narrows impossible endpoints.
+    elements.at(i) = node.get();
+    inferred.push_back(std::move(node));
   }
   Relation result;
   std::vector<std::string> outputs;
@@ -320,18 +357,12 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
   std::vector<std::string> filters;
   std::vector<std::string> path_nodes;
   std::vector<std::string> path_edges;
-  std::vector<std::string> mode_elements;
+  std::vector<std::string> node_values;
+  std::vector<std::string> edge_values;
   std::vector<std::string> tables;
   std::vector<std::string> connections;
-  std::vector<const googlesql::ResolvedGraphElementScan*> elements;
-  if (std::ranges::any_of(path.input_scan_list(), [](const auto& part) {
-        return !part->template Is<googlesql::ResolvedGraphElementScan>();
-      })) {
-    return Unsupported(scope, "nested graph paths");
-  }
-  for (size_t index = 0; index < path.input_scan_list().size(); ++index) {
-    const auto& part = path.input_scan_list().at(index);
-    const auto& element = *part->GetAs<googlesql::ResolvedGraphElementScan>();
+  for (size_t index = 0; index < elements.size(); ++index) {
+    const auto& element = *elements.at(index);
     if (element.target_element_table_list_size() != 1 || !element.hint_list().empty() ||
         element.column_list_size() != 1) {
       return Unsupported(scope, "graph patterns without a single table and label");
@@ -348,7 +379,6 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
     const auto* element_table = element.target_element_table_list(0);
     tables.push_back(QuoteIdentifierPath(element_table->GetTable()->FullName()) + " AS " +
                      variable);
-    elements.push_back(&element);
     std::vector<std::string> keys;
     for (size_t i = 0; i < element_table->GetKeyColumns().size(); ++i) {
       const auto output =
@@ -364,10 +394,8 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
     std::string endpoints;
     if (element.Is<googlesql::ResolvedGraphEdgeScan>()) {
       const auto& edge = *element.GetAs<googlesql::ResolvedGraphEdgeScan>();
-      const auto& left =
-          *path.input_scan_list().at(index - 1)->GetAs<googlesql::ResolvedGraphElementScan>();
-      const auto& right =
-          *path.input_scan_list().at(index + 1)->GetAs<googlesql::ResolvedGraphElementScan>();
+      const auto& left = *elements.at(index - 1);
+      const auto& right = *elements.at(index + 1);
       for (const bool source : {true, false}) {
         const auto endpoint = EndpointIdentity(edge, left, right, source);
         const std::string field = source ? "$source_id" : "$destination_id";
@@ -388,7 +416,13 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
           QuoteIdentifier("g" + std::to_string(column.column_id()) + "_" + property.name);
       const googlesql::GraphPropertyDefinition* definition = nullptr;
       if (!element_table->FindPropertyDefinitionByName(property.name, definition).ok()) {
-        return Unsupported(scope, "graph property definition");
+        const auto type = DuckDbType(property.value_type);
+        if (!type) {
+          return Unsupported(scope, "graph property type");
+        }
+        outputs.push_back("CAST(NULL AS " + *type + ") AS " + output);
+        fields.push_back(std::format("{} := q.{}", name, output));
+        continue;
       }
       const auto value = definition->GetValueExpression();
       if (!value.ok() || !(*value)->Is<googlesql::ResolvedCatalogColumnRef>()) {
@@ -411,12 +445,9 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
     };
     projections.push_back(pack(fields) + " AS " + ColumnName(column.column_id()));
     const bool is_edge = element.Is<googlesql::ResolvedGraphEdgeScan>();
-    if ((mode == googlesql::ResolvedGraphPathMode::TRAIL && is_edge) ||
-        (mode == googlesql::ResolvedGraphPathMode::ACYCLIC && !is_edge)) {
-      mode_elements.push_back("struct_extract(q." + ColumnName(column.column_id()) + ", '$id')");
-    }
-    if (path.path() != nullptr) {
-      const auto* path_type = path.path()->column().type()->AsGraphPath();
+    (is_edge ? path_edges : path_nodes)
+        .push_back("struct_extract(q." + ColumnName(column.column_id()) + ", '$id')");
+    if (path_type != nullptr) {
       const auto* target = is_edge ? path_type->edge_type() : path_type->node_type();
       std::vector<std::string> path_properties;
       for (const auto& property : target->property_types()) {
@@ -437,22 +468,19 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
       if (path_properties.empty()) {
         path_properties.emplace_back("\"$empty\" := TRUE");
       }
-      (is_edge ? path_edges : path_nodes).push_back(pack(path_properties));
+      (is_edge ? edge_values : node_values).push_back(pack(path_properties));
     }
     result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
   }
-  if (path.path() != nullptr) {
-    const auto& column = path.path()->column();
-    const auto* path_type = column.type()->AsGraphPath();
+  if (path_type != nullptr) {
     const auto node_type = DuckDbType(path_type->node_type());
     const auto edge_type = DuckDbType(path_type->edge_type());
     if (!node_type || !edge_type) {
       return Unsupported(scope, "graph path element type");
     }
-    projections.push_back("struct_pack(\"$nodes\" := CAST([" + Join(path_nodes, ", ") + "] AS " +
-                          *node_type + "[]), \"$edges\" := CAST([" + Join(path_edges, ", ") +
-                          "] AS " + *edge_type + "[])) AS " + ColumnName(column.column_id()));
-    result.columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
+    projections.push_back("struct_pack(\"$nodes\" := CAST([" + Join(node_values, ", ") + "] AS " +
+                          *node_type + "[]), \"$edges\" := CAST([" + Join(edge_values, ", ") +
+                          "] AS " + *edge_type + "[])) AS _graph_walk");
   }
   if (outputs.empty()) {
     outputs.emplace_back("1 AS _unit");
@@ -479,30 +507,301 @@ std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path,
   const auto rows = "SELECT " + Join(outputs, ", ") + " FROM " + Join(tables, " CROSS JOIN ") +
                     (connections.empty() ? "" : " WHERE " + Join(connections, " AND "));
   result.sql = "SELECT " + Join(projections, ", ") + " FROM (" + rows + ") AS q";
-  if (mode == googlesql::ResolvedGraphPathMode::TRAIL ||
-      mode == googlesql::ResolvedGraphPathMode::ACYCLIC) {
-    filters.push_back("list_unique([" + Join(mode_elements, ", ") +
-                      "]) = " + std::to_string(mode_elements.size()));
-  }
-  for (const auto& part : path.input_scan_list()) {
-    const auto* filter = part->GetAs<googlesql::ResolvedGraphElementScan>()->filter_expr();
-    if (filter != nullptr) {
-      const auto expression = GraphFilter(*filter, scope, result.columns);
+  for (const auto* element : input) {
+    if (element->filter_expr() != nullptr) {
+      const auto expression = GraphFilter(*element->filter_expr(), scope, result.columns);
       if (!expression) {
         return std::nullopt;
       }
       filters.push_back(*expression);
     }
   }
-  if (path.filter_expr() != nullptr) {
-    const auto expression = GraphFilter(*path.filter_expr(), scope, result.columns);
-    if (!expression) {
-      return std::nullopt;
-    }
-    filters.push_back(*expression);
-  }
   if (!filters.empty()) {
     result.sql = "SELECT q.*" + result.From() + " WHERE " + Join(filters, " AND ");
+  }
+  result.sql = "SELECT q.*, " + ColumnName(elements.front()->column_list(0).column_id()) +
+               " AS _graph_head, " + ColumnName(elements.back()->column_list(0).column_id()) +
+               " AS _graph_tail, CAST([" + Join(path_nodes, ", ") +
+               "] AS VARCHAR[]) AS _graph_nodes, CAST([" + Join(path_edges, ", ") +
+               "] AS VARCHAR[]) AS _graph_edges" + result.From();
+  return result;
+}
+
+// A path's boundary keeps the original node table candidates, but uses the column
+// created for its endpoint when the path is quantified.
+std::unique_ptr<googlesql::ResolvedGraphNodeScan> BoundaryNode(
+    const googlesql::ResolvedGraphPathScanBase& part, bool head, const Scope& scope) {
+  const auto* node = &part;
+  auto column = part.column_list(0);
+  bool nullable = false;
+  if (part.Is<googlesql::ResolvedGraphPathScan>()) {
+    const auto& path = *part.GetAs<googlesql::ResolvedGraphPathScan>();
+    column = head ? path.head() : path.tail();
+  }
+  while (node->Is<googlesql::ResolvedGraphPathScan>()) {
+    const auto& path = *node->GetAs<googlesql::ResolvedGraphPathScan>();
+    if (path.quantifier() != nullptr &&
+        path.quantifier()->lower_bound()->Is<googlesql::ResolvedLiteral>()) {
+      const auto& lower =
+          path.quantifier()->lower_bound()->GetAs<googlesql::ResolvedLiteral>()->value();
+      nullable = nullable || (!lower.is_null() && lower.int64_value() == 0);
+    }
+    node = head ? path.input_scan_list().front().get() : path.input_scan_list().back().get();
+  }
+  auto result = googlesql::MakeResolvedGraphNodeScan();
+  result->set_column_list({column});
+  if (nullable && scope.property_graph != nullptr) {
+    // A zero-length subpath can connect at a node whose label does not match
+    // either endpoint inside the repeated pattern.
+    absl::flat_hash_set<const googlesql::GraphNodeTable*> tables;
+    if (scope.property_graph->GetNodeTables(tables).ok()) {
+      result->set_target_element_table_list({tables.begin(), tables.end()});
+    }
+  } else {
+    result->set_target_element_table_list(
+        node->GetAs<googlesql::ResolvedGraphElementScan>()->target_element_table_list());
+  }
+  return result;
+}
+
+std::string AppendNodes(const std::string& left, const std::string& right) {
+  // Adjacent paths share one endpoint, including a zero-edge path.
+  return "list_concat(" + left + ", list_slice(" + right + ", 2, length(" + right + ")))";
+}
+
+std::string AppendWalk(const std::string& left, const std::string& right) {
+  return "struct_pack(\"$nodes\" := " + AppendNodes(left + ".\"$nodes\"", right + ".\"$nodes\"") +
+         ", \"$edges\" := list_concat(" + left + ".\"$edges\", " + right + ".\"$edges\"))";
+}
+
+std::optional<Relation> GraphPath(const googlesql::ResolvedGraphPathScan& path, const Scope& scope,
+                                  const googlesql::GraphPathType* path_type = nullptr) {
+  if (path.search_prefix() != nullptr || path.path_cost() != nullptr || !path.hint_list().empty() ||
+      !path.path_hint_list().empty()) {
+    return Unsupported(scope, "graph search prefixes, costs or hints");
+  }
+  const auto mode = path.path_mode() == nullptr ? googlesql::ResolvedGraphPathMode::WALK
+                                                : path.path_mode()->path_mode();
+  if (mode != googlesql::ResolvedGraphPathMode::WALK &&
+      mode != googlesql::ResolvedGraphPathMode::PATH_MODE_UNSPECIFIED &&
+      mode != googlesql::ResolvedGraphPathMode::TRAIL &&
+      mode != googlesql::ResolvedGraphPathMode::ACYCLIC) {
+    return Unsupported(scope, "this graph path mode");
+  }
+  if (path_type == nullptr && path.path() != nullptr) {
+    path_type = path.path()->column().type()->AsGraphPath();
+  }
+  std::vector<const googlesql::ResolvedGraphElementScan*> elements;
+  for (const auto& part : path.input_scan_list()) {
+    if (part->Is<googlesql::ResolvedGraphElementScan>()) {
+      elements.push_back(part->GetAs<googlesql::ResolvedGraphElementScan>());
+    }
+  }
+  std::optional<Relation> result;
+  if (elements.size() == path.input_scan_list().size()) {
+    result = FlatGraphPath(elements, path_type, scope);
+  } else {
+    // Compose subpaths and element patterns by identity. An edge gets its own
+    // endpoint rows so references to non-key columns still resolve correctly.
+    std::vector<Relation> pieces;
+    for (size_t i = 0; i < path.input_scan_list().size(); ++i) {
+      const auto& part = *path.input_scan_list().at(i);
+      std::optional<Relation> piece;
+      if (part.Is<googlesql::ResolvedGraphPathScan>()) {
+        piece = GraphPath(*part.GetAs<googlesql::ResolvedGraphPathScan>(), scope, path_type);
+      } else if (part.Is<googlesql::ResolvedGraphNodeScan>()) {
+        piece = FlatGraphPath({part.GetAs<googlesql::ResolvedGraphNodeScan>()}, path_type, scope);
+      } else if (part.Is<googlesql::ResolvedGraphEdgeScan>() && i > 0 &&
+                 i + 1 < path.input_scan_list().size()) {
+        auto left = BoundaryNode(*path.input_scan_list().at(i - 1), false, scope);
+        auto right = BoundaryNode(*path.input_scan_list().at(i + 1), true, scope);
+        piece =
+            FlatGraphPath({left.get(), part.GetAs<googlesql::ResolvedGraphEdgeScan>(), right.get()},
+                          path_type, scope);
+        if (piece) {
+          // Endpoint values belong to the adjacent pieces, not to this edge.
+          piece->columns.erase(left->column_list(0).column_id());
+          piece->columns.erase(right->column_list(0).column_id());
+        }
+      } else {
+        return Unsupported(scope, "this nested graph path");
+      }
+      if (!piece) {
+        return std::nullopt;
+      }
+      pieces.push_back(std::move(*piece));
+    }
+    Relation joined;
+    std::vector<std::string> projections;
+    std::string from;
+    std::string nodes;
+    std::string edges;
+    std::string walk;
+    for (size_t i = 0; i < pieces.size(); ++i) {
+      const auto alias = std::format("s{}", i);
+      from += std::format("{}{}) AS {}", i == 0 ? " FROM (" : " JOIN (", pieces.at(i).sql, alias);
+      if (i > 0) {
+        from += std::format(R"( ON s{}._graph_tail."$id" = {}._graph_head."$id")", i - 1, alias);
+      }
+      for (const auto& [id, unused] : pieces.at(i).columns) {
+        projections.push_back(alias + "." + ColumnName(id) + " AS " + ColumnName(id));
+        joined.columns.emplace(id, "q." + ColumnName(id));
+      }
+      const auto next_nodes = alias + "._graph_nodes";
+      const auto next_edges = alias + "._graph_edges";
+      nodes = i == 0 ? next_nodes : AppendNodes(nodes, next_nodes);
+      edges = i == 0 ? next_edges : std::format("list_concat({}, {})", edges, next_edges);
+      if (path_type != nullptr) {
+        const auto next_walk = alias + "._graph_walk";
+        walk = i == 0 ? next_walk : AppendWalk(std::format("({})", walk), next_walk);
+      }
+    }
+    projections.emplace_back("s0._graph_head AS _graph_head");
+    projections.push_back("s" + std::to_string(pieces.size() - 1) + "._graph_tail AS _graph_tail");
+    projections.push_back(nodes + " AS _graph_nodes");
+    projections.push_back(edges + " AS _graph_edges");
+    if (path_type != nullptr) {
+      projections.push_back(walk + " AS _graph_walk");
+    }
+    joined.sql = "SELECT " + Join(projections, ", ") + from;
+    result = std::move(joined);
+  }
+  if (!result) {
+    return std::nullopt;
+  }
+  if (path.filter_expr() != nullptr) {
+    const auto filter = GraphFilter(*path.filter_expr(), scope, result->columns);
+    if (!filter) {
+      return std::nullopt;
+    }
+    result->sql = "SELECT q.*" + result->From() + " WHERE " + *filter;
+  }
+  if (path.quantifier() != nullptr) {
+    const auto& quantifier = *path.quantifier();
+    // BigQuery documents bounded quantification. Do not invent a stopping point
+    // for an unbounded walk, or silently lose its repeated edges and nodes.
+    if (quantifier.upper_bound() == nullptr ||
+        !quantifier.lower_bound()->Is<googlesql::ResolvedLiteral>() ||
+        !quantifier.upper_bound()->Is<googlesql::ResolvedLiteral>()) {
+      return Unsupported(scope, "graph quantifiers without literal bounds");
+    }
+    const auto& lower = quantifier.lower_bound()->GetAs<googlesql::ResolvedLiteral>()->value();
+    const auto& upper = quantifier.upper_bound()->GetAs<googlesql::ResolvedLiteral>()->value();
+    if (lower.is_null() || upper.is_null() || lower.int64_value() < 0 ||
+        upper.int64_value() < lower.int64_value()) {
+      return Unsupported(scope, "graph quantifiers with invalid bounds");
+    }
+    const auto body = QuoteIdentifier(scope.context.FreshName("graph_step"));
+    const auto recursive = QuoteIdentifier(scope.context.FreshName("graph_walk"));
+    std::vector<std::string> initial = {
+        "b._graph_head",
+        "b._graph_tail",
+        "b._graph_nodes",
+        "b._graph_edges",
+    };
+    std::vector<std::string> next = {
+        "r._graph_head",
+        "b._graph_tail",
+        AppendNodes("r._graph_nodes", "b._graph_nodes"),
+        "list_concat(r._graph_edges, b._graph_edges)",
+    };
+    std::vector<std::string> names = {"_graph_head", "_graph_tail", "_graph_nodes", "_graph_edges"};
+    Columns columns;
+    for (const auto& group : path.group_variable_list()) {
+      names.push_back(ColumnName(group->array().column_id()));
+      initial.push_back("[b." + ColumnName(group->element().column_id()) + "]");
+      next.push_back("list_append(r." + names.back() + ", b." +
+                     ColumnName(group->element().column_id()) + ")");
+      columns.emplace(group->array().column_id(), "q." + names.back());
+    }
+    if (path_type != nullptr) {
+      names.emplace_back("_graph_walk");
+      initial.emplace_back("b._graph_walk");
+      next.push_back(AppendWalk("r._graph_walk", "b._graph_walk"));
+    }
+    names.emplace_back("_graph_repetitions");
+    initial.emplace_back("1::BIGINT");
+    next.emplace_back("r._graph_repetitions + 1");
+    result->sql = "WITH RECURSIVE " + body + " AS MATERIALIZED (" + result->sql + "), " +
+                  recursive + "(" + Join(names, ", ") + ") AS (SELECT " + Join(initial, ", ") +
+                  " FROM " + body + " b UNION ALL SELECT " + Join(next, ", ") + " FROM " +
+                  recursive + " r JOIN " + body +
+                  R"( b ON r._graph_tail."$id" = b._graph_head."$id")" +
+                  " WHERE r._graph_repetitions < " + std::to_string(upper.int64_value()) +
+                  ") SELECT *, _graph_head AS " + ColumnName(path.head().column_id()) +
+                  ", _graph_tail AS " + ColumnName(path.tail().column_id()) + " FROM " + recursive +
+                  " WHERE _graph_repetitions BETWEEN " + std::to_string(lower.int64_value()) +
+                  " AND " + std::to_string(upper.int64_value());
+    columns.emplace(path.head().column_id(), "q." + ColumnName(path.head().column_id()));
+    columns.emplace(path.tail().column_id(), "q." + ColumnName(path.tail().column_id()));
+    result->columns = std::move(columns);
+    if (lower.int64_value() == 0) {
+      absl::flat_hash_set<const googlesql::GraphNodeTable*> tables;
+      if (scope.property_graph == nullptr || !scope.property_graph->GetNodeTables(tables).ok()) {
+        return Unsupported(scope, "graph nodes for zero repetitions");
+      }
+      const auto head_type = DuckDbType(path.head().type());
+      const auto tail_type = DuckDbType(path.tail().type());
+      if (!head_type || !tail_type) {
+        return Unsupported(scope, "graph endpoint types");
+      }
+      // Zero repetitions impose no labels or filters from inside the quantified
+      // pattern: every graph node can connect the preceding and following parts.
+      std::vector<std::string> zero_rows;
+      for (const auto* table : tables) {
+        auto node = googlesql::MakeResolvedGraphNodeScan();
+        const auto& head = path.head();
+        // Zero repetitions can start on a different table than the repeated
+        // pattern. Preserve its properties in the enclosing path's common type.
+        node->set_column_list({
+            googlesql::ResolvedColumn(head.column_id(), head.table_name_id(), head.name_id(),
+                                      path_type == nullptr ? head.type() : path_type->node_type()),
+        });
+        node->set_target_element_table_list({table});
+        const auto zero = FlatGraphPath({node.get()}, path_type, scope);
+        if (!zero) {
+          return std::nullopt;
+        }
+        std::vector<std::string> values = {
+            "CAST(q._graph_head AS " + *head_type + ")",
+            "CAST(q._graph_tail AS " + *tail_type + ")",
+            "q._graph_nodes",
+            "q._graph_edges",
+        };
+        for (const auto& group : path.group_variable_list()) {
+          const auto type = DuckDbType(group->array().type());
+          if (!type) {
+            return Unsupported(scope, "graph group variable type");
+          }
+          values.push_back("CAST([] AS " + *type + ")");
+        }
+        if (path_type != nullptr) {
+          values.emplace_back("q._graph_walk");
+        }
+        values.emplace_back("0::BIGINT");
+        values.push_back("CAST(q._graph_head AS " + *head_type + ")");
+        values.push_back("CAST(q._graph_tail AS " + *tail_type + ")");
+        zero_rows.push_back("SELECT " + Join(values, ", ") + zero->From());
+      }
+      result->sql = "(" + result->sql + ") UNION ALL " + Join(zero_rows, " UNION ALL ");
+    }
+  }
+  if (mode == googlesql::ResolvedGraphPathMode::TRAIL ||
+      mode == googlesql::ResolvedGraphPathMode::ACYCLIC) {
+    const std::string values =
+        mode == googlesql::ResolvedGraphPathMode::TRAIL ? "q._graph_edges" : "q._graph_nodes";
+    result->sql = "SELECT q.*" + result->From() + " WHERE list_unique(" + values + ") = length(" +
+                  values + ")";
+  }
+  if (path.path() != nullptr) {
+    const auto& column = path.path()->column();
+    const auto type = DuckDbType(column.type());
+    if (!type) {
+      return Unsupported(scope, "graph path type");
+    }
+    result->sql = "SELECT q.*, CAST(_graph_walk AS " + *type + ") AS " +
+                  ColumnName(column.column_id()) + result->From();
+    result->columns.emplace(column.column_id(), "q." + ColumnName(column.column_id()));
   }
   return result;
 }
@@ -576,6 +875,7 @@ std::optional<Relation> GraphTableScan(const googlesql::ResolvedGraphTableScan& 
   Scope graph_scope = scope;
   const auto names = scan.property_graph()->NamePath();
   graph_scope.graph_name = DuckPGQName({names.begin(), names.end()});
+  graph_scope.property_graph = scan.property_graph();
   return Scan(*scan.input_scan(), graph_scope);
 }
 }  // namespace bigquery_emulator_duckdb::translator

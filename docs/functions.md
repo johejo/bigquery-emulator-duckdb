@@ -51,7 +51,7 @@ functions.
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
 | [Geography functions](#geography-functions) | 54 | 2 | 15 | 0 |
-| [Graph SQL functions](#graph-sql-functions) | 1 | 8 | 3 | 0 |
+| [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
 | [Interval functions](#interval-functions) | 4 | 0 | 0 | 0 |
@@ -306,16 +306,16 @@ functions.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`DESTINATION_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#destination_node_id) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
-| [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
+| [`EDGES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#edges) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`ELEMENT_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#element_id) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
-| [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
-| [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
-| [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
+| [`IS_ACYCLIC`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_acyclic) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
+| [`IS_SIMPLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_simple) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
+| [`IS_TRAIL`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#is_trail) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`LABELS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#labels) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
-| [`NODES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#nodes) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
-| [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
-| [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
-| [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | Partial | DuckDB SQL | [Graph limits](compatibility.md#graphs). Unsupported: nested graph paths. |
+| [`NODES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#nodes) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
+| [`PATH_FIRST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_first) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
+| [`PATH_LAST`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_last) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
+| [`PATH_LENGTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#path_length) | Supported | DuckDB SQL | [Graph limits](compatibility.md#graphs). |
 | [`SOURCE_NODE_ID`](https://cloud.google.com/bigquery/docs/reference/standard-sql/graph-sql-functions#source_node_id) | Unsupported |  | [Graph limits](compatibility.md#graphs). |
 
 ## Hash functions
