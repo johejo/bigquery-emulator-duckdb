@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -47,15 +49,23 @@ absl::StatusOr<int64_t> EditDistance(std::string_view first, std::string_view se
 template <bool kBytes, typename Compute>
 void WithRegExp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
                 Compute compute) {
-  EachRow(info, input, output, [&compute](const Arguments& arguments) {
+  // Reuse consecutive patterns within this chunk. Compile lazily so NULL rows never
+  // validate their pattern, and retain only one expression even for varying patterns.
+  std::string previous_pattern;
+  std::unique_ptr<const googlesql::functions::RegExp> regexp;
+  EachRow(info, input, output, [&](const Arguments& arguments) {
     const std::string pattern = arguments.String(1);
-    const auto regexp = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
-                               : googlesql::functions::MakeRegExpUtf8(pattern);
-    using Result = decltype(compute(**regexp, arguments));
-    if (!regexp.ok()) {
-      return Result(regexp.status());
+    using Result = decltype(compute(*regexp, arguments));
+    if (!regexp || pattern != previous_pattern) {
+      auto compiled = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
+                             : googlesql::functions::MakeRegExpUtf8(pattern);
+      if (!compiled.ok()) {
+        return Result(compiled.status());
+      }
+      previous_pattern = pattern;
+      regexp = std::move(*compiled);
     }
-    return compute(**regexp, arguments);
+    return compute(*regexp, arguments);
   });
 }
 
