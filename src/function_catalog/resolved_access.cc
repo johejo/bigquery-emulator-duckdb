@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/public/value.h"
@@ -54,6 +55,11 @@ bool OrdersOnlyArgument(const googlesql::ResolvedAggregateFunctionCall& call, si
 
 bool IsConstant(const googlesql::ResolvedExpr& expr) {
   return expr.Is<googlesql::ResolvedLiteral>() || expr.Is<googlesql::ResolvedParameter>();
+}
+
+std::optional<bool> IsConstantExpression(const googlesql::ResolvedExpr& expr) {
+  const auto constant = googlesql::IsConstantExpression(&expr);
+  return constant.ok() ? std::optional<bool>(*constant) : std::nullopt;
 }
 
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr) {

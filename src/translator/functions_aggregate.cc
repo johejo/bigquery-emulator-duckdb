@@ -657,14 +657,44 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
           {
               "LAG",
               {
-                  .rules = {{.function = "lag", .carries = true}},
+                  .rules =
+                      {
+                          {
+                              .function = "lag",
+                              .carries = true,
+                              .constant_arguments =
+                                  {
+                                      {
+                                          .argument = 3,
+                                          .description = "default expression",
+                                          .message = "The third argument (the default expression) "
+                                                     "to LAG must be constant",
+                                      },
+                                  },
+                          },
+                      },
                   .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
               },
           },
           {
               "LEAD",
               {
-                  .rules = {{.function = "lead", .carries = true}},
+                  .rules =
+                      {
+                          {
+                              .function = "lead",
+                              .carries = true,
+                              .constant_arguments =
+                                  {
+                                      {
+                                          .argument = 3,
+                                          .description = "default expression",
+                                          .message = "The third argument (the default expression) "
+                                                     "to LEAD must be constant",
+                                      },
+                                  },
+                          },
+                      },
                   .uses = {TypeUse::kAggregatesRange, TypeUse::kBigNumeric},
               },
           },

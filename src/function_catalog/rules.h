@@ -88,6 +88,14 @@ struct Rule {
   std::optional<Implementation> implementation = {};
 };
 
+// An aggregate or analytic argument that BigQuery requires to be a constant expression.
+struct ConstantArgument {
+  // Counted from 1; a call that leaves this optional argument out satisfies the requirement.
+  std::size_t argument;
+  std::string_view description;
+  std::string_view message;
+};
+
 // A DuckDB aggregate or window function that implements a BigQuery one.
 struct AggregateRule {
   // How the function treats IGNORE NULLS and RESPECT NULLS.
@@ -150,6 +158,7 @@ struct AggregateRule {
   // Reject ORDER BY of the first argument alone, or any ORDER BY with DISTINCT, with this
   // error. Other order keys, including ones combined with the first argument, remain allowed.
   std::string_view order_by_argument_error = {};
+  std::vector<ConstantArgument> constant_arguments = {};
 };
 
 // What functions do with values of a type that DuckDB holds in another type, such as a RANGE in a

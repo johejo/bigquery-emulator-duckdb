@@ -30,6 +30,10 @@ bool OrdersOnlyArgument(const googlesql::ResolvedAggregateFunctionCall& call, st
 // Whether `expr` is a literal or a query parameter, as BigQuery requires of some arguments.
 bool IsConstant(const googlesql::ResolvedExpr& expr);
 
+// Whether an expression is constant, including immutable calls and casts. No value means
+// GoogleSQL could not determine it; callers leave that argument form unsupported.
+std::optional<bool> IsConstantExpression(const googlesql::ResolvedExpr& expr);
+
 // The value of a STRING literal that is not NULL.
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr);
 

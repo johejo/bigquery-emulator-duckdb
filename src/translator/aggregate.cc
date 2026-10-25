@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include "googlesql/analyzer/expr_resolver_helper.h"
 #include "googlesql/public/function.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
@@ -35,6 +34,7 @@ using function_catalog::AggregateOrder;
 using function_catalog::AggregateRule;
 using function_catalog::Condition;
 using function_catalog::FunctionEntry;
+using function_catalog::IsConstantExpression;
 using function_catalog::OrdersOnlyArgument;
 using function_catalog::RejectArgumentTypes;
 using function_catalog::Translation;
@@ -75,16 +75,6 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
       (entry->translation == Translation::kAnalytic && over.empty())) {
     return Unsupported(scope, "aggregate or analytic function " + name);
   }
-  if ((name == "LAG" || name == "LEAD") && call.argument_list_size() == 3) {
-    const auto constant = googlesql::IsConstantExpression(call.argument_list(2));
-    if (!constant.ok()) {
-      return Unsupported(scope, name + " default expression");
-    }
-    if (!*constant) {
-      throw std::invalid_argument("The third argument (the default expression) to " + name +
-                                  " must be constant");
-    }
-  }
   const auto type_of = [&](std::size_t argument) {
     return argument < call.argument_list().size()
                ? call.argument_list().at(argument)->type()->kind()
@@ -98,6 +88,21 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                     condition.types.end();
            });
   });
+  if (rule != entry->aggregates.end()) {
+    for (const auto& requirement : rule->constant_arguments) {
+      if (requirement.argument > call.argument_list().size()) {
+        continue;
+      }
+      const auto constant =
+          IsConstantExpression(*call.argument_list(static_cast<int>(requirement.argument - 1)));
+      if (!constant) {
+        return Unsupported(scope, name + " " + std::string(requirement.description));
+      }
+      if (!*constant) {
+        throw std::invalid_argument(std::string(requirement.message));
+      }
+    }
+  }
   RejectArgumentTypes(call, entry->type_rejections);
   if (rule != entry->aggregates.end() && !rule->order_by_argument_error.empty() &&
       aggregate != nullptr && !aggregate->order_by_item_list().empty() &&
