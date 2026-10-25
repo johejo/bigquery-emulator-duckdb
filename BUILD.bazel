@@ -1227,6 +1227,8 @@ cc_test(
     name = "geography_adapter_test",
     srcs = ["tests/geography_adapter_test.cc"],
     copts = ["-std=c++20"],
+    # Match cc_binary's linking; cc_test defaults to shared dependencies.
+    linkstatic = True,
     deps = [
         ":duckdb_handle",
         "//src/googlesql_geography",
@@ -1241,6 +1243,7 @@ cc_test(
     name = "parquet_metadata_test",
     srcs = ["tests/parquet_metadata_test.cc"],
     copts = ["-std=c++20"],
+    linkstatic = True,
     deps = [
         ":api_error",
         ":parquet_metadata",

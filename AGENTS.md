@@ -4,6 +4,9 @@ C++20 built with Bazel; prefer the standard library. `nix develop` provides the 
 including `just` and `bq`. Use `just` recipes (see the [Justfile](Justfile)) for building, testing,
 formatting and generating docs. CI runs the same recipes through `nix run` apps.
 
+Set `linkstatic = True` on C++ tests to match executables' linking. Bazel defaults `cc_test`
+to dynamic linking, which can expose incomplete shared-library dependencies in upstream libraries.
+
 Bazel rejects cyclic dependencies; do not break a cycle with a target that holds only headers.
 Move what causes it, such as a type or an error class, to a lower target, or build sources that
 call each other, such as expressions and scans, as one target.

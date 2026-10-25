@@ -26,6 +26,7 @@ cc_test(
     name = "fingerprint2011_test",
     srcs = ["fingerprint2011_test.cc"],
     copts = ["-std=c++20"],
+    linkstatic = True,
     deps = [
         ":zetasketch",
         "@com_google_googletest//:gtest",
