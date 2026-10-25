@@ -1,0 +1,14 @@
+## JSON extraction with repeated paths across rows and chunks
+
+# Semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/json_functions
+SELECT COUNTIF(JSON_VALUE(CONCAT('{"a":', CAST(x AS STRING), '}'), '$.a') = CAST(x AS STRING)) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
+
+SELECT COUNTIF(JSON_VALUE(TO_JSON(STRUCT(x AS a)), '$.a') = CAST(x AS STRING)) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
+
+SELECT COUNTIF(JSON_EXTRACT_SCALAR(CONCAT('{"a.b":', CAST(x AS STRING), '}'), "$['a.b']") = CAST(x AS STRING)) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
+
+SELECT COUNTIF(TO_JSON_STRING(JSON_QUERY(TO_JSON(STRUCT([STRUCT(1 AS b), STRUCT(2 AS b)] AS a, x AS extra)), 'lax $.a.b')) = '[1,2]') FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
