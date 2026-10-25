@@ -198,6 +198,8 @@ enum class TypeUse : std::uint8_t {
   kReadsEmptyStruct,
   // BigQuery rejects the SAFE. prefix on these although GoogleSQL accepts it.
   kRejectsSafe,
+  // BigQuery rejects OVER on these aggregate functions although GoogleSQL accepts it.
+  kRejectsOver,
 };
 
 // A constexpr set of type attributes, also used by the plain and handler registrations.

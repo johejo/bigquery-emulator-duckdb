@@ -344,13 +344,22 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       HllCountInit(googlesql::TYPE_BIGNUMERIC),
                       HllCountInit(googlesql::TYPE_UNKNOWN),
                   },
-              .uses = {TypeUse::kBigNumeric},
+              .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
           },
       },
-      {"HLL_COUNT.MERGE_PARTIAL", {.rules = {{.function = "bq_hll_count_merge_partial"}}}},
+      {
+          "HLL_COUNT.MERGE_PARTIAL",
+          {
+              .rules = {{.function = "bq_hll_count_merge_partial"}},
+              .uses = {TypeUse::kRejectsOver},
+          },
+      },
       {
           "HLL_COUNT.MERGE",
-          {.rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}}},
+          {
+              .rules = {{.function = "bq_hll_count_merge_partial", .finish = ExtractSketch}},
+              .uses = {TypeUse::kRejectsOver},
+          },
       },
       // Other types count exactly, which is within any approximation error.
       {
@@ -365,7 +374,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& A
                       ApproxCountDistinct(googlesql::TYPE_BIGNUMERIC),
                       {.function = "count", .distinct = AggregateRule::Distinct::kAlways},
                   },
-              .uses = {TypeUse::kBigNumeric},
+              .uses = {TypeUse::kBigNumeric, TypeUse::kRejectsOver},
               .type_rejections =
                   {
                       {

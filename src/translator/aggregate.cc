@@ -817,15 +817,10 @@ std::optional<Relation> AnalyticScan(const googlesql::ResolvedAnalyticScan& anal
         }
       }
       // GoogleSQL takes these with OVER, which BigQuery rejects after analysis.
-      static const std::set<std::string_view> kAggregateOnly = {
-          "APPROX_COUNT_DISTINCT",
-          "HLL_COUNT.INIT",
-          "HLL_COUNT.MERGE",
-          "HLL_COUNT.MERGE_PARTIAL",
-      };
       if (IsBuiltinFunction(*call->function()) &&
-          kAggregateOnly.contains(
-              ToUpperAscii(call->function()->FullName(/*include_group=*/false)))) {
+          scope.context.functions.HasTypeUse(
+              ToUpperAscii(call->function()->FullName(/*include_group=*/false)),
+              TypeUse::kRejectsOver)) {
         throw std::invalid_argument("Analytic function " + ToUpperAscii(call->function()->Name()) +
                                     " is not supported.");
       }
