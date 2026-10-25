@@ -77,13 +77,16 @@ std::vector<Rule> IntegralRound(std::string_view function) {
 }
 
 // Shift the requested weekday to Monday, DuckDB's week boundary, then shift back.
-const std::vector<std::pair<std::string_view, int>>& WeekParts() {
-  static const std::vector<std::pair<std::string_view, int>> parts = {
-      {"week", 1},           {"isoweek", 0},       {"week_monday", 0}, {"week_tuesday", 6},
-      {"week_wednesday", 5}, {"week_thursday", 4}, {"week_friday", 3}, {"week_saturday", 2},
-  };
-  return parts;
-}
+constexpr auto kWeekParts = std::to_array<std::pair<std::string_view, int>>({
+    {"week", 1},
+    {"isoweek", 0},
+    {"week_monday", 0},
+    {"week_tuesday", 6},
+    {"week_wednesday", 5},
+    {"week_thursday", 4},
+    {"week_friday", 3},
+    {"week_saturday", 2},
+});
 
 std::string WeekStart(const std::string& value, int shift) {
   if (shift == 0) {
@@ -96,7 +99,8 @@ std::string WeekStart(const std::string& value, int shift) {
 // *_TRUNC to a week, with the result cast to `target` when date_trunc() would widen it.
 std::vector<Rule> WeekTrunc(std::string_view target = "") {
   std::vector<Rule> rules;
-  for (const auto& [part, shift] : WeekParts()) {
+  rules.reserve(kWeekParts.size());
+  for (const auto& [part, shift] : kWeekParts) {
     const std::string start = WeekStart("$1", shift);
     rules.push_back({
         .arity = 2,
@@ -128,7 +132,8 @@ std::vector<Rule> ZonedTrunc() {
 // BigQuery counts the week boundaries crossed, DuckDB whole seven day periods.
 std::vector<Rule> WeekDiff() {
   std::vector<Rule> rules;
-  for (const auto& [part, shift] : WeekParts()) {
+  rules.reserve(kWeekParts.size());
+  for (const auto& [part, shift] : kWeekParts) {
     rules.push_back({
         .arity = 3,
         .spelling = "(date_diff('day', " + WeekStart("$2", shift) + ", " + WeekStart("$1", shift) +
@@ -164,7 +169,7 @@ std::vector<Rule> LastDay() {
         .errors = {"'LAST_DAY produces an out-of-range date'"},
     });
   };
-  for (const auto& [part, shift] : WeekParts()) {
+  for (const auto& [part, shift] : kWeekParts) {
     append("CAST(" + WeekStart("$1", shift) + " + INTERVAL 6 DAY AS DATE)", Part(2, {part}));
   }
   // January 4 always belongs to its calendar year's ISO year. Truncating January 4

@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <format>
 #include <iterator>
-#include <map>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -369,13 +368,14 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
                                          const Scope& scope) {
   // CORRESPONDING is resolved into each input item's output_column_list, which is positional
   // and pads missing columns with NULLs, so the match and propagation modes need no handling.
-  static const std::map<googlesql::ResolvedSetOperationScan::SetOperationType, std::string>
-      operators = {
-          {googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
-          {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
-          {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
-          {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "},
-  };
+  using Operator =
+      std::pair<googlesql::ResolvedSetOperationScan::SetOperationType, std::string_view>;
+  static constexpr auto operators = std::to_array<Operator>({
+      {googlesql::ResolvedSetOperationScan::UNION_ALL, " UNION ALL "},
+      {googlesql::ResolvedSetOperationScan::UNION_DISTINCT, " UNION "},
+      {googlesql::ResolvedSetOperationScan::INTERSECT_DISTINCT, " INTERSECT "},
+      {googlesql::ResolvedSetOperationScan::EXCEPT_DISTINCT, " EXCEPT "},
+  });
   // GoogleSQL accepts these forms, but BigQuery only supports DISTINCT for them.
   if (set.op_type() == googlesql::ResolvedSetOperationScan::INTERSECT_ALL ||
       set.op_type() == googlesql::ResolvedSetOperationScan::EXCEPT_ALL) {
@@ -385,7 +385,7 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
     throw std::invalid_argument(name + " ALL is not supported. Only " + name +
                                 " DISTINCT is supported.");
   }
-  const auto op = operators.find(set.op_type());
+  const auto* op = std::ranges::find(operators, set.op_type(), &Operator::first);
   if (op == operators.end() || set.column_list().empty()) {
     return std::nullopt;
   }

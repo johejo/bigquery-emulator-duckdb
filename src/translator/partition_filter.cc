@@ -1,10 +1,11 @@
 #include "src/translator/partition_filter.h"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "googlesql/public/function.h"
@@ -174,9 +175,14 @@ bool PartitionValue(const Expr& expr, int key, const Filters& filters, bool temp
     return false;
   }
   const std::string name = Name(*call);
-  static const std::set<std::string> transforms = {
-      "date_add", "date_sub", "date_trunc", "$extract", "timestamp_trunc", "date",
-  };
+  static constexpr auto transforms = std::to_array<std::string_view>({
+      "date_add",
+      "date_sub",
+      "date_trunc",
+      "$extract",
+      "timestamp_trunc",
+      "date",
+  });
   // A periodic extraction, such as DAYOFWEEK, is not established by the YEAR case.
   if (name == "$extract") {
     const auto* part = call->argument_list_size() == 2
@@ -187,7 +193,8 @@ bool PartitionValue(const Expr& expr, int key, const Filters& filters, bool temp
       return false;
     }
   }
-  if (!IsBuiltinFunction(*call->function()) || !transforms.contains(name) ||
+  if (!IsBuiltinFunction(*call->function()) ||
+      std::ranges::find(transforms, name) == transforms.end() ||
       (name == "date" && call->argument_list_size() != 1) ||
       !PartitionValue(*call->argument_list(0), key, filters, temporal)) {
     return false;
@@ -226,11 +233,18 @@ bool Eliminates(const Expr& expr, int key, const Filters& filters, bool temporal
     const Expr& argument = *call->argument_list(0);
     return !Boolean(argument).has_value() && Eliminates(argument, key, filters, temporal, true);
   }
-  static const std::set<std::string> comparisons = {
-      "$equal",   "$not_equal", "$less", "$less_or_equal", "$greater", "$greater_or_equal",
-      "$is_null", "$between",   "$in",
-  };
-  if (!comparisons.contains(name)) {
+  static constexpr auto comparisons = std::to_array<std::string_view>({
+      "$equal",
+      "$not_equal",
+      "$less",
+      "$less_or_equal",
+      "$greater",
+      "$greater_or_equal",
+      "$is_null",
+      "$between",
+      "$in",
+  });
+  if (std::ranges::find(comparisons, name) == comparisons.end()) {
     return false;
   }
   bool partition = false;
