@@ -18,6 +18,7 @@ using function_catalog::ArgumentMode;
 using function_catalog::Handler;
 using function_catalog::Implementation;
 using function_catalog::Translation;
+using function_catalog::TypeRejection;
 using function_catalog::TypeUse;
 using function_catalog::TypeUses;
 
@@ -71,10 +72,34 @@ struct HandledFunction {
   TypeUses uses = {};
   std::span<const ArgumentMode> argument_modes = {};
   Handler struct_handler = nullptr;
+  std::span<const TypeRejection> type_rejections = {};
 };
 
 constexpr auto kBucketArgumentModes =
     std::to_array<ArgumentMode>({ArgumentMode::kExpression, ArgumentMode::kBucketWidth});
+
+constexpr std::array kIntervalTypes = {googlesql::TYPE_INTERVAL};
+
+constexpr auto kCaseTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function CASE_WITH_VALUE",
+    },
+});
+
+constexpr auto kGreatestTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function GREATEST",
+    },
+});
+
+constexpr auto kLeastTypeRejections = std::to_array<TypeRejection>({
+    {
+        .types = kIntervalTypes,
+        .message = "Unsupported type in function LEAST",
+    },
+});
 
 // Functions that src/translator/handlers.cc translates in code.
 constexpr auto kHandlers =
@@ -117,10 +142,12 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
+                            TypeUse::kCarriesResults,
                             TypeUse::kComparesStructsWithInterval,
                             TypeUse::kBigNumeric,
                         },
                     .struct_handler = StructComparison,
+                    .type_rejections = kCaseTypeRejections,
                 },
             },
             {"SAME", {.handler = GraphIdentityPredicate, .uses = {TypeUse::kGraphValues}}},
@@ -253,9 +280,9 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kRejectsIntervalComparison,
                             TypeUse::kBigNumeric,
                         },
+                    .type_rejections = kGreatestTypeRejections,
                 },
             },
             {
@@ -265,9 +292,9 @@ constexpr auto kHandlers =
                     .uses =
                         {
                             TypeUse::kCompares,
-                            TypeUse::kRejectsIntervalComparison,
                             TypeUse::kBigNumeric,
                         },
+                    .type_rejections = kLeastTypeRejections,
                 },
             },
             {
@@ -333,6 +360,11 @@ void AddBuiltinFunctions(function_catalog::Catalog& functions) {
                                     function.argument_modes.end(),
                                 },
                             .struct_handler = function.struct_handler,
+                            .type_rejections =
+                                {
+                                    function.type_rejections.begin(),
+                                    function.type_rejections.end(),
+                                },
                         });
   }
   for (const auto& [name, target] : kSafeFunctions) {

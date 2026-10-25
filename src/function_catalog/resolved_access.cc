@@ -5,6 +5,8 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,6 +19,28 @@
 #include "src/function_catalog/catalog.h"
 
 namespace bigquery_emulator_duckdb::function_catalog {
+
+void RejectArgumentTypes(const googlesql::ResolvedFunctionCallBase& call,
+                         std::span<const TypeRejection> rejections) {
+  for (const auto& rejection : rejections) {
+    if (rejection.types.size() > call.argument_list().size()) {
+      continue;
+    }
+    bool matches = true;
+    size_t i = 0;
+    for (const auto type : rejection.types) {
+      if (type != googlesql::TYPE_UNKNOWN &&
+          type != call.argument_list(static_cast<int>(i))->type()->kind()) {
+        matches = false;
+        break;
+      }
+      ++i;
+    }
+    if (matches) {
+      throw std::invalid_argument(std::string(rejection.message));
+    }
+  }
+}
 
 bool IsConstant(const googlesql::ResolvedExpr& expr) {
   return expr.Is<googlesql::ResolvedLiteral>() || expr.Is<googlesql::ResolvedParameter>();

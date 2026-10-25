@@ -1,5 +1,6 @@
 #include "src/translator/functions_template.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -36,6 +37,12 @@ using function_catalog::TypeUse;
 namespace {
 
 using enum googlesql::TypeKind;
+
+constexpr std::array kIntervalTypes = {TYPE_INTERVAL};
+constexpr std::array kStructTypes = {TYPE_STRUCT};
+constexpr std::array kRangeTypes = {TYPE_RANGE};
+constexpr std::array kIntervalDoubleTypes = {TYPE_INTERVAL, TYPE_DOUBLE};
+constexpr std::array kDoubleIntervalTypes = {TYPE_DOUBLE, TYPE_INTERVAL};
 
 Condition Mode(std::size_t argument, std::string_view rounding_mode) {
   return {.argument = argument, .rounding_mode = rounding_mode};
@@ -846,10 +853,16 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .uses =
                   {
                       TypeUse::kCompares,
-                      TypeUse::kRejectsIntervalComparison,
                       TypeUse::kBigNumeric,
                   },
               .struct_handler = StructComparison,
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalTypes,
+                          .message = "Unsupported type in function NULL_IF",
+                      },
+                  },
           },
       },
       // Operators. Division binds its operands once, as every rule does, and stays an
@@ -968,8 +981,8 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                           .spelling = "bq_multiply_numeric($1, $2)",
                           .conditions = {Is(1, {TYPE_NUMERIC})},
                       },
-                      // See src/googlesql_functions_duckdb/interval.cc; src/translator/function.cc
-                      // rejects FLOAT64 operands as BigQuery does.
+                      // See src/googlesql_functions_duckdb/interval.cc; the registered type
+                      // rejections reject FLOAT64 operands as BigQuery does.
                       {
                           .arity = 2,
                           .spelling = "bq_multiply_interval($1, $2)",
@@ -983,6 +996,17 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
                       {.arity = 2, .spelling = "($1 * $2)"},
                   },
               .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kIntervalDoubleTypes,
+                          .message = "No matching signature for operator *",
+                      },
+                      {
+                          .types = kDoubleIntervalTypes,
+                          .message = "No matching signature for operator *",
+                      },
+                  },
           },
       },
       {
@@ -1123,6 +1147,13 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           {
               .rules = {{.arity = 2, .spelling = "($1 IS DISTINCT FROM $2)"}},
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kStructTypes,
+                          .message = "IS DISTINCT FROM can't be used with arguments of type STRUCT",
+                      },
+                  },
           },
       },
       {
@@ -1130,6 +1161,14 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
           {
               .rules = {{.arity = 2, .spelling = "($1 IS NOT DISTINCT FROM $2)"}},
               .uses = {TypeUse::kCompares, TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
+              .type_rejections =
+                  {
+                      {
+                          .types = kStructTypes,
+                          .message =
+                              "IS NOT DISTINCT FROM can't be used with arguments of type STRUCT",
+                      },
+                  },
           },
       },
       {
@@ -1707,6 +1746,13 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TemplateRu
               .rules = RangeBucket(),
               .uses = {TypeUse::kComparesIntervalKeys, TypeUse::kBigNumeric},
               .argument_modes = {ArgumentMode::kExpression, ArgumentMode::kIntervalArrayKeys},
+              .type_rejections =
+                  {
+                      {
+                          .types = kRangeTypes,
+                          .message = "Unsupported type RANGE for function RANGE_BUCKET",
+                      },
+                  },
           },
       },
       {"RANGE", {.rules = RangeConstructor(), .uses = {TypeUse::kBuildsOrReadsRange}}},

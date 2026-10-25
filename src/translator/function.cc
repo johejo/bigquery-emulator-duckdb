@@ -34,6 +34,7 @@ using function_catalog::Catalog;
 using function_catalog::DatePart;
 using function_catalog::FunctionEntry;
 using function_catalog::NormalizeMode;
+using function_catalog::RejectArgumentTypes;
 using function_catalog::RoundingMode;
 using function_catalog::ScalarCall;
 using function_catalog::Translation;
@@ -323,31 +324,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         std::ranges::any_of(call.argument_list(), [](const auto& argument) {
                           return HasInterval(argument->type());
                         });
-  // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. CASE compares
-  // its first argument with its WHEN values.
-  if ((functions.HasTypeUse(function, TypeUse::kRejectsIntervalComparison) &&
-       std::ranges::any_of(call.argument_list(),
-                           [](const auto& argument) { return argument->type()->IsInterval(); })) ||
-      (function == "$CASE_WITH_VALUE" && call.argument_list(0)->type()->IsInterval())) {
-    throw std::invalid_argument("Unsupported type in function " +
-                                (function == "NULLIF"             ? std::string("NULL_IF")
-                                 : function == "$CASE_WITH_VALUE" ? std::string("CASE_WITH_VALUE")
-                                                                  : function));
-  }
-  // BigQuery compares only the fields of a STRUCT with IS DISTINCT FROM, although GoogleSQL
-  // compares the STRUCT.
-  if ((function == "$IS_DISTINCT_FROM" || function == "$IS_NOT_DISTINCT_FROM") &&
-      call.argument_list(0)->type()->IsStruct()) {
-    throw std::invalid_argument(
-        std::string(function == "$IS_DISTINCT_FROM" ? "IS DISTINCT FROM" : "IS NOT DISTINCT FROM") +
-        " can't be used with arguments of type STRUCT");
-  }
-  // BigQuery multiplies INTERVAL values only by INT64 values, although GoogleSQL takes FLOAT64.
-  if (function == "$MULTIPLY" && interval &&
-      std::ranges::any_of(call.argument_list(),
-                          [](const auto& argument) { return argument->type()->IsDouble(); })) {
-    throw std::invalid_argument("No matching signature for operator *");
-  }
+  RejectArgumentTypes(call, entry->type_rejections);
   const auto keyed = [&](const googlesql::Type* type, size_t i) {
     return type->IsInterval() || (argument_mode(i) == ArgumentMode::kIntervalArrayKeys &&
                                   type->IsArray() && type->AsArray()->element_type()->IsInterval());
@@ -364,8 +341,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       interval && functions.HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
       call.argument_list(0)->type()->IsStruct();
   // CASE with a value carries its results when it compares no INTERVAL values.
-  const bool carries_results =
-      function == "$CASE_WITH_VALUE" && !HasInterval(call.argument_list(0)->type());
+  const bool carries_results = functions.HasTypeUse(function, TypeUse::kCarriesResults) &&
+                               !HasInterval(call.argument_list(0)->type());
   // A declared conversion permits INTERVAL only in the argument it converts, not in the
   // result or nested inside another argument's ARRAY or STRUCT.
   bool converts_intervals = !HasInterval(call.type());
@@ -390,10 +367,6 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
       !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsGeography) &&
       !functions.HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
-  }
-  // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.
-  if (function == "RANGE_BUCKET" && call.argument_list(0)->type()->IsRange()) {
-    throw std::invalid_argument("Unsupported type RANGE for function RANGE_BUCKET");
   }
   // A RANGE is a STRUCT in DuckDB, which only these read as a RANGE.
   if ((HasRange(call.type()) ||

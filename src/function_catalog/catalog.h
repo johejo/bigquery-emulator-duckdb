@@ -71,6 +71,7 @@ struct FunctionEntry {
   std::vector<ArgumentMode> argument_modes = {};
   // Overrides the usual translation when the first argument is a STRUCT.
   Handler struct_handler = nullptr;
+  std::vector<TypeRejection> type_rejections = {};
   // kAggregate and kAnalytic: the overloads, the first that matches a call translating it.
   std::vector<AggregateRule> aggregates = {};
 };

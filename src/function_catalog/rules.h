@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -158,10 +159,10 @@ enum class TypeUse : std::uint8_t {
   // Handle BIGNUMERIC arguments and results without loss of precision. Other DuckDB functions
   // could compute BIGNUM values as DOUBLE or truncate them.
   kBigNumeric,
-  // BigQuery rejects direct INTERVAL arguments although GoogleSQL accepts them.
-  kRejectsIntervalComparison,
   // Pass, select or count their values without reading them.
   kCarries,
+  // Carry result arguments when the first, compared argument contains no INTERVAL values.
+  kCarriesResults,
   // Also compare or order their values.
   kCompares,
   // Build or read DuckDB intervals, which hold INTERVAL values.
@@ -219,6 +220,13 @@ enum class ArgumentMode : std::uint8_t {
   kIntervalArrayKeys,
 };
 
+// A type combination BigQuery rejects after GoogleSQL analysis. All listed argument positions
+// must be present and match; TYPE_UNKNOWN accepts any type. The type list must outlive the catalog.
+struct TypeRejection {
+  std::span<const googlesql::TypeKind> types;
+  std::string_view message;
+};
+
 struct ScalarCall;
 
 // Translates a call that templates cannot express, or returns nullopt when it is unsupported.
@@ -232,6 +240,7 @@ struct FunctionDefinition {
   std::vector<ArgumentMode> argument_modes = {};
   // Overrides the usual translation when the first argument is a STRUCT.
   Handler struct_handler = nullptr;
+  std::vector<TypeRejection> type_rejections = {};
 };
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

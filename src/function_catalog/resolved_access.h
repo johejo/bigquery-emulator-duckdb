@@ -6,13 +6,21 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 
 namespace googlesql {
 class ResolvedExpr;
+class ResolvedFunctionCallBase;
 }  // namespace googlesql
 
 namespace bigquery_emulator_duckdb::function_catalog {
+
+struct TypeRejection;
+
+// Raise the registered BigQuery error when the resolved argument types match a rejection.
+void RejectArgumentTypes(const googlesql::ResolvedFunctionCallBase& call,
+                         std::span<const TypeRejection> rejections);
 
 // Whether `expr` is a literal or a query parameter, as BigQuery requires of some arguments.
 bool IsConstant(const googlesql::ResolvedExpr& expr);
