@@ -234,7 +234,7 @@ functions.
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | Supported | S2 function |  |
 | [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | Supported | S2 function |  |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | Unsupported |  |  |
-| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a GEOMETRYCOLLECTION; ST_ASGEOJSON of a LINESTRING; ST_ASGEOJSON of a POLYGON. |
+| [`ST_ASGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asgeojson) | Partial | S2 function | Unsupported: ST_ASGEOJSON of a LINESTRING that crosses the antimeridian; ST_ASGEOJSON of a LINESTRING that touches a pole. |
 | [`ST_ASTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_astext) | Supported | S2 function |  |
 | [`ST_AZIMUTH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_azimuth) | Supported | S2 function |  |
 | [`ST_BOUNDARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_boundary) | Supported | S2 function |  |

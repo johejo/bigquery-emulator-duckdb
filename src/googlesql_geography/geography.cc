@@ -24,6 +24,7 @@
 #include "googlesql/base/status_macros.h"
 #include "s2/mutable_s2shape_index.h"
 #include "s2/r1interval.h"
+#include "s2/r2.h"
 #include "s2/s1angle.h"
 #include "s2/s1chord_angle.h"
 #include "s2/s1interval.h"
@@ -40,6 +41,7 @@
 #include "s2/s2earth.h"
 #include "s2/s2edge_crossings.h"
 #include "s2/s2edge_distances.h"
+#include "s2/s2edge_tessellator.h"
 #include "s2/s2error.h"
 #include "s2/s2furthest_edge_query.h"
 #include "s2/s2hausdorff_distance_query.h"
@@ -52,6 +54,7 @@
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
+#include "s2/s2projections.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
 #include "s2/s2shape_measures.h"
@@ -785,8 +788,72 @@ absl::StatusOr<double> Measure(const Geography& geography, bool use_spheroid,
   return S2Earth::ToMeters(S2::GetPerimeter(S2Polygon::Shape(polygon.get())));
 }
 
-// BigQuery adds vertices to the GeoJSON of a linestring or a polygon to keep its planar edges
-// near the geodesic ones, which the emulator does not.
+namespace {
+
+// "[ " and "]" around `items`, separated by commas, as BigQuery's GeoJSON writes arrays of arrays.
+std::string GeoJsonArray(const std::vector<std::string>& items) {
+  std::string text = "[ ";
+  for (const std::string& item : items) {
+    text += (&item == items.data() ? "" : ", ") + item;
+  }
+  return text + " ]";
+}
+
+std::string GeoJsonPosition(double longitude, double latitude) {
+  return "[" + Coordinate(longitude) + ", " + Coordinate(latitude) + "]";
+}
+
+std::string GeoJsonPoint(const S2Point& point) {
+  const Point coordinates = ToPoint(point);
+  return GeoJsonPosition(coordinates.longitude, coordinates.latitude);
+}
+
+// The positions of a chain of `vertices`, with the vertices S2EdgeTessellator adds between them.
+// The error names a chain whose GeoJSON BigQuery writes otherwise: one that touches a pole, whose
+// longitude the projection does not give, or that crosses the antimeridian, which the tessellator
+// continues beyond longitude 180 where BigQuery splits it.
+absl::StatusOr<std::string> GeoJsonChain(const std::vector<S2Point>& vertices) {
+  const S2::PlateCarreeProjection projection(180);
+  const S2EdgeTessellator tessellator(&projection, S2Earth::MetersToAngle(10));
+  std::vector<R2Point> projected;
+  for (auto a = vertices.begin(); a != vertices.end() && std::next(a) != vertices.end(); ++a) {
+    const S2Point& b = *std::next(a);
+    for (const S2Point& pole : {S2Point(0, 0, 1), S2Point(0, 0, -1)}) {
+      if (S2::GetDistance(pole, *a, b) < S2EdgeTessellator::kMinTolerance()) {
+        return absl::UnimplementedError(" that touches a pole");
+      }
+    }
+    tessellator.AppendProjected(*a, b, &projected);
+  }
+  std::vector<std::string> positions;
+  for (const R2Point& vertex : projected) {
+    if (std::abs(vertex.x()) > 180) {
+      return absl::UnimplementedError(" that crosses the antimeridian");
+    }
+    positions.push_back(GeoJsonPosition(vertex.x(), vertex.y()));
+  }
+  return GeoJsonArray(positions);
+}
+
+// The GeoJSON object of `items`, the points, linestrings or polygons of a geography, each as
+// `write` writes its coordinates, without BigQuery's trailing space.
+template <typename Item, typename Write>
+absl::StatusOr<std::string> GeoJsonParts(const std::vector<Item>& items, std::string_view one,
+                                         std::string_view many, Write write) {
+  std::vector<std::string> coordinates;
+  for (const Item& item : items) {
+    GOOGLESQL_ASSIGN_OR_RETURN(std::string text, write(item));
+    coordinates.push_back(std::move(text));
+  }
+  return R"({ "type": ")" + std::string(items.size() == 1 ? one : many) + R"(", "coordinates": )" +
+         (items.size() == 1 ? coordinates.front() : GeoJsonArray(coordinates)) + " }";
+}
+
+}  // namespace
+
+// BigQuery writes the parts of a geography as its WKT does, and adds vertices to keep each planar
+// edge within 10 meters of the geodesic one, as S2EdgeTessellator does; their last bits depend on
+// the platform's math library, such as one vertex of LINESTRING(0 0, 10 10) with macOS's atan2.
 absl::StatusOr<std::string> AsGeoJson(const Geography& geography) {
   if (geography.Full()) {
     return "{ \"type\": \"Polygon\", \"coordinates\": [ [ [180, 90], [-180, 90], [-180, -90], "
@@ -795,15 +862,53 @@ absl::StatusOr<std::string> AsGeoJson(const Geography& geography) {
   if (geography.Empty()) {
     return std::string(R"({ "type": "GeometryCollection", "geometries": [ ] } )");
   }
-  if (geography.Count() != 1 || geography.points.empty()) {
+  const auto rings = [](const Polygon& polygon) -> absl::StatusOr<std::string> {
+    std::vector<std::string> items;
+    for (const std::vector<S2Point>& loop : polygon) {
+      std::vector<S2Point> ring = loop;
+      if (&loop != polygon.data()) {
+        std::ranges::reverse(ring);
+      }
+      ring.push_back(ring.front());
+      GOOGLESQL_ASSIGN_OR_RETURN(std::string text, GeoJsonChain(ring));
+      items.push_back(std::move(text));
+    }
+    return GeoJsonArray(items);
+  };
+  const auto write = [&]() -> absl::StatusOr<std::vector<std::string>> {
+    std::vector<std::string> parts;
+    if (!geography.points.empty()) {
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          std::string part, GeoJsonParts(geography.points, "Point", "MultiPoint",
+                                         [](const S2Point& point) -> absl::StatusOr<std::string> {
+                                           return GeoJsonPoint(point);
+                                         }));
+      parts.push_back(std::move(part));
+    }
+    if (!geography.lines.empty()) {
+      GOOGLESQL_ASSIGN_OR_RETURN(std::string part, GeoJsonParts(geography.lines, "LineString",
+                                                                "MultiLineString", GeoJsonChain));
+      parts.push_back(std::move(part));
+    }
+    if (!geography.polygons.empty()) {
+      GOOGLESQL_ASSIGN_OR_RETURN(
+          std::string part, GeoJsonParts(geography.polygons, "Polygon", "MultiPolygon", rings));
+      parts.push_back(std::move(part));
+    }
+    return parts;
+  };
+  const absl::StatusOr<std::vector<std::string>> parts = write();
+  if (!parts.ok()) {
     std::string type = GeometryType(geography).substr(3);
     std::ranges::transform(type, type.begin(),
                            [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-    return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a " + type);
+    return absl::UnimplementedError("The emulator does not support ST_ASGEOJSON of a " + type +
+                                    std::string(parts.status().message()));
   }
-  const Point point = ToPoint(geography.points.front());
-  return R"({ "type": "Point", "coordinates": [)" + Coordinate(point.longitude) + ", " +
-         Coordinate(point.latitude) + "] } ";
+  if (parts->size() == 1) {
+    return parts->front() + " ";
+  }
+  return R"({ "type": "GeometryCollection", "geometries": )" + GeoJsonArray(*parts) + " } ";
 }
 
 // ST_STARTPOINT, ST_ENDPOINT and ST_POINTN: the vertex of a linestring at a 1-based index, a
