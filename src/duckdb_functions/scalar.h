@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -31,6 +32,11 @@ class Arguments {
 
   [[nodiscard]] std::string String(idx_t column) const {
     return VectorString(duckdb_data_chunk_get_vector(input_, column), row_);
+  }
+
+  // Borrows the input chunk, which remains valid throughout the scalar callback.
+  [[nodiscard]] std::string_view StringView(idx_t column) const {
+    return VectorStringView(duckdb_data_chunk_get_vector(input_, column), row_);
   }
 
   [[nodiscard]] int64_t Int(idx_t column) const {

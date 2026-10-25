@@ -34,7 +34,7 @@ void Sha512(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
   const auto hasher = googlesql::functions::Hasher::Create(googlesql::functions::Hasher::kSha512);
   EachRow(info, input, output,
           [&hasher](const Arguments& arguments) -> absl::StatusOr<std::string> {
-            return hasher->Hash(arguments.String(0));
+            return hasher->Hash(arguments.StringView(0));
           });
 }
 
@@ -54,7 +54,7 @@ void WithRegExp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vecto
   std::string previous_pattern;
   std::unique_ptr<const googlesql::functions::RegExp> regexp;
   EachRow(info, input, output, [&](const Arguments& arguments) {
-    const std::string pattern = arguments.String(1);
+    const std::string_view pattern = arguments.StringView(1);
     using Result = decltype(compute(*regexp, arguments));
     if (!regexp || pattern != previous_pattern) {
       auto compiled = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
@@ -79,7 +79,7 @@ void RegexpContains(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
                      [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
                        bool out = false;
                        absl::Status error;
-                       const bool ok = regexp.Contains(arguments.String(0), &out, &error);
+                       const bool ok = regexp.Contains(arguments.StringView(0), &out, &error);
                        return ToStatusOr(ok, out, error);
                      });
 }
@@ -91,9 +91,9 @@ void RegexpReplace(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
                      [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
                        std::string out;
                        absl::Status error;
-                       const bool ok =
-                           regexp.Replace(arguments.String(0), arguments.String(2), &out, &error);
-                       return ToStatusOr(ok, out, error);
+                       const bool ok = regexp.Replace(arguments.StringView(0),
+                                                      arguments.StringView(2), &out, &error);
+                       return ToStatusOr(ok, std::move(out), error);
                      });
 }
 
@@ -105,7 +105,7 @@ void RegexpExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
       info, input, output,
       [](const googlesql::functions::RegExp& regexp,
          const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
-        const std::string source = arguments.String(0);
+        const std::string_view source = arguments.StringView(0);
         absl::string_view out;
         bool is_null = true;
         absl::Status error;
@@ -126,7 +126,7 @@ void RegexpExtractAll(duckdb_function_info info, duckdb_data_chunk input, duckdb
   WithRegExp<kBytes>(info, input, output,
                      [](const googlesql::functions::RegExp& regexp,
                         const Arguments& arguments) -> absl::StatusOr<std::vector<std::string>> {
-                       const std::string source = arguments.String(0);
+                       const std::string_view source = arguments.StringView(0);
                        auto matches = regexp.CreateExtractAllIterator(source);
                        std::vector<std::string> out;
                        absl::string_view match;
@@ -153,7 +153,7 @@ void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
           return absl::OutOfRangeError(
               "Invalid return_position_after_match; it must be 0 or 1 (in REGEXP_INSTR)");
         }
-        const std::string source = arguments.String(0);
+        const std::string_view source = arguments.StringView(0);
         int64_t out = 0;
         absl::Status error;
         const bool ok = regexp.Instr(

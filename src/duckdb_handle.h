@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "duckdb.h"
@@ -42,9 +43,14 @@ inline T VectorElement(duckdb_vector vector, idx_t row) {
   return static_cast<const T*>(duckdb_vector_get_data(vector))[row];
 }
 
+// The view borrows the vector, including the inline storage of short strings.
+inline std::string_view VectorStringView(duckdb_vector vector, idx_t row) {
+  auto* value = static_cast<duckdb_string_t*>(duckdb_vector_get_data(vector)) + row;
+  return {duckdb_string_t_data(value), duckdb_string_t_length(*value)};
+}
+
 inline std::string VectorString(duckdb_vector vector, idx_t row) {
-  auto value = VectorElement<duckdb_string_t>(vector, row);
-  return {duckdb_string_t_data(&value), duckdb_string_t_length(value)};
+  return std::string(VectorStringView(vector, row));
 }
 
 }  // namespace bigquery_emulator_duckdb
