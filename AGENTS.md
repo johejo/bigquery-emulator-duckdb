@@ -67,8 +67,12 @@ neither clearly applies.
 
 ### Registering a function
 
-`src/translator/functions.cc` assembles the registry; `functions_template.cc`,
-`functions_backend.cc` and `functions_aggregate.cc` hold the rule tables. Each function is
+`src/emulator_functions.cc` assembles the application's registry from the builtin definitions in
+`src/translator/functions.cc` and feature providers such as the geography adapter. The shared
+registry model and rule expansion live in `src/function_catalog/`; translators receive the
+assembled catalog from their callers and do not select or register feature adapters.
+`functions_template.cc`, `functions_backend.cc` and `functions_aggregate.cc` hold the builtin
+rule tables. Each function is
 registered under one of these spellings; its rules may still spell overloads with different
 backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 

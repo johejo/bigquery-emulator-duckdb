@@ -26,6 +26,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/emulator_functions.h"
 #include "src/extract.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
@@ -375,7 +376,8 @@ std::shared_ptr<const Job> Emulator::RunLoad(LoadRequest request) {
       for (size_t i = 0; i < written.size(); ++i) {
         const auto& field = written.at(i);
         const auto name = QuoteIdentifier(field.name);
-        const auto rounded = TranslateAppendedValue(name, prepared.schema.at(i), field);
+        const auto rounded =
+            TranslateAppendedValue(EmulatorFunctionCatalog(), name, prepared.schema.at(i), field);
         if (!rounded) {
           throw ApiError::Unsupported("loading values into ROUND_HALF_EVEN columns");
         }
@@ -678,7 +680,9 @@ QueryResult Emulator::WriteDestination(const std::string& project_id, TableRefer
       const std::string name = QuoteIdentifier(field.name);
       const auto column = FindField(existing->schema, field.name);
       const std::optional<std::string> value =
-          column == existing->schema.end() ? name : TranslateAppendedValue(name, field, *column);
+          column == existing->schema.end()
+              ? name
+              : TranslateAppendedValue(EmulatorFunctionCatalog(), name, field, *column);
       if (!value.has_value()) {
         throw ApiError::Unsupported("appending rows of another schema to ROUND_HALF_EVEN columns");
       }

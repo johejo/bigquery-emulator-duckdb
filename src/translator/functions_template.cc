@@ -11,11 +11,26 @@
 #include <vector>
 
 #include "src/duckdb_sql.h"
-#include "src/translator/function_rule_builders.h"
-#include "src/translator/functions.h"
+#include "src/function_catalog/rule_builders.h"
+#include "src/function_catalog/rules.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::Rule;
+
+using function_catalog::Arity;
+using function_catalog::BigNumericCall;
+using function_catalog::BigNumericOperator;
+using function_catalog::Concat;
+using function_catalog::Condition;
+using function_catalog::FloatCompare;
+using function_catalog::FunctionDefinition;
+using function_catalog::Implementation;
+using function_catalog::Is;
+using function_catalog::Part;
+using function_catalog::TypeUse;
+
 namespace {
 
 using enum googlesql::TypeKind;

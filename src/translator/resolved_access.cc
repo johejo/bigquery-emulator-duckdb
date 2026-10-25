@@ -14,6 +14,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/catalog.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
@@ -137,3 +138,17 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
 }
 
 }  // namespace bigquery_emulator_duckdb::translator
+
+namespace bigquery_emulator_duckdb::function_catalog {
+
+const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {
+  return translator::ArgumentOf(resolved, i);
+}
+
+const googlesql::Type* ScalarCall::ArgumentType(size_t i) const {
+  return translator::TypeOf(Argument(i));
+}
+
+const googlesql::Type* ScalarCall::ResultType() const { return translator::ResultTypeOf(resolved); }
+
+}  // namespace bigquery_emulator_duckdb::function_catalog

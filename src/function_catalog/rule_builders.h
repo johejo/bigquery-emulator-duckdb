@@ -6,9 +6,9 @@
 #include <string_view>
 #include <vector>
 
-#include "src/translator/functions.h"
+#include "src/function_catalog/rules.h"
 
-namespace bigquery_emulator_duckdb::translator {
+namespace bigquery_emulator_duckdb::function_catalog {
 
 Condition Is(std::size_t argument, std::initializer_list<googlesql::TypeKind> types);
 Condition Part(std::size_t argument, std::initializer_list<std::string_view> date_parts);
@@ -22,4 +22,4 @@ Rule BigNumericOperator(std::string_view function, std::size_t arity);
 // neither less nor greater. DuckDB takes NaN as equal to itself and greater than every number.
 std::string FloatCompare(const std::string& left, std::string_view op, const std::string& right);
 
-}  // namespace bigquery_emulator_duckdb::translator
+}  // namespace bigquery_emulator_duckdb::function_catalog

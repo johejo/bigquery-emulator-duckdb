@@ -33,10 +33,11 @@
 #include "googlesql/public/types/type_factory.h"
 #include "nlohmann/json.hpp"
 #include "src/catalog.h"
+#include "src/emulator_functions.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
 #include "src/language_options.h"
 #include "src/table_source.h"
-#include "src/translator/functions.h"
 
 namespace bigquery_emulator_duckdb {
 namespace {
@@ -384,13 +385,13 @@ std::vector<std::pair<std::string, Call>> GeneratedCalls(const std::string& name
 }
 
 // Syntax and analyzer rewrites have no function registry entry of their own.
-std::string Implementation(const std::string& name, const translator::FunctionEntry* entry,
+std::string Implementation(const std::string& name, const function_catalog::FunctionEntry* entry,
                            bool table_function) {
   if (table_function) {
     return "Table function";
   }
   if (name == "CASE") {
-    return translator::Describe(*translator::FindFunction("$CASE_NO_VALUE"));
+    return function_catalog::Describe(*EmulatorFunctionCatalog().Find("$CASE_NO_VALUE"));
   }
   if (name == "CAST" || name == "SAFE_CAST" || name == "ARRAY") {
     return "DuckDB SQL, in code";
@@ -402,7 +403,7 @@ std::string Implementation(const std::string& name, const translator::FunctionEn
   if (name == "ARRAY_FIRST" || name == "ARRAY_LAST" || name == "ARRAY_SLICE" || name == "TYPEOF") {
     return "DuckDB SQL";
   }
-  return entry == nullptr ? "" : translator::Describe(*entry);
+  return entry == nullptr ? "" : function_catalog::Describe(*entry);
 }
 
 int Main(int argc, char** argv) {
@@ -429,7 +430,7 @@ int Main(int argc, char** argv) {
     const std::vector<std::string> path = absl::StrSplit(name, '.');
     const bool known = catalog.FindFunction(path, &function).ok();
     // Functions spelled as syntax, such as EXTRACT, are operators such as $EXTRACT.
-    const translator::FunctionEntry* entry = translator::FindFunction(
+    const function_catalog::FunctionEntry* entry = EmulatorFunctionCatalog().Find(
         known ? absl::AsciiStrToUpper(function->FullName(/*include_group=*/false)) : "$" + name);
     const googlesql::TableValuedFunction* table_function = nullptr;
     // RANGE_SESSIONIZE and EXTERNAL_QUERY have scan translators rather than scalar registry

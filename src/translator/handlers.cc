@@ -12,20 +12,17 @@
 #include "googlesql/public/type.h"
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
-#include "src/translator/function_rule_builders.h"
-#include "src/translator/functions.h"
+#include "src/function_catalog/catalog.h"
+#include "src/function_catalog/rule_builders.h"
+#include "src/function_catalog/rules.h"
 #include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
-const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {
-  return ArgumentOf(resolved, i);
-}
-
-const googlesql::Type* ScalarCall::ArgumentType(size_t i) const { return TypeOf(Argument(i)); }
-
-const googlesql::Type* ScalarCall::ResultType() const { return ResultTypeOf(resolved); }
+using function_catalog::FloatCompare;
+using function_catalog::FunctionArgument;
+using function_catalog::ScalarCall;
 
 namespace {
 

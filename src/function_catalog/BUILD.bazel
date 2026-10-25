@@ -1,0 +1,23 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(features = ["layering_check"])
+
+# Backend-independent registry data, rule construction and SQL expansion.
+cc_library(
+    name = "function_catalog",
+    srcs = [
+        "catalog.cc",
+        "rule_builders.cc",
+        "rules.cc",
+    ],
+    hdrs = [
+        "catalog.h",
+        "rule_builders.h",
+        "rules.h",
+    ],
+    copts = ["-std=c++20"],
+    implementation_deps = ["//:duckdb_sql"],
+    linkstatic = True,
+    visibility = ["//:__subpackages__"],
+    deps = ["@googlesql//googlesql/public:type_cc_proto"],
+)

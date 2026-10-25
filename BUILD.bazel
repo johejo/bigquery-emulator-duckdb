@@ -516,6 +516,19 @@ cc_library(
     deps = ["@googlesql//googlesql/public:analyzer"],
 )
 
+# Application composition: collect builtin and optional feature definitions above the translator.
+cc_library(
+    name = "emulator_functions",
+    srcs = ["src/emulator_functions.cc"],
+    hdrs = ["src/emulator_functions.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        "//src/function_catalog",
+        "//src/googlesql_geography_duckdb",
+        "//src/translator:functions",
+    ],
+)
+
 cc_library(
     name = "translator",
     srcs = ["src/translator.cc"],
@@ -526,6 +539,7 @@ cc_library(
         ":field_schema",
         ":schema_sql",
         ":type_mapping",
+        "//src/function_catalog",
         "//src/translator:context",
         "//src/translator:literal",
         "//src/translator:query",
@@ -841,18 +855,32 @@ cc_library(
     ],
 )
 
+# Column-default semantics used by translation and metadata writes, without a backend.
+cc_library(
+    name = "column_default",
+    srcs = ["src/column_default.cc"],
+    hdrs = ["src/column_default.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":api_error",
+        ":type_mapping",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/reference_impl:type_parameter_constraints",
+    ],
+    deps = [":field_schema"],
+)
+
 cc_library(
     name = "ddl_write",
     srcs = ["src/ddl_write.cc"],
     hdrs = ["src/ddl_write.h"],
     copts = ["-std=c++20"],
     implementation_deps = [
+        ":column_default",
         ":duckdb_catalog",
-        ":type_mapping",
         "@abseil-cpp//absl/time",
-        "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/reference_impl:type_parameter_constraints",
     ],
     deps = [
         ":api_error",
@@ -921,12 +949,14 @@ cc_library(
         ":analyzer",
         ":backend_error",
         ":catalog",
+        ":column_default",
         ":column_metadata",
         ":ddl_write",
         ":default_dataset",
         ":duckdb_catalog",
         ":duckdb_sql",
         ":duckdb_table_source",
+        ":emulator_functions",
         ":extract",
         ":language_options",
         ":load",
@@ -988,6 +1018,7 @@ cc_library(
         ":catalog",
         ":default_dataset",
         ":duckdb_sql",
+        ":emulator_functions",
         ":field_schema",
         ":javascript_function",
         ":language_options",
@@ -1170,10 +1201,11 @@ cc_binary(
     copts = ["-std=c++20"],
     deps = [
         ":catalog",
+        ":emulator_functions",
         ":field_schema",
         ":language_options",
         ":table_source",
-        "//src/translator:functions",
+        "//src/function_catalog",
         "@abseil-cpp//absl/strings",
         "@googlesql//googlesql/public:function",
         "@googlesql//googlesql/public:type",
