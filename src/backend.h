@@ -10,7 +10,9 @@
 
 #include "nlohmann/json.hpp"
 #include "src/field_schema.h"
+#include "src/function_options.h"
 #include "src/googlesql_functions_duckdb/objectref_options.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/result_rows.h"
 #include "src/storage_snapshot.h"
@@ -30,7 +32,7 @@ struct QueryResult {
 };
 
 // Owns a DuckDB database instance. Calls use separate connections unless this is a session.
-// Geography bounds expand outward as in BigQuery unless geography.expand_bounding_box is false.
+// Defaults select BigQuery function corrections and outward geography bounds.
 class Backend {
  public:
   explicit Backend(
@@ -38,7 +40,8 @@ class Backend {
       const udf::JavaScriptLimits& javascript = udf::JavaScriptLimits(),
       const functions_duckdb::ObjectStorage& storage = functions_duckdb::ObjectStorage(),
       const udf::PythonOptions& python = udf::PythonOptions(),
-      const googlesql_geography::Options& geography = {.expand_bounding_box = true});
+      const googlesql_geography::Options& geography = {.expand_bounding_box = true},
+      const functions_duckdb::Options& functions = BigQueryFunctionOptions());
   ~Backend();
 
   Backend(const Backend&) = delete;

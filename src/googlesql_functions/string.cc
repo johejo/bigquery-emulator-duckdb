@@ -107,8 +107,8 @@ absl::StatusOr<std::string> FromBase32(std::string_view text) {
 }
 
 // CHR, which BigQuery makes an empty string for 0 where GoogleSQL makes NUL.
-bool Chr(int64_t codepoint, std::string* out, absl::Status* error) {
-  if (codepoint == 0) {
+bool Chr(int64_t codepoint, bool zero_is_empty, std::string* out, absl::Status* error) {
+  if (zero_is_empty && codepoint == 0) {
     out->clear();
     return true;
   }

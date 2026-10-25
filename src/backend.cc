@@ -21,6 +21,7 @@
 #include "src/duckpgq.h"
 #include "src/field_schema.h"
 #include "src/googlesql_functions_duckdb/objectref_options.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/googlesql_geography/options.h"
 #include "src/mysql_query.h"
 #include "src/postgres_scanner.h"
@@ -158,7 +159,8 @@ struct Backend::Database {
   Handle<duckdb_database, duckdb_close> handle;
   Database(const std::optional<std::string>& session_user, const udf::JavaScriptLimits& javascript,
            const functions_duckdb::ObjectStorage& storage, const udf::PythonOptions& python,
-           const googlesql_geography::Options& geography) {
+           const googlesql_geography::Options& geography,
+           const functions_duckdb::Options& functions) {
     if (session_user && session_user->empty()) {
       throw std::invalid_argument("session_user must not be empty");
     }
@@ -191,7 +193,8 @@ struct Backend::Database {
     if (state == DuckDBError) {
       throw BackendError(message ? message.get() : "DuckDB failed to open database");
     }
-    RegisterBackendFunctions(handle.get(), session_user, javascript, storage, python, geography);
+    RegisterBackendFunctions(handle.get(), session_user, javascript, storage, python, geography,
+                             functions);
     RegisterPostgresScanner(handle.get());
     RegisterMySqlScanner(handle.get());
     RegisterDuckPGQ(handle.get());
@@ -235,8 +238,10 @@ Backend::CallConnection Backend::Connect() const {
 Backend::Backend(const std::optional<std::string>& session_user,
                  const udf::JavaScriptLimits& javascript,
                  const functions_duckdb::ObjectStorage& storage, const udf::PythonOptions& python,
-                 const googlesql_geography::Options& geography)
-    : db_(std::make_shared<Database>(session_user, javascript, storage, python, geography)) {}
+                 const googlesql_geography::Options& geography,
+                 const functions_duckdb::Options& functions)
+    : db_(std::make_shared<Database>(session_user, javascript, storage, python, geography,
+                                     functions)) {}
 
 Backend::Backend(std::shared_ptr<Database> database)
     : db_(std::move(database)), session_(std::make_unique<Session>(*db_)) {}

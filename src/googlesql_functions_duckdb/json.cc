@@ -34,6 +34,7 @@
 #include "src/duckdb_handle.h"
 #include "src/googlesql_functions_duckdb/any_arguments.h"
 #include "src/googlesql_functions_duckdb/json.h"
+#include "src/googlesql_functions_duckdb/options.h"
 #include "src/language_options.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
@@ -565,14 +566,27 @@ void JsonSet(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector o
       /*nulls=*/false);
 }
 
+// How JSON_ARRAY_APPEND and JSON_ARRAY_INSERT encode the values they add.
+struct JsonArrayModifyOptions {
+  // Reject numbers JSON would round, as BigQuery's TO_JSON encoding does.
+  bool strict_numbers = false;
+  // Keep the sign of a negative zero, as BigQuery does.
+  bool preserve_negative_zero = false;
+};
+
 // Validate every path before checking NULL input or the flag, then apply pairs in order.
 // A SQL array is expanded only when the flag is true; JSON arrays remain single values.
 template <bool kInsert>
 void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
   const idx_t columns = duckdb_data_chunk_get_column_count(input);
-  // BigQuery's TO_JSON encoding rejects lossy decimals, where GoogleSQL's default rounds.
+  const auto& modify_options = FunctionContext<JsonArrayModifyOptions>(info);
   googlesql::LanguageOptions options = GoogleSqlLanguageOptions();
-  options.EnableLanguageFeature(googlesql::FEATURE_JSON_STRICT_NUMBER_PARSING);
+  if (modify_options.strict_numbers) {
+    options.EnableLanguageFeature(googlesql::FEATURE_JSON_STRICT_NUMBER_PARSING);
+  } else {
+    options.DisableLanguageFeature(googlesql::FEATURE_JSON_STRICT_NUMBER_PARSING);
+  }
+  const bool canonicalize_zero = !modify_options.preserve_negative_zero;
   std::vector<idx_t> paired;
   for (idx_t i = 2; i + 1 < columns; i += 2) {
     paired.push_back(i);
@@ -580,7 +594,7 @@ void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_
   const AnyArguments values(input, paired);
   EachRow(
       info, input, output,
-      [&values, &options,
+      [&values, &options, canonicalize_zero,
        columns](const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
         const std::string function = kInsert ? "JSON_ARRAY_INSERT" : "JSON_ARRAY_APPEND";
         std::vector<std::unique_ptr<googlesql::functions::json_internal::StrictJSONPathIterator>>
@@ -612,10 +626,8 @@ void JsonArrayModify(duckdb_function_info info, duckdb_data_chunk input, duckdb_
           }
           const auto modify = kInsert ? googlesql::functions::JsonInsertArrayElement
                                       : googlesql::functions::JsonAppendArrayElement;
-          // BigQuery keeps the sign of a negative zero it inserts.
-          const absl::Status status =
-              modify(document->GetRef(), *paths.at(i), *value, options,
-                     /*canonicalize_zero=*/false, arguments.Bool(columns - 1));
+          const absl::Status status = modify(document->GetRef(), *paths.at(i), *value, options,
+                                             canonicalize_zero, arguments.Bool(columns - 1));
           if (!status.ok()) {
             return absl::OutOfRangeError("Invalid input to " + function + ": " +
                                          std::string(status.message()));
@@ -657,7 +669,7 @@ void JsonStripNulls(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 
 }  // namespace
 
-void RegisterJsonFunctions(duckdb_connection connection) {
+void RegisterJsonFunctions(duckdb_connection connection, const Options& options) {
   Register(connection, "bq_lax_bool", {kVarchar}, kBoolean,
            LaxConvert<bool, googlesql::functions::LaxConvertJsonToBool>);
   Register(connection, "bq_lax_int64", {kVarchar}, kBigint,
@@ -707,10 +719,14 @@ void RegisterJsonFunctions(duckdb_connection connection) {
            /*nulls=*/false);
   Register(connection, "bq_json_set", {kVarchar, kVarchar, kAny, kBoolean}, kVarchar, JsonSet,
            /*nulls=*/false);
-  Register(connection, "bq_json_array_append", {kVarchar}, kVarchar, JsonArrayModify<false>,
-           /*nulls=*/false, kAny);
-  Register(connection, "bq_json_array_insert", {kVarchar}, kVarchar, JsonArrayModify<true>,
-           /*nulls=*/false, kAny);
+  const JsonArrayModifyOptions modify_options{
+      .strict_numbers = options.json_strict_numbers,
+      .preserve_negative_zero = options.json_preserve_negative_zero,
+  };
+  RegisterWithContext(connection, "bq_json_array_append", {kVarchar}, kVarchar,
+                      JsonArrayModify<false>, modify_options, /*nulls=*/false, kAny);
+  RegisterWithContext(connection, "bq_json_array_insert", {kVarchar}, kVarchar,
+                      JsonArrayModify<true>, modify_options, /*nulls=*/false, kAny);
   Register(connection, "bq_json_strip_nulls", {kVarchar, kVarchar, kBoolean, kBoolean}, kVarchar,
            JsonStripNulls, /*nulls=*/false);
 }
