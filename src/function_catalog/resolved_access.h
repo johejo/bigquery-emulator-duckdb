@@ -34,6 +34,9 @@ bool IsConstant(const googlesql::ResolvedExpr& expr);
 // GoogleSQL could not determine it; callers leave that argument form unsupported.
 std::optional<bool> IsConstantExpression(const googlesql::ResolvedExpr& expr);
 
+// Whether an expression is a NULL literal, including a typed NULL.
+bool IsNullLiteral(const googlesql::ResolvedExpr& expr);
+
 // The value of a STRING literal that is not NULL.
 std::optional<std::string> StringLiteral(const googlesql::ResolvedExpr& expr);
 

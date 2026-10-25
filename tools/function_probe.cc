@@ -96,6 +96,8 @@ struct Selector {
 struct Hints {
   // Calls that replace the generated ones, by function.
   std::map<std::string, std::vector<std::string>> queries;
+  // Calls for forms that cannot be generated, added to the generated calls.
+  std::map<std::string, std::vector<std::string>> extra_queries;
   // Behavior a probe cannot observe, such as where results differ from DuckDB's defaults.
   std::map<std::string, std::string> notes;
   // The literal for an argument of a type, or of a templated kind such as <T1>.
@@ -174,7 +176,7 @@ Hints ReadHints(const std::string& path,
       message += " " + hint;
       throw std::runtime_error(message);
     };
-    if (directive == "query" || directive == "note") {
+    if (directive == "query" || directive == "extra_query" || directive == "note") {
       const std::string name = hint.substr(0, hint.find(' '));
       const std::string text = hint.substr(std::min(hint.size(), name.size() + 1));
       if (text.empty() || (directive == "note" && hints.notes.contains(name))) {
@@ -187,7 +189,7 @@ Hints ReadHints(const std::string& path,
       if (directive == "note") {
         hints.notes[name] = text;
       } else {
-        hints.queries[name].push_back(text);
+        (directive == "extra_query" ? hints.extra_queries : hints.queries)[name].push_back(text);
       }
     } else if ((directive == "sample" || directive == "optional") && fields.size() == 2) {
       (directive == "sample" ? hints.samples : hints.optional_samples)[fields.at(0)] = fields.at(1);
@@ -461,6 +463,11 @@ int Main(int argc, char** argv) {
       }
     } else {
       line["unsupported"].push_back("the analyzer does not know this function");
+    }
+    if (const auto extra = hints.extra_queries.find(name); extra != hints.extra_queries.end()) {
+      for (const auto& query : extra->second) {
+        line["queries"].push_back(query);
+      }
     }
     if (!list_signatures) {
       std::cout << line.dump() << "\n";

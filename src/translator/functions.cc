@@ -156,6 +156,23 @@ constexpr auto kHandlers =
             {"DATETIME_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
             {"TIMESTAMP_BUCKET", {.handler = Bucket, .argument_modes = kBucketArgumentModes}},
             {
+                "CONTAINS_SUBSTR",
+                {
+                    .handler = ContainsSubstr,
+                    .implementation = Implementation::kGoogleSQL,
+                    // Opaque primitive leaves are unsearched and contribute NULL.
+                    .uses =
+                        {
+                            TypeUse::kRejectsSafe,
+                            TypeUse::kReadsEmptyStruct,
+                            TypeUse::kBigNumeric,
+                            TypeUse::kBuildsOrReadsInterval,
+                            TypeUse::kBuildsOrReadsRange,
+                            TypeUse::kBuildsOrReadsGeography,
+                        },
+                },
+            },
+            {
                 "TO_JSON",
                 {
                     .handler = ToJson,

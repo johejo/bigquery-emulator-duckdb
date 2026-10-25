@@ -454,23 +454,6 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
                       },
               },
           },
-          // BigQuery compares the NFKC normal forms, case folded. Only the STRING overload is
-          // declared.
-          {
-              "CONTAINS_SUBSTR",
-              {
-                  .rules =
-                      {
-                          {
-                              .arity = 2,
-                              .spelling = "contains(bq_normalize_and_casefold($1, 'NFKC'), "
-                                          "bq_normalize_and_casefold($2, "
-                                          "'NFKC'))",
-                              .conditions = {Is(1, {TYPE_STRING}), Is(2, {TYPE_STRING})},
-                          },
-                      },
-              },
-          },
           // encode() takes a STRING's UTF-8 bytes.
           {
               "SHA512",

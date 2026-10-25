@@ -202,35 +202,35 @@ namespace {
 
 // Original struct names in depth-first order. JSON semantics depend on names, including empty
 // and duplicate ones, while DuckDB may hold these fields under positional internal names.
-void JsonFieldNames(const googlesql::Type* type, std::vector<std::string>& names) {
+void ValueFieldNames(const googlesql::Type* type, std::vector<std::string>& names) {
   if (type->IsArray()) {
-    JsonFieldNames(type->AsArray()->element_type(), names);
+    ValueFieldNames(type->AsArray()->element_type(), names);
   } else if (type->IsStruct()) {
     for (const auto& field : type->AsStruct()->fields()) {
       names.push_back(field.name);
-      JsonFieldNames(field.type, names);
+      ValueFieldNames(field.type, names);
     }
   }
 }
 
 // Pair each value with its original struct names, without evaluating the value twice. The
-// JSON backend reconstructs the GoogleSQL type from these names and the physical value type.
-std::optional<std::string> JsonArgument(const ScalarCall& call, size_t i) {
+// backend reconstructs the GoogleSQL type from these names and the physical value type.
+std::optional<std::string> ValueArgument(const ScalarCall& call, size_t i) {
   const auto type = DuckDbType(call.ArgumentType(i));
   if (!type) {
     return std::nullopt;
   }
   std::vector<std::string> names;
-  JsonFieldNames(call.ArgumentType(i), names);
+  ValueFieldNames(call.ArgumentType(i), names);
   return "struct_pack(value := CAST(" + call.arguments.at(i).sql + " AS " + *type +
          "), names := " + QuoteLiteral(nlohmann::json(names).dump()) + ")";
 }
 
-// The JSON arguments of a call, or nullopt when one has a type DuckDB cannot hold.
-std::optional<std::vector<std::string>> JsonArguments(const ScalarCall& call) {
+// The typed value arguments of a call, or nullopt when one has a type DuckDB cannot hold.
+std::optional<std::vector<std::string>> ValueArguments(const ScalarCall& call) {
   std::vector<std::string> arguments;
   for (size_t i = 0; i < call.arguments.size(); ++i) {
-    const auto argument = JsonArgument(call, i);
+    const auto argument = ValueArgument(call, i);
     if (!argument) {
       return std::nullopt;
     }
@@ -241,10 +241,29 @@ std::optional<std::vector<std::string>> JsonArguments(const ScalarCall& call) {
 
 }  // namespace
 
+std::optional<std::string> ContainsSubstr(const ScalarCall& call) {
+  if (function_catalog::IsNullLiteral(call.Argument(1))) {
+    throw std::invalid_argument("The second argument of CONTAINS_SUBSTR() must not be null.");
+  }
+  const auto constant = function_catalog::IsConstantExpression(call.Argument(1));
+  if (!constant) {
+    return std::nullopt;
+  }
+  if (!*constant) {
+    throw std::invalid_argument("CONTAINS_SUBSTR search value must be a constant expression");
+  }
+  const auto value = ValueArgument(call, 0);
+  if (!value) {
+    return std::nullopt;
+  }
+  return "bq_contains_substr(" + *value + ", " + call.arguments.at(1).sql + ", " +
+         call.arguments.at(2).sql + ")";
+}
+
 // TO_JSON(value, stringify_wide_numbers) and TO_JSON_STRING(value, pretty_print).
 std::optional<std::string> ToJson(const ScalarCall& call) {
   const size_t n = call.arguments.size();
-  const auto value = n == 1 || n == 2 ? JsonArgument(call, 0) : std::nullopt;
+  const auto value = n == 1 || n == 2 ? ValueArgument(call, 0) : std::nullopt;
   if (!value) {
     return std::nullopt;
   }
@@ -276,7 +295,7 @@ std::optional<std::string> JsonSet(const ScalarCall& call) {
   }
   std::string result = "CAST(" + args.at(0) + " AS VARCHAR)";
   for (size_t i = 1; i + 1 < n; i += 2) {
-    const auto value = JsonArgument(call, i + 1);
+    const auto value = ValueArgument(call, i + 1);
     if (!value) {
       return std::nullopt;
     }
@@ -301,7 +320,7 @@ std::optional<std::string> JsonArrayModify(const ScalarCall& call) {
   }
   std::vector<std::string> args = {"CAST(" + call.arguments.at(0).sql + " AS VARCHAR)"};
   for (size_t i = 1; i + 1 < n; i += 2) {
-    const auto value = JsonArgument(call, i + 1);
+    const auto value = ValueArgument(call, i + 1);
     if (!value) {
       return std::nullopt;
     }
@@ -316,7 +335,7 @@ std::optional<std::string> JsonArrayModify(const ScalarCall& call) {
 
 // JSON_ARRAY(values...).
 std::optional<std::string> JsonArray(const ScalarCall& call) {
-  const auto args = JsonArguments(call);
+  const auto args = ValueArguments(call);
   if (!args) {
     return std::nullopt;
   }
@@ -325,7 +344,7 @@ std::optional<std::string> JsonArray(const ScalarCall& call) {
 
 // JSON_OBJECT(key, value, ...) and JSON_OBJECT(keys, values).
 std::optional<std::string> JsonObject(const ScalarCall& call) {
-  const auto args = JsonArguments(call);
+  const auto args = ValueArguments(call);
   if (!args || args->size() % 2 != 0) {
     return std::nullopt;
   }

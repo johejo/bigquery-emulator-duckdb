@@ -118,3 +118,25 @@ cc_library(
     linkstatic = True,
     deps = ["@abseil-cpp//absl/status:statusor"],
 )
+
+cc_library(
+    name = "contains_substr",
+    srcs = ["contains_substr.cc"],
+    hdrs = ["contains_substr.h"],
+    copts = ["-std=c++20"],
+    implementation_deps = [
+        ":string",
+        "//:language_options",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/time",
+        "@googlesql//googlesql/base:status",
+        "@googlesql//googlesql/public:coercer",
+        "@googlesql//googlesql/public:json_value",
+        "@googlesql//googlesql/public:value",
+        "@googlesql//googlesql/public/types",
+    ],
+    linkstatic = True,
+    deps = [
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)

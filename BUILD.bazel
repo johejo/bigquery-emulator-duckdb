@@ -590,6 +590,7 @@ cc_library(
         "//src/googlesql_aead_duckdb",
         "//src/googlesql_functions_duckdb:bignumeric",
         "//src/googlesql_functions_duckdb:cast",
+        "//src/googlesql_functions_duckdb:contains_substr",
         "//src/googlesql_functions_duckdb:datetime",
         "//src/googlesql_functions_duckdb:interval",
         "//src/googlesql_functions_duckdb:json",

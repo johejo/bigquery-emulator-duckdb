@@ -14,6 +14,7 @@ std::optional<std::string> InList(const function_catalog::ScalarCall& call);
 std::optional<std::string> Case(const function_catalog::ScalarCall& call);
 std::optional<std::string> GraphIdentityPredicate(const function_catalog::ScalarCall& call);
 std::optional<std::string> Bucket(const function_catalog::ScalarCall& call);
+std::optional<std::string> ContainsSubstr(const function_catalog::ScalarCall& call);
 std::optional<std::string> ToJson(const function_catalog::ScalarCall& call);
 std::optional<std::string> JsonRemove(const function_catalog::ScalarCall& call);
 std::optional<std::string> JsonSet(const function_catalog::ScalarCall& call);

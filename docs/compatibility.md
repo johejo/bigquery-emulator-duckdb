@@ -148,7 +148,7 @@ See the [README compatibility exceptions](../README.md#compatibility) for refres
 
 ### STRUCT values
 
-An empty `STRUCT<>` can be passed only to JSON functions and ARRAY constructors; aggregates and
+An empty `STRUCT<>` can be passed only to JSON functions, `CONTAINS_SUBSTR` and ARRAY constructors; aggregates and
 other functions reject it. BigQuery's restrictions on empty STRUCTs in query results also apply.
 
 ### INTERVAL values
