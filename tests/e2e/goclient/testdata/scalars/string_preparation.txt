@@ -1,0 +1,26 @@
+## Repeated and changing string function parameters
+
+# Semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions
+SELECT STRING_AGG(TRIM('xyabxy', chars), ',' ORDER BY offset) FROM UNNEST(['xy', 'xy', 'x', '', 'xy']) AS chars WITH OFFSET AS offset
+=> "ab,ab,yabxy,xyabxy,ab"
+
+SELECT STRING_AGG(CAST(TRIM(b'xyabxy', chars) AS STRING), ',' ORDER BY offset) FROM UNNEST([b'xy', b'xy', b'x', b'', b'xy']) AS chars WITH OFFSET AS offset
+=> "ab,ab,yabxy,xyabxy,ab"
+
+SELECT STRING_AGG(TRANSLATE('abc', 'ab', target), ',' ORDER BY offset) FROM UNNEST(['xy', 'xy', 'uv', '', 'xy']) AS target WITH OFFSET AS offset
+=> "xyc,xyc,uvc,c,xyc"
+
+SELECT STRING_AGG(CAST(TRANSLATE(b'abc', b'ab', target) AS STRING), ',' ORDER BY offset) FROM UNNEST([b'xy', b'xy', b'uv', b'', b'xy']) AS target WITH OFFSET AS offset
+=> "xyc,xyc,uvc,c,xyc"
+
+SELECT STRING_AGG(TRANSLATE('abc', source, 'xy'), ',' ORDER BY offset) FROM UNNEST(['ab', 'ab', 'ba', 'bc', 'ab']) AS source WITH OFFSET AS offset
+=> "xyc,xyc,yxc,axy,xyc"
+
+SELECT STRING_AGG(COALESCE(SAFE.TRANSLATE('abc', source, 'xy'), 'NULL'), ',' ORDER BY offset) FROM UNNEST(['ab', 'aa', 'ab', NULL, 'ba']) AS source WITH OFFSET AS offset
+=> "xyc,NULL,xyc,NULL,yxc"
+
+SELECT STRING_AGG(INITCAP('hello-world there', delimiters), ',' ORDER BY offset) FROM UNNEST(['-', '-', ' ', '', '-']) AS delimiters WITH OFFSET AS offset
+=> "Hello-World there,Hello-World there,Hello-world There,Hello-world there,Hello-World there"
+
+SELECT COUNTIF(INITCAP(CONCAT('hello ', CAST(x AS STRING))) = CONCAT('Hello ', CAST(x AS STRING))) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
