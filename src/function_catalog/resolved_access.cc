@@ -1,4 +1,4 @@
-#include "src/translator/resolved_access.h"
+#include "src/function_catalog/resolved_access.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -16,17 +16,7 @@
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
 
-namespace bigquery_emulator_duckdb::translator {
-
-const googlesql::ResolvedExpr& ArgumentOf(const googlesql::ResolvedFunctionCall& call, size_t i) {
-  return *call.argument_list(static_cast<int>(i));
-}
-
-const googlesql::Type* TypeOf(const googlesql::ResolvedExpr& expr) { return expr.type(); }
-
-const googlesql::Type* ResultTypeOf(const googlesql::ResolvedFunctionCall& call) {
-  return call.type();
-}
+namespace bigquery_emulator_duckdb::function_catalog {
 
 bool IsConstant(const googlesql::ResolvedExpr& expr) {
   return expr.Is<googlesql::ResolvedLiteral>() || expr.Is<googlesql::ResolvedParameter>();
@@ -137,18 +127,12 @@ std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr) {
   return parts.empty() ? BucketWidth{.unit = "days", .factor = 0} : parts.at(0);
 }
 
-}  // namespace bigquery_emulator_duckdb::translator
-
-namespace bigquery_emulator_duckdb::function_catalog {
-
 const googlesql::ResolvedExpr& ScalarCall::Argument(size_t i) const {
-  return translator::ArgumentOf(resolved, i);
+  return *resolved.argument_list(static_cast<int>(i));
 }
 
-const googlesql::Type* ScalarCall::ArgumentType(size_t i) const {
-  return translator::TypeOf(Argument(i));
-}
+const googlesql::Type* ScalarCall::ArgumentType(size_t i) const { return Argument(i).type(); }
 
-const googlesql::Type* ScalarCall::ResultType() const { return translator::ResultTypeOf(resolved); }
+const googlesql::Type* ScalarCall::ResultType() const { return resolved.type(); }
 
 }  // namespace bigquery_emulator_duckdb::function_catalog

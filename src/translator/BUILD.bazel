@@ -36,7 +36,6 @@ cc_library(
     implementation_deps = [
         ":functions",
         ":literal",
-        ":resolved_access",
         "//:catalog_table",
         "//:connection_id",
         "//:duckdb_sql",
@@ -91,10 +90,9 @@ cc_library(
         "handlers.h",
     ],
     copts = ["-std=c++20"],
-    # The registry reads the resolved AST only through :resolved_access, so these sources, which
-    # change with every function, cannot include its definitions.
+    # The registry reads the resolved AST only through function_catalog/resolved_access.h, so
+    # these sources, which change with every function, cannot include its definitions.
     implementation_deps = [
-        ":resolved_access",
         "//:duckdb_sql",
         "//:type_mapping",
         "@googlesql//googlesql/public:type",
@@ -103,24 +101,6 @@ cc_library(
     linkstatic = True,
     visibility = ["//:__pkg__"],
     deps = ["//src/function_catalog"],
-)
-
-# Arguments, types and literal values of the resolved AST, as the function registry reads them.
-cc_library(
-    name = "resolved_access",
-    srcs = ["resolved_access.cc"],
-    hdrs = ["resolved_access.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        "//:duckdb_sql",
-        "//src/function_catalog",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
 )
 
 cc_library(

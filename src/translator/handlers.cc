@@ -13,16 +13,19 @@
 #include "nlohmann/json.hpp"
 #include "src/duckdb_sql.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rule_builders.h"
 #include "src/function_catalog/rules.h"
-#include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::BucketWidthOf;
 using function_catalog::FloatCompare;
 using function_catalog::FunctionArgument;
+using function_catalog::IsConstant;
 using function_catalog::ScalarCall;
+using function_catalog::StringLiteral;
 
 namespace {
 

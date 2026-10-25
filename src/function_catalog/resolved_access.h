@@ -4,23 +4,15 @@
 // literals. The registry and its handlers do not depend on the AST definitions, so this is the
 // only place they reach the AST from.
 
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 
 namespace googlesql {
 class ResolvedExpr;
-class ResolvedFunctionCall;
-class Type;
 }  // namespace googlesql
 
-namespace bigquery_emulator_duckdb::translator {
-
-const googlesql::ResolvedExpr& ArgumentOf(const googlesql::ResolvedFunctionCall& call,
-                                          std::size_t i);
-const googlesql::Type* TypeOf(const googlesql::ResolvedExpr& expr);
-const googlesql::Type* ResultTypeOf(const googlesql::ResolvedFunctionCall& call);
+namespace bigquery_emulator_duckdb::function_catalog {
 
 // Whether `expr` is a literal or a query parameter, as BigQuery requires of some arguments.
 bool IsConstant(const googlesql::ResolvedExpr& expr);
@@ -49,4 +41,4 @@ struct BucketWidth {
 
 std::optional<BucketWidth> BucketWidthOf(const googlesql::ResolvedExpr& expr);
 
-}  // namespace bigquery_emulator_duckdb::translator
+}  // namespace bigquery_emulator_duckdb::function_catalog

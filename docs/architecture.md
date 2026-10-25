@@ -63,6 +63,11 @@ uses of physical representations such as graph STRUCTs or BIGNUMERIC values. Rul
 is the same for all backends; GEOGRAPHY support is a type attribute, independent of the backend
 reported in the function support table.
 
+The common catalog also owns `ScalarCall`'s AST accessors and
+[resolved_access](../src/function_catalog/resolved_access.h), which reads arguments, types and
+literals for handlers. Feature providers can use them without depending on the translator;
+the resolved AST definitions remain private to the implementation source.
+
 [emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
 [builtin definitions](../src/translator/functions.cc) and feature providers. The emulator and
 function probe use this same composition. [backend_functions.cc](../src/backend_functions.cc)

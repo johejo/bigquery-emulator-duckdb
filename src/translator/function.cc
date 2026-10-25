@@ -14,6 +14,7 @@
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/function_catalog/catalog.h"
+#include "src/function_catalog/resolved_access.h"
 #include "src/function_catalog/rules.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
@@ -23,14 +24,16 @@
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
 #include "src/translator/handlers.h"
-#include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
+using function_catalog::BucketWidthOf;
 using function_catalog::Catalog;
-
+using function_catalog::DatePart;
 using function_catalog::FunctionEntry;
+using function_catalog::NormalizeMode;
+using function_catalog::RoundingMode;
 using function_catalog::ScalarCall;
 using function_catalog::Translation;
 using function_catalog::TypeUse;
