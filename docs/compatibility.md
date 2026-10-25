@@ -342,14 +342,16 @@ properties of type INT64, STRING, BOOL or FLOAT64. Edge endpoints must exist whe
 element tables, graph options and creation modes such as OR REPLACE and IF NOT
 EXISTS are unsupported.
 
-`GRAPH_TABLE` supports multiple fixed path patterns in one MATCH, chained MATCH and OPTIONAL MATCH,
+`GRAPH_TABLE` supports multiple path patterns in one MATCH, chained MATCH and OPTIONAL MATCH,
 directed or undirected edges, property projections through `RETURN`, and scalar filters. Each
 element, including shared variables, must resolve to one table within its MATCH; shared variables
-join by element identity. Fixed paths support WALK, TRAIL and ACYCLIC modes; path variables support
-node and edge access and path predicates. `IS [NOT] SOURCE [OF]` and
+join by element identity. Paths support WALK, TRAIL and ACYCLIC modes, parenthesized subpaths,
+and bounded edge or subpath repetition with literal bounds, including zero repetitions. Path variables support
+node and edge access and path predicates; group variables expose arrays in traversal order.
+Unbounded repetition and non-literal repetition bounds are unsupported. `IS [NOT] SOURCE [OF]` and
 `IS [NOT] DESTINATION [OF]` support non-NULL operands; NULL operands are rejected until
-their BigQuery behavior is verified. Quantified or nested paths, search prefixes,
-graph element or path results, and graph values in comparisons, grouping or aggregate and
+their BigQuery behavior is verified. Search prefixes, graph element or path results, and
+graph values in comparisons, grouping or aggregate and
 analytic functions are unsupported. Element IDs and edge endpoint ID functions are unsupported.
 `SAME` and `ALL_DIFFERENT` do not support `SAFE.` calls or mixing nodes and edges in one call.
 SQL/PGQ's

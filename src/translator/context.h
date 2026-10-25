@@ -13,6 +13,10 @@
 #include "src/query_parameters.h"
 #include "src/system_variables.h"
 
+namespace googlesql {
+class PropertyGraph;
+}
+
 namespace bigquery_emulator_duckdb::function_catalog {
 class Catalog;
 }
@@ -69,6 +73,7 @@ struct Scope {
   // The recursive query being defined, which a ResolvedRecursiveRefScan reads.
   std::optional<WithQuery> recursive = {};
   std::string graph_name = {};
+  const googlesql::PropertyGraph* property_graph = nullptr;
   std::shared_ptr<Relation> graph_input = {};
 };
 
