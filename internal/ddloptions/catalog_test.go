@@ -123,3 +123,22 @@ func TestCasesSetOneOptionPerSample(t *testing.T) {
 		t.Errorf("a context without a template = %+v", cases[2])
 	}
 }
+
+func TestAssignmentOperators(t *testing.T) {
+	t.Parallel()
+	c := &Catalog{
+		Source:   "https://example.com/ddl",
+		Groups:   map[string][]Option{"g": {{Name: "tags", Type: "ARRAY<STRUCT<STRING,STRING>>", Values: []string{"[]"}, Operators: []string{"=", "+=", "-="}}}},
+		Contexts: []Context{{Name: "ALTER T", Group: "g", Template: "ALTER T SET OPTIONS ({option})"}},
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(c.Cases()[0].Queries, "; "); got != "ALTER T SET OPTIONS (tags = []); ALTER T SET OPTIONS (tags += []); ALTER T SET OPTIONS (tags -= [])" {
+		t.Fatalf("queries = %s", got)
+	}
+	for _, ops := range [][]string{{"=", "="}, {"invalid"}} {
+		c.Groups["g"][0].Operators = ops
+		rejects(t, c, "invalid or duplicate operator")
+	}
+}

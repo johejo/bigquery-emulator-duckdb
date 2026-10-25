@@ -142,7 +142,8 @@ start with a letter and contain only letters, digits and underscores. Each step 
 and `${case}` is the case name. These names are reserved. File and case `vars` supply other
 values, with case variables taking precedence. Values can refer to other variables. A whole
 JSON value `${schema}` preserves an object's, array's or number's type; substitutions within a
-string accept scalar values. JSON escaping and integers above 2^53 are preserved.
+string accept scalar values. Object keys also expand variables and must remain strings;
+colliding expanded keys are rejected. JSON escaping and integers above 2^53 are preserved.
 
 `bind` saves response values as variables for later steps. `observe` selects response values to
 record under the step name. Both map names to [JSON Pointers](https://www.rfc-editor.org/rfc/rfc6901).

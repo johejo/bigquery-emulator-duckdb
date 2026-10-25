@@ -10,7 +10,8 @@ behavior these tables cannot show in [compatibility.md](compatibility.md).
 `tools/restprobe` takes the options, their types and sample values from `tools/ddl_options.json`,
 a snapshot of the reference, and runs one statement per sample against a fresh emulator holding
 the fixture tables `d.t (id INT64, d DATE, a NUMERIC) PARTITION BY d`. A probe checks only that
-the statement runs, not the metadata it stores. The notes of a Partial option list the statements
+the statement runs, not the metadata it stores. Samples use `=` unless the catalog lists
+assignment operators, such as `+=` and `-=` for tags. The notes of a Partial option list the statements
 the emulator rejected.
 
 - **Supported**: every sample runs.
@@ -21,19 +22,19 @@ the emulator rejected.
 
 | Context | Supported | Partial | Unsupported | Untested |
 | --- | --- | --- | --- | --- |
-| [CREATE SCHEMA](#create-schema) | 6 | 0 | 6 | 3 |
-| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 5 | 0 | 6 | 3 |
-| [CREATE TABLE](#create-table) | 6 | 2 | 4 | 3 |
-| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 6 | 0 | 6 | 3 |
+| [CREATE SCHEMA](#create-schema) | 7 | 0 | 5 | 3 |
+| [ALTER SCHEMA SET OPTIONS](#alter-schema-set-options) | 5 | 1 | 5 | 3 |
+| [CREATE TABLE](#create-table) | 7 | 2 | 3 | 3 |
+| [ALTER TABLE SET OPTIONS](#alter-table-set-options) | 6 | 1 | 5 | 3 |
 | [CREATE TABLE column](#create-table-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ADD COLUMN](#alter-table-add-column) | 2 | 0 | 2 | 0 |
 | [ALTER TABLE ALTER COLUMN SET OPTIONS](#alter-table-alter-column-set-options) | 2 | 0 | 2 | 0 |
-| [CREATE SNAPSHOT TABLE](#create-snapshot-table) | 4 | 0 | 1 | 0 |
-| [CREATE VIEW](#create-view) | 4 | 0 | 1 | 1 |
+| [CREATE SNAPSHOT TABLE](#create-snapshot-table) | 5 | 0 | 0 | 0 |
+| [CREATE VIEW](#create-view) | 5 | 0 | 0 | 1 |
 | [CREATE VIEW column](#create-view-column) | 0 | 0 | 1 | 0 |
 | [ALTER VIEW SET OPTIONS](#alter-view-set-options) | 0 | 0 | 5 | 1 |
 | [ALTER VIEW ALTER COLUMN SET OPTIONS](#alter-view-alter-column-set-options) | 0 | 0 | 1 | 0 |
-| [CREATE MATERIALIZED VIEW](#create-materialized-view) | 4 | 0 | 6 | 0 |
+| [CREATE MATERIALIZED VIEW](#create-materialized-view) | 5 | 0 | 5 | 0 |
 | [ALTER MATERIALIZED VIEW SET OPTIONS](#alter-materialized-view-set-options) | 0 | 0 | 9 | 0 |
 | [CREATE FUNCTION SQL](#create-function-sql) | 1 | 0 | 0 | 0 |
 | [CREATE FUNCTION JavaScript](#create-function-javascript) | 0 | 0 | 2 | 0 |
@@ -61,7 +62,7 @@ the emulator rejected.
 | [`max_time_travel_hours`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `INT64` | Unsupported |  |
 | [`primary_replica`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `STRING` | Unsupported |  |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## ALTER SCHEMA SET OPTIONS
 
@@ -80,7 +81,7 @@ the emulator rejected.
 | [`max_time_travel_hours`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `INT64` | Unsupported |  |
 | [`primary_replica`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`storage_billing_model`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `STRING` | Unsupported |  |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#schema_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER SCHEMA d SET OPTIONS (tags += NULL)`; `ALTER SCHEMA d SET OPTIONS (tags += [('123456789012/env', 'test')])`; `ALTER SCHEMA d SET OPTIONS (tags -= NULL)`; `ALTER SCHEMA d SET OPTIONS (tags -= [('123456789012/env', 'test')])`. |
 
 ## CREATE TABLE
 
@@ -100,7 +101,7 @@ the emulator rejected.
 | [`storage_uri`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`file_format`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`table_format`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## ALTER TABLE SET OPTIONS
 
@@ -120,7 +121,7 @@ the emulator rejected.
 | [`storage_uri`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`file_format`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Untested | No sample for this option's constraints. |
 | [`table_format`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#table_set_options_list) | `ARRAY<STRUCT<STRING,STRING>>` | Partial | Unsupported: `ALTER TABLE t SET OPTIONS (tags += NULL)`; `ALTER TABLE t SET OPTIONS (tags += [('123456789012/env', 'test')])`; `ALTER TABLE t SET OPTIONS (tags -= NULL)`. |
 
 ## CREATE TABLE column
 
@@ -157,7 +158,7 @@ the emulator rejected.
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `STRING` | Supported |  |
 | [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#snapshot_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE VIEW
 
@@ -168,7 +169,7 @@ the emulator rejected.
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `STRING` | Supported |  |
 | [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 | [`privacy_policy`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `STRING` | Untested | No sample for this option's constraints. |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## CREATE VIEW column
 
@@ -206,7 +207,7 @@ the emulator rejected.
 | [`friendly_name`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `STRING` | Supported |  |
 | [`description`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `STRING` | Supported |  |
 | [`labels`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
-| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Unsupported |  |
+| [`tags`](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#materialized_view_option_list) | `ARRAY<STRUCT<STRING,STRING>>` | Supported |  |
 
 ## ALTER MATERIALIZED VIEW SET OPTIONS
 

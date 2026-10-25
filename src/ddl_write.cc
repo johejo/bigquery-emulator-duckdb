@@ -57,6 +57,17 @@ void ApplyOptionUpdates(const OptionUpdates& updates, Metadata& metadata) {
     metadata.labels = *updates.labels;
     metadata.label_order = updates.label_order;
   }
+  if (updates.resource_tags.has_value()) {
+    metadata.resource_tags = *updates.resource_tags;
+    metadata.tag_order = updates.tag_order;
+  }
+  for (const auto& [key, value] : updates.removed_tags) {
+    const auto tag = metadata.resource_tags.find(key);
+    if (tag != metadata.resource_tags.end() && tag->second == value) {
+      metadata.resource_tags.erase(tag);
+      std::erase(metadata.tag_order, key);
+    }
+  }
   if (updates.default_rounding_mode.has_value()) {
     metadata.default_rounding_mode = *updates.default_rounding_mode;
   }
@@ -96,6 +107,7 @@ DdlWrite CreateDatasetWrite(const DatasetDefinition& definition, const std::stri
 std::vector<std::string> DatasetMetadataStatements(const DatasetReference& dataset,
                                                    const DatasetMetadata& metadata) {
   ValidateLabels(metadata.labels);
+  ValidateResourceTags(metadata.resource_tags);
   ValidateDefaultTableExpiration(metadata.default_table_expiration_ms);
   const std::string table = DatasetMetadataTable(dataset.project_id);
   std::vector<std::string> statements = {
@@ -103,6 +115,9 @@ std::vector<std::string> DatasetMetadataStatements(const DatasetReference& datas
   };
   if (!metadata.empty()) {
     nlohmann::json recorded = metadata.ToJson();
+    if (!metadata.tag_order.empty()) {
+      recorded["tagOrder"] = metadata.tag_order;
+    }
     if (!metadata.label_order.empty()) {
       recorded["labelOrder"] = metadata.label_order;
     }
@@ -155,6 +170,9 @@ DdlWrite CreateViewWrite(const ViewDefinition& view, const DatasetMetadata& data
 }
 
 DdlWrite CreateTableWrite(const TableDefinition& definition, const DatasetMetadata& dataset) {
+  if (definition.temporary && !definition.metadata.resource_tags.empty()) {
+    throw ApiError::Unsupported("tags on temporary tables");
+  }
   TableMetadata metadata = definition.metadata;
   metadata.creation_time = NowMillis();
   // A clone or snapshot made without time travel was made when it was created.

@@ -43,6 +43,8 @@ const googlesql::LanguageOptions& GoogleSqlLanguageOptions() {
     // in development.
     options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_EDIT_DISTANCE_BYTES);
     options->EnableLanguageFeature(googlesql::FEATURE_CREATE_TABLE_CLONE);
+    // BigQuery supports incremental tag options; handlers reject unsupported operators.
+    options->EnableLanguageFeature(googlesql::FEATURE_ENABLE_ALTER_ARRAY_OPTIONS);
     // BigQuery is the external product: INT64 and FLOAT64 rather than the internal type set.
     options->set_product_mode(googlesql::PRODUCT_EXTERNAL);
     // The analyzer accepts only queries by default, but the emulator also runs DDL and DML.

@@ -75,6 +75,9 @@ struct OptionUpdates {
   std::optional<std::string> friendly_name = {};
   std::optional<std::map<std::string, std::string>> labels = {};
   std::vector<std::string> label_order;
+  std::optional<std::map<std::string, std::string>> resource_tags = {};
+  std::vector<std::string> tag_order;
+  std::map<std::string, std::string> removed_tags;
   std::optional<std::optional<int64_t>> expiration_time = {};
   std::optional<std::optional<int64_t>> default_table_expiration_ms = {};
   std::optional<std::string> default_rounding_mode = {};

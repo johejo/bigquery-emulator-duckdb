@@ -41,9 +41,9 @@ struct BaseTableDefinition {
   std::string time = {};
 };
 
-// What a table or view carries besides its schema: Table.description, friendlyName and labels,
-// and a table's partitioning and clustering, which only shape how BigQuery stores it, the
-// defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
+// What a table or view carries besides its schema: Table.description, friendlyName, labels and
+// resourceTags, and a table's partitioning and clustering, which only shape how BigQuery stores it,
+// the defaultRoundingMode that NUMERIC and BIGNUMERIC fields added to it later take, the
 // cloneDefinition of a clone or snapshotDefinition of a table snapshot, and its expiration. An
 // empty description, friendly name or rounding mode is unset, as BigQuery reports it.
 struct TableMetadata {
@@ -52,6 +52,8 @@ struct TableMetadata {
   std::map<std::string, std::string> labels;
   // DDL array order, which TABLE_OPTIONS exposes.
   std::vector<std::string> label_order;
+  std::map<std::string, std::string> resource_tags;
+  std::vector<std::string> tag_order;
   std::optional<TimePartitioning> time_partitioning;
   std::optional<RangePartitioning> range_partitioning;
   // Queries must have a predicate eligible for partition elimination.
@@ -68,10 +70,11 @@ struct TableMetadata {
   int64_t creation_time = 0;  // Milliseconds since the Unix epoch; unknown for old tables.
 
   [[nodiscard]] bool empty() const {
-    return description.empty() && friendly_name.empty() && labels.empty() && !partitioned() &&
-           !require_partition_filter && clustering.empty() && default_rounding_mode.empty() &&
-           !clone.has_value() && !snapshot.has_value() && !expiration_time.has_value() &&
-           !restored_from_snapshot && creation_time == 0;
+    return description.empty() && friendly_name.empty() && labels.empty() &&
+           resource_tags.empty() && !partitioned() && !require_partition_filter &&
+           clustering.empty() && default_rounding_mode.empty() && !clone.has_value() &&
+           !snapshot.has_value() && !expiration_time.has_value() && !restored_from_snapshot &&
+           creation_time == 0;
   }
   [[nodiscard]] bool partitioned() const {
     return time_partitioning.has_value() || range_partitioning.has_value();
@@ -103,15 +106,17 @@ struct ViewDescription {
   std::optional<MaterializedViewSource> materialized_source = {};
 };
 
-// What a dataset carries besides its reference: Dataset.description, friendlyName and labels,
-// defaultTableExpirationMs, which sets the expiration of tables and views created in it later, and
-// defaultRoundingMode, which tables created in it later take as their own.
-// The emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
+// What a dataset carries besides its reference: Dataset.description, friendlyName, labels and
+// resourceTags, defaultTableExpirationMs, which sets the expiration of tables and views created in
+// it later, and defaultRoundingMode, which tables created in it later take as their own. The
+// emulator keeps them in a table of its own, since DuckDB cannot comment on a schema.
 struct DatasetMetadata {
   std::string description;
   std::string friendly_name;
   std::map<std::string, std::string> labels;
   std::vector<std::string> label_order;
+  std::map<std::string, std::string> resource_tags;
+  std::vector<std::string> tag_order;
   std::optional<int64_t> default_table_expiration_ms;
   std::string default_rounding_mode;  // ROUND_HALF_AWAY_FROM_ZERO or ROUND_HALF_EVEN.
   // Output only and recorded with the dataset.
@@ -122,8 +127,8 @@ struct DatasetMetadata {
 
   [[nodiscard]] bool empty() const {
     return description.empty() && friendly_name.empty() && labels.empty() &&
-           !default_table_expiration_ms.has_value() && default_rounding_mode.empty() &&
-           creation_time == 0 && location.empty();
+           resource_tags.empty() && !default_table_expiration_ms.has_value() &&
+           default_rounding_mode.empty() && creation_time == 0 && location.empty();
   }
   [[nodiscard]] std::string Location() const {
     return location.empty() ? kDefaultLocation : location;
@@ -141,6 +146,9 @@ TableMetadata TableMetadataFromJson(const nlohmann::json& table);
 
 // tables.patch (`patch`) or tables.update applied to `metadata`. tables.patch replaces the fields
 // `body` sets, clears those it sets to null, and merges its labels, a null value removing one;
+// resourceTags patches merge keys and preserve their order. An empty object is a no-op on
+// tables, and null clears table tags. Empty patches on tagged datasets and null dataset tags
+// remain unsupported. Full updates replace resourceTags.
 // tables.update replaces the description, friendly name, labels, clustering, default rounding mode
 // and expiration, including the required partition filter.
 // Partitioning cannot change, so both keep it and reject a different one, and both keep the
@@ -174,6 +182,8 @@ std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expir
 // characters other than lowercase letters, digits, underscores and dashes. Characters outside
 // ASCII are allowed.
 void ValidateLabels(const std::map<std::string, std::string>& labels);
+// Checks locally verifiable tag limits; Cloud Resource Manager definitions are not consulted.
+void ValidateResourceTags(const std::map<std::string, std::string>& tags);
 
 // Throws ApiError::Unsupported with `what` when `body` sets the EncryptionConfiguration `key`,
 // since the emulator does not encrypt tables with Cloud KMS keys. Null or {} leaves it unset.

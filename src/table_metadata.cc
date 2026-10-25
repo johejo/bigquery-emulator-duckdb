@@ -185,7 +185,7 @@ void ParsePartitioning(const json& table, TableMetadata& metadata) {
 // Applies the description, friendly name, labels and default rounding mode of a Table or Dataset
 // resource `body` to `metadata`, as UpdateTableMetadata documents.
 template <typename Metadata>
-void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
+void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch, bool table) {
   // Every REST update sorts the existing labels before applying additions and deletions.
   metadata.label_order.clear();
   if (patch) {
@@ -209,6 +209,43 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
       [&](const json& value) { metadata.friendly_name = StringValue(value, "friendlyName"); });
   set("labels",
       [&](const json& value) { MergeLabels(value, metadata.labels, metadata.label_order); });
+  if (const auto tags = body.find("resourceTags"); tags != body.end()) {
+    if (patch && table && tags->is_null()) {
+      metadata.resource_tags.clear();
+      metadata.tag_order.clear();
+    } else {
+      if (tags->is_null()) {
+        throw ApiError::Unsupported("null resourceTags on datasets or in full updates");
+      }
+      if (!tags->is_object()) {
+        throw ApiError::Invalid("Field resourceTags must be an object");
+      }
+      if (patch && !table && tags->empty() && !metadata.resource_tags.empty()) {
+        throw ApiError::Unsupported("empty resourceTags patches on tagged datasets");
+      }
+      if (!patch) {
+        metadata.resource_tags.clear();
+        metadata.tag_order.clear();
+      } else if (metadata.tag_order.empty()) {
+        for (const auto& [key, value] : metadata.resource_tags) {
+          metadata.tag_order.push_back(key);
+        }
+      }
+      for (const auto& [key, value] : tags->items()) {
+        if (!value.is_string()) {
+          throw ApiError::Invalid("Field resourceTags values must be strings");
+        }
+        if (patch && !metadata.resource_tags.contains(key)) {
+          metadata.tag_order.push_back(key);
+        }
+        metadata.resource_tags[key] = value.get<std::string>();
+      }
+    }
+  } else if (!patch) {
+    metadata.resource_tags.clear();
+    metadata.tag_order.clear();
+  }
+  ValidateResourceTags(metadata.resource_tags);
   set("defaultRoundingMode", [&](const json& value) {
     const std::string mode = StringValue(value, "defaultRoundingMode");
     std::optional<std::string> parsed = ParseRoundingMode(mode);
@@ -221,8 +258,8 @@ void UpdateDescriptiveFields(Metadata& metadata, const json& body, bool patch) {
 }
 
 // Throws for the fields of a Dataset resource the emulator does not keep; see
-// DatasetMetadataFromJson. A null field, or an empty object or array such as the resourceTags bq
-// sends, is accepted, since it sets nothing.
+// DatasetMetadataFromJson. A null field, or an empty object or array, is accepted,
+// since it sets nothing.
 void CheckDatasetFields(const json& dataset) {
   if (!dataset.is_object()) {
     throw ApiError::Invalid("Invalid dataset resource");
@@ -238,6 +275,8 @@ void CheckDatasetFields(const json& dataset) {
       "description",
       "friendlyName",
       "labels",
+      "resourceTags",
+      "tags",
       "defaultTableExpirationMs",
       "defaultRoundingMode",
       "location",
@@ -362,6 +401,9 @@ json TableMetadata::ToJson() const {
   if (!labels.empty()) {
     fields["labels"] = labels;
   }
+  if (!resource_tags.empty()) {
+    fields["resourceTags"] = resource_tags;
+  }
   if (time_partitioning.has_value()) {
     fields["timePartitioning"] = {
         {"type", time_partitioning->type},
@@ -432,6 +474,24 @@ json DatasetMetadata::ToJson() const {
   if (!labels.empty()) {
     fields["labels"] = labels;
   }
+  if (!resource_tags.empty()) {
+    fields["resourceTags"] = resource_tags;
+    fields["tags"] = json::array();
+    const auto append = [&](const std::string& key) {
+      if (const auto tag = resource_tags.find(key); tag != resource_tags.end()) {
+        fields["tags"].push_back({{"tagKey", tag->first}, {"tagValue", tag->second}});
+      }
+    };
+    if (tag_order.empty()) {
+      for (const auto& [key, value] : resource_tags) {
+        append(key);
+      }
+    } else {
+      for (const std::string& key : tag_order) {
+        append(key);
+      }
+    }
+  }
   if (default_table_expiration_ms.has_value()) {
     fields["defaultTableExpirationMs"] = std::to_string(*default_table_expiration_ms);
   }
@@ -479,7 +539,7 @@ void UpdateTableMetadata(TableMetadata& metadata, const json& body, bool patch) 
   if (!required.is_null() || !patch || body.contains("requirePartitionFilter")) {
     metadata.require_partition_filter = required == true;
   }
-  UpdateDescriptiveFields(metadata, body, patch);
+  UpdateDescriptiveFields(metadata, body, patch, /*table=*/true);
   if (body.contains("expirationTime")) {
     metadata.expiration_time = Member(body, "expirationTime").is_null()
                                    ? std::nullopt
@@ -509,7 +569,7 @@ void UpdateDatasetMetadata(DatasetMetadata& metadata, const json& body, bool pat
       location.has_value() && *location != metadata.Location()) {
     throw ApiError::Unsupported("changing the location of a dataset");
   }
-  UpdateDescriptiveFields(metadata, body, patch);
+  UpdateDescriptiveFields(metadata, body, patch, /*table=*/false);
   // Dataset REST ordering is unverified; retain its existing key ordering.
   metadata.label_order.clear();
   if (body.contains("defaultTableExpirationMs") || !patch) {
@@ -540,6 +600,19 @@ std::optional<int64_t> ExpirationWithDefault(const std::optional<int64_t>& expir
     throw ApiError::Invalid("The default table expiration of the dataset is out of range");
   }
   return creation_time + *dataset.default_table_expiration_ms;
+}
+
+void ValidateResourceTags(const std::map<std::string, std::string>& tags) {
+  if (tags.size() > 50) {
+    throw ApiError::Invalid("A resource can have at most 50 tags");
+  }
+  for (const auto& [key, value] : tags) {
+    const auto slash = key.find('/');
+    if (slash == std::string::npos || slash == 0 || slash + 1 == key.size() ||
+        key.find('/', slash + 1) != std::string::npos || value.empty()) {
+      throw ApiError::Invalid("Tags require a namespaced key and a nonempty short value name");
+    }
+  }
 }
 
 void ValidateLabels(const std::map<std::string, std::string>& labels) {

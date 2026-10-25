@@ -20,7 +20,9 @@ std::string StringOptionValue(const std::string& value) {
 std::vector<Option> CommonOptions(const std::string& description, const std::string& friendly_name,
                                   const std::map<std::string, std::string>& labels,
                                   const std::string& default_rounding_mode,
-                                  const std::vector<std::string>& label_order) {
+                                  const std::vector<std::string>& label_order,
+                                  const std::map<std::string, std::string>& resource_tags,
+                                  const std::vector<std::string>& tag_order) {
   std::vector<Option> options;
   if (!default_rounding_mode.empty()) {
     options.push_back({
@@ -37,29 +39,33 @@ std::vector<Option> CommonOptions(const std::string& description, const std::str
     options.push_back(
         {.name = "friendly_name", .type = "STRING", .value = StringOptionValue(friendly_name)});
   }
-  if (!labels.empty()) {
-    std::vector<std::string> entries;
-    const auto append = [&](const std::string& key) {
-      if (const auto it = labels.find(key); it != labels.end()) {
-        entries.push_back("STRUCT(" + StringOptionValue(it->first) + ", " +
-                          StringOptionValue(it->second) + ")");
+  const auto append_pairs = [&](const char* name, const auto& pairs, const auto& order) {
+    if (!pairs.empty()) {
+      std::vector<std::string> entries;
+      const auto append = [&](const std::string& key) {
+        if (const auto it = pairs.find(key); it != pairs.end()) {
+          entries.push_back("STRUCT(" + StringOptionValue(it->first) + ", " +
+                            StringOptionValue(it->second) + ")");
+        }
+      };
+      if (order.empty()) {
+        for (const auto& label : pairs) {
+          append(label.first);
+        }
+      } else {
+        for (const std::string& key : order) {
+          append(key);
+        }
       }
-    };
-    if (label_order.empty()) {
-      for (const auto& label : labels) {
-        append(label.first);
-      }
-    } else {
-      for (const std::string& key : label_order) {
-        append(key);
-      }
+      options.push_back({
+          .name = name,
+          .type = "ARRAY<STRUCT<STRING, STRING>>",
+          .value = "[" + absl::StrJoin(entries, ", ") + "]",
+      });
     }
-    options.push_back({
-        .name = "labels",
-        .type = "ARRAY<STRUCT<STRING, STRING>>",
-        .value = "[" + absl::StrJoin(entries, ", ") + "]",
-    });
-  }
+  };
+  append_pairs("labels", labels, label_order);
+  append_pairs("tags", resource_tags, tag_order);
   return options;
 }
 

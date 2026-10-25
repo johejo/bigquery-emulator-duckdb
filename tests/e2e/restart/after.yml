@@ -334,3 +334,24 @@ steps:
               useLegacySql: false
     test: |
       current.res.status == 200 && current.res.body.rows == [{"f": [{"v": "restored"}]}]
+  dataset_resource_tags:
+    req:
+      /projects/test/datasets/persist_tags:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.resourceTags == {"123456789012/env": "test"}
+  table_resource_tags:
+    req:
+      /projects/test/datasets/persist_tags/tables/t:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.resourceTags == {"123456789012/env": "test"}
+  view_resource_tags:
+    req:
+      /projects/test/datasets/persist_tags/tables/v:
+        get:
+          body: null
+    test: |
+      current.res.status == 200 && current.res.body.resourceTags == {"123456789012/env": "test"}

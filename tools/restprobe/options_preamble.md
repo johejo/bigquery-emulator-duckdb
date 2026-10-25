@@ -10,7 +10,8 @@ behavior these tables cannot show in [compatibility.md](compatibility.md).
 `tools/restprobe` takes the options, their types and sample values from `tools/ddl_options.json`,
 a snapshot of the reference, and runs one statement per sample against a fresh emulator holding
 the fixture tables `d.t (id INT64, d DATE, a NUMERIC) PARTITION BY d`. A probe checks only that
-the statement runs, not the metadata it stores. The notes of a Partial option list the statements
+the statement runs, not the metadata it stores. Samples use `=` unless the catalog lists
+assignment operators, such as `+=` and `-=` for tags. The notes of a Partial option list the statements
 the emulator rejected.
 
 - **Supported**: every sample runs.

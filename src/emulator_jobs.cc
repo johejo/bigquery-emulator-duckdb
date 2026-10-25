@@ -470,6 +470,9 @@ std::shared_ptr<const Job> Emulator::RunCopy(CopyRequest request) {
         throw ApiError::Invalid("Cannot copy a view: " + TableName(source));
       }
       CheckCopySource(copy, source, table.metadata);
+      if (!table.metadata.resource_tags.empty()) {
+        throw ApiError::Unsupported("copy jobs from tables with tags");
+      }
       if (sql.empty()) {
         schema = table.schema;
         first_source = source;

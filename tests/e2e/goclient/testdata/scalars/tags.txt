@@ -1,0 +1,37 @@
+# Tag option types and values are documented at:
+# https://cloud.google.com/bigquery/docs/information-schema-table-options
+# https://cloud.google.com/bigquery/docs/tags#list_tags_attached_to_a_dataset
+# Synthetic tag definitions use the emulator's documented IAM exception.
+# These single-tag cases do not assume an order for multiple tags.
+
+CREATE SCHEMA IF NOT EXISTS scalars_tags OPTIONS (tags = [('123456789012/env', 'test')]);
+ALTER SCHEMA scalars_tags SET OPTIONS (tags = [('123456789012/env', 'Production')]);
+SELECT CONCAT(option_type, ' ', option_value) FROM INFORMATION_SCHEMA.SCHEMATA_OPTIONS WHERE schema_name = 'scalars_tags' AND option_name = 'tags'
+=> "ARRAY<STRUCT<STRING, STRING>> [STRUCT(\"123456789012/env\", \"Production\")]"
+
+CREATE OR REPLACE TABLE scalars.tags_altered (x INT64) OPTIONS (tags = [('123456789012/old', 'test')]);
+ALTER TABLE scalars.tags_altered SET OPTIONS (tags = [('123456789012/env', 'Production')]);
+ALTER TABLE scalars.tags_altered SET OPTIONS (description = 'retains tags');
+SELECT CONCAT(option_type, ' ', option_value) FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_altered' AND option_name = 'tags'
+=> "ARRAY<STRUCT<STRING, STRING>> [STRUCT(\"123456789012/env\", \"Production\")]"
+
+CREATE OR REPLACE VIEW scalars.tags_view OPTIONS (tags = [('123456789012/env', 'test')]) AS SELECT 1 AS x;
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_view' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/env\", \"test\")]"
+
+CREATE OR REPLACE TABLE scalars.tags_mv_source (x INT64);
+CREATE MATERIALIZED VIEW scalars.tags_mv OPTIONS (tags = [('123456789012/env', 'test')]) AS SELECT COUNT(*) AS n FROM scalars.tags_mv_source;
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_mv' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/env\", \"test\")]"
+
+CREATE OR REPLACE TABLE scalars.tags_snapshot_source (x INT64);
+CREATE SNAPSHOT TABLE scalars.tags_snapshot CLONE scalars.tags_snapshot_source OPTIONS (tags = [('123456789012/env', 'test')]);
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_snapshot' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/env\", \"test\")]"
+
+# Documented tag detachment removes the matching key/value pair and keeps other tags.
+# https://cloud.google.com/bigquery/docs/tags#detach_tags_from_a_table
+CREATE OR REPLACE TABLE scalars.tags_removed (x INT64) OPTIONS (tags = [('123456789012/env', 'test'), ('123456789012/team', 'sales')]);
+ALTER TABLE scalars.tags_removed SET OPTIONS (tags -= [('123456789012/env', 'test')]);
+SELECT option_value FROM scalars.INFORMATION_SCHEMA.TABLE_OPTIONS WHERE table_name = 'tags_removed' AND option_name = 'tags'
+=> "[STRUCT(\"123456789012/team\", \"sales\")]"

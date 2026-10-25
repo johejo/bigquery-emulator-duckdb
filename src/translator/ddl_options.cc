@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -104,6 +105,18 @@ bool LabelsOption(const googlesql::Value& value, std::map<std::string, std::stri
   return true;
 }
 
+// Tags have the same pair representation as labels, but cannot repeat a key.
+// NULL clears tags; incremental additions stay unsupported until their ordering is verified.
+bool TagsOption(const googlesql::Value& value, std::map<std::string, std::string>& into,
+                std::vector<std::string>& order) {
+  if (!LabelsOption(value, into, order) ||
+      (!value.is_null() && static_cast<size_t>(value.num_elements()) != into.size())) {
+    return false;
+  }
+  ValidateResourceTags(into);
+  return true;
+}
+
 // The scalar functions that BigQuery's DDL reference excludes from option values.
 constexpr auto kExcludedOptionFunctions = std::to_array<std::string_view>({
     "ARRAY_TO_STRING",
@@ -192,7 +205,7 @@ bool LocationOption(const googlesql::Value& value, std::string& into) {
 }  // namespace
 
 // The value an option of `object`, such as a table, assigns: a literal, or a constant expression,
-// which the backend evaluates as a query would. nullopt for += and -=, and for a value the
+// which the backend evaluates as a query would. nullopt for an unsupported assignment or value the
 // emulator does not support, which `scope` may then name.
 std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
                                             std::string_view context, const Scope& scope) {
@@ -208,8 +221,10 @@ std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& opt
     }
     return value;
   };
+  const bool removing_tags = context == "ALTER TABLE" && ToLowerAscii(option.name()) == "tags" &&
+                             option.assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN;
   if (!option.qualifier().empty() ||
-      option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN) {
+      (option.assignment_op() != googlesql::ResolvedOption::DEFAULT_ASSIGN && !removing_tags)) {
     return std::nullopt;
   }
   const googlesql::ResolvedExpr& expression = *option.value();
@@ -266,6 +281,7 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, std::string
          (name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
+         (name == "tags" && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
          (name == "expiration_timestamp" && ExpirationOption(*value, metadata.expiration_time)) ||
          (statement == "CREATE TABLE" && name == "default_rounding_mode" &&
           RoundingModeOption(*value, metadata.default_rounding_mode)));
@@ -289,6 +305,7 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
         ((name == "description" && StringOption(*value, metadata.description)) ||
          (name == "friendly_name" && StringOption(*value, metadata.friendly_name)) ||
          (name == "labels" && LabelsOption(*value, metadata.labels, metadata.label_order)) ||
+         (name == "tags" && TagsOption(*value, metadata.resource_tags, metadata.tag_order)) ||
          (name == "default_table_expiration_days" &&
           DaysOption(*value, metadata.default_table_expiration_ms)) ||
          (name == "default_rounding_mode" &&
@@ -303,16 +320,32 @@ std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, con
 
 // The metadata SET OPTIONS of `statement` sets on `updates`. The
 // other options change how BigQuery stores or reads the table or dataset, which the
-// emulator does not emulate, so they are unsupported, and so are += and -=.
+// emulator does not emulate, so they are unsupported. Tag removal also accepts -=.
 bool SetOptions(const Options& options, std::string_view statement, const Scope& scope,
                 OptionUpdates& updates) {
+  bool tags_seen = false;
   for (const auto& option : options) {
     const std::string name = ToLowerAscii(option->name());
     // A dataset cannot move, and BigQuery takes no location in ALTER SCHEMA.
     if (statement == "ALTER SCHEMA" && name == "location") {
       throw ApiError::InvalidQuery("Unknown option: " + option->name());
     }
+    if (name == "tags") {
+      if (tags_seen) {
+        Unsupported(scope, "repeated tags in SET OPTIONS");
+        return false;
+      }
+      tags_seen = true;
+    }
     const std::optional<googlesql::Value> value = OptionValue(*option, statement, scope);
+    if (name == "tags" && option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
+      std::vector<std::string> order;
+      if (!value || value->is_null() || !TagsOption(*value, updates.removed_tags, order)) {
+        Unsupported(scope, std::string(statement) + " option " + option->name());
+        return false;
+      }
+      continue;
+    }
     const bool applied =
         value.has_value() &&
         ((statement == "ALTER TABLE" && name == "require_partition_filter" &&
@@ -321,6 +354,8 @@ bool SetOptions(const Options& options, std::string_view statement, const Scope&
          (name == "friendly_name" && StringOption(*value, updates.friendly_name.emplace())) ||
          (name == "labels" &&
           LabelsOption(*value, updates.labels.emplace(), updates.label_order)) ||
+         (name == "tags" &&
+          TagsOption(*value, updates.resource_tags.emplace(), updates.tag_order)) ||
          (statement == "ALTER TABLE" && name == "expiration_timestamp" &&
           ExpirationOption(*value, updates.expiration_time.emplace())) ||
          (statement == "ALTER SCHEMA" && name == "default_table_expiration_days" &&

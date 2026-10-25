@@ -27,7 +27,7 @@ setup POST /bigquery/v2/projects/test/queries {"query": "CREATE SNAPSHOT TABLE d
 
 request bigquery.datasets.delete | DELETE /bigquery/v2/projects/test/datasets/d?deleteContents=true
 request bigquery.datasets.get | GET /bigquery/v2/projects/test/datasets/d
-note bigquery.datasets.get | Returns the reference, description, friendly name, labels, default table expiration, default rounding mode and location.
+note bigquery.datasets.get | Returns the reference, description, friendly name, labels, resource tags, default table expiration, default rounding mode and location.
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "description": "data", "friendlyName": "E", "labels": {"env": "test"}, "location": "US"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "EU"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "location": "asia-northeast1"}
@@ -35,7 +35,8 @@ request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"da
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "access": [{"role": "READER", "specialGroup": "projectReaders"}]}
 request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "defaultRoundingMode": "ROUND_HALF_EVEN"}
-note bigquery.datasets.insert | See [Datasets](compatibility.md#datasets).
+request bigquery.datasets.insert | POST /bigquery/v2/projects/test/datasets {"datasetReference": {"datasetId": "e"}, "resourceTags": {"123456789012/env": "test"}}
+note bigquery.datasets.insert | See [Datasets](compatibility.md#datasets) and [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?maxResults=1&all=true
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:test
 request bigquery.datasets.list | GET /bigquery/v2/projects/test/datasets?filter=labels.env:*%20labels.active&maxResults=1
@@ -43,10 +44,11 @@ note bigquery.datasets.list | Filters by label value or key presence (`labels.ke
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"description": "data", "labels": {"env": "test"}}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"defaultTableExpirationMs": "3600000"}
 request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"location": "EU"}
-note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag.
+request bigquery.datasets.patch | PATCH /bigquery/v2/projects/test/datasets/d {"resourceTags": {"123456789012/env": "test"}}
+note bigquery.datasets.patch | Changes `description`, `friendlyName`, `labels`, `resourceTags`, `defaultTableExpirationMs`, which `0` clears, and `defaultRoundingMode`. Ignores the etag. See [Resource tags](compatibility.md#resource-tags).
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "description": "data"}
 request bigquery.datasets.update | PUT /bigquery/v2/projects/test/datasets/d {"datasetReference": {"datasetId": "d"}, "defaultTableExpirationMs": "3600000"}
-note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels and default table expiration.
+note bigquery.datasets.update | Behaves like `datasets.patch`, except that it replaces the description, friendly name, labels, resource tags and default table expiration.
 
 request bigquery.jobs.cancel | POST /bigquery/v2/projects/test/jobs/j/cancel
 note bigquery.jobs.cancel | See [Jobs](compatibility.md#jobs).
@@ -136,6 +138,7 @@ request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "a", "type": "STRING"}]}, "encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t"}}
 request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference":{"tableId":"mv"},"materializedView":{"query":"SELECT COUNT(*) AS n FROM test.d.t","enableRefresh":false}}
+request bigquery.tables.insert | POST /bigquery/v2/projects/test/datasets/d/tables {"tableReference": {"tableId": "n"}, "schema": {"fields": [{"name": "x", "type": "INT64"}]}, "resourceTags": {"123456789012/env": "test"}}
 note bigquery.tables.insert | See [Tables](compatibility.md#tables) and [Materialized views](compatibility.md#materialized-views).
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"schema": {"fields": [{"name": "id", "type": "INTEGER", "description": "key"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id"}}
@@ -144,12 +147,13 @@ request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tabl
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"defaultRoundingMode": "ROUND_HALF_EVEN"}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/h {"defaultRoundingMode": "ROUND_HALF_EVEN", "schema": {"fields": [{"name": "a", "type": "NUMERIC", "roundingMode": "ROUND_HALF_EVEN"}, {"name": "added", "type": "NUMERIC", "precision": "5", "scale": "1"}]}}
 request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"encryptionConfiguration": {"kmsKeyName": "projects/test/locations/us/keyRings/r/cryptoKeys/k"}}
-note bigquery.tables.patch | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes).
+request bigquery.tables.patch | PATCH /bigquery/v2/projects/test/datasets/d/tables/t {"resourceTags": {"123456789012/env": "test"}}
+note bigquery.tables.patch | Ignores `autodetect_schema` and the etag. See [Schema changes](compatibility.md#schema-changes) and [Resource tags](compatibility.md#resource-tags).
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "schema": {"fields": [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "STRING"}]}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/w {"view": {"query": "SELECT 2 AS id", "useLegacySql": false}}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"tableReference": {"tableId": "t"}, "expirationTime": "1893456000000"}
 request bigquery.tables.update | PUT /bigquery/v2/projects/test/datasets/d/tables/t {"timePartitioning": {"type": "DAY", "field": "id", "expirationMs": "3600000"}}
-note bigquery.tables.update | See [Schema changes](compatibility.md#schema-changes).
+note bigquery.tables.update | See [Schema changes](compatibility.md#schema-changes) and [Resource tags](compatibility.md#resource-tags).
 request bigquery.tables.list | GET /bigquery/v2/projects/test/datasets/d/tables?maxResults=1
 
 request bigquery.projects.list | GET /bigquery/v2/projects?maxResults=1
