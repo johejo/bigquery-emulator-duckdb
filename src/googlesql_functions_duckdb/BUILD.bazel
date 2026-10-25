@@ -56,7 +56,10 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["//third_party/duckdb"],
+    deps = [
+        "//src/function_catalog",
+        "//third_party/duckdb",
+    ],
 )
 
 cc_library(

@@ -72,13 +72,17 @@ the resolved AST definitions remain private to the implementation source.
 [builtin definitions](../src/translator/functions.cc) and feature providers. The emulator and
 function probe use this same composition. [backend_functions.cc](../src/backend_functions.cc)
 registers the executable implementations with DuckDB at the same application layer. The translator
-and common catalog do not depend on geography's function-registration target.
+and common catalog do not depend on the feature adapters' function-registration targets.
 
 Geography's DuckDB adapter declares backend registrations and the SQL functions that call them
 together. Both `RegisterGeographyFunctions` and the application's catalog composition consume
 those definitions, including aliases and overloads that share an implementation. The adapter
 and translator depend on the common `//src/function_catalog` rule types, construction and
-expansion code. The `googlesql_geography` library remains independent of DuckDB. See
+expansion code. The `googlesql_geography` library remains independent of DuckDB.
+[GoogleSQL math's adapter](../src/googlesql_functions_duckdb/math.cc) similarly shares a table
+of public names, backend names, callbacks and arities for trigonometric functions between
+DuckDB registration and SQL rule construction. Other math functions still use the builtin
+backend rule table. See
 [AGENTS.md](../AGENTS.md#implementing-functions) for backend selection and registration.
 
 Graph definitions use [DuckPGQ](https://github.com/cwida/duckpgq-extension), linked

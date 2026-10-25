@@ -524,6 +524,7 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "//src/function_catalog",
+        "//src/googlesql_functions_duckdb:math",
         "//src/googlesql_geography_duckdb",
         "//src/translator:functions",
     ],
