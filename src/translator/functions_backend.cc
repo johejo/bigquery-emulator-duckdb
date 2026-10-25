@@ -4,15 +4,26 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include "src/duckdb_sql.h"
-#include "src/translator/function_rule_builders.h"
-#include "src/translator/functions.h"
+#include "src/function_catalog/rule_builders.h"
+#include "src/function_catalog/rules.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::Rule;
+
+using function_catalog::Arity;
+using function_catalog::BigNumericOperator;
+using function_catalog::Concat;
+using function_catalog::FunctionDefinition;
+using function_catalog::Is;
+using function_catalog::Part;
+using function_catalog::Same;
+using function_catalog::TypeUse;
+
 namespace {
 
 using enum googlesql::TypeKind;
@@ -227,8 +238,7 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
                   .uses = {TypeUse::kBuildsOrReadsInterval},
               },
           },
-          // DuckDB raises errors where BigQuery returns NaN, such as SIN(+inf), and returns
-          // infinities where BigQuery raises errors, such as EXP(1000).
+          // DuckDB returns infinities where BigQuery raises errors, such as EXP(1000).
           {"SQRT", {.rules = Numbers("sqrt"), .uses = {TypeUse::kBigNumeric}}},
           {"CBRT", {.rules = Numbers("cbrt"), .uses = {TypeUse::kBigNumeric}}},
           {"POW", {.rules = Numbers("pow", 2), .uses = {TypeUse::kBigNumeric}}},
@@ -248,25 +258,6 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
                   .uses = {TypeUse::kBigNumeric},
               },
           },
-          {"SIN", {.rules = Float64("bq_sin")}},
-          {"COS", {.rules = Float64("bq_cos")}},
-          {"TAN", {.rules = Float64("bq_tan")}},
-          {"ASIN", {.rules = Float64("bq_asin")}},
-          {"ACOS", {.rules = Float64("bq_acos")}},
-          {"ATAN", {.rules = Float64("bq_atan")}},
-          {"ATAN2", {.rules = Float64("bq_atan2", 2)}},
-          {"ASINH", {.rules = Float64("bq_asinh")}},
-          {"TANH", {.rules = Float64("bq_tanh")}},
-          {"SINH", {.rules = Float64("bq_sinh")}},
-          {"COSH", {.rules = Float64("bq_cosh")}},
-          {"ACOSH", {.rules = Float64("bq_acosh")}},
-          {"ATANH", {.rules = Float64("bq_atanh")}},
-          {"CSC", {.rules = Float64("bq_csc")}},
-          {"SEC", {.rules = Float64("bq_sec")}},
-          {"COT", {.rules = Float64("bq_cot")}},
-          {"CSCH", {.rules = Float64("bq_csch")}},
-          {"SECH", {.rules = Float64("bq_sech")}},
-          {"COTH", {.rules = Float64("bq_coth")}},
           {"COSINE_DISTANCE", {.rules = {{.arity = 2, .spelling = "bq_cosine_distance($1, $2)"}}}},
           {
               "EUCLIDEAN_DISTANCE",
@@ -959,172 +950,6 @@ const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& BackendRul
                       },
               },
           },
-  };
-  return *kRules;
-}
-
-const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& S2Rules() {
-  // A call of `function` with the arguments of the rule, the optional ones defaulting to
-  // `defaults`.
-  const auto call = [](std::string_view function, Arity arity,
-                       std::vector<std::string_view> defaults = {}) {
-    std::string arguments;
-    for (size_t i = 1; i <= arity.max; ++i) {
-      arguments += (i == 1 ? "$" : ", $") + std::to_string(i);
-    }
-    return std::vector<Rule>{
-        {
-            .arity = arity,
-            .spelling = std::string(function) + "(" + arguments + ")",
-            .conditions = {},
-            .defaults = std::move(defaults),
-        },
-    };
-  };
-  // A function whose last argument, use_spheroid, defaults to FALSE; the backend function takes
-  // the name of `function` for its error on TRUE.
-  const auto spheroid = [](std::string_view backend, Arity arity, std::string_view function) {
-    std::vector<Rule> rules;
-    std::string arguments;
-    for (size_t i = 1; i <= arity.max; ++i) {
-      arguments += "$" + std::to_string(i) + ", ";
-    }
-    rules.push_back({
-        .arity = arity,
-        .spelling = std::string(backend) + "(" + arguments + QuoteLiteral(function) + ")",
-        .conditions = {},
-        .defaults = {"false"},
-    });
-    return rules;
-  };
-  static const auto* const kRules =
-      new std::unordered_map<std::string_view, FunctionDefinition<Rule>>{
-          {"ST_GEOGPOINT", {.rules = call("bq_st_geogpoint", 2)}},
-          {"ST_GEOGFROMTEXT", {.rules = call("bq_st_geogfromtext", 1)}},
-          {"ST_GEOGPOINTFROMGEOHASH", {.rules = call("bq_st_geogpointfromgeohash", 1)}},
-          {"ST_ASTEXT", {.rules = call("bq_st_astext", 1)}},
-          {"ST_ASGEOJSON", {.rules = call("bq_st_asgeojson", 1)}},
-          {"ST_ANGLE", {.rules = call("bq_st_angle", 3)}},
-          {"ST_CENTROID", {.rules = call("bq_st_centroid", 1)}},
-          {"ST_CONVEXHULL", {.rules = call("bq_st_convexhull", 1)}},
-          {"ST_LINEINTERPOLATEPOINT", {.rules = call("bq_st_lineinterpolatepoint", 2)}},
-          {"ST_LINELOCATEPOINT", {.rules = call("bq_st_linelocatepoint", 2)}},
-          {"ST_LINESUBSTRING", {.rules = call("bq_st_linesubstring", 3)}},
-          {"ST_AZIMUTH", {.rules = call("bq_st_azimuth", 2)}},
-          {"ST_DISTANCE", {.rules = spheroid("bq_st_distance", {2, 3}, "ST_DISTANCE")}},
-          {"ST_HAUSDORFFDISTANCE", {.rules = call("bq_st_hausdorffdistance", {2, 3}, {"false"})}},
-          {
-              "ST_HAUSDORFFDWITHIN",
-              {
-                  .rules =
-                      {
-                          {
-                              .arity = {3, 4},
-                              .spelling = "bq_st_hausdorffdwithin($1, $2, $4, $3)",
-                              .defaults = {"false"},
-                          },
-                      },
-              },
-          },
-          {"ST_MAXDISTANCE", {.rules = spheroid("bq_st_distance", {2, 3}, "ST_MAXDISTANCE")}},
-          {"ST_CLOSESTPOINT", {.rules = spheroid("bq_st_closestpoint", {2, 3}, "ST_CLOSESTPOINT")}},
-          {"ST_INTERSECTSBOX", {.rules = call("bq_st_intersectsbox", 5)}},
-          {"ST_DWITHIN", {.rules = spheroid("bq_st_dwithin", {3, 4}, "ST_DWITHIN")}},
-          {"ST_EQUALS", {.rules = call("bq_st_equals", 2)}},
-          {"ST_INTERSECTS", {.rules = call("bq_st_intersects", 2)}},
-          {"ST_INTERSECTION", {.rules = call("bq_st_intersection", 2)}},
-          {"ST_DIFFERENCE", {.rules = call("bq_st_difference", 2)}},
-          {"ST_BOUNDARY", {.rules = call("bq_st_boundary", 1)}},
-          {"ST_BOUNDINGBOX", {.rules = call("bq_st_boundingbox", 1)}},
-          {"ST_DISJOINT", {.rules = {{.arity = 2, .spelling = "(NOT bq_st_intersects($1, $2))"}}}},
-          {"ST_TOUCHES", {.rules = call("bq_st_touches", 2)}},
-          {"ST_COVERS", {.rules = call("bq_st_covers", 2)}},
-          {"ST_COVEREDBY", {.rules = {{.arity = 2, .spelling = "bq_st_covers($2, $1)"}}}},
-          {"ST_CONTAINS", {.rules = call("bq_st_contains", 2)}},
-          {"ST_WITHIN", {.rules = {{.arity = 2, .spelling = "bq_st_contains($2, $1)"}}}},
-          {
-              "ST_UNION",
-              {
-                  .rules =
-                      {
-                          {.arity = 2, .spelling = "bq_st_union($1, $2)"},
-                          {
-                              .arity = 1,
-                              .spelling = "bq_st_union_array(list_filter($1, lambda geography: "
-                                          "geography IS NOT NULL))",
-                          },
-                      },
-              },
-          },
-          {"ST_X", {.rules = call("bq_st_x", 1)}},
-          {"ST_Y", {.rules = call("bq_st_y", 1)}},
-          {"ST_GEOMETRYTYPE", {.rules = call("bq_st_geometrytype", 1)}},
-          {"ST_DIMENSION", {.rules = call("bq_st_dimension", 1)}},
-          {"ST_NUMPOINTS", {.rules = call("bq_st_numpoints", 1)}},
-          {"ST_NPOINTS", {.rules = call("bq_st_numpoints", 1)}},
-          {"ST_ISEMPTY", {.rules = call("bq_st_isempty", 1)}},
-          {"ST_ISCOLLECTION", {.rules = call("bq_st_iscollection", 1)}},
-          {"ST_NUMGEOMETRIES", {.rules = call("bq_st_numgeometries", 1)}},
-          // A NULL dimension matches no part.
-          {
-              "ST_DUMP",
-              {
-                  .rules =
-                      {
-                          {.arity = 1, .spelling = "bq_st_dump($1, -1)"},
-                          {
-                              .arity = 2,
-                              .spelling =
-                                  "CASE WHEN $2 IS NULL THEN CASE WHEN $1 IS NULL THEN NULL ELSE "
-                                  "[]::BLOB[] END ELSE bq_st_dump($1, $2) END",
-                          },
-                      },
-              },
-          },
-          {"ST_ISCLOSED", {.rules = call("bq_st_isclosed", 1)}},
-          {"ST_ISRING", {.rules = call("bq_st_isring", 1)}},
-          {"ST_LENGTH", {.rules = spheroid("bq_st_length", {1, 2}, "ST_LENGTH")}},
-          {"ST_AREA", {.rules = spheroid("bq_st_measure", {1, 2}, "ST_AREA")}},
-          {"ST_PERIMETER", {.rules = spheroid("bq_st_measure", {1, 2}, "ST_PERIMETER")}},
-          {"ST_EXTERIORRING", {.rules = call("bq_st_exteriorring", 1)}},
-          {"ST_INTERIORRINGS", {.rules = call("bq_st_interiorrings", 1)}},
-          {
-              "ST_GEOHASH",
-              {.rules = call("bq_st_geohash", {1, 2}, {"20"}), .uses = {TypeUse::kRejectsSafe}},
-          },
-          {"ST_STARTPOINT", {.rules = {{.arity = 1, .spelling = "bq_st_pointn($1, 1)"}}}},
-          {"ST_ENDPOINT", {.rules = {{.arity = 1, .spelling = "bq_st_pointn($1, -1)"}}}},
-          {"ST_POINTN", {.rules = {{.arity = 2, .spelling = "bq_st_pointn($1, $2)"}}}},
-          // An array with a NULL element makes NULL.
-          {
-              "ST_MAKELINE",
-              {
-                  .rules =
-                      {
-                          {.arity = 2, .spelling = "bq_st_makeline($1, $2)"},
-                          {
-                              .arity = 1,
-                              .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE "
-                                          "bq_st_makeline_array($1) END",
-                          },
-                      },
-              },
-          },
-          {
-              "ST_MAKEPOLYGON",
-              {
-                  .rules =
-                      {
-                          {.arity = 1, .spelling = "bq_st_makepolygon($1)"},
-                          {
-                              .arity = 2,
-                              .spelling = "CASE WHEN list_count($2) <> len($2) THEN NULL ELSE "
-                                          "bq_st_makepolygon_holes($1, $2) END",
-                          },
-                      },
-              },
-          },
-          {"S2_CELLIDFROMPOINT", {.rules = call("bq_s2_cellidfrompoint", {1, 2}, {"30"})}},
   };
   return *kRules;
 }

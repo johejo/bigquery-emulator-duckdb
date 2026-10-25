@@ -3,11 +3,15 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "src/translator/functions.h"
+#include "src/function_catalog/rules.h"
 
 namespace bigquery_emulator_duckdb::translator {
 
-const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Aggregates();
-const std::unordered_map<std::string_view, FunctionDefinition<AggregateRule>>& Analytics();
+const std::unordered_map<std::string_view,
+                         function_catalog::FunctionDefinition<function_catalog::AggregateRule>>&
+Aggregates();
+const std::unordered_map<std::string_view,
+                         function_catalog::FunctionDefinition<function_catalog::AggregateRule>>&
+Analytics();
 
 }  // namespace bigquery_emulator_duckdb::translator

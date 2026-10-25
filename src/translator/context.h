@@ -13,6 +13,10 @@
 #include "src/query_parameters.h"
 #include "src/system_variables.h"
 
+namespace bigquery_emulator_duckdb::function_catalog {
+class Catalog;
+}
+
 namespace bigquery_emulator_duckdb {
 struct TranslatedStatement;
 }  // namespace bigquery_emulator_duckdb
@@ -32,6 +36,7 @@ struct WithQuery {
 
 // What the whole statement's translation shares: its inputs, and what it records on the way.
 struct Context {
+  const function_catalog::Catalog& functions;
   const QueryParameters& parameters;
   const DefaultDataset& defaults;
   // DDL records what it creates, alters or drops in the statement itself, so that this header,

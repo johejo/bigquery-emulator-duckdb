@@ -36,7 +36,6 @@ cc_library(
     implementation_deps = [
         ":functions",
         ":literal",
-        ":resolved_access",
         "//:catalog_table",
         "//:connection_id",
         "//:duckdb_sql",
@@ -51,6 +50,7 @@ cc_library(
         "//:table_source",
         "//:translated_statement",
         "//:type_mapping",
+        "//src/function_catalog",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
@@ -72,13 +72,10 @@ cc_library(
     deps = [":context"],
 )
 
-# The registry of BigQuery functions and how each is spelled in DuckDB: as is, renamed, by
-# template rules or backend rules, or by a handler.
+# Builtin function definitions and handlers, added to an application-owned catalog.
 cc_library(
     name = "functions",
     srcs = [
-        "function_rule_builders.cc",
-        "function_rule_builders.h",
         "functions.cc",
         "functions_aggregate.cc",
         "functions_aggregate.h",
@@ -87,18 +84,15 @@ cc_library(
         "functions_template.cc",
         "functions_template.h",
         "handlers.cc",
-        "rules.cc",
     ],
     hdrs = [
         "functions.h",
         "handlers.h",
     ],
     copts = ["-std=c++20"],
-    # The registry reads the resolved AST only through :resolved_access, so these sources, which
-    # change with every function, cannot include its definitions.
+    # The registry reads the resolved AST only through function_catalog/resolved_access.h, so
+    # these sources, which change with every function, cannot include its definitions.
     implementation_deps = [
-        ":context",
-        ":resolved_access",
         "//:duckdb_sql",
         "//:type_mapping",
         "@googlesql//googlesql/public:type",
@@ -106,24 +100,7 @@ cc_library(
     ],
     linkstatic = True,
     visibility = ["//:__pkg__"],
-    deps = ["@googlesql//googlesql/public:type_cc_proto"],
-)
-
-# Arguments, types and literal values of the resolved AST, as the function registry reads them.
-cc_library(
-    name = "resolved_access",
-    srcs = ["resolved_access.cc"],
-    hdrs = ["resolved_access.h"],
-    copts = ["-std=c++20"],
-    implementation_deps = [
-        "//:duckdb_sql",
-        "@googlesql//googlesql/public:function",
-        "@googlesql//googlesql/public:type",
-        "@googlesql//googlesql/public:value",
-        "@googlesql//googlesql/resolved_ast",
-    ],
-    linkstatic = True,
-    visibility = ["//:__pkg__"],
+    deps = ["//src/function_catalog"],
 )
 
 cc_library(
@@ -206,7 +183,7 @@ cc_library(
         ":ddl_options",
         ":query",
         "//:catalog_table",
-        "//:ddl_write",
+        "//:column_default",
         "//:duckdb_sql",
         "//:field_schema",
         "//:python_function",

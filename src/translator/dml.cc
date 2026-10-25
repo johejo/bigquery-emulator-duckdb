@@ -122,7 +122,7 @@ std::optional<std::string> DmlValue(const googlesql::ResolvedDMLValue& value,
   if (!sql || field == nullptr) {
     return sql;
   }
-  return WrittenValue(*sql, value.value()->type(), *field, assignment);
+  return WrittenValue(scope.context.functions, *sql, value.value()->type(), *field, assignment);
 }
 
 // The assignments below one column or struct field: either its new value, or the fields of it
@@ -301,9 +301,10 @@ std::optional<std::string> Insert(const googlesql::ResolvedInsertStmt& insert, c
       if (column == relation->columns.end() || i >= fields.size()) {
         return std::nullopt;
       }
-      const auto value = fields.at(i) == nullptr
-                             ? column->second
-                             : WrittenValue(column->second, output.type(), *fields.at(i));
+      const auto value =
+          fields.at(i) == nullptr
+              ? column->second
+              : WrittenValue(scope.context.functions, column->second, output.type(), *fields.at(i));
       if (!value) {
         return std::nullopt;
       }

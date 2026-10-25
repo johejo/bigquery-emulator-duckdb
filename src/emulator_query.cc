@@ -29,12 +29,14 @@
 #include "src/api_error.h"
 #include "src/backend.h"
 #include "src/backend_error.h"
+#include "src/column_default.h"
 #include "src/ddl_write.h"
 #include "src/default_dataset.h"
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/duckdb_table_source.h"
 #include "src/emulator.h"
+#include "src/emulator_functions.h"
 #include "src/field_schema.h"
 #include "src/language_options.h"
 #include "src/location.h"
@@ -432,7 +434,7 @@ TranslatedStatement Emulator::Translate(const std::string& query, const QueryPar
   const AnalyzerResult analyzed = AnalyzeGoogleSql(query, catalog, type_factory, settings);
   std::string unsupported;
   std::optional<TranslatedStatement> translated =
-      TranslateStatement(analyzed.statement(), parameters,
+      TranslateStatement(EmulatorFunctionCatalog(), analyzed.statement(), parameters,
                          DefaultDataset{
                              .project = settings.default_project,
                              .dataset = settings.default_dataset,
@@ -554,7 +556,7 @@ std::vector<std::string> Emulator::ColumnDefaultStatements(const TableReference&
     }
     std::string unsupported;
     const std::optional<std::string> query =
-        TranslateExpression(analyzed->expression(), {},
+        TranslateExpression(EmulatorFunctionCatalog(), analyzed->expression(), {},
                             DefaultDataset{
                                 .project = table.project_id,
                                 .dataset = {},

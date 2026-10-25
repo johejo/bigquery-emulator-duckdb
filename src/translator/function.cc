@@ -13,6 +13,9 @@
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
+#include "src/function_catalog/resolved_access.h"
+#include "src/function_catalog/rules.h"
 #include "src/javascript_function.h"
 #include "src/language_options.h"
 #include "src/python_function.h"
@@ -20,19 +23,29 @@
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
-#include "src/translator/functions.h"
 #include "src/translator/handlers.h"
-#include "src/translator/resolved_access.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::BucketWidthOf;
+using function_catalog::Catalog;
+using function_catalog::DatePart;
+using function_catalog::FunctionEntry;
+using function_catalog::NormalizeMode;
+using function_catalog::RoundingMode;
+using function_catalog::ScalarCall;
+using function_catalog::Translation;
+using function_catalog::TypeUse;
+
 namespace {
 
 // The DuckDB spelling of a scalar call over already translated arguments.
-std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
+std::optional<std::string> Call(const Catalog& functions,
+                                const googlesql::ResolvedFunctionCall& resolved,
                                 std::string_view name, const std::vector<std::string>& args,
                                 bool safe, std::string_view project) {
-  const FunctionEntry* entry = FindFunction(name);
+  const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr) {
     return std::nullopt;
   }
@@ -47,13 +60,13 @@ std::optional<std::string> Call(const googlesql::ResolvedFunctionCall& resolved,
     });
   }
   if (!args.empty() && resolved.argument_list(0)->type()->IsStruct() &&
-      HasTypeUse(name, TypeUse::kComparesStructs)) {
+      functions.HasTypeUse(name, TypeUse::kComparesStructs)) {
     return StructComparison(call);
   }
   if (entry->translation == Translation::kHandler) {
     return entry->handler(call);
   }
-  return TranslateFunction(name, call.arguments, safe);
+  return functions.Translate(name, call.arguments, safe);
 }
 
 }  // namespace
@@ -133,16 +146,16 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 namespace {
 
 // Bind each container once: rebuilding a STRUCT must not evaluate its expression per field.
-std::optional<std::string> RoundedValue(const std::string& value, const googlesql::Type* type,
-                                        const FieldSchema& field, std::string_view column,
-                                        int depth) {
+std::optional<std::string> RoundedValue(const Catalog& functions, const std::string& value,
+                                        const googlesql::Type* type, const FieldSchema& field,
+                                        std::string_view column, int depth) {
   if (!RoundsToEven(field)) {
     return value;
   }
   const std::string name = "_round" + std::to_string(depth);
   if (type->IsArray()) {
     const auto element =
-        RoundedValue(name, type->AsArray()->element_type(), field, column, depth + 1);
+        RoundedValue(functions, name, type->AsArray()->element_type(), field, column, depth + 1);
     if (!element) {
       return std::nullopt;
     }
@@ -158,7 +171,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
     std::vector<std::string> fields;
     for (int i = 0; i < structure->num_fields(); ++i) {
       const auto rounded =
-          RoundedValue("struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
+          RoundedValue(functions, "struct_extract_at(" + name + ", " + std::to_string(i + 1) + ")",
                        structure->field(i).type, field.fields.at(i), column, depth + 1);
       if (!rounded) {
         return std::nullopt;
@@ -168,7 +181,7 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
     return "list_transform([" + value + "], lambda " + name + ": CASE WHEN " + name +
            " IS NULL THEN NULL ELSE struct_pack(" + Join(fields, ", ") + ") END)[1]";
   }
-  auto rounded = TranslateFunction(
+  auto rounded = functions.Translate(
       "ROUND",
       {
           {.sql = value, .type = type->kind()},
@@ -197,16 +210,18 @@ std::optional<std::string> RoundedValue(const std::string& value, const googlesq
 
 }  // namespace
 
-std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
-                                        const FieldSchema& field, bool assignment) {
-  const auto rounded = RoundedToEven(ResultValue(value, type, field.name, true), type, field);
+std::optional<std::string> WrittenValue(const Catalog& functions, const std::string& value,
+                                        const googlesql::Type* type, const FieldSchema& field,
+                                        bool assignment) {
+  const auto rounded =
+      RoundedToEven(functions, ResultValue(value, type, field.name, true), type, field);
   return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, field, assignment))
                  : std::nullopt;
 }
 
-std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,
-                                         const FieldSchema& field) {
-  return RoundedValue(value, type, field, field.name, 0);
+std::optional<std::string> RoundedToEven(const Catalog& functions, const std::string& value,
+                                         const googlesql::Type* type, const FieldSchema& field) {
+  return RoundedValue(functions, value, type, field, field.name, 0);
 }
 
 namespace {
@@ -247,6 +262,7 @@ std::optional<std::string> ExternalCall(const googlesql::ResolvedFunctionCall& c
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,
                                     const Columns& columns) {
+  const Catalog& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   if (!call.generic_argument_list().empty() || !call.hint_list().empty() ||
       !call.collation_list().empty()) {
@@ -262,7 +278,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     return Unsupported(scope, "function " + name);
   }
   // BigQuery rejects this prefix on these functions although GoogleSQL accepts it.
-  if (HasTypeUse(name, TypeUse::kRejectsSafe) &&
+  if (functions.HasTypeUse(name, TypeUse::kRejectsSafe) &&
       call.error_mode() == googlesql::ResolvedFunctionCallBase::SAFE_ERROR_MODE) {
     throw std::invalid_argument("SAFE with function " + call.function()->Name() +
                                 " is not supported.");
@@ -270,7 +286,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (name == "SESSION_USER" && !scope.context.defaults.has_session_user) {
     return Unsupported(scope, "function SESSION_USER");
   }
-  const FunctionEntry* entry = FindFunction(name);
+  const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr) {
     return Unsupported(scope, "function " + name);
   }
@@ -281,7 +297,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if (!safe && call.error_mode() != googlesql::ResolvedFunctionCallBase::DEFAULT_ERROR_MODE) {
     return Unsupported(scope, "function " + name + " error mode");
   }
-  if (!HasTypeUse(function, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
+  if (!functions.HasTypeUse(function, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
   // Private graph metadata is not a SQL STRUCT's value. Opt functions in explicitly rather
@@ -289,7 +305,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGraph(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGraph(argument->type()); })) &&
-      !HasTypeUse(function, TypeUse::kGraphValues)) {
+      !functions.HasTypeUse(function, TypeUse::kGraphValues)) {
     return Unsupported(scope, "function " + name + " with graph values");
   }
   const bool interval = HasInterval(call.type()) ||
@@ -298,7 +314,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                         });
   // BigQuery rejects these over INTERVAL values although GoogleSQL accepts them. CASE compares
   // its first argument with its WHEN values.
-  if ((HasTypeUse(function, TypeUse::kRejectsIntervalComparison) &&
+  if ((functions.HasTypeUse(function, TypeUse::kRejectsIntervalComparison) &&
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return argument->type()->IsInterval(); })) ||
       (function == "$CASE_WITH_VALUE" && call.argument_list(0)->type()->IsInterval())) {
@@ -326,20 +342,20 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                   type->IsArray() && type->AsArray()->element_type()->IsInterval());
   };
   const bool compares_intervals =
-      interval && HasTypeUse(function, TypeUse::kComparesIntervalKeys) &&
+      interval && functions.HasTypeUse(function, TypeUse::kComparesIntervalKeys) &&
       std::ranges::all_of(call.argument_list(), [&](const auto& argument) {
         return !HasInterval(argument->type()) || keyed(argument->type());
       });
-  const bool compares_structs = interval &&
-                                HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
-                                call.argument_list(0)->type()->IsStruct();
+  const bool compares_structs =
+      interval && functions.HasTypeUse(function, TypeUse::kComparesStructsWithInterval) &&
+      call.argument_list(0)->type()->IsStruct();
   // CASE with a value carries its results when it compares no INTERVAL values.
   const bool carries_results =
       function == "$CASE_WITH_VALUE" && !HasInterval(call.argument_list(0)->type());
   // Enabling a physical type must not silently enable arithmetic, comparisons or JSON conversion.
   if (interval && !compares_intervals && !compares_structs && !carries_results &&
-      entry->handler != Bucket && !HasTypeUse(function, TypeUse::kCarries) &&
-      !HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
+      entry->handler != Bucket && !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsInterval)) {
     return Unsupported(scope, "function " + name + " with INTERVAL");
   }
   // A GEOGRAPHY is a BLOB in DuckDB, which the S2 functions build and read, and which DuckDB
@@ -347,7 +363,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasGeography(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasGeography(argument->type()); })) &&
-      entry->translation != Translation::kS2 && !HasTypeUse(function, TypeUse::kCarries)) {
+      !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsGeography) &&
+      !functions.HasTypeUse(function, TypeUse::kCarries)) {
     return Unsupported(scope, "function " + name + " with GEOGRAPHY");
   }
   // BigQuery rejects RANGE_BUCKET over RANGE values although GoogleSQL accepts it.
@@ -358,8 +375,9 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasRange(argument->type()); })) &&
-      !HasTypeUse(function, TypeUse::kCarries) && !HasTypeUse(function, TypeUse::kCompares) &&
-      !HasTypeUse(function, TypeUse::kBuildsOrReadsRange)) {
+      !functions.HasTypeUse(function, TypeUse::kCarries) &&
+      !functions.HasTypeUse(function, TypeUse::kCompares) &&
+      !functions.HasTypeUse(function, TypeUse::kBuildsOrReadsRange)) {
     return Unsupported(scope, "function " + name + " with RANGE");
   }
   // A STRUCT<> is a STRUCT with a placeholder field in DuckDB, which only these read as empty.
@@ -367,7 +385,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
                                                           [](const auto& argument) {
                                                             return HasEmptyStruct(argument->type());
                                                           })) &&
-      !HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
+      !functions.HasTypeUse(function, TypeUse::kReadsEmptyStruct)) {
     return Unsupported(scope, "function " + name + " with STRUCT<>");
   }
   const bool bucket = entry->handler == Bucket;
@@ -420,7 +438,7 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     }
   }
   if (!safe) {
-    auto sql = Call(call, function, args, false, scope.context.defaults.project);
+    auto sql = Call(functions, call, function, args, false, scope.context.defaults.project);
     if (!sql) {
       return Unsupported(scope, "function " + name);
     }
@@ -447,7 +465,8 @@ std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call,
     placeholders.push_back(lambda);
     placeholders.back() += "." + field;
   }
-  const auto sql = Call(call, function, placeholders, true, scope.context.defaults.project);
+  const auto sql =
+      Call(functions, call, function, placeholders, true, scope.context.defaults.project);
   if (!sql) {
     return Unsupported(scope, "SAFE." + name);
   }

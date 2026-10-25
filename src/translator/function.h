@@ -39,12 +39,14 @@ std::string ResultValue(const std::string& value, const googlesql::Type* type,
 // of a ROUND_HALF_EVEN field, at any depth in a STRUCT or ARRAY, is rounded to even first, as
 // ROUND does. REQUIRED and length constraints are checked at every depth. Container expressions are
 // evaluated once and NULL STRUCTs remain NULL.
-std::optional<std::string> WrittenValue(const std::string& value, const googlesql::Type* type,
+std::optional<std::string> WrittenValue(const function_catalog::Catalog& functions,
+                                        const std::string& value, const googlesql::Type* type,
                                         const FieldSchema& field, bool assignment = false);
 
 // `value`, the SQL of a value of `type` already in the form a query returns, rounded for the
 // column `field` as WrittenValue rounds it.
-std::optional<std::string> RoundedToEven(const std::string& value, const googlesql::Type* type,
+std::optional<std::string> RoundedToEven(const function_catalog::Catalog& functions,
+                                         const std::string& value, const googlesql::Type* type,
                                          const FieldSchema& field);
 
 std::optional<std::string> Function(const googlesql::ResolvedFunctionCall& call, const Scope& scope,

@@ -10,10 +10,6 @@
 #include "src/table_metadata.h"
 #include "src/translated_statement.h"
 
-namespace googlesql {
-class Value;
-}  // namespace googlesql
-
 namespace bigquery_emulator_duckdb {
 
 // What a DDL statement runs besides itself, in the same transaction: the statements that
@@ -24,14 +20,6 @@ struct DdlWrite {
   std::vector<std::string> metadata_statements;
   std::string skip_query = {};
 };
-
-// Rounds a literal default with its column's current mode, including nested fields.
-googlesql::Value RoundedColumnDefault(const FieldSchema& field, const googlesql::Value& value);
-
-// Checks a literal column default against its REQUIRED mode and type parameters. A non-literal
-// default has no `literal_value` and is rejected for parameterized fields.
-void ValidateColumnDefault(const FieldSchema& field,
-                           const std::optional<googlesql::Value>& literal_value);
 
 // What CREATE SCHEMA and datasets.insert record for a new dataset: its metadata and the time it
 // was created. A dataset whose metadata names no location is created in `location`, the job's.

@@ -17,6 +17,10 @@ class ResolvedStatement;
 class Value;
 }  // namespace googlesql
 
+namespace bigquery_emulator_duckdb::function_catalog {
+class Catalog;
+}
+
 namespace bigquery_emulator_duckdb {
 
 struct FieldSchema;
@@ -31,7 +35,8 @@ struct FieldSchema;
 // script reads the script's variables as catalog constants and its system variables from
 // `system_variables`.
 std::optional<TranslatedStatement> TranslateStatement(
-    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters = {},
+    const function_catalog::Catalog& functions, const googlesql::ResolvedStatement& statement,
+    const QueryParameters& parameters = {},
     // LLVM 23 mistakes the argument separator after {} for an initializer's trailing comma.
     // NOLINTNEXTLINE(readability-trailing-comma)
     const DefaultDataset& defaults = {}, std::string* unsupported = nullptr,
@@ -40,8 +45,8 @@ std::optional<TranslatedStatement> TranslateStatement(
 // Translates the expression of a script, such as a variable's DEFAULT or an IF condition, into a
 // DuckDB query returning its value as one row of one column, like TranslateStatement does.
 std::optional<std::string> TranslateExpression(
-    const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
-    const DefaultDataset& defaults, std::string* unsupported,
+    const function_catalog::Catalog& functions, const googlesql::ResolvedExpr& expression,
+    const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables);
 
 // The query parameters that EXECUTE IMMEDIATE passes with USING, as literals of their values.
@@ -56,7 +61,8 @@ std::optional<QueryParameters> TranslateParameters(
 // rounds them, and its REQUIRED and length constraints checked. DuckDB's casts round halfway values
 // away from zero. nullopt when the emulator cannot round them, such as values that are not NUMERIC
 // or BIGNUMERIC or STRUCT fields in another order.
-std::optional<std::string> TranslateAppendedValue(const std::string& value,
+std::optional<std::string> TranslateAppendedValue(const function_catalog::Catalog& functions,
+                                                  const std::string& value,
                                                   const FieldSchema& source,
                                                   const FieldSchema& destination);
 

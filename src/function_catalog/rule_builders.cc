@@ -1,4 +1,4 @@
-#include "src/translator/function_rule_builders.h"
+#include "src/function_catalog/rule_builders.h"
 
 #include <cstddef>
 #include <initializer_list>
@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "src/duckdb_sql.h"
-#include "src/translator/functions.h"
+#include "src/function_catalog/rules.h"
 
-namespace bigquery_emulator_duckdb::translator {
+namespace bigquery_emulator_duckdb::function_catalog {
 
 using enum googlesql::TypeKind;
 
@@ -71,4 +71,4 @@ std::string FloatCompare(const std::string& left, std::string_view op, const std
          " " + std::string(op) + " " + right + ") END";
 }
 
-}  // namespace bigquery_emulator_duckdb::translator
+}  // namespace bigquery_emulator_duckdb::function_catalog

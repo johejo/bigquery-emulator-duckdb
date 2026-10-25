@@ -17,6 +17,7 @@
 #include "src/duckdb_catalog.h"
 #include "src/duckdb_sql.h"
 #include "src/emulator.h"
+#include "src/emulator_functions.h"
 #include "src/field_schema.h"
 #include "src/references.h"
 #include "src/schema_sql.h"
@@ -35,7 +36,8 @@ std::string RoundedInsertValue(const json& value, const FieldSchema& field,
                                bool ignore_unknown_values) {
   const FieldSchema unrounded = WithoutRoundingParameters(field);
   const std::optional<std::string> rounded = TranslateAppendedValue(
-      InsertValue(value, unrounded, ignore_unknown_values), unrounded, field);
+      EmulatorFunctionCatalog(), InsertValue(value, unrounded, ignore_unknown_values), unrounded,
+      field);
   if (!rounded.has_value()) {
     throw ApiError::Unsupported("streaming into ROUND_HALF_EVEN columns");
   }

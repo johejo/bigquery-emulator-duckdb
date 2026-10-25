@@ -18,15 +18,25 @@
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/duckdb_sql.h"
+#include "src/function_catalog/catalog.h"
+#include "src/function_catalog/rules.h"
 #include "src/language_options.h"
 #include "src/translator/context.h"
 #include "src/translator/expression.h"
 #include "src/translator/function.h"
-#include "src/translator/functions.h"
 #include "src/translator/scan.h"
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::AggregateArguments;
+using function_catalog::AggregateOrder;
+using function_catalog::AggregateRule;
+using function_catalog::Condition;
+using function_catalog::FunctionEntry;
+using function_catalog::Translation;
+using function_catalog::TypeUse;
+
 namespace {
 
 // Aggregate calls (with `aggregate` set) and analytic calls (with a non-empty `over`). An
@@ -36,6 +46,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
                                          const std::string& over, const Scope& scope,
                                          const Columns& columns, const std::string& having = "",
                                          std::vector<std::string>* intermediates = nullptr) {
+  const auto& functions = scope.context.functions;
   const std::string name = ToUpperAscii(call.function()->FullName(/*include_group=*/false));
   if (HasGraph(call.type()) || std::ranges::any_of(call.argument_list(), [](const auto& argument) {
         return HasGraph(argument->type());
@@ -54,7 +65,7 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
        aggregate->having_expr() != nullptr)) {
     return Unsupported(scope, "aggregate " + name + " with HAVING or GROUP BY");
   }
-  const FunctionEntry* entry = FindFunction(name);
+  const FunctionEntry* entry = functions.Find(name);
   if (entry == nullptr ||
       (entry->translation != Translation::kAggregate &&
        entry->translation != Translation::kAnalytic) ||
@@ -137,10 +148,10 @@ std::optional<std::string> NonScalarCall(const googlesql::ResolvedNonScalarFunct
   if ((HasRange(call.type()) ||
        std::ranges::any_of(call.argument_list(),
                            [](const auto& argument) { return HasRange(argument->type()); })) &&
-      !HasTypeUse(name, TypeUse::kAggregatesRange)) {
+      !functions.HasTypeUse(name, TypeUse::kAggregatesRange)) {
     return Unsupported(scope, "aggregate or analytic function " + name + " with RANGE");
   }
-  if (!HasTypeUse(name, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
+  if (!functions.HasTypeUse(name, TypeUse::kBigNumeric) && InvolvesBigNumeric(call)) {
     return Unsupported(scope, "function " + name + " with BIGNUMERIC");
   }
   if (rule == entry->aggregates.end()) {

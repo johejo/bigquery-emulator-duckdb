@@ -17,6 +17,7 @@
 #include "src/analyzer.h"
 #include "src/default_dataset.h"
 #include "src/field_schema.h"
+#include "src/function_catalog/catalog.h"
 #include "src/query_parameters.h"
 #include "src/schema_sql.h"
 #include "src/system_variables.h"
@@ -31,11 +32,12 @@
 namespace bigquery_emulator_duckdb {
 
 std::optional<TranslatedStatement> TranslateStatement(
-    const googlesql::ResolvedStatement& statement, const QueryParameters& parameters,
-    const DefaultDataset& defaults, std::string* unsupported,
+    const function_catalog::Catalog& functions, const googlesql::ResolvedStatement& statement,
+    const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
   TranslatedStatement translated;
   translator::Context context{
+      .functions = functions,
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
@@ -55,12 +57,13 @@ std::optional<TranslatedStatement> TranslateStatement(
 }
 
 std::optional<std::string> TranslateExpression(
-    const googlesql::ResolvedExpr& expression, const QueryParameters& parameters,
-    const DefaultDataset& defaults, std::string* unsupported,
+    const function_catalog::Catalog& functions, const googlesql::ResolvedExpr& expression,
+    const QueryParameters& parameters, const DefaultDataset& defaults, std::string* unsupported,
     const googlesql::SystemVariableValuesMap* system_variables) {
   // Context takes a statement, though an expression records nothing in it.
   TranslatedStatement translated;
   translator::Context context{
+      .functions = functions,
       .parameters = parameters,
       .defaults = defaults,
       .statement = translated,
@@ -136,7 +139,8 @@ bool RoundsAs(const FieldSchema& source, const FieldSchema& destination) {
 
 }  // namespace
 
-std::optional<std::string> TranslateAppendedValue(const std::string& value,
+std::optional<std::string> TranslateAppendedValue(const function_catalog::Catalog& functions,
+                                                  const std::string& value,
                                                   const FieldSchema& source,
                                                   const FieldSchema& destination) {
   if (!RoundsToEven(destination)) {
@@ -150,7 +154,7 @@ std::optional<std::string> TranslateAppendedValue(const std::string& value,
   if (!type.ok()) {
     return std::nullopt;
   }
-  const auto rounded = translator::RoundedToEven(value, *type, destination);
+  const auto rounded = translator::RoundedToEven(functions, value, *type, destination);
   return rounded ? std::optional<std::string>(CheckedWriteValue(*rounded, destination))
                  : std::nullopt;
 }

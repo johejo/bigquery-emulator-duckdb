@@ -1,5 +1,6 @@
-// Translates calls with the registry of src/translator/functions.cc: expands the rules of a
-// function into DuckDB SQL, and spells the arguments of an aggregate rule.
+// Expands the supplied catalog's rules into DuckDB SQL and spells aggregate arguments.
+
+#include "src/function_catalog/rules.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -10,9 +11,9 @@
 #include <vector>
 
 #include "src/duckdb_sql.h"
-#include "src/translator/functions.h"
+#include "src/function_catalog/catalog.h"
 
-namespace bigquery_emulator_duckdb::translator {
+namespace bigquery_emulator_duckdb::function_catalog {
 namespace {
 
 // The argument a $n, #n or !n at spelling[i] refers to, counted from 0; for !n, the error.
@@ -165,10 +166,10 @@ std::string Substitute(std::string_view spelling, const std::vector<std::string>
 
 }  // namespace
 
-std::optional<std::string> TranslateFunction(std::string_view upper_name,
-                                             const std::vector<FunctionArgument>& arguments,
-                                             bool safe) {
-  const FunctionEntry* entry = FindFunction(upper_name);
+std::optional<std::string> Catalog::Translate(std::string_view upper_name,
+                                              const std::vector<FunctionArgument>& arguments,
+                                              bool safe) const {
+  const FunctionEntry* entry = Find(upper_name);
   if (entry == nullptr) {
     return std::nullopt;
   }
@@ -178,8 +179,6 @@ std::optional<std::string> TranslateFunction(std::string_view upper_name,
     case Translation::kRenamed:
       return Invoke(entry->target, arguments);
     case Translation::kRules:
-    case Translation::kBackend:
-    case Translation::kS2:
       // A function with rules is translated by them alone, so a call no rule matches, such as
       // one with an argument type the rules leave out, stays unsupported.
       if (const auto rule = std::ranges::find_if(
@@ -213,4 +212,4 @@ std::string AggregateOrder(const AggregateRule& rule, const std::vector<std::str
   return rule.order.empty() ? "" : Substitute(rule.order, arguments);
 }
 
-}  // namespace bigquery_emulator_duckdb::translator
+}  // namespace bigquery_emulator_duckdb::function_catalog

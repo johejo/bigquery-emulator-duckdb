@@ -21,7 +21,7 @@
 #include "googlesql/public/value.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "src/catalog_table.h"
-#include "src/ddl_write.h"
+#include "src/column_default.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
 #include "src/references.h"
@@ -39,6 +39,7 @@
 #include "src/type_mapping.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
 namespace {
 
 constexpr auto kDefaultExpressionFunctions = std::to_array<std::string_view>({
@@ -974,8 +975,8 @@ std::optional<std::string> CreateTableAsSelect(
     // default, or the dataset's, as CreateTableWrite records it.
     FieldSchema& field = table.schema.at(i);
     ApplyDefaultRoundingMode(field, rounding_mode);
-    const auto value =
-        WrittenValue(column->second, create.output_column_list(i)->column().type(), field);
+    const auto value = WrittenValue(scope.context.functions, column->second,
+                                    create.output_column_list(i)->column().type(), field);
     if (!value) {
       return std::nullopt;
     }

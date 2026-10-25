@@ -1,23 +1,24 @@
 #include "src/translator/functions.h"
 
-#include <algorithm>
 #include <array>
-#include <cstdlib>
-#include <iostream>
-#include <iterator>
-#include <set>
-#include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
-#include <vector>
 
+#include "src/function_catalog/catalog.h"
+#include "src/function_catalog/rules.h"
 #include "src/translator/functions_aggregate.h"
 #include "src/translator/functions_backend.h"
 #include "src/translator/functions_template.h"
 #include "src/translator/handlers.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::Handler;
+using function_catalog::Implementation;
+using function_catalog::Translation;
+using function_catalog::TypeUse;
+using function_catalog::TypeUses;
+
 namespace {
 
 struct NamedFunction {
@@ -289,148 +290,61 @@ constexpr auto kSafeFunctions = std::to_array<std::pair<std::string_view, std::s
     {"SAFE_NEGATE", "$UNARY_MINUS"},
 });
 
-std::vector<Implementation> Implementations(const std::vector<Rule>& rules,
-                                            Implementation fallback) {
-  std::set<Implementation> implementations;
-  std::ranges::transform(
-      rules, std::inserter(implementations, implementations.end()),
-      [fallback](const Rule& rule) { return rule.implementation.value_or(fallback); });
-  return {implementations.begin(), implementations.end()};
-}
-
-// Every function, collected from the rule tables. A function is in one table only.
-const std::unordered_map<std::string_view, FunctionEntry>& Registry() {
-  static const auto* const kRegistry = [] {
-    auto* registry = new std::unordered_map<std::string_view, FunctionEntry>();
-    const auto add = [registry](std::string_view name, FunctionEntry entry) {
-      if (!registry->emplace(name, std::move(entry)).second) {
-        std::cerr << "function " << name << " is registered twice\n";
-        std::abort();
-      }
-    };
-    for (const auto& [name, definition] : TemplateRules()) {
-      add(name, {
-                    .translation = Translation::kRules,
-                    .uses = definition.uses,
-                    .implementations = Implementations(definition.rules, Implementation::kSQL),
-                    .rules = definition.rules,
-                });
-    }
-    for (const auto& [name, definition] : BackendRules()) {
-      add(name,
-          {
-              .translation = Translation::kBackend,
-              .uses = definition.uses,
-              .implementations = Implementations(definition.rules, Implementation::kGoogleSQL),
-              .rules = definition.rules,
-          });
-    }
-    for (const auto& [name, definition] : S2Rules()) {
-      add(name, {
-                    .translation = Translation::kS2,
-                    .uses = definition.uses,
-                    .implementations = Implementations(definition.rules, Implementation::kS2),
-                    .rules = definition.rules,
-                });
-    }
-    for (const auto& [name, function] : kFunctionNames) {
-      add(name, {
-                    .translation = Translation::kRenamed,
-                    .uses = function.uses,
-                    .implementations = {function.implementation},
-                    .target = function.target,
-                });
-    }
-    for (const auto& function : kPlainFunctions) {
-      add(function.name, {
-                             .translation = Translation::kSame,
-                             .uses = function.uses,
-                             .implementations = {Implementation::kSame},
-                         });
-    }
-    for (const auto& [name, function] : kHandlers) {
-      add(name, {
-                    .translation = Translation::kHandler,
-                    .uses = function.uses,
-                    .implementations = {function.implementation},
-                    .handler = function.handler,
-                });
-    }
-    for (const auto& [name, target] : kSafeFunctions) {
-      add(name, {
-                    .translation = Translation::kSafe,
-                    .implementations = {Implementation::kSafe},
-                    .target = target,
-                });
-    }
-    for (const auto& [name, definition] : Aggregates()) {
-      add(name, {
-                    .translation = Translation::kAggregate,
-                    .uses = definition.uses,
-                    .implementations = {Implementation::kAggregate},
-                    .aggregates = definition.rules,
-                });
-    }
-    for (const auto& [name, definition] : Analytics()) {
-      add(name, {
-                    .translation = Translation::kAnalytic,
-                    .uses = definition.uses,
-                    .implementations = {Implementation::kAnalytic},
-                    .aggregates = definition.rules,
-                });
-    }
-    return registry;
-  }();
-  return *kRegistry;
-}
-
-std::string_view Describe(Implementation implementation) {
-  switch (implementation) {
-    case Implementation::kSame:
-      return "DuckDB function";
-    case Implementation::kRenamed:
-      return "DuckDB function, renamed";
-    case Implementation::kSQL:
-      return "DuckDB SQL";
-    case Implementation::kGoogleSQL:
-      return "GoogleSQL function";
-    case Implementation::kS2:
-      return "S2 function";
-    case Implementation::kSQLInCode:
-      return "DuckDB SQL, in code";
-    case Implementation::kCustom:
-      return "Emulator function";
-    case Implementation::kSafe:
-      return "SAFE. operator";
-    case Implementation::kAggregate:
-      return "DuckDB aggregate";
-    case Implementation::kAnalytic:
-      return "DuckDB window function";
-  }
-  return "";
-}
-
 }  // namespace
 
-std::string Describe(const FunctionEntry& entry) {
-  std::string description;
-  for (const Implementation implementation : entry.implementations) {
-    if (!description.empty()) {
-      description += " / ";
-    }
-    description += Describe(implementation);
+void AddBuiltinFunctions(function_catalog::Catalog& functions) {
+  for (const auto& [name, definition] : TemplateRules()) {
+    functions.AddRules(name, definition, Implementation::kSQL);
   }
-  return description;
-}
-
-bool HasTypeUse(std::string_view upper_name, TypeUse use) {
-  const FunctionEntry* entry = FindFunction(upper_name);
-  return entry != nullptr && entry->uses.Contains(use);
-}
-
-const FunctionEntry* FindFunction(std::string_view upper_name) {
-  const auto entry = Registry().find(upper_name);
-  return entry == Registry().end() ? nullptr : &entry->second;
+  for (const auto& [name, definition] : BackendRules()) {
+    functions.AddRules(name, definition, Implementation::kGoogleSQL);
+  }
+  for (const auto& [name, function] : kFunctionNames) {
+    functions.Add(name, {
+                            .translation = Translation::kRenamed,
+                            .uses = function.uses,
+                            .implementations = {function.implementation},
+                            .target = function.target,
+                        });
+  }
+  for (const auto& function : kPlainFunctions) {
+    functions.Add(function.name, {
+                                     .translation = Translation::kSame,
+                                     .uses = function.uses,
+                                     .implementations = {Implementation::kSame},
+                                 });
+  }
+  for (const auto& [name, function] : kHandlers) {
+    functions.Add(name, {
+                            .translation = Translation::kHandler,
+                            .uses = function.uses,
+                            .implementations = {function.implementation},
+                            .handler = function.handler,
+                        });
+  }
+  for (const auto& [name, target] : kSafeFunctions) {
+    functions.Add(name, {
+                            .translation = Translation::kSafe,
+                            .implementations = {Implementation::kSafe},
+                            .target = target,
+                        });
+  }
+  for (const auto& [name, definition] : Aggregates()) {
+    functions.Add(name, {
+                            .translation = Translation::kAggregate,
+                            .uses = definition.uses,
+                            .implementations = {Implementation::kAggregate},
+                            .aggregates = definition.rules,
+                        });
+  }
+  for (const auto& [name, definition] : Analytics()) {
+    functions.Add(name, {
+                            .translation = Translation::kAnalytic,
+                            .uses = definition.uses,
+                            .implementations = {Implementation::kAnalytic},
+                            .aggregates = definition.rules,
+                        });
+  }
 }
 
 }  // namespace bigquery_emulator_duckdb::translator

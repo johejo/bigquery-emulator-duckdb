@@ -55,12 +55,34 @@ AST into DuckDB SQL. A statement-wide `Context` and per-scan `Scope` track colum
 Internal column IDs avoid alias collisions; translation preserves GoogleSQL semantics where
 DuckDB differs, including NULL ordering and STRUCT comparisons.
 
-[functions.cc](../src/translator/functions.cc) assembles function rules. Calls use DuckDB,
-GoogleSQL backend functions or S2 according to their semantics. Each registration keeps its
-translation and `TypeUse` attributes together; rule tables use `FunctionDefinition` to attach
-the attributes to a function's overloads. Calls consult the resulting registry entry to reject
-unsupported uses of physical representations such as graph STRUCTs or BIGNUMERIC values.
-Overload-specific argument restrictions stay in the rules. See
+The translator receives a read-only [function catalog](../src/function_catalog/catalog.h) from its
+caller. The catalog owns registry entries and expands rules into SQL; it does not select feature
+adapters. Each registration keeps its translation and `TypeUse` attributes together, with
+argument restrictions in the overload rules. Calls use these attributes to reject unsupported
+uses of physical representations such as graph STRUCTs or BIGNUMERIC values. Rule expansion
+is the same for all backends; GEOGRAPHY support is a type attribute, independent of the backend
+reported in the function support table.
+
+The common catalog also owns `ScalarCall`'s AST accessors and
+[resolved_access](../src/function_catalog/resolved_access.h), which reads arguments, types and
+literals for handlers. Feature providers can use them without depending on the translator;
+the resolved AST definitions remain private to the implementation source.
+
+[emulator_functions.cc](../src/emulator_functions.cc) assembles the application's catalog from
+[builtin definitions](../src/translator/functions.cc) and feature providers. The emulator and
+function probe use this same composition. [backend_functions.cc](../src/backend_functions.cc)
+registers the executable implementations with DuckDB at the same application layer. The translator
+and common catalog do not depend on the feature adapters' function-registration targets.
+
+Geography's DuckDB adapter declares backend registrations and the SQL functions that call them
+together. Both `RegisterGeographyFunctions` and the application's catalog composition consume
+those definitions, including aliases and overloads that share an implementation. The adapter
+and translator depend on the common `//src/function_catalog` rule types, construction and
+expansion code. The `googlesql_geography` library remains independent of DuckDB.
+[GoogleSQL math's adapter](../src/googlesql_functions_duckdb/math.cc) similarly shares a table
+of public names, backend names, callbacks and arities for trigonometric functions between
+DuckDB registration and SQL rule construction. Other math functions still use the builtin
+backend rule table. See
 [AGENTS.md](../AGENTS.md#implementing-functions) for backend selection and registration.
 
 Graph definitions use [DuckPGQ](https://github.com/cwida/duckpgq-extension), linked

@@ -6,9 +6,15 @@
 #include <unordered_map>
 #include <vector>
 
-#include "src/translator/functions.h"
+#include "src/function_catalog/rules.h"
 
 namespace bigquery_emulator_duckdb::translator {
+
+using function_catalog::AggregateRule;
+using function_catalog::FunctionDefinition;
+using function_catalog::Raise;
+using function_catalog::TypeUse;
+
 namespace {
 
 // histogram() leaves out NULL, which APPROX_TOP_COUNT counts as a value of its own. Sorting the

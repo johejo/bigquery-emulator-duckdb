@@ -1,8 +1,14 @@
 #include "googlesql/public/functions/math.h"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -20,11 +26,52 @@
 #include "src/duckdb_functions/register.h"
 #include "src/duckdb_functions/scalar.h"
 #include "src/duckdb_handle.h"
+#include "src/function_catalog/rule_builders.h"
+#include "src/function_catalog/rules.h"
 #include "src/googlesql_functions_duckdb/math.h"
 
 namespace bigquery_emulator_duckdb::functions_duckdb {
+namespace fn = googlesql::functions;
 using namespace duckdb_functions;
+using function_catalog::FunctionDefinition;
+using function_catalog::Rule;
 namespace {
+
+// The public names, backend calls and arities used by both registration and translation.
+// GoogleSQL preserves BigQuery's errors and nonfinite results, such as SIN(+inf) = NaN.
+struct TrigonometricFunction {
+  std::string_view name;
+  const char* backend;
+  duckdb_scalar_function_t implementation;
+  std::size_t arity = 1;
+};
+
+constexpr auto kTrigonometricFunctions = std::to_array<TrigonometricFunction>({
+    {.name = "SIN", .backend = "bq_sin", .implementation = Apply<fn::Sin<double>>},
+    {.name = "COS", .backend = "bq_cos", .implementation = Apply<fn::Cos<double>>},
+    {.name = "TAN", .backend = "bq_tan", .implementation = Apply<fn::Tan<double>>},
+    {.name = "ASIN", .backend = "bq_asin", .implementation = Apply<fn::Asin<double>>},
+    {.name = "ACOS", .backend = "bq_acos", .implementation = Apply<fn::Acos<double>>},
+    {.name = "ATAN", .backend = "bq_atan", .implementation = Apply<fn::Atan<double>>},
+    {
+        .name = "ATAN2",
+        .backend = "bq_atan2",
+        .implementation = Apply<fn::Atan2<double>>,
+        .arity = 2,
+    },
+    {.name = "ASINH", .backend = "bq_asinh", .implementation = Apply<fn::Asinh<double>>},
+    {.name = "TANH", .backend = "bq_tanh", .implementation = Apply<fn::Tanh<double>>},
+    {.name = "SINH", .backend = "bq_sinh", .implementation = Apply<fn::Sinh<double>>},
+    {.name = "COSH", .backend = "bq_cosh", .implementation = Apply<fn::Cosh<double>>},
+    {.name = "ACOSH", .backend = "bq_acosh", .implementation = Apply<fn::Acosh<double>>},
+    {.name = "ATANH", .backend = "bq_atanh", .implementation = Apply<fn::Atanh<double>>},
+    {.name = "CSC", .backend = "bq_csc", .implementation = Apply<fn::Csc<double>>},
+    {.name = "SEC", .backend = "bq_sec", .implementation = Apply<fn::Sec<double>>},
+    {.name = "COT", .backend = "bq_cot", .implementation = Apply<fn::Cot<double>>},
+    {.name = "CSCH", .backend = "bq_csch", .implementation = Apply<fn::Csch<double>>},
+    {.name = "SECH", .backend = "bq_sech", .implementation = Apply<fn::Sech<double>>},
+    {.name = "COTH", .backend = "bq_coth", .implementation = Apply<fn::Coth<double>>},
+});
 
 // Read only the vector types the distance signatures resolve: DOUBLE arrays and
 // sparse arrays of (INT64 or STRING, DOUBLE). Preserve nulls for GoogleSQL to validate.
@@ -80,7 +127,6 @@ absl::StatusOr<googlesql::Value> DistanceArray(const Arguments& arguments, idx_t
 // return infinities on finite overflow and clamp cosine results.
 template <bool kCosine>
 void Distance(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-  namespace fn = googlesql::functions;
   namespace types = googlesql::types;
   using Function = absl::StatusOr<googlesql::Value> (*)(googlesql::Value, googlesql::Value);
   Function function = kCosine ? fn::CosineDistanceDense : fn::EuclideanDistanceDense;
@@ -144,7 +190,6 @@ constexpr uint8_t kNumericScale = 9;
 constexpr int kMaxGeneratedArraySize = 1048576;
 template <typename T>
 absl::Status GenerateArray(T start, T end, T step, std::vector<T>* out) {
-  namespace fn = googlesql::functions;
   return fn::GenerateArrayHelper<fn::ArrayGenTrait<T, T>, kMaxGeneratedArraySize>(start, end, step,
                                                                                   out);
 }
@@ -152,7 +197,6 @@ absl::Status GenerateArray(T start, T end, T step, std::vector<T>* out) {
 // Registers the NUMERIC functions, named as the FLOAT64 ones plus `suffix`.
 template <typename T>
 void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix) {
-  namespace fn = googlesql::functions;
   LogicalType const type(duckdb_create_decimal_type(38, kNumericScale));
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
@@ -182,8 +226,26 @@ void RegisterDecimalMath(duckdb_connection connection, const std::string& suffix
 
 }  // namespace
 
+const std::unordered_map<std::string_view, FunctionDefinition<Rule>>& TrigonometricFunctions() {
+  static const auto* const kFunctions = [] {
+    auto* functions = new std::unordered_map<std::string_view, FunctionDefinition<Rule>>();
+    std::ranges::transform(kTrigonometricFunctions, std::inserter(*functions, functions->end()),
+                           [](const TrigonometricFunction& function) {
+                             return std::pair{
+                                 function.name,
+                                 FunctionDefinition<Rule>{
+                                     .rules = function_catalog::Same(
+                                         function.backend, function.arity,
+                                         {function_catalog::Is(1, {googlesql::TYPE_DOUBLE})}),
+                                 },
+                             };
+                           });
+    return functions;
+  }();
+  return *kFunctions;
+}
+
 void RegisterMathFunctions(duckdb_connection connection) {
-  namespace fn = googlesql::functions;
   for (const auto& [name, function] :
        std::initializer_list<std::pair<const char*, duckdb_scalar_function_t>>{
            {"bq_sqrt", Apply<fn::Sqrt<double>>},
@@ -191,29 +253,14 @@ void RegisterMathFunctions(duckdb_connection connection) {
            {"bq_exp", Apply<fn::Exp<double>>},
            {"bq_ln", Apply<fn::NaturalLogarithm<double>>},
            {"bq_log10", Apply<fn::DecimalLogarithm<double>>},
-           {"bq_sin", Apply<fn::Sin<double>>},
-           {"bq_cos", Apply<fn::Cos<double>>},
-           {"bq_tan", Apply<fn::Tan<double>>},
-           {"bq_asin", Apply<fn::Asin<double>>},
-           {"bq_acos", Apply<fn::Acos<double>>},
-           {"bq_atan", Apply<fn::Atan<double>>},
-           {"bq_asinh", Apply<fn::Asinh<double>>},
-           {"bq_tanh", Apply<fn::Tanh<double>>},
-           {"bq_sinh", Apply<fn::Sinh<double>>},
-           {"bq_cosh", Apply<fn::Cosh<double>>},
-           {"bq_acosh", Apply<fn::Acosh<double>>},
-           {"bq_atanh", Apply<fn::Atanh<double>>},
-           {"bq_csc", Apply<fn::Csc<double>>},
-           {"bq_sec", Apply<fn::Sec<double>>},
-           {"bq_cot", Apply<fn::Cot<double>>},
-           {"bq_csch", Apply<fn::Csch<double>>},
-           {"bq_sech", Apply<fn::Sech<double>>},
-           {"bq_coth", Apply<fn::Coth<double>>},
        }) {
     Register(connection, name, {kDouble}, kDouble, function);
   }
+  for (const auto& function : kTrigonometricFunctions) {
+    Register(connection, function.backend, std::vector<duckdb_type>(function.arity, kDouble),
+             kDouble, function.implementation);
+  }
   Register(connection, "bq_pow", {kDouble, kDouble}, kDouble, Apply<fn::Pow<double>>);
-  Register(connection, "bq_atan2", {kDouble, kDouble}, kDouble, Apply<fn::Atan2<double>>);
   Register(connection, "bq_log", {kDouble, kDouble}, kDouble, Apply<fn::Logarithm<double>>);
   LogicalType const float64(duckdb_create_logical_type(kDouble));
   LogicalType const list(duckdb_create_list_type(float64.get()));

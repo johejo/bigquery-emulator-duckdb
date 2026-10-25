@@ -67,8 +67,12 @@ neither clearly applies.
 
 ### Registering a function
 
-`src/translator/functions.cc` assembles the registry; `functions_template.cc`,
-`functions_backend.cc` and `functions_aggregate.cc` hold the rule tables. Each function is
+`src/emulator_functions.cc` assembles the application's registry from the builtin definitions in
+`src/translator/functions.cc` and feature providers such as the geography adapter. The shared
+registry model and rule expansion live in `src/function_catalog/`; translators receive the
+assembled catalog from their callers and do not select or register feature adapters.
+`functions_template.cc`, `functions_backend.cc` and `functions_aggregate.cc` hold the builtin
+rule tables. Each function is
 registered under one of these spellings; its rules may still spell overloads with different
 backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
 
@@ -78,14 +82,14 @@ backends, such as a DuckDB function for STRING and GoogleSQL's for BYTES:
   difference such as argument order, a default or a date part.
 - **A backend rule** (`BackendRules`, registered in `src/googlesql_functions_duckdb/`): a call to
   GoogleSQL's implementation.
-- **An S2 rule** (`S2Rules`, registered in `src/googlesql_geography_duckdb/geography.cc`): a GEOGRAPHY
+- **An S2 rule** (`GeographyFunctions`, declared in `src/googlesql_geography_duckdb/geography.cc`): a GEOGRAPHY
   function, which GoogleSQL does not implement, over the S2 Geometry library.
 - **A handler** (`Handlers`, `src/translator/handlers.cc`): when the spelling depends on more of
   the resolved AST than a rule sees, such as a variable number of arguments or a literal pattern
   or path. The handler builds the call and leaves the semantics to the backend chosen above; do
   not reimplement them in generated SQL, such as by walking BYTES as hex digits.
 
-The registry reads the resolved AST only through `src/translator/resolved_access.h`; add a
+The registry reads the resolved AST only through `src/function_catalog/resolved_access.h`; add a
 function there, such as one that reads a literal, rather than a dependency on the AST to
 `//src/translator:functions`.
 
