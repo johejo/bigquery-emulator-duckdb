@@ -1,0 +1,12 @@
+## String arguments borrowed from DuckDB vectors
+
+# SUBSTR semantics: https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#substr
+# Exercise short inline strings, longer strings, UTF-8 and embedded NULs.
+SELECT STRING_AGG(SUBSTR(value, 2, 3), ',' ORDER BY offset) FROM UNNEST(['abcde', 'abcdefghijklmnop', 'あいうえお', 'a\u0000bc']) AS value WITH OFFSET AS offset
+=> "bcd,bcd,いうえ,\u0000bc"
+
+SELECT STRING_AGG(TO_HEX(SUBSTR(value, 2, 3)), ',' ORDER BY offset) FROM UNNEST([b'abcde', b'abcdefghijklmnop', b'a\x00bc']) AS value WITH OFFSET AS offset
+=> "626364,626364,006263"
+
+SELECT COUNTIF(LENGTH(SUBSTR(REPEAT(CAST(x AS STRING), 20), 2)) = LENGTH(REPEAT(CAST(x AS STRING), 20)) - 1) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"

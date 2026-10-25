@@ -1,11 +1,16 @@
 #include "googlesql/public/functions/string.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -32,7 +37,7 @@ void Sha512(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector ou
   const auto hasher = googlesql::functions::Hasher::Create(googlesql::functions::Hasher::kSha512);
   EachRow(info, input, output,
           [&hasher](const Arguments& arguments) -> absl::StatusOr<std::string> {
-            return hasher->Hash(arguments.String(0));
+            return hasher->Hash(arguments.StringView(0));
           });
 }
 
@@ -47,20 +52,120 @@ absl::StatusOr<int64_t> EditDistance(std::string_view first, std::string_view se
 template <bool kBytes, typename Compute>
 void WithRegExp(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
                 Compute compute) {
-  EachRow(info, input, output, [&compute](const Arguments& arguments) {
-    const std::string pattern = arguments.String(1);
-    const auto regexp = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
-                               : googlesql::functions::MakeRegExpUtf8(pattern);
-    using Result = decltype(compute(**regexp, arguments));
-    if (!regexp.ok()) {
-      return Result(regexp.status());
+  // Reuse consecutive patterns within this chunk. Compile lazily so NULL rows never
+  // validate their pattern, and retain only one expression even for varying patterns.
+  std::string previous_pattern;
+  std::unique_ptr<const googlesql::functions::RegExp> regexp;
+  EachRow(info, input, output, [&](const Arguments& arguments) {
+    const std::string_view pattern = arguments.StringView(1);
+    using Result = decltype(compute(*regexp, arguments));
+    if (!regexp || pattern != previous_pattern) {
+      auto compiled = kBytes ? googlesql::functions::MakeRegExpBytes(pattern)
+                             : googlesql::functions::MakeRegExpUtf8(pattern);
+      if (!compiled.ok()) {
+        return Result(compiled.status());
+      }
+      previous_pattern = pattern;
+      regexp = std::move(*compiled);
     }
-    return compute(**regexp, arguments);
+    return compute(*regexp, arguments);
   });
 }
 
 constexpr googlesql::functions::RegExp::PositionUnit PositionUnit(bool bytes) {
   return bytes ? googlesql::functions::RegExp::kBytes : googlesql::functions::RegExp::kUtf8Chars;
+}
+
+// Prepare arguments 1..kParameters lazily, reusing consecutive parameter sets.
+// The keys and any state borrowing them remain valid for this input chunk only.
+template <typename State, size_t kParameters, typename Initialize, typename Compute>
+void WithStringState(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
+                     Initialize initialize, Compute compute) {
+  std::optional<State> state;
+  std::array<std::string_view, kParameters> previous{};
+  EachRow(info, input, output, [&](const Arguments& arguments) {
+    std::array<std::string_view, kParameters> parameters{};
+    for (size_t i = 0; i < kParameters; ++i) {
+      parameters.at(i) = arguments.StringView(i + 1);
+    }
+    using Result = decltype(compute(*state, arguments));
+    if (!state || parameters != previous) {
+      state.emplace();
+      if (const auto status = initialize(*state, parameters); !status.ok()) {
+        return Result(status);
+      }
+      previous = parameters;
+    }
+    return compute(*state, arguments);
+  });
+}
+
+template <auto kTrim>
+void TrimUtf8(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithStringState<googlesql::functions::Utf8Trimmer, 1>(
+      info, input, output,
+      [](auto& trimmer, const auto& parameters) {
+        absl::Status error;
+        return trimmer.Initialize(parameters.at(0), &error) ? absl::OkStatus() : error;
+      },
+      [](auto& trimmer, const Arguments& arguments) {
+        absl::string_view out;
+        absl::Status error;
+        const bool ok = (trimmer.*kTrim)(arguments.StringView(0), &out, &error);
+        return ToStatusOr(ok, std::string(out), error);
+      });
+}
+
+template <auto kTrim>
+void TrimBytes(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithStringState<googlesql::functions::BytesTrimmer, 1>(
+      info, input, output,
+      [](auto& trimmer, const auto& parameters) {
+        trimmer.Initialize(parameters.at(0));
+        return absl::OkStatus();
+      },
+      [](auto& trimmer, const Arguments& arguments) -> absl::StatusOr<std::string> {
+        return std::string((trimmer.*kTrim)(arguments.StringView(0)));
+      });
+}
+
+template <bool kBytes>
+void Translate(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  using State = std::conditional_t<kBytes, googlesql::functions::BytesTranslator,
+                                   googlesql::functions::Utf8Translator>;
+  WithStringState<State, 2>(
+      info, input, output,
+      [](auto& translator, const auto& parameters) {
+        absl::Status error;
+        return translator.Initialize(parameters.at(0), parameters.at(1), &error) ? absl::OkStatus()
+                                                                                 : error;
+      },
+      [](auto& translator, const Arguments& arguments) {
+        std::string out;
+        absl::Status error;
+        const bool ok = translator.Translate(arguments.StringView(0), &out, &error);
+        return ToStatusOr(ok, std::move(out), error);
+      });
+}
+
+template <bool kDefault>
+void Initcap(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+  WithStringState<googlesql::functions::Utf8Capitalizer, kDefault ? 0 : 1>(
+      info, input, output,
+      [](auto& capitalizer, [[maybe_unused]] const auto& parameters) {
+        absl::Status error;
+        if constexpr (kDefault) {
+          return capitalizer.InitializeDefault(&error) ? absl::OkStatus() : error;
+        } else {
+          return capitalizer.Initialize(parameters.at(0), &error) ? absl::OkStatus() : error;
+        }
+      },
+      [](auto& capitalizer, const Arguments& arguments) {
+        std::string out;
+        absl::Status error;
+        const bool ok = capitalizer.Capitalize(arguments.StringView(0), &out, &error);
+        return ToStatusOr(ok, std::move(out), error);
+      });
 }
 
 template <bool kBytes>
@@ -69,7 +174,7 @@ void RegexpContains(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
                      [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
                        bool out = false;
                        absl::Status error;
-                       const bool ok = regexp.Contains(arguments.String(0), &out, &error);
+                       const bool ok = regexp.Contains(arguments.StringView(0), &out, &error);
                        return ToStatusOr(ok, out, error);
                      });
 }
@@ -81,9 +186,9 @@ void RegexpReplace(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
                      [](const googlesql::functions::RegExp& regexp, const Arguments& arguments) {
                        std::string out;
                        absl::Status error;
-                       const bool ok =
-                           regexp.Replace(arguments.String(0), arguments.String(2), &out, &error);
-                       return ToStatusOr(ok, out, error);
+                       const bool ok = regexp.Replace(arguments.StringView(0),
+                                                      arguments.StringView(2), &out, &error);
+                       return ToStatusOr(ok, std::move(out), error);
                      });
 }
 
@@ -95,7 +200,7 @@ void RegexpExtract(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
       info, input, output,
       [](const googlesql::functions::RegExp& regexp,
          const Arguments& arguments) -> absl::StatusOr<std::optional<std::string>> {
-        const std::string source = arguments.String(0);
+        const std::string_view source = arguments.StringView(0);
         absl::string_view out;
         bool is_null = true;
         absl::Status error;
@@ -116,7 +221,7 @@ void RegexpExtractAll(duckdb_function_info info, duckdb_data_chunk input, duckdb
   WithRegExp<kBytes>(info, input, output,
                      [](const googlesql::functions::RegExp& regexp,
                         const Arguments& arguments) -> absl::StatusOr<std::vector<std::string>> {
-                       const std::string source = arguments.String(0);
+                       const std::string_view source = arguments.StringView(0);
                        auto matches = regexp.CreateExtractAllIterator(source);
                        std::vector<std::string> out;
                        absl::string_view match;
@@ -143,7 +248,7 @@ void RegexpInstr(duckdb_function_info info, duckdb_data_chunk input, duckdb_vect
           return absl::OutOfRangeError(
               "Invalid return_position_after_match; it must be 0 or 1 (in REGEXP_INSTR)");
         }
-        const std::string source = arguments.String(0);
+        const std::string_view source = arguments.StringView(0);
         int64_t out = 0;
         absl::Status error;
         const bool ok = regexp.Instr(
@@ -193,8 +298,8 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_reverse_bytes", {kBlob}, kBlob, Apply<fn::ReverseBytes>},
            {"bq_replace", {kVarchar, kVarchar, kVarchar}, kVarchar, Apply<fn::ReplaceUtf8>},
            {"bq_replace_bytes", {kBlob, kBlob, kBlob}, kBlob, Apply<fn::ReplaceBytes>},
-           {"bq_translate", {kVarchar, kVarchar, kVarchar}, kVarchar, Apply<fn::TranslateUtf8>},
-           {"bq_translate_bytes", {kBlob, kBlob, kBlob}, kBlob, Apply<fn::TranslateBytes>},
+           {"bq_translate", {kVarchar, kVarchar, kVarchar}, kVarchar, Translate<false>},
+           {"bq_translate_bytes", {kBlob, kBlob, kBlob}, kBlob, Translate<true>},
            {"bq_starts_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::StartsWithBytes>},
            {"bq_ends_with_bytes", {kBlob, kBlob}, kBoolean, Apply<fn::EndsWithBytes>},
            {"bq_ascii", {kVarchar}, kBigint, Apply<fn::FirstCharOfStringToASCII>},
@@ -224,14 +329,19 @@ void RegisterStringFunctions(duckdb_connection connection) {
            {"bq_rpad", {kVarchar, kBigint, kVarchar}, kVarchar, Apply<fn::RightPadUtf8>},
            {"bq_rpad_bytes", {kBlob, kBigint, kBlob}, kBlob, Apply<fn::RightPadBytes>},
            {"bq_trim", {kVarchar}, kVarchar, Apply<fn::TrimSpacesUtf8>},
-           {"bq_trim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::TrimUtf8>},
-           {"bq_trim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::TrimBytes>},
+           {"bq_trim_chars", {kVarchar, kVarchar}, kVarchar, TrimUtf8<&fn::Utf8Trimmer::Trim>},
+           {"bq_trim_bytes", {kBlob, kBlob}, kBlob, TrimBytes<&fn::BytesTrimmer::Trim>},
            {"bq_ltrim", {kVarchar}, kVarchar, Apply<fn::LeftTrimSpacesUtf8>},
-           {"bq_ltrim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::LeftTrimUtf8>},
-           {"bq_ltrim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::LeftTrimBytes>},
+           {"bq_ltrim_chars", {kVarchar, kVarchar}, kVarchar, TrimUtf8<&fn::Utf8Trimmer::TrimLeft>},
+           {"bq_ltrim_bytes", {kBlob, kBlob}, kBlob, TrimBytes<&fn::BytesTrimmer::TrimLeft>},
            {"bq_rtrim", {kVarchar}, kVarchar, Apply<fn::RightTrimSpacesUtf8>},
-           {"bq_rtrim_chars", {kVarchar, kVarchar}, kVarchar, Apply<fn::RightTrimUtf8>},
-           {"bq_rtrim_bytes", {kBlob, kBlob}, kBlob, Apply<fn::RightTrimBytes>},
+           {
+               "bq_rtrim_chars",
+               {kVarchar, kVarchar},
+               kVarchar,
+               TrimUtf8<&fn::Utf8Trimmer::TrimRight>,
+           },
+           {"bq_rtrim_bytes", {kBlob, kBlob}, kBlob, TrimBytes<&fn::BytesTrimmer::TrimRight>},
            {"bq_normalize", {kVarchar, kVarchar}, kVarchar, Apply<googlesql_functions::Normalize>},
            {
                "bq_normalize_and_casefold",
@@ -281,11 +391,10 @@ void RegisterStringFunctions(duckdb_connection connection) {
   Register(connection, "bq_sha512", {kBlob}, kBlob, Sha512);
   Register(connection, "bq_to_base32", {kBlob}, kVarchar, Apply<ToBase32>);
   Register(connection, "bq_from_base32", {kVarchar}, kBlob, Apply<FromBase32>);
-  Register(connection, "bq_initcap", {kVarchar}, kVarchar, Apply<fn::InitialCapitalizeDefault>);
+  Register(connection, "bq_initcap", {kVarchar}, kVarchar, Initcap<true>);
   Register(connection, "bq_decimal_string", {kVarchar}, kVarchar, Apply<DecimalString>);
   Register(connection, "bq_double_string", {kDouble}, kVarchar, Apply<DoubleString>);
-  Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar,
-           Apply<fn::InitialCapitalize>);
+  Register(connection, "bq_initcap_delimiters", {kVarchar, kVarchar}, kVarchar, Initcap<false>);
   Register(connection, "bq_edit_distance", {kVarchar, kVarchar, kBigint}, kBigint,
            Apply<EditDistance<fn::EditDistance>>);
   Register(connection, "bq_edit_distance_bytes", {kBlob, kBlob, kBigint}, kBigint,

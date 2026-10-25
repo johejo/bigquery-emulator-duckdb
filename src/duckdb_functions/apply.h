@@ -66,12 +66,12 @@ struct Codec<int32_t> : ColumnCodec<int32_t, &Arguments::Date> {};
 template <>
 struct Codec<std::string> : ColumnCodec<std::string, &Arguments::String> {};
 
-// A string_view argument views the string read for the row. A string_view result, which may
-// point into the arguments, is copied before they go.
+// A string_view argument borrows the input chunk. A string_view result, which may
+// point into the arguments, is copied before returning it to EachRow.
 template <>
 struct Codec<std::string_view> {
-  static absl::StatusOr<std::string> Read(const Arguments& arguments, idx_t column) {
-    return arguments.String(column);
+  static absl::StatusOr<std::string_view> Read(const Arguments& arguments, idx_t column) {
+    return arguments.StringView(column);
   }
   static std::string Write(std::string_view value) { return std::string(value); }
 };

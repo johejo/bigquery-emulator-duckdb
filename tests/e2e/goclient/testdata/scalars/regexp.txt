@@ -1,5 +1,16 @@
 ## Regular expression functions
 
+# Matching behavior from https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#regexp_contains
+# Exercise a repeated pattern across chunks, and changes to the pattern within a chunk.
+SELECT COUNTIF(REGEXP_CONTAINS(CAST(x AS STRING), r'^[0-9]+$')) FROM UNNEST(GENERATE_ARRAY(1, 4097)) AS x
+=> "4097"
+
+SELECT STRING_AGG(CAST(REGEXP_CONTAINS('abc', pattern) AS STRING), ',' ORDER BY offset) FROM UNNEST(['b', 'b', 'z', '', 'b']) AS pattern WITH OFFSET AS offset
+=> "true,true,false,true,true"
+
+SELECT STRING_AGG(CAST(REGEXP_CONTAINS(b'abc', pattern) AS STRING), ',' ORDER BY offset) FROM UNNEST([b'b', b'b', b'z', b'', b'b']) AS pattern WITH OFFSET AS offset
+=> "true,true,false,true,true"
+
 SELECT REGEXP_EXTRACT('foo123bar', r'\d+')
 => "123"
 
