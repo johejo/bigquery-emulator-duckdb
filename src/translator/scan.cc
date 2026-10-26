@@ -404,9 +404,11 @@ std::optional<Relation> SetOperationScan(const googlesql::ResolvedSetOperationSc
       throw std::invalid_argument("Type STRUCT is not supported in " + name +
                                   " DISTINCT operation");
     }
-    if (set.op_type() != googlesql::ResolvedSetOperationScan::UNION_ALL &&
-        HasInterval(column.type()) && !(distinct && column.type()->IsInterval())) {
-      return Unsupported(scope, "set operation with INTERVAL");
+    if (distinct && column.type()->IsArray()) {
+      const std::string name = set.op_type() == googlesql::ResolvedSetOperationScan::UNION_DISTINCT
+                                   ? "UNION DISTINCT"
+                                   : "INTERSECT DISTINCT or EXCEPT DISTINCT";
+      throw std::invalid_argument("Type ARRAY is not supported in " + name + " operation");
     }
     intervals = intervals || column.type()->IsInterval();
     names.push_back(ColumnName(column.column_id()));

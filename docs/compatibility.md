@@ -172,7 +172,7 @@ other functions reject it. BigQuery's restrictions on empty STRUCTs in query res
 INTERVAL arithmetic is limited to `+`, `-`, unary `-`, multiplication by INT64 and division by
 INT64, and subtraction between DATE, DATETIME, TIMESTAMP or TIME values. Other limits are:
 
-- `PARTITION BY` and distinct set operations over ARRAYs with INTERVAL elements are unsupported.
+- `PARTITION BY` over ARRAYs containing INTERVAL values is unsupported.
 - Aggregate and analytic functions are limited to `SUM`, `AVG`, `ARRAY_AGG`, `ARRAY_CONCAT_AGG`,
   `ANY_VALUE`, `COUNT`, `MIN`, `MAX`, `MIN_BY`, `MAX_BY` and navigation functions, subject to
   BigQuery's own restrictions on INTERVAL inputs.
