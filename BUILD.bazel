@@ -92,10 +92,19 @@ cc_library(
 )
 
 cc_library(
+    name = "json_int64",
+    srcs = ["src/json_int64.cc"],
+    hdrs = ["src/json_int64.h"],
+    copts = ["-std=c++20"],
+    deps = ["@nlohmann_json//:json"],
+)
+
+cc_library(
     name = "field_schema",
     srcs = ["src/field_schema.cc"],
     hdrs = ["src/field_schema.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [":json_int64"],
     deps = [
         ":api_error",
         "@nlohmann_json//:json",
@@ -118,6 +127,7 @@ cc_library(
     srcs = ["src/table_metadata.cc"],
     hdrs = ["src/table_metadata.h"],
     copts = ["-std=c++20"],
+    implementation_deps = [":json_int64"],
     deps = [
         ":api_error",
         ":duckdb_sql",

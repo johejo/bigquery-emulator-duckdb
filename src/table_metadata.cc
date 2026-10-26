@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -13,7 +12,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -21,6 +19,7 @@
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
 #include "src/field_schema.h"
+#include "src/json_int64.h"
 #include "src/location.h"
 
 namespace bigquery_emulator_duckdb {
@@ -122,17 +121,9 @@ std::string_view LabelTextProblem(const std::string& text) {
 // accepted too.
 int64_t Int64Member(const json& value, const char* key) {
   const auto it = value.find(key);
-  if (it != value.end() && it->is_number_integer() &&
-      (!it->is_number_unsigned() ||
-       it->get<uint64_t>() <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max()))) {
-    return it->get<int64_t>();
-  }
-  if (it != value.end() && it->is_string()) {
-    const auto& text = it->get_ref<const std::string&>();
-    int64_t parsed = 0;
-    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
-    if (error == std::errc() && end == text.data() + text.size()) {
-      return parsed;
+  if (it != value.end()) {
+    if (const auto parsed = ParseJsonInt64(*it)) {
+      return *parsed;
     }
   }
   throw ApiError::Invalid(std::string("Field ") + key + " must be an integer");
