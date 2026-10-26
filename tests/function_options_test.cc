@@ -71,6 +71,8 @@ TEST(FunctionOptionsTest, RegistrationsOwnIndependentPolicies) {
     const std::array cases = {
         Case{.sql = "SELECT length(bq_chr(0)) = 0", .expected = i != 0},
         Case{.sql = "SELECT length(bq_format('%t', chr(0))) = 0", .expected = bigquery},
+        Case{.sql = "SELECT bq_double_string(-0.0::DOUBLE) = '-0'", .expected = bigquery},
+        Case{.sql = "SELECT bq_format('%g', -0.0::DOUBLE) = '-0'", .expected = bigquery},
         Case{
             .sql = "SELECT bq_format_date('%G', DATE '0900-01-04') = '900'",
             .expected = bigquery || std::string_view(native_year.data()) == "900",
@@ -138,7 +140,10 @@ TEST(FunctionOptionsTest, NanPolicyPreservesOtherValues) {
                                                  {negative_nan, googlesql::Value::Double(-0.0)});
   ASSERT_TRUE(array.ok()) << array.status();
   for (const bool unsigned_nan : {false, true}) {
-    const googlesql_functions::FormatOptions options{.unsigned_nan = unsigned_nan};
+    const googlesql_functions::FormatOptions options{
+        .unsigned_nan = unsigned_nan,
+        .signed_zero = true,
+    };
     const auto formatted = googlesql_functions::Format("%t", {*array}, options);
     ASSERT_TRUE(formatted.ok()) << formatted.status();
     ASSERT_TRUE(formatted->has_value());

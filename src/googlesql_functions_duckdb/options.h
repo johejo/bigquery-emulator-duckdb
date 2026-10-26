@@ -11,6 +11,8 @@ struct Options {
   bool format_specifiers = false;
   // FORMAT writes no sign for a NaN.
   bool unsigned_nan = false;
+  // CAST(FLOAT64 AS STRING) and FORMAT write the sign of a negative zero.
+  bool signed_zero_strings = false;
   // FORMAT_DATE, FORMAT_DATETIME and FORMAT_TIMESTAMP do not pad %G below 1000.
   bool unpadded_iso_year = false;
   // GENERATE_ARRAY and GENERATE_DATE_ARRAY exceed GoogleSQL's 16,000-element limit.

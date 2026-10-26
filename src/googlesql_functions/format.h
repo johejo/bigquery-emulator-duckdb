@@ -19,6 +19,8 @@ struct FormatOptions {
   bool adapt_specifiers = false;
   // No sign for a NaN in floating-point specifiers.
   bool unsigned_nan = false;
+  // The sign of a floating-point negative zero.
+  bool signed_zero = false;
 };
 
 absl::StatusOr<std::optional<std::string>> Format(std::string_view pattern,

@@ -123,9 +123,11 @@ absl::StatusOr<std::string> DecimalString(std::string_view text) {
 }
 
 // The text of a FLOAT64 as BigQuery writes it, the shortest that reads back as the same value,
-// without DuckDB's ".0" for a whole number, preserving the sign of negative zero.
-bool DoubleString(double value, std::string* out, absl::Status* error) {
-  return googlesql::functions::NumericToString(value, out, error, /*canonicalize_zero=*/false);
+// without DuckDB's ".0" for a whole number, and with the sign of a negative zero when
+// `signed_zero` is set.
+bool DoubleString(double value, bool signed_zero, std::string* out, absl::Status* error) {
+  return googlesql::functions::NumericToString(value, out, error,
+                                               /*canonicalize_zero=*/!signed_zero);
 }
 
 absl::StatusOr<bool> CheckStringLength(std::string_view text, int64_t maximum,

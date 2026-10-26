@@ -16,16 +16,6 @@ known_errors {
   label: ".*"
 }
 
-# BigQuery generates arrays far longer than GoogleSQL's 16000 elements, so the emulator lifts the
-# limit, and these ranges of about 1e38 BIGNUMERIC elements run for most of an hour each before
-# they fail, as the tests expect, with or without SAFE. They are not run.
-known_errors {
-  mode: CRASHES_DO_NOT_RUN
-  reason: "GENERATE_ARRAY over a BIGNUMERIC range too long to generate"
-  label: "code:(safe_error_mode__safe_)?generate_array_BIGNUMERIC_0_BIGNUMERIC_1_BIGNUMERIC_0.00000000000000000000000000000000000001"
-  label: "code:(safe_error_mode__safe_)?generate_array_BIGNUMERIC_-578960446186580977117854925043439539266.34992332820282019728792003956564819968_BIGNUMERIC_578960446186580977117854925043439539266.34992332820282019728792003956564819967_BIGNUMERIC_1"
-}
-
 # Statements that fail, by reason.
 
 known_errors {
@@ -1880,29 +1870,10 @@ known_errors {
   label: "code:bXor_BYTES_NULL_BYTES_<foo>"
 }
 
-# https://cloud.google.com/bigquery/docs/reference/standard-sql/string_functions#chr
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "CHR(0) returns an empty string as BigQuery documents; GoogleSQL returns NUL"
-  label: "code:chr_INT64_0"
-  label: "strings_test:strings_function_chr"
-}
-
 known_errors {
   mode: ALLOW_ERROR
   reason: "TO_JSON_STRING with escaped field names differs"
   label: "strings_test:to_json_string_with_escaped_field_names"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "FORMAT preserves FLOAT64 negative zero as BigQuery does; GoogleSQL canonicalizes it"
-  label: "code:format_STRING_<%@e>_FLOAT64_-0"
-  label: "code:format_STRING_<%@f>_FLOAT64_-0"
-  label: "code:format_STRING_<%@g>_FLOAT64_-0"
-  label: "code:format_STRING_<%e>_FLOAT64_-0"
-  label: "code:format_STRING_<%f>_FLOAT64_-0"
-  label: "code:format_STRING_<%g>_FLOAT64_-0"
 }
 
 known_errors {
@@ -1921,13 +1892,6 @@ known_errors {
   mode: ALLOW_ERROR_OR_WRONG_ANSWER
   reason: "Large FLOAT64 values fail to cast to NUMERIC or lose precision"
   label: "code:CastTo_NUMERIC_FLOAT64_1@844674407370955e19"
-}
-
-known_errors {
-  mode: ALLOW_ERROR_OR_WRONG_ANSWER
-  reason: "Casting FLOAT64 negative zero to STRING gives '-0', as BigQuery does, where the reference implementation gives '0'"
-  label: "code:CastTo_STRING_FLOAT64_-0"
-  label: "code:SafeCastTo_STRING_FLOAT64_-0"
 }
 
 known_errors {
@@ -1977,14 +1941,6 @@ known_errors {
 }
 
 # BigQuery TO_JSON encoding rejects lossy decimals. GoogleSQL without
-# FEATURE_JSON_STRICT_NUMBER_PARSING expects rounded results for these cases.
-known_errors {
-  mode: ALLOW_ERROR
-  reason: "BigQuery JSON array mutators reject lossy BIGNUMERIC conversion where GoogleSQL rounds"
-  label: "code:json_array_append_JSON_<@@1,2,3@_c8YZwGMcUL4_o@@@@@@@>_STRING_<@@0@>_BIGNUMERIC_123.123456981723189237198273"
-  label: "code:json_array_insert_JSON_<@@1,2,3@_c8YZwGMcUL4_o@@@@@@@>_STRING_<@@0@@0@>_BIGNUMERIC_123.123456981723189237198273"
-}
-
 known_errors {
   mode: ALLOW_ERROR
   reason: "JSON comparisons are not translated as BigQuery orders JSON values"

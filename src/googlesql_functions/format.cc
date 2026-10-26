@@ -47,11 +47,12 @@ bool HasNul(const googlesql::Value& value) {
   }
 }
 
-// GoogleSQL's FORMAT, preserving the sign of floating-point zero as BigQuery does.
+// GoogleSQL's FORMAT, preserving the sign of floating-point zero when `signed_zero` is set, as
+// BigQuery does.
 absl::Status StringFormat(std::string_view pattern, const std::vector<googlesql::Value>& values,
-                          std::string* out, bool* is_null) {
+                          bool signed_zero, std::string* out, bool* is_null) {
   return googlesql::functions::StringFormatUtf8(pattern, values, googlesql::PRODUCT_EXTERNAL, out,
-                                                is_null, /*canonicalize_zero=*/false,
+                                                is_null, /*canonicalize_zero=*/!signed_zero,
                                                 /*use_external_float32=*/true);
 }
 
@@ -67,7 +68,8 @@ struct AdaptedFormat {
 // specifier GoogleSQL rejects, or whose arguments are missing, is copied as is so that GoogleSQL
 // reports it.
 std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
-                                         const std::vector<googlesql::Value>& values) {
+                                         const std::vector<googlesql::Value>& values,
+                                         bool signed_zero) {
   // GoogleSQL's limit on the output width, which also caps an integer's precision.
   constexpr int64_t kMaxPrecision = 1048576;
   constexpr std::string_view kDigits = "0123456789";
@@ -123,7 +125,8 @@ std::optional<AdaptedFormat> AdaptFormat(std::string_view pattern,
     const googlesql::Value& value = values.at(value_arg);
     std::string text;
     bool is_null = false;
-    if (conversion == 't' && HasNul(value) && StringFormat("%t", {value}, &text, &is_null).ok()) {
+    if (conversion == 't' && HasNul(value) &&
+        StringFormat("%t", {value}, signed_zero, &text, &is_null).ok()) {
       // BigQuery ends the text of %t at the first NUL of a STRING, also of one in an ARRAY or a
       // STRUCT, as GoogleSQL does for %s. A value that fails here fails below as well.
       adapted.values.at(value_arg) = googlesql::Value::String(text.substr(0, text.find('\0')));
@@ -205,12 +208,12 @@ absl::StatusOr<std::optional<std::string>> Format(std::string_view pattern,
     }
   }
   const std::optional<AdaptedFormat> adapted =
-      options.adapt_specifiers ? AdaptFormat(pattern, values) : std::nullopt;
+      options.adapt_specifiers ? AdaptFormat(pattern, values, options.signed_zero) : std::nullopt;
   std::string out;
   bool is_null = false;
   const auto format = [&](std::string_view format_pattern,
                           const std::vector<googlesql::Value>& format_values) {
-    return StringFormat(format_pattern, format_values, &out, &is_null);
+    return StringFormat(format_pattern, format_values, options.signed_zero, &out, &is_null);
   };
   absl::Status status =
       adapted.has_value() ? format(adapted->pattern, adapted->values) : format(pattern, values);
