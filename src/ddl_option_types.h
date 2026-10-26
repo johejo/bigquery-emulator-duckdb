@@ -56,6 +56,7 @@ struct DdlOptionDefinition {
   DdlOptionType type;
 };
 std::span<const DdlOptionDefinition> DdlOptionDefinitions();
+const DdlOptionDefinition* FindDdlOption(DdlOptionContext context, DdlOptionId name);
 const DdlOptionDefinition* FindDdlOption(DdlOptionContext context, std::string_view name);
 const googlesql::Type* DdlOptionSqlType(DdlOptionType type);
 // Preserves the handlers' existing acceptance of untyped NULL and INT64 expiration days.

@@ -113,10 +113,8 @@ bool ApplyAnnotations(const googlesql::Type* type,
     field.mode = FieldMode::kRequired;
   }
   for (const auto& option : annotations.option_list()) {
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
-    const std::optional<googlesql::Value> value =
-        OptionValue(*option, DdlOptionContext::kColumn, scope);
-    if (!value || !name || !ApplyColumnOption(*name, *value, field)) {
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kColumn, scope);
+    if (!decoded || !ApplyColumnOption(decoded->id, decoded->value, field)) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }
@@ -189,10 +187,8 @@ std::optional<std::string> ColumnDefinitionType(const googlesql::ResolvedColumnD
 // they are unsupported, and so are += and -=.
 bool ColumnSetOptions(const Options& options, const Scope& scope, ColumnOptionsAction& action) {
   for (const auto& option : options) {
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
-    const std::optional<googlesql::Value> value =
-        OptionValue(*option, DdlOptionContext::kColumn, scope);
-    if (!value || !name || !ApplyColumnOption(*name, *value, action)) {
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kColumn, scope);
+    if (!decoded || !ApplyColumnOption(decoded->id, decoded->value, action)) {
       Unsupported(scope, "column option " + option->name());
       return false;
     }

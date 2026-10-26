@@ -278,26 +278,24 @@ bool ApplyOptionUpdate(DdlOptionId name, const googlesql::Value& value, DdlOptio
   }
 }
 
-}  // namespace
-
-// The value an option of `object`, such as a table, assigns: a literal, or a constant expression,
-// which the backend evaluates as a query would. nullopt for an unsupported assignment or value the
-// emulator does not support, which `scope` may then name.
-std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
-                                            DdlOptionContext context, const Scope& scope) {
+// Decodes an option after name-only checks, without resolving its name again.
+std::optional<DecodedDdlOption> DecodeNamedDdlOption(const googlesql::ResolvedOption& option,
+                                                     std::optional<DdlOptionId> name,
+                                                     DdlOptionContext context, const Scope& scope) {
   const auto context_name = DdlOptionContextName(context);
   const std::string object =
       context == DdlOptionContext::kColumn ? "column" : OptionObject(context_name);
-  const auto* definition = FindDdlOption(context, ToLowerAscii(option.name()));
+  const auto* definition = name ? FindDdlOption(context, *name) : nullptr;
   if (definition == nullptr) {
     Unsupported(scope, std::string(context_name) + " option " + option.name());
     return std::nullopt;
   }
-  const auto checked = [&](std::optional<googlesql::Value> value) {
-    if (value && !DdlOptionValueMatches(definition->type, *value)) {
-      return std::optional<googlesql::Value>{};
+  const auto checked =
+      [&](std::optional<googlesql::Value> value) -> std::optional<DecodedDdlOption> {
+    if (!value || !DdlOptionValueMatches(definition->type, *value)) {
+      return std::nullopt;
     }
-    return value;
+    return DecodedDdlOption{.id = definition->name, .value = *std::move(value)};
   };
   const bool removing_tags = context == DdlOptionContext::kAlterTable &&
                              definition->name == DdlOptionId::kTags &&
@@ -319,6 +317,14 @@ std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& opt
     return std::nullopt;
   }
   return checked(evaluate("SELECT " + *sql, expression.type()));
+}
+
+}  // namespace
+
+std::optional<DecodedDdlOption> DecodeDdlOption(const googlesql::ResolvedOption& option,
+                                                DdlOptionContext context, const Scope& scope) {
+  return DecodeNamedDdlOption(option, ParseDdlOptionId(ToLowerAscii(option.name())), context,
+                              scope);
 }
 
 // A STRING option into `into`; NULL leaves it unset.
@@ -353,9 +359,8 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
                                              const Scope& scope, TableMetadata metadata) {
   const bool table = statement == DdlOptionContext::kCreateTable;
   for (const auto& option : options) {
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
-    const auto value = OptionValue(*option, statement, scope);
-    if (!value || !name || !ApplyTableOption(*name, *value, table, metadata)) {
+    const auto decoded = DecodeDdlOption(*option, statement, scope);
+    if (!decoded || !ApplyTableOption(decoded->id, decoded->value, table, metadata)) {
       return Unsupported(
           scope, std::string(DdlOptionContextName(statement)) + " option " + option->name());
     }
@@ -369,9 +374,8 @@ std::optional<TableMetadata> OptionsMetadata(const Options& options, DdlOptionCo
 std::optional<DatasetMetadata> SchemaOptionsMetadata(const Options& options, const Scope& scope) {
   DatasetMetadata metadata;
   for (const auto& option : options) {
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
-    const auto value = OptionValue(*option, DdlOptionContext::kCreateSchema, scope);
-    if (!value || !name || !ApplySchemaOption(*name, *value, metadata)) {
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kCreateSchema, scope);
+    if (!decoded || !ApplySchemaOption(decoded->id, decoded->value, metadata)) {
       return Unsupported(scope, "CREATE SCHEMA option " + option->name());
     }
   }
@@ -398,7 +402,7 @@ bool SetOptions(const Options& options, DdlOptionContext statement, const Scope&
       }
       tags_seen = true;
     }
-    const auto value = OptionValue(*option, statement, scope);
+    const auto decoded = DecodeNamedDdlOption(*option, name, statement, scope);
     const auto fail = [&] {
       Unsupported(scope,
                   std::string(DdlOptionContextName(statement)) + " option " + option->name());
@@ -406,12 +410,13 @@ bool SetOptions(const Options& options, DdlOptionContext statement, const Scope&
     };
     if (name == kTags && option->assignment_op() == googlesql::ResolvedOption::SUB_ASSIGN) {
       std::vector<std::string> order;
-      if (!value || value->is_null() || !TagsOption(*value, updates.removed_tags, order)) {
+      if (!decoded || decoded->value.is_null() ||
+          !TagsOption(decoded->value, updates.removed_tags, order)) {
         return fail();
       }
       continue;
     }
-    if (!value || !name || !ApplyOptionUpdate(*name, *value, statement, updates)) {
+    if (!decoded || !ApplyOptionUpdate(decoded->id, decoded->value, statement, updates)) {
       return fail();
     }
   }

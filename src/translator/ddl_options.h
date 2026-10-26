@@ -23,8 +23,14 @@ struct Scope;
 
 using Options = std::vector<std::unique_ptr<const googlesql::ResolvedOption>>;
 
-std::optional<googlesql::Value> OptionValue(const googlesql::ResolvedOption& option,
-                                            DdlOptionContext context, const Scope& scope);
+struct DecodedDdlOption {
+  DdlOptionId id;
+  googlesql::Value value;
+};
+
+// Resolves the option's name and validates and evaluates its assignment once.
+std::optional<DecodedDdlOption> DecodeDdlOption(const googlesql::ResolvedOption& option,
+                                                DdlOptionContext context, const Scope& scope);
 bool StringOption(const googlesql::Value& value, std::string& into);
 // Sets `into` to the rounding mode `value` names, or clears it for NULL. False for any other
 // value.

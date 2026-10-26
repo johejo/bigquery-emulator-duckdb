@@ -135,11 +135,15 @@ std::optional<I> ParseDdlOptionId(std::string_view name) {
   return std::nullopt;
 }
 std::span<const DdlOptionDefinition> DdlOptionDefinitions() { return kOptions; }
+const DdlOptionDefinition* FindDdlOption(C context, I name) {
+  const auto* found = std::ranges::find_if(kOptions, [&](const auto& option) {
+    return option.context == context && option.name == name;
+  });
+  return found == kOptions.end() ? nullptr : found;
+}
 const DdlOptionDefinition* FindDdlOption(C context, std::string_view name) {
   const auto id = ParseDdlOptionId(name);
-  const auto* found = std::ranges::find_if(
-      kOptions, [&](const auto& option) { return option.context == context && option.name == id; });
-  return found == kOptions.end() ? nullptr : found;
+  return id ? FindDdlOption(context, *id) : nullptr;
 }
 
 const googlesql::Type* DdlOptionSqlType(DdlOptionType type) {

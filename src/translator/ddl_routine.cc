@@ -126,22 +126,23 @@ std::optional<std::string> CreateFunction(const googlesql::ResolvedCreateFunctio
       {"lastModifiedTime", now},
   };
   for (const auto& option : create.option_list()) {
-    const auto value = OptionValue(*option, DdlOptionContext::kCreateFunction, scope);
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kCreateFunction, scope);
     std::string text;
-    if (!value || !StringOption(*value, text)) {
+    if (!decoded || !StringOption(decoded->value, text)) {
       return Unsupported(scope, "CREATE FUNCTION option " + option->name());
     }
+    const auto name = decoded->id;
+    const auto& value = decoded->value;
     if (name == DdlOptionId::kDescription) {
-      if (!value->is_null()) {
+      if (!value.is_null()) {
         resource["description"] = text;
       }
-    } else if (python && !value->is_null() && name == DdlOptionId::kRuntimeVersion) {
+    } else if (python && !value.is_null() && name == DdlOptionId::kRuntimeVersion) {
       if (text != "python-3.11") {
         return Unsupported(scope, "Python runtime " + text);
       }
       resource["runtimeVersion"] = text;
-    } else if (python && !value->is_null() && name == DdlOptionId::kEntryPoint && !text.empty() &&
+    } else if (python && !value.is_null() && name == DdlOptionId::kEntryPoint && !text.empty() &&
                text.find('\0') == std::string::npos) {
       resource["pythonOptions"]["entryPoint"] = text;
     } else {
@@ -215,14 +216,13 @@ std::optional<std::string> CreateTableFunction(
   };
   // A function's only option is its description, which BigQuery keeps as metadata.
   for (const auto& option : create.option_list()) {
-    const std::optional<googlesql::Value> value =
-        OptionValue(*option, DdlOptionContext::kCreateTableFunction, scope);
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kCreateTableFunction, scope);
     std::string description;
-    if (!value.has_value() || ToLowerAscii(option->name()) != "description" ||
-        !StringOption(*value, description)) {
+    if (!decoded || decoded->id != DdlOptionId::kDescription ||
+        !StringOption(decoded->value, description)) {
       return Unsupported(scope, "CREATE TABLE FUNCTION option " + option->name());
     }
-    if (value->is_null()) {
+    if (decoded->value.is_null()) {
       resource.erase("description");
     } else {
       resource["description"] = description;
@@ -288,16 +288,17 @@ std::optional<std::string> CreateProcedure(const googlesql::ResolvedCreateProced
       {"lastModifiedTime", now},
   };
   for (const auto& option : create.option_list()) {
-    const auto value = OptionValue(*option, DdlOptionContext::kCreateProcedure, scope);
-    if (!value) {
+    const auto decoded = DecodeDdlOption(*option, DdlOptionContext::kCreateProcedure, scope);
+    if (!decoded) {
       return std::nullopt;
     }
-    const auto name = ParseDdlOptionId(ToLowerAscii(option->name()));
+    const auto name = decoded->id;
+    const auto& value = decoded->value;
     std::string description;
-    if (name == DdlOptionId::kStrictMode && value->type()->IsBool() && !value->is_null()) {
-      resource["strictMode"] = value->bool_value();
-    } else if (name == DdlOptionId::kDescription && StringOption(*value, description)) {
-      if (!value->is_null()) {
+    if (name == DdlOptionId::kStrictMode && value.type()->IsBool() && !value.is_null()) {
+      resource["strictMode"] = value.bool_value();
+    } else if (name == DdlOptionId::kDescription && StringOption(value, description)) {
+      if (!value.is_null()) {
         resource["description"] = description;
       }
     } else {

@@ -52,11 +52,21 @@ std::string ViewDdl(const std::string& project, const std::string& dataset,
 std::string PartitionId(const TableMetadata& metadata) {
   if (metadata.time_partitioning.has_value()) {
     const std::string column = QuoteIdentifier(metadata.time_partitioning->field);
-    const std::string type(TimePartitionUnitName(metadata.time_partitioning->type));
-    const std::string format = type == "HOUR"    ? "%Y%m%d%H"
-                               : type == "MONTH" ? "%Y%m"
-                               : type == "YEAR"  ? "%Y"
-                                                 : "%Y%m%d";
+    std::string format;
+    switch (metadata.time_partitioning->type) {
+      case TimePartitionUnit::kDay:
+        format = "%Y%m%d";
+        break;
+      case TimePartitionUnit::kHour:
+        format = "%Y%m%d%H";
+        break;
+      case TimePartitionUnit::kMonth:
+        format = "%Y%m";
+        break;
+      case TimePartitionUnit::kYear:
+        format = "%Y";
+        break;
+    }
     // Partition boundaries are in UTC, which DuckDB's session time zone is.
     return "CASE WHEN " + column + " IS NULL THEN '__NULL__' WHEN CAST(" + column +
            " AS DATE) NOT BETWEEN DATE '1960-01-01' AND DATE '2159-12-31' THEN "
