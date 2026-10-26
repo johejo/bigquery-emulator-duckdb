@@ -16,6 +16,9 @@ SELECT ST_NUMPOINTS(ST_GEOGFROMTEXT('fullglobe'))
 SELECT ST_AREA(ST_GEOGFROMTEXT('fullglobe'))
 => "5.100660731179886E14"
 
+# The documentation describes distances between vertices, but BigQuery returns the distance
+# to the antipode for a full polygon, which has no vertices (ST_NUMPOINTS above).
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance
 SELECT ST_MAXDISTANCE(ST_GEOGFROMTEXT('fullglobe'), ST_GEOGPOINT(0, 0))
 => "2.001511821194711E7"
 

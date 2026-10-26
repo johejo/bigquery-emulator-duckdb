@@ -103,6 +103,11 @@ values geojson | ST_GEOGFROMTEXT('fullglobe') | ST_GEOGPOINT(3, 5) | ST_GEOGFROM
 elements ^ST_ASGEOJSON\( | geojson | GEOGRAPHY
 values wkt | 'fullglobe' | 'POINT(3 5)' | 'GeometryCollection EMPTY' | 'LINESTRING(0 0, 1 1)' | 'POLYGON((0 0, 1 0, 0 1, 0 0))' | 'MULTIPOLYGON(((0 0, 1 0, 0 1, 0 0)), ((5 5, 6 5, 5 6, 5 5)))' | 'GEOMETRYCOLLECTION(POINT(9 9), LINESTRING(0 0, 1 1))'
 elements ^ST_GEOGFROMTEXT\( | wkt | STRING
+# Named parser options are omitted by signature-generated calls.
+extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE)
+extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POINT(1 2)', planar => TRUE)
+extra_query ST_GEOGFROMTEXT SELECT ST_GEOGFROMTEXT('POINT(1 2)', make_valid => TRUE)
+note ST_GEOGFROMTEXT See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 values geojson_text | '{"type": "Point", "coordinates": [3, 5]}' | '{"type": "GeometryCollection", "geometries": []}' | '{"type": "LineString", "coordinates": [[0, 0], [1, 1]]}' | '{"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [0, 1], [0, 0]]]}' | '{"type": "MultiPolygon", "coordinates": [[[[0, 0], [1, 0], [0, 1], [0, 0]]], [[[5, 5], [6, 5], [5, 6], [5, 5]]]]}' | '{"type": "GeometryCollection", "geometries": [{"type": "Point", "coordinates": [9, 9]}, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]}]}'
 elements ^ST_GEOGFROMGEOJSON\( | geojson_text | STRING
 # ST_GEOGFROM reads a STRING as WKT, GeoJSON or hex-encoded WKB, and BYTES as WKB.
@@ -113,6 +118,9 @@ note ST_GEOGFROMGEOJSON See [GEOGRAPHY values](compatibility.md#geography-values
 values wkb_text | '010100000000000000000000400000000000001040' | '010700000000000000' | '010200000002000000feffffffffffef3f000000000000f03f01000000000008400000000000000040'
 elements ^ST_GEOGFROMWKB\( | wkb_text | STRING
 argument ^ST_GEOGFROMWKB\( | BYTES | FROM_HEX('010100000000000000000000400000000000001040')
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB(FROM_HEX('010100000000000000000000400000000000001040'), oriented => TRUE)
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB('010100000000000000000000400000000000001040', oriented => TRUE)
+extra_query ST_GEOGFROMWKB SELECT ST_GEOGFROMWKB(FROM_HEX('010100000000000000000000400000000000001040'), planar => TRUE)
 note ST_GEOGFROMWKB See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 argument ^ST_GEOGPOINTFROMGEOHASH\( | STRING | 'u4pruydqqvj'
 # BigQuery also measures nonempty points over the spheroid, which the emulator rejects.
@@ -132,6 +140,12 @@ argument ^ST_(EXTERIORRING|INTERIORRINGS)\( | GEOGRAPHY | ST_GEOGFROMTEXT('POLYG
 query ST_MAKEPOLYGON SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 0 2, 2 2, 2 0, 0 0)'))
 query ST_MAKEPOLYGON SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), [ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2, 1 1)')])
 query ST_MAKEPOLYGON SELECT ST_MAKEPOLYGON(ST_GEOGFROMTEXT('LINESTRING EMPTY'))
+values oriented_polygon_rings | [ST_GEOGFROMTEXT('LINESTRING(0 0, 0 90, 90 0, 0 0)')] | [ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2, 1 2, 1 1)')] | [ST_GEOGFROMTEXT('LINESTRING EMPTY')] | ARRAY<GEOGRAPHY>[] | [ST_GEOGFROMTEXT('LINESTRING(0 0, 1 0, 0 1, 0 0)'), NULL]
+elements ^ST_MAKEPOLYGONORIENTED\( | oriented_polygon_rings | ARRAY<GEOGRAPHY>
+elements ^S2_COVERINGCELLIDS\( | geography | GEOGRAPHY
+extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), min_level => 4, max_level => 8, max_cells => 8, buffer => 1000)
+extra_query S2_COVERINGCELLIDS SELECT S2_COVERINGCELLIDS(ST_GEOGPOINT(1, 2), max_cells => 2147483648)
+note S2_COVERINGCELLIDS See [GEOGRAPHY values](compatibility.md#geography-values) for limits.
 
 # HLL_COUNT functions take a sketch, here HLL_COUNT.INIT's of 0, and a precision from 10 to 24.
 argument ^HLL_COUNT\.(EXTRACT|MERGE|MERGE_PARTIAL)\( | BYTES | FROM_HEX('087010011802200882070b1001180f20143203a2a721')

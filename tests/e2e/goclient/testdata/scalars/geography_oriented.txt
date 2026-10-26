@@ -1,0 +1,83 @@
+# BigQuery documentation and observed answers for oriented polygons.
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext
+# https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented
+
+# ST_GEOGFROMTEXT's documented example.
+SELECT ST_CONTAINS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))'), ST_GEOGPOINT(1, 1))
+=> "true"
+
+SELECT ST_CONTAINS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', oriented => FALSE), ST_GEOGPOINT(1, 1))
+=> "true"
+
+SELECT ST_CONTAINS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', oriented => TRUE), ST_GEOGPOINT(1, 1))
+=> "false"
+
+# BigQuery answers, obtained with tools/bqanswers.
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE))
+=> "POLYGON((0 0, 0 90, 90 0, 0 0))"
+
+SELECT ST_CONTAINS(ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE), ST_GEOGPOINT(-90, 0))
+=> "true"
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => FALSE))
+=> "POLYGON((90 0, 0 90, 0 0, 90 0))"
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POINT(1 2)', oriented => NULL))
+=> null
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (1 1, 2 1, 2 2, 1 2, 1 1))', oriented => TRUE))
+=> error: ST_GeogFromText failed: Shape 0 has one or more edges with interior on the right.
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 0 10, 10 10, 10 0, 0 0), (1 1, 2 1, 2 2, 1 2, 1 1))', oriented => TRUE))
+=> error: ST_GeogFromText failed: Polygon's first loop must be shell. It is nested in loop 2
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))', oriented => TRUE, planar => FALSE, make_valid => FALSE))
+=> "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))"
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POINT(1 2)', oriented => TRUE, planar => TRUE))
+=> error: ST_GeogFromText failed: Options planar and oriented are not compatible.
+
+SELECT ST_ASTEXT(ST_GEOGFROMTEXT('POINT(1 2)', oriented => TRUE, make_valid => TRUE))
+=> error: ST_GeogFromText failed: Options make_valid and oriented are not compatible.
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING(0 0, 0 90, 90 0, 0 0)')]))
+=> "POLYGON((0 0, 0 90, 90 0, 0 0))"
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING(0 0, 90 0, 0 90)')]))
+=> "POLYGON((0 0, 90 0, 0 90, 0 0))"
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED(ARRAY<GEOGRAPHY>[]))
+=> null
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING EMPTY')]))
+=> "GEOMETRYCOLLECTION(POLYGON((0 0, 120 0, -120 0, 0 0)), POLYGON((0 0, -120 0, 120 0, 0 0)))"
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING EMPTY'), ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 0 10, 0 0)')]))
+=> "POLYGON((0 10, 10 0, 0 0, 0 10))"
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 0 10, 0 0)'), NULL]))
+=> null
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED(CAST(NULL AS ARRAY<GEOGRAPHY>)))
+=> null
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGPOINT(0, 0)]))
+=> error: ST_MakePolygonOriented failed: Input geographies for STMakePolygon must be empty or consist of exactly one linestring.
+
+# Contrary to the linked documentation's opposite-orientation requirement, BigQuery accepts
+# a counterclockwise hole with a counterclockwise shell, and rejects a clockwise hole here.
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), ST_GEOGFROMTEXT('LINESTRING(1 1, 1 2, 2 2, 2 1, 1 1)')]))
+=> error: ST_MakePolygonOriented failed: Shape 0 has one or more edges with interior on the right.
+
+SELECT ST_ASTEXT(ST_MAKEPOLYGONORIENTED([ST_GEOGFROMTEXT('LINESTRING(0 0, 10 0, 10 10, 0 10, 0 0)'), ST_GEOGFROMTEXT('LINESTRING(1 1, 2 1, 2 2, 1 2, 1 1)')]))
+=> "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0), (1 2, 2 2, 2 1, 1 1, 1 2))"
+
+# Previously a known bug: oriented WKB preserves the large region too.
+SELECT ST_GEOGFROMWKB(FROM_HEX('01030000000100000004000000000000000000000000000000000000000000000000000000000000000000f03f000000000000f03f000000000000000000000000000000000000000000000000'), oriented => TRUE)
+=> "POLYGON((0 0, 0 1, 1 0, 0 0))"
+
+SELECT ST_EQUALS(g, ST_GEOGFROMWKB(ST_ASBINARY(g), oriented => TRUE)) FROM (SELECT ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE) AS g)
+=> "true"
+
+SELECT ST_ASTEXT(ST_UNION(ST_GEOGFROMTEXT('POLYGON((0 0, 0 90, 90 0, 0 0))', oriented => TRUE), ST_GEOGPOINT(10, 10)))
+=> "GEOMETRYCOLLECTION(POINT(10 10), POLYGON((0 0, 0 90, 90 0, 0 0)))"

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -58,8 +57,7 @@ func TestGeographyColumns(t *testing.T) {
 		[]bigquery.Value{"LINESTRING(0 0, 132 0)"}, []bigquery.Value{"POINT(10 10)"})}); err != nil {
 		t.Fatal(err)
 	}
-	// Each row with a value that is neither WKT nor GeoJSON fails; a WKT polygon whose shell runs
-	// clockwise is unsupported, since BigQuery takes it as the region on its left:
+	// Invalid text fails; a clockwise WKT shell encloses the region on its left:
 	// https://cloud.google.com/bigquery/docs/geospatial-data#polygon_orientation
 	var rowErrors bigquery.PutMultiError
 	inserter.SkipInvalidRows = true
@@ -67,9 +65,8 @@ func TestGeographyColumns(t *testing.T) {
 		row(int64(2), "POINT(1", nil, nil),
 		row(int64(8), "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))", nil, nil),
 	})
-	if !errors.As(err, &rowErrors) || len(rowErrors) != 2 ||
-		!strings.Contains(rowErrors[1].Error(), "whose shell runs clockwise") {
-		t.Fatalf("invalid rows: %v, want an error for each, for a clockwise shell", err)
+	if !errors.As(err, &rowErrors) || len(rowErrors) != 1 || rowErrors[0].RowIndex != 0 {
+		t.Fatalf("invalid rows: %v, want an error only for the malformed point", err)
 	}
 
 	// Both also take GeoJSON geometries and hex-encoded WKB, whose polygons are oriented as WKT's
@@ -82,10 +79,8 @@ func TestGeographyColumns(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	err = inserter.Put(ctx, []*bigquery.ValuesSaver{row(int64(8), clockwiseWkb, nil, nil)})
-	if !errors.As(err, &rowErrors) || len(rowErrors) != 1 ||
-		!strings.Contains(rowErrors[0].Error(), "whose shell runs clockwise") {
-		t.Fatalf("clockwise WKB: %v, want an error for a clockwise shell", err)
+	if err := inserter.Put(ctx, []*bigquery.ValuesSaver{row(int64(15), clockwiseWkb, nil, nil)}); err != nil {
+		t.Fatal(err)
 	}
 	if err := p.load("places", `{"id": 4, "g": "POINT(5 6)", "r": {"g": null}}`+"\n"+
 		`{"id": 12, "g": "{\"type\": \"Point\", \"coordinates\": [3, 4]}"}`+"\n"+
@@ -120,9 +115,11 @@ func TestGeographyColumns(t *testing.T) {
 		{int64(4), "POINT(5 6)", empty, []bigquery.Value{nil}},
 		{int64(5), "POINT(170 10)", empty, nil},
 		{int64(6), "POINT(12 13)", []bigquery.Value{"POINT(5 6)"}, nil},
+		{int64(8), "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))", empty, nil},
 		{int64(12), "POINT(3 4)", empty, nil},
 		{int64(13), "POINT(2 4)", empty, nil},
 		{int64(14), "POINT(2 4)", empty, nil},
+		{int64(15), "POLYGON((0 0, 0 1, 1 0, 0 0))", empty, nil},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("tabledata.list = %v, want %v", got, want)

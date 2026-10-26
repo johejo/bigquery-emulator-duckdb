@@ -56,8 +56,10 @@
 #include "s2/s2point_vector_shape.h"
 #include "s2/s2polygon.h"
 #include "s2/s2polyline.h"
+#include "s2/s2region_coverer.h"
 #include "s2/s2shape.h"
 #include "s2/s2shape_index.h"
+#include "s2/s2shape_index_buffered_region.h"
 #include "s2/s2shape_measures.h"
 #include "src/googlesql_geography/options.h"
 #include "src/googlesql_geography/value.h"
@@ -1105,7 +1107,9 @@ absl::StatusOr<Geography> MakeLine(const std::vector<Geography>& geographies) {
 
 // The polygon whose rings are the linestrings of `geographies`, a shell and then its holes, each
 // closed by an edge from its last vertex to its first where it does not end where it starts.
-absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies) {
+absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies, bool oriented) {
+  const std::string function = oriented ? "ST_MakePolygonOriented" : "ST_MakePolygon";
+  const std::string failed = function + " failed: ";
   std::vector<std::vector<S2Point>> rings;
   for (const Geography& geography : geographies) {
     if (geography.Empty()) {
@@ -1114,7 +1118,8 @@ absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies)
     }
     if (geography.Count() != 1 || geography.lines.empty()) {
       return absl::OutOfRangeError(
-          "ST_MakePolygon failed: Input geographies for STMakePolygon must be empty or consist of "
+          failed +
+          "Input geographies for STMakePolygon must be empty or consist of "
           "exactly one linestring.");
     }
     std::vector<S2Point>& ring = rings.emplace_back(geography.lines.front());
@@ -1122,8 +1127,75 @@ absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies)
       ring.pop_back();
     }
   }
-  GOOGLESQL_ASSIGN_OR_RETURN(Geography polygon, BuildPolygon(rings, "ST_MakePolygon failed: "));
-  return polygon;
+  // Unlike oriented WKT, BigQuery's constructor takes each hole as the region it removes.
+  return BuildPolygon(rings, failed, oriented);
+}
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): follows the SQL argument order.
+absl::StatusOr<std::vector<int64_t>> CoveringCellIds(const IndexedGeography& geography,
+                                                     int64_t min_level, int64_t max_level,
+                                                     int64_t max_cells, double buffer) {
+  // NOLINTEND(bugprone-easily-swappable-parameters)
+  const auto invalid = [](std::string_view message) {
+    return absl::OutOfRangeError("S2_CoveringCellIDs: GetS2CellCovering failed: " +
+                                 std::string(message) + "; error in S2_COVERINGCELLIDS expression");
+  };
+  if (min_level < 0) {
+    return invalid("min_level must be nonnegative");
+  }
+  if (max_level > 30) {
+    return invalid("max_level is above maximum possible allowed value of 30");
+  }
+  if (min_level > max_level) {
+    return invalid("min_level should be less than or equal to max_level");
+  }
+  if (max_cells <= 0) {
+    return invalid("max_cells should at least be specified to be at least one cell");
+  }
+  if (max_cells > std::numeric_limits<int>::max()) {
+    return absl::UnimplementedError(
+        "The emulator does not support S2_COVERINGCELLIDS max_cells above INT32_MAX");
+  }
+  if (!(buffer >= 0)) {
+    return absl::OutOfRangeError(
+        "S2_CoveringCellIDs: GetS2CellCovering failed: buffer_meters should be nonnegative. "
+        "Error in S2_COVERINGCELLIDS expression");
+  }
+  if (buffer >= std::numbers::pi * S2Earth::RadiusMeters()) {
+    return absl::OutOfRangeError(
+        "S2_CoveringCellIDs: buffer_meters must be set to less than half the circumference of "
+        "the earth. Error in S2_COVERINGCELLIDS expression");
+  }
+  S2RegionCoverer::Options options;
+  options.set_min_level(static_cast<int>(min_level));
+  options.set_max_level(static_cast<int>(max_level));
+  options.set_max_cells(static_cast<int>(max_cells));
+  S2RegionCoverer coverer(options);
+  std::vector<S2CellId> cells;
+  if (buffer == 0 && geography.geography().Count() == 1 &&
+      geography.geography().points.size() == 1) {
+    // A point on a cell boundary belongs to one cell, not every closed cell touching it.
+    cells.push_back(
+        S2CellId(geography.geography().points.front()).parent(static_cast<int>(max_level)));
+  } else if (buffer == 0 && geography.geography().points.empty() &&
+             geography.geography().lines.empty()) {
+    coverer.GetCovering(*ToS2Polygon(geography.geography()), &cells);
+  } else {
+    coverer.GetCovering(
+        S2ShapeIndexBufferedRegion(&geography.index(), S2Earth::MetersToAngle(buffer)), &cells);
+  }
+  if (cells.size() > static_cast<size_t>(max_cells)) {
+    return absl::OutOfRangeError(
+        "S2_CoveringCellIDs: GetS2CellCovering failed: covering exceeded max_cells argument of " +
+        std::to_string(max_cells) +
+        ". Consider reducing `min_level` or increasing `max_cells`. Error in "
+        "S2_COVERINGCELLIDS expression");
+  }
+  std::vector<int64_t> result;
+  result.reserve(cells.size());
+  std::ranges::transform(cells, std::back_inserter(result),
+                         [](S2CellId cell) { return std::bit_cast<int64_t>(cell.id()); });
+  return result;
 }
 
 // A loop of a polygon as a linestring that ends where it starts.

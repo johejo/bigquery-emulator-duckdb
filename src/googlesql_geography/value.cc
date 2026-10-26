@@ -406,8 +406,8 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
   polygon.InitNested(std::move(loops));
   S2Error error;
   if (polygon.FindValidationError(&error)) {
-    return absl::OutOfRangeError(std::string(failed) +
-                                 "Invalid polygon: " + std::string(error.message()));
+    return absl::OutOfRangeError(std::string(failed) + (oriented ? "" : "Invalid polygon: ") +
+                                 std::string(error.message()));
   }
   if (rings.front().empty()) {
     for (size_t i = 0; i < order.size(); ++i) {
@@ -420,6 +420,17 @@ absl::StatusOr<Geography> Assemble(const std::vector<std::vector<S2Point>>& ring
     }
     polygon.Invert();
     return FromPolygon(polygon);
+  }
+  if (oriented && order.front()->depth() != 0) {
+    for (int i = 0; i < polygon.num_loops(); ++i) {
+      if (polygon.loop(i) == order.front()) {
+        const S2Loop* parent = polygon.loop(polygon.GetParent(i));
+        const auto position = std::ranges::find(order, parent);
+        return absl::OutOfRangeError(std::string(failed) +
+                                     "Polygon's first loop must be shell. It is nested in loop " +
+                                     std::to_string(std::distance(order.begin(), position) + 1));
+      }
+    }
   }
   for (size_t i = 1; i < order.size(); ++i) {
     if (order.at(i)->depth() == 0) {

@@ -129,8 +129,7 @@ func TestQueryRejectsUndeclaredParameters(t *testing.T) {
 
 // A GEOGRAPHY parameter is a GEOGRAPHY in the query, given as WKT whose polygons are oriented,
 // at any depth; the coordinates are those of scalars/geography.txt. BigQuery answered the other
-// cases, including the errors, which name the parameter even for an element or a field. The
-// emulator does not support a clockwise shell, which encloses more than a hemisphere.
+// cases, including the errors, which name the parameter even for an element or a field.
 func TestGeographyQueryParameters(t *testing.T) {
 	t.Parallel()
 	client := newClient(t)
@@ -151,11 +150,10 @@ func TestGeographyQueryParameters(t *testing.T) {
 			[]bigquery.Value{"POINT(1 2)"}, ""},
 		{"counterclockwise", "SELECT ST_AREA(@p) < 1e11", geography("POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"),
 			[]bigquery.Value{true}, ""},
-		{"clockwise", "SELECT ST_AREA(@p) < 1e11", geography(clockwise), nil,
-			"does not support GEOGRAPHY values of polygons whose shell runs clockwise"},
+		{"clockwise", "SELECT ST_AREA(@p) < 1e11", geography(clockwise),
+			[]bigquery.Value{false}, ""},
 		{"clockwise_element", "SELECT ST_AREA(@p[OFFSET(0)]) < 1e11",
-			[]bigquery.NullGeography{geography(clockwise)}, nil,
-			"does not support GEOGRAPHY values of polygons whose shell runs clockwise"},
+			[]bigquery.NullGeography{geography(clockwise)}, []bigquery.Value{false}, ""},
 		{"invalid", "SELECT ST_X(@p)", geography("POINT(1"), nil,
 			"Unparseable query parameter `p` in type `TYPE_GEOGRAPHY`, Expected latitude, but saw " +
 				"end of data at position 7. value: 'POINT(1'"},

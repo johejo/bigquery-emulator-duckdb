@@ -50,7 +50,7 @@ functions.
 | [Debugging functions](#debugging-functions) | 1 | 0 | 0 | 0 |
 | [DLP functions](#dlp-functions) | 0 | 0 | 3 | 0 |
 | [Federated query functions](#federated-query-functions) | 0 | 1 | 0 | 0 |
-| [Geography functions](#geography-functions) | 61 | 2 | 8 | 0 |
+| [Geography functions](#geography-functions) | 60 | 5 | 6 | 0 |
 | [Graph SQL functions](#graph-sql-functions) | 9 | 0 | 3 | 0 |
 | [Hash functions](#hash-functions) | 5 | 0 | 0 | 0 |
 | [HLL functions](#hll-functions) | 4 | 0 | 0 | 0 |
@@ -230,7 +230,7 @@ functions.
 | Function | Status | Implementation | Notes |
 | --- | --- | --- | --- |
 | [`S2_CELLIDFROMPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_cellidfrompoint) | Supported | S2 function |  |
-| [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | Unsupported |  |  |
+| [`S2_COVERINGCELLIDS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#s2_coveringcellids) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: S2_COVERINGCELLIDS max_cells above INT32_MAX. |
 | [`ST_ANGLE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_angle) | Supported | S2 function |  |
 | [`ST_AREA`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_area) | Supported | S2 function |  |
 | [`ST_ASBINARY`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_asbinary) | Supported | S2 function |  |
@@ -261,8 +261,8 @@ functions.
 | [`ST_EXTERIORRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_exteriorring) | Supported | S2 function |  |
 | [`ST_GEOGFROM`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfrom) | Supported | S2 function |  |
 | [`ST_GEOGFROMGEOJSON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromgeojson) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
-| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Supported | S2 function |  |
-| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Supported | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. |
+| [`ST_GEOGFROMTEXT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromtext) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMTEXT with planar or make_valid set to TRUE. |
+| [`ST_GEOGFROMWKB`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogfromwkb) | Partial | S2 function | See [GEOGRAPHY values](compatibility.md#geography-values) for limits. Unsupported: ST_GEOGFROMWKB with planar or make_valid set to TRUE. |
 | [`ST_GEOGPOINT`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpoint) | Supported | S2 function |  |
 | [`ST_GEOGPOINTFROMGEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geogpointfromgeohash) | Supported | S2 function |  |
 | [`ST_GEOHASH`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_geohash) | Supported | S2 function |  |
@@ -283,7 +283,7 @@ functions.
 | [`ST_LINESUBSTRING`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_linesubstring) | Supported | S2 function |  |
 | [`ST_MAKELINE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makeline) | Supported | S2 function |  |
 | [`ST_MAKEPOLYGON`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygon) | Supported | S2 function |  |
-| [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Unsupported |  |  |
+| [`ST_MAKEPOLYGONORIENTED`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_makepolygonoriented) | Supported | S2 function |  |
 | [`ST_MAXDISTANCE`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_maxdistance) | Supported | S2 function |  |
 | [`ST_NPOINTS`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_npoints) | Supported | S2 function |  |
 | [`ST_NUMGEOMETRIES`](https://cloud.google.com/bigquery/docs/reference/standard-sql/geography_functions#st_numgeometries) | Supported | S2 function |  |

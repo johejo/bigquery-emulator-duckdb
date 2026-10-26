@@ -1,1 +1,4 @@
-exports_files(["throw_delegate.patch"])
+exports_files([
+    "covering_order.patch",
+    "throw_delegate.patch",
+])

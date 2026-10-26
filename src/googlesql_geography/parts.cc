@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -10,7 +11,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/base/status_macros.h"
-#include "s2/s2loop_measures.h"
 #include "s2/s2point.h"
 #include "src/googlesql_geography/value.h"
 
@@ -55,14 +55,14 @@ absl::StatusOr<Geography> Build(const Part& part, bool oriented, std::string_vie
     }
     loop.pop_back();
   }
-  if (oriented && std::ranges::any_of(loops, [&](const std::vector<S2Point>& loop) {
-        return S2::IsNormalized(loop) != (&loop == &loops.front());
-      })) {
-    return absl::UnimplementedError(
-        "The emulator does not support GEOGRAPHY values of polygons whose shell runs clockwise "
-        "or whose holes run counterclockwise");
+  // BuildPolygon stores holes as the regions they remove, whereas an oriented input ring
+  // always has the polygon's interior on its left.
+  if (oriented) {
+    for (size_t i = 1; i < loops.size(); ++i) {
+      std::ranges::reverse(loops.at(i));
+    }
   }
-  return BuildPolygon(loops, failed);
+  return BuildPolygon(loops, failed, oriented);
 }
 
 }  // namespace

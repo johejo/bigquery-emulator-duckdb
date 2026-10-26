@@ -65,11 +65,15 @@ absl::StatusOr<Geography> LineSubstring(const Geography& geography, double start
 absl::StatusOr<std::optional<Geography>> UnionGeographies(
     const std::vector<Geography>& geographies);
 absl::StatusOr<Geography> MakeLine(const std::vector<Geography>& geographies);
-absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies);
+absl::StatusOr<Geography> MakePolygon(const std::vector<Geography>& geographies,
+                                      bool oriented = false);
 absl::StatusOr<std::vector<Geography>> Dump(const Geography& geography, int64_t dimension);
 absl::StatusOr<std::optional<std::string>> Geohash(const Geography& geography, int64_t length);
 absl::StatusOr<Geography> PointFromGeohash(const std::string& hash);
 absl::StatusOr<int64_t> CellIdFromPoint(const Geography& geography, int64_t level);
+absl::StatusOr<std::vector<int64_t>> CoveringCellIds(const IndexedGeography& geography,
+                                                     int64_t min_level, int64_t max_level,
+                                                     int64_t max_cells, double buffer);
 absl::StatusOr<bool> Intersects(const Geography& a, const Geography& b);
 absl::StatusOr<bool> Touches(const Geography& a, const Geography& b);
 absl::StatusOr<bool> Covers(const Geography& a, const Geography& b);
