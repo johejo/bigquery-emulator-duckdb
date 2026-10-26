@@ -42,6 +42,8 @@ constexpr std::string_view kCommaDefault[] = {"','"};
 constexpr std::string_view kNfcDefault[] = {"'NFC'"};
 constexpr std::string_view kExactDefault[] = {"'exact'"};
 constexpr std::string_view kRoundDefault[] = {"'round'"};
+constexpr std::string_view kSpaceDefault[] = {"' '"};
+constexpr std::string_view kBytesSpaceDefault[] = {"encode(' ')"};
 
 // These helpers only assemble views of static data; they do not generate SQL or own strings.
 constexpr std::array<StaticRule, 2> StringBytes(Arity arity, std::string_view text,
@@ -119,14 +121,6 @@ std::vector<Rule> JsonExtract(std::string_view function, bool standard, bool jso
   };
 }
 
-// The backend uses `function` for STRING and `function`_bytes for BYTES.
-std::vector<Rule> Strings(std::string_view function, Arity arity) {
-  return Concat({
-      Same(function, arity, {Is(1, {TYPE_STRING})}),
-      Same(std::string(function) + "_bytes", arity, {Is(1, {TYPE_BYTES})}),
-  });
-}
-
 // Decimal overloads retain precision rather than going through FLOAT64.
 std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
   const std::string function = "bq_" + std::string(name);
@@ -137,40 +131,22 @@ std::vector<Rule> Numbers(std::string_view name, std::size_t arity = 1) {
   });
 }
 
-// CODE_POINTS_TO_* is NULL when an element is NULL.
-std::vector<Rule> CodePointsTo(const std::string& function) {
-  return {
-      {
-          .arity = 1,
-          .spelling = "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE " + function + "($1) END",
-      },
-  };
-}
-
 // Without explicit characters, trim Unicode whitespace rather than DuckDB's spaces.
-std::vector<Rule> Trim(const std::string& function) {
+constexpr std::array<StaticRule, 3> Trim(std::string_view whitespace, std::string_view characters,
+                                         std::string_view bytes) {
   return {
-      {.arity = 1, .spelling = function + "($1)", .conditions = {Is(1, {TYPE_STRING})}},
-      {.arity = 2, .spelling = function + "_chars($1, $2)", .conditions = {Is(1, {TYPE_STRING})}},
-      {.arity = 2, .spelling = function + "_bytes($1, $2)", .conditions = {Is(1, {TYPE_BYTES})}},
+      {
+          {.arity = 1, .spelling = whitespace, .conditions = ArgumentType<TYPE_STRING>::kFirst},
+          {.arity = 2, .spelling = characters, .conditions = ArgumentType<TYPE_STRING>::kFirst},
+          {.arity = 2, .spelling = bytes, .conditions = ArgumentType<TYPE_BYTES>::kFirst},
+      },
   };
 }
 
-std::vector<Rule> Pad(const std::string& function) {
-  return {
-      {
-          .arity = {2, 3},
-          .spelling = function + "($1, $2, $3)",
-          .conditions = {Is(1, {TYPE_STRING})},
-          .defaults = {"' '"},
-      },
-      {
-          .arity = {2, 3},
-          .spelling = function + "_bytes($1, $2, $3)",
-          .conditions = {Is(1, {TYPE_BYTES})},
-          .defaults = {"encode(' ')"},
-      },
-  };
+constexpr std::array<StaticRule, 2> Pad(std::string_view text, std::string_view bytes) {
+  auto rules = StringBytes({2, 3}, text, bytes, kSpaceDefault);
+  rules.at(1).defaults = kBytesSpaceDefault;
+  return rules;
 }
 
 }  // namespace
@@ -211,6 +187,53 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       {.arity = 2, .spelling = "bq_generate_date_array($1, $2, 1, 'day')"},
       {.arity = 4, .spelling = "bq_generate_date_array($1, $2, $3, #4)"},
   };
+  // DuckDB's BLOB has almost no functions; its Unicode and error semantics differ too.
+  static constexpr auto kRepeat = StringBytes(2, "bq_repeat($1, $2)", "bq_repeat_bytes($1, $2)");
+  static constexpr auto kLower = StringBytes(1, "bq_lower($1)", "bq_lower_bytes($1)");
+  static constexpr auto kUpper = StringBytes(1, "bq_upper($1)", "bq_upper_bytes($1)");
+  static constexpr auto kReverse = StringBytes(1, "bq_reverse($1)", "bq_reverse_bytes($1)");
+  static constexpr auto kReplace =
+      StringBytes(3, "bq_replace($1, $2, $3)", "bq_replace_bytes($1, $2, $3)");
+  static constexpr auto kTranslate =
+      StringBytes(3, "bq_translate($1, $2, $3)", "bq_translate_bytes($1, $2, $3)");
+  static constexpr auto kAscii = StringBytes(1, "bq_ascii($1)", "bq_ascii_bytes($1)");
+  static constexpr StaticRule kUnicode[] = {
+      {.arity = 1, .spelling = "bq_unicode($1)", .conditions = ArgumentType<TYPE_STRING>::kFirst},
+  };
+  static constexpr auto kToCodePoints =
+      StringBytes(1, "bq_to_code_points($1)", "bq_to_code_points_bytes($1)");
+  // CODE_POINTS_TO_* is NULL when an element is NULL.
+  static constexpr StaticRule kCodePointsToString[] = {
+      {
+          .arity = 1,
+          .spelling =
+              "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE bq_code_points_to_string($1) END",
+      },
+  };
+  static constexpr StaticRule kCodePointsToBytes[] = {
+      {
+          .arity = 1,
+          .spelling =
+              "CASE WHEN list_count($1) <> len($1) THEN NULL ELSE bq_code_points_to_bytes($1) END",
+      },
+  };
+  static constexpr auto kLeft = StringBytes(2, "bq_left($1, $2)", "bq_left_bytes($1, $2)");
+  static constexpr auto kRight = StringBytes(2, "bq_right($1, $2)", "bq_right_bytes($1, $2)");
+  static constexpr auto kLpad = Pad("bq_lpad($1, $2, $3)", "bq_lpad_bytes($1, $2, $3)");
+  static constexpr auto kRpad = Pad("bq_rpad($1, $2, $3)", "bq_rpad_bytes($1, $2, $3)");
+  static constexpr auto kTrim =
+      Trim("bq_trim($1)", "bq_trim_chars($1, $2)", "bq_trim_bytes($1, $2)");
+  static constexpr auto kLtrim =
+      Trim("bq_ltrim($1)", "bq_ltrim_chars($1, $2)", "bq_ltrim_bytes($1, $2)");
+  static constexpr auto kRtrim =
+      Trim("bq_rtrim($1)", "bq_rtrim_chars($1, $2)", "bq_rtrim_bytes($1, $2)");
+  // DuckDB's regexp replacement and nonparticipating captures have different semantics.
+  static constexpr auto kRegexpContains =
+      StringBytes(2, "bq_regexp_contains($1, $2)", "bq_regexp_contains_bytes($1, $2)");
+  static constexpr auto kRegexpReplace =
+      StringBytes(3, "bq_regexp_replace($1, $2, $3)", "bq_regexp_replace_bytes($1, $2, $3)");
+  static constexpr auto kRegexpExtractAll =
+      StringBytes(2, "bq_regexp_extract_all($1, $2)", "bq_regexp_extract_all_bytes($1, $2)");
   // STRING and BYTES use GoogleSQL's position, length and NULL semantics.
   static constexpr auto kSubstr =
       StringBytes({2, 3}, "bq_substr($1, $2, $3)", "bq_substr_bytes($1, $2, $3)", kMaxLength);
@@ -452,6 +475,27 @@ std::span<const function_catalog::StaticNamedDefinition<StaticRule>> StaticBacke
       {"COSINE_DISTANCE", {.rules = kCosineDistance}},
       {"EUCLIDEAN_DISTANCE", {.rules = kEuclideanDistance}},
       {"CHR", {.rules = kChr}},
+      {"REPEAT", {.rules = kRepeat}},
+      {"LOWER", {.rules = kLower}},
+      {"UPPER", {.rules = kUpper}},
+      {"REVERSE", {.rules = kReverse}},
+      {"REPLACE", {.rules = kReplace}},
+      {"TRANSLATE", {.rules = kTranslate}},
+      {"ASCII", {.rules = kAscii}},
+      {"UNICODE", {.rules = kUnicode}},
+      {"TO_CODE_POINTS", {.rules = kToCodePoints}},
+      {"CODE_POINTS_TO_STRING", {.rules = kCodePointsToString}},
+      {"CODE_POINTS_TO_BYTES", {.rules = kCodePointsToBytes}},
+      {"LEFT", {.rules = kLeft}},
+      {"RIGHT", {.rules = kRight}},
+      {"LPAD", {.rules = kLpad}},
+      {"RPAD", {.rules = kRpad}},
+      {"TRIM", {.rules = kTrim}},
+      {"LTRIM", {.rules = kLtrim}},
+      {"RTRIM", {.rules = kRtrim}},
+      {"REGEXP_CONTAINS", {.rules = kRegexpContains}},
+      {"REGEXP_REPLACE", {.rules = kRegexpReplace}},
+      {"REGEXP_EXTRACT_ALL", {.rules = kRegexpExtractAll}},
       {"SUBSTR", {.rules = kSubstr}},
       {"SUBSTRING", {.rules = kSubstr}},
       {"INSTR", {.rules = kInstr}},
@@ -537,25 +581,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> BackendRules() {
           "LOG",
           {.rules = Concat({Numbers("ln"), Numbers("log", 2)}), .uses = {TypeUse::kBigNumeric}},
       },
-      // DuckDB's BLOB has almost no functions; its Unicode and error semantics differ too.
-      {"REPEAT", {.rules = Strings("bq_repeat", 2)}},
-      {"LOWER", {.rules = Strings("bq_lower", 1)}},
-      {"UPPER", {.rules = Strings("bq_upper", 1)}},
-      {"REVERSE", {.rules = Strings("bq_reverse", 1)}},
-      {"REPLACE", {.rules = Strings("bq_replace", 3)}},
-      {"TRANSLATE", {.rules = Strings("bq_translate", 3)}},
-      {"ASCII", {.rules = Strings("bq_ascii", 1)}},
-      {"UNICODE", {.rules = Same("bq_unicode", 1, {Is(1, {TYPE_STRING})})}},
-      {"TO_CODE_POINTS", {.rules = Strings("bq_to_code_points", 1)}},
-      {"CODE_POINTS_TO_STRING", {.rules = CodePointsTo("bq_code_points_to_string")}},
-      {"CODE_POINTS_TO_BYTES", {.rules = CodePointsTo("bq_code_points_to_bytes")}},
-      {"LEFT", {.rules = Strings("bq_left", 2)}},
-      {"RIGHT", {.rules = Strings("bq_right", 2)}},
-      {"LPAD", {.rules = Pad("bq_lpad")}},
-      {"RPAD", {.rules = Pad("bq_rpad")}},
-      {"TRIM", {.rules = Trim("bq_trim")}},
-      {"LTRIM", {.rules = Trim("bq_ltrim")}},
-      {"RTRIM", {.rules = Trim("bq_rtrim")}},
       {
           "GENERATE_RANGE_ARRAY",
           {
@@ -563,10 +588,6 @@ std::span<const function_catalog::NamedDefinition<Rule>> BackendRules() {
               .uses = {TypeUse::kBuildsOrReadsInterval, TypeUse::kBuildsOrReadsRange},
           },
       },
-      // DuckDB's regexp replacement and nonparticipating captures have different semantics.
-      {"REGEXP_CONTAINS", {.rules = Strings("bq_regexp_contains", 2)}},
-      {"REGEXP_REPLACE", {.rules = Strings("bq_regexp_replace", 3)}},
-      {"REGEXP_EXTRACT_ALL", {.rules = Strings("bq_regexp_extract_all", 2)}},
       {"JSON_QUERY", {.rules = JsonExtract("bq_json_query", true, true)}},
       {"JSON_EXTRACT", {.rules = JsonExtract("bq_json_query", false, true)}},
       {"JSON_VALUE", {.rules = JsonExtract("bq_json_value", true, false)}},
