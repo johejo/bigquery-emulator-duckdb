@@ -89,7 +89,7 @@ cc_library(
         "_XOPEN_SOURCE=700",
     ],
     deps = [
-        "@boringssl//:ssl",
+        "@openssl//:ssl",
         "@zlib",
     ],
 )

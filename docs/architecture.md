@@ -232,7 +232,8 @@ calls typed `bq_py_*` scalar functions. Each DuckDB local function state starts 
 reuses its compiled functions across rows, and destroys it at query cleanup. Independent
 execution states use separate processes and Python globals.
 
-The emulator links the rules_python CPython 3.11 runtime and re-executes itself with
+The emulator statically links CPython 3.11 from the full python-build-standalone distribution
+(see [third_party/python](../third_party/python/)) and re-executes itself with
 the `internal-python-worker` subcommand for each worker. Only this internal mode initializes libpython,
 before any server or DuckDB initialization. An explicit `--python-worker` still starts an
 external executable with the memory limit as its only argument. The worker uses the CPython C API for compilation,

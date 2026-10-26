@@ -61,6 +61,9 @@
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
             CC = "/usr/bin/clang";
             CXX = "/usr/bin/clang++";
+            # Go's external linker does not preserve the action PATH. Give clang an
+            # explicit search path for ld64.lld through Bazel's C++ toolchain flags.
+            BAZEL_LINKOPTS = "-B${pkgs.llvmPackages_23.lld}/bin";
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             # Apps do not run the compiler setup hook that sets these in a devShell.
             CC = "${pkgs.llvmPackages_23.clang}/bin/clang";

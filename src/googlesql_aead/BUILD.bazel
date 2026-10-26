@@ -9,8 +9,8 @@ cc_library(
     copts = ["-std=c++20"],
     implementation_deps = [
         "@abseil-cpp//absl/status",
-        "@boringssl//:crypto",
         "@nlohmann_json//:json",
+        "@openssl//:crypto",
         "@protobuf//third_party/utf8_range:utf8_validity",
     ],
     linkstatic = True,

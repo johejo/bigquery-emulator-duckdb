@@ -41,9 +41,10 @@ build --host_copt=--system-header-prefix=s2/
 # optimized.
 build --per_file_copt=external/.*@-O2
 
-# Build libpq against the BoringSSL that gRPC already links, rather than a second TLS library
-# whose symbols would collide with it.
-common --@postgres//:with_ssl=boringssl
+# Share Python's OpenSSL across the TLS clients.
+common --@postgres//:with_ssl=openssl
+common --@grpc//third_party:grpc_use_openssl=true
+common --@curl//:ssl_lib=openssl
 
 # GoogleSQL's py_binary relies on implicit __init__.py creation, which rules_python deprecates. No
 # Python target in the build needs it.
@@ -54,10 +55,10 @@ build --@rules_python//python/config_settings:bootstrap_impl=script
 # macOS build compatibility.
 build:macos --features=-header_modules
 build:macos --features=-parse_headers
-# Apple's linker warns about the -lm and -lpthread that protobuf adds to each of its targets; Bazel
-# does not deduplicate link options across targets.
-build:macos --linkopt=-Wl,-no_warn_duplicate_libraries
-build:macos --host_linkopt=-Wl,-no_warn_duplicate_libraries
+# The standalone CPython static archive contains LLVM bitcode. Use LLVM's Mach-O linker
+# for target binaries and build tools, rather than Apple's linker and its older LTO reader.
+build:macos --linkopt=-fuse-ld=lld
+build:macos --host_linkopt=-fuse-ld=lld
 
 # clang-tidy uses the build's C++ toolchain and target parsing settings; see tools/clang_tidy/.
 build:clang-tidy --aspects=//tools/clang_tidy:clang_tidy.bzl%clang_tidy

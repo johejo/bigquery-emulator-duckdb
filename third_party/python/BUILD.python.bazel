@@ -1,0 +1,65 @@
+load("@rules_cc//cc:cc_import.bzl", "cc_import")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["install/bin/python3"])
+
+alias(
+    name = "python3",
+    actual = "install/bin/python3",
+)
+
+filegroup(
+    name = "files",
+    srcs = glob(
+        [
+            "install/lib/**",
+        ],
+        exclude = [
+            "**/__pycache__/**",
+            "**/*.a",
+        ],
+    ),
+)
+
+cc_import(
+    name = "libpython",
+    static_library = glob(["install/lib/python3.11/config-*/libpython3.11.a"])[0],
+)
+
+cc_library(
+    name = "runtime",
+    srcs = glob(
+        ["build/lib/*.a"],
+        exclude = [
+            "build/lib/libssl.a",
+            "build/lib/libcrypto.a",
+        ],
+    ),
+    hdrs = glob(["install/include/python3.11/**/*.h"]),
+    includes = ["install/include/python3.11"],
+    linkopts = select({
+        "@platforms//os:macos": [
+            # System dependencies of the static modules listed in PYTHON.json.
+            "-lncurses",
+            "-lpanel",
+            "-ledit",
+            "-lz",
+            "-framework CoreFoundation",
+            "-framework SystemConfiguration",
+            "-Wl,-export_dynamic",
+        ],
+        "//conditions:default": [
+            "-ldl",
+            "-lm",
+            "-lpthread",
+            "-lutil",
+            "-Wl,--export-dynamic",
+        ],
+    }),
+    deps = [
+        ":libpython",
+        "@openssl//:ssl",
+    ],
+)
