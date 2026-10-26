@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -28,6 +29,7 @@
 #include "googlesql/public/value.h"
 #include "src/api_error.h"
 #include "src/duckdb_sql.h"
+#include "src/extract_options.h"
 #include "src/field_schema.h"
 #include "src/parquet_metadata.h"
 #include "src/schema_sql.h"
@@ -331,8 +333,12 @@ void AnnotateBigNumerics(const FieldSchema& field, const ParquetColumn& column,
 }  // namespace
 
 void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
-                      const ExtractValue& value, const TextExtractOptions& options,
-                      const std::string& path) {
+                      const ExtractValue& value, const TextExtractFormatOptions& options,
+                      ExtractCompression compression, const std::string& path) {
+  if (compression != ExtractCompression::kNone && compression != ExtractCompression::kGzip) {
+    throw ApiError::Invalid("Unsupported text extract compression: " +
+                            std::string(ExtractCompressionName(compression)));
+  }
   CheckTextFields(schema);
   googlesql::TypeFactory type_factory;
   std::vector<const googlesql::Type*> types;
@@ -348,7 +354,7 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
     return values;
   };
   std::string contents;
-  if (options.json) {
+  if (std::holds_alternative<JsonExtractOptions>(options)) {
     for (size_t r = 0; r < row_count; ++r) {
       std::string line;
       const std::vector<googlesql::Value> values = row(r);
@@ -364,8 +370,9 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
       throw ApiError::Invalid("Operation cannot be performed on a nested schema. Field: " +
                               nested->name);
     }
-    const std::string& delimiter = options.field_delimiter;
-    if (options.print_header) {
+    const auto& csv = std::get<CsvExtractOptions>(options);
+    const std::string& delimiter = csv.field_delimiter;
+    if (csv.print_header) {
       for (size_t i = 0; i < schema.size(); ++i) {
         if (i > 0) {
           contents += delimiter;
@@ -387,7 +394,7 @@ void WriteTextExtract(const std::vector<FieldSchema>& schema, size_t row_count,
       contents += '\n';
     }
   }
-  WriteFile(path, contents, options.gzip);
+  WriteFile(path, contents, compression == ExtractCompression::kGzip);
 }
 
 std::string ParquetExtractColumns(const std::vector<FieldSchema>& schema) {

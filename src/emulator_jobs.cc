@@ -28,6 +28,7 @@
 #include "src/emulator.h"
 #include "src/emulator_functions.h"
 #include "src/extract.h"
+#include "src/extract_options.h"
 #include "src/field_schema.h"
 #include "src/gcs.h"
 #include "src/job_options.h"
@@ -566,21 +567,14 @@ std::shared_ptr<const Job> Emulator::RunExtract(ExtractRequest request) {
       AnnotateParquetBigNumerics(path, table.schema);
     } else {
       const QueryResult result = Execute("SELECT * FROM " + ReadTableRelation(backend_, source));
-      const ExtractFormatOptions options =
-          ParseExtractFormatOptions(encoding.format, extract.configuration);
-      const auto* csv = std::get_if<CsvExtractOptions>(&options);
+      const TextExtractFormatOptions options =
+          ParseTextExtractFormatOptions(encoding.format, extract.configuration);
       WriteTextExtract(
           table.schema, result.rows.size(),
           [&](size_t row, size_t column, const googlesql::Type* type) {
             return result.rows.GoogleSqlValue(row, column, type);
           },
-          {
-              .json = std::holds_alternative<JsonExtractOptions>(options),
-              .gzip = encoding.compression == ExtractCompression::kGzip,
-              .field_delimiter = csv ? csv->field_delimiter : ",",
-              .print_header = csv ? csv->print_header : true,
-          },
-          path);
+          options, encoding.compression, path);
     }
     if (uri.starts_with("gs://")) {
       gcs_client_.Upload(path, uri);
