@@ -2,7 +2,9 @@ package bqscenario
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -25,60 +27,87 @@ import (
 )
 
 func TestRESTScenarioUploadAndResponse(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer token" {
-			t.Error("missing authorization")
-		}
-		if r.URL.Path != "/upload/bigquery/v2/projects/project/jobs" || r.URL.Query().Get("uploadType") != "multipart" {
-			t.Errorf("URL = %s", r.URL)
-		}
-		kind, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || kind != "multipart/related" {
-			t.Errorf("content type = %s, %v", kind, err)
-			w.WriteHeader(500)
-			return
-		}
-		reader := multipart.NewReader(r.Body, params["boundary"])
-		part, err := reader.NextPart()
-		if err != nil {
-			t.Error(err)
-			w.WriteHeader(500)
-			return
-		}
-		data, _ := io.ReadAll(part)
-		if !strings.Contains(string(data), `9007199254740993`) || !strings.Contains(string(data), `quoted\"\\value`) {
-			t.Errorf("metadata = %s", data)
-		}
-		part, err = reader.NextPart()
-		if err != nil {
-			t.Error(err)
-			w.WriteHeader(500)
-			return
-		}
-		data, _ = io.ReadAll(part)
-		if string(data) != "2.25,2.5\n" {
-			t.Errorf("upload = %q", data)
-		}
-		if _, err := reader.NextPart(); err != io.EOF {
-			t.Errorf("extra part = %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"number":9007199254740993,"jobReference":{"jobId":"job"}}`)
-	}))
-	defer server.Close()
-	transport := NewTransport("token")
-	transport.RESTEndpoint = server.URL
-	media := "${data}"
-	response, err := transport.Call(t.Context(), Step{REST: &RESTRequest{
-		Method: "POST", Path: "/upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart",
-		Body: map[string]any{"number": "${number}", "text": "${text}"}, Upload: &media,
-	}}, map[string]any{"project": "project", "number": json.Number("9007199254740993"), "text": "quoted\"\\value", "data": "2.25,2.5\n"})
-	if err != nil || response.Failed {
-		t.Fatalf("response = %+v, %v", response, err)
+	for _, binary := range []bool{false, true} {
+		t.Run(fmt.Sprint("binary=", binary), func(t *testing.T) {
+			mediaBytes := "2.25,2.5\n"
+			if binary {
+				mediaBytes = "PAR1\x00\xff\x80\r\nPAR1"
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer token" {
+					t.Error("missing authorization")
+				}
+				if r.URL.Path != "/upload/bigquery/v2/projects/project/jobs" || r.URL.Query().Get("uploadType") != "multipart" {
+					t.Errorf("URL = %s", r.URL)
+				}
+				kind, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+				if err != nil || kind != "multipart/related" {
+					t.Errorf("content type = %s, %v", kind, err)
+					w.WriteHeader(500)
+					return
+				}
+				reader := multipart.NewReader(r.Body, params["boundary"])
+				part, err := reader.NextPart()
+				if err != nil {
+					t.Error(err)
+					w.WriteHeader(500)
+					return
+				}
+				data, _ := io.ReadAll(part)
+				if !strings.Contains(string(data), `9007199254740993`) || !strings.Contains(string(data), `quoted\"\\value`) {
+					t.Errorf("metadata = %s", data)
+				}
+				part, err = reader.NextPart()
+				if err != nil {
+					t.Error(err)
+					w.WriteHeader(500)
+					return
+				}
+				data, _ = io.ReadAll(part)
+				if string(data) != mediaBytes {
+					t.Errorf("upload = %q", data)
+				}
+				if _, err := reader.NextPart(); err != io.EOF {
+					t.Errorf("extra part = %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"number":9007199254740993,"jobReference":{"jobId":"job"}}`)
+			}))
+			defer server.Close()
+			transport := NewTransport("token")
+			transport.RESTEndpoint = server.URL
+			media := "${data}"
+			request := &RESTRequest{
+				Method: "POST", Path: "/upload/bigquery/v2/projects/${project}/jobs?uploadType=multipart",
+				Body: map[string]any{"number": "${number}", "text": "${text}"}, Upload: &media,
+			}
+			data := mediaBytes
+			if binary {
+				request.Upload = nil
+				request.UploadBase64 = &media
+				data = base64.StdEncoding.EncodeToString([]byte(mediaBytes))
+			}
+			response, err := transport.Call(t.Context(), Step{REST: request}, map[string]any{"project": "project", "number": json.Number("9007199254740993"), "text": "quoted\"\\value", "data": data})
+			if err != nil || response.Failed {
+				t.Fatalf("response = %+v, %v", response, err)
+			}
+			got, _, err := pointer(response.Value, "/body/number")
+			if err != nil || got != json.Number("9007199254740993") {
+				t.Fatalf("number = %v, %v", got, err)
+			}
+		})
 	}
-	got, _, err := pointer(response.Value, "/body/number")
-	if err != nil || got != json.Number("9007199254740993") {
-		t.Fatalf("number = %v, %v", got, err)
+}
+
+func TestRESTScenarioInvalidUpload(t *testing.T) {
+	invalid, valid := "not base64!", "UEFSMQ=="
+	for _, request := range []RESTRequest{
+		{Method: "POST", Path: "/upload", UploadBase64: &invalid},
+		{Method: "POST", Path: "/upload", Upload: &valid, UploadBase64: &valid},
+	} {
+		if _, err := NewTransport("").rest(t.Context(), request, nil); err == nil {
+			t.Fatal("invalid upload accepted")
+		}
 	}
 }
 

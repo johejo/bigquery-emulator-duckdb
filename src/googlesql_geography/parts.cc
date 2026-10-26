@@ -11,7 +11,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "googlesql/base/status_macros.h"
+#include "s2/r2.h"
 #include "s2/s2point.h"
+#include "src/googlesql_geography/planar.h"
 #include "src/googlesql_geography/value.h"
 
 namespace googlesql_geography {
@@ -91,6 +93,47 @@ absl::StatusOr<Geography> BuildParts(std::vector<Part> parts, bool oriented,
     return Geography{};
   }
   return Combine(built);
+}
+
+absl::StatusOr<Geography> BuildPlanarParts(const std::vector<Part>& parts,
+                                           std::string_view failed) {
+  std::vector<Geography> built;
+  for (const Part& part : parts) {
+    std::vector<std::vector<R2Point>> rings;
+    for (const auto& ring : part.rings) {
+      auto& positions = rings.emplace_back();
+      for (const Point& vertex : ring) {
+        if (std::abs(vertex.latitude) > 90) {
+          return absl::OutOfRangeError(
+              std::string(failed) +
+              "Latitude must be between -90 and 90 degrees. Actual value was " +
+              Coordinate(vertex.latitude));
+        }
+        positions.emplace_back(vertex.longitude, vertex.latitude);
+      }
+    }
+    absl::StatusOr<Geography> geography;
+    switch (part.type) {
+      case Part::Type::kPoint: {
+        Point point = part.rings.front().front();
+        point.longitude = std::remainder(point.longitude, 360.0);
+        geography = PointGeography(ToS2Point(point));
+        break;
+      }
+      case Part::Type::kLineString:
+        geography = PlanarLine(rings.front(), failed);
+        break;
+      case Part::Type::kPolygon:
+        geography = PlanarPolygon(rings, failed);
+        break;
+      case Part::Type::kFull:
+        geography = FullGeography();
+        break;
+    }
+    GOOGLESQL_RETURN_IF_ERROR(geography.status());
+    built.push_back(std::move(*geography));
+  }
+  return built.empty() ? absl::StatusOr<Geography>(Geography{}) : Combine(built);
 }
 
 }  // namespace googlesql_geography

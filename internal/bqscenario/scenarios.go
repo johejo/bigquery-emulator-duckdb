@@ -59,6 +59,8 @@ type RESTRequest struct {
 	Body    any               `json:"body,omitempty"`
 	// Upload is inline media for jobs.insert's multipart/related upload, such as CSV or JSON Lines.
 	Upload *string `json:"upload,omitempty"`
+	// UploadBase64 carries binary media, such as Parquet, without UTF-8 conversion.
+	UploadBase64 *string `json:"uploadBase64,omitempty"`
 }
 
 type GRPCRequest struct {
@@ -288,6 +290,9 @@ func (file *File) validate() error {
 			if step.REST != nil {
 				if step.REST.Method == "" || !strings.HasPrefix(step.REST.Path, "/") || strings.HasPrefix(step.REST.Path, "//") {
 					return fmt.Errorf("%s/%s: REST requires a method and an absolute path", c.Name, step.Name)
+				}
+				if step.REST.Upload != nil && step.REST.UploadBase64 != nil {
+					return fmt.Errorf("%s/%s: upload and uploadBase64 are mutually exclusive", c.Name, step.Name)
 				}
 				if len(step.Until) != 0 && step.REST.Method != "GET" {
 					return fmt.Errorf("%s/%s: until requires a REST GET", c.Name, step.Name)

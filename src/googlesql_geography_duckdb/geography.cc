@@ -17,7 +17,6 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/escaping.h"
 #include "duckdb.h"
 #include "googlesql/base/status_macros.h"
 #include "googlesql/public/type.pb.h"
@@ -257,30 +256,11 @@ absl::StatusOr<std::string> GeographyInput(const Arguments& args) {
   return ReadGeography(args.String(0), /*oriented=*/true, kInputFailed);
 }
 
-// A GEOGRAPHY that a Parquet load writes, as GeographyInput takes it, except that a binary column
-// holds WKB, which DuckDB casts to text that escapes as \xHH each byte it does not print, as it
-// does the first byte of any WKB.
-absl::StatusOr<std::string> ParquetGeographyInput(const Arguments& args) {
-  const std::string text = args.String(0);
-  if (!text.starts_with("\\x")) {
-    return ReadGeography(text, /*oriented=*/true, kInputFailed);
-  }
-  std::string bytes;
-  for (size_t i = 0; i < text.size(); ++i) {
-    if (text.at(i) == '\\' && i + 3 < text.size() && text.at(i + 1) == 'x') {
-      std::string byte;
-      if (!absl::HexStringToBytes(std::string_view(text).substr(i + 2, 2), &byte)) {
-        return absl::InvalidArgumentError("Invalid escaped BLOB text: " + text);
-      }
-      bytes += byte;
-      i += 3;
-    } else {
-      bytes.push_back(text.at(i));
-    }
-  }
+// Read Parquet binary columns directly, retaining GeoParquet's planar edge semantics.
+absl::StatusOr<std::string> ParquetWkbInput(const Arguments& args) {
   GOOGLESQL_ASSIGN_OR_RETURN(const Geography geography,
-                             googlesql_geography::ReadWkb(bytes, "ST_GeogFromWKB failed: ",
-                                                          /*oriented=*/true));
+                             googlesql_geography::ReadWkb(args.String(0), "ST_GeogFromWKB failed: ",
+                                                          /*oriented=*/true, args.Bool(1)));
   return EncodeGeography(geography);
 }
 
@@ -480,8 +460,8 @@ const Definitions& GeographyDefinitions() {
                           kGeography, EachRow<GeogFromOrientedWkb<true>>);
     }
     definitions->Scalar("bq_geography_input", {kVarchar}, kGeography, EachRow<GeographyInput>);
-    definitions->Scalar("bq_parquet_geography_input", {kVarchar}, kGeography,
-                        EachRow<ParquetGeographyInput>);
+    definitions->Scalar("bq_parquet_wkb_input", {kBlob, kBoolean}, kGeography,
+                        EachRow<ParquetWkbInput>);
     definitions->Scalar("bq_st_geogpointfromgeohash", {kVarchar}, kGeography,
                         EachRow<Call<googlesql_geography::PointFromGeohash>>);
     definitions->Scalar("bq_st_astext", {kGeography}, kVarchar,

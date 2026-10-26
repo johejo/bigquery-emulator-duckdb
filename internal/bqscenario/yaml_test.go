@@ -131,6 +131,11 @@ func TestVerifyMismatchAndCleanup(t *testing.T) {
 	} {
 		c := file.Cases[0]
 		c.Expect = json.RawMessage(want)
+		if err := file.Verify(t.Context(), c, "p", "r", time.Second, fixtureCall); err == nil {
+			t.Fatal("mismatched expectation accepted")
+		} else if _, ok := err.(*MismatchError); !ok {
+			t.Fatalf("completed mismatch has type %T: %v", err, err)
+		}
 		cleaned := false
 		err := file.Verify(t.Context(), c, "p", "r", time.Second, func(ctx context.Context, step Step, vars map[string]any) (Response, error) {
 			if step.Name == "delete" {
@@ -141,6 +146,9 @@ func TestVerifyMismatchAndCleanup(t *testing.T) {
 		})
 		if !cleaned || !errors.Is(err, failure) || !strings.Contains(err.Error(), "observations differ") {
 			t.Fatalf("verify: %v, cleanup=%v", err, cleaned)
+		}
+		if _, ok := err.(*MismatchError); ok {
+			t.Fatal("cleanup failure classified as a completed mismatch")
 		}
 	}
 	c := file.Cases[0]

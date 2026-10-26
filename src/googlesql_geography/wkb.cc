@@ -301,15 +301,17 @@ class WkbWriter {
 
 }  // namespace
 
-absl::StatusOr<Geography> ReadWkb(std::string_view bytes, std::string_view failed, bool oriented) {
+absl::StatusOr<Geography> ReadWkb(std::string_view bytes, std::string_view failed, bool oriented,
+                                  bool planar) {
   WkbReader reader(bytes, failed);
   std::vector<Part> parts;
   GOOGLESQL_RETURN_IF_ERROR(reader.Geometry(parts));
   GOOGLESQL_RETURN_IF_ERROR(reader.End());
   // Errors in the geography the WKB describes name it.
   const absl::Status status = CheckFinite(parts, failed);
-  absl::StatusOr<Geography> geography =
-      status.ok() ? BuildParts(std::move(parts), oriented, failed) : status;
+  absl::StatusOr<Geography> geography = !status.ok() ? absl::StatusOr<Geography>(status)
+                                        : planar ? BuildPlanarParts(parts, failed)
+                                                 : BuildParts(std::move(parts), oriented, failed);
   if (!geography.ok() && geography.status().code() == absl::StatusCode::kOutOfRange) {
     return absl::OutOfRangeError(std::string(geography.status().message()) + "; in WKB geography");
   }

@@ -269,14 +269,15 @@ FieldSchema TextGeographies(FieldSchema field) {
 }
 
 // The DuckDB value `sql` of `column`, a Parquet column or null for none, as `field`. DuckDB casts
-// most columns itself, but StageParquetDecimals makes it read a wide DECIMAL as its bytes, and
+// most columns itself, but StageParquetSources makes it read a wide DECIMAL as its bytes, and
 // it casts a DECIMAL to BIGNUM as an integer, so those go through GoogleSQL's conversions. A
 // lambda takes the name _e and its `depth`.
 std::string ParquetValue(const std::string& sql, const FieldSchema& field,
                          const ParquetColumn* column, int depth) {
   std::string cast = std::format("CAST({} AS {})", sql, ToDuckDbType(field));
   if (column == nullptr ||
-      (field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
+      (field.type != FieldType::kGeography && !HasType(field.fields, FieldType::kGeography) &&
+       field.type != FieldType::kBigNumeric && !HasType(field.fields, FieldType::kBigNumeric) &&
        !column->HasWideDecimal())) {
     return cast;
   }
@@ -298,6 +299,14 @@ std::string ParquetValue(const std::string& sql, const FieldSchema& field,
     return MapFields(sql, field, [&](const std::string& value, const FieldSchema& child) {
       return ParquetValue(value, child, column->Child(child.name), depth);
     });
+  }
+  if (field.type == FieldType::kGeography) {
+    if ((column->type == parquet::kByteArray || column->type == parquet::kFixedLenByteArray) &&
+        column->converted == -1 && column->logical == 0) {
+      return std::format("bq_parquet_wkb_input({}, {})", sql,
+                         column->edges == ParquetColumn::Edges::kPlanar ? "true" : "false");
+    }
+    return std::format("bq_geography_input(CAST({} AS VARCHAR))", sql);
   }
   if (column->IsWideDecimal() &&
       (field.type != FieldType::kBigNumeric || column->scale > kBigNumericScale)) {
@@ -453,12 +462,62 @@ std::string JsonValue(const std::string& name, const FieldSchema& field, int dep
 
 }  // namespace
 
-ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
-                                    TemporaryFiles& downloads, bool list_inference) {
+ParquetSources StageParquetSources(const std::vector<std::string>& paths, TemporaryFiles& downloads,
+                                   bool list_inference) {
   ParquetSources sources;
   for (const std::string& path : paths) {
     ThriftValue metadata = ReadParquetMetadata(path);
-    const ParquetColumn columns = ParquetColumns(metadata, list_inference);
+    ParquetColumn columns = ParquetColumns(metadata, list_inference);
+    bool geo = false;
+    // FileMetaData.key_value_metadata (5), KeyValue.key (1), value (2).
+    // Hide geo from DuckDB: its native GEOMETRY reader discards the edge interpretation.
+    if (ThriftValue* entries = metadata.Field(5)) {
+      std::erase_if(entries->elements, [&](const ThriftValue& entry) {
+        const ThriftValue* key = entry.Field(1);
+        if (key == nullptr || key->bytes != "geo") {
+          return false;
+        }
+        geo = true;
+        const ThriftValue* value = entry.Field(2);
+        if (value == nullptr) {
+          throw ApiError::Invalid("GeoParquet metadata has no value");
+        }
+        json description;
+        try {
+          description = json::parse(value->bytes);
+          for (const auto& [name, definition] : description.at("columns").items()) {
+            const auto found = std::ranges::find(columns.children, name, &ParquetColumn::name);
+            if (found == columns.children.end() || found->kind != ParquetColumn::Kind::kLeaf ||
+                found->type != parquet::kByteArray) {
+              throw ApiError::Unsupported("GeoParquet geometry column that is not binary WKB");
+            }
+            if (definition.at("encoding") != "WKB") {
+              throw ApiError::Unsupported("GeoParquet encoding other than WKB");
+            }
+            if (definition.contains("crs") && (!definition["crs"].is_object() ||
+                                               definition["crs"].value("id", json::object()) !=
+                                                   json{{"authority", "OGC"}, {"code", "CRS84"}})) {
+              throw ApiError::Unsupported("GeoParquet CRS other than CRS84");
+            }
+            if (definition.contains("epoch")) {
+              throw ApiError::Unsupported("GeoParquet coordinate epoch");
+            }
+            const std::string edges = definition.value("edges", "planar");
+            if (edges != "planar" && edges != "spherical") {
+              throw ApiError::Unsupported("GeoParquet edge interpretation " + edges);
+            }
+            found->edges = edges == "planar" ? ParquetColumn::Edges::kPlanar
+                                             : ParquetColumn::Edges::kSpherical;
+            const auto& element = metadata.Field(parquet::kSchema)->elements.at(found->element);
+            const auto* repetition = element.Field(parquet::kElementRepetition);
+            found->required = repetition != nullptr && repetition->integer == 0;
+          }
+        } catch (const json::exception& error) {
+          throw ApiError::Invalid(std::string("Invalid GeoParquet metadata: ") + error.what());
+        }
+        return true;
+      });
+    }
     if (sources.paths.empty()) {
       sources.columns = columns;
     } else if (columns != sources.columns &&
@@ -466,6 +525,11 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
       throw ApiError::Unsupported(
           "loading Parquet files whose schemas differ when one has a DECIMAL "
           "wider than 38 digits");
+    } else if (columns != sources.columns &&
+               (geo || std::ranges::any_of(sources.columns.children, [](const auto& column) {
+                  return column.edges != ParquetColumn::Edges::kNone;
+                }))) {
+      throw ApiError::Unsupported("loading Parquet files with differing GeoParquet metadata");
     } else if (columns != sources.columns && (columns.Reshaped() || sources.columns.Reshaped())) {
       throw ApiError::Unsupported(
           "loading Parquet files whose schemas differ when one has a STRUCT of one field that "
@@ -473,7 +537,7 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
     }
     std::vector<size_t> wide;
     WideDecimals(columns, wide);
-    if (wide.empty()) {
+    if (wide.empty() && !geo) {
       sources.paths.push_back(path);
       continue;
     }
@@ -496,10 +560,15 @@ ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
   return sources;
 }
 
-void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
-                           const std::vector<DecimalTargetType>& targets) {
+void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
+                         const std::vector<DecimalTargetType>& targets) {
   for (FieldSchema& field : schema) {
     DetectDecimals(field, columns.Child(field.name), targets);
+    const ParquetColumn* column = columns.Child(field.name);
+    if (column != nullptr && column->edges != ParquetColumn::Edges::kNone) {
+      field.type = FieldType::kGeography;
+      field.mode = column->required ? FieldMode::kRequired : FieldMode::kNullable;
+    }
   }
 }
 
@@ -543,6 +612,10 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
   if (is_parquet) {
     for (const FieldSchema& field : schema) {
       const ParquetColumn* column = parquet.Child(field.name);
+      if (column != nullptr && column->edges != ParquetColumn::Edges::kNone &&
+          field.type != FieldType::kGeography) {
+        throw ApiError::Unsupported("loading a GeoParquet geometry into a non-GEOGRAPHY field");
+      }
       if (field.type == FieldType::kRange && column != nullptr &&
           column->kind == ParquetColumn::Kind::kLeaf) {
         throw ApiError::Invalid(
@@ -626,13 +699,11 @@ std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>
     std::vector<std::string> columns;
     for (const FieldSchema& field : schema) {
       const std::string name = QuoteIdentifier(field.name);
-      columns.push_back(std::format(
-          "{} AS {}",
-          StoredValue(is_parquet
-                          ? ParquetValue(name, TextGeographies(field), parquet.Child(field.name), 0)
-                          : JsonValue(name, TextGeographies(field)),
-                      field, is_parquet),
-          name));
+      const std::string value =
+          is_parquet
+              ? CheckedWriteValue(ParquetValue(name, field, parquet.Child(field.name), 0), field)
+              : StoredValue(JsonValue(name, TextGeographies(field)), field);
+      columns.push_back(std::format("{} AS {}", value, name));
     }
     sql = std::format("SELECT {} FROM ({}) AS source", Join(columns, ", "), sql);
   }

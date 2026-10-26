@@ -33,25 +33,22 @@ struct ParquetSources {
   ParquetColumn columns;
 };
 
-// Stages the PARQUET files `paths` for LoadQuery. DuckDB reads a DECIMAL wider than 38 digits as
-// a DOUBLE, so a file with one is copied into `downloads` with the DECIMAL annotations of those
-// columns removed from its footer, for DuckDB to read their bytes and LoadQuery to convert them
-// exactly. Throws ApiError::Invalid for a file that is not Parquet, and for files whose schemas
-// differ when one has such a column. The columns take the shape BigQuery loads with or without
-// `list_inference`.
-ParquetSources StageParquetDecimals(const std::vector<std::string>& paths,
-                                    TemporaryFiles& downloads, bool list_inference);
+// Stages PARQUET files for LoadQuery. Copies files into `downloads` with wide DECIMAL
+// annotations and GeoParquet metadata removed, so DuckDB reads their raw bytes. Keeps decimal
+// types and geometry edge semantics in `columns` for schema inference and conversion.
+// Rejects incompatible file schemas or unsupported GeoParquet encodings and coordinate systems.
+// The columns take the shape BigQuery loads with or without `list_inference`.
+ParquetSources StageParquetSources(const std::vector<std::string>& paths, TemporaryFiles& downloads,
+                                   bool list_inference);
 
-// Gives the fields of `schema`, as DuckDB detects it from staged Parquet files with `columns`,
-// that hold a DECIMAL wider than 38 digits the type that BigQuery detects for them under the
-// decimalTargetTypes in `targets`. Throws ApiError::Invalid when
-// that type is not BIGNUMERIC, which the emulator does not support.
-void DetectParquetDecimals(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
-                           const std::vector<DecimalTargetType>& targets);
+// Restores GeoParquet GEOGRAPHY types and modes and wide DECIMAL types in DuckDB's inferred
+// schema. Wide decimals require BIGNUMERIC in decimalTargetTypes (`targets`).
+void DetectParquetSchema(std::vector<FieldSchema>& schema, const ParquetColumn& columns,
+                         const std::vector<DecimalTargetType>& targets);
 
 // The query that reads the files `paths` using `options`, as the columns of `schema`,
 // or as DuckDB detects them when
-// `schema` is empty. PARQUET files take the `parquet` columns StageParquetDecimals found. Throws
+// `schema` is empty. PARQUET files take the `parquet` columns StageParquetSources found. Throws
 // ApiError::Invalid for a Parquet column the emulator cannot load into its field.
 std::string LoadQuery(const LoadOptions& options, const std::vector<std::string>& paths,
                       const std::vector<FieldSchema>& schema, const ParquetColumn& parquet = {});

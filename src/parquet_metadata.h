@@ -119,6 +119,11 @@ inline constexpr int64_t kConvertedLastInteger = 18;
 struct ParquetColumn {
   enum class Kind : uint8_t { kLeaf, kStruct, kList, kMap };
 
+  // GeoParquet WKB edge interpretation; ordinary binary columns have kNone.
+  enum class Edges : uint8_t { kNone, kPlanar, kSpherical };
+  Edges edges = Edges::kNone;
+  bool required = false;
+
   std::string name;
   Kind kind = Kind::kLeaf;
   // kStruct: the fields. kList: the element, whose name is the list's.
