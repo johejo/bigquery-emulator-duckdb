@@ -29,12 +29,7 @@ func TestColumnRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_rounding_mode")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_rounding_mode")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	run, read := p.run, p.read
 
@@ -154,12 +149,7 @@ func TestAppendedRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_appended_rounding_mode")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_appended_rounding_mode")
 	numeric := func(name string, typ bigquery.FieldType, precision, scale int64, mode bigquery.RoundingMode) *bigquery.FieldSchema {
 		return &bigquery.FieldSchema{Name: name, Type: typ, Precision: precision, Scale: scale, RoundingMode: mode}
 	}
@@ -586,12 +576,7 @@ func TestCopyRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_copy_rounding_modes")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_copy_rounding_modes")
 	if _, _, err := runScript(t, client, dataset.DatasetID, `
 	 CREATE TABLE src (n NUMERIC(5, 1) OPTIONS (rounding_mode = 'ROUND_HALF_EVEN'));
 	 INSERT src VALUES (NUMERIC '2.25');
@@ -633,12 +618,7 @@ func TestLoadedUnparameterizedRoundingModes(t *testing.T) {
 	t.Parallel()
 	client := newClient(t)
 	ctx := t.Context()
-	dataset := client.Dataset("go_loaded_rounding_modes")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_loaded_rounding_modes")
 	schema := bigquery.Schema{
 		{Name: "n", Type: bigquery.NumericFieldType, RoundingMode: bigquery.RoundHalfEven},
 		{Name: "b", Type: bigquery.BigNumericFieldType, RoundingMode: bigquery.RoundHalfEven},
@@ -689,12 +669,7 @@ func TestUpdatedDefaultRoundingModes(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	client := newClient(t)
-	dataset := client.Dataset("go_updated_default_rounding")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	dataset := newDataset(t, client, "go_updated_default_rounding")
 	const even, away, unspecified = "ROUND_HALF_EVEN", "ROUND_HALF_AWAY_FROM_ZERO", "ROUNDING_MODE_UNSPECIFIED"
 	for _, method := range []string{"PATCH", "PUT"} {
 		for index, modes := range [][2]string{{away, even}, {even, away}, {even, unspecified}, {away, unspecified}} {

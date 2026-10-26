@@ -41,12 +41,7 @@ func TestPersistentSqlUdfs(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_routines")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_routines")
 	run := func(sql string) error {
 		t.Helper()
 		_, _, err := runScript(t, client, "", sql)
@@ -207,14 +202,8 @@ func TestPersistentSqlUdfs(t *testing.T) {
 // The emulator rejects the forms of persistent UDFs it does not run.
 func TestPersistentUdfsRejectUnsupportedForms(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_routines_unsupported")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	newDataset(t, client, "go_routines_unsupported")
 	if _, _, err := runScript(t, client, "", "CREATE FUNCTION go_routines_unsupported.f(x INT64) AS (x)"); err != nil {
 		t.Fatal(err)
 	}
@@ -253,12 +242,7 @@ func TestRoutineInsertUpdate(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_routine_api")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_routine_api")
 	routine := dataset.Routine("f")
 	args := []*bigquery.RoutineArgument{{Name: "x", DataType: &bigquery.StandardSQLDataType{TypeKind: "INT64"}}}
 	initial := &bigquery.RoutineMetadata{Type: "SCALAR_FUNCTION", Arguments: args,

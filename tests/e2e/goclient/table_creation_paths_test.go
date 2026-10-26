@@ -89,12 +89,7 @@ func TestTableCreationPaths(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_creation_paths")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_table_creation_paths")
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 
 	// A string literal default keeps its quotes in defaultValueExpression
@@ -206,14 +201,8 @@ func TestTableCreationPaths(t *testing.T) {
 // disposition says, and omitted columns take their defaults.
 func TestWritesToExistingTables(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_writes_to_existing_tables")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_writes_to_existing_tables")
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE target (id INT64 OPTIONS (description = 'key'), name STRING DEFAULT 'none', tags ARRAY<STRING>)
 	  OPTIONS (description = 'the table', labels = [('env', 'dev')])`)
@@ -296,12 +285,7 @@ func TestFailedReplacementsKeepTheTable(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_failed_replacements")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_failed_replacements")
 	p := creationPaths{datasetQueries{t: t, client: client, dataset: dataset}}
 	p.mustRun(`CREATE TABLE keep (id INT64 NOT NULL OPTIONS (description = 'key'), name STRING DEFAULT 'none')
 	  OPTIONS (description = 'the table', friendly_name = 'Keep', labels = [('env', 'dev')])`)

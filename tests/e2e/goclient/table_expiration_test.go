@@ -18,12 +18,7 @@ func TestTableExpiration(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_table_expiration")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_table_expiration")
 	run := func(sql string) error {
 		query := client.Query(sql)
 		query.DefaultDatasetID = dataset.DatasetID

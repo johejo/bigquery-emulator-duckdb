@@ -36,12 +36,7 @@ func TestGCSLoadWildcards(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_gcs_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_gcs_load")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	carol, dave := []bigquery.Value{int64(3), "carol"}, []bigquery.Value{int64(4), "dave"}
 
@@ -81,12 +76,7 @@ func TestGCSLoadErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_gcs_load_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_gcs_load_errors")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 	if err := loadGCS(ctx, table, people, "", "gs://load-fixtures/nested/people.jsonl"); err != nil {
@@ -120,12 +110,7 @@ func TestGzipLoad(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_gzip_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_gzip_load")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	table := dataset.Table("t")
 
@@ -159,12 +144,7 @@ func TestBigNumericTextLoads(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_text_load")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_bignumeric_text_load")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	const maxNumeric = "99999999999999999999999999999.999999999"
 	load := func(table string, format bigquery.DataFormat, data string, schema bigquery.Schema) error {

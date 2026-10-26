@@ -78,6 +78,20 @@ func readRows(t *testing.T, rows *bigquery.RowIterator) [][]bigquery.Value {
 	return result
 }
 
+// newDataset resets a test-owned dataset and removes it when the test finishes.
+// Tests of dataset creation or metadata should create their datasets explicitly.
+func newDataset(t *testing.T, client *bigquery.Client, id string) *bigquery.Dataset {
+	t.Helper()
+	ctx := context.Background()
+	dataset := client.Dataset(id)
+	_ = dataset.DeleteWithContents(ctx)
+	if err := dataset.Create(ctx, nil); err != nil {
+		t.Fatalf("create dataset %s: %v", id, err)
+	}
+	t.Cleanup(func() { _ = dataset.DeleteWithContents(context.Background()) })
+	return dataset
+}
+
 func newClient(t *testing.T) *bigquery.Client {
 	t.Helper()
 	project := os.Getenv("BQ_EMULATOR_PROJECT")

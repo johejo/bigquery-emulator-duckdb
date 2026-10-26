@@ -37,12 +37,7 @@ func TestGeographyColumns(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_geography_columns")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_geography_columns")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	schema := bigquery.Schema{
 		{Name: "id", Type: bigquery.IntegerFieldType},
@@ -186,12 +181,7 @@ func TestGeographyParquetWkb(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_geography_parquet_wkb")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_geography_parquet_wkb")
 
 	point, err := hex.DecodeString(pointWkb)
 	if err != nil {

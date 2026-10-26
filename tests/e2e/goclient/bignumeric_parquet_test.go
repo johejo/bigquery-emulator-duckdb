@@ -90,12 +90,7 @@ func TestBigNumericParquet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_parquet")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_bignumeric_parquet")
 
 	allocator := memory.NewGoAllocator()
 	wide := array.NewDecimal256Builder(allocator, bigNumericParquet)
@@ -262,12 +257,7 @@ func TestBigNumericParquetErrors(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := newClient(t)
-	dataset := client.Dataset("go_bignumeric_parquet_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_bignumeric_parquet_errors")
 
 	allocator := memory.NewGoAllocator()
 	// 10^75 units of 1 is out of BIGNUMERIC's range.

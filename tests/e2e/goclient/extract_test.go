@@ -137,12 +137,7 @@ func TestExtract(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
 	bucket := newExtractBucket(t, "go-extract")
-	dataset := client.Dataset("go_extract")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_extract")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun(`CREATE TABLE scalars AS SELECT
 	  1 AS i, 2.5 AS f, NUMERIC '1.5' AS n, TRUE AS b, b'ab' AS bt,
@@ -271,12 +266,7 @@ func TestExtractErrors(t *testing.T) {
 	ctx := context.Background()
 	client := newClient(t)
 	newExtractBucket(t, "go-extract-errors")
-	dataset := client.Dataset("go_extract_errors")
-	_ = dataset.DeleteWithContents(ctx)
-	if err := dataset.Create(ctx, nil); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dataset.DeleteWithContents(ctx) })
+	dataset := newDataset(t, client, "go_extract_errors")
 	p := datasetQueries{t: t, client: client, dataset: dataset}
 	p.mustRun("CREATE TABLE scalars AS SELECT 1 AS i")
 	p.mustRun("CREATE TABLE nested AS SELECT STRUCT(1 AS x) AS r")
