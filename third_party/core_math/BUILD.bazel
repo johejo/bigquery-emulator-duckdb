@@ -1,0 +1,10 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+exports_files(["BUILD.core_math.bazel"])
+
+cc_library(
+    name = "core_math",
+    hdrs = ["core_math.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@core_math"],
+)

@@ -17,9 +17,7 @@
 #include "s2/r2.h"
 #include "s2/s2earth.h"
 #include "s2/s2edge_tessellator.h"
-#include "s2/s2latlng.h"
 #include "s2/s2point.h"
-#include "s2/s2projections.h"
 #include "src/googlesql_geography/value.h"
 
 namespace googlesql_geography {
@@ -33,20 +31,11 @@ absl::Status Failed(std::string_view message) {
   return absl::OutOfRangeError(std::string(kFailed) + std::string(message));
 }
 
-// Longitudes and latitudes in degrees, as the plate carrée projection holds them, but without
-// wrapping: BigQuery takes an edge from longitude 170 to -170 the long way, through 0.
-class PlanarProjection final : public S2::Projection {
+// Longitudes and latitudes in degrees, but without wrapping: BigQuery takes an edge from longitude
+// 170 to -170 the long way, through 0.
+class PlanarProjection final : public DegreesProjection {
  public:
-  [[nodiscard]] R2Point Project(const S2Point& p) const override { return plate_.Project(p); }
-  [[nodiscard]] S2Point Unproject(const R2Point& p) const override { return plate_.Unproject(p); }
-  [[nodiscard]] R2Point FromLatLng(const S2LatLng& ll) const override {
-    return plate_.FromLatLng(ll);
-  }
-  [[nodiscard]] S2LatLng ToLatLng(const R2Point& p) const override { return plate_.ToLatLng(p); }
   [[nodiscard]] R2Point wrap_distance() const override { return {0, 0}; }
-
- private:
-  S2::PlateCarreeProjection plate_{180};
 };
 
 const PlanarProjection& Projection() {

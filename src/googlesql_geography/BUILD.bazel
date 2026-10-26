@@ -23,6 +23,7 @@ cc_library(
     ],
     copts = ["-std=c++20"],
     implementation_deps = [
+        "//third_party/core_math",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/types:span",
         "@googlesql//googlesql/base:status",

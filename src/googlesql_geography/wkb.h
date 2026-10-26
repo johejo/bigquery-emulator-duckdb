@@ -20,7 +20,7 @@ absl::StatusOr<Geography> ReadWkb(std::string_view bytes,
 
 // The little-endian WKB of `geography`: one point, linestring or polygon, a MULTIPOINT,
 // MULTILINESTRING or MULTIPOLYGON of more than one, and a GEOMETRYCOLLECTION of each of them where
-// it has parts of more than one dimension, with the coordinates that S2LatLng gives.
+// it has parts of more than one dimension, with the coordinates that ToPoint gives.
 std::string Wkb(const Geography& geography);
 
 }  // namespace googlesql_geography

@@ -97,6 +97,16 @@ http_archive(
     urls = ["https://github.com/apache/arrow-nanoarrow/archive/refs/tags/apache-arrow-nanoarrow-0.7.0.tar.gz"],
 )
 
+# Correctly rounded atan2, sin and cos for converting between degrees and S2Point; see
+# third_party/core_math.
+http_archive(
+    name = "core_math",
+    build_file = "//third_party/core_math:BUILD.core_math.bazel",
+    sha256 = "52cad8445f872ac5f169a9804a5a5c7ce97c1159c6d5d203131c68586269dc76",
+    strip_prefix = "core-math-e3f1fcc7daf46c61332357fac591e19e88902926",
+    urls = ["https://gitlab.inria.fr/core-math/core-math/-/archive/e3f1fcc7daf46c61332357fac591e19e88902926/core-math-e3f1fcc7daf46c61332357fac591e19e88902926.tar.gz"],
+)
+
 # Prebuilt static libduckdb per platform, linked into the binary; //third_party/duckdb selects the
 # one for the target platform, so only that archive is downloaded. DuckDB v2's ICU extension
 # no longer embeds ICU, so the UCaseMap symbol localization used with v1 is unnecessary.
